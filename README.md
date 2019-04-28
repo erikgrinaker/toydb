@@ -6,7 +6,7 @@ Distributed SQL database in Rust, written as a learning project.
 
 * **Storage:** Self-written engine using LSM-trees with B-trees for primary and secondary indexes (to learn both data structures). No log compaction or write-ahead log, unless necessary.
 
-* **Networking:** gRPC over TCP/IP, using third-party library.
+* **Networking:** gRPC over TCP/IP, using third-party library. No security.
 
 * **Consensus:** Self-written Raft implementation, handling all writes and reads.
 
