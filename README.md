@@ -26,3 +26,5 @@ Distributed SQL database in Rust, written as a learning project.
   * `DELETE FROM [TABLE] WHERE ...`
   * `SELECT ... FROM ... WHERE ... ORDER BY ...`
   * `EXPLAIN SELECT ...`
+
+* **Client:** Simple interactive REPL client over gRPC, without authentication.
