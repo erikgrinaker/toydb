@@ -21,6 +21,7 @@ Distributed SQL database in Rust, written as a learning project.
 * **Language:** Basic SQL support
 
   * `[CREATE|DROP] TABLE ...` and `[CREATE|DROP] INDEX ...`
+  * `BEGIN`, `COMMIT`, and `ROLLBACK`
   * `INSERT INTO [TABLE] (...) VALUES (...)`
   * `UPDATE [TABLE] SET ... WHERE ...`
   * `DELETE FROM [TABLE] WHERE ...`
