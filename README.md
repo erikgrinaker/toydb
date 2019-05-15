@@ -14,7 +14,7 @@ Distributed SQL database in Rust, written as a learning project.
 
 - [ ] **Constraints:** Singular required primary keys, unique indexes, and foreign keys.
 
-- [ ] **Transactions:** Serializable isolation with MVCC-based snapshot isolation.
+- [ ] **Transactions:** MVCC-based serializable snapshot isolation.
 
 - [ ] **Query Engine:** Simple heuristic-based planner and optimizer supporting expressions, functions, and inner joins.
 
