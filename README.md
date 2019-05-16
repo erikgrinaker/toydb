@@ -4,7 +4,7 @@ Distributed SQL database in Rust, written as a learning project.
 
 ## Project Outline
 
-- [ ] **Networking:** gRPC, no security.
+- [x] **Networking:** gRPC, no security.
 
 - [ ] **Storage:** Self-written key-value engine using LSM-trees and/or B+-trees, with secondary indexes. MessagePack for serialization. No log compaction or write-ahead log.
 

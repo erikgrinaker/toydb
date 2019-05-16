@@ -1,2 +1,4 @@
 /target
+/src/service/toydb.rs
+/src/service/toydb_grpc.rs
 **/*.rs.bk

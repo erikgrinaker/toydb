@@ -5,3 +5,12 @@ authors = ["Erik Grinaker <erik@grinaker.org>"]
 edition = "2018"
 
 [dependencies]
+grpc = "~0.6.1"
+nanoid = "~0.2.0"
+protobuf = "~2.5.0"
+
+# The following are sub-dependencies that we need for error handling
+httpbis = "~0.7.0"
+
+[build-dependencies]
+protoc-rust-grpc = "~0.6.1"
