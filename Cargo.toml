@@ -1,10 +1,12 @@
 [package]
 name = "toydb"
+description = "A distributed SQL database"
 version = "0.1.0"
 authors = ["Erik Grinaker <erik@grinaker.org>"]
 edition = "2018"
 
 [dependencies]
+clap = "~2.33.0"
 config = "~0.9.3"
 grpc = "~0.6.1"
 log = "~0.4.6"
