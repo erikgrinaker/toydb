@@ -6,8 +6,10 @@ edition = "2018"
 
 [dependencies]
 grpc = "~0.6.1"
+log = "~0.4.6"
 nanoid = "~0.2.0"
 protobuf = "~2.5.0"
+simplelog = "~0.5.3"
 
 # The following are sub-dependencies that we need for error handling
 httpbis = "~0.7.0"
