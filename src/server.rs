@@ -9,6 +9,7 @@ pub struct Server {
 
 impl Server {
     pub fn listen(&self) -> Result<(), Error> {
+        info!("Starting ToyDB node with ID {}", self.id);
         let mut server = grpc::ServerBuilder::new_plain();
         server.http.set_addr(&self.addr)?;
         server.http.set_cpu_pool_threads(self.threads);

@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate log;
 
+extern crate config;
 extern crate httpbis;
 
 mod error;

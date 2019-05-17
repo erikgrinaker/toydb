@@ -17,6 +17,12 @@ impl std::fmt::Display for Error {
     }
 }
 
+impl From<config::ConfigError> for Error {
+    fn from(err: config::ConfigError) -> Self {
+        Error::Config(err.to_string())
+    }
+}
+
 impl From<grpc::Error> for Error {
     fn from(err: grpc::Error) -> Self {
         Error::IO(err.to_string())
@@ -26,6 +32,12 @@ impl From<grpc::Error> for Error {
 impl From<httpbis::Error> for Error {
     fn from(err: httpbis::Error) -> Self {
         Error::IO(err.to_string())
+    }
+}
+
+impl From<log::ParseLevelError> for Error {
+    fn from(err: log::ParseLevelError) -> Self {
+        Error::Config(err.to_string())
     }
 }
 
