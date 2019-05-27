@@ -1,0 +1,42 @@
+version: "3.7"
+
+services:
+  toydb-a:
+    build: ..
+    command: ["toydb", "-c", "/etc/toydb/toydb-a.yml"]
+    volumes:
+    - .:/etc/toydb
+    ports:
+    - 9601:9601
+
+  toydb-b:
+    build: ..
+    command: ["toydb", "-c", "/etc/toydb/toydb-b.yml"]
+    volumes:
+    - .:/etc/toydb
+    ports:
+    - 9602:9602
+
+  toydb-c:
+    build: ..
+    command: ["toydb", "-c", "/etc/toydb/toydb-c.yml"]
+    volumes:
+    - .:/etc/toydb
+    ports:
+    - 9603:9603
+
+  toydb-d:
+    build: ..
+    command: ["toydb", "-c", "/etc/toydb/toydb-d.yml"]
+    volumes:
+    - .:/etc/toydb
+    ports:
+    - 9604:9604
+
+  toydb-e:
+    build: ..
+    command: ["toydb", "-c", "/etc/toydb/toydb-e.yml"]
+    volumes:
+    - .:/etc/toydb
+    ports:
+    - 9605:9605
