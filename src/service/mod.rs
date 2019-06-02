@@ -4,5 +4,5 @@
 mod toydb;
 mod toydb_grpc;
 
-pub use toydb::*;
-pub use toydb_grpc::*;
+pub use self::toydb::*;
+pub use self::toydb_grpc::*;
