@@ -1,13 +1,14 @@
 #![warn(clippy::all)]
 
-#[macro_use]
-extern crate log;
-
 extern crate config;
 extern crate httpbis;
+#[macro_use]
+extern crate log;
+extern crate rmp_serde as rmps;
+extern crate serde;
 
 mod error;
-mod kvstore;
+mod kv;
 mod server;
 mod service;
 
