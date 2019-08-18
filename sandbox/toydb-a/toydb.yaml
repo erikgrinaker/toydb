@@ -1,0 +1,6 @@
+id: toydb-a
+peers:
+  toydb-b: 172.20.0.102
+  toydb-c: 172.20.0.103
+  toydb-d: 172.20.0.104
+  toydb-e: 172.20.0.105

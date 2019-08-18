@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 clap = "~2.33.0"
 config = "~0.9.3"
+crossbeam-channel = "~0.3.8"
 grpc = "~0.6.1"
 log = "~0.4.6"
 protobuf = "~2.5.0"
@@ -15,10 +16,15 @@ rand = "~0.6.5"
 rmp-serde = "~0.13.7"
 serde = "~1.0.91"
 serde_derive = "~1.0.91"
-simplelog = "~0.5.3"
+simplelog = "~0.6.0"
+uuid = { version = "~0.7.4", features = ["v4"] }
 
 # The following are sub-dependencies that we need for error handling
 httpbis = "~0.7.0"
 
 [build-dependencies]
 protoc-rust-grpc = "~0.6.1"
+
+[dev-dependencies]
+assert_matches = "~1.3.0"
+tempfile = "~3.1.0"
