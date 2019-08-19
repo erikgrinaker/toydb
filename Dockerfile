@@ -1,5 +1,5 @@
 # Initial build
-FROM rust:1.34 AS build
+FROM rust:1.37 AS build
 
 RUN apt-get update \
     && apt-get install -y musl-tools protobuf-compiler \
