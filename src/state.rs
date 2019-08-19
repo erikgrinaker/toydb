@@ -21,7 +21,7 @@ pub enum Read {
 #[derive(Debug)]
 pub struct State {
     // The backing store.
-    kv: Box<kv::Store>,
+    kv: Box<dyn kv::Store>,
 }
 
 impl State {

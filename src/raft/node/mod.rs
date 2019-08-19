@@ -104,7 +104,7 @@ pub struct RoleNode<R> {
     peers: Vec<String>,
     term: u64,
     log: Log,
-    state: Box<State>,
+    state: Box<dyn State>,
     sender: Sender<Message>,
     role: R,
 }

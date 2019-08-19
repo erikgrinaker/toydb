@@ -16,7 +16,7 @@ pub struct Entry {
 #[derive(Debug)]
 pub struct Log {
     /// The underlying key-value store
-    kv: Box<kv::Store>,
+    kv: Box<dyn kv::Store>,
     /// The index of the last stored entry.
     last_index: u64,
     /// The term of the last stored entry.
@@ -83,7 +83,7 @@ impl Log {
     /// Applies the next committed entry to the state machine, if any.
     /// Returns the applied entry index and output, or None if no entry.
     #[allow(clippy::borrowed_box)] // Currently this is correct
-    pub fn apply(&mut self, state: &mut Box<State>) -> Result<Option<(u64, Vec<u8>)>, Error> {
+    pub fn apply(&mut self, state: &mut Box<dyn State>) -> Result<Option<(u64, Vec<u8>)>, Error> {
         if self.apply_index >= self.commit_index {
             return Ok(None);
         }

@@ -3,12 +3,16 @@
 
 // The allows are to avoid clippy warnings in the generated code, see:
 // https://github.com/stepancheg/rust-protobuf/pull/332
+#[allow(bare_trait_objects)]
 #[allow(renamed_and_removed_lints)]
 mod raft;
+#[allow(bare_trait_objects)]
 #[allow(renamed_and_removed_lints)]
 mod raft_grpc;
+#[allow(bare_trait_objects)]
 #[allow(renamed_and_removed_lints)]
 mod toydb;
+#[allow(bare_trait_objects)]
 #[allow(renamed_and_removed_lints)]
 mod toydb_grpc;
 

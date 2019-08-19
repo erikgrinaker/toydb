@@ -24,18 +24,18 @@ pub mod tests {
     use super::*;
 
     pub struct Suite {
-        factory: Box<Fn() -> Box<Store>>,
+        factory: Box<dyn Fn() -> Box<dyn Store>>,
     }
 
     impl Suite {
         pub fn new<F>(setup: F) -> Self
         where
-            F: 'static + Fn() -> Box<Store>,
+            F: 'static + Fn() -> Box<dyn Store>,
         {
             Self { factory: Box::new(setup) }
         }
 
-        fn setup(&self) -> Box<Store> {
+        fn setup(&self) -> Box<dyn Store> {
             (&self.factory)()
         }
 

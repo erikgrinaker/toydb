@@ -144,7 +144,7 @@ pub mod tests {
             Self { commands: Arc::new(Mutex::new(Vec::new())) }
         }
 
-        pub fn boxed(&self) -> Box<State> {
+        pub fn boxed(&self) -> Box<dyn State> {
             Box::new(self.clone())
         }
 
