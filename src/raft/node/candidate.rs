@@ -85,6 +85,7 @@ impl RoleNode<Candidate> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node, Error> {
+        while let Some(_) = self.log.apply(&mut self.state)? {}
         // If the election times out, start a new one for the next term.
         self.role.election_ticks += 1;
         if self.role.election_ticks >= self.role.election_timeout {
