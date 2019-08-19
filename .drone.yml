@@ -1,0 +1,42 @@
+kind: pipeline
+name: default
+
+clone:
+  depth: 1
+
+env: &env
+  CARGO_HOME: ./.cargo
+
+steps:
+- name: build
+  image: rust:1.37
+  pull: true
+  environment: *env
+  commands:
+  - apt-get update && apt-get install -y protobuf-compiler
+  - cargo build
+
+- name: test
+  image: rust:1.37
+  environment: *env
+  commands:
+  - cargo test
+
+- name: lint
+  image: rust:1.37
+  environment: *env
+  commands:
+  - rustup component add clippy
+  - cargo clippy -- -D warnings
+
+- name: notify
+  image: drillster/drone-email
+  settings:
+    host: {from_secret: smtp_hostname}
+    username: {from_secret: smtp_username}
+    password: {from_secret: smtp_password}
+    from: Drone CI <drone@grinaker.org>
+  when:
+    status:
+    - changed
+    - failure

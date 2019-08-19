@@ -1,5 +1,7 @@
 # toyDB
 
+[![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
+
 Distributed SQL database in Rust, written as a learning project.
 
 The primary goal is to build a minimally functional yet correct distributed database. Performance, security, reliability, and convenience are non-goals.
