@@ -1,5 +1,5 @@
-use crate::service;
 use crate::raft::Raft;
+use crate::service;
 use crate::state;
 
 pub struct ToyDB {
@@ -8,6 +8,15 @@ pub struct ToyDB {
 }
 
 impl service::ToyDB for ToyDB {
+    fn echo(
+        &self,
+        _: grpc::RequestOptions,
+        req: service::EchoRequest,
+    ) -> grpc::SingleResponse<service::EchoResponse> {
+        let value = req.value.clone();
+        grpc::SingleResponse::completed(service::EchoResponse { value, ..Default::default() })
+    }
+
     fn get(
         &self,
         _: grpc::RequestOptions,

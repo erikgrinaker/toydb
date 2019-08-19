@@ -5,6 +5,9 @@ service ToyDB {
   // Status asks the server for its status.
   rpc Status(StatusRequest) returns (StatusResponse) {};
 
+  // Echo is a simple echo service.
+  rpc Echo(EchoRequest) returns (EchoResponse) {};
+
   // Get is a temporary key-value command.
   rpc Get(GetRequest) returns (GetResponse) {};
 
@@ -19,6 +22,14 @@ message StatusResponse {
   string version = 2;
   int64 time = 3;
 };
+
+message EchoRequest {
+  string value = 1;
+};
+
+message EchoResponse {
+  string value = 1;
+}
 
 message GetRequest {
   string key = 1;

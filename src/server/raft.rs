@@ -24,6 +24,7 @@ impl Transport for GRPC {
     fn send(&self, msg: Message) -> Result<(), Error> {
         if let Some(to) = &msg.to {
             if let Some(client) = self.peers.get(to) {
+                // FIXME Needs to check the response.
                 client.step(grpc::RequestOptions::new(), message_to_protobuf(msg));
                 Ok(())
             } else {
@@ -87,9 +88,10 @@ fn message_from_protobuf(pb: service::Message) -> Result<Message, Error> {
             Some(service::Message_oneof_event::heartbeat(e)) => {
                 Event::Heartbeat { commit_index: e.commit_index, commit_term: e.commit_term }
             }
-            Some(service::Message_oneof_event::confirm_leader(e)) => {
-                Event::ConfirmLeader { commit_index: e.commit_index, has_committed: e.has_committed }
-            }
+            Some(service::Message_oneof_event::confirm_leader(e)) => Event::ConfirmLeader {
+                commit_index: e.commit_index,
+                has_committed: e.has_committed,
+            },
             Some(service::Message_oneof_event::solicit_vote(e)) => {
                 Event::SolicitVote { last_index: e.last_index, last_term: e.last_term }
             }

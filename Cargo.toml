@@ -4,6 +4,7 @@ description = "A distributed SQL database"
 version = "0.1.0"
 authors = ["Erik Grinaker <erik@grinaker.org>"]
 edition = "2018"
+default-run = "toydb"
 
 [dependencies]
 clap = "~2.33.0"
@@ -14,6 +15,7 @@ log = "~0.4.6"
 protobuf = "~2.5.0"
 rand = "~0.6.5"
 rmp-serde = "~0.13.7"
+rustyline = "~5.0.0"
 serde = "~1.0.91"
 serde_derive = "~1.0.91"
 simplelog = "~0.6.0"
