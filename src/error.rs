@@ -5,6 +5,7 @@ pub enum Error {
     IO(String),
     Internal(String),
     Network(String),
+    Parse(String),
     Value(String),
 }
 
@@ -21,6 +22,7 @@ impl std::fmt::Display for Error {
             | Error::IO(s)
             | Error::Internal(s)
             | Error::Network(s)
+            | Error::Parse(s)
             | Error::Value(s) => write!(f, "{}", s),
             Error::RaftBaseNotFound { index, term } => {
                 write!(f, "Base entry at index {} with term {} not found", index, term)
