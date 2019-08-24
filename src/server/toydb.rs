@@ -10,15 +10,6 @@ pub struct ToyDB {
 }
 
 impl service::ToyDB for ToyDB {
-    fn echo(
-        &self,
-        _: grpc::RequestOptions,
-        req: service::EchoRequest,
-    ) -> grpc::SingleResponse<service::EchoResponse> {
-        let value = req.value.clone();
-        grpc::SingleResponse::completed(service::EchoResponse { value, ..Default::default() })
-    }
-
     fn query(
         &self,
         _: grpc::RequestOptions,

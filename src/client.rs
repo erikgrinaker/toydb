@@ -21,18 +21,6 @@ impl Client {
         })
     }
 
-    /// Runs an echo request
-    pub fn echo(&self, value: &str) -> Result<String, Error> {
-        let (_, resp, _) = self
-            .client
-            .echo(
-                grpc::RequestOptions::new(),
-                service::EchoRequest { value: value.to_owned(), ..Default::default() },
-            )
-            .wait()?;
-        Ok(resp.value)
-    }
-
     /// Runs a query
     pub fn query(&self, query: &str) -> Result<ResultSet, Error> {
         let (metadata, iter) = self
