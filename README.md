@@ -28,7 +28,7 @@ $ grpcurl -plaintext -proto protobuf/toydb.proto localhost:9605 ToyDB/Status
 
 - [ ] **Storage:** Self-written key-value engine using B+-trees (and possibly LSM-trees), with secondary indexes. MessagePack for serialization. No log compaction or write-ahead log.
 
-- [ ] **Data Types:** Support for nulls, booleans, signed 64-bit doubles, and short UTF-8 strings.
+- [x] **Data Types:** Support for nulls, booleans, 64-bit integers, 64-bit floats, and UTF-8 strings up to 1 KB.
 
 - [ ] **Constraints:** Compulsory singluar primary keys, unique indexes, and foreign keys.
 
@@ -64,7 +64,7 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 
 * **Single node processing:** all operations (both reads and writes) are processed by a single Raft thread on a single node (the master), and the system consists of a single Raft cluster, preventing horizontal scalability and efficient resource utilization.
 
-* **Client call retries:** there is currently no retries of client-submitted operations, and if a node processing or proxying an operations changes role then the call is dropped.
+* **Client call retries:** there is currently no retries of client-submitted operations, and if a node processing or proxying an operation changes role then the call is dropped.
 
 * **State machine errors:** errors during state machine mutations currently crash the node - it may be beneficial to support user errors which simply skip the erroring log entry.
 

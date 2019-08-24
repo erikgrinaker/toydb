@@ -41,8 +41,12 @@ fn main() -> Result<(), toydb::Error> {
             Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => break,
             Err(err) => return Err(err.into()),
         };
-        let result = client.echo(&query)?;
-        println!("{}", result);
+        let mut resultset = client.query(&query)?;
+        println!("{}", resultset.columns().join("|"));
+        while let Some(Ok(row)) = resultset.next() {
+            let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
+            println!("{}", formatted.join("|"));
+        }
     }
     Ok(())
 }

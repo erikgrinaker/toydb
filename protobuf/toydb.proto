@@ -8,6 +8,9 @@ service ToyDB {
   // Echo is a simple echo service.
   rpc Echo(EchoRequest) returns (EchoResponse) {};
 
+  // Query runs an SQL query.
+  rpc Query(QueryRequest) returns (stream Row) {};
+
   // Get is a temporary key-value command.
   rpc Get(GetRequest) returns (GetResponse) {};
 
@@ -29,6 +32,23 @@ message EchoRequest {
 
 message EchoResponse {
   string value = 1;
+}
+
+message QueryRequest {
+  string query = 1;
+};
+
+message Row {
+  repeated Field field = 1;
+};
+
+message Field {
+  oneof value {
+    bool boolean = 1;
+    int64 integer = 2;
+    double float = 3;
+    string string = 4;
+  };
 }
 
 message GetRequest {
