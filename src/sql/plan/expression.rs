@@ -2,6 +2,7 @@ use super::super::types::Value;
 use crate::Error;
 
 /// An expression
+#[derive(Debug)]
 pub enum Expression {
     Constant(Value),
     Add(Box<Expression>, Box<Expression>),

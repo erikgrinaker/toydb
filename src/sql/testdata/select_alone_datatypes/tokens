@@ -1,0 +1,28 @@
+[
+    Keyword(
+        Select,
+    ),
+    Keyword(
+        Null,
+    ),
+    Comma,
+    Keyword(
+        True,
+    ),
+    Comma,
+    Keyword(
+        False,
+    ),
+    Comma,
+    Number(
+        "1",
+    ),
+    Comma,
+    Number(
+        "3.14",
+    ),
+    Comma,
+    String(
+        "Hi! 👋",
+    ),
+]

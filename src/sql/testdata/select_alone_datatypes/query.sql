@@ -1,0 +1,1 @@
+SELECT NULL, TRUE, FALSE, 1, 3.14, 'Hi! 👋'

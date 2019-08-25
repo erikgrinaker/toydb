@@ -62,14 +62,20 @@ impl From<Keyword> for Token {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Keyword {
     As,
+    False,
+    Null,
     Select,
+    True,
 }
 
 impl Keyword {
     fn from_str(ident: &str) -> Option<Self> {
         Some(match ident.to_uppercase().as_ref() {
             "AS" => Self::As,
+            "FALSE" => Self::False,
+            "NULL" => Self::Null,
             "SELECT" => Self::Select,
+            "TRUE" => Self::True,
             _ => return None,
         })
     }
@@ -77,7 +83,10 @@ impl Keyword {
     fn to_str(&self) -> &str {
         match self {
             Self::As => "AS",
+            Self::False => "FALSE",
+            Self::Null => "NULL",
             Self::Select => "SELECT",
+            Self::True => "TRUE",
         }
     }
 }
@@ -226,120 +235,5 @@ impl<'a> Lexer<'a> {
             ',' => Some(Token::Comma),
             _ => None,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn assert_scan(input: &str, expect: Vec<Token>) {
-        let actual: Vec<Token> = Lexer::new(input).map(|r| r.unwrap()).collect();
-        assert_eq!(expect, actual);
-    }
-
-    #[test]
-    fn literal_string() {
-        assert_scan(
-            r#"A 'literal string with ''single'' and "double" quotes inside 😀'."#,
-            vec![
-                Token::Ident("A".into()),
-                Token::String(
-                    r#"literal string with 'single' and "double" quotes inside 😀"#.into(),
-                ),
-                Token::Period,
-            ],
-        );
-    }
-
-    #[test]
-    fn literal_number() {
-        assert_scan(
-            "0 1 3.14 293. -2.718 3.14e3 2.718E-2",
-            vec![
-                Token::Number("0".into()),
-                Token::Number("1".into()),
-                Token::Number("3.14".into()),
-                Token::Number("293.".into()),
-                Token::Minus,
-                Token::Number("2.718".into()),
-                Token::Number("3.14e3".into()),
-                Token::Number("2.718E-2".into()),
-            ],
-        )
-    }
-
-    #[test]
-    fn select() {
-        use super::Keyword;
-        use Token::*;
-        assert_scan(
-            "
-            SELECT artist.name, album.name, EXTRACT(YEAR FROM NOW()) - album.release_year AS age
-            FROM artist INNER JOIN album ON album.artist_id = artist.id
-            WHERE album.genre != 'country' AND album.release_year >= 1980
-            ORDER BY artist.name ASC, age DESC",
-            vec![
-                Keyword::Select.into(),
-                Ident("artist".into()),
-                Period,
-                Ident("name".into()),
-                Comma,
-                Ident("album".into()),
-                Period,
-                Ident("name".into()),
-                Comma,
-                Ident("EXTRACT".into()),
-                OpenParen,
-                Ident("YEAR".into()),
-                Ident("FROM".into()),
-                Ident("NOW".into()),
-                OpenParen,
-                CloseParen,
-                CloseParen,
-                Minus,
-                Ident("album".into()),
-                Period,
-                Ident("release_year".into()),
-                Keyword::As.into(),
-                Ident("age".into()),
-                Ident("FROM".into()),
-                Ident("artist".into()),
-                Ident("INNER".into()),
-                Ident("JOIN".into()),
-                Ident("album".into()),
-                Ident("ON".into()),
-                Ident("album".into()),
-                Period,
-                Ident("artist_id".into()),
-                Equals,
-                Ident("artist".into()),
-                Period,
-                Ident("id".into()),
-                Ident("WHERE".into()),
-                Ident("album".into()),
-                Period,
-                Ident("genre".into()),
-                Exclamation,
-                Equals,
-                String("country".into()),
-                Ident("AND".into()),
-                Ident("album".into()),
-                Period,
-                Ident("release_year".into()),
-                GreaterThan,
-                Equals,
-                Number("1980".into()),
-                Ident("ORDER".into()),
-                Ident("BY".into()),
-                Ident("artist".into()),
-                Period,
-                Ident("name".into()),
-                Ident("ASC".into()),
-                Comma,
-                Ident("age".into()),
-                Ident("DESC".into()),
-            ],
-        )
     }
 }

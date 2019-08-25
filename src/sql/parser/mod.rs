@@ -1,5 +1,5 @@
 pub mod ast;
-mod lexer;
+pub mod lexer;
 
 use crate::Error;
 use lexer::{Keyword, Lexer, Token};
@@ -95,15 +95,24 @@ impl<'a> Parser<'a> {
         let mut clause = ast::SelectClause { expressions: Vec::new(), labels: Vec::new() };
         loop {
             clause.expressions.push(self.parse_expression(0)?);
-            clause.labels.push(if self.next_if_token(Keyword::As.into()).is_some() {
-                match self.next()? {
-                    Token::Ident(label) => Some(label),
-                    token => {
-                        return Err(Error::Parse(format!("Expected label, found token {}", token)))
+            clause.labels.push(match self.peek()? {
+                Some(Token::Keyword(Keyword::As)) => {
+                    self.next()?;
+                    match self.next()? {
+                        Token::Ident(ident) => Some(ident),
+                        token => {
+                            return Err(Error::Parse(format!(
+                                "Expected identifier, found {}",
+                                token
+                            )))
+                        }
                     }
                 }
-            } else {
-                None
+                Some(Token::Ident(ident)) => {
+                    self.next()?;
+                    Some(ident)
+                }
+                _ => None,
             });
             if self.next_if_token(Token::Comma).is_none() {
                 break;
@@ -131,23 +140,20 @@ impl<'a> Parser<'a> {
 
     /// Parses an expression atom
     fn parse_expression_atom(&mut self) -> Result<ast::Expression, Error> {
-        match self.next()? {
+        Ok(match self.next()? {
             Token::Number(n) => {
                 if n.chars().all(|c| c.is_digit(10)) {
-                    Ok(ast::Literal::Integer(n.parse()?).into())
+                    ast::Literal::Integer(n.parse()?).into()
                 } else {
-                    Ok(ast::Literal::Float(n.parse()?).into())
+                    ast::Literal::Float(n.parse()?).into()
                 }
             }
-            Token::String(s) => Ok(ast::Literal::String(s).into()),
-            Token::Ident(i) => match i.to_lowercase().as_ref() {
-                "true" => Ok(ast::Literal::Boolean(true).into()),
-                "false" => Ok(ast::Literal::Boolean(false).into()),
-                "null" => Ok(ast::Literal::Null.into()),
-                _ => panic!("Not implemented"),
-            },
-            t => Err(Error::Parse(format!("Expected expression atom, found {}", t))),
-        }
+            Token::String(s) => ast::Literal::String(s).into(),
+            Token::Keyword(Keyword::False) => ast::Literal::Boolean(false).into(),
+            Token::Keyword(Keyword::Null) => ast::Literal::Null.into(),
+            Token::Keyword(Keyword::True) => ast::Literal::Boolean(true).into(),
+            t => return Err(Error::Parse(format!("Expected expression atom, found {}", t))),
+        })
     }
 }
 

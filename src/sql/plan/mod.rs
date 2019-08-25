@@ -10,6 +10,7 @@ use crate::Error;
 use planner::Planner;
 
 /// A plan
+#[derive(Debug)]
 pub struct Plan {
     /// The plan column names
     pub columns: Vec<String>,

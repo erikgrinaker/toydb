@@ -3,6 +3,7 @@ use super::expression::Expression;
 use crate::Error;
 
 /// A plan node
+#[derive(Debug)]
 pub enum Node {
     Projection { labels: Vec<String>, source: Box<Node>, expressions: Vec<Expression> },
     Nothing { done: bool },

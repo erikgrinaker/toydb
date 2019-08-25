@@ -1,0 +1,1 @@
+SELECT 'Literal with ''single'' and "double" quotes'

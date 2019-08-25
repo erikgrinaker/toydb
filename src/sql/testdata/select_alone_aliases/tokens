@@ -1,0 +1,25 @@
+[
+    Keyword(
+        Select,
+    ),
+    Number(
+        "1",
+    ),
+    Comma,
+    Number(
+        "2",
+    ),
+    Ident(
+        "b",
+    ),
+    Comma,
+    Number(
+        "3",
+    ),
+    Keyword(
+        As,
+    ),
+    Ident(
+        "c",
+    ),
+]

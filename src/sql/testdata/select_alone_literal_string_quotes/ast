@@ -1,0 +1,14 @@
+Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                String(
+                    "Literal with \'single\' and \"double\" quotes",
+                ),
+            ),
+        ],
+        labels: [
+            None,
+        ],
+    },
+}

@@ -1,0 +1,53 @@
+Plan {
+    columns: [
+        "?",
+        "?",
+        "?",
+        "?",
+        "?",
+        "?",
+    ],
+    root: Projection {
+        labels: [
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+        ],
+        source: Nothing {
+            done: false,
+        },
+        expressions: [
+            Constant(
+                Null,
+            ),
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Float(
+                    3.14,
+                ),
+            ),
+            Constant(
+                String(
+                    "Hi! 👋",
+                ),
+            ),
+        ],
+    },
+}

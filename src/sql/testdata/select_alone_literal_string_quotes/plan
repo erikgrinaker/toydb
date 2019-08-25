@@ -1,0 +1,20 @@
+Plan {
+    columns: [
+        "?",
+    ],
+    root: Projection {
+        labels: [
+            "?",
+        ],
+        source: Nothing {
+            done: false,
+        },
+        expressions: [
+            Constant(
+                String(
+                    "Literal with \'single\' and \"double\" quotes",
+                ),
+            ),
+        ],
+    },
+}

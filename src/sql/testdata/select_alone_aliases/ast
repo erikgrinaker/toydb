@@ -1,0 +1,30 @@
+Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Integer(
+                    2,
+                ),
+            ),
+            Literal(
+                Integer(
+                    3,
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            Some(
+                "b",
+            ),
+            Some(
+                "c",
+            ),
+        ],
+    },
+}

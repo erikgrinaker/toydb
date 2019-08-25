@@ -1,5 +1,5 @@
 /// Statements
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     /// A SELECT statement
     Select {
@@ -9,7 +9,7 @@ pub enum Statement {
 }
 
 /// A SELECT clause
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SelectClause {
     /// The expressions to select
     pub expressions: Vec<Expression>,
@@ -18,7 +18,7 @@ pub struct SelectClause {
 }
 
 /// Expressions
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     Literal(Literal),
     Operation(Operation),
@@ -37,7 +37,7 @@ impl From<Operation> for Expression {
 }
 
 /// Literals
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Literal {
     Null,
     Boolean(bool),
@@ -47,7 +47,7 @@ pub enum Literal {
 }
 
 /// Operations (done by operators)
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Operation {
     Add(Box<Expression>, Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
