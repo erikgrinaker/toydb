@@ -53,7 +53,13 @@ impl ResultSet {
         metadata: grpc::Metadata,
         rows: Box<dyn std::iter::Iterator<Item = Result<service::Row, grpc::Error>>>,
     ) -> Result<Self, Error> {
-        Ok(Self { columns: Self::deserialize(metadata.get("columns").unwrap().to_vec())?, rows })
+        let columns = Self::deserialize(
+            metadata
+                .get("columns")
+                .map(|c| c.to_vec())
+                .ok_or_else(|| Error::Network("Columns not found in gRPC result".into()))?,
+        )?;
+        Ok(Self { columns, rows })
     }
 
     pub fn columns(&self) -> Vec<String> {

@@ -1,6 +1,7 @@
 use crate::raft::Raft;
 use crate::service;
 use crate::sql::types::{Row, Value};
+use crate::sql::{Parser, Plan};
 use crate::state;
 use crate::Error;
 
@@ -13,21 +14,19 @@ impl service::ToyDB for ToyDB {
     fn query(
         &self,
         _: grpc::RequestOptions,
-        _req: service::QueryRequest,
+        req: service::QueryRequest,
     ) -> grpc::StreamingResponse<service::Row> {
+        let plan = Plan::build(Parser::new(&req.query).parse().unwrap()).unwrap();
         let mut metadata = grpc::Metadata::new();
         metadata.add(
             grpc::MetadataKey::from("columns"),
-            Self::serialize(vec!["null", "boolean", "integer", "float", "string"]).unwrap().into(),
+            Self::serialize(&plan.columns).unwrap().into(),
         );
-        let rows = vec![Self::row_to_protobuf(vec![
-            Value::Null,
-            Value::Boolean(true),
-            Value::Integer(7),
-            Value::Float(1.23),
-            Value::String("Hi! 👋".into()),
-        ])];
-        grpc::StreamingResponse::iter_with_metadata(metadata, rows.into_iter())
+        // FIXME This needs to handle errors
+        grpc::StreamingResponse::iter_with_metadata(
+            metadata,
+            plan.map(|row| Self::row_to_protobuf(row.unwrap())),
+        )
     }
 
     fn get(

@@ -5,41 +5,23 @@ use std::str::Chars;
 // A lexer token
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    /// A number literal
     Number(String),
-    /// A string literal
     String(String),
-    /// A textual identifier
     Ident(String),
-    /// The period symbol .
     Period,
-    /// The equals symbol =
     Equals,
-    /// The greater-than symbol >
     GreaterThan,
-    /// The less-than symbol <
     LessThan,
-    /// The addition symbol +
     Plus,
-    /// The subtraction symbol -
     Minus,
-    /// The multiplication symbol *
     Asterisk,
-    /// The division symbol /
     Slash,
-    /// The exponentiation symbol ^
     Caret,
-    /// The modulo symbol %
     Percent,
-    /// The factorial or not symbol !
     Exclamation,
-    /// The query parameter marker ?
     Question,
-    /// An opening parenthesis
     OpenParen,
-    /// A closing parenthesis
     CloseParen,
-    /// An expression separator ,
     Comma,
 }
 
