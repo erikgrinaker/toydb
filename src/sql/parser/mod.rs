@@ -2,7 +2,7 @@ pub mod ast;
 mod lexer;
 
 use crate::Error;
-use lexer::{Lexer, Token};
+use lexer::{Keyword, Lexer, Token};
 
 /// An SQL parser
 pub struct Parser<'a> {
@@ -50,14 +50,6 @@ impl<'a> Parser<'a> {
         self.next().ok()
     }
 
-    /// Grabs the next lexer token if it is a given keyword
-    fn next_if_keyword(&mut self, keyword: &str) -> Option<Token> {
-        self.next_if(|t| match t {
-            Token::Ident(ref ident) if ident.to_lowercase() == keyword.to_lowercase() => true,
-            _ => false,
-        })
-    }
-
     /// Grabs the next operator if it satisfies the type and precedence
     fn next_if_operator<O: Operator>(&mut self, min_prec: u8) -> Option<O> {
         let operator = self
@@ -84,10 +76,7 @@ impl<'a> Parser<'a> {
     /// Parses an SQL statement
     fn parse_statement(&mut self) -> Result<ast::Statement, Error> {
         match self.peek()? {
-            Some(Token::Ident(ref ident)) => match ident.to_lowercase().as_ref() {
-                "select" => self.parse_statement_select(),
-                ident => Err(Error::Parse(format!("Unexpected statement start {}", ident))),
-            },
+            Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
             Some(token) => Err(Error::Parse(format!("Unexpected token {}", token))),
             None => Err(Error::Parse("Unexpected end of input".into())),
         }
@@ -100,13 +89,13 @@ impl<'a> Parser<'a> {
 
     /// Parses a select clause
     fn parse_clause_select(&mut self) -> Result<Option<ast::SelectClause>, Error> {
-        if self.next_if_keyword("select").is_none() {
+        if self.next_if_token(Keyword::Select.into()).is_none() {
             return Ok(None);
         }
         let mut clause = ast::SelectClause { expressions: Vec::new(), labels: Vec::new() };
         loop {
             clause.expressions.push(self.parse_expression(0)?);
-            clause.labels.push(if self.next_if_keyword("as").is_some() {
+            clause.labels.push(if self.next_if_token(Keyword::As.into()).is_some() {
                 match self.next()? {
                     Token::Ident(label) => Some(label),
                     token => {
