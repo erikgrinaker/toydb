@@ -1,6 +1,8 @@
 use super::super::types::Value;
 use crate::Error;
 
+const FLOAT_ERROR = 1e-10;
+
 /// An expression
 #[derive(Debug)]
 pub enum Expression {
@@ -8,7 +10,10 @@ pub enum Expression {
     Add(Box<Expression>, Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
     Exponentiate(Box<Expression>, Box<Expression>),
+    Equals(Box<Expression>, Box<Expression>),
     Factorial(Box<Expression>),
+    GreaterThan(Box<Expression>, Box<Expression>),
+    LesserThan(Box<Expression>, Box<Expression>),
     Modulo(Box<Expression>, Box<Expression>),
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),
@@ -36,6 +41,15 @@ impl Expression {
                     return Err(Error::Value(format!("Can't divide {} and {}", lhs, rhs)))
                 }
             },
+            Expression::Equals(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs == rhs),
+                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 == rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs == rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs == rhs),
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
             Expression::Exponentiate(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 // FIXME Handle overflow
                 (Integer(lhs), Integer(rhs)) => Integer(lhs.pow(rhs as u32)),
@@ -49,6 +63,24 @@ impl Expression {
             Expression::Factorial(v) => match v.evaluate()? {
                 Integer(v) => Integer((1..=v).fold(1, |a, b| a * b as i64)),
                 v => return Err(Error::Value(format!("Can't take factorial of {}", v))),
+            },
+            Expression::GreaterThan(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs > rhs),
+                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 > rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs > rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs > rhs),
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
+            Expression::LesserThan(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs < rhs),
+                (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) < rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs < rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs < rhs),
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
             },
             Expression::Modulo(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 // The % operator in Rust is remainder, not modulo, so we have to do a bit of

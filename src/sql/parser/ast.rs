@@ -51,8 +51,11 @@ pub enum Literal {
 pub enum Operation {
     Add(Box<Expression>, Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
+    Equals(Box<Expression>, Box<Expression>),
     Exponentiate(Box<Expression>, Box<Expression>),
     Factorial(Box<Expression>),
+    GreaterThan(Box<Expression>, Box<Expression>),
+    LesserThan(Box<Expression>, Box<Expression>),
     Modulo(Box<Expression>, Box<Expression>),
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),

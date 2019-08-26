@@ -199,14 +199,17 @@ impl Operator for PrefixOperator {
     }
 
     fn prec(&self) -> u8 {
-        5
+        7
     }
 }
 
 enum InfixOperator {
     Add,
     Divide,
+    Equals,
     Exponentiate,
+    GreatherThan,
+    LesserThan,
     Modulo,
     Multiply,
     Subtract,
@@ -218,7 +221,10 @@ impl InfixOperator {
         match self {
             Self::Add => ast::Operation::Add(lhs, rhs),
             Self::Divide => ast::Operation::Divide(lhs, rhs),
+            Self::Equals => ast::Operation::Equals(lhs, rhs),
             Self::Exponentiate => ast::Operation::Exponentiate(lhs, rhs),
+            Self::GreatherThan => ast::Operation::GreaterThan(lhs, rhs),
+            Self::LesserThan => ast::Operation::LesserThan(lhs, rhs),
             Self::Modulo => ast::Operation::Modulo(lhs, rhs),
             Self::Multiply => ast::Operation::Multiply(lhs, rhs),
             Self::Subtract => ast::Operation::Subtract(lhs, rhs),
@@ -249,9 +255,11 @@ impl Operator for InfixOperator {
 
     fn prec(&self) -> u8 {
         match self {
-            Self::Add | Self::Subtract => 1,
-            Self::Multiply | Self::Divide | Self::Modulo => 2,
-            Self::Exponentiate => 3,
+            Self::Equals => 1,
+            Self::GreatherThan | Self::LesserThan => 2,
+            Self::Add | Self::Subtract => 3,
+            Self::Multiply | Self::Divide | Self::Modulo => 4,
+            Self::Exponentiate => 5,
         }
     }
 }
@@ -282,6 +290,6 @@ impl Operator for PostfixOperator {
     }
 
     fn prec(&self) -> u8 {
-        4
+        6
     }
 }
