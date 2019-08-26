@@ -174,6 +174,7 @@ const ASSOC_RIGHT: u8 = 0;
 enum PrefixOperator {
     Plus,
     Minus,
+    Not,
 }
 
 impl PrefixOperator {
@@ -181,6 +182,7 @@ impl PrefixOperator {
         match self {
             Self::Plus => rhs,
             Self::Minus => ast::Operation::Negate(Box::new(rhs)).into(),
+            Self::Not => ast::Operation::Not(Box::new(rhs)).into(),
         }
     }
 }
@@ -188,7 +190,9 @@ impl PrefixOperator {
 impl Operator for PrefixOperator {
     fn from(token: &Token) -> Option<Self> {
         match token {
+            Token::Exclamation => Some(Self::Not),
             Token::Minus => Some(Self::Minus),
+            Token::Keyword(Keyword::Not) => Some(Self::Not),
             Token::Plus => Some(Self::Plus),
             _ => None,
         }
@@ -199,12 +203,13 @@ impl Operator for PrefixOperator {
     }
 
     fn prec(&self) -> u8 {
-        7
+        9
     }
 }
 
 enum InfixOperator {
     Add,
+    And,
     Divide,
     Equals,
     Exponentiate,
@@ -212,6 +217,7 @@ enum InfixOperator {
     LesserThan,
     Modulo,
     Multiply,
+    Or,
     Subtract,
 }
 
@@ -220,6 +226,7 @@ impl InfixOperator {
         let (lhs, rhs) = (Box::new(lhs), Box::new(rhs));
         match self {
             Self::Add => ast::Operation::Add(lhs, rhs),
+            Self::And => ast::Operation::And(lhs, rhs),
             Self::Divide => ast::Operation::Divide(lhs, rhs),
             Self::Equals => ast::Operation::Equals(lhs, rhs),
             Self::Exponentiate => ast::Operation::Exponentiate(lhs, rhs),
@@ -227,6 +234,7 @@ impl InfixOperator {
             Self::LesserThan => ast::Operation::LesserThan(lhs, rhs),
             Self::Modulo => ast::Operation::Modulo(lhs, rhs),
             Self::Multiply => ast::Operation::Multiply(lhs, rhs),
+            Self::Or => ast::Operation::Or(lhs, rhs),
             Self::Subtract => ast::Operation::Subtract(lhs, rhs),
         }
         .into()
@@ -235,15 +243,17 @@ impl InfixOperator {
 
 impl Operator for InfixOperator {
     fn from(token: &Token) -> Option<Self> {
-        match token {
-            Token::Plus => Some(Self::Add),
-            Token::Minus => Some(Self::Subtract),
-            Token::Asterisk => Some(Self::Multiply),
-            Token::Slash => Some(Self::Divide),
-            Token::Percent => Some(Self::Modulo),
-            Token::Caret => Some(Self::Exponentiate),
-            _ => None,
-        }
+        Some(match token {
+            Token::Plus => Self::Add,
+            Token::Minus => Self::Subtract,
+            Token::Asterisk => Self::Multiply,
+            Token::Slash => Self::Divide,
+            Token::Percent => Self::Modulo,
+            Token::Caret => Self::Exponentiate,
+            Token::Keyword(Keyword::And) => Self::And,
+            Token::Keyword(Keyword::Or) => Self::Or,
+            _ => return None,
+        })
     }
 
     fn assoc(&self) -> u8 {
@@ -255,11 +265,13 @@ impl Operator for InfixOperator {
 
     fn prec(&self) -> u8 {
         match self {
-            Self::Equals => 1,
-            Self::GreatherThan | Self::LesserThan => 2,
-            Self::Add | Self::Subtract => 3,
-            Self::Multiply | Self::Divide | Self::Modulo => 4,
-            Self::Exponentiate => 5,
+            Self::Or => 1,
+            Self::And => 2,
+            Self::Equals => 3,
+            Self::GreatherThan | Self::LesserThan => 4,
+            Self::Add | Self::Subtract => 5,
+            Self::Multiply | Self::Divide | Self::Modulo => 6,
+            Self::Exponentiate => 7,
         }
     }
 }
@@ -290,6 +302,6 @@ impl Operator for PostfixOperator {
     }
 
     fn prec(&self) -> u8 {
-        6
+        8
     }
 }

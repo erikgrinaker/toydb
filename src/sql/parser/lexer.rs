@@ -61,9 +61,12 @@ impl From<Keyword> for Token {
 /// Lexer keywords
 #[derive(Clone, Debug, PartialEq)]
 pub enum Keyword {
+    And,
     As,
     False,
+    Not,
     Null,
+    Or,
     Select,
     True,
 }
@@ -72,8 +75,11 @@ impl Keyword {
     fn from_str(ident: &str) -> Option<Self> {
         Some(match ident.to_uppercase().as_ref() {
             "AS" => Self::As,
+            "AND" => Self::And,
             "FALSE" => Self::False,
+            "NOT" => Self::Not,
             "NULL" => Self::Null,
+            "OR" => Self::Or,
             "SELECT" => Self::Select,
             "TRUE" => Self::True,
             _ => return None,
@@ -83,8 +89,11 @@ impl Keyword {
     fn to_str(&self) -> &str {
         match self {
             Self::As => "AS",
+            Self::And => "AND",
             Self::False => "FALSE",
+            Self::Not => "NOT",
             Self::Null => "NULL",
+            Self::Or => "OR",
             Self::Select => "SELECT",
             Self::True => "TRUE",
         }

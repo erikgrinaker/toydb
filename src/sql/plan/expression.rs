@@ -1,13 +1,12 @@
 use super::super::types::Value;
 use crate::Error;
 
-const FLOAT_ERROR = 1e-10;
-
 /// An expression
 #[derive(Debug)]
 pub enum Expression {
     Constant(Value),
     Add(Box<Expression>, Box<Expression>),
+    And(Box<Expression>, Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
     Exponentiate(Box<Expression>, Box<Expression>),
     Equals(Box<Expression>, Box<Expression>),
@@ -17,6 +16,8 @@ pub enum Expression {
     Modulo(Box<Expression>, Box<Expression>),
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),
+    Not(Box<Expression>),
+    Or(Box<Expression>, Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
 }
 
@@ -32,6 +33,10 @@ impl Expression {
                 (Float(lhs), Float(rhs)) => Float(lhs + rhs),
                 (lhs, rhs) => return Err(Error::Value(format!("Can't add {} and {}", lhs, rhs))),
             },
+            Expression::And(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs && rhs),
+                (lhs, rhs) => return Err(Error::Value(format!("Can't and {} and {}", lhs, rhs))),
+            },
             Expression::Divide(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 / rhs),
@@ -41,6 +46,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't divide {} and {}", lhs, rhs)))
                 }
             },
+            #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
             Expression::Equals(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 == rhs),
@@ -60,9 +66,9 @@ impl Expression {
                     return Err(Error::Value(format!("Can't exponentiate {} and {}", lhs, rhs)))
                 }
             },
-            Expression::Factorial(v) => match v.evaluate()? {
-                Integer(v) => Integer((1..=v).fold(1, |a, b| a * b as i64)),
-                v => return Err(Error::Value(format!("Can't take factorial of {}", v))),
+            Expression::Factorial(expr) => match expr.evaluate()? {
+                Integer(i) => Integer((1..=i).fold(1, |a, b| a * b as i64)),
+                value => return Err(Error::Value(format!("Can't take factorial of {}", value))),
             },
             Expression::GreaterThan(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs > rhs),
@@ -103,9 +109,17 @@ impl Expression {
                 }
             },
             Expression::Negate(expr) => match expr.evaluate()? {
-                Integer(v) => Integer(-v),
-                Float(v) => Float(-v),
-                v => return Err(Error::Value(format!("Can't negate {}", v))),
+                Integer(i) => Integer(-i),
+                Float(f) => Float(-f),
+                value => return Err(Error::Value(format!("Can't negate {}", value))),
+            },
+            Expression::Not(expr) => match expr.evaluate()? {
+                Boolean(b) => Boolean(!b),
+                value => return Err(Error::Value(format!("Can't negate {}", value))),
+            },
+            Expression::Or(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
+                (lhs, rhs) => return Err(Error::Value(format!("Can't or {} and {}", lhs, rhs))),
             },
             Expression::Subtract(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 (Integer(lhs), Integer(rhs)) => Integer(lhs - rhs),
@@ -117,7 +131,7 @@ impl Expression {
                 }
             },
 
-            Expression::Constant(v) => v.clone(),
+            Expression::Constant(c) => c.clone(),
         })
     }
 }

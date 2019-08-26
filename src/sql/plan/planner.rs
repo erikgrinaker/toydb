@@ -58,15 +58,20 @@ impl From<ast::Expression> for Expression {
             ast::Expression::Literal(l) => Expression::Constant(l.into()),
             ast::Expression::Operation(op) => match op {
                 ast::Operation::Add(lhs, rhs) => Self::Add(lhs.into(), rhs.into()),
+                ast::Operation::And(lhs, rhs) => Self::And(lhs.into(), rhs.into()),
                 ast::Operation::Divide(lhs, rhs) => Self::Divide(lhs.into(), rhs.into()),
-                ast::Operation::Exponentiate(lhs, rhs) => Self::Exponentiate(lhs.into(), rhs.into()),
+                ast::Operation::Exponentiate(lhs, rhs) => {
+                    Self::Exponentiate(lhs.into(), rhs.into())
+                }
                 ast::Operation::Equals(lhs, rhs) => Self::Equals(lhs.into(), rhs.into()),
-                ast::Operation::Factorial(e) => Self::Factorial(e.into()),
+                ast::Operation::Factorial(expr) => Self::Factorial(expr.into()),
                 ast::Operation::GreaterThan(lhs, rhs) => Self::GreaterThan(lhs.into(), rhs.into()),
                 ast::Operation::LesserThan(lhs, rhs) => Self::LesserThan(lhs.into(), rhs.into()),
                 ast::Operation::Modulo(lhs, rhs) => Self::Modulo(lhs.into(), rhs.into()),
                 ast::Operation::Multiply(lhs, rhs) => Self::Multiply(lhs.into(), rhs.into()),
-                ast::Operation::Negate(e) => Self::Negate(e.into()),
+                ast::Operation::Negate(expr) => Self::Negate(expr.into()),
+                ast::Operation::Not(expr) => Self::Not(expr.into()),
+                ast::Operation::Or(lhs, rhs) => Self::Or(lhs.into(), rhs.into()),
                 ast::Operation::Subtract(lhs, rhs) => Self::Subtract(lhs.into(), rhs.into()),
             },
         }
