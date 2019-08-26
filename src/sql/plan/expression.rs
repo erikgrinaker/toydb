@@ -12,11 +12,14 @@ pub enum Expression {
     Equals(Box<Expression>, Box<Expression>),
     Factorial(Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
+    GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     LesserThan(Box<Expression>, Box<Expression>),
+    LesserThanOrEqual(Box<Expression>, Box<Expression>),
     Modulo(Box<Expression>, Box<Expression>),
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),
     Not(Box<Expression>),
+    NotEqual(Box<Expression>, Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
 }
@@ -79,11 +82,29 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
+            Expression::GreaterThanOrEqual(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs >= rhs),
+                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 >= rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs >= rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs >= rhs),
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
             Expression::LesserThan(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs < rhs),
                 (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) < rhs),
                 (Float(lhs), Integer(rhs)) => Boolean(lhs < rhs as f64),
                 (Float(lhs), Float(rhs)) => Boolean(lhs < rhs),
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
+            Expression::LesserThanOrEqual(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs <= rhs),
+                (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) <= rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs <= rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs <= rhs),
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
@@ -116,6 +137,16 @@ impl Expression {
             Expression::Not(expr) => match expr.evaluate()? {
                 Boolean(b) => Boolean(!b),
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
+            },
+            #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
+            Expression::NotEqual(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs != rhs),
+                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 != rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs != rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs != rhs),
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
             },
             Expression::Or(lhs, rhs) => match (lhs.evaluate()?, rhs.evaluate()?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),

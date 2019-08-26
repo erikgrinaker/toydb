@@ -12,7 +12,10 @@ pub enum Token {
     Period,
     Equals,
     GreaterThan,
+    GreaterThanOrEqual,
     LessThan,
+    LessThanOrEqual,
+    LessOrGreaterThan,
     Plus,
     Minus,
     Asterisk,
@@ -20,6 +23,7 @@ pub enum Token {
     Caret,
     Percent,
     Exclamation,
+    NotEqual,
     Question,
     OpenParen,
     CloseParen,
@@ -36,7 +40,10 @@ impl std::fmt::Display for Token {
             Token::Period => ".",
             Token::Equals => "=",
             Token::GreaterThan => ">",
+            Token::GreaterThanOrEqual => ">=",
             Token::LessThan => "<",
+            Token::LessThanOrEqual => "<=",
+            Token::LessOrGreaterThan => "<>",
             Token::Plus => "+",
             Token::Minus => "-",
             Token::Asterisk => "*",
@@ -44,6 +51,7 @@ impl std::fmt::Display for Token {
             Token::Caret => "^",
             Token::Percent => "%",
             Token::Exclamation => "!",
+            Token::NotEqual => "!=",
             Token::Question => "?",
             Token::OpenParen => "(",
             Token::CloseParen => ")",
@@ -224,7 +232,8 @@ impl<'a> Lexer<'a> {
         Ok(Some(Token::String(s)))
     }
 
-    /// Scans the input for the next symbol token, if any
+    /// Scans the input for the next symbol token, if any, and
+    /// handle any multi-symbol tokens
     fn scan_symbol(&mut self) -> Option<Token> {
         self.next_if_token(|c| match c {
             '.' => Some(Token::Period),
@@ -243,6 +252,32 @@ impl<'a> Lexer<'a> {
             ')' => Some(Token::CloseParen),
             ',' => Some(Token::Comma),
             _ => None,
+        })
+        .map(|token| match token {
+            Token::Exclamation => {
+                if self.next_if(|c| c == '=').is_some() {
+                    Token::NotEqual
+                } else {
+                    token
+                }
+            }
+            Token::LessThan => {
+                if self.next_if(|c| c == '>').is_some() {
+                    Token::LessOrGreaterThan
+                } else if self.next_if(|c| c == '=').is_some() {
+                    Token::LessThanOrEqual
+                } else {
+                    token
+                }
+            }
+            Token::GreaterThan => {
+                if self.next_if(|c| c == '=').is_some() {
+                    Token::GreaterThanOrEqual
+                } else {
+                    token
+                }
+            }
+            _ => token,
         })
     }
 }
