@@ -57,24 +57,29 @@ impl From<ast::Expression> for Expression {
         match expr {
             ast::Expression::Literal(l) => Expression::Constant(l.into()),
             ast::Expression::Operation(op) => match op {
-                ast::Operation::Add(lhs, rhs) => Self::Add(lhs.into(), rhs.into()),
+                // Logical operators
                 ast::Operation::And(lhs, rhs) => Self::And(lhs.into(), rhs.into()),
+                ast::Operation::Not(expr) => Self::Not(expr.into()),
+                ast::Operation::Or(lhs, rhs) => Self::Or(lhs.into(), rhs.into()),
+
+                // Comparison operators
+                ast::Operation::CompareEQ(lhs, rhs) => Self::CompareEQ(lhs.into(), rhs.into()),
+                ast::Operation::CompareGT(lhs, rhs) => Self::CompareGT(lhs.into(), rhs.into()),
+                ast::Operation::CompareGTE(lhs, rhs) => Self::CompareGTE(lhs.into(), rhs.into()),
+                ast::Operation::CompareLT(lhs, rhs) => Self::CompareLT(lhs.into(), rhs.into()),
+                ast::Operation::CompareLTE(lhs, rhs) => Self::CompareLTE(lhs.into(), rhs.into()),
+                ast::Operation::CompareNE(lhs, rhs) => Self::CompareNE(lhs.into(), rhs.into()),
+
+                // Mathematical operators
+                ast::Operation::Add(lhs, rhs) => Self::Add(lhs.into(), rhs.into()),
                 ast::Operation::Divide(lhs, rhs) => Self::Divide(lhs.into(), rhs.into()),
                 ast::Operation::Exponentiate(lhs, rhs) => {
                     Self::Exponentiate(lhs.into(), rhs.into())
                 }
-                ast::Operation::Equals(lhs, rhs) => Self::Equals(lhs.into(), rhs.into()),
                 ast::Operation::Factorial(expr) => Self::Factorial(expr.into()),
-                ast::Operation::GreaterThan(lhs, rhs) => Self::GreaterThan(lhs.into(), rhs.into()),
-                ast::Operation::GreaterThanOrEqual(lhs, rhs) => Self::GreaterThanOrEqual(lhs.into(), rhs.into()),
-                ast::Operation::LesserThan(lhs, rhs) => Self::LesserThan(lhs.into(), rhs.into()),
-                ast::Operation::LesserThanOrEqual(lhs, rhs) => Self::LesserThanOrEqual(lhs.into(), rhs.into()),
                 ast::Operation::Modulo(lhs, rhs) => Self::Modulo(lhs.into(), rhs.into()),
                 ast::Operation::Multiply(lhs, rhs) => Self::Multiply(lhs.into(), rhs.into()),
                 ast::Operation::Negate(expr) => Self::Negate(expr.into()),
-                ast::Operation::Not(expr) => Self::Not(expr.into()),
-                ast::Operation::NotEqual(lhs, rhs) => Self::NotEqual(lhs.into(), rhs.into()),
-                ast::Operation::Or(lhs, rhs) => Self::Or(lhs.into(), rhs.into()),
                 ast::Operation::Subtract(lhs, rhs) => Self::Subtract(lhs.into(), rhs.into()),
             },
         }

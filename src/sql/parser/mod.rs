@@ -172,9 +172,9 @@ const ASSOC_RIGHT: u8 = 0;
 
 /// Prefix operators
 enum PrefixOperator {
-    Plus,
     Minus,
     Not,
+    Plus,
 }
 
 impl PrefixOperator {
@@ -191,8 +191,8 @@ impl Operator for PrefixOperator {
     fn from(token: &Token) -> Option<Self> {
         match token {
             Token::Exclamation => Some(Self::Not),
-            Token::Minus => Some(Self::Minus),
             Token::Keyword(Keyword::Not) => Some(Self::Not),
+            Token::Minus => Some(Self::Minus),
             Token::Plus => Some(Self::Plus),
             _ => None,
         }
@@ -210,16 +210,16 @@ impl Operator for PrefixOperator {
 enum InfixOperator {
     Add,
     And,
+    CompareEQ,
+    CompareGT,
+    CompareGTE,
+    CompareLT,
+    CompareLTE,
+    CompareNE,
     Divide,
-    Equals,
     Exponentiate,
-    GreatherThan,
-    GreatherThanOrEqual,
-    LesserThan,
-    LesserThanOrEqual,
     Modulo,
     Multiply,
-    NotEqual,
     Or,
     Subtract,
 }
@@ -230,16 +230,16 @@ impl InfixOperator {
         match self {
             Self::Add => ast::Operation::Add(lhs, rhs),
             Self::And => ast::Operation::And(lhs, rhs),
+            Self::CompareEQ => ast::Operation::CompareEQ(lhs, rhs),
+            Self::CompareGT => ast::Operation::CompareGT(lhs, rhs),
+            Self::CompareGTE => ast::Operation::CompareGTE(lhs, rhs),
+            Self::CompareLT => ast::Operation::CompareLT(lhs, rhs),
+            Self::CompareLTE => ast::Operation::CompareLTE(lhs, rhs),
+            Self::CompareNE => ast::Operation::CompareNE(lhs, rhs),
             Self::Divide => ast::Operation::Divide(lhs, rhs),
-            Self::Equals => ast::Operation::Equals(lhs, rhs),
             Self::Exponentiate => ast::Operation::Exponentiate(lhs, rhs),
-            Self::GreatherThan => ast::Operation::GreaterThan(lhs, rhs),
-            Self::GreatherThanOrEqual => ast::Operation::GreaterThanOrEqual(lhs, rhs),
-            Self::LesserThan => ast::Operation::LesserThan(lhs, rhs),
-            Self::LesserThanOrEqual => ast::Operation::LesserThanOrEqual(lhs, rhs),
             Self::Modulo => ast::Operation::Modulo(lhs, rhs),
             Self::Multiply => ast::Operation::Multiply(lhs, rhs),
-            Self::NotEqual => ast::Operation::NotEqual(lhs, rhs),
             Self::Or => ast::Operation::Or(lhs, rhs),
             Self::Subtract => ast::Operation::Subtract(lhs, rhs),
         }
@@ -250,20 +250,20 @@ impl InfixOperator {
 impl Operator for InfixOperator {
     fn from(token: &Token) -> Option<Self> {
         Some(match token {
-            Token::Plus => Self::Add,
-            Token::Minus => Self::Subtract,
             Token::Asterisk => Self::Multiply,
-            Token::Slash => Self::Divide,
-            Token::Percent => Self::Modulo,
             Token::Caret => Self::Exponentiate,
-            Token::NotEqual => Self::NotEqual,
-            Token::LessOrGreaterThan => Self::NotEqual,
-            Token::GreaterThan => Self::GreatherThan,
-            Token::GreaterThanOrEqual => Self::GreatherThanOrEqual,
-            Token::LessThan => Self::LesserThan,
-            Token::LessThanOrEqual => Self::LesserThanOrEqual,
+            Token::GreaterThan => Self::CompareGT,
+            Token::GreaterThanOrEqual => Self::CompareGTE,
             Token::Keyword(Keyword::And) => Self::And,
             Token::Keyword(Keyword::Or) => Self::Or,
+            Token::LessOrGreaterThan => Self::CompareNE,
+            Token::LessThan => Self::CompareLT,
+            Token::LessThanOrEqual => Self::CompareLTE,
+            Token::Minus => Self::Subtract,
+            Token::NotEqual => Self::CompareNE,
+            Token::Percent => Self::Modulo,
+            Token::Plus => Self::Add,
+            Token::Slash => Self::Divide,
             _ => return None,
         })
     }
@@ -279,8 +279,8 @@ impl Operator for InfixOperator {
         match self {
             Self::Or => 1,
             Self::And => 2,
-            Self::Equals | Self::NotEqual => 3,
-            Self::GreatherThan | Self::GreatherThanOrEqual | Self::LesserThan | Self::LesserThanOrEqual => 4,
+            Self::CompareEQ | Self::CompareNE => 3,
+            Self::CompareGT | Self::CompareGTE | Self::CompareLT | Self::CompareLTE => 4,
             Self::Add | Self::Subtract => 5,
             Self::Multiply | Self::Divide | Self::Modulo => 6,
             Self::Exponentiate => 7,
