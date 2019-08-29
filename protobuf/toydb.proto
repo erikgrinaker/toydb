@@ -7,12 +7,6 @@ service ToyDB {
 
   // Query runs an SQL query.
   rpc Query(QueryRequest) returns (stream Row) {};
-
-  // Get is a temporary key-value command.
-  rpc Get(GetRequest) returns (GetResponse) {};
-
-  // Set is a temporary key-value command.
-  rpc Set(SetRequest) returns (SetResponse) {};
 };
 
 message StatusRequest {};
@@ -38,23 +32,4 @@ message Field {
     double float = 3;
     string string = 4;
   };
-}
-
-message GetRequest {
-  string key = 1;
-}
-
-message GetResponse {
-  string key = 1;
-  string value = 2;
-}
-
-message SetRequest {
-  string key = 1;
-  string value = 2;
-}
-
-message SetResponse {
-  string key = 1;
-  string value = 2;
 }

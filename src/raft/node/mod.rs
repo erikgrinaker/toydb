@@ -366,7 +366,7 @@ mod tests {
             "a",
             vec![],
             kv::Memory::new(),
-            crate::state::State::new(kv::Memory::new()),
+            TestState::new(),
             sender,
         )
         .unwrap();

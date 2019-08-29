@@ -2,7 +2,6 @@ use crate::raft::Raft;
 use crate::service;
 use crate::sql::types::{Row, Value};
 use crate::sql::{Parser, Planner, Storage};
-use crate::state;
 use crate::Error;
 
 pub struct ToyDB {
@@ -30,37 +29,6 @@ impl service::ToyDB for ToyDB {
             metadata,
             plan.map(|row| Self::row_to_protobuf(row.unwrap())),
         )
-    }
-
-    fn get(
-        &self,
-        _: grpc::RequestOptions,
-        req: service::GetRequest,
-    ) -> grpc::SingleResponse<service::GetResponse> {
-        let value =
-            self.raft.read(state::serialize(state::Read::Get(req.key.clone())).unwrap()).unwrap();
-        grpc::SingleResponse::completed(service::GetResponse {
-            key: req.key,
-            value: state::deserialize(value).unwrap(),
-            ..Default::default()
-        })
-    }
-
-    fn set(
-        &self,
-        _: grpc::RequestOptions,
-        req: service::SetRequest,
-    ) -> grpc::SingleResponse<service::SetResponse> {
-        self.raft
-            .mutate(
-                state::serialize(state::Mutation::Set {
-                    key: req.key,
-                    value: state::serialize(req.value).unwrap(),
-                })
-                .unwrap(),
-            )
-            .unwrap();
-        grpc::SingleResponse::completed(service::SetResponse { ..Default::default() })
     }
 
     fn status(

@@ -1,9 +1,13 @@
 mod file;
+#[cfg(test)]
 mod memory;
+mod raft;
 
 use crate::Error;
 pub use file::File;
+#[cfg(test)]
 pub use memory::Memory;
+pub use raft::Raft;
 
 /// A key-value store
 pub trait Store: 'static + Sync + Send + std::fmt::Debug {

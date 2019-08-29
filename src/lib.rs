@@ -24,7 +24,6 @@ mod raft;
 mod server;
 mod service;
 mod sql;
-mod state;
 mod utility;
 
 pub use client::Client;
