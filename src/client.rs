@@ -32,6 +32,15 @@ impl Client {
             .wait()?;
         ResultSet::from_grpc(metadata, iter)
     }
+
+    /// Checks server status
+    pub fn status(&self) -> Result<Status, Error> {
+        let (_, resp, _) = self.client.status(grpc::RequestOptions::new(), service::StatusRequest::new()).wait()?;
+        Ok(Status{
+            id: resp.id,
+            version: resp.version,
+        })
+    }
 }
 
 /// A query result set
@@ -86,4 +95,10 @@ impl ResultSet {
             Some(service::Field_oneof_value::string(s)) => Value::String(s),
         }
     }
+}
+
+/// Server status
+pub struct Status {
+    pub id: String,
+    pub version: String,
 }

@@ -31,6 +31,9 @@ fn main() -> Result<(), toydb::Error> {
         .parse::<std::net::SocketAddr>()?;
 
     let client = toydb::Client::new(sa)?;
+    let status = client.status()?;
+    println!("Connected to node \"{}\" (version {})", status.id, status.version);
+
     let mut editor = rustyline::Editor::<()>::new();
     loop {
         let query = match editor.readline("toydb> ") {
