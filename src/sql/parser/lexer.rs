@@ -71,12 +71,21 @@ impl From<Keyword> for Token {
 pub enum Keyword {
     And,
     As,
+    Boolean,
+    Create,
+    Drop,
     False,
+    Float,
+    Integer,
+    Key,
     Not,
     Null,
     Or,
+    Primary,
     Select,
+    Table,
     True,
+    Varchar,
 }
 
 impl Keyword {
@@ -84,12 +93,21 @@ impl Keyword {
         Some(match ident.to_uppercase().as_ref() {
             "AS" => Self::As,
             "AND" => Self::And,
+            "BOOLEAN" => Self::Boolean,
+            "CREATE" => Self::Create,
+            "DROP" => Self::Drop,
             "FALSE" => Self::False,
+            "FLOAT" => Self::Float,
+            "INTEGER" => Self::Integer,
+            "KEY" => Self::Key,
             "NOT" => Self::Not,
             "NULL" => Self::Null,
             "OR" => Self::Or,
+            "PRIMARY" => Self::Primary,
             "SELECT" => Self::Select,
+            "TABLE" => Self::Table,
             "TRUE" => Self::True,
+            "VARCHAR" => Self::Varchar,
             _ => return None,
         })
     }
@@ -98,12 +116,21 @@ impl Keyword {
         match self {
             Self::As => "AS",
             Self::And => "AND",
+            Self::Boolean => "BOOLEAN",
+            Self::Create => "CREATE",
+            Self::Drop => "DROP",
             Self::False => "FALSE",
+            Self::Float => "FLOAT",
+            Self::Integer => "INTEGER",
+            Self::Key => "KEY",
             Self::Not => "NOT",
             Self::Null => "NULL",
             Self::Or => "OR",
+            Self::Primary => "PRIMARY",
             Self::Select => "SELECT",
+            Self::Table => "TABLE",
             Self::True => "TRUE",
+            Self::Varchar => "VARCHAR",
         }
     }
 }

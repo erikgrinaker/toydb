@@ -1,10 +1,8 @@
 mod file;
-#[cfg(test)]
 mod memory;
 
 use crate::Error;
 pub use file::File;
-#[cfg(test)]
 pub use memory::Memory;
 
 /// A key-value store

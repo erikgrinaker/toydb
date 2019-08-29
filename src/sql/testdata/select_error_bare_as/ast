@@ -1,1 +1,1 @@
-Err(Parse("Expected identifier, found ,"))
+Err(Parse("Expected identifier, got ,"))

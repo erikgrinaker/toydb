@@ -1,0 +1,45 @@
+CreateTable {
+    name: "name",
+    columns: [
+        ColumnSpec {
+            name: "id",
+            datatype: Integer,
+            primary_key: true,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "string",
+            datatype: String,
+            primary_key: false,
+            nullable: Some(
+                false,
+            ),
+        },
+        ColumnSpec {
+            name: "text",
+            datatype: String,
+            primary_key: false,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "number",
+            datatype: Integer,
+            primary_key: false,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "decimal",
+            datatype: Float,
+            primary_key: false,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "bool",
+            datatype: Boolean,
+            primary_key: false,
+            nullable: Some(
+                true,
+            ),
+        },
+    ],
+}

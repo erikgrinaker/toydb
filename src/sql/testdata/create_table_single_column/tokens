@@ -1,0 +1,25 @@
+[
+    Keyword(
+        Create,
+    ),
+    Keyword(
+        Table,
+    ),
+    Ident(
+        "name",
+    ),
+    OpenParen,
+    Ident(
+        "id",
+    ),
+    Keyword(
+        Integer,
+    ),
+    Keyword(
+        Primary,
+    ),
+    Keyword(
+        Key,
+    ),
+    CloseParen,
+]

@@ -71,6 +71,12 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 
 * **Log replication optimization:** currently only the simplest version of the Raft log replication protocol is implemented, without snapshots or rapid log replay (i.e. replication of old log entries is retried one by one until a common base entry is found).
 
+### Schema
+
+* **Single database:** only a single, unnamed database is supported per ToyDB cluster.
+
+* **Schema changes:** schema changes other than creating or dropping tables and indexes is not supported, i.e. there is no `ALTER TABLE`.
+
 ### Query Engine
 
 * **Type checking:** query type checking (e.g. `SELECT a + b` must receive two numbers) is done at query evaluation time, not at query compile time.

@@ -4,10 +4,9 @@ mod planner;
 
 pub use node::Node;
 
-use super::parser::ast;
 use super::types::Row;
 use crate::Error;
-use planner::Planner;
+pub use planner::Planner;
 
 /// A plan
 #[derive(Debug)]
@@ -24,12 +23,5 @@ impl Iterator for Plan {
 
     fn next(&mut self) -> Option<Result<Row, Error>> {
         self.root.next()
-    }
-}
-
-impl Plan {
-    /// Builds a plan from a statement AST
-    pub fn build(statement: ast::Statement) -> Result<Self, Error> {
-        Planner::new().build(statement)
     }
 }

@@ -1,0 +1,11 @@
+CreateTable {
+    name: "name",
+    columns: [
+        ColumnSpec {
+            name: "id",
+            datatype: Integer,
+            primary_key: false,
+            nullable: None,
+        },
+    ],
+}

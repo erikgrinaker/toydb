@@ -1,11 +1,26 @@
+use super::super::types;
+
 /// Statements
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
+    /// A CREATE TABLE statement
+    CreateTable { name: String, columns: Vec<ColumnSpec> },
+    /// A DROP TABLE statement
+    DropTable(String),
     /// A SELECT statement
     Select {
         /// The select clause
         select: SelectClause,
     },
+}
+
+/// A column specification
+#[derive(Clone, Debug, PartialEq)]
+pub struct ColumnSpec {
+    pub name: String,
+    pub datatype: types::DataType,
+    pub primary_key: bool,
+    pub nullable: Option<bool>,
 }
 
 /// A SELECT clause

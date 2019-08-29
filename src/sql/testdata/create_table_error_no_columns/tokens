@@ -1,0 +1,11 @@
+[
+    Keyword(
+        Create,
+    ),
+    Keyword(
+        Table,
+    ),
+    Ident(
+        "name",
+    ),
+]

@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod lexer;
 
+use super::types::DataType;
 use crate::Error;
 use lexer::{Keyword, Lexer, Token};
 
@@ -44,6 +45,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Grabs the next identifier, or errors if not found
+    fn next_ident(&mut self) -> Result<String, Error> {
+        match self.next()? {
+            Token::Ident(ident) => Ok(ident),
+            token => Err(Error::Parse(format!("Expected identifier, got {}", token))),
+        }
+    }
+
     /// Grabs the next lexer token if it satisfies the predicate function
     fn next_if<F: Fn(&Token) -> bool>(&mut self, predicate: F) -> Option<Token> {
         self.peek().unwrap_or(None).filter(|t| predicate(&t))?;
@@ -61,6 +70,14 @@ impl<'a> Parser<'a> {
         Some(operator)
     }
 
+    /// Grabs the next lexer token if it is a keyword
+    fn next_if_keyword(&mut self) -> Option<Token> {
+        self.next_if(|t| match t {
+            Token::Keyword(_) => true,
+            _ => false,
+        })
+    }
+
     /// Grabs the next lexer token if it is a given token
     fn next_if_token(&mut self, token: Token) -> Option<Token> {
         self.next_if(|t| t == &token)
@@ -76,10 +93,95 @@ impl<'a> Parser<'a> {
     /// Parses an SQL statement
     fn parse_statement(&mut self) -> Result<ast::Statement, Error> {
         match self.peek()? {
+            Some(Token::Keyword(Keyword::Create)) => self.parse_ddl(),
+            Some(Token::Keyword(Keyword::Drop)) => self.parse_ddl(),
             Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
             Some(token) => Err(Error::Parse(format!("Unexpected token {}", token))),
             None => Err(Error::Parse("Unexpected end of input".into())),
         }
+    }
+
+    /// Parses a DDL statement
+    fn parse_ddl(&mut self) -> Result<ast::Statement, Error> {
+        match self.next()? {
+            Token::Keyword(Keyword::Create) => match self.next()? {
+                Token::Keyword(Keyword::Table) => self.parse_ddl_create_table(),
+                token => Err(Error::Parse(format!("Unexpected token {}", token))),
+            },
+            Token::Keyword(Keyword::Drop) => match self.next()? {
+                Token::Keyword(Keyword::Table) => self.parse_ddl_drop_table(),
+                token => Err(Error::Parse(format!("Unexpected token {}", token))),
+            },
+            token => Err(Error::Parse(format!("Unexpected token {}", token))),
+        }
+    }
+
+    /// Parses a CREATE TABLE DDL statement. The CREATE TABLE prefix has
+    /// already been consumed.
+    fn parse_ddl_create_table(&mut self) -> Result<ast::Statement, Error> {
+        let name = self.next_ident()?;
+        self.next_expect(Some(Token::OpenParen))?;
+
+        let mut columns = Vec::new();
+        loop {
+            columns.push(self.parse_ddl_columnspec()?);
+            if self.next_if_token(Token::Comma).is_none() {
+                break;
+            }
+        }
+        self.next_expect(Some(Token::CloseParen))?;
+        Ok(ast::Statement::CreateTable { name, columns })
+    }
+
+    /// Parses a DROP TABLE DDL statement. The DROP TABLE prefix has
+    /// already been consumed.
+    fn parse_ddl_drop_table(&mut self) -> Result<ast::Statement, Error> {
+        Ok(ast::Statement::DropTable(self.next_ident()?))
+    }
+
+    /// Parses a column specification
+    fn parse_ddl_columnspec(&mut self) -> Result<ast::ColumnSpec, Error> {
+        let mut column = ast::ColumnSpec {
+            name: self.next_ident()?,
+            datatype: match self.next()? {
+                Token::Keyword(Keyword::Boolean) => DataType::Boolean,
+                Token::Keyword(Keyword::Integer) => DataType::Integer,
+                Token::Keyword(Keyword::Float) => DataType::Float,
+                Token::Keyword(Keyword::Varchar) => DataType::String,
+                token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+            },
+            primary_key: false,
+            nullable: None,
+        };
+        while let Some(Token::Keyword(keyword)) = self.next_if_keyword() {
+            match keyword {
+                Keyword::Primary => {
+                    self.next_expect(Some(Keyword::Key.into()))?;
+                    column.primary_key = true;
+                }
+                Keyword::Null => {
+                    if let Some(false) = column.nullable {
+                        return Err(Error::Value(format!(
+                            "Column {} can't be both not nullable and nullable",
+                            column.name
+                        )));
+                    }
+                    column.nullable = Some(true)
+                }
+                Keyword::Not => {
+                    self.next_expect(Some(Keyword::Null.into()))?;
+                    if let Some(true) = column.nullable {
+                        return Err(Error::Value(format!(
+                            "Column {} can't be both not nullable and nullable",
+                            column.name
+                        )));
+                    }
+                    column.nullable = Some(false)
+                }
+                keyword => return Err(Error::Parse(format!("Unexpected keyword {}", keyword))),
+            }
+        }
+        Ok(column)
     }
 
     /// Parses a select statement
@@ -98,20 +200,9 @@ impl<'a> Parser<'a> {
             clause.labels.push(match self.peek()? {
                 Some(Token::Keyword(Keyword::As)) => {
                     self.next()?;
-                    match self.next()? {
-                        Token::Ident(ident) => Some(ident),
-                        token => {
-                            return Err(Error::Parse(format!(
-                                "Expected identifier, found {}",
-                                token
-                            )))
-                        }
-                    }
+                    Some(self.next_ident()?)
                 }
-                Some(Token::Ident(ident)) => {
-                    self.next()?;
-                    Some(ident)
-                }
+                Some(Token::Ident(_)) => Some(self.next_ident()?),
                 _ => None,
             });
             if self.next_if_token(Token::Comma).is_none() {

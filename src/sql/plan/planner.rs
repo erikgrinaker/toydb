@@ -1,16 +1,20 @@
 use super::super::parser::ast;
+use super::super::schema;
+use super::super::storage::Storage;
 use super::super::types::Value;
 use super::expression::Expression;
-use super::node::Node;
+use super::node::{Node, DDL};
 use super::Plan;
 use crate::Error;
 
-pub struct Planner {}
+pub struct Planner {
+    storage: Box<Storage>,
+}
 
 impl Planner {
     /// Creates a new planner
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(storage: Box<Storage>) -> Self {
+        Self { storage }
     }
 
     /// Builds a plan tree for an AST statement
@@ -19,6 +23,7 @@ impl Planner {
         Ok(Plan {
             columns: match &root {
                 Node::Projection { labels, .. } => labels.clone(),
+                Node::DDL { .. } => vec![],
                 _ => panic!("Not implemented"),
             },
             root,
@@ -28,6 +33,13 @@ impl Planner {
     /// Builds a plan node for a statement
     fn build_statement(&self, statement: ast::Statement) -> Result<Node, Error> {
         Ok(match statement {
+            ast::Statement::CreateTable { name, columns } => Node::DDL {
+                storage: self.storage.clone(),
+                ddl: DDL::CreateTable(self.build_schema_table(name, columns)?),
+            },
+            ast::Statement::DropTable(name) => {
+                Node::DDL { storage: self.storage.clone(), ddl: DDL::DropTable(name) }
+            }
             ast::Statement::Select { select } => Node::Projection {
                 labels: select
                     .labels
@@ -48,6 +60,42 @@ impl Planner {
     /// Builds an array of plan expressions from AST expressions
     fn build_expressions(&self, exprs: Vec<ast::Expression>) -> Result<Vec<Expression>, Error> {
         exprs.into_iter().map(|e| self.build_expression(e)).collect()
+    }
+
+    /// Builds a table schema from an AST CreateTable node
+    fn build_schema_table(
+        &self,
+        name: String,
+        columnspecs: Vec<ast::ColumnSpec>,
+    ) -> Result<schema::Table, Error> {
+        let primary_keys: Vec<&ast::ColumnSpec> =
+            columnspecs.iter().filter(|c| c.primary_key).collect();
+        if primary_keys.is_empty() {
+            return Err(Error::Value(format!("No primary key defined for table {}", name)));
+        } else if primary_keys.len() > 1 {
+            return Err(Error::Value(format!(
+                "{} primary keys defined for table {}, must set exactly 1",
+                primary_keys.len(),
+                name
+            )));
+        }
+        let primary_key = primary_keys[0];
+        if let Some(true) = primary_key.nullable {
+            return Err(Error::Value("Primary key cannot be nullable".into()));
+        }
+
+        Ok(schema::Table {
+            name,
+            primary_key: primary_key.name.clone(),
+            columns: columnspecs
+                .into_iter()
+                .map(|spec| schema::Column {
+                    name: spec.name,
+                    datatype: spec.datatype,
+                    nullable: spec.nullable.unwrap_or(!spec.primary_key),
+                })
+                .collect(),
+        })
     }
 }
 

@@ -1,0 +1,1 @@
+CREATE TABLE name (id INTEGER)

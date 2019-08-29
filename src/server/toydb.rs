@@ -1,13 +1,14 @@
 use crate::raft::Raft;
 use crate::service;
 use crate::sql::types::{Row, Value};
-use crate::sql::{Parser, Plan};
+use crate::sql::{Parser, Planner, Storage};
 use crate::state;
 use crate::Error;
 
 pub struct ToyDB {
     pub id: String,
     pub raft: Raft,
+    pub storage: Box<Storage>,
 }
 
 impl service::ToyDB for ToyDB {
@@ -16,7 +17,9 @@ impl service::ToyDB for ToyDB {
         _: grpc::RequestOptions,
         req: service::QueryRequest,
     ) -> grpc::StreamingResponse<service::Row> {
-        let plan = Plan::build(Parser::new(&req.query).parse().unwrap()).unwrap();
+        let plan = Planner::new(self.storage.clone())
+            .build(Parser::new(&req.query).parse().unwrap())
+            .unwrap();
         let mut metadata = grpc::Metadata::new();
         metadata.add(
             grpc::MetadataKey::from("columns"),
