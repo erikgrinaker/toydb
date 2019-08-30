@@ -9,6 +9,12 @@ pub struct Table {
     pub primary_key: String,
 }
 
+impl Table {
+    pub fn get_primary_key_index(&self) -> usize {
+        self.columns.iter().position(|c| c.name == self.primary_key).unwrap()
+    }
+}
+
 /// A table column
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Column {

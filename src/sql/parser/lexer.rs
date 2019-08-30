@@ -76,7 +76,9 @@ pub enum Keyword {
     Drop,
     False,
     Float,
+    Insert,
     Integer,
+    Into,
     Key,
     Not,
     Null,
@@ -85,6 +87,7 @@ pub enum Keyword {
     Select,
     Table,
     True,
+    Values,
     Varchar,
 }
 
@@ -98,6 +101,8 @@ impl Keyword {
             "DROP" => Self::Drop,
             "FALSE" => Self::False,
             "FLOAT" => Self::Float,
+            "INSERT" => Self::Insert,
+            "INTO" => Self::Into,
             "INTEGER" => Self::Integer,
             "KEY" => Self::Key,
             "NOT" => Self::Not,
@@ -107,6 +112,7 @@ impl Keyword {
             "SELECT" => Self::Select,
             "TABLE" => Self::Table,
             "TRUE" => Self::True,
+            "VALUES" => Self::Values,
             "VARCHAR" => Self::Varchar,
             _ => return None,
         })
@@ -121,7 +127,9 @@ impl Keyword {
             Self::Drop => "DROP",
             Self::False => "FALSE",
             Self::Float => "FLOAT",
+            Self::Insert => "INSERT",
             Self::Integer => "INTEGER",
+            Self::Into => "INTO",
             Self::Key => "KEY",
             Self::Not => "NOT",
             Self::Null => "NULL",
@@ -130,6 +138,7 @@ impl Keyword {
             Self::Select => "SELECT",
             Self::Table => "TABLE",
             Self::True => "TRUE",
+            Self::Values => "VALUES",
             Self::Varchar => "VARCHAR",
         }
     }

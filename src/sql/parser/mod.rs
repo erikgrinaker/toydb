@@ -95,6 +95,7 @@ impl<'a> Parser<'a> {
         match self.peek()? {
             Some(Token::Keyword(Keyword::Create)) => self.parse_ddl(),
             Some(Token::Keyword(Keyword::Drop)) => self.parse_ddl(),
+            Some(Token::Keyword(Keyword::Insert)) => self.parse_statement_insert(),
             Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
             Some(token) => Err(Error::Parse(format!("Unexpected token {}", token))),
             None => Err(Error::Parse("Unexpected end of input".into())),
@@ -182,6 +183,49 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(column)
+    }
+
+    /// Parses an insert statement
+    fn parse_statement_insert(&mut self) -> Result<ast::Statement, Error> {
+        self.next_expect(Some(Keyword::Insert.into()))?;
+        self.next_expect(Some(Keyword::Into.into()))?;
+        let table = self.next_ident()?;
+
+        let columns = if self.next_if_token(Token::OpenParen).is_some() {
+            let mut cols = Vec::new();
+            loop {
+                cols.push(self.next_ident()?.to_string());
+                match self.next()? {
+                    Token::CloseParen => break,
+                    Token::Comma => {}
+                    token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+                }
+            }
+            Some(cols)
+        } else {
+            None
+        };
+
+        self.next_expect(Some(Keyword::Values.into()))?;
+        let mut values = Vec::new();
+        loop {
+            self.next_expect(Some(Token::OpenParen))?;
+            let mut exprs = ast::Expressions::new();
+            loop {
+                exprs.push(self.parse_expression(0)?);
+                match self.next()? {
+                    Token::CloseParen => break,
+                    Token::Comma => {}
+                    token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+                }
+            }
+            values.push(exprs);
+            if self.next_if_token(Token::Comma).is_none() {
+                break;
+            }
+        }
+
+        Ok(ast::Statement::Insert { table, columns, values })
     }
 
     /// Parses a select statement

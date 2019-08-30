@@ -30,6 +30,8 @@ pub enum Expression {
     Subtract(Box<Expression>, Box<Expression>),
 }
 
+pub type Expressions = Vec<Expression>;
+
 impl Expression {
     /// Evaluates an expression to a value
     pub fn evaluate(&self) -> Result<Value, Error> {

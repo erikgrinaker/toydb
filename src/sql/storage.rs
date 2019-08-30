@@ -1,4 +1,5 @@
 use super::schema;
+use super::types;
 use crate::kv;
 use crate::Error;
 use std::sync::{Arc, RwLock};
@@ -20,6 +21,19 @@ impl Storage {
         Storage { kv: Arc::new(RwLock::new(Box::new(store))) }
     }
 
+    /// Creates a row
+    pub fn create_row(&mut self, table: &str, row: types::Row) -> Result<(), Error> {
+        let table = self.get_table(&table)?;
+        let id = row
+            .get(table.get_primary_key_index())
+            .ok_or_else(|| Error::Value("No primary key value".into()))?;
+        // FIXME Needs to check existence
+        self.kv
+            .write()?
+            .set(&Self::key_row(&table.name, &id.to_string()), Self::serialize(row)?)?;
+        Ok(())
+    }
+
     /// Creates a table
     pub fn create_table(&mut self, table: schema::Table) -> Result<(), Error> {
         if self.table_exists(&table.name)? {
@@ -39,12 +53,22 @@ impl Storage {
 
     /// Fetches a table schema
     pub fn get_table(&self, table: &str) -> Result<schema::Table, Error> {
-        Self::deserialize(self.kv.read()?.get(&Self::key_table(table))?.ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?)
+        Self::deserialize(
+            self.kv
+                .read()?
+                .get(&Self::key_table(table))?
+                .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?,
+        )
     }
 
     /// Checks if a table exists
     pub fn table_exists(&self, table: &str) -> Result<bool, Error> {
         Ok(self.kv.read()?.get(&Self::key_table(table))?.is_some())
+    }
+
+    /// Generates a key for a row
+    fn key_row(table: &str, id: &str) -> String {
+        format!("{}.{}", Self::key_table(table), id)
     }
 
     /// Generates a key for a table

@@ -10,7 +10,7 @@ pub enum DataType {
 }
 
 /// A value
-#[derive(Clone, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Value {
     /// An unknown value
     Null,

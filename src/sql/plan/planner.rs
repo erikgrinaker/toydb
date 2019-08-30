@@ -3,7 +3,7 @@ use super::super::schema;
 use super::super::storage::Storage;
 use super::super::types::Value;
 use super::expression::Expression;
-use super::node::{Node, DDL};
+use super::node::{Node, DDL, DML};
 use super::Plan;
 use crate::Error;
 
@@ -24,6 +24,7 @@ impl Planner {
             columns: match &root {
                 Node::Projection { labels, .. } => labels.clone(),
                 Node::DDL { .. } => vec![],
+                Node::DML { .. } => vec![],
                 _ => panic!("Not implemented"),
             },
             root,
@@ -39,6 +40,14 @@ impl Planner {
             },
             ast::Statement::DropTable(name) => {
                 Node::DDL { storage: self.storage.clone(), ddl: DDL::DropTable(name) }
+            }
+            ast::Statement::Insert { table, values, .. } => {
+                // FIXME Needs to handle columns
+                let values = values
+                    .into_iter()
+                    .map(|exprs| exprs.into_iter().map(|expr| expr.into()).collect())
+                    .collect();
+                Node::DML { storage: self.storage.clone(), dml: DML::Insert(table, values) }
             }
             ast::Statement::Select { select } => Node::Projection {
                 labels: select
