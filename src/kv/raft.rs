@@ -1,5 +1,6 @@
 use super::Store;
 use crate::raft;
+use crate::utility::{deserialize, serialize};
 use crate::Error;
 use serde_derive::{Deserialize, Serialize};
 
@@ -102,16 +103,4 @@ impl raft::State for State {
             }
         }
     }
-}
-
-/// Deserializes a value from a byte buffer
-fn deserialize<'de, V: serde::Deserialize<'de>>(bytes: Vec<u8>) -> Result<V, Error> {
-    Ok(serde::Deserialize::deserialize(&mut rmps::Deserializer::new(&bytes[..]))?)
-}
-
-/// Serializes a value into a byte buffer
-fn serialize<V: serde::Serialize>(value: V) -> Result<Vec<u8>, Error> {
-    let mut bytes = Vec::new();
-    value.serialize(&mut rmps::Serializer::new(&mut bytes))?;
-    Ok(bytes)
 }

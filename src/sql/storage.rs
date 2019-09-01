@@ -1,6 +1,7 @@
 use super::schema;
 use super::types;
 use crate::kv;
+use crate::utility::{deserialize, serialize};
 use crate::Error;
 use std::sync::{Arc, RwLock};
 
@@ -28,9 +29,7 @@ impl Storage {
             .get(table.get_primary_key_index())
             .ok_or_else(|| Error::Value("No primary key value".into()))?;
         // FIXME Needs to check existence
-        self.kv
-            .write()?
-            .set(&Self::key_row(&table.name, &id.to_string()), Self::serialize(row)?)?;
+        self.kv.write()?.set(&Self::key_row(&table.name, &id.to_string()), serialize(row)?)?;
         Ok(())
     }
 
@@ -39,7 +38,7 @@ impl Storage {
         if self.table_exists(&table.name)? {
             Err(Error::Value(format!("Table {} already exists", table.name)))
         } else {
-            self.kv.write()?.set(&Self::key_table(&table.name), Self::serialize(table)?)?;
+            self.kv.write()?.set(&Self::key_table(&table.name), serialize(table)?)?;
             Ok(())
         }
     }
@@ -53,7 +52,7 @@ impl Storage {
 
     /// Fetches a table schema
     pub fn get_table(&self, table: &str) -> Result<schema::Table, Error> {
-        Self::deserialize(
+        deserialize(
             self.kv
                 .read()?
                 .get(&Self::key_table(table))?
@@ -74,17 +73,5 @@ impl Storage {
     /// Generates a key for a table
     fn key_table(table: &str) -> String {
         format!("schema.table.{}", table)
-    }
-
-    /// Deserializes a value from a byte buffer
-    fn deserialize<'de, V: serde::Deserialize<'de>>(bytes: Vec<u8>) -> Result<V, Error> {
-        Ok(serde::Deserialize::deserialize(&mut rmps::Deserializer::new(&bytes[..]))?)
-    }
-
-    /// Serializes a value into a byte buffer
-    fn serialize<V: serde::Serialize>(value: V) -> Result<Vec<u8>, Error> {
-        let mut bytes = Vec::new();
-        value.serialize(&mut rmps::Serializer::new(&mut bytes))?;
-        Ok(bytes)
     }
 }

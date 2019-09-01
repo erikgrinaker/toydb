@@ -1,5 +1,6 @@
 use super::state::State;
 use crate::kv;
+use crate::utility::{deserialize, serialize};
 use crate::Error;
 use serde_derive::{Deserialize, Serialize};
 
@@ -37,11 +38,11 @@ impl Log {
     /// Creates a new log, using a kv::Store for storage.
     pub fn new<S: kv::Store>(store: S) -> Result<Self, Error> {
         let apply_index = match store.get("apply_index")? {
-            Some(v) => Self::deserialize(v)?,
+            Some(v) => deserialize(v)?,
             None => 0,
         };
         let (commit_index, commit_term) = match store.get(&apply_index.to_string())? {
-            Some(raw_entry) => (apply_index, Self::deserialize::<Entry>(raw_entry)?.term),
+            Some(raw_entry) => (apply_index, deserialize::<Entry>(raw_entry)?.term),
             None if apply_index == 0 => (0, 0),
             None => {
                 return Err(Error::Internal(format!("Applied entry {} not found", apply_index)))
@@ -52,7 +53,7 @@ impl Log {
         let (mut last_index, mut last_term) = (0, 0);
         for i in 1..std::u64::MAX {
             if let Some(e) = store.get(&i.to_string())? {
-                let entry: Entry = Self::deserialize(e)?;
+                let entry: Entry = deserialize(e)?;
                 last_index = i;
                 last_term = entry.term;
             } else {
@@ -76,7 +77,7 @@ impl Log {
         let index = self.last_index + 1;
         self.last_index = index;
         self.last_term = entry.term;
-        self.kv.set(&index.to_string(), Self::serialize(entry)?)?;
+        self.kv.set(&index.to_string(), serialize(entry)?)?;
         Ok(index)
     }
 
@@ -97,7 +98,7 @@ impl Log {
             self.apply_index += 1;
             self.apply_term = entry.term;
         }
-        self.kv.set("apply_index", Self::serialize(self.apply_index)?)?;
+        self.kv.set("apply_index", serialize(self.apply_index)?)?;
         Ok(Some((self.apply_index, output)))
     }
 
@@ -123,7 +124,7 @@ impl Log {
     /// Fetches an entry at an index
     pub fn get(&self, index: u64) -> Result<Option<Entry>, Error> {
         if let Some(value) = self.kv.get(&index.to_string())? {
-            Ok(Some(Self::deserialize(value)?))
+            Ok(Some(deserialize(value)?))
         } else {
             Ok(None)
         }
@@ -217,10 +218,9 @@ impl Log {
     /// containing the term number (0 if none) and candidate voted for
     /// in current term (if any).
     pub fn load_term(&self) -> Result<(u64, Option<String>), Error> {
-        let term =
-            if let Some(value) = self.kv.get("term")? { Self::deserialize(value)? } else { 0 };
+        let term = if let Some(value) = self.kv.get("term")? { deserialize(value)? } else { 0 };
         let voted_for = if let Some(value) = self.kv.get("voted_for")? {
-            Some(Self::deserialize(value)?)
+            Some(deserialize(value)?)
         } else {
             None
         };
@@ -232,29 +232,17 @@ impl Log {
     // FIXME Should be transactional.
     pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
         if term > 0 {
-            self.kv.set("term", Self::serialize(term)?)?
+            self.kv.set("term", serialize(term)?)?
         } else {
             self.kv.delete("term")?
         }
         if let Some(v) = voted_for {
-            self.kv.set("voted_for", Self::serialize(v)?)?
+            self.kv.set("voted_for", serialize(v)?)?
         } else {
             self.kv.delete("voted_for")?
         }
         debug!("Saved term={} and voted_for={:?}", term, voted_for);
         Ok(())
-    }
-
-    /// Deserializes a value from a byte buffer
-    fn deserialize<'de, V: serde::Deserialize<'de>>(bytes: Vec<u8>) -> Result<V, Error> {
-        Ok(serde::Deserialize::deserialize(&mut rmps::Deserializer::new(&bytes[..]))?)
-    }
-
-    /// Serializes a value into a byte buffer
-    fn serialize<V: serde::Serialize>(value: V) -> Result<Vec<u8>, Error> {
-        let mut bytes = Vec::new();
-        value.serialize(&mut rmps::Serializer::new(&mut bytes))?;
-        Ok(bytes)
     }
 }
 

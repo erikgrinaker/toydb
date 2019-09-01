@@ -2,7 +2,7 @@ use crate::raft::Raft;
 use crate::service;
 use crate::sql::types::{Row, Value};
 use crate::sql::{Parser, Planner, Storage};
-use crate::Error;
+use crate::utility::serialize;
 
 pub struct ToyDB {
     pub id: String,
@@ -32,10 +32,7 @@ impl service::ToyDB for ToyDB {
             .build(Parser::new(&req.query).parse().unwrap())
             .unwrap();
         let mut metadata = grpc::Metadata::new();
-        metadata.add(
-            grpc::MetadataKey::from("columns"),
-            Self::serialize(&plan.columns).unwrap().into(),
-        );
+        metadata.add(grpc::MetadataKey::from("columns"), serialize(&plan.columns).unwrap().into());
         // FIXME This needs to handle errors
         grpc::StreamingResponse::iter_with_metadata(
             metadata,
@@ -84,12 +81,5 @@ impl ToyDB {
             },
             ..Default::default()
         }
-    }
-
-    /// Serializes a value into a byte buffer
-    fn serialize<V: serde::Serialize>(value: V) -> Result<Vec<u8>, Error> {
-        let mut bytes = Vec::new();
-        value.serialize(&mut rmps::Serializer::new(&mut bytes))?;
-        Ok(bytes)
     }
 }

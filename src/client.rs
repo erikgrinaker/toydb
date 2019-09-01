@@ -1,5 +1,6 @@
 use crate::service;
 use crate::sql::types::{Row, Value};
+use crate::utility::deserialize;
 use crate::Error;
 use grpc::ClientStubExt;
 use service::ToyDB;
@@ -23,10 +24,13 @@ impl Client {
 
     /// Fetches the table schema as SQL
     pub fn get_table(&self, table: &str) -> Result<String, Error> {
-        let (_, resp, _) = self.client.get_table(
-            grpc::RequestOptions::new(),
-            service::GetTableRequest { name: table.to_string(), ..Default::default() },
-        ).wait()?;
+        let (_, resp, _) = self
+            .client
+            .get_table(
+                grpc::RequestOptions::new(),
+                service::GetTableRequest { name: table.to_string(), ..Default::default() },
+            )
+            .wait()?;
         Ok(resp.sql)
     }
 
@@ -71,7 +75,7 @@ impl ResultSet {
         metadata: grpc::Metadata,
         rows: Box<dyn std::iter::Iterator<Item = Result<service::Row, grpc::Error>>>,
     ) -> Result<Self, Error> {
-        let columns = Self::deserialize(
+        let columns = deserialize(
             metadata
                 .get("columns")
                 .map(|c| c.to_vec())
@@ -82,11 +86,6 @@ impl ResultSet {
 
     pub fn columns(&self) -> Vec<String> {
         self.columns.clone()
-    }
-
-    /// Deserializes a value from a byte buffer
-    fn deserialize<'de, V: serde::Deserialize<'de>>(bytes: Vec<u8>) -> Result<V, Error> {
-        Ok(serde::Deserialize::deserialize(&mut rmps::Deserializer::new(&bytes[..]))?)
     }
 
     /// Converts a protobuf row into a proper row
