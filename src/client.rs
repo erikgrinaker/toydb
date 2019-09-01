@@ -12,11 +12,11 @@ pub struct Client {
 
 impl Client {
     /// Creates a new client
-    pub fn new(addr: std::net::SocketAddr) -> Result<Self, Error> {
+    pub fn new(host: &str, port: u16) -> Result<Self, Error> {
         Ok(Self {
             client: service::ToyDBClient::new_plain(
-                &addr.ip().to_string(),
-                addr.port(),
+                host,
+                port,
                 grpc::ClientConf::new(),
             )?,
         })

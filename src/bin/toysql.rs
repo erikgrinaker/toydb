@@ -1,3 +1,8 @@
+/*
+ * ToySQL is a command-line client for ToyDB. It can connect to any ToyDB node
+ * via gRPC and run SQL queries through a REPL interface.
+ */
+
 #![warn(clippy::all)]
 
 #[macro_use]
@@ -13,7 +18,7 @@ fn main() -> Result<(), toydb::Error> {
             clap::Arg::with_name("host")
                 .short("h")
                 .long("host")
-                .help("Host to connect to (IP address)")
+                .help("Host to connect to")
                 .takes_value(true)
                 .default_value("127.0.0.1"),
         )
@@ -30,33 +35,63 @@ fn main() -> Result<(), toydb::Error> {
     ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)?.run()
 }
 
+/// The ToySQL REPL
 struct ToySQL {
     client: toydb::Client,
     editor: rustyline::Editor<()>,
 }
 
 impl ToySQL {
-    fn new(hostname: &str, port: u16) -> Result<Self, toydb::Error> {
-        let sa = format!("{}:{}", hostname, port).parse::<std::net::SocketAddr>()?;
-        Ok(Self { client: toydb::Client::new(sa)?, editor: rustyline::Editor::<()>::new() })
+    /// Creates a new ToySQL REPL for the given server host and port
+    fn new(host: &str, port: u16) -> Result<Self, toydb::Error> {
+        Ok(Self { client: toydb::Client::new(host, port)?, editor: rustyline::Editor::<()>::new() })
     }
 
+    /// Runs the ToySQL REPL
     fn run(&mut self) -> Result<(), toydb::Error> {
+        let history_path = match std::env::var_os("HOME") {
+            Some(home) => Some(std::path::Path::new(&home).join(".toysql.history")),
+            None => None,
+        };
+        if let Some(path) = &history_path {
+            match self.editor.load_history(path) {
+                Ok(_) => {}
+                Err(ReadlineError::Io(ref err)) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => return Err(err.into()),
+            };
+        }
+
         let status = self.client.status()?;
         println!("Connected to node \"{}\" (version {})", status.id, status.version);
 
-        while let Some(command) = self.prompt()? {
-            if command.is_empty() {
+        while let Some(input) = self.prompt()? {
+            if input.is_empty() {
                 continue;
-            } else if command.starts_with('!') {
-                self.command(&command)?;
+            } else if input.starts_with('!') {
+                self.command(&input)?;
             } else {
-                self.query(&command)?;
+                self.query(&input)?;
             }
+        }
+
+        if let Some(path) = &history_path {
+            self.editor.save_history(path)?;
         }
         Ok(())
     }
 
+    /// Runs a query and displays the results
+    fn query(&mut self, query: &str) -> Result<(), toydb::Error> {
+        let mut resultset = self.client.query(query)?;
+        println!("{}", resultset.columns().join("|"));
+        while let Some(Ok(row)) = resultset.next() {
+            let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
+            println!("{}", formatted.join("|"));
+        }
+        Ok(())
+    }
+
+    /// Handles a REPL command (prefixed by !, e.g. !help)
     fn command(&mut self, command: &str) -> Result<(), toydb::Error> {
         let mut args = command.split_whitespace();
         match args.next() {
@@ -68,21 +103,13 @@ impl ToySQL {
         Ok(())
     }
 
+    /// Handles the !table command
     fn command_table(&mut self, table: &str) -> Result<(), toydb::Error> {
         println!("{}", self.client.get_table(table)?);
         Ok(())
     }
 
-    fn query(&mut self, query: &str) -> Result<(), toydb::Error> {
-        let mut resultset = self.client.query(query)?;
-        println!("{}", resultset.columns().join("|"));
-        while let Some(Ok(row)) = resultset.next() {
-            let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
-            println!("{}", formatted.join("|"));
-        }
-        Ok(())
-    }
-
+    /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>, toydb::Error> {
         match self.editor.readline("toydb> ") {
             Ok(input) => {
