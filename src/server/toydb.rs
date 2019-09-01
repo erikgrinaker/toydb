@@ -11,6 +11,18 @@ pub struct ToyDB {
 }
 
 impl service::ToyDB for ToyDB {
+    fn get_table(
+        &self,
+        _: grpc::RequestOptions,
+        req: service::GetTableRequest,
+    ) -> grpc::SingleResponse<service::GetTableResponse> {
+        let schema = self.storage.get_table(&req.name).unwrap();
+        grpc::SingleResponse::completed(service::GetTableResponse {
+            sql: schema.to_query(),
+            ..Default::default()
+        })
+    }
+
     fn query(
         &self,
         _: grpc::RequestOptions,

@@ -2,6 +2,9 @@ syntax = "proto3";
 
 // The main ToyDB service used by ToyDB clients.
 service ToyDB {
+  // GetTable fetches the schema for a table
+  rpc GetTable(GetTableRequest) returns (GetTableResponse) {};
+
   // Status asks the server for its status.
   rpc Status(StatusRequest) returns (StatusResponse) {};
 
@@ -32,4 +35,14 @@ message Field {
     double float = 3;
     string string = 4;
   };
+}
+
+message GetTableRequest {
+  string name = 1;
+}
+
+// FIXME We currently just return the CREATE TABLE query for the table,
+// to avoid having to map the entire schema data structure to Protobuf.
+message GetTableResponse {
+  string sql = 1;
 }

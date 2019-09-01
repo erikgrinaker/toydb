@@ -21,6 +21,15 @@ impl Client {
         })
     }
 
+    /// Fetches the table schema as SQL
+    pub fn get_table(&self, table: &str) -> Result<String, Error> {
+        let (_, resp, _) = self.client.get_table(
+            grpc::RequestOptions::new(),
+            service::GetTableRequest { name: table.to_string(), ..Default::default() },
+        ).wait()?;
+        Ok(resp.sql)
+    }
+
     /// Runs a query
     pub fn query(&self, query: &str) -> Result<ResultSet, Error> {
         let (metadata, iter) = self
@@ -35,11 +44,11 @@ impl Client {
 
     /// Checks server status
     pub fn status(&self) -> Result<Status, Error> {
-        let (_, resp, _) = self.client.status(grpc::RequestOptions::new(), service::StatusRequest::new()).wait()?;
-        Ok(Status{
-            id: resp.id,
-            version: resp.version,
-        })
+        let (_, resp, _) = self
+            .client
+            .status(grpc::RequestOptions::new(), service::StatusRequest::new())
+            .wait()?;
+        Ok(Status { id: resp.id, version: resp.version })
     }
 }
 

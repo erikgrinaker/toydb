@@ -27,29 +27,70 @@ fn main() -> Result<(), toydb::Error> {
         )
         .get_matches();
 
-    let sa = format!("{}:{}", opts.value_of("host").unwrap(), opts.value_of("port").unwrap())
-        .parse::<std::net::SocketAddr>()?;
+    ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)?.run()
+}
 
-    let client = toydb::Client::new(sa)?;
-    let status = client.status()?;
-    println!("Connected to node \"{}\" (version {})", status.id, status.version);
+struct ToySQL {
+    client: toydb::Client,
+    editor: rustyline::Editor<()>,
+}
 
-    let mut editor = rustyline::Editor::<()>::new();
-    loop {
-        let query = match editor.readline("toydb> ") {
-            Ok(input) => {
-                editor.add_history_entry(&input);
-                input
+impl ToySQL {
+    fn new(hostname: &str, port: u16) -> Result<Self, toydb::Error> {
+        let sa = format!("{}:{}", hostname, port).parse::<std::net::SocketAddr>()?;
+        Ok(Self { client: toydb::Client::new(sa)?, editor: rustyline::Editor::<()>::new() })
+    }
+
+    fn run(&mut self) -> Result<(), toydb::Error> {
+        let status = self.client.status()?;
+        println!("Connected to node \"{}\" (version {})", status.id, status.version);
+
+        while let Some(command) = self.prompt()? {
+            if command.is_empty() {
+                continue;
+            } else if command.starts_with('!') {
+                self.command(&command)?;
+            } else {
+                self.query(&command)?;
             }
-            Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => break,
-            Err(err) => return Err(err.into()),
+        }
+        Ok(())
+    }
+
+    fn command(&mut self, command: &str) -> Result<(), toydb::Error> {
+        let mut args = command.split_whitespace();
+        match args.next() {
+            Some("!help") => println!("Help!"),
+            Some("!table") => self.command_table(args.next().unwrap())?,
+            Some(c) => return Err(toydb::Error::Parse(format!("Unknown command {}", c))),
+            None => return Err(toydb::Error::Parse("Expected command".to_string())),
         };
-        let mut resultset = client.query(&query)?;
+        Ok(())
+    }
+
+    fn command_table(&mut self, table: &str) -> Result<(), toydb::Error> {
+        println!("{}", self.client.get_table(table)?);
+        Ok(())
+    }
+
+    fn query(&mut self, query: &str) -> Result<(), toydb::Error> {
+        let mut resultset = self.client.query(query)?;
         println!("{}", resultset.columns().join("|"));
         while let Some(Ok(row)) = resultset.next() {
             let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
             println!("{}", formatted.join("|"));
         }
+        Ok(())
     }
-    Ok(())
+
+    fn prompt(&mut self) -> Result<Option<String>, toydb::Error> {
+        match self.editor.readline("toydb> ") {
+            Ok(input) => {
+                self.editor.add_history_entry(&input);
+                Ok(Some(input.trim().to_string()))
+            }
+            Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => Ok(None),
+            Err(err) => Err(err.into()),
+        }
+    }
 }
