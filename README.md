@@ -23,8 +23,6 @@ Connected to node "toydb" (version 0.1.0). Enter !help for instructions.
 toydb> 
 ```
 
-See `cargo run --bin toysql -- --help` for more.
-
 ## Project Outline
 
 - [x] **Networking:** gRPC for internal and external communication, no security.
