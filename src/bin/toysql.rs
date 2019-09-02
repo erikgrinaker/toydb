@@ -39,73 +39,56 @@ fn main() -> Result<(), toydb::Error> {
 struct ToySQL {
     client: toydb::Client,
     editor: rustyline::Editor<()>,
+    history_path: Option<std::path::PathBuf>,
 }
 
 impl ToySQL {
     /// Creates a new ToySQL REPL for the given server host and port
     fn new(host: &str, port: u16) -> Result<Self, toydb::Error> {
-        Ok(Self { client: toydb::Client::new(host, port)?, editor: rustyline::Editor::<()>::new() })
-    }
-
-    /// Runs the ToySQL REPL
-    fn run(&mut self) -> Result<(), toydb::Error> {
-        let history_path = match std::env::var_os("HOME") {
-            Some(home) => Some(std::path::Path::new(&home).join(".toysql.history")),
-            None => None,
-        };
-        if let Some(path) = &history_path {
-            match self.editor.load_history(path) {
-                Ok(_) => {}
-                Err(ReadlineError::Io(ref err)) if err.kind() == std::io::ErrorKind::NotFound => {}
-                Err(err) => return Err(err.into()),
-            };
-        }
-
-        let status = self.client.status()?;
-        println!("Connected to node \"{}\" (version {})", status.id, status.version);
-
-        while let Some(input) = self.prompt()? {
-            if input.is_empty() {
-                continue;
-            } else if input.starts_with('!') {
-                self.command(&input)?;
-            } else {
-                self.query(&input)?;
-            }
-        }
-
-        if let Some(path) = &history_path {
-            self.editor.save_history(path)?;
-        }
-        Ok(())
-    }
-
-    /// Runs a query and displays the results
-    fn query(&mut self, query: &str) -> Result<(), toydb::Error> {
-        let mut resultset = self.client.query(query)?;
-        println!("{}", resultset.columns().join("|"));
-        while let Some(Ok(row)) = resultset.next() {
-            let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
-            println!("{}", formatted.join("|"));
-        }
-        Ok(())
+        Ok(Self {
+            client: toydb::Client::new(host, port)?,
+            editor: rustyline::Editor::<()>::new(),
+            history_path: std::env::var_os("HOME")
+                .map(|home| std::path::Path::new(&home).join(".toysql.history")),
+        })
     }
 
     /// Handles a REPL command (prefixed by !, e.g. !help)
-    fn command(&mut self, command: &str) -> Result<(), toydb::Error> {
-        let mut args = command.split_whitespace();
-        match args.next() {
-            Some("!help") => println!("Help!"),
-            Some("!table") => self.command_table(args.next().unwrap())?,
-            Some(c) => return Err(toydb::Error::Parse(format!("Unknown command {}", c))),
-            None => return Err(toydb::Error::Parse("Expected command".to_string())),
-        };
-        Ok(())
-    }
+    fn command(&mut self, input: &str) -> Result<(), toydb::Error> {
+        let mut input = input.split_ascii_whitespace();
+        let command =
+            input.next().ok_or_else(|| toydb::Error::Parse("Expected command.".to_string()))?;
 
-    /// Handles the !table command
-    fn command_table(&mut self, table: &str) -> Result<(), toydb::Error> {
-        println!("{}", self.client.get_table(table)?);
+        let getargs = |n| {
+            let args: Vec<&str> = input.collect();
+            if args.len() != n {
+                Err(toydb::Error::Parse(format!(
+                    "{}: expected {} args, got {}",
+                    command,
+                    n,
+                    args.len()
+                )))
+            } else {
+                Ok(args)
+            }
+        };
+
+        match command {
+            "!help" => println!(
+                r#"
+Enter an SQL statement on a single line to execute it and display the result.
+Semicolons are not supported. The following !-commands are also available:
+
+  !help            This help message
+  !table [table]   Display table schema, if it exists
+"#
+            ),
+            "!table" => {
+                let args = getargs(1)?;
+                println!("{}", self.client.get_table(args[0])?);
+            }
+            c => return Err(toydb::Error::Parse(format!("Unknown command {}", c))),
+        }
         Ok(())
     }
 
@@ -119,5 +102,46 @@ impl ToySQL {
             Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => Ok(None),
             Err(err) => Err(err.into()),
         }
+    }
+
+    /// Runs a query and displays the results
+    fn query(&mut self, query: &str) -> Result<(), toydb::Error> {
+        let mut resultset = self.client.query(query)?;
+        println!("{}", resultset.columns().join("|"));
+        while let Some(Ok(row)) = resultset.next() {
+            let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
+            println!("{}", formatted.join("|"));
+        }
+        Ok(())
+    }
+
+    /// Runs the ToySQL REPL
+    fn run(&mut self) -> Result<(), toydb::Error> {
+        if let Some(path) = &self.history_path {
+            match self.editor.load_history(path) {
+                Ok(_) => {}
+                Err(ReadlineError::Io(ref err)) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => return Err(err.into()),
+            };
+        }
+
+        let status = self.client.status()?;
+        println!(
+            "Connected to node \"{}\" (version {}). Enter !help for instructions.",
+            status.id, status.version
+        );
+
+        while let Some(input) = self.prompt()? {
+            if input.starts_with('!') {
+                self.command(&input)?;
+            } else if !input.is_empty() {
+                self.query(&input)?;
+            }
+        }
+
+        if let Some(path) = &self.history_path {
+            self.editor.save_history(path)?;
+        }
+        Ok(())
     }
 }
