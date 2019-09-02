@@ -15,6 +15,7 @@ use rustyline::error::ReadlineError;
 fn main() -> Result<(), toydb::Error> {
     let opts = app_from_crate!()
         .arg(clap::Arg::with_name("command"))
+        .arg(clap::Arg::with_name("headers").short("H").long("headers").help("Show column headers"))
         .arg(
             clap::Arg::with_name("host")
                 .short("h")
@@ -37,6 +38,10 @@ fn main() -> Result<(), toydb::Error> {
 
     let mut toysql =
         ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)?;
+    if opts.is_present("headers") {
+        toysql.show_headers = true
+    }
+
     if let Some(command) = opts.value_of("command") {
         toysql.execute(&command)
     } else {
@@ -49,6 +54,7 @@ struct ToySQL {
     client: toydb::Client,
     editor: rustyline::Editor<()>,
     history_path: Option<std::path::PathBuf>,
+    show_headers: bool,
 }
 
 impl ToySQL {
@@ -59,6 +65,7 @@ impl ToySQL {
             editor: rustyline::Editor::<()>::new(),
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
+            show_headers: false,
         })
     }
 
@@ -94,13 +101,30 @@ impl ToySQL {
         };
 
         match command {
+            "!headers" => match getargs(1)?[0] {
+                "on" => {
+                    self.show_headers = true;
+                    println!("Headers enabled");
+                }
+                "off" => {
+                    self.show_headers = false;
+                    println!("Headers disabled");
+                }
+                v => {
+                    return Err(toydb::Error::Parse(format!(
+                        "Invalid value {}, expected on or off",
+                        v
+                    )))
+                }
+            },
             "!help" => println!(
                 r#"
 Enter an SQL statement on a single line to execute it and display the result.
 Semicolons are not supported. The following !-commands are also available:
 
-  !help            This help message
-  !table [table]   Display table schema, if it exists
+  !headers <on|off>  Toggles/enables/disables column headers display
+  !help              This help message
+  !table [table]     Display table schema, if it exists
 "#
             ),
             "!table" => {
@@ -115,7 +139,9 @@ Semicolons are not supported. The following !-commands are also available:
     /// Runs a query and displays the results
     fn execute_query(&mut self, query: &str) -> Result<(), toydb::Error> {
         let mut resultset = self.client.query(query)?;
-        println!("{}", resultset.columns().join("|"));
+        if self.show_headers {
+            println!("{}", resultset.columns().join("|"));
+        }
         while let Some(Ok(row)) = resultset.next() {
             let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
             println!("{}", formatted.join("|"));

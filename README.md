@@ -22,17 +22,19 @@ $ grpcurl -plaintext -proto protobuf/toydb.proto localhost:9605 ToyDB/Status
 
 ## Project Outline
 
-- [x] **Networking:** gRPC, no security.
+- [x] **Networking:** gRPC for internal and external communication, no security.
+
+- [x] **Client:** Simple interactive REPL client over gRPC.
 
 - [x] **Consensus:** Self-written Raft implementation with strictly serializable reads and writes.
 
-- [ ] **Storage:** Self-written key-value engine using B+-trees (and possibly LSM-trees), with secondary indexes. MessagePack for serialization. No log compaction or write-ahead log.
+- [ ] **Storage:** Self-written key-value store using B+-trees and possibly LSM-trees. MessagePack for serialization. No log compaction or write-ahead log.
 
 - [x] **Data Types:** Support for nulls, booleans, 64-bit integers, 64-bit floats, and UTF-8 strings up to 1 KB.
 
-- [ ] **Schemas:** Compulsory singluar primary keys, unique indexes, and foreign keys.
+- [ ] **Schemas:** Compulsory singluar primary keys, unique and foreign key constraints, indexes.
 
-- [ ] **Transactions:** MVCC-based serializable snapshot isolation.
+- [ ] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based serializable snapshot isolation.
 
 - [ ] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer.
 
@@ -46,8 +48,6 @@ $ grpcurl -plaintext -proto protobuf/toydb.proto localhost:9605 ToyDB/Status
   * `DELETE FROM ... WHERE ...`
   * `SELECT ... FROM ... WHERE ... GROUP BY ... HAVING ... ORDER BY ...`
   * `EXPLAIN SELECT ...`
-
-- [ ] **Client:** Simple interactive REPL client over gRPC.
 
 - [ ] **Verification:** [Jepsen](https://github.com/jepsen-io/jepsen) test suite.
 
