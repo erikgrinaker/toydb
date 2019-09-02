@@ -53,8 +53,19 @@ impl ToySQL {
         })
     }
 
+    /// Executes a line of input
+    fn execute(&mut self, input: &str) -> Result<(), toydb::Error> {
+        if input.starts_with('!') {
+            self.execute_command(&input)
+        } else if !input.is_empty() {
+            self.execute_query(&input)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Handles a REPL command (prefixed by !, e.g. !help)
-    fn command(&mut self, input: &str) -> Result<(), toydb::Error> {
+    fn execute_command(&mut self, input: &str) -> Result<(), toydb::Error> {
         let mut input = input.split_ascii_whitespace();
         let command =
             input.next().ok_or_else(|| toydb::Error::Parse("Expected command.".to_string()))?;
@@ -92,6 +103,17 @@ Semicolons are not supported. The following !-commands are also available:
         Ok(())
     }
 
+    /// Runs a query and displays the results
+    fn execute_query(&mut self, query: &str) -> Result<(), toydb::Error> {
+        let mut resultset = self.client.query(query)?;
+        println!("{}", resultset.columns().join("|"));
+        while let Some(Ok(row)) = resultset.next() {
+            let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
+            println!("{}", formatted.join("|"));
+        }
+        Ok(())
+    }
+
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>, toydb::Error> {
         match self.editor.readline("toydb> ") {
@@ -102,17 +124,6 @@ Semicolons are not supported. The following !-commands are also available:
             Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => Ok(None),
             Err(err) => Err(err.into()),
         }
-    }
-
-    /// Runs a query and displays the results
-    fn query(&mut self, query: &str) -> Result<(), toydb::Error> {
-        let mut resultset = self.client.query(query)?;
-        println!("{}", resultset.columns().join("|"));
-        while let Some(Ok(row)) = resultset.next() {
-            let formatted: Vec<String> = row.into_iter().map(|v| format!("{}", v)).collect();
-            println!("{}", formatted.join("|"));
-        }
-        Ok(())
     }
 
     /// Runs the ToySQL REPL
@@ -132,10 +143,8 @@ Semicolons are not supported. The following !-commands are also available:
         );
 
         while let Some(input) = self.prompt()? {
-            if input.starts_with('!') {
-                self.command(&input)?;
-            } else if !input.is_empty() {
-                self.query(&input)?;
+            if let Err(err) = self.execute(&input) {
+                println!("Error: {}", err.to_string())
             }
         }
 
