@@ -14,12 +14,14 @@ use rustyline::error::ReadlineError;
 
 fn main() -> Result<(), toydb::Error> {
     let opts = app_from_crate!()
+        .arg(clap::Arg::with_name("command"))
         .arg(
             clap::Arg::with_name("host")
                 .short("h")
                 .long("host")
                 .help("Host to connect to")
                 .takes_value(true)
+                .required(true)
                 .default_value("127.0.0.1"),
         )
         .arg(
@@ -28,11 +30,18 @@ fn main() -> Result<(), toydb::Error> {
                 .long("port")
                 .help("Port number to connect to")
                 .takes_value(true)
+                .required(true)
                 .default_value("9605"),
         )
         .get_matches();
 
-    ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)?.run()
+    let mut toysql =
+        ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)?;
+    if let Some(command) = opts.value_of("command") {
+        toysql.execute(&command)
+    } else {
+        toysql.run()
+    }
 }
 
 /// The ToySQL REPL
