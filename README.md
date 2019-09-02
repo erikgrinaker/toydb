@@ -8,17 +8,22 @@ The primary goal is to build a minimally functional yet correct distributed data
 
 ## Usage
 
-A local five-node cluster can be started by running:
+A local five-node cluster can be started on `localhost` ports `9601` to `9605` by running:
 
-```sh
+```
 $ (cd sandbox && docker-compose up --build)
 ```
 
-The nodes can be contacted on `localhost` ports `9601` to `9605`, e.g.:
+A command-line REPL client can be built and used with the node on `localhost` port `9605`
+by running:
 
-```sh
-$ grpcurl -plaintext -proto protobuf/toydb.proto localhost:9605 ToyDB/Status
 ```
+$ cargo run --bin toysql
+Connected to node "toydb" (version 0.1.0). Enter !help for instructions.
+toydb> 
+```
+
+See `cargo run --bin toysql -- --help` for more.
 
 ## Project Outline
 
