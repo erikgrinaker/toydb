@@ -18,21 +18,18 @@ impl Iterator for Node {
 
     fn next(&mut self) -> Option<Result<Row, Error>> {
         match self {
-            Node::DDL { storage, ddl } => {
-                ddl.execute(*storage.clone()).unwrap();
-                None
-            }
-            Node::DML { storage, dml } => {
-                dml.execute(*storage.clone()).unwrap();
-                None
-            }
-            Node::Projection { source, expressions, .. } => {
-                if let Err(err) = source.next()? {
-                    Some(Err(err))
-                } else {
-                    Some(expressions.iter().map(|e| e.evaluate()).collect())
-                }
-            }
+            Node::DDL { storage, ddl } => match ddl.execute(*storage.clone()) {
+                Err(err) => Some(Err(err)),
+                _ => None,
+            },
+            Node::DML { storage, dml } => match dml.execute(*storage.clone()) {
+                Err(err) => Some(Err(err)),
+                _ => None,
+            },
+            Node::Projection { source, expressions, .. } => match source.next()? {
+                Err(err) => Some(Err(err)),
+                _ => Some(expressions.iter().map(|e| e.evaluate()).collect()),
+            },
             Node::Nothing { ref mut done } => {
                 if !*done {
                     *done = true;
