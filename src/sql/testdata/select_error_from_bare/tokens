@@ -1,0 +1,11 @@
+[
+    Keyword(
+        Select,
+    ),
+    Number(
+        "1",
+    ),
+    Keyword(
+        From,
+    ),
+]

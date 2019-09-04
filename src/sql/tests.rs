@@ -66,5 +66,6 @@ test_sql! {
     select_alone_literal_string_quotes: r#"SELECT 'Literal with ''single'' and "double" quotes'"#,
     select_error_bare: "SELECT",
     select_error_bare_as: "SELECT 1 AS, 2",
+    select_error_from_bare: "SELECT 1 FROM",
     select_error_trailing_comma: "SELECT 1, 2,",
 }
