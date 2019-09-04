@@ -60,6 +60,17 @@ impl Storage {
         )
     }
 
+    /// Lists tables
+    pub fn list_tables(&self) -> Result<Vec<String>, Error> {
+        let mut iter = self.kv.read()?.iter_prefix("schema.table");
+        let mut tables = Vec::new();
+        while let Some((_, value)) = iter.next().transpose()? {
+            let schema: schema::Table = deserialize(value)?;
+            tables.push(schema.name)
+        }
+        Ok(tables)
+    }
+
     /// Checks if a table exists
     pub fn table_exists(&self, table: &str) -> Result<bool, Error> {
         Ok(self.kv.read()?.get(&Self::key_table(table))?.is_some())

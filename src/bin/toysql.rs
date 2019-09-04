@@ -125,11 +125,18 @@ Semicolons are not supported. The following !-commands are also available:
   !headers <on|off>  Toggles/enables/disables column headers display
   !help              This help message
   !table [table]     Display table schema, if it exists
+  !tables            List tables
 "#
             ),
             "!table" => {
                 let args = getargs(1)?;
                 println!("{}", self.client.get_table(args[0])?);
+            }
+            "!tables" => {
+                getargs(0)?;
+                for table in self.client.list_tables()? {
+                    println!("{}", table)
+                }
             }
             c => return Err(toydb::Error::Parse(format!("Unknown command {}", c))),
         }

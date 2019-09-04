@@ -5,12 +5,17 @@ service ToyDB {
   // GetTable fetches the schema for a table
   rpc GetTable(GetTableRequest) returns (GetTableResponse) {};
 
+  // ListTables lists the database tables
+  rpc ListTables(Empty) returns (ListTablesResponse) {};
+
   // Status asks the server for its status.
   rpc Status(StatusRequest) returns (StatusResponse) {};
 
   // Query runs an SQL query.
   rpc Query(QueryRequest) returns (stream Row) {};
 };
+
+message Empty {}
 
 message Error { string message = 1; }
 
@@ -45,4 +50,9 @@ message GetTableRequest { string name = 1; }
 message GetTableResponse {
   Error error = 1;
   string sql = 2;
+}
+
+message ListTablesResponse {
+  Error error = 1;
+  repeated string name = 2;
 }

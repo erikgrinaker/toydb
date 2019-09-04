@@ -29,6 +29,14 @@ impl Client {
         Ok(resp.sql)
     }
 
+    /// Lists database tables
+    pub fn list_tables(&self) -> Result<Vec<String>, Error> {
+        let (_, resp, _) =
+            self.client.list_tables(grpc::RequestOptions::new(), service::Empty::new()).wait()?;
+        error_from_protobuf(resp.error)?;
+        Ok(resp.name.to_vec())
+    }
+
     /// Runs a query
     pub fn query(&self, query: &str) -> Result<ResultSet, Error> {
         let (metadata, iter) = self
@@ -64,10 +72,10 @@ impl Iterator for ResultSet {
         match self.rows.next()? {
             Ok(row) => {
                 if let Err(err) = error_from_protobuf(row.error.clone()) {
-                    return Some(Err(err))
+                    return Some(Err(err));
                 }
                 Some(Ok(row_from_protobuf(row)))
-            },
+            }
             Err(err) => Some(Err(err.into())),
         }
     }

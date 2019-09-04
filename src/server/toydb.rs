@@ -25,6 +25,19 @@ impl service::ToyDB for ToyDB {
         grpc::SingleResponse::completed(resp)
     }
 
+    fn list_tables(
+        &self,
+        _: grpc::RequestOptions,
+        _: service::Empty,
+    ) -> grpc::SingleResponse<service::ListTablesResponse> {
+        let mut resp = service::ListTablesResponse::new();
+        match self.storage.list_tables() {
+            Ok(tables) => resp.name = protobuf::RepeatedField::from_vec(tables),
+            Err(err) => resp.error = Self::error_to_protobuf(err),
+        };
+        grpc::SingleResponse::completed(resp)
+    }
+
     fn query(
         &self,
         _: grpc::RequestOptions,
