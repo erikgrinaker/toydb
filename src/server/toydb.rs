@@ -1,7 +1,8 @@
+use crate::Error;
 use crate::raft::Raft;
 use crate::service;
 use crate::sql::types::{Row, Value};
-use crate::sql::{Parser, Planner, Storage};
+use crate::sql::{Parser, Plan, Planner, Storage};
 use crate::utility::serialize;
 
 pub struct ToyDB {
@@ -16,11 +17,12 @@ impl service::ToyDB for ToyDB {
         _: grpc::RequestOptions,
         req: service::GetTableRequest,
     ) -> grpc::SingleResponse<service::GetTableResponse> {
-        let schema = self.storage.get_table(&req.name).unwrap();
-        grpc::SingleResponse::completed(service::GetTableResponse {
-            sql: schema.to_query(),
-            ..Default::default()
-        })
+        let mut resp = service::GetTableResponse::new();
+        match self.storage.get_table(&req.name) {
+            Ok(schema) => resp.sql = schema.to_query(),
+            Err(err) => resp.error = Self::error_to_protobuf(err),
+        };
+        grpc::SingleResponse::completed(resp)
     }
 
     fn query(
@@ -28,15 +30,21 @@ impl service::ToyDB for ToyDB {
         _: grpc::RequestOptions,
         req: service::QueryRequest,
     ) -> grpc::StreamingResponse<service::Row> {
-        let plan = Planner::new(self.storage.clone())
-            .build(Parser::new(&req.query).parse().unwrap())
-            .unwrap();
+        let plan = match self.execute(&req.query) {
+            Ok(plan) => plan,
+            Err(err) => return grpc::StreamingResponse::completed(vec![service::Row{
+                error: Self::error_to_protobuf(err),
+                ..Default::default()
+            }])
+        };
         let mut metadata = grpc::Metadata::new();
         metadata.add(grpc::MetadataKey::from("columns"), serialize(&plan.columns).unwrap().into());
-        // FIXME This needs to handle errors
         grpc::StreamingResponse::iter_with_metadata(
             metadata,
-            plan.map(|row| Self::row_to_protobuf(row.unwrap())),
+            plan.map(|result| match result {
+                Ok(row) => Self::row_to_protobuf(row),
+                Err(err) => service::Row{error: Self::error_to_protobuf(err), ..Default::default()},
+            }),
         )
     }
 
@@ -48,19 +56,22 @@ impl service::ToyDB for ToyDB {
         grpc::SingleResponse::completed(service::StatusResponse {
             id: self.id.clone(),
             version: env!("CARGO_PKG_VERSION").into(),
-            time: match std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|t| t.as_secs())
-            {
-                Ok(t) => t as i64,
-                Err(e) => return grpc::SingleResponse::err(grpc::Error::Panic(format!("{}", e))),
-            },
             ..Default::default()
         })
     }
 }
 
 impl ToyDB {
+    /// Executes an SQL statement
+    fn execute(&self, query: &str) -> Result<Plan, Error> {
+        Planner::new(self.storage.clone()).build(Parser::new(query).parse()?)
+    }
+
+    /// Converts an error into a protobuf object
+    fn error_to_protobuf(err: Error) -> protobuf::SingularPtrField<service::Error> {
+        protobuf::SingularPtrField::from(Some(service::Error { message: err.to_string(), ..Default::default() }))
+    }
+
     /// Converts a row into a protobuf row
     fn row_to_protobuf(row: Row) -> service::Row {
         service::Row {

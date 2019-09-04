@@ -12,20 +12,21 @@ service ToyDB {
   rpc Query(QueryRequest) returns (stream Row) {};
 };
 
+message Error { string message = 1; }
+
 message StatusRequest {};
 
 message StatusResponse {
-  string id = 1;
-  string version = 2;
-  int64 time = 3;
+  Error error = 1;
+  string id = 2;
+  string version = 3;
 };
 
-message QueryRequest {
-  string query = 1;
-};
+message QueryRequest { string query = 1; };
 
 message Row {
-  repeated Field field = 1;
+  Error error = 1;
+  repeated Field field = 2;
 };
 
 message Field {
@@ -37,12 +38,11 @@ message Field {
   };
 }
 
-message GetTableRequest {
-  string name = 1;
-}
+message GetTableRequest { string name = 1; }
 
 // FIXME We currently just return the CREATE TABLE query for the table,
 // to avoid having to map the entire schema data structure to Protobuf.
 message GetTableResponse {
-  string sql = 1;
+  Error error = 1;
+  string sql = 2;
 }
