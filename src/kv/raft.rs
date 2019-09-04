@@ -1,4 +1,4 @@
-use super::Store;
+use super::{Iter, Pair, Store};
 use crate::raft;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
@@ -38,6 +38,14 @@ impl Store for Raft {
         Ok(deserialize(self.raft.read(serialize(Read::Get(key.to_string()))?)?)?)
     }
 
+    fn iter_prefix(&self, prefix: &str) -> Box<dyn Iterator<Item = Result<Pair, Error>>> {
+        let items: Vec<(String, Vec<u8>)> = deserialize(
+            self.raft.read(serialize(Read::GetPrefix(prefix.to_string())).unwrap()).unwrap(),
+        )
+        .unwrap();
+        Box::new(Iter::from_vec(items))
+    }
+
     fn set(&mut self, key: &str, value: Vec<u8>) -> Result<(), Error> {
         self.raft.mutate(serialize(Mutation::Set(key.to_string(), value))?)?;
         Ok(())
@@ -58,6 +66,8 @@ enum Mutation {
 enum Read {
     /// Fetches a key
     Get(String),
+    /// Fetches an array of pairs under a key prefix
+    GetPrefix(String),
 }
 
 /// The underlying state machine for the store
@@ -100,6 +110,12 @@ impl raft::State for State {
             Read::Get(key) => {
                 info!("Getting {}", key);
                 Ok(serialize(self.store.get(&key)?)?)
+            }
+            Read::GetPrefix(prefix) => {
+                info!("Getting pairs under prefix {}", prefix);
+                let pairs: Vec<(String, Vec<u8>)> =
+                    self.store.iter_prefix(&prefix).collect::<Result<_, Error>>()?;
+                Ok(serialize(pairs)?)
             }
         }
     }

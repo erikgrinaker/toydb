@@ -1,4 +1,4 @@
-use super::Store;
+use super::{Iter, Pair, Store};
 use crate::Error;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
@@ -26,6 +26,12 @@ impl Store for Memory {
 
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Error> {
         Ok(self.data.clone().read()?.get(key).cloned())
+    }
+
+    fn iter_prefix(&self, prefix: &str) -> Box<dyn Iterator<Item = Result<Pair, Error>>> {
+        let from = prefix.to_string();
+        let to = from.clone() + &std::char::MAX.to_string();
+        Box::new(Iter::from(self.data.read().unwrap().range(from..to)))
     }
 
     fn set(&mut self, key: &str, value: Vec<u8>) -> Result<(), Error> {
