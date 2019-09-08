@@ -7,6 +7,17 @@ pub enum DataType {
     String,
 }
 
+impl std::fmt::Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Boolean => "BOOLEAN",
+            Self::Integer => "INTEGER",
+            Self::Float => "FLOAT",
+            Self::String => "VARCHAR",
+        })
+    }
+}
+
 /// A value
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Value {
@@ -26,15 +37,28 @@ impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(
             match self {
-                Value::Null => "NULL".to_string(),
-                Value::Boolean(b) if *b => "TRUE".to_string(),
-                Value::Boolean(_) => "FALSE".to_string(),
-                Value::Integer(i) => i.to_string(),
-                Value::Float(f) => f.to_string(),
-                Value::String(s) => s.clone(),
+                Self::Null => "NULL".to_string(),
+                Self::Boolean(b) if *b => "TRUE".to_string(),
+                Self::Boolean(_) => "FALSE".to_string(),
+                Self::Integer(i) => i.to_string(),
+                Self::Float(f) => f.to_string(),
+                Self::String(s) => s.clone(),
             }
             .as_ref(),
         )
+    }
+}
+
+impl Value {
+    /// Returns the value's datatype, or None for null values
+    pub fn datatype(&self) -> Option<DataType> {
+        match self {
+            Self::Null => None,
+            Self::Boolean(_) => Some(DataType::Boolean),
+            Self::Integer(_) => Some(DataType::Integer),
+            Self::Float(_) => Some(DataType::Float),
+            Self::String(_) => Some(DataType::String),
+        }
     }
 }
 

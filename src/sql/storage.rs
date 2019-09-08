@@ -19,11 +19,15 @@ impl Storage {
     /// Creates a row
     pub fn create_row(&mut self, table: &str, row: types::Row) -> Result<(), Error> {
         let table = self.get_table(&table)?;
-        let id = row
-            .get(table.primary_key)
-            .ok_or_else(|| Error::Value("No primary key value".into()))?;
-        // FIXME Needs to check existence
-        self.kv.write()?.set(&Self::key_row(&table.name, &id.to_string()), serialize(row)?)?;
+        table.validate_row(&row)?;
+        let pk = row.get(table.primary_key).unwrap();
+        if self.get_row(&table.name, &pk)?.is_some() {
+            return Err(Error::Value(format!(
+                "Primary key {} already exists for table {}",
+                pk, table.name
+            )));
+        }
+        self.kv.write()?.set(&Self::key_row(&table.name, &pk.to_string()), serialize(row)?)?;
         Ok(())
     }
 
@@ -42,6 +46,11 @@ impl Storage {
         self.get_table(table)?;
         self.kv.write()?.delete(&Self::key_table(table))?;
         Ok(())
+    }
+
+    /// Fetches a row
+    pub fn get_row(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error> {
+        self.kv.read()?.get(&Self::key_row(table, &id.to_string()))?.map(deserialize).transpose()
     }
 
     /// Fetches a table schema

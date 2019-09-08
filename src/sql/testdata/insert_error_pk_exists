@@ -1,0 +1,55 @@
+Query: INSERT INTO genres VALUES (1, 'Western')
+
+Tokens:
+  Keyword(Insert)
+  Keyword(Into)
+  Ident("genres")
+  Keyword(Values)
+  OpenParen
+  Number("1")
+  Comma
+  String("Western")
+  CloseParen
+
+AST: Insert {
+    table: "genres",
+    columns: None,
+    values: [
+        [
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                String(
+                    "Western",
+                ),
+            ),
+        ],
+    ],
+}
+
+Plan: Plan {
+    root: Insert {
+        table: "genres",
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    String(
+                        "Western",
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
+Query: INSERT INTO genres VALUES (1, 'Western')
+
+Result: Value("Primary key 1 already exists for table genres")

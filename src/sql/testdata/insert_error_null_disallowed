@@ -1,0 +1,51 @@
+Query: INSERT INTO genres VALUES (9, NULL)
+
+Tokens:
+  Keyword(Insert)
+  Keyword(Into)
+  Ident("genres")
+  Keyword(Values)
+  OpenParen
+  Number("9")
+  Comma
+  Keyword(Null)
+  CloseParen
+
+AST: Insert {
+    table: "genres",
+    columns: None,
+    values: [
+        [
+            Literal(
+                Integer(
+                    9,
+                ),
+            ),
+            Literal(
+                Null,
+            ),
+        ],
+    ],
+}
+
+Plan: Plan {
+    root: Insert {
+        table: "genres",
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+                Constant(
+                    Null,
+                ),
+            ],
+        ],
+    },
+}
+
+Query: INSERT INTO genres VALUES (9, NULL)
+
+Result: Value("NULL value not allowed for column name")

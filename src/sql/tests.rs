@@ -1,3 +1,7 @@
+/**
+ * Tests for the SQL engine. Runs SQL queries against an in-memory database,
+ * and compares the results with golden files stored under src/sql/testdata/
+ */
 use super::lexer::{Lexer, Token};
 use super::schema;
 use super::types::{DataType, Row, Value};
@@ -7,7 +11,6 @@ use crate::Error;
 use goldenfile::Mint;
 use std::io::Write;
 
-// test_sql! tests
 macro_rules! test_sql {
     ( $( $name:ident: $sql:expr, )* ) => {
     $(
@@ -191,6 +194,12 @@ test_sql! {
     expr_datatypes: "SELECT NULL, TRUE, FALSE, 1, 3.14, 'Hi! 👋'",
     expr_literal_numbers: "SELECT 0, 1, -2, --3, +-4, 3.14, 293, 3.14e3, 2.718E-2",
     expr_literal_string_quotes: r#"SELECT 'Literal with ''single'' and "double" quotes'"#,
+
+    insert_error_datatype_conflict: "INSERT INTO genres VALUES (9, 3.14)",
+    insert_error_null_disallowed: "INSERT INTO genres VALUES (9, NULL)",
+    insert_error_pk_exists: "INSERT INTO genres VALUES (1, 'Western')",
+    insert_error_pk_null: "INSERT INTO genres VALUES (NULL, 'Western')",
+    insert_values: "INSERT INTO genres VALUES (9, 'Western')",
 
     select_all_from_table: "SELECT * FROM movies",
     select_aliases: "SELECT 1, 2 b, 3 AS c",

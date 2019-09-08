@@ -1,4 +1,4 @@
-use super::types::DataType;
+use super::types::{DataType, Value};
 use crate::Error;
 
 /// A table
@@ -17,16 +17,7 @@ impl Table {
     pub fn to_query(&self) -> String {
         let mut query = format!("CREATE TABLE {} (\n", self.name);
         for (i, column) in self.columns.iter().enumerate() {
-            query += &format!(
-                "  {} {}",
-                column.name,
-                match column.datatype {
-                    DataType::Boolean => "BOOLEAN",
-                    DataType::Float => "FLOAT",
-                    DataType::Integer => "INTEGER",
-                    DataType::String => "VARCHAR",
-                }
-            );
+            query += &format!("  {} {}", column.name, column.datatype);
             if i == self.primary_key {
                 query += " PRIMARY KEY";
             }
@@ -56,6 +47,22 @@ impl Table {
         }
         Ok(())
     }
+
+    /// Validates a row
+    pub fn validate_row(&self, row: &[Value]) -> Result<(), Error> {
+        if row.len() != self.columns.len() {
+            return Err(Error::Value(format!(
+                "Invalid row size {} for table {}, expected {}",
+                row.len(),
+                self.name,
+                self.columns.len()
+            )));
+        }
+        for (column, value) in self.columns.iter().zip(row.iter()) {
+            column.validate_value(value)?;
+        }
+        Ok(())
+    }
 }
 
 /// A table column
@@ -67,4 +74,19 @@ pub struct Column {
     pub datatype: DataType,
     /// Whether the column allows null values
     pub nullable: bool,
+}
+
+impl Column {
+    /// Validates a column value
+    pub fn validate_value(&self, value: &Value) -> Result<(), Error> {
+        match value.datatype() {
+            None if self.nullable => Ok(()),
+            None => Err(Error::Value(format!("NULL value not allowed for column {}", self.name))),
+            Some(ref datatype) if datatype != &self.datatype => Err(Error::Value(format!(
+                "Invalid datatype {} for {} column {}",
+                datatype, self.datatype, self.name
+            ))),
+            _ => Ok(()),
+        }
+    }
 }

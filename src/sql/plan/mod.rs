@@ -141,21 +141,22 @@ impl Planner {
     fn build_schema_table(
         &self,
         name: String,
-        columnspecs: Vec<ast::ColumnSpec>,
+        cols: Vec<ast::ColumnSpec>,
     ) -> Result<schema::Table, Error> {
-        match columnspecs.iter().filter(|c| c.primary_key).count() {
+        match cols.iter().filter(|c| c.primary_key).count() {
             0 => return Err(Error::Value(format!("No primary key defined for table {}", name))),
-            n if n > 1 => return Err(Error::Value(format!(
-                "{} primary keys defined for table {}, must set exactly 1",
-                n,
-                name
-            ))),
+            n if n > 1 => {
+                return Err(Error::Value(format!(
+                    "{} primary keys defined for table {}, must set exactly 1",
+                    n, name
+                )))
+            }
             _ => {}
         };
         let table = schema::Table {
             name,
-            primary_key: columnspecs.iter().position(|c| c.primary_key).unwrap_or(0),
-            columns: columnspecs
+            primary_key: cols.iter().position(|c| c.primary_key).unwrap_or(0),
+            columns: cols
                 .into_iter()
                 .map(|spec| schema::Column {
                     name: spec.name,

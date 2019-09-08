@@ -1,0 +1,51 @@
+Query: INSERT INTO genres VALUES (NULL, 'Western')
+
+Tokens:
+  Keyword(Insert)
+  Keyword(Into)
+  Ident("genres")
+  Keyword(Values)
+  OpenParen
+  Keyword(Null)
+  Comma
+  String("Western")
+  CloseParen
+
+AST: Insert {
+    table: "genres",
+    columns: None,
+    values: [
+        [
+            Literal(
+                Null,
+            ),
+            Literal(
+                String(
+                    "Western",
+                ),
+            ),
+        ],
+    ],
+}
+
+Plan: Plan {
+    root: Insert {
+        table: "genres",
+        expressions: [
+            [
+                Constant(
+                    Null,
+                ),
+                Constant(
+                    String(
+                        "Western",
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
+Query: INSERT INTO genres VALUES (NULL, 'Western')
+
+Result: Value("NULL value not allowed for column id")
