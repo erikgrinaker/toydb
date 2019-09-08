@@ -17,6 +17,8 @@ extern crate rand;
 extern crate rmp_serde as rmps;
 extern crate rustyline;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate uuid;
 
 mod client;

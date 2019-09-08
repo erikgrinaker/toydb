@@ -2,7 +2,6 @@ use super::state::State;
 use crate::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
-use serde_derive::{Deserialize, Serialize};
 
 /// A replicated log entry
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

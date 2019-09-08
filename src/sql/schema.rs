@@ -1,5 +1,4 @@
 use super::types::DataType;
-use serde_derive::{Deserialize, Serialize};
 
 /// A table
 #[derive(Clone, Debug, Deserialize, Serialize)]

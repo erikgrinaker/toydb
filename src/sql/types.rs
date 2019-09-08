@@ -1,5 +1,3 @@
-use serde_derive::{Deserialize, Serialize};
-
 /// A datatype
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DataType {

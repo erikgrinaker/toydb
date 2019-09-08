@@ -2,7 +2,6 @@ use super::{Iter, Range, Store};
 use crate::raft;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
-use serde_derive::{Deserialize, Serialize};
 
 /// A Raft-backed key-value store. The underlying Raft state machine must be
 /// generated from Raft::new_state().
