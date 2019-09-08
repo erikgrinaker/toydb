@@ -1,0 +1,138 @@
+Query: INSERT INTO movies (title, released, id, genre_id, rating) VALUES ('District 9', 2009, 9, 1, 7.9)
+
+Tokens:
+  Keyword(Insert)
+  Keyword(Into)
+  Ident("movies")
+  OpenParen
+  Ident("title")
+  Comma
+  Ident("released")
+  Comma
+  Ident("id")
+  Comma
+  Ident("genre_id")
+  Comma
+  Ident("rating")
+  CloseParen
+  Keyword(Values)
+  OpenParen
+  String("District 9")
+  Comma
+  Number("2009")
+  Comma
+  Number("9")
+  Comma
+  Number("1")
+  Comma
+  Number("7.9")
+  CloseParen
+
+AST: Insert {
+    table: "movies",
+    columns: Some(
+        [
+            "title",
+            "released",
+            "id",
+            "genre_id",
+            "rating",
+        ],
+    ),
+    values: [
+        [
+            Literal(
+                String(
+                    "District 9",
+                ),
+            ),
+            Literal(
+                Integer(
+                    2009,
+                ),
+            ),
+            Literal(
+                Integer(
+                    9,
+                ),
+            ),
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Float(
+                    7.9,
+                ),
+            ),
+        ],
+    ],
+}
+
+Plan: Plan {
+    root: Insert {
+        table: "movies",
+        columns: [
+            "title",
+            "released",
+            "id",
+            "genre_id",
+            "rating",
+        ],
+        expressions: [
+            [
+                Constant(
+                    String(
+                        "District 9",
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        2009,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    Float(
+                        7.9,
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
+Query: INSERT INTO movies (title, released, id, genre_id, rating) VALUES ('District 9', 2009, 9, 1, 7.9)
+
+Result:
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(9), String("District 9"), Integer(1), Integer(2009), Float(7.9), Null]

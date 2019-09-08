@@ -1,0 +1,301 @@
+Query: INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)
+
+Tokens:
+  Keyword(Insert)
+  Keyword(Into)
+  Ident("movies")
+  Keyword(Values)
+  OpenParen
+  Number("2")
+  Asterisk
+  Number("5")
+  Minus
+  Number("1")
+  Comma
+  String("District 9")
+  Comma
+  Number("1000")
+  Caret
+  Number("0")
+  Comma
+  Number("2")
+  Asterisk
+  Number("1000")
+  Plus
+  Number("1")
+  Asterisk
+  Number("10")
+  Minus
+  Minus
+  Minus
+  Number("1")
+  Comma
+  Number("793")
+  Slash
+  Number("1e2")
+  Comma
+  Keyword(True)
+  Keyword(Or)
+  Keyword(False)
+  CloseParen
+
+AST: Insert {
+    table: "movies",
+    columns: None,
+    values: [
+        [
+            Operation(
+                Subtract(
+                    Operation(
+                        Multiply(
+                            Literal(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                            Literal(
+                                Integer(
+                                    5,
+                                ),
+                            ),
+                        ),
+                    ),
+                    Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                ),
+            ),
+            Literal(
+                String(
+                    "District 9",
+                ),
+            ),
+            Operation(
+                Exponentiate(
+                    Literal(
+                        Integer(
+                            1000,
+                        ),
+                    ),
+                    Literal(
+                        Integer(
+                            0,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                Subtract(
+                    Operation(
+                        Add(
+                            Operation(
+                                Multiply(
+                                    Literal(
+                                        Integer(
+                                            2,
+                                        ),
+                                    ),
+                                    Literal(
+                                        Integer(
+                                            1000,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            Operation(
+                                Multiply(
+                                    Literal(
+                                        Integer(
+                                            1,
+                                        ),
+                                    ),
+                                    Literal(
+                                        Integer(
+                                            10,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                    Operation(
+                        Negate(
+                            Operation(
+                                Negate(
+                                    Literal(
+                                        Integer(
+                                            1,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                Divide(
+                    Literal(
+                        Integer(
+                            793,
+                        ),
+                    ),
+                    Literal(
+                        Float(
+                            100.0,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                Or(
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                    Literal(
+                        Boolean(
+                            false,
+                        ),
+                    ),
+                ),
+            ),
+        ],
+    ],
+}
+
+Plan: Plan {
+    root: Insert {
+        table: "movies",
+        columns: [],
+        expressions: [
+            [
+                Subtract(
+                    Multiply(
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                5,
+                            ),
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                ),
+                Constant(
+                    String(
+                        "District 9",
+                    ),
+                ),
+                Exponentiate(
+                    Constant(
+                        Integer(
+                            1000,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            0,
+                        ),
+                    ),
+                ),
+                Subtract(
+                    Add(
+                        Multiply(
+                            Constant(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    1000,
+                                ),
+                            ),
+                        ),
+                        Multiply(
+                            Constant(
+                                Integer(
+                                    1,
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    10,
+                                ),
+                            ),
+                        ),
+                    ),
+                    Negate(
+                        Negate(
+                            Constant(
+                                Integer(
+                                    1,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                Divide(
+                    Constant(
+                        Integer(
+                            793,
+                        ),
+                    ),
+                    Constant(
+                        Float(
+                            100.0,
+                        ),
+                    ),
+                ),
+                Or(
+                    Constant(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                    Constant(
+                        Boolean(
+                            false,
+                        ),
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
+Query: INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)
+
+Result:
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(9), String("District 9"), Integer(1), Integer(2009), Float(7.93), Boolean(true)]

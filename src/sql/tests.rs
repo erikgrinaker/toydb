@@ -195,10 +195,16 @@ test_sql! {
     expr_literal_numbers: "SELECT 0, 1, -2, --3, +-4, 3.14, 293, 3.14e3, 2.718E-2",
     expr_literal_string_quotes: r#"SELECT 'Literal with ''single'' and "double" quotes'"#,
 
+    insert_default_null: "INSERT INTO movies VALUES (9, 'District 9', 1, 2009)",
+    insert_expression: "INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)",
+    insert_error_columns_duplicate: "INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)",
+    insert_error_columns_mismatch: "INSERT INTO genres (id) VALUES (9, 'Western')",
     insert_error_datatype_conflict: "INSERT INTO genres VALUES (9, 3.14)",
+    insert_error_default_null_disallowed: "INSERT INTO movies VALUES (9)",
     insert_error_null_disallowed: "INSERT INTO genres VALUES (9, NULL)",
     insert_error_pk_exists: "INSERT INTO genres VALUES (1, 'Western')",
     insert_error_pk_null: "INSERT INTO genres VALUES (NULL, 'Western')",
+    insert_partial: "INSERT INTO movies (title, released, id, genre_id, rating) VALUES ('District 9', 2009, 9, 1, 7.9)",
     insert_values: "INSERT INTO genres VALUES (9, 'Western')",
 
     select_all_from_table: "SELECT * FROM movies",

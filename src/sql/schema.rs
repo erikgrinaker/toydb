@@ -1,5 +1,6 @@
-use super::types::{DataType, Value};
+use super::types::{DataType, Row, Value};
 use crate::Error;
+use std::collections::HashMap;
 
 /// A table
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -13,6 +14,42 @@ pub struct Table {
 }
 
 impl Table {
+    /// Returns the index of a named column, if it exists
+    pub fn column_index(&self, name: &str) -> Option<usize> {
+        self.columns.iter().position(|c| c.name == name)
+    }
+
+    /// Normalizes a partial row into a full row, and reorders it
+    /// according to the column names.
+    pub fn normalize_row(&self, mut row: Row, columns: Option<Vec<String>>) -> Result<Row, Error> {
+        if let Some(cols) = columns {
+            if row.len() != cols.len() {
+                return Err(Error::Value("Column and value counts do not match".into()));
+            }
+            let mut column_values = HashMap::new();
+            for (c, v) in cols.into_iter().zip(row.into_iter()) {
+                if self.column_index(&c).is_none() {
+                    return Err(Error::Value(format!(
+                        "Unknown column {} in table {}",
+                        c, self.name
+                    )));
+                }
+                if column_values.insert(c.clone(), v).is_some() {
+                    return Err(Error::Value(format!("Column {} specified multiple times", c)));
+                }
+            }
+            row = self
+                .columns
+                .iter()
+                .map(|c| column_values.get(&c.name).cloned().unwrap_or(Value::Null))
+                .collect();
+        }
+        while row.len() < self.columns.len() {
+            row.push(Value::Null)
+        }
+        Ok(row)
+    }
+
     /// Generates an SQL DDL query for the table schema
     pub fn to_query(&self) -> String {
         let mut query = format!("CREATE TABLE {} (\n", self.name);

@@ -90,17 +90,15 @@ impl Planner {
                 CreateTable::new(self.build_schema_table(name, columns)?).into()
             }
             ast::Statement::DropTable(name) => DropTable::new(name).into(),
-            ast::Statement::Insert { table, values, .. } => {
-                // FIXME Needs to handle columns
-                Insert::new(
-                    table,
-                    values
-                        .into_iter()
-                        .map(|exprs| exprs.into_iter().map(|expr| expr.into()).collect())
-                        .collect(),
-                )
-                .into()
-            }
+            ast::Statement::Insert { table, columns, values } => Insert::new(
+                table,
+                columns.unwrap_or_else(Vec::new),
+                values
+                    .into_iter()
+                    .map(|exprs| exprs.into_iter().map(|expr| expr.into()).collect())
+                    .collect(),
+            )
+            .into(),
             ast::Statement::Select { select, from } => {
                 let mut n: Box<dyn Node> = match from {
                     // FIXME Handle multiple FROM tables

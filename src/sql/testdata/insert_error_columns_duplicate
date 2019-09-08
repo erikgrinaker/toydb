@@ -1,19 +1,34 @@
-Query: INSERT INTO genres VALUES (9, 'Western')
+Query: INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)
 
 Tokens:
   Keyword(Insert)
   Keyword(Into)
   Ident("genres")
+  OpenParen
+  Ident("id")
+  Comma
+  Ident("name")
+  Comma
+  Ident("id")
+  CloseParen
   Keyword(Values)
   OpenParen
   Number("9")
   Comma
   String("Western")
+  Comma
+  Number("9")
   CloseParen
 
 AST: Insert {
     table: "genres",
-    columns: None,
+    columns: Some(
+        [
+            "id",
+            "name",
+            "id",
+        ],
+    ),
     values: [
         [
             Literal(
@@ -26,6 +41,11 @@ AST: Insert {
                     "Western",
                 ),
             ),
+            Literal(
+                Integer(
+                    9,
+                ),
+            ),
         ],
     ],
 }
@@ -33,7 +53,11 @@ AST: Insert {
 Plan: Plan {
     root: Insert {
         table: "genres",
-        columns: [],
+        columns: [
+            "id",
+            "name",
+            "id",
+        ],
         expressions: [
             [
                 Constant(
@@ -46,32 +70,16 @@ Plan: Plan {
                         "Western",
                     ),
                 ),
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
             ],
         ],
     },
 }
 
-Query: INSERT INTO genres VALUES (9, 'Western')
+Query: INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)
 
-Result:
-
-Storage:
-CREATE TABLE genres (
-  id INTEGER PRIMARY KEY NOT NULL,
-  name VARCHAR NOT NULL
-)
-[Integer(1), String("Science Fiction")]
-[Integer(2), String("Action")]
-[Integer(9), String("Western")]
-
-CREATE TABLE movies (
-  id INTEGER PRIMARY KEY NOT NULL,
-  title VARCHAR NOT NULL,
-  genre_id INTEGER NOT NULL,
-  released INTEGER NOT NULL,
-  rating FLOAT,
-  bluray BOOLEAN
-)
-[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
-[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
-[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+Result: Value("Column id specified multiple times")

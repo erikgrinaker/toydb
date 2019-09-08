@@ -1,18 +1,22 @@
-Query: INSERT INTO genres VALUES (9, 'Western')
+Query: INSERT INTO movies VALUES (9, 'District 9', 1, 2009)
 
 Tokens:
   Keyword(Insert)
   Keyword(Into)
-  Ident("genres")
+  Ident("movies")
   Keyword(Values)
   OpenParen
   Number("9")
   Comma
-  String("Western")
+  String("District 9")
+  Comma
+  Number("1")
+  Comma
+  Number("2009")
   CloseParen
 
 AST: Insert {
-    table: "genres",
+    table: "movies",
     columns: None,
     values: [
         [
@@ -23,7 +27,17 @@ AST: Insert {
             ),
             Literal(
                 String(
-                    "Western",
+                    "District 9",
+                ),
+            ),
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Integer(
+                    2009,
                 ),
             ),
         ],
@@ -32,7 +46,7 @@ AST: Insert {
 
 Plan: Plan {
     root: Insert {
-        table: "genres",
+        table: "movies",
         columns: [],
         expressions: [
             [
@@ -43,7 +57,17 @@ Plan: Plan {
                 ),
                 Constant(
                     String(
-                        "Western",
+                        "District 9",
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        2009,
                     ),
                 ),
             ],
@@ -51,7 +75,7 @@ Plan: Plan {
     },
 }
 
-Query: INSERT INTO genres VALUES (9, 'Western')
+Query: INSERT INTO movies VALUES (9, 'District 9', 1, 2009)
 
 Result:
 
@@ -62,7 +86,6 @@ CREATE TABLE genres (
 )
 [Integer(1), String("Science Fiction")]
 [Integer(2), String("Action")]
-[Integer(9), String("Western")]
 
 CREATE TABLE movies (
   id INTEGER PRIMARY KEY NOT NULL,
@@ -75,3 +98,4 @@ CREATE TABLE movies (
 [Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
 [Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
 [Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(9), String("District 9"), Integer(1), Integer(2009), Null, Null]

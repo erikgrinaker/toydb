@@ -33,6 +33,7 @@ AST: Insert {
 Plan: Plan {
     root: Insert {
         table: "genres",
+        columns: [],
         expressions: [
             [
                 Constant(
