@@ -210,6 +210,7 @@ test_sql! {
 
     select_all_from_table: "SELECT * FROM movies",
     select_aliases: "SELECT 1, 2 b, 3 AS c",
+    select_fields: "SELECT title, 2019 - released AS age, rating * 10 FROM movies",
     select_error_bare: "SELECT",
     select_error_bare_as: "SELECT 1 AS, 2",
     select_error_bare_from: "SELECT 1 FROM",

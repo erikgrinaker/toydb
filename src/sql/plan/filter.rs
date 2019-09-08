@@ -1,4 +1,4 @@
-use super::super::expression::Expression;
+use super::super::expression::{Environment, Expression};
 use super::super::types::{Row, Value};
 use super::{Context, Node};
 use crate::Error;
@@ -31,7 +31,7 @@ impl Iterator for Filter {
                 Err(err) => return Some(Err(err)),
                 Ok(r) => r,
             };
-            match self.predicate.evaluate() {
+            match self.predicate.evaluate(&Environment::empty()) {
                 Err(err) => return Some(Err(err)),
                 Ok(Value::Boolean(true)) => return Some(Ok(row)),
                 Ok(Value::Boolean(false)) => {}

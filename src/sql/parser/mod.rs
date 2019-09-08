@@ -276,7 +276,7 @@ impl<'a> Parser<'a> {
     /// Parses a WHERE clause
     fn parse_clause_where(&mut self) -> Result<Option<ast::WhereClause>, Error> {
         if self.next_if_token(Keyword::Where.into()).is_none() {
-            return Ok(None)
+            return Ok(None);
         }
         Ok(Some(ast::WhereClause(self.parse_expression(0)?)))
     }
@@ -301,6 +301,7 @@ impl<'a> Parser<'a> {
     /// Parses an expression atom
     fn parse_expression_atom(&mut self) -> Result<ast::Expression, Error> {
         Ok(match self.next()? {
+            Token::Ident(i) => ast::Expression::Field(i),
             Token::Number(n) => {
                 if n.chars().all(|c| c.is_digit(10)) {
                     ast::Literal::Integer(n.parse()?).into()

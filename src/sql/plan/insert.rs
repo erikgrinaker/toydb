@@ -1,4 +1,4 @@
-use super::super::expression::Expressions;
+use super::super::expression::{Environment, Expressions};
 use super::super::types::Row;
 use super::{Context, Node};
 use crate::Error;
@@ -26,7 +26,7 @@ impl Node for Insert {
         for exprs in &self.expressions {
             let mut row = Row::new();
             for expr in exprs {
-                row.push(expr.evaluate()?);
+                row.push(expr.evaluate(&Environment::empty())?);
             }
             row = table.normalize_row(
                 row,

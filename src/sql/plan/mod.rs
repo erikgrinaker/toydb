@@ -178,6 +178,7 @@ impl From<ast::Expression> for Expression {
     fn from(expr: ast::Expression) -> Self {
         match expr {
             ast::Expression::Literal(l) => Expression::Constant(l.into()),
+            ast::Expression::Field(name) => Expression::Field(name),
             ast::Expression::Operation(op) => match op {
                 // Logical operators
                 ast::Operation::And(lhs, rhs) => Self::And(lhs.into(), rhs.into()),

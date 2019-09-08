@@ -1,0 +1,108 @@
+Query: SELECT title, 2019 - released AS age, rating * 10 FROM movies
+
+Tokens:
+  Keyword(Select)
+  Ident("title")
+  Comma
+  Number("2019")
+  Minus
+  Ident("released")
+  Keyword(As)
+  Ident("age")
+  Comma
+  Ident("rating")
+  Asterisk
+  Number("10")
+  Keyword(From)
+  Ident("movies")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                "title",
+            ),
+            Operation(
+                Subtract(
+                    Literal(
+                        Integer(
+                            2019,
+                        ),
+                    ),
+                    Field(
+                        "released",
+                    ),
+                ),
+            ),
+            Operation(
+                Multiply(
+                    Field(
+                        "rating",
+                    ),
+                    Literal(
+                        Integer(
+                            10,
+                        ),
+                    ),
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            Some(
+                "age",
+            ),
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            "?",
+            "age",
+            "?",
+        ],
+        expressions: [
+            Field(
+                "title",
+            ),
+            Subtract(
+                Constant(
+                    Integer(
+                        2019,
+                    ),
+                ),
+                Field(
+                    "released",
+                ),
+            ),
+            Multiply(
+                Field(
+                    "rating",
+                ),
+                Constant(
+                    Integer(
+                        10,
+                    ),
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT title, 2019 - released AS age, rating * 10 FROM movies
+
+Result: Value("Unknown field title")
