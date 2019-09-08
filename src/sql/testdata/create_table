@@ -119,7 +119,7 @@ Plan: Plan {
                     nullable: true,
                 },
             ],
-            primary_key: "id",
+            primary_key: 0,
         },
     },
 }
@@ -139,7 +139,7 @@ Result:
 Storage:
 CREATE TABLE genres (
   id INTEGER PRIMARY KEY NOT NULL,
-  name VARCHAR NOT NULL,
+  name VARCHAR NOT NULL
 )
 [Integer(1), String("Science Fiction")]
 [Integer(2), String("Action")]
@@ -149,8 +149,8 @@ CREATE TABLE movies (
   title VARCHAR NOT NULL,
   genre_id INTEGER NOT NULL,
   released INTEGER NOT NULL,
-  rating FLOAT NULL,
-  bluray BOOLEAN NULL,
+  rating FLOAT,
+  bluray BOOLEAN
 )
 [Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
 [Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
@@ -159,8 +159,8 @@ CREATE TABLE movies (
 CREATE TABLE name (
   id INTEGER PRIMARY KEY NOT NULL,
   string VARCHAR NOT NULL,
-  text VARCHAR NULL,
-  number INTEGER NULL,
-  decimal FLOAT NULL,
-  bool BOOLEAN NULL,
+  text VARCHAR,
+  number INTEGER,
+  decimal FLOAT,
+  bool BOOLEAN
 )

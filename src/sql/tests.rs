@@ -28,7 +28,7 @@ macro_rules! test_sql {
                         nullable: false,
                     },
                 ],
-                primary_key: "id".into(),
+                primary_key: 0,
             }).unwrap();
             storage.create_table(&schema::Table{
                 name: "movies".into(),
@@ -64,7 +64,7 @@ macro_rules! test_sql {
                         nullable: true,
                     },
                 ],
-                primary_key: "id".into(),
+                primary_key: 0,
             }).unwrap();
             storage.create_row("genres", vec![
                 Value::Integer(1),
@@ -181,8 +181,9 @@ test_sql! {
     create_table_error_no_columns: "CREATE TABLE name",
     create_table_error_no_datatype: "CREATE TABLE name (id)",
     create_table_error_no_name: "CREATE TABLE (id INTEGER)",
-    create_table_error_no_primary_key: "CREATE TABLE name (id INTEGER)",
-    create_table_error_multiple_primary_key: "CREATE TABLE name (id INTEGER PRIMARY KEY, name VARCHAR PRIMARY KEY)",
+    create_table_error_pk_missing: "CREATE TABLE name (id INTEGER)",
+    create_table_error_pk_multiple: "CREATE TABLE name (id INTEGER PRIMARY KEY, name VARCHAR PRIMARY KEY)",
+    create_table_error_pk_nullable: "CREATE TABLE name (id INTEGER PRIMARY KEY NULL)",
 
     drop_table: "DROP TABLE name",
     drop_table_error_bare: "DROP TABLE",

@@ -1,0 +1,29 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY NULL)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+  OpenParen
+  Ident("id")
+  Keyword(Integer)
+  Keyword(Primary)
+  Keyword(Key)
+  Keyword(Null)
+  CloseParen
+
+AST: CreateTable {
+    name: "name",
+    columns: [
+        ColumnSpec {
+            name: "id",
+            datatype: Integer,
+            primary_key: true,
+            nullable: Some(
+                true,
+            ),
+        },
+    ],
+}
+
+Plan: Value("Primary key column id cannot be nullable")

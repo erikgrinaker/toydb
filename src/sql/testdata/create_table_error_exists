@@ -34,7 +34,7 @@ Plan: Plan {
                     nullable: false,
                 },
             ],
-            primary_key: "id",
+            primary_key: 0,
         },
     },
 }

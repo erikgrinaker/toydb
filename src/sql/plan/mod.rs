@@ -143,25 +143,18 @@ impl Planner {
         name: String,
         columnspecs: Vec<ast::ColumnSpec>,
     ) -> Result<schema::Table, Error> {
-        let primary_keys: Vec<&ast::ColumnSpec> =
-            columnspecs.iter().filter(|c| c.primary_key).collect();
-        if primary_keys.is_empty() {
-            return Err(Error::Value(format!("No primary key defined for table {}", name)));
-        } else if primary_keys.len() > 1 {
-            return Err(Error::Value(format!(
+        match columnspecs.iter().filter(|c| c.primary_key).count() {
+            0 => return Err(Error::Value(format!("No primary key defined for table {}", name))),
+            n if n > 1 => return Err(Error::Value(format!(
                 "{} primary keys defined for table {}, must set exactly 1",
-                primary_keys.len(),
+                n,
                 name
-            )));
-        }
-        let primary_key = primary_keys[0];
-        if let Some(true) = primary_key.nullable {
-            return Err(Error::Value("Primary key cannot be nullable".into()));
-        }
-
-        Ok(schema::Table {
+            ))),
+            _ => {}
+        };
+        let table = schema::Table {
             name,
-            primary_key: primary_key.name.clone(),
+            primary_key: columnspecs.iter().position(|c| c.primary_key).unwrap_or(0),
             columns: columnspecs
                 .into_iter()
                 .map(|spec| schema::Column {
@@ -170,7 +163,9 @@ impl Planner {
                     nullable: spec.nullable.unwrap_or(!spec.primary_key),
                 })
                 .collect(),
-        })
+        };
+        table.validate()?;
+        Ok(table)
     }
 }
 

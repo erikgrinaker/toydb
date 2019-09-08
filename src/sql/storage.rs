@@ -20,7 +20,7 @@ impl Storage {
     pub fn create_row(&mut self, table: &str, row: types::Row) -> Result<(), Error> {
         let table = self.get_table(&table)?;
         let id = row
-            .get(table.get_primary_key_index())
+            .get(table.primary_key)
             .ok_or_else(|| Error::Value("No primary key value".into()))?;
         // FIXME Needs to check existence
         self.kv.write()?.set(&Self::key_row(&table.name, &id.to_string()), serialize(row)?)?;
