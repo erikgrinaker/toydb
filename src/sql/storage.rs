@@ -10,12 +10,6 @@ pub struct Storage {
     kv: Arc<RwLock<Box<dyn kv::Store>>>,
 }
 
-impl std::fmt::Debug for Storage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Storage")
-    }
-}
-
 impl Storage {
     /// Creates a new Storage
     pub fn new<S: kv::Store>(store: S) -> Self {
@@ -34,7 +28,7 @@ impl Storage {
     }
 
     /// Creates a table
-    pub fn create_table(&mut self, table: schema::Table) -> Result<(), Error> {
+    pub fn create_table(&mut self, table: &schema::Table) -> Result<(), Error> {
         if self.table_exists(&table.name)? {
             Err(Error::Value(format!("Table {} already exists", table.name)))
         } else {
@@ -71,6 +65,18 @@ impl Storage {
         Ok(tables)
     }
 
+    /// Creates an iterator over the rows of a table
+    pub fn scan_rows(
+        &self,
+        table: &str,
+    ) -> Box<dyn Iterator<Item = Result<types::Row, Error>> + Sync + Send> {
+        let key = table.to_string() + ".";
+        Box::new(self.kv.read().unwrap().iter_prefix(&key).map(|res| match res {
+            Ok((_, v)) => deserialize(v),
+            Err(err) => Err(err),
+        }))
+    }
+
     /// Checks if a table exists
     pub fn table_exists(&self, table: &str) -> Result<bool, Error> {
         Ok(self.kv.read()?.get(&Self::key_table(table))?.is_some())
@@ -78,7 +84,7 @@ impl Storage {
 
     /// Generates a key for a row
     fn key_row(table: &str, id: &str) -> String {
-        format!("{}.{}", Self::key_table(table), id)
+        format!("{}.{}", table, id)
     }
 
     /// Generates a key for a table

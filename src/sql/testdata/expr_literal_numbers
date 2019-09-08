@@ -1,0 +1,203 @@
+Query: SELECT 0, 1, -2, --3, +-4, 3.14, 293, 3.14e3, 2.718E-2
+
+Tokens:
+  Keyword(Select)
+  Number("0")
+  Comma
+  Number("1")
+  Comma
+  Minus
+  Number("2")
+  Comma
+  Minus
+  Minus
+  Number("3")
+  Comma
+  Plus
+  Minus
+  Number("4")
+  Comma
+  Number("3.14")
+  Comma
+  Number("293")
+  Comma
+  Number("3.14e3")
+  Comma
+  Number("2.718E-2")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                Integer(
+                    0,
+                ),
+            ),
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Operation(
+                Negate(
+                    Literal(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                Negate(
+                    Operation(
+                        Negate(
+                            Literal(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                Negate(
+                    Literal(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                ),
+            ),
+            Literal(
+                Float(
+                    3.14,
+                ),
+            ),
+            Literal(
+                Integer(
+                    293,
+                ),
+            ),
+            Literal(
+                Float(
+                    3140.0,
+                ),
+            ),
+            Literal(
+                Float(
+                    0.02718,
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    0,
+                ),
+            ),
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Negate(
+                Constant(
+                    Integer(
+                        2,
+                    ),
+                ),
+            ),
+            Negate(
+                Negate(
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ),
+            ),
+            Negate(
+                Constant(
+                    Integer(
+                        4,
+                    ),
+                ),
+            ),
+            Constant(
+                Float(
+                    3.14,
+                ),
+            ),
+            Constant(
+                Integer(
+                    293,
+                ),
+            ),
+            Constant(
+                Float(
+                    3140.0,
+                ),
+            ),
+            Constant(
+                Float(
+                    0.02718,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT 0, 1, -2, --3, +-4, 3.14, 293, 3.14e3, 2.718E-2
+
+Result:
+[Integer(0), Integer(1), Integer(-2), Integer(3), Integer(-4), Float(3.14), Integer(293), Float(3140.0), Float(0.02718)]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL,
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT NULL,
+  bluray BOOLEAN NULL,
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]

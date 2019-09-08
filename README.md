@@ -19,8 +19,13 @@ by running:
 
 ```
 $ cargo run --bin toysql
-Connected to node "toydb" (version 0.1.0). Enter !help for instructions.
-toydb> 
+Connected to node "toydb-e" (version 0.1.0). Enter !help for instructions.
+toydb> CREATE TABLE movie (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL)
+toydb> INSERT INTO movie VALUES (1, 'Sicario'), (2, 'Stalker'), (3, 'Her')
+toydb> SELECT * FROM movie
+1|Sicario
+2|Stalker
+3|Her
 ```
 
 ## Project Outline

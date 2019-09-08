@@ -1,0 +1,97 @@
+Query: SELECT 1, 2 b, 3 AS c
+
+Tokens:
+  Keyword(Select)
+  Number("1")
+  Comma
+  Number("2")
+  Ident("b")
+  Comma
+  Number("3")
+  Keyword(As)
+  Ident("c")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Integer(
+                    2,
+                ),
+            ),
+            Literal(
+                Integer(
+                    3,
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            Some(
+                "b",
+            ),
+            Some(
+                "c",
+            ),
+        ],
+    },
+    from: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            "?",
+            "b",
+            "c",
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+            Constant(
+                Integer(
+                    3,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT 1, 2 b, 3 AS c
+
+Result:
+[Integer(1), Integer(2), Integer(3)]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL,
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT NULL,
+  bluray BOOLEAN NULL,
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]

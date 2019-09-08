@@ -1,9 +1,0 @@
-Plan {
-    columns: [],
-    root: DDL {
-        storage: Storage,
-        ddl: DropTable(
-            "name",
-        ),
-    },
-}

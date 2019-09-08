@@ -1,0 +1,24 @@
+Query: CREATE TABLE name (id INTEGER)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+  OpenParen
+  Ident("id")
+  Keyword(Integer)
+  CloseParen
+
+AST: CreateTable {
+    name: "name",
+    columns: [
+        ColumnSpec {
+            name: "id",
+            datatype: Integer,
+            primary_key: false,
+            nullable: None,
+        },
+    ],
+}
+
+Plan: Value("No primary key defined for table name")

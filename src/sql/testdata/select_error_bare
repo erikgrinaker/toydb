@@ -1,0 +1,6 @@
+Query: SELECT
+
+Tokens:
+  Keyword(Select)
+
+AST: Parse("Unexpected end of input")

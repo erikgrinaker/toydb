@@ -1,0 +1,10 @@
+Query: SELECT 1, 2,
+
+Tokens:
+  Keyword(Select)
+  Number("1")
+  Comma
+  Number("2")
+  Comma
+
+AST: Parse("Unexpected end of input")

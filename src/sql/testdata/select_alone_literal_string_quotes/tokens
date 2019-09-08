@@ -1,8 +1,0 @@
-[
-    Keyword(
-        Select,
-    ),
-    String(
-        "Literal with \'single\' and \"double\" quotes",
-    ),
-]

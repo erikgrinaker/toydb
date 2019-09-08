@@ -1,0 +1,20 @@
+Query: DROP TABLE name
+
+Tokens:
+  Keyword(Drop)
+  Keyword(Table)
+  Ident("name")
+
+AST: DropTable(
+    "name",
+)
+
+Plan: Plan {
+    root: DropTable {
+        table: "name",
+    },
+}
+
+Query: DROP TABLE name
+
+Result: Value("Table name does not exist")

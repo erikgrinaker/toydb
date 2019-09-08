@@ -1,0 +1,8 @@
+Query: SELECT 1 FROM
+
+Tokens:
+  Keyword(Select)
+  Number("1")
+  Keyword(From)
+
+AST: Parse("Unexpected end of input")

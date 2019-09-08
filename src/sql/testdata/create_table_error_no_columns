@@ -1,0 +1,8 @@
+Query: CREATE TABLE name
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+
+AST: Parse("Unexpected end of input")

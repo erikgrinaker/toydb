@@ -1,14 +1,14 @@
-use crate::Error;
 use crate::raft::Raft;
 use crate::service;
 use crate::sql::types::{Row, Value};
-use crate::sql::{Parser, Plan, Planner, Storage};
+use crate::sql;
 use crate::utility::serialize;
+use crate::Error;
 
 pub struct ToyDB {
     pub id: String,
     pub raft: Raft,
-    pub storage: Box<Storage>,
+    pub storage: Box<sql::Storage>,
 }
 
 impl service::ToyDB for ToyDB {
@@ -43,20 +43,28 @@ impl service::ToyDB for ToyDB {
         _: grpc::RequestOptions,
         req: service::QueryRequest,
     ) -> grpc::StreamingResponse<service::Row> {
-        let plan = match self.execute(&req.query) {
-            Ok(plan) => plan,
-            Err(err) => return grpc::StreamingResponse::completed(vec![service::Row{
-                error: Self::error_to_protobuf(err),
-                ..Default::default()
-            }])
+        let result = match self.execute(&req.query) {
+            Ok(result) => result,
+            Err(err) => {
+                return grpc::StreamingResponse::completed(vec![service::Row {
+                    error: Self::error_to_protobuf(err),
+                    ..Default::default()
+                }])
+            }
         };
         let mut metadata = grpc::Metadata::new();
-        metadata.add(grpc::MetadataKey::from("columns"), serialize(&plan.columns).unwrap().into());
+        // FIXME metadata.add(grpc::MetadataKey::from("columns"), serialize(&plan.columns).unwrap().into());
+        metadata.add(
+            grpc::MetadataKey::from("columns"),
+            serialize(Vec::<String>::new()).unwrap().into(),
+        );
         grpc::StreamingResponse::iter_with_metadata(
             metadata,
-            plan.map(|result| match result {
+            result.map(|r| match r {
                 Ok(row) => Self::row_to_protobuf(row),
-                Err(err) => service::Row{error: Self::error_to_protobuf(err), ..Default::default()},
+                Err(err) => {
+                    service::Row { error: Self::error_to_protobuf(err), ..Default::default() }
+                }
             }),
         )
     }
@@ -76,13 +84,18 @@ impl service::ToyDB for ToyDB {
 
 impl ToyDB {
     /// Executes an SQL statement
-    fn execute(&self, query: &str) -> Result<Plan, Error> {
-        Planner::new(self.storage.clone()).build(Parser::new(query).parse()?)
+    fn execute(&self, query: &str) -> Result<sql::ResultSet, Error> {
+        sql::Plan::build(sql::Parser::new(query).parse()?)?.execute(sql::Context{
+            storage: self.storage.clone(),
+        })
     }
 
     /// Converts an error into a protobuf object
     fn error_to_protobuf(err: Error) -> protobuf::SingularPtrField<service::Error> {
-        protobuf::SingularPtrField::from(Some(service::Error { message: err.to_string(), ..Default::default() }))
+        protobuf::SingularPtrField::from(Some(service::Error {
+            message: err.to_string(),
+            ..Default::default()
+        }))
     }
 
     /// Converts a row into a protobuf row

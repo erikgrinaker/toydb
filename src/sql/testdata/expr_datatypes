@@ -1,0 +1,128 @@
+Query: SELECT NULL, TRUE, FALSE, 1, 3.14, 'Hi! 👋'
+
+Tokens:
+  Keyword(Select)
+  Keyword(Null)
+  Comma
+  Keyword(True)
+  Comma
+  Keyword(False)
+  Comma
+  Number("1")
+  Comma
+  Number("3.14")
+  Comma
+  String("Hi! 👋")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                Null,
+            ),
+            Literal(
+                Boolean(
+                    true,
+                ),
+            ),
+            Literal(
+                Boolean(
+                    false,
+                ),
+            ),
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Float(
+                    3.14,
+                ),
+            ),
+            Literal(
+                String(
+                    "Hi! 👋",
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+            "?",
+        ],
+        expressions: [
+            Constant(
+                Null,
+            ),
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Float(
+                    3.14,
+                ),
+            ),
+            Constant(
+                String(
+                    "Hi! 👋",
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT NULL, TRUE, FALSE, 1, 3.14, 'Hi! 👋'
+
+Result:
+[Null, Boolean(true), Boolean(false), Integer(1), Float(3.14), String("Hi! 👋")]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL,
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT NULL,
+  bluray BOOLEAN NULL,
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]

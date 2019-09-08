@@ -6,6 +6,8 @@ extern crate assert_matches;
 extern crate config;
 #[macro_use(select)]
 extern crate crossbeam_channel;
+#[macro_use]
+extern crate derivative;
 #[cfg(test)]
 extern crate goldenfile;
 extern crate httpbis;

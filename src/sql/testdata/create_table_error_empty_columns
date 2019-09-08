@@ -1,0 +1,10 @@
+Query: CREATE TABLE name ()
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+  OpenParen
+  CloseParen
+
+AST: Parse("Expected identifier, got )")

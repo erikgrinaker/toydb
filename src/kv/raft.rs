@@ -1,4 +1,4 @@
-use super::{Iter, Pair, Store};
+use super::{Iter, Range, Store};
 use crate::raft;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
@@ -38,7 +38,7 @@ impl Store for Raft {
         Ok(deserialize(self.raft.read(serialize(Read::Get(key.to_string()))?)?)?)
     }
 
-    fn iter_prefix(&self, prefix: &str) -> Box<dyn Iterator<Item = Result<Pair, Error>>> {
+    fn iter_prefix(&self, prefix: &str) -> Box<Range> {
         let items: Vec<(String, Vec<u8>)> = deserialize(
             self.raft.read(serialize(Read::GetPrefix(prefix.to_string())).unwrap()).unwrap(),
         )

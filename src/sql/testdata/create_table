@@ -1,0 +1,166 @@
+Query: 
+        CREATE TABLE name (
+            id INTEGER PRIMARY KEY,
+            string VARCHAR NOT NULL,
+            text VARCHAR,
+            number INTEGER,
+            decimal FLOAT,
+            bool BOOLEAN NULL
+        )
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+  OpenParen
+  Ident("id")
+  Keyword(Integer)
+  Keyword(Primary)
+  Keyword(Key)
+  Comma
+  Ident("string")
+  Keyword(Varchar)
+  Keyword(Not)
+  Keyword(Null)
+  Comma
+  Ident("text")
+  Keyword(Varchar)
+  Comma
+  Ident("number")
+  Keyword(Integer)
+  Comma
+  Ident("decimal")
+  Keyword(Float)
+  Comma
+  Ident("bool")
+  Keyword(Boolean)
+  Keyword(Null)
+  CloseParen
+
+AST: CreateTable {
+    name: "name",
+    columns: [
+        ColumnSpec {
+            name: "id",
+            datatype: Integer,
+            primary_key: true,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "string",
+            datatype: String,
+            primary_key: false,
+            nullable: Some(
+                false,
+            ),
+        },
+        ColumnSpec {
+            name: "text",
+            datatype: String,
+            primary_key: false,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "number",
+            datatype: Integer,
+            primary_key: false,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "decimal",
+            datatype: Float,
+            primary_key: false,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "bool",
+            datatype: Boolean,
+            primary_key: false,
+            nullable: Some(
+                true,
+            ),
+        },
+    ],
+}
+
+Plan: Plan {
+    root: CreateTable {
+        schema: Table {
+            name: "name",
+            columns: [
+                Column {
+                    name: "id",
+                    datatype: Integer,
+                    nullable: false,
+                },
+                Column {
+                    name: "string",
+                    datatype: String,
+                    nullable: false,
+                },
+                Column {
+                    name: "text",
+                    datatype: String,
+                    nullable: true,
+                },
+                Column {
+                    name: "number",
+                    datatype: Integer,
+                    nullable: true,
+                },
+                Column {
+                    name: "decimal",
+                    datatype: Float,
+                    nullable: true,
+                },
+                Column {
+                    name: "bool",
+                    datatype: Boolean,
+                    nullable: true,
+                },
+            ],
+            primary_key: "id",
+        },
+    },
+}
+
+Query: 
+        CREATE TABLE name (
+            id INTEGER PRIMARY KEY,
+            string VARCHAR NOT NULL,
+            text VARCHAR,
+            number INTEGER,
+            decimal FLOAT,
+            bool BOOLEAN NULL
+        )
+
+Result:
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL,
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT NULL,
+  bluray BOOLEAN NULL,
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+
+CREATE TABLE name (
+  id INTEGER PRIMARY KEY NOT NULL,
+  string VARCHAR NOT NULL,
+  text VARCHAR NULL,
+  number INTEGER NULL,
+  decimal FLOAT NULL,
+  bool BOOLEAN NULL,
+)

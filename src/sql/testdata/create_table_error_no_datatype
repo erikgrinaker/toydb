@@ -1,0 +1,11 @@
+Query: CREATE TABLE name (id)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+  OpenParen
+  Ident("id")
+  CloseParen
+
+AST: Parse("Unexpected token )")

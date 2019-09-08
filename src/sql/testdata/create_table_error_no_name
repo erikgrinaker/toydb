@@ -1,0 +1,11 @@
+Query: CREATE TABLE (id INTEGER)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  OpenParen
+  Ident("id")
+  Keyword(Integer)
+  CloseParen
+
+AST: Parse("Expected identifier, got (")

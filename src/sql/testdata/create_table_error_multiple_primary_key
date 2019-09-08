@@ -1,0 +1,37 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY, name VARCHAR PRIMARY KEY)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+  OpenParen
+  Ident("id")
+  Keyword(Integer)
+  Keyword(Primary)
+  Keyword(Key)
+  Comma
+  Ident("name")
+  Keyword(Varchar)
+  Keyword(Primary)
+  Keyword(Key)
+  CloseParen
+
+AST: CreateTable {
+    name: "name",
+    columns: [
+        ColumnSpec {
+            name: "id",
+            datatype: Integer,
+            primary_key: true,
+            nullable: None,
+        },
+        ColumnSpec {
+            name: "name",
+            datatype: String,
+            primary_key: true,
+            nullable: None,
+        },
+    ],
+}
+
+Plan: Value("2 primary keys defined for table name, must set exactly 1")

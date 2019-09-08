@@ -1,0 +1,68 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("name")
+  OpenParen
+  Ident("id")
+  Keyword(Integer)
+  Keyword(Primary)
+  Keyword(Key)
+  CloseParen
+
+AST: CreateTable {
+    name: "name",
+    columns: [
+        ColumnSpec {
+            name: "id",
+            datatype: Integer,
+            primary_key: true,
+            nullable: None,
+        },
+    ],
+}
+
+Plan: Plan {
+    root: CreateTable {
+        schema: Table {
+            name: "name",
+            columns: [
+                Column {
+                    name: "id",
+                    datatype: Integer,
+                    nullable: false,
+                },
+            ],
+            primary_key: "id",
+        },
+    },
+}
+
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY)
+
+Result:
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL,
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT NULL,
+  bluray BOOLEAN NULL,
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+
+CREATE TABLE name (
+  id INTEGER PRIMARY KEY NOT NULL,
+)
