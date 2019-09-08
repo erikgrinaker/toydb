@@ -1,0 +1,20 @@
+Query: DROP TABLE missing
+
+Tokens:
+  Keyword(Drop)
+  Keyword(Table)
+  Ident("missing")
+
+AST: DropTable(
+    "missing",
+)
+
+Plan: Plan {
+    root: DropTable {
+        table: "missing",
+    },
+}
+
+Query: DROP TABLE missing
+
+Result: Value("Table missing does not exist")

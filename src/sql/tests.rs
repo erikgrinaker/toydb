@@ -188,8 +188,9 @@ test_sql! {
     create_table_error_pk_multiple: "CREATE TABLE name (id INTEGER PRIMARY KEY, name VARCHAR PRIMARY KEY)",
     create_table_error_pk_nullable: "CREATE TABLE name (id INTEGER PRIMARY KEY NULL)",
 
-    drop_table: "DROP TABLE name",
+    drop_table: "DROP TABLE movies",
     drop_table_error_bare: "DROP TABLE",
+    drop_table_error_missing: "DROP TABLE missing",
 
     expr_datatypes: "SELECT NULL, TRUE, FALSE, 1, 3.14, 'Hi! 👋'",
     expr_literal_numbers: "SELECT 0, 1, -2, --3, +-4, 3.14, 293, 3.14e3, 2.718E-2",

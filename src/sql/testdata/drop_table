@@ -1,20 +1,28 @@
-Query: DROP TABLE name
+Query: DROP TABLE movies
 
 Tokens:
   Keyword(Drop)
   Keyword(Table)
-  Ident("name")
+  Ident("movies")
 
 AST: DropTable(
-    "name",
+    "movies",
 )
 
 Plan: Plan {
     root: DropTable {
-        table: "name",
+        table: "movies",
     },
 }
 
-Query: DROP TABLE name
+Query: DROP TABLE movies
 
-Result: Value("Table name does not exist")
+Result:
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
