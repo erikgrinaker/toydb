@@ -1,5 +1,6 @@
 mod create_table;
 mod drop_table;
+mod filter;
 mod insert;
 mod nothing;
 mod projection;
@@ -13,6 +14,7 @@ use super::types::{Row, Value};
 use crate::Error;
 use create_table::CreateTable;
 use drop_table::DropTable;
+use filter::Filter;
 use insert::Insert;
 use nothing::Nothing;
 use projection::Projection;
@@ -99,7 +101,7 @@ impl Planner {
                     .collect(),
             )
             .into(),
-            ast::Statement::Select { select, from } => {
+            ast::Statement::Select { select, from, r#where } => {
                 let mut n: Box<dyn Node> = match from {
                     // FIXME Handle multiple FROM tables
                     Some(from) => Scan::new(from.tables[0].clone()).into(),
@@ -107,6 +109,9 @@ impl Planner {
                         return Err(Error::Value("Can't select * without a table".into()))
                     }
                     None => Nothing::new().into(),
+                };
+                if let Some(ast::WhereClause(expr)) = r#where {
+                    n = Filter::new(n, expr.into()).into();
                 };
                 if !select.expressions.is_empty() {
                     n = Projection::new(

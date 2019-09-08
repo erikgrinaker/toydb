@@ -1,10 +1,12 @@
-Query: SELECT * FROM movies
+Query: SELECT * FROM movies WHERE TRUE
 
 Tokens:
   Keyword(Select)
   Asterisk
   Keyword(From)
   Ident("movies")
+  Keyword(Where)
+  Keyword(True)
 
 AST: Select {
     select: SelectClause {
@@ -18,16 +20,31 @@ AST: Select {
             ],
         },
     ),
-    where: None,
+    where: Some(
+        WhereClause(
+            Literal(
+                Boolean(
+                    true,
+                ),
+            ),
+        ),
+    ),
 }
 
 Plan: Plan {
-    root: Scan {
-        table: "movies",
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Boolean(
+                true,
+            ),
+        ),
     },
 }
 
-Query: SELECT * FROM movies
+Query: SELECT * FROM movies WHERE TRUE
 
 Result:
 [Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]

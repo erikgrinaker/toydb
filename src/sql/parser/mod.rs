@@ -233,6 +233,7 @@ impl<'a> Parser<'a> {
         Ok(ast::Statement::Select {
             select: self.parse_clause_select()?.unwrap(),
             from: self.parse_clause_from()?,
+            r#where: self.parse_clause_where()?,
         })
     }
 
@@ -270,6 +271,14 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(Some(clause))
+    }
+
+    /// Parses a WHERE clause
+    fn parse_clause_where(&mut self) -> Result<Option<ast::WhereClause>, Error> {
+        if self.next_if_token(Keyword::Where.into()).is_none() {
+            return Ok(None)
+        }
+        Ok(Some(ast::WhereClause(self.parse_expression(0)?)))
     }
 
     /// Parses an expression consisting of at least one atom operated on by any

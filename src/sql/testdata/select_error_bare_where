@@ -1,0 +1,10 @@
+Query: SELECT 1 FROM movies WHERE
+
+Tokens:
+  Keyword(Select)
+  Number("1")
+  Keyword(From)
+  Ident("movies")
+  Keyword(Where)
+
+AST: Parse("Unexpected end of input")

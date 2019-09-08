@@ -213,5 +213,12 @@ test_sql! {
     select_error_bare: "SELECT",
     select_error_bare_as: "SELECT 1 AS, 2",
     select_error_bare_from: "SELECT 1 FROM",
+    select_error_bare_where: "SELECT 1 FROM movies WHERE",
     select_error_trailing_comma: "SELECT 1, 2,",
+    select_error_where_nonboolean: "SELECT * FROM movies WHERE 1",
+    select_expr_where_false: "SELECT 1 WHERE FALSE",
+    select_expr_where_true: "SELECT 1 WHERE TRUE",
+    select_where_false: "SELECT * FROM movies WHERE FALSE",
+    select_where_null: "SELECT * FROM movies WHERE NULL",
+    select_where_true: "SELECT * FROM movies WHERE TRUE",
 }

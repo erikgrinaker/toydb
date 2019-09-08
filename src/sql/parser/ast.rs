@@ -11,10 +11,9 @@ pub enum Statement {
     Insert { table: String, columns: Option<Vec<String>>, values: Vec<Expressions> },
     /// A SELECT statement
     Select {
-        /// The select clause
         select: SelectClause,
-        /// The from clause,
         from: Option<FromClause>,
+        r#where: Option<WhereClause>,
     },
 }
 
@@ -41,6 +40,10 @@ pub struct SelectClause {
 pub struct FromClause {
     pub tables: Vec<String>,
 }
+
+/// A WHERE clause
+#[derive(Clone, Debug, PartialEq)]
+pub struct WhereClause(pub Expression);
 
 /// Expressions
 #[derive(Clone, Debug, PartialEq)]

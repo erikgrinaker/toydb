@@ -90,6 +90,7 @@ pub enum Keyword {
     True,
     Values,
     Varchar,
+    Where,
 }
 
 impl Keyword {
@@ -116,6 +117,7 @@ impl Keyword {
             "TRUE" => Self::True,
             "VALUES" => Self::Values,
             "VARCHAR" => Self::Varchar,
+            "WHERE" => Self::Where,
             _ => return None,
         })
     }
@@ -143,6 +145,7 @@ impl Keyword {
             Self::True => "TRUE",
             Self::Values => "VALUES",
             Self::Varchar => "VARCHAR",
+            Self::Where => "WHERE",
         }
     }
 }

@@ -1,46 +1,52 @@
-Query: SELECT 'Literal with ''single'' and "double" quotes'
+Query: SELECT * FROM movies WHERE FALSE
 
 Tokens:
   Keyword(Select)
-  String("Literal with \'single\' and \"double\" quotes")
+  Asterisk
+  Keyword(From)
+  Ident("movies")
+  Keyword(Where)
+  Keyword(False)
 
 AST: Select {
     select: SelectClause {
-        expressions: [
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
             Literal(
-                String(
-                    "Literal with \'single\' and \"double\" quotes",
+                Boolean(
+                    false,
                 ),
             ),
-        ],
-        labels: [
-            None,
-        ],
-    },
-    from: None,
-    where: None,
+        ),
+    ),
 }
 
 Plan: Plan {
-    root: Projection {
-        source: Nothing,
-        labels: [
-            "?",
-        ],
-        expressions: [
-            Constant(
-                String(
-                    "Literal with \'single\' and \"double\" quotes",
-                ),
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Boolean(
+                false,
             ),
-        ],
+        ),
     },
 }
 
-Query: SELECT 'Literal with ''single'' and "double" quotes'
+Query: SELECT * FROM movies WHERE FALSE
 
 Result:
-[String("Literal with \'single\' and \"double\" quotes")]
 
 Storage:
 CREATE TABLE genres (

@@ -1,0 +1,49 @@
+Query: SELECT * FROM movies WHERE 1
+
+Tokens:
+  Keyword(Select)
+  Asterisk
+  Keyword(From)
+  Ident("movies")
+  Keyword(Where)
+  Number("1")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+        ),
+    ),
+}
+
+Plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Integer(
+                1,
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies WHERE 1
+
+Result: Value("Unexpected value 1 for filter, expected boolean")
