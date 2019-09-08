@@ -156,7 +156,7 @@ macro_rules! test_sql {
 
             write!(f, "\n\nStorage:").unwrap();
             for table in &storage.list_tables().unwrap() {
-                let schema = &storage.get_table(&table).unwrap();
+                let schema = &storage.get_table(&table).unwrap().unwrap();
                 write!(f, "\n{}\n", schema.to_query()).unwrap();
                 for row in storage.scan_rows(&table) {
                     write!(f, "{:?}\n", row.unwrap()).unwrap();

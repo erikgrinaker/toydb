@@ -1,7 +1,7 @@
 use crate::raft::Raft;
 use crate::service;
-use crate::sql::types::{Row, Value};
 use crate::sql;
+use crate::sql::types::{Row, Value};
 use crate::utility::serialize;
 use crate::Error;
 
@@ -19,7 +19,13 @@ impl service::ToyDB for ToyDB {
     ) -> grpc::SingleResponse<service::GetTableResponse> {
         let mut resp = service::GetTableResponse::new();
         match self.storage.get_table(&req.name) {
-            Ok(schema) => resp.sql = schema.to_query(),
+            Ok(Some(schema)) => resp.sql = schema.to_query(),
+            Ok(None) => {
+                resp.error = Self::error_to_protobuf(Error::Value(format!(
+                    "Table {} does not exist",
+                    req.name
+                )))
+            }
             Err(err) => resp.error = Self::error_to_protobuf(err),
         };
         grpc::SingleResponse::completed(resp)
@@ -85,9 +91,8 @@ impl service::ToyDB for ToyDB {
 impl ToyDB {
     /// Executes an SQL statement
     fn execute(&self, query: &str) -> Result<sql::ResultSet, Error> {
-        sql::Plan::build(sql::Parser::new(query).parse()?)?.execute(sql::Context{
-            storage: self.storage.clone(),
-        })
+        sql::Plan::build(sql::Parser::new(query).parse()?)?
+            .execute(sql::Context { storage: self.storage.clone() })
     }
 
     /// Converts an error into a protobuf object

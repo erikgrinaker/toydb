@@ -18,7 +18,9 @@ impl Storage {
 
     /// Creates a row
     pub fn create_row(&mut self, table: &str, row: types::Row) -> Result<(), Error> {
-        let table = self.get_table(&table)?;
+        let table = self
+            .get_table(&table)?
+            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
         table.validate_row(&row)?;
         let pk = row.get(table.primary_key).unwrap();
         if self.get_row(&table.name, &pk)?.is_some() {
@@ -33,19 +35,18 @@ impl Storage {
 
     /// Creates a table
     pub fn create_table(&mut self, table: &schema::Table) -> Result<(), Error> {
-        if self.table_exists(&table.name)? {
-            Err(Error::Value(format!("Table {} already exists", table.name)))
-        } else {
-            self.kv.write()?.set(&Self::key_table(&table.name), serialize(table)?)?;
-            Ok(())
+        if self.get_table(&table.name)?.is_some() {
+            return Err(Error::Value(format!("Table {} already exists", table.name)));
         }
+        self.kv.write()?.set(&Self::key_table(&table.name), serialize(table)?)
     }
 
     /// Deletes a table
-    pub fn drop_table(&mut self, table: &str) -> Result<(), Error> {
-        self.get_table(table)?;
-        self.kv.write()?.delete(&Self::key_table(table))?;
-        Ok(())
+    pub fn delete_table(&mut self, table: &str) -> Result<(), Error> {
+        if self.get_table(table)?.is_none() {
+            return Err(Error::Value(format!("Table {} does not exist", table)));
+        }
+        self.kv.write()?.delete(&Self::key_table(table))
     }
 
     /// Fetches a row
@@ -54,13 +55,8 @@ impl Storage {
     }
 
     /// Fetches a table schema
-    pub fn get_table(&self, table: &str) -> Result<schema::Table, Error> {
-        deserialize(
-            self.kv
-                .read()?
-                .get(&Self::key_table(table))?
-                .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?,
-        )
+    pub fn get_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
+        self.kv.read()?.get(&Self::key_table(table))?.map(deserialize).transpose()
     }
 
     /// Lists tables
@@ -84,11 +80,6 @@ impl Storage {
             Ok((_, v)) => deserialize(v),
             Err(err) => Err(err),
         }))
-    }
-
-    /// Checks if a table exists
-    pub fn table_exists(&self, table: &str) -> Result<bool, Error> {
-        Ok(self.kv.read()?.get(&Self::key_table(table))?.is_some())
     }
 
     /// Generates a key for a row

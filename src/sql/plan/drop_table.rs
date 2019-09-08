@@ -16,7 +16,7 @@ impl DropTable {
 
 impl Node for DropTable {
     fn execute(&mut self, ctx: &mut Context) -> Result<(), Error> {
-        ctx.storage.drop_table(&self.table)
+        ctx.storage.delete_table(&self.table)
     }
 }
 
