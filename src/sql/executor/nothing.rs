@@ -14,8 +14,8 @@ impl Nothing {
 }
 
 impl Executor for Nothing {
-    fn close(&mut self) {
-        self.done = true
+    fn columns(&self) -> Vec<String> {
+        Vec::new()
     }
 
     fn fetch(&mut self) -> Result<Option<Row>, Error> {

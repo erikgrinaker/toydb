@@ -13,7 +13,9 @@ impl DropTable {
 }
 
 impl Executor for DropTable {
-    fn close(&mut self) {}
+    fn columns(&self) -> Vec<String> {
+        Vec::new()
+    }
 
     fn fetch(&mut self) -> Result<Option<Row>, Error> {
         Ok(None)

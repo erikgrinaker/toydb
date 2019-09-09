@@ -25,7 +25,7 @@ Plan: Plan {
     root: Projection {
         source: Nothing,
         labels: [
-            "?",
+            None,
         ],
         expressions: [
             Constant(
@@ -39,7 +39,7 @@ Plan: Plan {
 
 Query: SELECT 'Literal with ''single'' and "double" quotes'
 
-Result:
+Result: [["?"]]
 [String("Literal with \'single\' and \"double\" quotes")]
 
 Storage:
@@ -61,3 +61,5 @@ CREATE TABLE movies (
 [Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
 [Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
 [Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

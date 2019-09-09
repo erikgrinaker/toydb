@@ -100,13 +100,19 @@ pub type Row = Vec<Value>;
 
 /// A result set
 pub struct ResultSet {
+    columns: Vec<String>,
     executor: Option<Box<dyn Executor>>,
 }
 
 impl ResultSet {
     /// Creates a result set from an executor
     pub fn from_executor(executor: Box<dyn Executor>) -> Self {
-        Self { executor: Some(executor) }
+        Self { columns: executor.columns(), executor: Some(executor) }
+    }
+
+    /// Fetches the columns of the result set
+    pub fn columns(&self) -> Vec<String> {
+        self.columns.clone()
     }
 }
 

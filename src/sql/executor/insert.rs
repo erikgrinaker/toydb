@@ -3,11 +3,15 @@ use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;
 
-/// An INSERT executor
 pub struct Insert;
 
 impl Insert {
-    pub fn execute(ctx: &mut Context, table: &str, columns: Vec<String>, expressions: Vec<Expressions>) -> Result<Box<dyn Executor>, Error> {
+    pub fn execute(
+        ctx: &mut Context,
+        table: &str,
+        columns: Vec<String>,
+        expressions: Vec<Expressions>,
+    ) -> Result<Box<dyn Executor>, Error> {
         let table = ctx
             .storage
             .get_table(table)?
@@ -28,7 +32,9 @@ impl Insert {
 }
 
 impl Executor for Insert {
-    fn close(&mut self) {}
+    fn columns(&self) -> Vec<String> {
+        Vec::new()
+    }
 
     fn fetch(&mut self) -> Result<Option<Row>, Error> {
         Ok(None)

@@ -71,9 +71,11 @@ Plan: Plan {
             table: "movies",
         },
         labels: [
-            "?",
-            "age",
-            "?",
+            None,
+            Some(
+                "age",
+            ),
+            None,
         ],
         expressions: [
             Field(
@@ -105,4 +107,31 @@ Plan: Plan {
 
 Query: SELECT title, 2019 - released AS age, rating * 10 FROM movies
 
-Result: Value("Unknown field title")
+Result: [["title", "age", "?"]]
+[String("Stalker"), Integer(40), Float(82.0)]
+[String("Sicario"), Integer(4), Float(76.0)]
+[String("Primer"), Integer(15), Float(69.0)]
+[String("Heat"), Integer(24), Float(82.0)]
+[String("The Fountain"), Integer(13), Float(72.0)]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

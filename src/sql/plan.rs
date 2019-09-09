@@ -31,7 +31,7 @@ pub enum Node {
     Filter { source: Box<Self>, predicate: Expression },
     Insert { table: String, columns: Vec<String>, expressions: Vec<Expressions> },
     Nothing,
-    Projection { source: Box<Self>, labels: Vec<String>, expressions: Expressions },
+    Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
     Scan { table: String },
 }
 
@@ -53,10 +53,10 @@ impl Planner {
     fn build_statement(&self, statement: ast::Statement) -> Result<Node, Error> {
         Ok(match statement {
             ast::Statement::CreateTable { name, columns } => {
-                Node::CreateTable{schema: self.build_schema_table(name, columns)? }
+                Node::CreateTable { schema: self.build_schema_table(name, columns)? }
             }
-            ast::Statement::DropTable(name) => Node::DropTable{name},
-            ast::Statement::Insert { table, columns, values } => Node::Insert{
+            ast::Statement::DropTable(name) => Node::DropTable { name },
+            ast::Statement::Insert { table, columns, values } => Node::Insert {
                 table,
                 columns: columns.unwrap_or_else(Vec::new),
                 expressions: values
@@ -67,23 +67,19 @@ impl Planner {
             ast::Statement::Select { select, from, r#where } => {
                 let mut n: Node = match from {
                     // FIXME Handle multiple FROM tables
-                    Some(from) => Node::Scan{table: from.tables[0].clone() },
+                    Some(from) => Node::Scan { table: from.tables[0].clone() },
                     None if select.expressions.is_empty() => {
                         return Err(Error::Value("Can't select * without a table".into()))
                     }
                     None => Node::Nothing,
                 };
                 if let Some(ast::WhereClause(expr)) = r#where {
-                    n = Node::Filter{ source: Box::new(n), predicate: expr.into() };
+                    n = Node::Filter { source: Box::new(n), predicate: expr.into() };
                 };
                 if !select.expressions.is_empty() {
-                    n = Node::Projection{
+                    n = Node::Projection {
                         source: Box::new(n),
-                        labels: select
-                            .labels
-                            .into_iter()
-                            .map(|l| l.unwrap_or_else(|| "?".into()))
-                            .collect(),
+                        labels: select.labels,
                         expressions: self.build_expressions(select.expressions)?,
                     };
                 };

@@ -6,6 +6,7 @@ use crate::Error;
 /// A filter executor
 pub struct Filter {
     source: Box<dyn Executor>,
+    columns: Vec<String>,
     predicate: Expression,
 }
 
@@ -15,19 +16,20 @@ impl Filter {
         source: Box<dyn Executor>,
         predicate: Expression,
     ) -> Result<Box<dyn Executor>, Error> {
-        Ok(Box::new(Self { source, predicate }))
+        Ok(Box::new(Self { columns: source.columns(), source, predicate }))
     }
 }
 
 impl Executor for Filter {
-    fn close(&mut self) {
-        // FIXME
-        //self.source = Box::new(EmptyResult)
+    fn columns(&self) -> Vec<String> {
+        self.columns.clone()
     }
 
     fn fetch(&mut self) -> Result<Option<Row>, Error> {
         while let Some(row) = self.source.fetch()? {
-            match self.predicate.evaluate(&Environment::empty())? {
+            let env =
+                Environment::new(self.columns.iter().cloned().zip(row.iter().cloned()).collect());
+            match self.predicate.evaluate(&env)? {
                 Value::Boolean(true) => return Ok(Some(row)),
                 Value::Boolean(false) => {}
                 Value::Null => {}

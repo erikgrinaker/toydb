@@ -14,7 +14,9 @@ impl CreateTable {
 }
 
 impl Executor for CreateTable {
-    fn close(&mut self) {}
+    fn columns(&self) -> Vec<String> {
+        Vec::new()
+    }
 
     fn fetch(&mut self) -> Result<Option<Row>, Error> {
         Ok(None)

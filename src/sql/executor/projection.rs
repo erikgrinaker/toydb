@@ -1,11 +1,12 @@
-use super::super::expression::{Environment, Expressions};
+use super::super::expression::{Environment, Expression, Expressions};
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;
 
 pub struct Projection {
     source: Box<dyn Executor>,
-    //labels: Vec<String>,
+    source_columns: Vec<String>,
+    columns: Vec<String>,
     expressions: Expressions,
 }
 
@@ -13,21 +14,41 @@ impl Projection {
     pub fn execute(
         _: &mut Context,
         source: Box<dyn Executor>,
-        _labels: Vec<String>,
+        labels: Vec<Option<String>>,
         expressions: Expressions,
     ) -> Result<Box<dyn Executor>, Error> {
-        Ok(Box::new(Self { source, expressions }))
+        let columns = expressions
+            .iter()
+            .enumerate()
+            .map(|(i, expr)| {
+                if let Some(Some(label)) = labels.get(i) {
+                    label.clone()
+                } else if let Expression::Field(field) = expr {
+                    field.clone()
+                } else {
+                    "?".to_string()
+                }
+            })
+            .collect();
+        Ok(Box::new(Self { source_columns: source.columns(), source, columns, expressions }))
     }
 }
 
 impl Executor for Projection {
-    fn close(&mut self) {}
+    fn columns(&self) -> Vec<String> {
+        self.columns.clone()
+    }
 
     fn fetch(&mut self) -> Result<Option<Row>, Error> {
-        let env = Environment::empty();
-        self.source
-            .fetch()?
-            .map(|_| self.expressions.iter().map(|e| e.evaluate(&env)).collect())
-            .transpose()
+        if let Some(row) = self.source.fetch()? {
+            let env = Environment::new(
+                self.source_columns.iter().cloned().zip(row.iter().cloned()).collect(),
+            );
+            Ok(Some(
+                self.expressions.iter().map(|e| e.evaluate(&env)).collect::<Result<_, Error>>()?,
+            ))
+        } else {
+            Ok(None)
+        }
     }
 }

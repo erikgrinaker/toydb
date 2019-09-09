@@ -17,7 +17,7 @@ Plan: Plan {
 
 Query: DROP TABLE movies
 
-Result:
+Result: <none>
 
 Storage:
 CREATE TABLE genres (

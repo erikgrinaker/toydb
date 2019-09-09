@@ -59,11 +59,8 @@ impl service::ToyDB for ToyDB {
             }
         };
         let mut metadata = grpc::Metadata::new();
-        // FIXME metadata.add(grpc::MetadataKey::from("columns"), serialize(&plan.columns).unwrap().into());
-        metadata.add(
-            grpc::MetadataKey::from("columns"),
-            serialize(Vec::<String>::new()).unwrap().into(),
-        );
+        metadata
+            .add(grpc::MetadataKey::from("columns"), serialize(result.columns()).unwrap().into());
         grpc::StreamingResponse::iter_with_metadata(
             metadata,
             result.map(|r| match r {

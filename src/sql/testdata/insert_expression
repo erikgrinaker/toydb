@@ -277,7 +277,7 @@ Plan: Plan {
 
 Query: INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)
 
-Result:
+Result: <none>
 
 Storage:
 CREATE TABLE genres (
@@ -298,4 +298,6 @@ CREATE TABLE movies (
 [Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
 [Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
 [Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]
 [Integer(9), String("District 9"), Integer(1), Integer(2009), Float(7.93), Boolean(true)]

@@ -22,8 +22,7 @@ use crate::Error;
 /// A plan executor
 pub trait Executor: Sync + Send + 'static {
     //fn affected(&self) -> Option<u64>;
-    fn close(&mut self);
-    //fn columns(&self) -> Vec<String>;
+    fn columns(&self) -> Vec<String>;
     fn fetch(&mut self) -> Result<Option<Row>, Error>;
 }
 

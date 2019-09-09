@@ -101,6 +101,22 @@ macro_rules! test_sql {
                 Value::Float(6.9),
                 Value::Null,
             ]).unwrap();
+            storage.create_row("movies", vec![
+                Value::Integer(4),
+                Value::String("Heat".into()),
+                Value::Integer(2),
+                Value::Integer(1995),
+                Value::Float(8.2),
+                Value::Boolean(true),
+            ]).unwrap();
+            storage.create_row("movies", vec![
+                Value::Integer(5),
+                Value::String("The Fountain".into()),
+                Value::Integer(1),
+                Value::Integer(2006),
+                Value::Float(7.2),
+                Value::Boolean(true),
+            ]).unwrap();
 
             let mut mint = Mint::new("src/sql/testdata");
             let mut f = mint.new_goldenfile(format!("{}", stringify!($name))).unwrap();
@@ -143,18 +159,31 @@ macro_rules! test_sql {
             write!(f, "Query: {}\n\n", $sql).unwrap();
 
             write!(f, "Result:").unwrap();
-            let result: Vec<Row> = match plan.execute(Context{storage: Box::new(storage.clone())}).and_then(|i| i.collect()) {
+            let result = match plan.execute(Context{storage: Box::new(storage.clone())}) {
                 Ok(result) => result,
                 Err(err) => {
                     write!(f, " {:?}", err).unwrap();
                     return
                 }
             };
-            for row in result {
-                write!(f, "\n{:?}", row).unwrap();
+            let columns = result.columns();
+            let rows: Vec<Row> = match result.collect() {
+                Ok(rows) => rows,
+                Err(err) => {
+                    write!(f, " {:?}", err).unwrap();
+                    return
+                }
+            };
+            if !columns.is_empty() || !rows.is_empty() {
+                write!(f, " [{:?}]\n", columns).unwrap();
+                for row in rows {
+                    write!(f, "{:?}\n", row).unwrap();
+                }
+            } else {
+                write!(f, " <none>\n").unwrap();
             }
 
-            write!(f, "\n\nStorage:").unwrap();
+            write!(f, "\nStorage:").unwrap();
             for table in &storage.list_tables().unwrap() {
                 let schema = &storage.get_table(&table).unwrap().unwrap();
                 write!(f, "\n{}\n", schema.to_query()).unwrap();
@@ -210,7 +239,6 @@ test_sql! {
 
     select_all_from_table: "SELECT * FROM movies",
     select_aliases: "SELECT 1, 2 b, 3 AS c",
-    select_fields: "SELECT title, 2019 - released AS age, rating * 10 FROM movies",
     select_error_bare: "SELECT",
     select_error_bare_as: "SELECT 1 AS, 2",
     select_error_bare_from: "SELECT 1 FROM",
@@ -219,6 +247,8 @@ test_sql! {
     select_error_where_nonboolean: "SELECT * FROM movies WHERE 1",
     select_expr_where_false: "SELECT 1 WHERE FALSE",
     select_expr_where_true: "SELECT 1 WHERE TRUE",
+    select_fields: "SELECT title, 2019 - released AS age, rating * 10 FROM movies",
+    select_where: "SELECT * FROM movies WHERE released >= 2000 AND rating > 7",
     select_where_false: "SELECT * FROM movies WHERE FALSE",
     select_where_null: "SELECT * FROM movies WHERE NULL",
     select_where_true: "SELECT * FROM movies WHERE TRUE",
