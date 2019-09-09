@@ -1,74 +1,38 @@
-mod create_table;
-mod drop_table;
-mod filter;
-mod insert;
-mod nothing;
-mod projection;
-mod scan;
-
-use super::expression::Expression;
+use super::executor::{Context, Executor};
+use super::expression::{Expression, Expressions};
 use super::parser::ast;
 use super::schema;
-use super::storage::Storage;
-use super::types::{Row, Value};
+use super::types::{ResultSet, Value};
 use crate::Error;
-use create_table::CreateTable;
-use drop_table::DropTable;
-use filter::Filter;
-use insert::Insert;
-use nothing::Nothing;
-use projection::Projection;
-use scan::Scan;
 
-/// A plan
+/// A query plan
 #[derive(Debug)]
 pub struct Plan {
-    /// The plan root
-    root: Box<dyn Node>,
+    root: Node,
 }
 
 impl Plan {
+    /// Builds a plan from an AST statement
     pub fn build(statement: ast::Statement) -> Result<Self, Error> {
         Planner::new().build(statement)
     }
 
-    pub fn execute(mut self, mut context: Context) -> Result<ResultSet, Error> {
-        self.root.execute(&mut context)?;
-        Ok(ResultSet { root: self.root })
-    }
-}
-
-/// A plan execution context
-pub struct Context {
-    /// The underlying storage
-    pub storage: Box<Storage>,
-}
-
-/// A plan execution result
-pub struct ResultSet {
-    root: Box<dyn Node>,
-}
-
-impl Iterator for ResultSet {
-    type Item = Result<Row, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.root.next()
+    /// Executes the plan, consuming it
+    pub fn execute(self, mut ctx: Context) -> Result<ResultSet, Error> {
+        Ok(ResultSet::from_executor(Executor::execute(&mut ctx, self.root)?))
     }
 }
 
 /// A plan node
-pub trait Node:
-    Iterator<Item = Result<Row, Error>> + std::fmt::Debug + Send + Sync + 'static
-{
-    /// Execute starts execution of the plan
-    fn execute(&mut self, ctx: &mut Context) -> Result<(), Error>;
-}
-
-impl<N: Node> From<N> for Box<dyn Node> {
-    fn from(n: N) -> Self {
-        Box::new(n)
-    }
+#[derive(Debug)]
+pub enum Node {
+    CreateTable { schema: schema::Table },
+    DropTable { name: String },
+    Filter { source: Box<Self>, predicate: Expression },
+    Insert { table: String, columns: Vec<String>, expressions: Vec<Expressions> },
+    Nothing,
+    Projection { source: Box<Self>, labels: Vec<String>, expressions: Expressions },
+    Scan { table: String },
 }
 
 /// The plan builder
@@ -76,54 +40,52 @@ struct Planner {}
 
 impl Planner {
     /// Creates a new planner
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {}
     }
 
     /// Builds a plan tree for an AST statement
-    pub fn build(&self, statement: ast::Statement) -> Result<Plan, Error> {
+    fn build(&self, statement: ast::Statement) -> Result<Plan, Error> {
         Ok(Plan { root: self.build_statement(statement)? })
     }
 
     /// Builds a plan node for a statement
-    fn build_statement(&self, statement: ast::Statement) -> Result<Box<dyn Node>, Error> {
+    fn build_statement(&self, statement: ast::Statement) -> Result<Node, Error> {
         Ok(match statement {
             ast::Statement::CreateTable { name, columns } => {
-                CreateTable::new(self.build_schema_table(name, columns)?).into()
+                Node::CreateTable{schema: self.build_schema_table(name, columns)? }
             }
-            ast::Statement::DropTable(name) => DropTable::new(name).into(),
-            ast::Statement::Insert { table, columns, values } => Insert::new(
+            ast::Statement::DropTable(name) => Node::DropTable{name},
+            ast::Statement::Insert { table, columns, values } => Node::Insert{
                 table,
-                columns.unwrap_or_else(Vec::new),
-                values
+                columns: columns.unwrap_or_else(Vec::new),
+                expressions: values
                     .into_iter()
                     .map(|exprs| exprs.into_iter().map(|expr| expr.into()).collect())
                     .collect(),
-            )
-            .into(),
+            },
             ast::Statement::Select { select, from, r#where } => {
-                let mut n: Box<dyn Node> = match from {
+                let mut n: Node = match from {
                     // FIXME Handle multiple FROM tables
-                    Some(from) => Scan::new(from.tables[0].clone()).into(),
+                    Some(from) => Node::Scan{table: from.tables[0].clone() },
                     None if select.expressions.is_empty() => {
                         return Err(Error::Value("Can't select * without a table".into()))
                     }
-                    None => Nothing::new().into(),
+                    None => Node::Nothing,
                 };
                 if let Some(ast::WhereClause(expr)) = r#where {
-                    n = Filter::new(n, expr.into()).into();
+                    n = Node::Filter{ source: Box::new(n), predicate: expr.into() };
                 };
                 if !select.expressions.is_empty() {
-                    n = Projection::new(
-                        n,
-                        select
+                    n = Node::Projection{
+                        source: Box::new(n),
+                        labels: select
                             .labels
                             .into_iter()
                             .map(|l| l.unwrap_or_else(|| "?".into()))
                             .collect(),
-                        self.build_expressions(select.expressions)?,
-                    )
-                    .into();
+                        expressions: self.build_expressions(select.expressions)?,
+                    };
                 };
                 n
             }

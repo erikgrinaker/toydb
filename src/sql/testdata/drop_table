@@ -11,7 +11,7 @@ AST: DropTable(
 
 Plan: Plan {
     root: DropTable {
-        table: "movies",
+        name: "movies",
     },
 }
 

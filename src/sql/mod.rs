@@ -1,3 +1,4 @@
+mod executor;
 mod expression;
 mod parser;
 mod plan;
@@ -7,7 +8,8 @@ mod storage;
 mod tests;
 pub mod types;
 
+pub use executor::Context;
 pub use expression::Expression;
 pub use parser::{ast, lexer, Parser};
-pub use plan::{Context, Plan, ResultSet};
+pub use plan::Plan;
 pub use storage::Storage;

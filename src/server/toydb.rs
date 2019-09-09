@@ -90,7 +90,7 @@ impl service::ToyDB for ToyDB {
 
 impl ToyDB {
     /// Executes an SQL statement
-    fn execute(&self, query: &str) -> Result<sql::ResultSet, Error> {
+    fn execute(&self, query: &str) -> Result<sql::types::ResultSet, Error> {
         sql::Plan::build(sql::Parser::new(query).parse()?)?
             .execute(sql::Context { storage: self.storage.clone() })
     }

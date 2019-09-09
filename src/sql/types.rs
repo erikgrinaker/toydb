@@ -1,3 +1,6 @@
+use super::executor::Executor;
+use crate::Error;
+
 /// A datatype
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DataType {
@@ -94,3 +97,35 @@ impl From<&str> for Value {
 
 /// A row of values
 pub type Row = Vec<Value>;
+
+/// A result set
+pub struct ResultSet {
+    executor: Option<Box<dyn Executor>>,
+}
+
+impl ResultSet {
+    /// Creates a result set from an executor
+    pub fn from_executor(executor: Box<dyn Executor>) -> Self {
+        Self { executor: Some(executor) }
+    }
+}
+
+impl Iterator for ResultSet {
+    type Item = Result<Row, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Make sure iteration is aborted on the first error, otherwise callers
+        // may keep calling next for as long as it keeps returning errors
+        if let Some(ref mut iter) = self.executor {
+            match iter.next() {
+                Some(Err(err)) => {
+                    self.executor = None;
+                    Some(Err(err))
+                }
+                r => r,
+            }
+        } else {
+            None
+        }
+    }
+}
