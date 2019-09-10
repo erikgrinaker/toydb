@@ -4,7 +4,7 @@ pub mod lexer;
 use super::types::DataType;
 use crate::Error;
 use lexer::{Keyword, Lexer, Token};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// An SQL parser
 pub struct Parser<'a> {
@@ -255,7 +255,7 @@ impl<'a> Parser<'a> {
         let table = self.next_ident()?;
         self.next_expect(Some(Keyword::Set.into()))?;
 
-        let mut set = HashMap::new();
+        let mut set = BTreeMap::new();
         loop {
             let column = self.next_ident()?;
             self.next_expect(Some(Token::Equals))?;

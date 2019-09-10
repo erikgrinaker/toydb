@@ -2,7 +2,7 @@ use super::super::types::Row;
 use super::super::{Environment, Expression};
 use super::{Context, Executor};
 use crate::Error;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// An update executor
 pub struct Update;
@@ -12,7 +12,7 @@ impl Update {
         ctx: &mut Context,
         table: String,
         mut source: Box<dyn Executor>,
-        expressions: HashMap<String, Expression>,
+        expressions: BTreeMap<String, Expression>,
     ) -> Result<Box<dyn Executor>, Error> {
         let schema = ctx
             .storage
@@ -22,8 +22,7 @@ impl Update {
         let columns: Vec<String> = schema.columns.iter().map(|c| c.name.clone()).collect();
         while let Some(mut row) = source.fetch()? {
             let pk = row.get(pk_index).unwrap().clone();
-            let env =
-                Environment::new(columns.iter().cloned().zip(row.iter().cloned()).collect());
+            let env = Environment::new(columns.iter().cloned().zip(row.iter().cloned()).collect());
             for (c, expr) in &expressions {
                 row[schema.column_index(&c).unwrap()] = expr.evaluate(&env)?;
             }

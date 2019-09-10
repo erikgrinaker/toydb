@@ -4,7 +4,7 @@ use super::parser::ast;
 use super::schema;
 use super::types::{ResultSet, Value};
 use crate::Error;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// A query plan
 #[derive(Debug)]
@@ -36,7 +36,8 @@ pub enum Node {
     Order { source: Box<Self>, orders: Vec<(Expression, Order)> },
     Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
     Scan { table: String },
-    Update { table: String, source: Box<Self>, expressions: HashMap<String, Expression> },
+    // Uses BTreeMap for test stability
+    Update { table: String, source: Box<Self>, expressions: BTreeMap<String, Expression> },
 }
 
 /// A sort order
@@ -113,7 +114,10 @@ impl Planner {
                 // FIXME Because the projection doesn't retain original table values, we can't
                 // order by fields which are not in the result set.
                 if !order.is_empty() {
-                    n = Node::Order{ source: Box::new(n), orders: order.into_iter().map(|(e,o)| (e.into(), o.into())).collect() };
+                    n = Node::Order {
+                        source: Box::new(n),
+                        orders: order.into_iter().map(|(e, o)| (e.into(), o.into())).collect(),
+                    };
                 }
                 n
             }

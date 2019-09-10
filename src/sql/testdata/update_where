@@ -63,10 +63,10 @@ Plan: Plan {
             ),
         },
         expressions: {
-            "rating": Constant(
+            "bluray": Constant(
                 Null,
             ),
-            "bluray": Constant(
+            "rating": Constant(
                 Null,
             ),
         },

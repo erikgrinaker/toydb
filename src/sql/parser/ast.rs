@@ -1,5 +1,5 @@
 use super::super::types;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Statements
 #[derive(Clone, Debug, PartialEq)]
@@ -20,7 +20,7 @@ pub enum Statement {
         order: Vec<(Expression, Order)>,
     },
     /// An UPDATE statement
-    Update { table: String, set: HashMap<String, Expression>, r#where: Option<WhereClause> },
+    Update { table: String, set: BTreeMap<String, Expression>, r#where: Option<WhereClause> },
 }
 
 /// A column specification
