@@ -5,6 +5,8 @@ use super::super::types;
 pub enum Statement {
     /// A CREATE TABLE statement
     CreateTable { name: String, columns: Vec<ColumnSpec> },
+    /// A DELETE statement
+    Delete { table: String, r#where: Option<WhereClause> },
     /// A DROP TABLE statement
     DropTable(String),
     /// An INSERT statement

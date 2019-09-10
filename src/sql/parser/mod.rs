@@ -94,6 +94,7 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self) -> Result<ast::Statement, Error> {
         match self.peek()? {
             Some(Token::Keyword(Keyword::Create)) => self.parse_ddl(),
+            Some(Token::Keyword(Keyword::Delete)) => self.parse_statement_delete(),
             Some(Token::Keyword(Keyword::Drop)) => self.parse_ddl(),
             Some(Token::Keyword(Keyword::Insert)) => self.parse_statement_insert(),
             Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
@@ -183,6 +184,14 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(column)
+    }
+
+    /// Parses a delete statement
+    fn parse_statement_delete(&mut self) -> Result<ast::Statement, Error> {
+        self.next_expect(Some(Keyword::Delete.into()))?;
+        self.next_expect(Some(Keyword::From.into()))?;
+        let table = self.next_ident()?;
+        Ok(ast::Statement::Delete { table, r#where: self.parse_clause_where()? })
     }
 
     /// Parses an insert statement

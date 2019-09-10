@@ -27,6 +27,7 @@ impl Plan {
 #[derive(Debug)]
 pub enum Node {
     CreateTable { schema: schema::Table },
+    Delete { table: String, source: Box<Self> },
     DropTable { name: String },
     Filter { source: Box<Self>, predicate: Expression },
     Insert { table: String, columns: Vec<String>, expressions: Vec<Expressions> },
@@ -54,6 +55,13 @@ impl Planner {
         Ok(match statement {
             ast::Statement::CreateTable { name, columns } => {
                 Node::CreateTable { schema: self.build_schema_table(name, columns)? }
+            }
+            ast::Statement::Delete { table, r#where } => {
+                let mut source = Node::Scan { table: table.clone() };
+                if let Some(ast::WhereClause(expr)) = r#where {
+                    source = Node::Filter { source: Box::new(source), predicate: expr.into() };
+                }
+                Node::Delete { table, source: Box::new(source) }
             }
             ast::Statement::DropTable(name) => Node::DropTable { name },
             ast::Statement::Insert { table, columns, values } => Node::Insert {

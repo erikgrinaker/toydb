@@ -41,6 +41,11 @@ impl Storage {
         self.kv.write()?.set(&Self::key_table(&table.name), serialize(table)?)
     }
 
+    /// Deletes a row
+    pub fn delete_row(&mut self, table: &str, id: &types::Value) -> Result<(), Error> {
+        self.kv.write()?.delete(&Self::key_row(table, &id.to_string()))
+    }
+
     /// Deletes a table
     pub fn delete_table(&mut self, table: &str) -> Result<(), Error> {
         if self.get_table(table)?.is_none() {

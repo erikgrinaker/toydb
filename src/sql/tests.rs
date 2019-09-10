@@ -217,6 +217,15 @@ test_sql! {
     create_table_error_pk_multiple: "CREATE TABLE name (id INTEGER PRIMARY KEY, name VARCHAR PRIMARY KEY)",
     create_table_error_pk_nullable: "CREATE TABLE name (id INTEGER PRIMARY KEY NULL)",
 
+    delete_all: "DELETE FROM movies",
+    delete_error_bare: "DELETE FROM",
+    delete_error_multiple: "DELETE FROM movies, genres",
+    delete_error_table: "DELETE FROM missing",
+    delete_where: "DELETE FROM movies WHERE released >= 2000",
+    delete_where_false: "DELETE FROM movies WHERE FALSE",
+    delete_where_null: "DELETE FROM movies WHERE NULL",
+    delete_where_true: "DELETE FROM movies WHERE TRUE",
+
     drop_table: "DROP TABLE movies",
     drop_table_error_bare: "DROP TABLE",
     drop_table_error_missing: "DROP TABLE missing",

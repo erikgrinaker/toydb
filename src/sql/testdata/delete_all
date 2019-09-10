@@ -1,0 +1,41 @@
+Query: DELETE FROM movies
+
+Tokens:
+  Keyword(Delete)
+  Keyword(From)
+  Ident("movies")
+
+AST: Delete {
+    table: "movies",
+    where: None,
+}
+
+Plan: Plan {
+    root: Delete {
+        table: "movies",
+        source: Scan {
+            table: "movies",
+        },
+    },
+}
+
+Query: DELETE FROM movies
+
+Result: <none>
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)

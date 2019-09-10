@@ -1,0 +1,7 @@
+Query: DELETE FROM
+
+Tokens:
+  Keyword(Delete)
+  Keyword(From)
+
+AST: Parse("Unexpected end of input")

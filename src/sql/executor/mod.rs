@@ -1,4 +1,5 @@
 mod create_table;
+mod delete;
 mod drop_table;
 mod filter;
 mod insert;
@@ -7,6 +8,7 @@ mod projection;
 mod scan;
 
 use create_table::CreateTable;
+use delete::Delete;
 use drop_table::DropTable;
 use filter::Filter;
 use insert::Insert;
@@ -31,6 +33,10 @@ impl dyn Executor {
     pub fn execute(ctx: &mut Context, node: Node) -> Result<Box<Self>, Error> {
         Ok(match node {
             Node::CreateTable { schema } => CreateTable::execute(ctx, schema)?,
+            Node::Delete { table, source } => {
+                let source = Self::execute(ctx, *source)?;
+                Delete::execute(ctx, source, table)?
+            }
             Node::DropTable { name } => DropTable::execute(ctx, name)?,
             Node::Filter { source, predicate } => {
                 let source = Self::execute(ctx, *source)?;
