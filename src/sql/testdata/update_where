@@ -1,0 +1,100 @@
+Query: UPDATE movies SET rating = NULL, bluray = NULL WHERE released < 2000
+
+Tokens:
+  Keyword(Update)
+  Ident("movies")
+  Keyword(Set)
+  Ident("rating")
+  Equals
+  Keyword(Null)
+  Comma
+  Ident("bluray")
+  Equals
+  Keyword(Null)
+  Keyword(Where)
+  Ident("released")
+  LessThan
+  Number("2000")
+
+AST: Update {
+    table: "movies",
+    set: {
+        "bluray": Literal(
+            Null,
+        ),
+        "rating": Literal(
+            Null,
+        ),
+    },
+    where: Some(
+        WhereClause(
+            Operation(
+                CompareLT(
+                    Field(
+                        "released",
+                    ),
+                    Literal(
+                        Integer(
+                            2000,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+}
+
+Plan: Plan {
+    root: Update {
+        table: "movies",
+        source: Filter {
+            source: Scan {
+                table: "movies",
+            },
+            predicate: CompareLT(
+                Field(
+                    "released",
+                ),
+                Constant(
+                    Integer(
+                        2000,
+                    ),
+                ),
+            ),
+        },
+        expressions: {
+            "rating": Constant(
+                Null,
+            ),
+            "bluray": Constant(
+                Null,
+            ),
+        },
+    },
+}
+
+Query: UPDATE movies SET rating = NULL, bluray = NULL WHERE released < 2000
+
+Result: <none>
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Null, Null]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Null, Null]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

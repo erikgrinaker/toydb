@@ -4,6 +4,7 @@ use super::parser::ast;
 use super::schema;
 use super::types::{ResultSet, Value};
 use crate::Error;
+use std::collections::HashMap;
 
 /// A query plan
 #[derive(Debug)]
@@ -34,6 +35,7 @@ pub enum Node {
     Nothing,
     Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
     Scan { table: String },
+    Update { table: String, source: Box<Self>, expressions: HashMap<String, Expression> },
 }
 
 /// The plan builder
@@ -92,6 +94,17 @@ impl Planner {
                     };
                 };
                 n
+            }
+            ast::Statement::Update { table, set, r#where } => {
+                let mut source = Node::Scan { table: table.clone() };
+                if let Some(ast::WhereClause(expr)) = r#where {
+                    source = Node::Filter { source: Box::new(source), predicate: expr.into() };
+                }
+                Node::Update {
+                    table,
+                    source: Box::new(source),
+                    expressions: set.into_iter().map(|(c, e)| (c, e.into())).collect(),
+                }
             }
         })
     }

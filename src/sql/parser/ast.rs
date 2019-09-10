@@ -1,4 +1,5 @@
 use super::super::types;
+use std::collections::HashMap;
 
 /// Statements
 #[derive(Clone, Debug, PartialEq)]
@@ -13,6 +14,8 @@ pub enum Statement {
     Insert { table: String, columns: Option<Vec<String>>, values: Vec<Expressions> },
     /// A SELECT statement
     Select { select: SelectClause, from: Option<FromClause>, r#where: Option<WhereClause> },
+    /// An UPDATE statement
+    Update { table: String, set: HashMap<String, Expression>, r#where: Option<WhereClause> },
 }
 
 /// A column specification

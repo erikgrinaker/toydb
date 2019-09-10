@@ -6,6 +6,7 @@ mod insert;
 mod nothing;
 mod projection;
 mod scan;
+mod update;
 
 use create_table::CreateTable;
 use delete::Delete;
@@ -15,6 +16,7 @@ use insert::Insert;
 use nothing::Nothing;
 use projection::Projection;
 use scan::Scan;
+use update::Update;
 
 use super::plan::Node;
 use super::types::Row;
@@ -51,6 +53,10 @@ impl dyn Executor {
                 Projection::execute(ctx, source, labels, expressions)?
             }
             Node::Scan { table } => Scan::execute(ctx, table)?,
+            Node::Update { table, source, expressions } => {
+                let source = Self::execute(ctx, *source)?;
+                Update::execute(ctx, table, source, expressions)?
+            }
         })
     }
 }

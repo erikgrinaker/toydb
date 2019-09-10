@@ -87,6 +87,18 @@ impl Storage {
         }))
     }
 
+    /// Updates a row
+    pub fn update_row(
+        &mut self,
+        table: &str,
+        id: &types::Value,
+        row: types::Row,
+    ) -> Result<(), Error> {
+        // FIXME For now, we're lazy and just do a delete + create
+        self.delete_row(table, id)?;
+        self.create_row(table, row)
+    }
+
     /// Generates a key for a row
     fn key_row(table: &str, id: &str) -> String {
         format!("{}.{}", table, id)

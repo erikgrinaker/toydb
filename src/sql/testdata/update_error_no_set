@@ -1,0 +1,7 @@
+Query: UPDATE movies
+
+Tokens:
+  Keyword(Update)
+  Ident("movies")
+
+AST: Parse("Unexpected end of input")

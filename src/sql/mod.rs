@@ -9,7 +9,7 @@ mod tests;
 pub mod types;
 
 pub use executor::Context;
-pub use expression::Expression;
+pub use expression::{Environment, Expression};
 pub use parser::{ast, lexer, Parser};
 pub use plan::Plan;
 pub use storage::Storage;

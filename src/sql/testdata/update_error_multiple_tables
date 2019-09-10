@@ -1,0 +1,13 @@
+Query: UPDATE movies, genres SET title = 'X'
+
+Tokens:
+  Keyword(Update)
+  Ident("movies")
+  Comma
+  Ident("genres")
+  Keyword(Set)
+  Ident("title")
+  Equals
+  String("X")
+
+AST: Parse("Expected token SET, found ,")

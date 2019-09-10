@@ -4,6 +4,7 @@ pub mod lexer;
 use super::types::DataType;
 use crate::Error;
 use lexer::{Keyword, Lexer, Token};
+use std::collections::HashMap;
 
 /// An SQL parser
 pub struct Parser<'a> {
@@ -98,6 +99,7 @@ impl<'a> Parser<'a> {
             Some(Token::Keyword(Keyword::Drop)) => self.parse_ddl(),
             Some(Token::Keyword(Keyword::Insert)) => self.parse_statement_insert(),
             Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
+            Some(Token::Keyword(Keyword::Update)) => self.parse_statement_update(),
             Some(token) => Err(Error::Parse(format!("Unexpected token {}", token))),
             None => Err(Error::Parse("Unexpected end of input".into())),
         }
@@ -242,6 +244,33 @@ impl<'a> Parser<'a> {
         Ok(ast::Statement::Select {
             select: self.parse_clause_select()?.unwrap(),
             from: self.parse_clause_from()?,
+            r#where: self.parse_clause_where()?,
+        })
+    }
+
+    /// Parses an update statement
+    fn parse_statement_update(&mut self) -> Result<ast::Statement, Error> {
+        self.next_expect(Some(Keyword::Update.into()))?;
+        let table = self.next_ident()?;
+        self.next_expect(Some(Keyword::Set.into()))?;
+
+        let mut set = HashMap::new();
+        loop {
+            let column = self.next_ident()?;
+            self.next_expect(Some(Token::Equals))?;
+            let expr = self.parse_expression(0)?;
+            if set.contains_key(&column) {
+                return Err(Error::Value(format!("Duplicate values given for column {}", column)));
+            }
+            set.insert(column, expr);
+            if self.next_if_token(Token::Comma).is_none() {
+                break;
+            }
+        }
+
+        Ok(ast::Statement::Update {
+            table,
+            set,
             r#where: self.parse_clause_where()?,
         })
     }
