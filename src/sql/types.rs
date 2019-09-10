@@ -22,7 +22,7 @@ impl std::fmt::Display for DataType {
 }
 
 /// A value
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     /// An unknown value
     Null,
@@ -65,6 +65,23 @@ impl Value {
     }
 }
 
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::Null, Self::Null) => Some(std::cmp::Ordering::Equal),
+            (Self::Null, _) => Some(std::cmp::Ordering::Less),
+            (_, Self::Null) => Some(std::cmp::Ordering::Greater),
+            (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
+            (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
+            (Self::Float(a), Self::Integer(b)) => a.partial_cmp(&(*b as f64)),
+            (Self::Integer(a), Self::Float(b)) => (*a as f64).partial_cmp(b),
+            (Self::Integer(a), Self::Integer(b)) => a.partial_cmp(b),
+            (Self::String(a), Self::String(b)) => a.partial_cmp(b),
+            (_, _) => None,
+        }
+    }
+}
+
 impl From<bool> for Value {
     fn from(v: bool) -> Self {
         Value::Boolean(v)
@@ -94,6 +111,9 @@ impl From<&str> for Value {
         Value::String(v.to_owned())
     }
 }
+
+/// A sort order
+
 
 /// A row of values
 pub type Row = Vec<Value>;

@@ -63,6 +63,7 @@ AST: Select {
         },
     ),
     where: None,
+    order: [],
 }
 
 Plan: Plan {

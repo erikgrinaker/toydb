@@ -33,9 +33,26 @@ pub enum Node {
     Filter { source: Box<Self>, predicate: Expression },
     Insert { table: String, columns: Vec<String>, expressions: Vec<Expressions> },
     Nothing,
+    Order { source: Box<Self>, orders: Vec<(Expression, Order)> },
     Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
     Scan { table: String },
     Update { table: String, source: Box<Self>, expressions: HashMap<String, Expression> },
+}
+
+/// A sort order
+#[derive(Debug, PartialEq)]
+pub enum Order {
+    Ascending,
+    Descending,
+}
+
+impl From<ast::Order> for Order {
+    fn from(o: ast::Order) -> Self {
+        match o {
+            ast::Order::Ascending => Self::Ascending,
+            ast::Order::Descending => Self::Descending,
+        }
+    }
 }
 
 /// The plan builder
@@ -74,7 +91,7 @@ impl Planner {
                     .map(|exprs| exprs.into_iter().map(|expr| expr.into()).collect())
                     .collect(),
             },
-            ast::Statement::Select { select, from, r#where } => {
+            ast::Statement::Select { select, from, r#where, order } => {
                 let mut n: Node = match from {
                     // FIXME Handle multiple FROM tables
                     Some(from) => Node::Scan { table: from.tables[0].clone() },
@@ -93,6 +110,11 @@ impl Planner {
                         expressions: self.build_expressions(select.expressions)?,
                     };
                 };
+                // FIXME Because the projection doesn't retain original table values, we can't
+                // order by fields which are not in the result set.
+                if !order.is_empty() {
+                    n = Node::Order{ source: Box::new(n), orders: order.into_iter().map(|(e,o)| (e.into(), o.into())).collect() };
+                }
                 n
             }
             ast::Statement::Update { table, set, r#where } => {

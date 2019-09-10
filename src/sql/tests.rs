@@ -257,6 +257,8 @@ test_sql! {
     select_expr_where_false: "SELECT 1 WHERE FALSE",
     select_expr_where_true: "SELECT 1 WHERE TRUE",
     select_fields: "SELECT title, 2019 - released AS age, rating * 10 FROM movies",
+    select_order: "SELECT * FROM movies ORDER BY bluray ASC, released DESC",
+    select_order_projection: "SELECT 5 - id AS a, title FROM movies ORDER BY a",
     select_where: "SELECT * FROM movies WHERE released >= 2000 AND rating > 7",
     select_where_false: "SELECT * FROM movies WHERE FALSE",
     select_where_null: "SELECT * FROM movies WHERE NULL",

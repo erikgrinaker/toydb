@@ -1,0 +1,130 @@
+Query: SELECT 5 - id AS a, title FROM movies ORDER BY a
+
+Tokens:
+  Keyword(Select)
+  Number("5")
+  Minus
+  Ident("id")
+  Keyword(As)
+  Ident("a")
+  Comma
+  Ident("title")
+  Keyword(From)
+  Ident("movies")
+  Keyword(Order)
+  Keyword(By)
+  Ident("a")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Operation(
+                Subtract(
+                    Literal(
+                        Integer(
+                            5,
+                        ),
+                    ),
+                    Field(
+                        "id",
+                    ),
+                ),
+            ),
+            Field(
+                "title",
+            ),
+        ],
+        labels: [
+            Some(
+                "a",
+            ),
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [
+        (
+            Field(
+                "a",
+            ),
+            Ascending,
+        ),
+    ],
+}
+
+Plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Scan {
+                table: "movies",
+            },
+            labels: [
+                Some(
+                    "a",
+                ),
+                None,
+            ],
+            expressions: [
+                Subtract(
+                    Constant(
+                        Integer(
+                            5,
+                        ),
+                    ),
+                    Field(
+                        "id",
+                    ),
+                ),
+                Field(
+                    "title",
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    "a",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT 5 - id AS a, title FROM movies ORDER BY a
+
+Result: [["a", "title"]]
+[Integer(0), String("The Fountain")]
+[Integer(1), String("Heat")]
+[Integer(2), String("Primer")]
+[Integer(3), String("Sicario")]
+[Integer(4), String("Stalker")]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

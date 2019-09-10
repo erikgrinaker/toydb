@@ -245,6 +245,7 @@ impl<'a> Parser<'a> {
             select: self.parse_clause_select()?.unwrap(),
             from: self.parse_clause_from()?,
             r#where: self.parse_clause_where()?,
+            order: self.parse_clause_order()?,
         })
     }
 
@@ -283,6 +284,31 @@ impl<'a> Parser<'a> {
         let mut clause = ast::FromClause { tables: Vec::new() };
         clause.tables.push(self.next_ident()?);
         Ok(Some(clause))
+    }
+
+    /// Parses an order clause
+    fn parse_clause_order(&mut self) -> Result<Vec<(ast::Expression, ast::Order)>, Error> {
+        if self.next_if_token(Keyword::Order.into()).is_none() {
+            return Ok(Vec::new());
+        }
+        self.next_expect(Some(Keyword::By.into()))?;
+        let mut orders = Vec::new();
+        loop {
+            orders.push((
+                self.parse_expression(0)?,
+                if self.next_if_token(Keyword::Asc.into()).is_some() {
+                    ast::Order::Ascending
+                } else if self.next_if_token(Keyword::Desc.into()).is_some() {
+                    ast::Order::Descending
+                } else {
+                    ast::Order::Ascending
+                },
+            ));
+            if self.next_if_token(Token::Comma).is_none() {
+                break;
+            }
+        }
+        Ok(orders)
     }
 
     /// Parses a select clause

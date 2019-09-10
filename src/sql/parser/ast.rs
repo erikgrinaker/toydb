@@ -13,7 +13,12 @@ pub enum Statement {
     /// An INSERT statement
     Insert { table: String, columns: Option<Vec<String>>, values: Vec<Expressions> },
     /// A SELECT statement
-    Select { select: SelectClause, from: Option<FromClause>, r#where: Option<WhereClause> },
+    Select {
+        select: SelectClause,
+        from: Option<FromClause>,
+        r#where: Option<WhereClause>,
+        order: Vec<(Expression, Order)>,
+    },
     /// An UPDATE statement
     Update { table: String, set: HashMap<String, Expression>, r#where: Option<WhereClause> },
 }
@@ -45,6 +50,13 @@ pub struct FromClause {
 /// A WHERE clause
 #[derive(Clone, Debug, PartialEq)]
 pub struct WhereClause(pub Expression);
+
+/// Sort orders
+#[derive(Clone, Debug, PartialEq)]
+pub enum Order {
+    Ascending,
+    Descending,
+}
 
 /// Expressions
 #[derive(Clone, Debug, PartialEq)]

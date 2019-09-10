@@ -29,6 +29,7 @@ AST: Select {
             ),
         ),
     ),
+    order: [],
 }
 
 Plan: Plan {

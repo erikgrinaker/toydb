@@ -42,6 +42,7 @@ AST: Select {
     },
     from: None,
     where: None,
+    order: [],
 }
 
 Plan: Plan {

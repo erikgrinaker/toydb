@@ -4,6 +4,7 @@ mod drop_table;
 mod filter;
 mod insert;
 mod nothing;
+mod order;
 mod projection;
 mod scan;
 mod update;
@@ -14,6 +15,7 @@ use drop_table::DropTable;
 use filter::Filter;
 use insert::Insert;
 use nothing::Nothing;
+use order::Order;
 use projection::Projection;
 use scan::Scan;
 use update::Update;
@@ -48,6 +50,10 @@ impl dyn Executor {
                 Insert::execute(ctx, &table, columns, expressions)?
             }
             Node::Nothing => Nothing::execute(ctx)?,
+            Node::Order{source, orders} => {
+                let source = Self::execute(ctx, *source)?;
+                Order::execute(ctx, source, orders)?
+            }
             Node::Projection { source, labels, expressions } => {
                 let source = Self::execute(ctx, *source)?;
                 Projection::execute(ctx, source, labels, expressions)?
