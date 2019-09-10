@@ -42,7 +42,7 @@ toydb> SELECT * FROM movies
 
 - [x] **Consensus:** Self-written Raft implementation with strictly serializable reads and writes.
 
-- [ ] **Storage:** Self-written key-value store using B+-trees and possibly LSM-trees. MessagePack for serialization. No log compaction or write-ahead log.
+- [ ] **Storage:** Self-written key-value store using B+-trees and possibly LSM-trees, with MessagePack for serialization.
 
 - [x] **Data Types:** Support for nulls, booleans, 64-bit integers, 64-bit floats, and UTF-8 strings up to 1 KB.
 
@@ -54,14 +54,16 @@ toydb> SELECT * FROM movies
 
 - [ ] **Language:** Self-written SQL parser with support for:
 
-  * `[CREATE|DROP] TABLE ...`
-  * `[CREATE|DROP] INDEX ...`
-  * `BEGIN`, `COMMIT`, and `ROLLBACK`
-  * `INSERT INTO ... (...) VALUES (...)`
-  * `UPDATE ... SET ... WHERE ...`
-  * `DELETE FROM ... WHERE ...`
-  * `SELECT ... FROM ... WHERE ... GROUP BY ... HAVING ... ORDER BY ...`
-  * `EXPLAIN SELECT ...`
+  - [x] `[CREATE|DROP] TABLE ...`
+  - [ ] `[CREATE|DROP] INDEX ...`
+  - [ ] `BEGIN`, `COMMIT`, and `ROLLBACK`
+  - [x] `INSERT INTO ... (...) VALUES (...)`
+  - [x] `UPDATE ... SET ... WHERE ...`
+  - [x] `DELETE FROM ... WHERE ...`
+  - [x] `SELECT ... FROM ... WHERE ... ORDER BY ...`
+    - [ ] `GROUP BY ... HAVING ...`
+    - [ ] `[INNER|LEFT|RIGHT|FULL|CROSS] JOIN`
+  - [ ] `EXPLAIN SELECT ...`
 
 - [ ] **Verification:** [Jepsen](https://github.com/jepsen-io/jepsen) test suite.
 
@@ -94,3 +96,5 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 ### Query Engine
 
 * **Type checking:** query type checking (e.g. `SELECT a + b` must receive two numbers) is done at query evaluation time, not at query compile time.
+
+* **Ordering:** it's only possible to order on output columns of the `SELECT` statement.
