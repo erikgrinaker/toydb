@@ -3,7 +3,9 @@ mod delete;
 mod drop_table;
 mod filter;
 mod insert;
+mod limit;
 mod nothing;
+mod offset;
 mod order;
 mod projection;
 mod scan;
@@ -14,7 +16,9 @@ use delete::Delete;
 use drop_table::DropTable;
 use filter::Filter;
 use insert::Insert;
+use limit::Limit;
 use nothing::Nothing;
+use offset::Offset;
 use order::Order;
 use projection::Projection;
 use scan::Scan;
@@ -49,7 +53,15 @@ impl dyn Executor {
             Node::Insert { table, columns, expressions } => {
                 Insert::execute(ctx, &table, columns, expressions)?
             }
+            Node::Limit { source, limit } => {
+                let source = Self::execute(ctx, *source)?;
+                Limit::execute(ctx, source, limit)?
+            }
             Node::Nothing => Nothing::execute(ctx)?,
+            Node::Offset { source, offset } => {
+                let source = Self::execute(ctx, *source)?;
+                Offset::execute(ctx, source, offset)?
+            }
             Node::Order{source, orders} => {
                 let source = Self::execute(ctx, *source)?;
                 Order::execute(ctx, source, orders)?

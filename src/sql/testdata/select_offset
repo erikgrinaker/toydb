@@ -1,10 +1,15 @@
-Query: SELECT * FROM movies
+Query: SELECT * FROM movies ORDER BY id OFFSET 2
 
 Tokens:
   Keyword(Select)
   Asterisk
   Keyword(From)
   Ident("movies")
+  Keyword(Order)
+  Keyword(By)
+  Ident("id")
+  Keyword(Offset)
+  Number("2")
 
 AST: Select {
     select: SelectClause {
@@ -19,22 +24,46 @@ AST: Select {
         },
     ),
     where: None,
-    order: [],
+    order: [
+        (
+            Field(
+                "id",
+            ),
+            Ascending,
+        ),
+    ],
     limit: None,
-    offset: None,
+    offset: Some(
+        Literal(
+            Integer(
+                2,
+            ),
+        ),
+    ),
 }
 
 Plan: Plan {
-    root: Scan {
-        table: "movies",
+    root: Offset {
+        source: Order {
+            source: Scan {
+                table: "movies",
+            },
+            orders: [
+                (
+                    Field(
+                        "id",
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        offset: 2,
     },
 }
 
-Query: SELECT * FROM movies
+Query: SELECT * FROM movies ORDER BY id OFFSET 2
 
 Result: [["id", "title", "genre_id", "released", "rating", "bluray"]]
-[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
-[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
 [Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
 [Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
 [Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

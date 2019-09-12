@@ -28,6 +28,8 @@ AST: Select {
         ),
     ),
     order: [],
+    limit: None,
+    offset: None,
 }
 
 Plan: Plan {

@@ -246,6 +246,16 @@ impl<'a> Parser<'a> {
             from: self.parse_clause_from()?,
             r#where: self.parse_clause_where()?,
             order: self.parse_clause_order()?,
+            limit: if self.next_if_token(Keyword::Limit.into()).is_some() {
+                Some(self.parse_expression(0)?)
+            } else {
+                None
+            },
+            offset: if self.next_if_token(Keyword::Offset.into()).is_some() {
+                Some(self.parse_expression(0)?)
+            } else {
+                None
+            },
         })
     }
 

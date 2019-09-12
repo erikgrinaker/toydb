@@ -1,5 +1,5 @@
 use super::executor::{Context, Executor};
-use super::expression::{Expression, Expressions};
+use super::expression::{Environment, Expression, Expressions};
 use super::parser::ast;
 use super::schema;
 use super::types::{ResultSet, Value};
@@ -32,7 +32,9 @@ pub enum Node {
     DropTable { name: String },
     Filter { source: Box<Self>, predicate: Expression },
     Insert { table: String, columns: Vec<String>, expressions: Vec<Expressions> },
+    Limit { source: Box<Self>, limit: u64 },
     Nothing,
+    Offset { source: Box<Self>, offset: u64 },
     Order { source: Box<Self>, orders: Vec<(Expression, Order)> },
     Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
     Scan { table: String },
@@ -92,7 +94,7 @@ impl Planner {
                     .map(|exprs| exprs.into_iter().map(|expr| expr.into()).collect())
                     .collect(),
             },
-            ast::Statement::Select { select, from, r#where, order } => {
+            ast::Statement::Select { select, from, r#where, order, limit, offset } => {
                 let mut n: Node = match from {
                     // FIXME Handle multiple FROM tables
                     Some(from) => Node::Scan { table: from.tables[0].clone() },
@@ -118,6 +120,29 @@ impl Planner {
                         source: Box::new(n),
                         orders: order.into_iter().map(|(e, o)| (e.into(), o.into())).collect(),
                     };
+                }
+                // FIXME Limit and offset need to check that the expression is constant
+                if let Some(expr) = offset {
+                    n = Node::Offset {
+                        source: Box::new(n),
+                        offset: match Expression::from(expr).evaluate(&Environment::empty())? {
+                            Value::Integer(i) => i as u64,
+                            v => {
+                                return Err(Error::Value(format!("Invalid value {} for offset", v)))
+                            }
+                        },
+                    }
+                }
+                if let Some(expr) = limit {
+                    n = Node::Limit {
+                        source: Box::new(n),
+                        limit: match Expression::from(expr).evaluate(&Environment::empty())? {
+                            Value::Integer(i) => i as u64,
+                            v => {
+                                return Err(Error::Value(format!("Invalid value {} for limit", v)))
+                            }
+                        },
+                    }
                 }
                 n
             }

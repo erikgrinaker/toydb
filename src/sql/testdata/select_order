@@ -40,6 +40,8 @@ AST: Select {
             Descending,
         ),
     ],
+    limit: None,
+    offset: None,
 }
 
 Plan: Plan {

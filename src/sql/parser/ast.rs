@@ -18,6 +18,8 @@ pub enum Statement {
         from: Option<FromClause>,
         r#where: Option<WhereClause>,
         order: Vec<(Expression, Order)>,
+        limit: Option<Expression>,
+        offset: Option<Expression>,
     },
     /// An UPDATE statement
     Update { table: String, set: BTreeMap<String, Expression>, r#where: Option<WhereClause> },
