@@ -1,5 +1,5 @@
 use super::super::expression::{Environment, Expression};
-use super::super::plan;
+use super::super::planner;
 use super::super::types::{Row, Value};
 use super::{Context, Executor};
 use crate::Error;
@@ -14,7 +14,7 @@ impl Order {
     pub fn execute(
         _: &mut Context,
         mut source: Box<dyn Executor>,
-        orders: Vec<(Expression, plan::Order)>,
+        orders: Vec<(Expression, planner::Order)>,
     ) -> Result<Box<dyn Executor>, Error> {
         let columns = source.columns();
 
@@ -43,7 +43,7 @@ impl Order {
                 match value_a.partial_cmp(value_b) {
                     Some(std::cmp::Ordering::Equal) => {}
                     Some(o) => {
-                        return if *order == plan::Order::Ascending { o } else { o.reverse() }
+                        return if *order == planner::Order::Ascending { o } else { o.reverse() }
                     }
                     None => {}
                 }

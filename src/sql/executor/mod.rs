@@ -24,7 +24,7 @@ use projection::Projection;
 use scan::Scan;
 use update::Update;
 
-use super::plan::Node;
+use super::planner::Node;
 use super::types::Row;
 use super::Storage;
 use crate::Error;

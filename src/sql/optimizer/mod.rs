@@ -2,7 +2,7 @@ mod constant_folder;
 
 pub use constant_folder::ConstantFolder;
 
-use super::plan::Node;
+use super::planner::Node;
 use crate::Error;
 
 /// A plan optimizer

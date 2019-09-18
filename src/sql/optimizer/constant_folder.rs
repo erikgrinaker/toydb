@@ -1,4 +1,4 @@
-use super::super::plan::Node;
+use super::super::planner::Node;
 use super::super::{Environment, Expression};
 use super::Optimizer;
 use crate::Error;
