@@ -112,9 +112,6 @@ impl From<&str> for Value {
     }
 }
 
-/// A sort order
-
-
 /// A row of values
 pub type Row = Vec<Value>;
 
