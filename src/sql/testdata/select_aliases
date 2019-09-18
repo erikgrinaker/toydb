@@ -79,6 +79,38 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            Some(
+                "b",
+            ),
+            Some(
+                "c",
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+            Constant(
+                Integer(
+                    3,
+                ),
+            ),
+        ],
+    },
+}
+
 Query: SELECT 1, 2 b, 3 AS c
 
 Result: [["?", "b", "c"]]

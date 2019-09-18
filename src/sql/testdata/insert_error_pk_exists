@@ -51,6 +51,27 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Insert {
+        table: "genres",
+        columns: [],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    String(
+                        "Western",
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
 Query: INSERT INTO genres VALUES (1, 'Western')
 
 Result: Value("Primary key 1 already exists for table genres")

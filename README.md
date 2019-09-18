@@ -50,7 +50,7 @@ toydb> SELECT * FROM movies
 
 - [ ] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based serializable snapshot isolation.
 
-- [ ] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer.
+- [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer.
 
 - [ ] **Language:** Self-written SQL parser with support for:
 
@@ -60,7 +60,7 @@ toydb> SELECT * FROM movies
   - [x] `INSERT INTO ... (...) VALUES (...)`
   - [x] `UPDATE ... SET ... WHERE ...`
   - [x] `DELETE FROM ... WHERE ...`
-  - [x] `SELECT ... FROM ... WHERE ... ORDER BY ...`
+  - [x] `SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT ... OFFSET ...`
     - [ ] `GROUP BY ... HAVING ...`
     - [ ] `[INNER|LEFT|RIGHT|FULL|CROSS] JOIN`
   - [ ] `EXPLAIN SELECT ...`

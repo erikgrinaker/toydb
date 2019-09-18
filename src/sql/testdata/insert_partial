@@ -112,6 +112,48 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Insert {
+        table: "movies",
+        columns: [
+            "title",
+            "released",
+            "id",
+            "genre_id",
+            "rating",
+        ],
+        expressions: [
+            [
+                Constant(
+                    String(
+                        "District 9",
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        2009,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    Float(
+                        7.9,
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
 Query: INSERT INTO movies (title, released, id, genre_id, rating) VALUES ('District 9', 2009, 9, 1, 7.9)
 
 Result: <none>

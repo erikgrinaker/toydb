@@ -80,6 +80,36 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Insert {
+        table: "genres",
+        columns: [
+            "id",
+            "name",
+            "id",
+        ],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+                Constant(
+                    String(
+                        "Western",
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
 Query: INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)
 
 Result: Value("Column id specified multiple times")

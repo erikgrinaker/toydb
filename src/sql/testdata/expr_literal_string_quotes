@@ -40,6 +40,22 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+        ],
+        expressions: [
+            Constant(
+                String(
+                    "Literal with \'single\' and \"double\" quotes",
+                ),
+            ),
+        ],
+    },
+}
+
 Query: SELECT 'Literal with ''single'' and "double" quotes'
 
 Result: [["?"]]

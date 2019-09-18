@@ -47,6 +47,19 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Integer(
+                1,
+            ),
+        ),
+    },
+}
+
 Query: SELECT * FROM movies WHERE 1
 
 Result: Value("Unexpected value 1 for filter, expected boolean")

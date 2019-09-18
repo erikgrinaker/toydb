@@ -57,6 +57,29 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Projection {
+        source: Filter {
+            source: Nothing,
+            predicate: Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        },
+        labels: [
+            None,
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+        ],
+    },
+}
+
 Query: SELECT 1 WHERE FALSE
 
 Result: [["?"]]

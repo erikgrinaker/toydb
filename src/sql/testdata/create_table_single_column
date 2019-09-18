@@ -39,6 +39,22 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: CreateTable {
+        schema: Table {
+            name: "name",
+            columns: [
+                Column {
+                    name: "id",
+                    datatype: Integer,
+                    nullable: false,
+                },
+            ],
+            primary_key: 0,
+        },
+    },
+}
+
 Query: CREATE TABLE name (id INTEGER PRIMARY KEY)
 
 Result: <none>

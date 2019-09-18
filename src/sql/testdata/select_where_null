@@ -43,6 +43,17 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Null,
+        ),
+    },
+}
+
 Query: SELECT * FROM movies WHERE NULL
 
 Result: [["id", "title", "genre_id", "released", "rating", "bluray"]]

@@ -108,6 +108,46 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            None,
+            Some(
+                "age",
+            ),
+            None,
+        ],
+        expressions: [
+            Field(
+                "title",
+            ),
+            Subtract(
+                Constant(
+                    Integer(
+                        2019,
+                    ),
+                ),
+                Field(
+                    "released",
+                ),
+            ),
+            Multiply(
+                Field(
+                    "rating",
+                ),
+                Constant(
+                    Integer(
+                        10,
+                    ),
+                ),
+            ),
+        ],
+    },
+}
+
 Query: SELECT title, 2019 - released AS age, rating * 10 FROM movies
 
 Result: [["title", "age", "?"]]

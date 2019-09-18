@@ -53,6 +53,29 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Update {
+        table: "movies",
+        source: Filter {
+            source: Scan {
+                table: "movies",
+            },
+            predicate: Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        },
+        expressions: {
+            "title": Constant(
+                String(
+                    "X",
+                ),
+            ),
+        },
+    },
+}
+
 Query: UPDATE movies SET title = 'X' WHERE FALSE
 
 Result: <none>

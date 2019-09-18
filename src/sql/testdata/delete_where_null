@@ -32,6 +32,20 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Delete {
+        table: "movies",
+        source: Filter {
+            source: Scan {
+                table: "movies",
+            },
+            predicate: Constant(
+                Null,
+            ),
+        },
+    },
+}
+
 Query: DELETE FROM movies WHERE NULL
 
 Result: <none>

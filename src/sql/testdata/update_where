@@ -73,6 +73,35 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Update {
+        table: "movies",
+        source: Filter {
+            source: Scan {
+                table: "movies",
+            },
+            predicate: CompareLT(
+                Field(
+                    "released",
+                ),
+                Constant(
+                    Integer(
+                        2000,
+                    ),
+                ),
+            ),
+        },
+        expressions: {
+            "bluray": Constant(
+                Null,
+            ),
+            "rating": Constant(
+                Null,
+            ),
+        },
+    },
+}
+
 Query: UPDATE movies SET rating = NULL, bluray = NULL WHERE released < 2000
 
 Result: <none>

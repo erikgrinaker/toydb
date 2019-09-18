@@ -1,5 +1,6 @@
 mod executor;
 mod expression;
+mod optimizer;
 mod parser;
 mod plan;
 mod schema;

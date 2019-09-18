@@ -39,6 +39,22 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Insert {
+        table: "movies",
+        columns: [],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
 Query: INSERT INTO movies VALUES (9)
 
 Result: Value("NULL value not allowed for column title")

@@ -51,6 +51,27 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Insert {
+        table: "genres",
+        columns: [],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+                Constant(
+                    String(
+                        "Western",
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
 Query: INSERT INTO genres VALUES (9, 'Western')
 
 Result: <none>

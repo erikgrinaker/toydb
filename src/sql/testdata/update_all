@@ -60,6 +60,30 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Update {
+        table: "movies",
+        source: Scan {
+            table: "movies",
+        },
+        expressions: {
+            "bluray": Constant(
+                Null,
+            ),
+            "released": Constant(
+                Integer(
+                    0,
+                ),
+            ),
+            "title": Constant(
+                String(
+                    "X",
+                ),
+            ),
+        },
+    },
+}
+
 Query: UPDATE movies SET title = 'X', released = 0, bluray = NULL
 
 Result: <none>

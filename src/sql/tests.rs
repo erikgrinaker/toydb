@@ -156,6 +156,16 @@ macro_rules! test_sql {
             };
             write!(f, "{:#?}\n\n", plan).unwrap();
 
+            write!(f, "Optimized plan: ").unwrap();
+            let plan = match plan.optimize() {
+                Ok(plan) => plan,
+                Err(err) => {
+                    write!(f, "{:?}", err).unwrap();
+                    return
+                }
+            };
+            write!(f, "{:#?}\n\n", plan).unwrap();
+
             write!(f, "Query: {}\n\n", $sql).unwrap();
 
             write!(f, "Result:").unwrap();

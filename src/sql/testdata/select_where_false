@@ -47,6 +47,19 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Boolean(
+                false,
+            ),
+        ),
+    },
+}
+
 Query: SELECT * FROM movies WHERE FALSE
 
 Result: [["id", "title", "genre_id", "released", "rating", "bluray"]]

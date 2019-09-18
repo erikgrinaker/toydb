@@ -15,6 +15,12 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: DropTable {
+        name: "missing",
+    },
+}
+
 Query: DROP TABLE missing
 
 Result: Value("Table missing does not exist")

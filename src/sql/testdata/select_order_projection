@@ -100,6 +100,45 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Scan {
+                table: "movies",
+            },
+            labels: [
+                Some(
+                    "a",
+                ),
+                None,
+            ],
+            expressions: [
+                Subtract(
+                    Constant(
+                        Integer(
+                            5,
+                        ),
+                    ),
+                    Field(
+                        "id",
+                    ),
+                ),
+                Field(
+                    "title",
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    "a",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
 Query: SELECT 5 - id AS a, title FROM movies ORDER BY a
 
 Result: [["a", "title"]]

@@ -19,6 +19,15 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Delete {
+        table: "missing",
+        source: Scan {
+            table: "missing",
+        },
+    },
+}
+
 Query: DELETE FROM missing
 
 Result: Value("Table missing not found")

@@ -51,6 +51,27 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Insert {
+        table: "genres",
+        columns: [],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+                Constant(
+                    Float(
+                        3.14,
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
 Query: INSERT INTO genres VALUES (9, 3.14)
 
 Result: Value("Invalid datatype FLOAT for VARCHAR column name")

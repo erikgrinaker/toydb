@@ -47,6 +47,25 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Insert {
+        table: "genres",
+        columns: [],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        9,
+                    ),
+                ),
+                Constant(
+                    Null,
+                ),
+            ],
+        ],
+    },
+}
+
 Query: INSERT INTO genres VALUES (9, NULL)
 
 Result: Value("NULL value not allowed for column name")

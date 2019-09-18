@@ -72,6 +72,28 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Limit {
+        source: Offset {
+            source: Order {
+                source: Scan {
+                    table: "movies",
+                },
+                orders: [
+                    (
+                        Field(
+                            "id",
+                        ),
+                        Ascending,
+                    ),
+                ],
+            },
+            offset: 2,
+        },
+        limit: 2,
+    },
+}
+
 Query: SELECT * FROM movies ORDER BY id LIMIT 2 OFFSET 2
 
 Result: [["id", "title", "genre_id", "released", "rating", "bluray"]]

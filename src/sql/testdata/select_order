@@ -66,6 +66,28 @@ Plan: Plan {
     },
 }
 
+Optimized plan: Plan {
+    root: Order {
+        source: Scan {
+            table: "movies",
+        },
+        orders: [
+            (
+                Field(
+                    "bluray",
+                ),
+                Ascending,
+            ),
+            (
+                Field(
+                    "released",
+                ),
+                Descending,
+            ),
+        ],
+    },
+}
+
 Query: SELECT * FROM movies ORDER BY bluray ASC, released DESC
 
 Result: [["id", "title", "genre_id", "released", "rating", "bluray"]]

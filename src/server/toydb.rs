@@ -89,6 +89,7 @@ impl ToyDB {
     /// Executes an SQL statement
     fn execute(&self, query: &str) -> Result<sql::types::ResultSet, Error> {
         sql::Plan::build(sql::Parser::new(query).parse()?)?
+            .optimize()?
             .execute(sql::Context { storage: self.storage.clone() })
     }
 
