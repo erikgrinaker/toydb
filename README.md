@@ -40,9 +40,9 @@ toydb> SELECT * FROM movies
 
 - [x] **Client:** Simple interactive REPL client over gRPC.
 
-- [x] **Consensus:** Self-written Raft implementation with strictly serializable reads and writes.
+- [x] **Consensus:** Self-written Raft implementation with linearizable replication of arbitrary state machines.
 
-- [ ] **Storage:** Self-written key-value store using B+-trees and possibly LSM-trees, with MessagePack for serialization.
+- [ ] **Storage:** Self-written key-value store using B+trees and possibly LSM-trees, with MessagePack for serialization.
 
 - [x] **Data Types:** Support for nulls, booleans, 64-bit integers, 64-bit floats, and UTF-8 strings up to 1 KB.
 
