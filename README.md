@@ -52,6 +52,10 @@ toydb> SELECT * FROM movies
 
 - [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer.
 
+  - [ ] Predicate pushdown
+
+  - [ ] Time travel queries
+
 - [ ] **Language:** Self-written SQL parser with support for:
 
   - [x] `[CREATE|DROP] TABLE ...`
@@ -86,6 +90,12 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 * **State machine errors:** errors during state machine mutations currently crash the node - it may be beneficial to support user errors which simply skip the erroring log entry.
 
 * **Log replication optimization:** currently only the simplest version of the Raft log replication protocol is implemented, without snapshots or rapid log replay (i.e. replication of old log entries is retried one by one until a common base entry is found).
+
+### Storage
+
+* **Recovery:** there is no WAL or other form of crash recovery - unexpected termination is likely to corrupt data.
+
+* **Garbage collection:** old Raft log entries or MVCC versions are never removed, giving unbounded disk usage but also unbounded data history.
 
 ### Schema
 
