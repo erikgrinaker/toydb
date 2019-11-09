@@ -25,16 +25,11 @@ fn main() -> Result<(), toydb::Error> {
     let cfg = Config::new(opts.value_of("config").unwrap())?;
 
     let loglevel = cfg.log_level.parse::<simplelog::LevelFilter>()?;
-    simplelog::SimpleLogger::init(
-        loglevel,
-        simplelog::Config {
-            filter_allow: match loglevel {
-                simplelog::LevelFilter::Debug => None,
-                _ => Some(&["toydb"]),
-            },
-            ..Default::default()
-        },
-    )?;
+    let mut logconfig = simplelog::ConfigBuilder::new();
+    if loglevel == simplelog::LevelFilter::Debug {
+        logconfig.add_filter_allow_str("toydb");
+    }
+    simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
     toydb::Server {
         id: cfg.id.clone(),
