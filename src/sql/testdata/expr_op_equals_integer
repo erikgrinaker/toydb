@@ -1,0 +1,140 @@
+Query: SELECT 1 = 1, 1 = 2
+
+Tokens:
+  Keyword(Select)
+  Number("1")
+  Equals
+  Number("1")
+  Comma
+  Number("1")
+  Equals
+  Number("2")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                    Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                    Literal(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            None,
+        ],
+    },
+    from: None,
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            None,
+        ],
+        expressions: [
+            CompareEQ(
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+            ),
+            CompareEQ(
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        2,
+                    ),
+                ),
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            None,
+        ],
+        expressions: [
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT 1 = 1, 1 = 2
+
+Result: [["?", "?"]]
+[Boolean(true), Boolean(false)]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

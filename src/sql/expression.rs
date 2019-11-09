@@ -64,10 +64,12 @@ impl Expression {
             // Comparison operations
             #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
             Self::CompareEQ(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 == rhs),
                 (Float(lhs), Integer(rhs)) => Boolean(lhs == rhs as f64),
                 (Float(lhs), Float(rhs)) => Boolean(lhs == rhs),
+                (String(lhs), String(rhs)) => Boolean(lhs == rhs),
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
@@ -110,10 +112,12 @@ impl Expression {
             },
             #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
             Self::CompareNE(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs != rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs != rhs),
                 (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 != rhs),
                 (Float(lhs), Integer(rhs)) => Boolean(lhs != rhs as f64),
                 (Float(lhs), Float(rhs)) => Boolean(lhs != rhs),
+                (String(lhs), String(rhs)) => Boolean(lhs != rhs),
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }

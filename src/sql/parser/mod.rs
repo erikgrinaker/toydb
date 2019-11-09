@@ -279,11 +279,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(ast::Statement::Update {
-            table,
-            set,
-            r#where: self.parse_clause_where()?,
-        })
+        Ok(ast::Statement::Update { table, set, r#where: self.parse_clause_where()? })
     }
 
     /// Parses a from clause
@@ -487,6 +483,7 @@ impl Operator for InfixOperator {
         Some(match token {
             Token::Asterisk => Self::Multiply,
             Token::Caret => Self::Exponentiate,
+            Token::Equals => Self::CompareEQ,
             Token::GreaterThan => Self::CompareGT,
             Token::GreaterThanOrEqual => Self::CompareGTE,
             Token::Keyword(Keyword::And) => Self::And,

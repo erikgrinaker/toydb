@@ -1,0 +1,178 @@
+Query: SELECT TRUE = TRUE, FALSE = FALSE, TRUE = FALSE
+
+Tokens:
+  Keyword(Select)
+  Keyword(True)
+  Equals
+  Keyword(True)
+  Comma
+  Keyword(False)
+  Equals
+  Keyword(False)
+  Comma
+  Keyword(True)
+  Equals
+  Keyword(False)
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Boolean(
+                            false,
+                        ),
+                    ),
+                    Literal(
+                        Boolean(
+                            false,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                    Literal(
+                        Boolean(
+                            false,
+                        ),
+                    ),
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+        ],
+    },
+    from: None,
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            CompareEQ(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+            CompareEQ(
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+            ),
+            CompareEQ(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT TRUE = TRUE, FALSE = FALSE, TRUE = FALSE
+
+Result: [["?", "?", "?"]]
+[Boolean(true), Boolean(true), Boolean(false)]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

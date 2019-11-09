@@ -243,6 +243,10 @@ test_sql! {
     expr_datatypes: "SELECT NULL, TRUE, FALSE, 1, 3.14, 'Hi! 👋'",
     expr_literal_numbers: "SELECT 0, 1, -2, --3, +-4, 3.14, 293, 3.14e3, 2.718E-2",
     expr_literal_string_quotes: r#"SELECT 'Literal with ''single'' and "double" quotes'"#,
+    expr_op_equals_boolean: "SELECT TRUE = TRUE, FALSE = FALSE, TRUE = FALSE",
+    expr_op_equals_float: "SELECT 3.14 = 3.14, 3.14 = 2.718, 3.0 = 3, 3 = 3.0, 3.01 = 3",
+    expr_op_equals_integer: "SELECT 1 = 1, 1 = 2",
+    expr_op_equals_string: "SELECT 'abc' = 'abc', 'abc' = 'xyz', 'abc' = 'ABC'",
 
     insert_default_null: "INSERT INTO movies VALUES (9, 'District 9', 1, 2009)",
     insert_expression: "INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)",

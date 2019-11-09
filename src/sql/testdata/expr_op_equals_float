@@ -1,0 +1,254 @@
+Query: SELECT 3.14 = 3.14, 3.14 = 2.718, 3.0 = 3, 3 = 3.0, 3.01 = 3
+
+Tokens:
+  Keyword(Select)
+  Number("3.14")
+  Equals
+  Number("3.14")
+  Comma
+  Number("3.14")
+  Equals
+  Number("2.718")
+  Comma
+  Number("3.0")
+  Equals
+  Number("3")
+  Comma
+  Number("3")
+  Equals
+  Number("3.0")
+  Comma
+  Number("3.01")
+  Equals
+  Number("3")
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Float(
+                            3.14,
+                        ),
+                    ),
+                    Literal(
+                        Float(
+                            3.14,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Float(
+                            3.14,
+                        ),
+                    ),
+                    Literal(
+                        Float(
+                            2.718,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Float(
+                            3.0,
+                        ),
+                    ),
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Literal(
+                        Float(
+                            3.0,
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                CompareEQ(
+                    Literal(
+                        Float(
+                            3.01,
+                        ),
+                    ),
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: None,
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            CompareEQ(
+                Constant(
+                    Float(
+                        3.14,
+                    ),
+                ),
+                Constant(
+                    Float(
+                        3.14,
+                    ),
+                ),
+            ),
+            CompareEQ(
+                Constant(
+                    Float(
+                        3.14,
+                    ),
+                ),
+                Constant(
+                    Float(
+                        2.718,
+                    ),
+                ),
+            ),
+            CompareEQ(
+                Constant(
+                    Float(
+                        3.0,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        3,
+                    ),
+                ),
+            ),
+            CompareEQ(
+                Constant(
+                    Integer(
+                        3,
+                    ),
+                ),
+                Constant(
+                    Float(
+                        3.0,
+                    ),
+                ),
+            ),
+            CompareEQ(
+                Constant(
+                    Float(
+                        3.01,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        3,
+                    ),
+                ),
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT 3.14 = 3.14, 3.14 = 2.718, 3.0 = 3, 3 = 3.0, 3.01 = 3
+
+Result: [["?", "?", "?", "?", "?"]]
+[Boolean(true), Boolean(false), Boolean(true), Boolean(true), Boolean(false)]
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name VARCHAR NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title VARCHAR NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]
