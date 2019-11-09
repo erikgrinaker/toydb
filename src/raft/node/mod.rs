@@ -1,3 +1,6 @@
+// FIXME While waiting for https://doc.rust-lang.org/std/option/enum.Option.html#method.deref
+#![allow(unstable_name_collisions)]
+
 mod candidate;
 mod follower;
 mod leader;
