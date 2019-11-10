@@ -29,6 +29,7 @@ pub trait Store: 'static + Sync + Send + std::fmt::Debug {
 /// This is a terrible, temporary iterator implementation which is prepopulated
 /// with all data, to avoid having to deal with trait lifetimes right now.
 struct Iter {
+    #[allow(clippy::type_complexity)]
     stack: Vec<Result<(Vec<u8>, Vec<u8>), Error>>,
 }
 
