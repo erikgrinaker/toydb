@@ -26,7 +26,7 @@ fn main() -> Result<(), toydb::Error> {
 
     let loglevel = cfg.log_level.parse::<simplelog::LevelFilter>()?;
     let mut logconfig = simplelog::ConfigBuilder::new();
-    if loglevel == simplelog::LevelFilter::Debug {
+    if loglevel != simplelog::LevelFilter::Debug {
         logconfig.add_filter_allow_str("toydb");
     }
     simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
