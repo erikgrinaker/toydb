@@ -9,7 +9,7 @@ use std::io::Seek;
 #[derive(Debug)]
 pub struct File {
     file: std::fs::File,
-    data: BTreeMap<String, Vec<u8>>,
+    data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 impl File {
@@ -32,24 +32,25 @@ impl File {
 }
 
 impl Store for File {
-    fn delete(&mut self, key: &str) -> Result<(), Error> {
+    fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
         self.data.remove(key);
         self.flush()?;
         Ok(())
     }
 
-    fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Error> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         Ok(self.data.get(key).cloned())
     }
 
-    fn iter_prefix(&self, prefix: &str) -> Box<Range> {
-        let from = prefix.to_string();
-        let to = from.clone() + &std::char::MAX.to_string();
+    fn iter_prefix(&self, prefix: &[u8]) -> Box<Range> {
+        let from = prefix.to_vec();
+        let mut to = from.clone();
+        to.extend_from_slice(std::char::MAX.to_string().as_bytes());
         Box::new(Iter::from(self.data.range(from..to)))
     }
 
-    fn set(&mut self, key: &str, value: Vec<u8>) -> Result<(), Error> {
-        self.data.insert(key.to_string(), value);
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        self.data.insert(key.to_vec(), value);
         self.flush()?;
         Ok(())
     }

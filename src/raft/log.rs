@@ -36,11 +36,11 @@ pub struct Log {
 impl Log {
     /// Creates a new log, using a kv::Store for storage.
     pub fn new<S: kv::Store>(store: S) -> Result<Self, Error> {
-        let apply_index = match store.get("apply_index")? {
+        let apply_index = match store.get(b"apply_index")? {
             Some(v) => deserialize(v)?,
             None => 0,
         };
-        let (commit_index, commit_term) = match store.get(&apply_index.to_string())? {
+        let (commit_index, commit_term) = match store.get(&apply_index.to_string().as_bytes())? {
             Some(raw_entry) => (apply_index, deserialize::<Entry>(raw_entry)?.term),
             None if apply_index == 0 => (0, 0),
             None => {
@@ -51,7 +51,7 @@ impl Log {
         // FIXME This really needs to be done in a better way.
         let (mut last_index, mut last_term) = (0, 0);
         for i in 1..std::u64::MAX {
-            if let Some(e) = store.get(&i.to_string())? {
+            if let Some(e) = store.get(&i.to_string().as_bytes())? {
                 let entry: Entry = deserialize(e)?;
                 last_index = i;
                 last_term = entry.term;
@@ -76,7 +76,7 @@ impl Log {
         let index = self.last_index + 1;
         self.last_index = index;
         self.last_term = entry.term;
-        self.kv.set(&index.to_string(), serialize(entry)?)?;
+        self.kv.set(&index.to_string().as_bytes(), serialize(entry)?)?;
         Ok(index)
     }
 
@@ -97,7 +97,7 @@ impl Log {
             self.apply_index += 1;
             self.apply_term = entry.term;
         }
-        self.kv.set("apply_index", serialize(self.apply_index)?)?;
+        self.kv.set(b"apply_index", serialize(self.apply_index)?)?;
         Ok(Some((self.apply_index, output)))
     }
 
@@ -122,7 +122,7 @@ impl Log {
 
     /// Fetches an entry at an index
     pub fn get(&self, index: u64) -> Result<Option<Entry>, Error> {
-        if let Some(value) = self.kv.get(&index.to_string())? {
+        if let Some(value) = self.kv.get(&index.to_string().as_bytes())? {
             Ok(Some(deserialize(value)?))
         } else {
             Ok(None)
@@ -206,7 +206,7 @@ impl Log {
 
         // FIXME This shouldn't rely on last_index
         for i in (index + 1)..=self.last_index {
-            self.kv.delete(&i.to_string())?
+            self.kv.delete(&i.to_string().as_bytes())?
         }
         self.last_index = std::cmp::min(index, self.last_index);
         self.last_term = self.get(self.last_index)?.map(|e| e.term).unwrap_or(0);
@@ -217,8 +217,8 @@ impl Log {
     /// containing the term number (0 if none) and candidate voted for
     /// in current term (if any).
     pub fn load_term(&self) -> Result<(u64, Option<String>), Error> {
-        let term = if let Some(value) = self.kv.get("term")? { deserialize(value)? } else { 0 };
-        let voted_for = if let Some(value) = self.kv.get("voted_for")? {
+        let term = if let Some(value) = self.kv.get(b"term")? { deserialize(value)? } else { 0 };
+        let voted_for = if let Some(value) = self.kv.get(b"voted_for")? {
             Some(deserialize(value)?)
         } else {
             None
@@ -231,14 +231,14 @@ impl Log {
     // FIXME Should be transactional.
     pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
         if term > 0 {
-            self.kv.set("term", serialize(term)?)?
+            self.kv.set(b"term", serialize(term)?)?
         } else {
-            self.kv.delete("term")?
+            self.kv.delete(b"term")?
         }
         if let Some(v) = voted_for {
-            self.kv.set("voted_for", serialize(v)?)?
+            self.kv.set(b"voted_for", serialize(v)?)?
         } else {
-            self.kv.delete("voted_for")?
+            self.kv.delete(b"voted_for")?
         }
         debug!("Saved term={} and voted_for={:?}", term, voted_for);
         Ok(())

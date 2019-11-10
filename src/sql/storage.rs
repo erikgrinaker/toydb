@@ -66,7 +66,7 @@ impl Storage {
 
     /// Lists tables
     pub fn list_tables(&self) -> Result<Vec<String>, Error> {
-        let mut iter = self.kv.read()?.iter_prefix("schema.table");
+        let mut iter = self.kv.read()?.iter_prefix(b"schema.table");
         let mut tables = Vec::new();
         while let Some((_, value)) = iter.next().transpose()? {
             let schema: schema::Table = deserialize(value)?;
@@ -81,7 +81,7 @@ impl Storage {
         table: &str,
     ) -> Box<dyn Iterator<Item = Result<types::Row, Error>> + Sync + Send> {
         let key = table.to_string() + ".";
-        Box::new(self.kv.read().unwrap().iter_prefix(&key).map(|res| match res {
+        Box::new(self.kv.read().unwrap().iter_prefix(&key.as_bytes()).map(|res| match res {
             Ok((_, v)) => deserialize(v),
             Err(err) => Err(err),
         }))
@@ -100,12 +100,12 @@ impl Storage {
     }
 
     /// Generates a key for a row
-    fn key_row(table: &str, id: &str) -> String {
-        format!("{}.{}", table, id)
+    fn key_row(table: &str, id: &str) -> Vec<u8> {
+        format!("{}.{}", table, id).as_bytes().to_vec()
     }
 
     /// Generates a key for a table
-    fn key_table(table: &str) -> String {
-        format!("schema.table.{}", table)
+    fn key_table(table: &str) -> Vec<u8> {
+        format!("schema.table.{}", table).as_bytes().to_vec()
     }
 }

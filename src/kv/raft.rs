@@ -28,25 +28,25 @@ impl Raft {
 }
 
 impl Store for Raft {
-    fn delete(&mut self, key: &str) -> Result<(), Error> {
-        self.raft.mutate(serialize(Mutation::Delete(key.to_string()))?)?;
+    fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
+        self.raft.mutate(serialize(Mutation::Delete(key.to_vec()))?)?;
         Ok(())
     }
 
-    fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Error> {
-        Ok(deserialize(self.raft.read(serialize(Read::Get(key.to_string()))?)?)?)
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        Ok(deserialize(self.raft.read(serialize(Read::Get(key.to_vec()))?)?)?)
     }
 
-    fn iter_prefix(&self, prefix: &str) -> Box<Range> {
-        let items: Vec<(String, Vec<u8>)> = deserialize(
-            self.raft.read(serialize(Read::GetPrefix(prefix.to_string())).unwrap()).unwrap(),
+    fn iter_prefix(&self, prefix: &[u8]) -> Box<Range> {
+        let items: Vec<(Vec<u8>, Vec<u8>)> = deserialize(
+            self.raft.read(serialize(Read::GetPrefix(prefix.to_vec())).unwrap()).unwrap(),
         )
         .unwrap();
         Box::new(Iter::from_vec(items))
     }
 
-    fn set(&mut self, key: &str, value: Vec<u8>) -> Result<(), Error> {
-        self.raft.mutate(serialize(Mutation::Set(key.to_string(), value))?)?;
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        self.raft.mutate(serialize(Mutation::Set(key.to_vec(), value))?)?;
         Ok(())
     }
 }
@@ -55,18 +55,18 @@ impl Store for Raft {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 enum Mutation {
     /// Deletes a key
-    Delete(String),
+    Delete(Vec<u8>),
     /// Sets a key to a value
-    Set(String, Vec<u8>),
+    Set(Vec<u8>, Vec<u8>),
 }
 
 /// A state machine read
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 enum Read {
     /// Fetches a key
-    Get(String),
+    Get(Vec<u8>),
     /// Fetches an array of pairs under a key prefix
-    GetPrefix(String),
+    GetPrefix(Vec<u8>),
 }
 
 /// The underlying state machine for the store
@@ -91,12 +91,12 @@ impl raft::State for State {
         let mutation: Mutation = deserialize(command)?;
         match mutation {
             Mutation::Delete(key) => {
-                info!("Deleting {}", key);
+                info!("Deleting {:?}", key);
                 self.store.delete(&key)?;
                 Ok(vec![])
             }
             Mutation::Set(key, value) => {
-                info!("Setting {} to {:?}", key, value);
+                info!("Setting {:?} to {:?}", key, value);
                 self.store.set(&key, value)?;
                 Ok(vec![])
             }
@@ -107,12 +107,12 @@ impl raft::State for State {
         let read: Read = deserialize(command)?;
         match read {
             Read::Get(key) => {
-                info!("Getting {}", key);
+                info!("Getting {:?}", key);
                 Ok(serialize(self.store.get(&key)?)?)
             }
             Read::GetPrefix(prefix) => {
-                info!("Getting pairs under prefix {}", prefix);
-                let pairs: Vec<(String, Vec<u8>)> =
+                info!("Getting pairs under prefix {:?}", prefix);
+                let pairs: Vec<(Vec<u8>, Vec<u8>)> =
                     self.store.iter_prefix(&prefix).collect::<Result<_, Error>>()?;
                 Ok(serialize(pairs)?)
             }
