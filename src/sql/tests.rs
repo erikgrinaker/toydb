@@ -11,6 +11,20 @@ use crate::Error;
 use goldenfile::Mint;
 use std::io::Write;
 
+macro_rules! test_expr {
+    ( $( $name:ident: $expr:expr => $value:expr, )* ) => {
+    $(
+        #[test]
+        fn $name() {
+            let ctx = Context{storage: Box::new(Storage::new(kv::Memory::new()))};
+            let ast = Parser::new(&format!("SELECT {}", $expr)).parse().unwrap();
+            let mut result = Plan::build(ast).unwrap().optimize().unwrap().execute(ctx).unwrap();
+            assert_eq!($value, *result.next().unwrap().unwrap().get(0).unwrap())
+        }
+    )*
+    }
+}
+
 macro_rules! test_sql {
     ( $( $name:ident: $sql:expr, )* ) => {
     $(
@@ -240,14 +254,6 @@ test_sql! {
     drop_table_error_bare: "DROP TABLE",
     drop_table_error_missing: "DROP TABLE missing",
 
-    expr_datatypes: "SELECT NULL, TRUE, FALSE, 1, 3.14, 'Hi! 👋'",
-    expr_literal_numbers: "SELECT 0, 1, -2, --3, +-4, 3.14, 293, 3.14e3, 2.718E-2",
-    expr_literal_string_quotes: r#"SELECT 'Literal with ''single'' and "double" quotes'"#,
-    expr_op_equals_boolean: "SELECT TRUE = TRUE, FALSE = FALSE, TRUE = FALSE",
-    expr_op_equals_float: "SELECT 3.14 = 3.14, 3.14 = 2.718, 3.0 = 3, 3 = 3.0, 3.01 = 3",
-    expr_op_equals_integer: "SELECT 1 = 1, 1 = 2",
-    expr_op_equals_string: "SELECT 'abc' = 'abc', 'abc' = 'xyz', 'abc' = 'ABC'",
-
     insert_default_null: "INSERT INTO movies VALUES (9, 'District 9', 1, 2009)",
     insert_expression: "INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)",
     insert_error_columns_duplicate: "INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)",
@@ -287,4 +293,38 @@ test_sql! {
     update_error_no_set_where: "UPDATE movies WHERE TRUE",
     update_false: "UPDATE movies SET title = 'X' WHERE FALSE",
     update_where: "UPDATE movies SET rating = NULL, bluray = NULL WHERE released < 2000",
+}
+
+use Value::*;
+
+test_expr! {
+    lit_bool_false: "FALSE" => Boolean(false),
+    lit_bool_true: "TRUE" => Boolean(true),
+    lit_float: "3.14" => Float(3.14),
+    lit_float_exp: "3.14e3" => Float(3140.0),
+    lit_float_exp_neg: "2.718E-2" => Float(0.02718),
+    lit_float_nodecimal: "3.0" => Float(3.0),
+    lit_int: "3" => Integer(3),
+    lit_int_multidigit: "314" => Integer(314),
+    lit_int_zeroprefix: "03" => Integer(3),
+    lit_null: "NULL" => Null,
+    lit_str: "'Hi! 👋'" => String("Hi! 👋".into()),
+    lit_str_quotes: r#"'Has ''single'' and "double" quotes'"# => String(r#"Has 'single' and "double" quotes"#.into()),
+
+    op_add: "1 + 2" => Integer(3),
+    op_add_negative: "1 + -3" => Integer(-2),
+
+    op_eq_bool_falses: "TRUE = TRUE" => Boolean(true),
+    op_eq_bool_truefalse: "TRUE = FALSE" => Boolean(false),
+    op_eq_bool_trues: "TRUE = TRUE" => Boolean(true),
+    op_eq_float: "3.14 = 3.14" => Boolean(true),
+    op_eq_float_neq: "3.14 = 2.718" => Boolean(false),
+    op_eq_float_int: "3.0 = 3" => Boolean(true),
+    op_eq_float_int_neq: "3.01 = 3" => Boolean(false),
+    op_eq_int: "1 = 1" => Boolean(true),
+    op_eq_int_neq: "1 = 2" => Boolean(false),
+
+    op_eq_str: "'abc' = 'abc'" => Boolean(true),
+    op_eq_str_case: "'abc' = 'ABC'" => Boolean(false),
+    op_eq_str_neq: "'abc' = 'xyz'" => Boolean(false),
 }
