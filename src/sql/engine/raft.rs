@@ -100,7 +100,7 @@ impl super::Transaction for Transaction {
     }
 
     fn read(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error> {
-        deserialize(self.raft.read(serialize(Query::Read {
+        deserialize(self.raft.query(serialize(Query::Read {
             txn_id: self.id,
             table: table.into(),
             id: id.clone(),
@@ -110,7 +110,8 @@ impl super::Transaction for Transaction {
     fn scan(&self, table: &str) -> Result<super::Scan, Error> {
         Ok(Box::new(
             deserialize::<Vec<types::Row>>(
-                self.raft.read(serialize(Query::Scan { txn_id: self.id, table: table.into() })?)?,
+                self.raft
+                    .query(serialize(Query::Scan { txn_id: self.id, table: table.into() })?)?,
             )?
             .into_iter()
             .map(Ok),
@@ -145,13 +146,13 @@ impl super::Transaction for Transaction {
     }
 
     fn list_tables(&self) -> Result<Vec<schema::Table>, Error> {
-        deserialize(self.raft.read(serialize(Query::ListTables { txn_id: self.id })?)?)
+        deserialize(self.raft.query(serialize(Query::ListTables { txn_id: self.id })?)?)
     }
 
     fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
         deserialize(
             self.raft
-                .read(serialize(Query::ReadTable { txn_id: self.id, table: table.into() })?)?,
+                .query(serialize(Query::ReadTable { txn_id: self.id, table: table.into() })?)?,
         )
     }
 }

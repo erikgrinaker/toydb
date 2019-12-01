@@ -79,7 +79,7 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Candidate, L, S> {
             Event::AcceptEntries { .. } => {}
             Event::RejectEntries { .. } => {}
             // FIXME These should be queued or something
-            Event::ReadState { .. } => {}
+            Event::QueryState { .. } => {}
             Event::MutateState { .. } => {}
             Event::RespondState { .. } => {}
             Event::RespondError { .. } => {}

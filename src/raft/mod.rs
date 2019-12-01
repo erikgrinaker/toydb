@@ -126,9 +126,9 @@ impl Raft {
         }
     }
 
-    /// Reads from the Raft state machine.
-    pub fn read(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
-        match self.call(Event::ReadState { call_id: Self::call_id(), command })? {
+    /// Queries the Raft state machine.
+    pub fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
+        match self.call(Event::QueryState { call_id: Self::call_id(), command })? {
             Event::RespondState { response, .. } => Ok(response),
             event => Err(Error::Internal(format!("Unexpected Raft read response {:?}", event))),
         }

@@ -96,8 +96,8 @@ fn message_from_protobuf(pb: service::Message) -> Result<Message, Error> {
                 Event::SolicitVote { last_index: e.last_index, last_term: e.last_term }
             }
             Some(service::Message_oneof_event::grant_vote(_)) => Event::GrantVote,
-            Some(service::Message_oneof_event::read_state(e)) => {
-                Event::ReadState { call_id: e.call_id, command: e.command }
+            Some(service::Message_oneof_event::query_state(e)) => {
+                Event::QueryState { call_id: e.call_id, command: e.command }
             }
             Some(service::Message_oneof_event::mutate_state(e)) => {
                 Event::MutateState { call_id: e.call_id, command: e.command }
@@ -159,8 +159,8 @@ fn message_to_protobuf(msg: Message) -> service::Message {
                 })
             }
             Event::GrantVote => service::Message_oneof_event::grant_vote(service::GrantVote::new()),
-            Event::ReadState { call_id, command } => {
-                service::Message_oneof_event::read_state(service::ReadState {
+            Event::QueryState { call_id, command } => {
+                service::Message_oneof_event::query_state(service::QueryState {
                     call_id,
                     command,
                     ..Default::default()

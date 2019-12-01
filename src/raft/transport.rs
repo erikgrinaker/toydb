@@ -103,8 +103,8 @@ pub enum Event {
     },
     /// Followers may also reject a set of log entries from a leader.
     RejectEntries,
-    /// Reads from the state machine.
-    ReadState {
+    /// Queries the state machine.
+    QueryState {
         /// The call ID.
         call_id: Vec<u8>,
         /// The state machine command.
@@ -137,7 +137,7 @@ impl Event {
     /// Returns the call ID for the event, if any
     pub fn call_id(&self) -> Option<Vec<u8>> {
         match self {
-            Event::ReadState { call_id, .. }
+            Event::QueryState { call_id, .. }
             | Event::MutateState { call_id, .. }
             | Event::RespondState { call_id, .. }
             | Event::RespondError { call_id, .. } => Some(call_id.clone()),
@@ -219,5 +219,4 @@ mod tests {
         .validate("a", 3)
         .is_err());
     }
-
 }

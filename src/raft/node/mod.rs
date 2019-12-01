@@ -422,7 +422,7 @@ mod tests {
             from: None,
             to: None,
             term: 0,
-            event: Event::ReadState { call_id: vec![], command: vec![] },
+            event: Event::QueryState { call_id: vec![], command: vec![] },
         };
         assert!(node.normalize_message(&mut msg));
         assert_eq!(
@@ -431,7 +431,7 @@ mod tests {
                 from: None,
                 to: Some("a".into()),
                 term: 1,
-                event: Event::ReadState { call_id: vec![], command: vec![] },
+                event: Event::QueryState { call_id: vec![], command: vec![] },
             }
         );
 

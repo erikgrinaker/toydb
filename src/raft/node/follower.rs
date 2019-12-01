@@ -121,7 +121,7 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Follower, L, S> {
                     }
                 }
             }
-            Event::ReadState { ref call_id, .. } | Event::MutateState { ref call_id, .. } => {
+            Event::QueryState { ref call_id, .. } | Event::MutateState { ref call_id, .. } => {
                 self.role.proxy_calls.insert(call_id.clone(), msg.from);
                 self.send(self.role.leader.as_deref(), msg.event)?;
             }
@@ -766,7 +766,7 @@ pub mod tests {
     fn step_readstate_mutatestate_respond() {
         let calls = vec![
             Event::MutateState { call_id: vec![0x02], command: vec![0x02] },
-            Event::ReadState { call_id: vec![0x01], command: vec![0x01] },
+            Event::QueryState { call_id: vec![0x01], command: vec![0x01] },
         ];
         let responses = vec![
             Event::RespondError { call_id: vec![], error: "b00m".into() },

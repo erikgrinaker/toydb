@@ -159,7 +159,7 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Leader, L, S> {
                     self.replicate(&from)?;
                 }
             }
-            Event::ReadState { call_id, command } => {
+            Event::QueryState { call_id, command } => {
                 let (commit_index, commit_term) = self.log.get_committed();
                 self.role.calls.register(Call {
                     id: call_id,
@@ -660,7 +660,7 @@ mod tests {
                 from: None,
                 to: None,
                 term: 0,
-                event: Event::ReadState { call_id: vec![0x02], command: vec![0x06] },
+                event: Event::QueryState { call_id: vec![0x02], command: vec![0x06] },
             })
             .unwrap();
         assert_node(&node).is_leader().term(3);

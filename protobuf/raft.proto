@@ -21,7 +21,7 @@ message Message {
     ReplicateEntries replicate_entries = 8;
     AcceptEntries accept_entries = 9;
     RejectEntries reject_entries = 10;
-    ReadState read_state = 11;
+    QueryState query_state = 11;
     MutateState mutate_state = 12;
     RespondState respond_state = 13;
     RespondError respond_error = 14;
@@ -60,7 +60,7 @@ message AcceptEntries { uint64 last_index = 1; }
 
 message RejectEntries {}
 
-message ReadState {
+message QueryState {
   bytes call_id = 1;
   bytes command = 2;
 }
