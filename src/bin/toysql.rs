@@ -55,7 +55,6 @@ struct ToySQL {
     editor: rustyline::Editor<()>,
     history_path: Option<std::path::PathBuf>,
     show_headers: bool,
-    txn_id: Option<u64>,
 }
 
 impl ToySQL {
@@ -67,7 +66,6 @@ impl ToySQL {
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
             show_headers: false,
-            txn_id: None,
         })
     }
 
@@ -147,25 +145,18 @@ Semicolons are not supported. The following !-commands are also available:
 
     /// Runs a query and displays the results
     fn execute_query(&mut self, query: &str) -> Result<(), toydb::Error> {
-        let resultset = self.client.query(self.txn_id.clone(), query)?;
+        let resultset = self.client.query(query)?;
 
-        match (resultset.txn_id(), self.txn_id) {
-            (None, None) => {}
-            (Some(new_id), Some(current_id)) if new_id == current_id => {}
-            (Some(new_id), Some(current_id)) => {
-                return Err(toydb::Error::Internal(format!(
-                    "Unexpected transaction ID {}, current {}",
-                    new_id, current_id
-                )))
+        match resultset.effect() {
+            Some(toydb::client::Effect::Begin { id, readonly: false }) => {
+                println!("Began transaction {}", id)
             }
-            (Some(new_id), None) => {
-                println!("Began transaction {}", new_id);
-                self.txn_id = Some(new_id)
+            Some(toydb::client::Effect::Begin { id, readonly: true }) => {
+                println!("Began read-only transaction in snapshot of version {}", id)
             }
-            (None, Some(current_id)) => {
-                println!("Ended transaction {}", current_id);
-                self.txn_id = None
-            }
+            Some(toydb::client::Effect::Commit(id)) => println!("Committed transaction {}", id),
+            Some(toydb::client::Effect::Rollback(id)) => println!("Rolled back transaction {}", id),
+            None => {}
         }
 
         if self.show_headers {

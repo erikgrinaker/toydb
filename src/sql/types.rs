@@ -1,4 +1,5 @@
 use super::executor::Executor;
+use crate::client;
 use crate::Error;
 
 /// A datatype
@@ -117,37 +118,26 @@ pub type Row = Vec<Value>;
 
 /// A result set
 pub struct ResultSet {
-    // FIXME Shouldn't be public
-    pub txn_id: Option<u64>,
+    // FIXME Shouldn't be public, and shouldn't use client package
+    pub effect: Option<client::Effect>,
     columns: Vec<String>,
     executor: Option<Box<dyn Executor>>,
 }
 
 impl ResultSet {
-    /// Creates an empty result set, mostly used for transaction commit and rollback
+    /// Creates an empty result set
     pub fn empty() -> Self {
-        Self { txn_id: None, columns: Vec::new(), executor: None }
-    }
-
-    /// Creates a result set for a transaction begin
-    pub fn from_begin(txn_id: u64) -> Self {
-        Self { txn_id: Some(txn_id), columns: Vec::new(), executor: None }
+        Self { effect: None, columns: Vec::new(), executor: None }
     }
 
     /// Creates a result set from an executor
     pub fn from_executor(executor: Box<dyn Executor>) -> Self {
-        Self { txn_id: None, columns: executor.columns(), executor: Some(executor) }
+        Self { effect: None, columns: executor.columns(), executor: Some(executor) }
     }
 
     /// Fetches the columns of the result set
     pub fn columns(&self) -> Vec<String> {
         self.columns.clone()
-    }
-
-    /// Fetches the active transaction ID after the statement was executed
-    /// (i.e. Some after BEGIN but None after COMMIT/ROLLBACK)
-    pub fn txn_id(&self) -> Option<u64> {
-        self.txn_id
     }
 }
 

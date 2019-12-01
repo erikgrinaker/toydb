@@ -291,7 +291,18 @@ impl<'a> Parser<'a> {
     /// Parses a transaction statement
     fn parse_transaction(&mut self) -> Result<ast::Statement, Error> {
         match self.next()? {
-            Token::Keyword(Keyword::Begin) => Ok(ast::Statement::Begin),
+            Token::Keyword(Keyword::Begin) => {
+                let mut readonly = false;
+                self.next_if_token(Keyword::Transaction.into());
+                if self.next_if_token(Keyword::Read.into()).is_some() {
+                    match self.next()? {
+                        Token::Keyword(Keyword::Only) => readonly = true,
+                        Token::Keyword(Keyword::Write) => readonly = false,
+                        token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+                    }
+                }
+                Ok(ast::Statement::Begin { readonly })
+            }
             Token::Keyword(Keyword::Commit) => Ok(ast::Statement::Commit),
             Token::Keyword(Keyword::Rollback) => Ok(ast::Statement::Rollback),
             token => Err(Error::Parse(format!("Unexpected token {}", token))),

@@ -25,7 +25,7 @@ impl Planner {
     /// Builds a plan node for a statement
     fn build_statement(&self, statement: ast::Statement) -> Result<Node, Error> {
         Ok(match statement {
-            ast::Statement::Begin | ast::Statement::Commit | ast::Statement::Rollback => {
+            ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
                 return Err(Error::Internal(format!(
                     "Unexpected transaction statement {:?}",
                     statement

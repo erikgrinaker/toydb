@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 #[allow(clippy::large_enum_variant)]
 pub enum Statement {
     /// A BEGIN statement
-    Begin,
+    Begin { readonly: bool },
     /// A COMMIT statement
     Commit,
     /// A ROLLBACK statement
@@ -32,35 +32,6 @@ pub enum Statement {
     },
     /// An UPDATE statement
     Update { table: String, set: BTreeMap<String, Expression>, r#where: Option<WhereClause> },
-}
-
-#[allow(dead_code)]
-impl Statement {
-    pub fn r#type(&self) -> StatementType {
-        match self {
-            Statement::Begin => StatementType::TCS,
-            Statement::Commit => StatementType::TCS,
-            Statement::Rollback => StatementType::TCS,
-
-            Statement::CreateTable { .. } => StatementType::DDL,
-            Statement::DropTable(_) => StatementType::DDL,
-
-            Statement::Delete { .. } => StatementType::DML,
-            Statement::Insert { .. } => StatementType::DML,
-            Statement::Select { .. } => StatementType::DML,
-            Statement::Update { .. } => StatementType::DML,
-        }
-    }
-}
-
-//// Statement types
-pub enum StatementType {
-    /// Data definition language
-    DDL,
-    /// Data manipulation language
-    DML,
-    /// Transaction control statement
-    TCS,
 }
 
 /// A column specification

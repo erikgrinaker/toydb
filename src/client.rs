@@ -8,12 +8,24 @@ use service::ToyDB;
 /// A ToyDB client
 pub struct Client {
     client: service::ToyDBClient,
+    mode: Mode,
+}
+
+#[derive(Clone, Debug)]
+/// A ToyDB client mode.
+pub enum Mode {
+    Statement,
+    Transaction(u64),
+    Snapshot(u64),
 }
 
 impl Client {
     /// Creates a new client
     pub fn new(host: &str, port: u16) -> Result<Self, Error> {
-        Ok(Self { client: service::ToyDBClient::new_plain(host, port, grpc::ClientConf::new())? })
+        Ok(Self {
+            client: service::ToyDBClient::new_plain(host, port, grpc::ClientConf::new())?,
+            mode: Mode::Statement,
+        })
     }
 
     /// Fetches the table schema as SQL
@@ -37,20 +49,39 @@ impl Client {
         Ok(resp.name.to_vec())
     }
 
+    /// Returns the client mode
+    pub fn mode(&self) -> Mode {
+        self.mode.clone()
+    }
+
     /// Runs a query
-    pub fn query(&self, txn_id: Option<u64>, query: &str) -> Result<ResultSet, Error> {
+    pub fn query(&mut self, query: &str) -> Result<ResultSet, Error> {
         let (metadata, iter) = self
             .client
             .query(
                 grpc::RequestOptions::new(),
                 service::QueryRequest {
                     query: query.to_owned(),
-                    txn_id: txn_id.unwrap_or(0),
+                    mode: match self.mode {
+                        Mode::Statement => None,
+                        Mode::Transaction(id) => Some(service::QueryRequest_oneof_mode::txn_id(id)),
+                        Mode::Snapshot(version) => {
+                            Some(service::QueryRequest_oneof_mode::snapshot_version(version))
+                        }
+                    },
                     ..Default::default()
                 },
             )
             .wait()?;
-        ResultSet::from_grpc(metadata, iter)
+        let rs = ResultSet::from_grpc(metadata, iter)?;
+        match rs.effect() {
+            Some(Effect::Begin { id, readonly: false }) => self.mode = Mode::Transaction(id),
+            Some(Effect::Begin { id, readonly: true }) => self.mode = Mode::Snapshot(id),
+            Some(Effect::Commit(_)) => self.mode = Mode::Statement,
+            Some(Effect::Rollback(_)) => self.mode = Mode::Statement,
+            None => {}
+        }
+        Ok(rs)
     }
 
     /// Checks server status
@@ -65,9 +96,16 @@ impl Client {
 
 /// A query result set
 pub struct ResultSet {
-    txn_id: Option<u64>,
+    effect: Option<Effect>,
     columns: Vec<String>,
     rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Effect {
+    Begin { id: u64, readonly: bool },
+    Commit(u64),
+    Rollback(u64),
 }
 
 impl Iterator for ResultSet {
@@ -94,19 +132,19 @@ impl ResultSet {
         let columns =
             deserialize(metadata.get("columns").map(|c| c.to_vec()).unwrap_or_else(Vec::new))
                 .unwrap_or_else(|_| Vec::new());
-        let txn_id = match metadata.get("txn_id") {
+        let effect = match metadata.get("effect") {
             Some(v) => deserialize(v.to_vec()).ok(),
             None => None,
         };
-        Ok(Self { columns, rows, txn_id })
+        Ok(Self { effect, columns, rows })
     }
 
     pub fn columns(&self) -> Vec<String> {
         self.columns.clone()
     }
 
-    pub fn txn_id(&self) -> Option<u64> {
-        self.txn_id
+    pub fn effect(&self) -> Option<Effect> {
+        self.effect.clone()
     }
 }
 

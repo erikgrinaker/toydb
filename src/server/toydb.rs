@@ -1,3 +1,4 @@
+use crate::client;
 use crate::raft::Raft;
 use crate::service;
 use crate::sql;
@@ -58,8 +59,14 @@ impl service::ToyDB for ToyDB {
         _: grpc::RequestOptions,
         req: service::QueryRequest,
     ) -> grpc::StreamingResponse<service::Row> {
-        let txn_id = if req.txn_id > 0 { Some(req.txn_id) } else { None };
-        let result = match self.execute(txn_id, &req.query) {
+        let mode = match req.mode {
+            Some(service::QueryRequest_oneof_mode::txn_id(id)) => client::Mode::Transaction(id),
+            Some(service::QueryRequest_oneof_mode::snapshot_version(version)) => {
+                client::Mode::Snapshot(version)
+            }
+            None => client::Mode::Statement,
+        };
+        let result = match self.execute(mode, &req.query) {
             Ok(result) => result,
             Err(err) => {
                 return grpc::StreamingResponse::completed(vec![service::Row {
@@ -71,8 +78,8 @@ impl service::ToyDB for ToyDB {
         let mut metadata = grpc::Metadata::new();
         metadata
             .add(grpc::MetadataKey::from("columns"), serialize(result.columns()).unwrap().into());
-        if let Some(txn_id) = result.txn_id() {
-            metadata.add(grpc::MetadataKey::from("txn_id"), serialize(txn_id).unwrap().into());
+        if let Some(effect) = result.effect.clone() {
+            metadata.add(grpc::MetadataKey::from("effect"), serialize(effect).unwrap().into());
         }
         grpc::StreamingResponse::iter_with_metadata(
             metadata,
@@ -100,60 +107,98 @@ impl service::ToyDB for ToyDB {
 
 impl ToyDB {
     /// Executes an SQL statement
-    fn execute(&self, txn_id: Option<u64>, query: &str) -> Result<sql::types::ResultSet, Error> {
+    fn execute(&self, mode: client::Mode, query: &str) -> Result<sql::types::ResultSet, Error> {
         let statement = sql::Parser::new(query).parse()?;
 
-        // Handle statements in an ongoing transaction
-        if let Some(txn_id) = txn_id {
-            let mut txn = self.engine.resume(txn_id)?;
-            return match statement {
-                sql::ast::Statement::Begin => {
-                    Err(Error::Value(format!("Already in a transaction (id {})", txn_id)))
+        // FIXME Needs to return effect for DDL statements as well
+        match mode {
+            // Ongoing transaction
+            client::Mode::Transaction(txn_id) => {
+                let mut txn = self.engine.resume(txn_id)?;
+                match statement {
+                    sql::ast::Statement::Begin { .. } => {
+                        Err(Error::Value("Already in a transaction".into()))
+                    }
+                    sql::ast::Statement::Commit => {
+                        let mut rs = sql::types::ResultSet::empty();
+                        rs.effect = Some(client::Effect::Commit(txn.id()));
+                        txn.commit()?;
+                        Ok(rs)
+                    }
+                    sql::ast::Statement::Rollback => {
+                        let mut rs = sql::types::ResultSet::empty();
+                        rs.effect = Some(client::Effect::Rollback(txn.id()));
+                        txn.rollback()?;
+                        Ok(rs)
+                    }
+                    _ => {
+                        let rs = sql::Plan::build(statement)?
+                            .optimize()?
+                            .execute(sql::Context { txn: &mut txn })?;
+                        Ok(rs)
+                    }
                 }
-                sql::ast::Statement::Commit => {
-                    txn.commit()?;
-                    Ok(sql::types::ResultSet::empty())
+            }
+            // Ongoing read-only snapshot transaction
+            client::Mode::Snapshot(version) => {
+                let mut txn = self.engine.snapshot(Some(version))?;
+                match statement {
+                    sql::ast::Statement::Begin { .. } => {
+                        Err(Error::Value("Already in a transaction".into()))
+                    }
+                    sql::ast::Statement::Commit => {
+                        let mut rs = sql::types::ResultSet::empty();
+                        rs.effect = Some(client::Effect::Commit(txn.id()));
+                        txn.commit()?;
+                        Ok(rs)
+                    }
+                    sql::ast::Statement::Rollback => {
+                        let mut rs = sql::types::ResultSet::empty();
+                        rs.effect = Some(client::Effect::Rollback(txn.id()));
+                        txn.rollback()?;
+                        Ok(rs)
+                    }
+                    _ => {
+                        let rs = sql::Plan::build(statement)?
+                            .optimize()?
+                            .execute(sql::Context { txn: &mut txn })?;
+                        Ok(rs)
+                    }
                 }
-                sql::ast::Statement::Rollback => {
-                    txn.rollback()?;
-                    Ok(sql::types::ResultSet::empty())
-                }
-                _ => {
-                    let mut rs = sql::Plan::build(statement)?
-                        .optimize()?
-                        .execute(sql::Context { txn: &mut txn })?;
-                    // FIXME Shouldn't be necessary
-                    rs.txn_id = Some(txn_id);
+            }
+            client::Mode::Statement => match statement {
+                sql::ast::Statement::Begin { readonly: false } => {
+                    let txn = self.engine.begin()?;
+                    let mut rs = sql::types::ResultSet::empty();
+                    rs.effect = Some(client::Effect::Begin { id: txn.id(), readonly: false });
                     Ok(rs)
                 }
-            };
-        }
-
-        // Handle standalone statements
-        match statement {
-            sql::ast::Statement::Begin => {
-                let txn = self.engine.begin()?;
-                Ok(sql::types::ResultSet::from_begin(txn.id()))
-            }
-            sql::ast::Statement::Commit | sql::ast::Statement::Rollback => {
-                Err(Error::Value("Not in a transaction".into()))
-            }
-            sql::ast::Statement::Select { .. } => {
-                let mut txn = self.engine.snapshot(None)?;
-                let result = sql::Plan::build(statement)?
-                    .optimize()?
-                    .execute(sql::Context { txn: &mut txn });
-                txn.commit()?;
-                result
-            }
-            _ => {
-                let mut txn = self.engine.begin()?;
-                let result = sql::Plan::build(statement)?
-                    .optimize()?
-                    .execute(sql::Context { txn: &mut txn });
-                txn.commit()?;
-                result
-            }
+                sql::ast::Statement::Begin { readonly: true } => {
+                    let txn = self.engine.snapshot(None)?;
+                    let mut rs = sql::types::ResultSet::empty();
+                    rs.effect = Some(client::Effect::Begin { id: txn.id(), readonly: true });
+                    Ok(rs)
+                }
+                sql::ast::Statement::Commit | sql::ast::Statement::Rollback => {
+                    Err(Error::Value("Not in a transaction".into()))
+                }
+                sql::ast::Statement::Select { .. } => {
+                    let mut txn = self.engine.snapshot(None)?;
+                    let result = sql::Plan::build(statement)?
+                        .optimize()?
+                        .execute(sql::Context { txn: &mut txn });
+                    txn.commit()?;
+                    result
+                }
+                _ => {
+                    let mut txn = self.engine.begin()?;
+                    let result = sql::Plan::build(statement)?
+                        .optimize()?
+                        .execute(sql::Context { txn: &mut txn });
+                    txn.commit()?;
+                    result
+                }
+            },
         }
     }
 

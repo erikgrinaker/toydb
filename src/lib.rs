@@ -19,7 +19,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate uuid;
 
-mod client;
+pub mod client;
 mod error;
 mod kv;
 mod raft;
