@@ -38,12 +38,16 @@ impl Client {
     }
 
     /// Runs a query
-    pub fn query(&self, query: &str) -> Result<ResultSet, Error> {
+    pub fn query(&self, txn_id: Option<u64>, query: &str) -> Result<ResultSet, Error> {
         let (metadata, iter) = self
             .client
             .query(
                 grpc::RequestOptions::new(),
-                service::QueryRequest { query: query.to_owned(), ..Default::default() },
+                service::QueryRequest {
+                    query: query.to_owned(),
+                    txn_id: txn_id.unwrap_or(0),
+                    ..Default::default()
+                },
             )
             .wait()?;
         ResultSet::from_grpc(metadata, iter)
@@ -61,6 +65,7 @@ impl Client {
 
 /// A query result set
 pub struct ResultSet {
+    txn_id: Option<u64>,
     columns: Vec<String>,
     rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>>>,
 }
@@ -89,11 +94,19 @@ impl ResultSet {
         let columns =
             deserialize(metadata.get("columns").map(|c| c.to_vec()).unwrap_or_else(Vec::new))
                 .unwrap_or_else(|_| Vec::new());
-        Ok(Self { columns, rows })
+        let txn_id = match metadata.get("txn_id") {
+            Some(v) => deserialize(v.to_vec()).ok(),
+            None => None,
+        };
+        Ok(Self { columns, rows, txn_id })
     }
 
     pub fn columns(&self) -> Vec<String> {
         self.columns.clone()
+    }
+
+    pub fn txn_id(&self) -> Option<u64> {
+        self.txn_id
     }
 }
 

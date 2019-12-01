@@ -48,9 +48,7 @@ toydb> SELECT * FROM movies
 
 - [ ] **Schemas:** Compulsory singluar primary keys, unique and foreign key constraints, indexes.
 
-- [ ] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based snapshot isolation.
-
-  - [ ] Serializable snapshot isolation.
+- [x] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based snapshot isolation.
 
 - [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer.
 
@@ -102,6 +100,8 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 ### Transactions
 
 * **Abortion:** client disconnects or system crashes do not abort transactions, which may cause serialization failures for other transactions due to uncommitted writes.
+
+* **Serializability:** transactions use MVCC without serializable snapshot isolation, thus are vulnerable to write skew and other anomalies.
 
 ### Schema
 

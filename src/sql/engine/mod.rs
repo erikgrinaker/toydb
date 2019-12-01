@@ -10,8 +10,11 @@ use crate::Error;
 
 pub trait Engine {
     type Transaction: Transaction;
+    type Snapshot: Transaction;
 
     fn begin(&self) -> Result<Self::Transaction, Error>;
+    fn resume(&self, id: u64) -> Result<Self::Transaction, Error>;
+    fn snapshot(&self, version: Option<u64>) -> Result<Self::Snapshot, Error>;
 }
 
 pub trait Transaction {

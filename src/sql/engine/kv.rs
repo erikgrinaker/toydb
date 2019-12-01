@@ -16,9 +16,18 @@ impl<S: kv::storage::Storage> KV<S> {
 
 impl<S: kv::storage::Storage> super::Engine for KV<S> {
     type Transaction = Transaction<S>;
+    type Snapshot = Transaction<S>;
 
     fn begin(&self) -> Result<Self::Transaction, Error> {
         Ok(Self::Transaction::new(self.kv.begin()?))
+    }
+
+    fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
+        Ok(Self::Transaction::new(self.kv.resume(id)?))
+    }
+
+    fn snapshot(&self, version: Option<u64>) -> Result<Self::Snapshot, Error> {
+        Ok(Self::Transaction::new(self.kv.begin_readonly(version)?))
     }
 }
 

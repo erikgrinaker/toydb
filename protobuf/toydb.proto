@@ -27,7 +27,10 @@ message StatusResponse {
   string version = 3;
 };
 
-message QueryRequest { string query = 1; };
+message QueryRequest {
+  string query = 1;
+  uint64 txn_id = 2;
+};
 
 message Row {
   Error error = 1;

@@ -55,6 +55,7 @@ struct ToySQL {
     editor: rustyline::Editor<()>,
     history_path: Option<std::path::PathBuf>,
     show_headers: bool,
+    txn_id: Option<u64>,
 }
 
 impl ToySQL {
@@ -66,6 +67,7 @@ impl ToySQL {
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
             show_headers: false,
+            txn_id: None,
         })
     }
 
@@ -145,7 +147,27 @@ Semicolons are not supported. The following !-commands are also available:
 
     /// Runs a query and displays the results
     fn execute_query(&mut self, query: &str) -> Result<(), toydb::Error> {
-        let resultset = self.client.query(query)?;
+        let resultset = self.client.query(self.txn_id.clone(), query)?;
+
+        match (resultset.txn_id(), self.txn_id) {
+            (None, None) => {}
+            (Some(new_id), Some(current_id)) if new_id == current_id => {}
+            (Some(new_id), Some(current_id)) => {
+                return Err(toydb::Error::Internal(format!(
+                    "Unexpected transaction ID {}, current {}",
+                    new_id, current_id
+                )))
+            }
+            (Some(new_id), None) => {
+                println!("Began transaction {}", new_id);
+                self.txn_id = Some(new_id)
+            }
+            (None, Some(current_id)) => {
+                println!("Ended transaction {}", current_id);
+                self.txn_id = None
+            }
+        }
+
         if self.show_headers {
             println!("{}", resultset.columns().join("|"));
         }

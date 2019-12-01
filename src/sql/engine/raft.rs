@@ -6,7 +6,6 @@ use crate::kv;
 use crate::raft;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
-use std::collections::HashMap;
 
 /// A state machine mutation
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,11 +25,21 @@ enum Mutation {
 /// A state machine query
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum Query {
+    BeginReadOnly(Option<u64>),
+    Resume(u64),
+
     Read { txn_id: u64, table: String, id: types::Value },
     Scan { txn_id: u64, table: String },
 
     ListTables { txn_id: u64 },
     ReadTable { txn_id: u64, table: String },
+
+    // FIXME Snapshot queries shouldn't be separate variants
+    ReadSnapshot { version: u64, table: String, id: types::Value },
+    ScanSnapshot { version: u64, table: String },
+
+    ListTablesSnapshot { version: u64 },
+    ReadTableSnapshot { version: u64, table: String },
 }
 
 pub struct Raft {
@@ -51,21 +60,35 @@ impl Raft {
 
 impl super::Engine for Raft {
     type Transaction = Transaction;
+    type Snapshot = Snapshot;
 
     fn begin(&self) -> Result<Self::Transaction, Error> {
         Transaction::new(self.raft.clone())
+    }
+
+    fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
+        Transaction::resume(self.raft.clone(), id)
+    }
+
+    fn snapshot(&self, version: Option<u64>) -> Result<Self::Snapshot, Error> {
+        Snapshot::new(self.raft.clone(), version)
     }
 }
 
 #[derive(Clone)]
 pub struct Transaction {
-    id: u64,
     raft: raft::Raft,
+    id: u64,
 }
 
 impl Transaction {
     fn new(raft: raft::Raft) -> Result<Self, Error> {
         let id = deserialize(raft.mutate(serialize(Mutation::Begin)?)?)?;
+        Ok(Self { raft, id })
+    }
+
+    fn resume(raft: raft::Raft, id: u64) -> Result<Self, Error> {
+        let id = deserialize(raft.query(serialize(Query::Resume(id))?)?)?;
         Ok(Self { raft, id })
     }
 }
@@ -157,10 +180,88 @@ impl super::Transaction for Transaction {
     }
 }
 
+#[derive(Clone)]
+pub struct Snapshot {
+    raft: raft::Raft,
+    version: u64,
+}
+
+impl Snapshot {
+    fn new(raft: raft::Raft, version: Option<u64>) -> Result<Self, Error> {
+        let version = deserialize(raft.query(serialize(Query::BeginReadOnly(version))?)?)?;
+        Ok(Self { raft, version })
+    }
+}
+
+impl super::Transaction for Snapshot {
+    fn id(&self) -> u64 {
+        self.version
+    }
+
+    fn commit(self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn rollback(self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn create(&mut self, _table: &str, _row: types::Row) -> Result<(), Error> {
+        Err(Error::ReadOnly)
+    }
+
+    fn delete(&mut self, _table: &str, _id: &types::Value) -> Result<(), Error> {
+        Err(Error::ReadOnly)
+    }
+
+    fn read(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error> {
+        deserialize(self.raft.query(serialize(Query::ReadSnapshot {
+            version: self.version,
+            table: table.into(),
+            id: id.clone(),
+        })?)?)
+    }
+
+    fn scan(&self, table: &str) -> Result<super::Scan, Error> {
+        Ok(Box::new(
+            deserialize::<Vec<types::Row>>(self.raft.query(serialize(Query::ScanSnapshot {
+                version: self.version,
+                table: table.into(),
+            })?)?)?
+            .into_iter()
+            .map(Ok),
+        ))
+    }
+
+    fn update(&mut self, _table: &str, _id: &types::Value, _row: types::Row) -> Result<(), Error> {
+        Err(Error::ReadOnly)
+    }
+
+    fn create_table(&mut self, _table: &schema::Table) -> Result<(), Error> {
+        Err(Error::ReadOnly)
+    }
+
+    fn delete_table(&mut self, _table: &str) -> Result<(), Error> {
+        Err(Error::ReadOnly)
+    }
+
+    fn list_tables(&self) -> Result<Vec<schema::Table>, Error> {
+        deserialize(
+            self.raft.query(serialize(Query::ListTablesSnapshot { version: self.version })?)?,
+        )
+    }
+
+    fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
+        deserialize(self.raft.query(serialize(Query::ReadTableSnapshot {
+            version: self.version,
+            table: table.into(),
+        })?)?)
+    }
+}
+
 /// The underlying state machine for the Raft-based engine
 pub struct State<S: kv::storage::Storage> {
     engine: super::KV<S>,
-    txns: HashMap<u64, <super::KV<S> as super::Engine>::Transaction>,
 }
 
 impl<S: kv::storage::Storage> std::fmt::Debug for State<S> {
@@ -171,95 +272,74 @@ impl<S: kv::storage::Storage> std::fmt::Debug for State<S> {
 
 impl<S: kv::storage::Storage> State<S> {
     pub fn new(store: kv::MVCC<S>) -> Self {
-        State { engine: super::KV::new(store), txns: HashMap::new() }
+        State { engine: super::KV::new(store) }
     }
 }
 
 impl<S: kv::storage::Storage> raft::State for State<S> {
     fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
         match deserialize(command)? {
-            Mutation::Begin => {
-                let txn = self.engine.begin()?;
-                let txn_id = txn.id();
-                self.txns.insert(txn_id, txn);
-                serialize(txn_id)
+            Mutation::Begin => serialize(self.engine.begin()?.id()),
+            Mutation::Commit(txn_id) => serialize(self.engine.resume(txn_id)?.commit()?),
+            Mutation::Rollback(txn_id) => serialize(self.engine.resume(txn_id)?.rollback()?),
+
+            Mutation::Create { txn_id, table, row } => {
+                serialize(self.engine.resume(txn_id)?.create(&table, row)?)
             }
-            Mutation::Commit(txn_id) => serialize(
-                self.txns
-                    .remove(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .commit()?,
-            ),
-            Mutation::Rollback(txn_id) => serialize(
-                self.txns
-                    .remove(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .rollback()?,
-            ),
+            Mutation::Delete { txn_id, table, id } => {
+                serialize(self.engine.resume(txn_id)?.delete(&table, &id)?)
+            }
+            Mutation::Update { txn_id, table, id, row } => {
+                serialize(self.engine.resume(txn_id)?.update(&table, &id, row)?)
+            }
 
-            Mutation::Create { txn_id, table, row } => serialize(
-                self.txns
-                    .get_mut(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .create(&table, row)?,
-            ),
-            Mutation::Delete { txn_id, table, id } => serialize(
-                self.txns
-                    .get_mut(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .delete(&table, &id)?,
-            ),
-            Mutation::Update { txn_id, table, id, row } => serialize(
-                self.txns
-                    .get_mut(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .update(&table, &id, row)?,
-            ),
-
-            Mutation::CreateTable { txn_id, schema } => serialize(
-                self.txns
-                    .get_mut(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .create_table(&schema)?,
-            ),
-            Mutation::DeleteTable { txn_id, table } => serialize(
-                self.txns
-                    .get_mut(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .delete_table(&table)?,
-            ),
+            Mutation::CreateTable { txn_id, schema } => {
+                serialize(self.engine.resume(txn_id)?.create_table(&schema)?)
+            }
+            Mutation::DeleteTable { txn_id, table } => {
+                serialize(self.engine.resume(txn_id)?.delete_table(&table)?)
+            }
         }
     }
 
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
         match deserialize(command)? {
-            Query::Read { txn_id, table, id } => serialize(
-                self.txns
-                    .get(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .read(&table, &id)?,
-            ),
+            Query::BeginReadOnly(version) => serialize(self.engine.snapshot(version)?.id()),
+            Query::Resume(id) => serialize(self.engine.resume(id)?.id()),
+
+            Query::Read { txn_id, table, id } => {
+                serialize(self.engine.resume(txn_id)?.read(&table, &id)?)
+            }
+            // FIXME This needs to stream rows
             Query::Scan { txn_id, table } => serialize(
-                // FIXME This needs to stream rows
-                self.txns
-                    .get(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
+                self.engine
+                    .resume(txn_id)?
                     .scan(&table)?
                     .collect::<Result<Vec<types::Row>, Error>>()?,
             ),
 
-            Query::ListTables { txn_id } => serialize(
-                self.txns
-                    .get(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .list_tables()?,
+            Query::ListTables { txn_id } => serialize(self.engine.resume(txn_id)?.list_tables()?),
+            Query::ReadTable { txn_id, table } => {
+                serialize(self.engine.resume(txn_id)?.read_table(&table)?)
+            }
+
+            Query::ReadSnapshot { version, table, id } => {
+                serialize(self.engine.snapshot(Some(version))?.read(&table, &id)?)
+            }
+            // FIXME This needs to stream rows
+            Query::ScanSnapshot { version, table } => serialize(
+                self.engine
+                    .snapshot(Some(version))?
+                    .scan(&table)?
+                    .collect::<Result<Vec<types::Row>, Error>>()?,
             ),
-            Query::ReadTable { txn_id, table } => serialize(
-                self.txns
-                    .get(&txn_id)
-                    .ok_or_else(|| Error::Internal("Unknown transaction".into()))?
-                    .read_table(&table)?,
-            ),
+
+            Query::ListTablesSnapshot { version } => {
+                serialize(self.engine.snapshot(Some(version))?.list_tables()?)
+            }
+            Query::ReadTableSnapshot { version, table } => {
+                serialize(self.engine.snapshot(Some(version))?.read_table(&table)?)
+            }
         }
     }
 }

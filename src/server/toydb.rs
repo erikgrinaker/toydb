@@ -58,7 +58,8 @@ impl service::ToyDB for ToyDB {
         _: grpc::RequestOptions,
         req: service::QueryRequest,
     ) -> grpc::StreamingResponse<service::Row> {
-        let result = match self.execute(&req.query) {
+        let txn_id = if req.txn_id > 0 { Some(req.txn_id) } else { None };
+        let result = match self.execute(txn_id, &req.query) {
             Ok(result) => result,
             Err(err) => {
                 return grpc::StreamingResponse::completed(vec![service::Row {
@@ -70,6 +71,9 @@ impl service::ToyDB for ToyDB {
         let mut metadata = grpc::Metadata::new();
         metadata
             .add(grpc::MetadataKey::from("columns"), serialize(result.columns()).unwrap().into());
+        if let Some(txn_id) = result.txn_id() {
+            metadata.add(grpc::MetadataKey::from("txn_id"), serialize(txn_id).unwrap().into());
+        }
         grpc::StreamingResponse::iter_with_metadata(
             metadata,
             result.map(|r| match r {
@@ -96,13 +100,61 @@ impl service::ToyDB for ToyDB {
 
 impl ToyDB {
     /// Executes an SQL statement
-    fn execute(&self, query: &str) -> Result<sql::types::ResultSet, Error> {
-        let mut txn = self.engine.begin()?;
-        let rs = sql::Plan::build(sql::Parser::new(query).parse()?)?
-            .optimize()?
-            .execute(sql::Context { txn: &mut txn })?;
-        txn.commit()?;
-        Ok(rs)
+    fn execute(&self, txn_id: Option<u64>, query: &str) -> Result<sql::types::ResultSet, Error> {
+        let statement = sql::Parser::new(query).parse()?;
+
+        // Handle statements in an ongoing transaction
+        if let Some(txn_id) = txn_id {
+            let mut txn = self.engine.resume(txn_id)?;
+            return match statement {
+                sql::ast::Statement::Begin => {
+                    Err(Error::Value(format!("Already in a transaction (id {})", txn_id)))
+                }
+                sql::ast::Statement::Commit => {
+                    txn.commit()?;
+                    Ok(sql::types::ResultSet::empty())
+                }
+                sql::ast::Statement::Rollback => {
+                    txn.rollback()?;
+                    Ok(sql::types::ResultSet::empty())
+                }
+                _ => {
+                    let mut rs = sql::Plan::build(statement)?
+                        .optimize()?
+                        .execute(sql::Context { txn: &mut txn })?;
+                    // FIXME Shouldn't be necessary
+                    rs.txn_id = Some(txn_id);
+                    Ok(rs)
+                }
+            };
+        }
+
+        // Handle standalone statements
+        match statement {
+            sql::ast::Statement::Begin => {
+                let txn = self.engine.begin()?;
+                Ok(sql::types::ResultSet::from_begin(txn.id()))
+            }
+            sql::ast::Statement::Commit | sql::ast::Statement::Rollback => {
+                Err(Error::Value("Not in a transaction".into()))
+            }
+            sql::ast::Statement::Select { .. } => {
+                let mut txn = self.engine.snapshot(None)?;
+                let result = sql::Plan::build(statement)?
+                    .optimize()?
+                    .execute(sql::Context { txn: &mut txn });
+                txn.commit()?;
+                result
+            }
+            _ => {
+                let mut txn = self.engine.begin()?;
+                let result = sql::Plan::build(statement)?
+                    .optimize()?
+                    .execute(sql::Context { txn: &mut txn });
+                txn.commit()?;
+                result
+            }
+        }
     }
 
     /// Converts an error into a protobuf object

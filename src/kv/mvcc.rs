@@ -27,6 +27,12 @@ impl<S: Storage> MVCC<S> {
     pub fn begin_readonly(&self, version: Option<u64>) -> Result<Transaction<S>, Error> {
         Transaction::new_readonly(self.storage.clone(), version)
     }
+
+    /// Resumes a transaction
+    #[allow(dead_code)]
+    pub fn resume(&self, id: u64) -> Result<Transaction<S>, Error> {
+        Transaction::new_resume(self.storage.clone(), id)
+    }
 }
 
 /// An MVCC transaction
@@ -35,19 +41,12 @@ pub struct Transaction<S: Storage> {
     id: u64,
     readonly: bool,
     invisible: HashSet<u64>,
-    updated: HashSet<Vec<u8>>,
 }
 
 impl<S: Storage> Transaction<S> {
     /// Creates a new transaction
     fn new(storage: Arc<RwLock<S>>) -> Result<Self, Error> {
-        let mut txn = Self {
-            storage,
-            id: 0,
-            readonly: false,
-            invisible: HashSet::new(),
-            updated: HashSet::new(),
-        };
+        let mut txn = Self { storage, id: 0, readonly: false, invisible: HashSet::new() };
         {
             let mut storage = txn.storage.write()?;
             txn.id = match storage.read(&Key::TxnNext.encode())? {
@@ -55,7 +54,6 @@ impl<S: Storage> Transaction<S> {
                 None => 0,
             };
             storage.write(&Key::TxnNext.encode(), serialize(txn.id + 1)?)?;
-            storage.write(&Key::TxnActive(txn.id).encode(), serialize(true)?)?;
 
             for r in storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(txn.id).encode()) {
                 let (k, _) = r?;
@@ -64,6 +62,7 @@ impl<S: Storage> Transaction<S> {
                     _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
                 };
             }
+            storage.write(&Key::TxnActive(txn.id).encode(), serialize(txn.invisible.clone())?)?;
         }
         Ok(txn)
     }
@@ -78,13 +77,7 @@ impl<S: Storage> Transaction<S> {
         if id >= next_id {
             return Err(Error::Value("Can't start read-only transaction in the future".into()));
         }
-        let mut txn = Self {
-            storage,
-            id,
-            readonly: true,
-            invisible: HashSet::new(),
-            updated: HashSet::new(),
-        };
+        let mut txn = Self { storage, id, readonly: true, invisible: HashSet::new() };
         for r in
             txn.storage.read()?.scan(&Key::TxnActive(0).encode()..=&Key::TxnActive(txn.id).encode())
         {
@@ -94,6 +87,18 @@ impl<S: Storage> Transaction<S> {
                 _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
             };
         }
+        Ok(txn)
+    }
+
+    /// Resumes a transaction
+    fn new_resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
+        let key = Key::TxnActive(id).encode();
+        let mut txn = Self { storage, id, readonly: false, invisible: HashSet::new() };
+        if let Some(v) = txn.storage.read()?.read(&key)? {
+            txn.invisible = deserialize(v)?;
+        } else {
+            return Err(Error::Value(format!("Unable to resume non-existant transaction {}", id)));
+        };
         Ok(txn)
     }
 
@@ -114,8 +119,16 @@ impl<S: Storage> Transaction<S> {
     pub fn rollback(self) -> Result<(), Error> {
         if !self.readonly {
             let mut storage = self.storage.write()?;
-            for key in self.updated.iter() {
-                storage.remove(key)?;
+            let start = Key::TxnUpdatedStart(self.id).encode();
+            let end = Key::TxnUpdatedEnd(self.id).encode();
+            for r in storage.scan(start..end).rev() {
+                let (k, _) = r?;
+                if let Key::TxnUpdated(_, key) = Key::decode(k.clone())? {
+                    storage.remove(&key)?;
+                    storage.remove(&k)?;
+                } else {
+                    return Err(Error::Internal("Unexpected key".into()));
+                }
             }
             storage.remove(&Key::TxnActive(self.id).encode())?;
         }
@@ -129,9 +142,11 @@ impl<S: Storage> Transaction<S> {
         if self.is_dirty(&mut storage, key)? {
             return Err(Error::Serialization);
         }
+
         let key = Key::Record(key.to_vec(), self.id).encode();
+        let update_key = Key::TxnUpdated(self.id, key.clone()).encode();
+        storage.write(&update_key, Vec::new())?;
         storage.write(&key, Value::Delete.encode())?;
-        self.updated.insert(key);
         Ok(())
     }
 
@@ -183,8 +198,9 @@ impl<S: Storage> Transaction<S> {
             return Err(Error::Serialization);
         }
         let key = Key::Record(key.to_vec(), self.id).encode();
+        let update_key = Key::TxnUpdated(self.id, key.clone()).encode();
+        storage.write(&update_key, Vec::new())?;
         storage.write(&key, Value::Set(value).encode())?;
-        self.updated.insert(key);
         Ok(())
     }
 
@@ -319,6 +335,9 @@ impl DoubleEndedIterator for Scan {
 enum Key {
     TxnNext,
     TxnActive(u64),
+    TxnUpdatedStart(u64),
+    TxnUpdated(u64, Vec<u8>),
+    TxnUpdatedEnd(u64),
     Record(Vec<u8>, u64),
     RecordStart,
     RecordEnd,
@@ -337,6 +356,25 @@ impl Key {
                 let mut id = [0; 8];
                 id.copy_from_slice(&bytes[..]);
                 Ok(Key::TxnActive(u64::from_be_bytes(id)))
+            }
+            Some(0x03) => {
+                let bytes: Vec<u8> = iter.collect();
+                if bytes.len() < 10 {
+                    return Err(Error::Value("Unable to parse MVCC update key".into()));
+                }
+                let mut id = [0; 8];
+                id.copy_from_slice(&bytes[0..8]);
+                let id = u64::from_be_bytes(id);
+                if bytes.len() == 10 {
+                    return match bytes[9] {
+                        0x00 => Ok(Key::TxnUpdatedStart(id)),
+                        0xff => Ok(Key::TxnUpdatedEnd(id)),
+                        _ => return Err(Error::Value("Invalid MVCC update key".into())),
+                    };
+                }
+
+                let key = bytes[9..].to_vec();
+                Ok(Key::TxnUpdated(id, key))
             }
 
             Some(0xf1) => {
@@ -359,6 +397,13 @@ impl Key {
         match self {
             Self::TxnNext => vec![0x01],
             Self::TxnActive(id) => [vec![0x02], id.to_be_bytes().to_vec()].concat(),
+            Self::TxnUpdatedStart(id) => {
+                [vec![0x03], id.to_be_bytes().to_vec(), vec![0x00]].concat()
+            }
+            Self::TxnUpdated(id, key) => {
+                [vec![0x03], id.to_be_bytes().to_vec(), vec![0x00], key].concat()
+            }
+            Self::TxnUpdatedEnd(id) => [vec![0x03], id.to_be_bytes().to_vec(), vec![0xff]].concat(),
             Self::RecordStart => vec![0xf0],
             Self::Record(key, version) => {
                 // We have to use 0x00 as a key/version separator, and use 0x00 0xff as an
@@ -450,7 +495,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_begin_read() -> Result<(), Error> {
+    fn test_begin_readonly() -> Result<(), Error> {
         let mvcc = setup();
 
         let txn = mvcc.begin_readonly(None)?;
@@ -471,6 +516,59 @@ pub mod tests {
         let txn = mvcc.begin_readonly(None)?;
         assert_eq!(txn.id(), 2);
         txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_resume() -> Result<(), Error> {
+        let mvcc = setup();
+
+        // We first write a set of values that should be visible
+        let mut t0 = mvcc.begin()?;
+        t0.set(b"a", b"t0".to_vec())?;
+        t0.set(b"b", b"t0".to_vec())?;
+        t0.commit()?;
+
+        // We then start three transactions, of which we will resume t2.
+        // We commit t1 and t3's changes, which should not be visible,
+        // and write a change for t2 which should be visible.
+        let mut t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+        let mut t3 = mvcc.begin()?;
+
+        t1.set(b"a", b"t1".to_vec())?;
+        t2.set(b"b", b"t2".to_vec())?;
+        t3.set(b"c", b"t3".to_vec())?;
+
+        t1.commit()?;
+        t3.commit()?;
+
+        // We now resume t2, who should see it's own changes but none
+        // of the others'
+        let id = t2.id();
+        std::mem::drop(t2);
+        let tr = mvcc.resume(id)?;
+
+        assert_eq!(Some(b"t0".to_vec()), tr.get(b"a")?);
+        assert_eq!(Some(b"t2".to_vec()), tr.get(b"b")?);
+        assert_eq!(None, tr.get(b"c")?);
+
+        // A separate transaction should not see t2's changes, but should see the others
+        let t = mvcc.begin_readonly(None)?;
+        assert_eq!(Some(b"t1".to_vec()), t.get(b"a")?);
+        assert_eq!(Some(b"t0".to_vec()), t.get(b"b")?);
+        assert_eq!(Some(b"t3".to_vec()), t.get(b"c")?);
+        t.rollback()?;
+
+        // Once tr commits, a separate transaction should see t2's changes
+        tr.commit()?;
+
+        let t = mvcc.begin_readonly(None)?;
+        assert_eq!(Some(b"t1".to_vec()), t.get(b"a")?);
+        assert_eq!(Some(b"t2".to_vec()), t.get(b"b")?);
+        assert_eq!(Some(b"t3".to_vec()), t.get(b"c")?);
+        t.rollback()?;
 
         Ok(())
     }
