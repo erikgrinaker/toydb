@@ -1,4 +1,4 @@
-use super::state::State;
+use super::State;
 use crate::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;

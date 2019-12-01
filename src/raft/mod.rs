@@ -1,10 +1,8 @@
 mod log;
 mod node;
-mod state;
 mod transport;
 
 pub use self::log::Entry;
-pub use self::state::State;
 pub use self::transport::{Event, Message, Transport};
 
 use crate::kv;
@@ -17,6 +15,15 @@ use uuid::Uuid;
 /// The duration of a Raft tick, which is the unit of time for e.g.
 /// heartbeat intervals and election timeouts.
 const TICK: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// A Raft-managed state machine.
+pub trait State: 'static + Sync + Send + std::fmt::Debug {
+    /// Mutates the state machine.
+    fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error>;
+
+    /// Queries the state machine.
+    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error>;
+}
 
 /// A Raft state machine representing an entire Raft cluster.
 #[derive(Clone)]
@@ -161,11 +168,11 @@ pub mod tests {
         }
 
         // Reads the command in the internal commands list at the index
-        // given by the read command (1-based). Returns the stored command prefixed by
+        // given by the query command (1-based). Returns the stored command prefixed by
         // 0xbb, or 0xbb 0x00 if not found.
-        fn read(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
+        fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
             if command.len() != 1 {
-                return Err(Error::Value("Read payload must be 1 byte".into()));
+                return Err(Error::Value("Query payload must be 1 byte".into()));
             }
             let index = command[0] as usize;
             Ok(vec![0xbb, self.commands.lock()?.get(index - 1).map(|c| c[0]).unwrap_or(0x00)])

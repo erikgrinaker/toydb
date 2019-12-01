@@ -113,7 +113,7 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Leader, L, S> {
             match call.operation {
                 Operation::ReadState { command, .. } => self.send(
                     call.from.as_deref(),
-                    Event::RespondState { call_id: call.id, response: self.state.read(command)? },
+                    Event::RespondState { call_id: call.id, response: self.state.query(command)? },
                 )?,
                 _ => return Err(Error::Network(format!("Unsupported call {:?}", call))),
             }

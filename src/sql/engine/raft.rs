@@ -230,7 +230,7 @@ impl<S: kv::storage::Storage> raft::State for State<S> {
         }
     }
 
-    fn read(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
+    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
         match deserialize(command)? {
             Query::Read { txn_id, table, id } => serialize(
                 self.txns
