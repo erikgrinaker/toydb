@@ -171,7 +171,12 @@ Semicolons are not supported. The following !-commands are also available:
 
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>, toydb::Error> {
-        match self.editor.readline("toydb> ") {
+        let prompt = match self.client.mode() {
+            toydb::client::Mode::Statement => "toydb> ".into(),
+            toydb::client::Mode::Transaction(id) => format!("toydb:{}> ", id),
+            toydb::client::Mode::Snapshot(version) => format!("toydb@{}> ", version),
+        };
+        match self.editor.readline(&prompt) {
             Ok(input) => {
                 self.editor.add_history_entry(&input);
                 Ok(Some(input.trim().to_string()))
