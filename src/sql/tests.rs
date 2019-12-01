@@ -5,7 +5,7 @@
 use super::lexer::{Lexer, Token};
 use super::schema;
 use super::types::{DataType, Row, Value};
-use super::{Context, Parser, Plan, Storage};
+use super::{Context, Engine, Parser, Plan, Transaction};
 use crate::kv;
 use crate::Error;
 use goldenfile::Mint;
@@ -16,9 +16,12 @@ macro_rules! test_expr {
     $(
         #[test]
         fn $name() {
-            let ctx = Context{storage: Box::new(Storage::new(kv::Memory::new()))};
+            let engine = super::engine::KV::new(kv::MVCC::new(kv::storage::Memory::new()));
+            let mut txn = engine.begin().unwrap();
+            let ctx = Context{txn: &mut txn};
             let ast = Parser::new(&format!("SELECT {}", $expr)).parse().unwrap();
             let mut result = Plan::build(ast).unwrap().optimize().unwrap().execute(ctx).unwrap();
+            txn.rollback().unwrap();
             assert_eq!($value, *result.next().unwrap().unwrap().get(0).unwrap())
         }
     )*
@@ -30,8 +33,9 @@ macro_rules! test_sql {
     $(
         #[test]
         fn $name() {
-            let mut storage = Storage::new(kv::Memory::new());
-            storage.create_table(&schema::Table{
+            let engine = super::engine::KV::new(kv::MVCC::new(kv::storage::Memory::new()));
+            let mut txn = engine.begin().unwrap();
+            txn.create_table(&schema::Table{
                 name: "genres".into(),
                 columns: vec![
                     schema::Column{
@@ -47,7 +51,7 @@ macro_rules! test_sql {
                 ],
                 primary_key: 0,
             }).unwrap();
-            storage.create_table(&schema::Table{
+            txn.create_table(&schema::Table{
                 name: "movies".into(),
                 columns: vec![
                     schema::Column{
@@ -83,15 +87,15 @@ macro_rules! test_sql {
                 ],
                 primary_key: 0,
             }).unwrap();
-            storage.create_row("genres", vec![
+            txn.create("genres", vec![
                 Value::Integer(1),
                 Value::String("Science Fiction".into()),
             ]).unwrap();
-            storage.create_row("genres", vec![
+            txn.create("genres", vec![
                 Value::Integer(2),
                 Value::String("Action".into()),
             ]).unwrap();
-            storage.create_row("movies", vec![
+            txn.create("movies", vec![
                 Value::Integer(1),
                 Value::String("Stalker".into()),
                 Value::Integer(1),
@@ -99,7 +103,7 @@ macro_rules! test_sql {
                 Value::Float(8.2),
                 Value::Boolean(false),
             ]).unwrap();
-            storage.create_row("movies", vec![
+            txn.create("movies", vec![
                 Value::Integer(2),
                 Value::String("Sicario".into()),
                 Value::Integer(2),
@@ -107,7 +111,7 @@ macro_rules! test_sql {
                 Value::Float(7.6),
                 Value::Boolean(true),
             ]).unwrap();
-            storage.create_row("movies", vec![
+            txn.create("movies", vec![
                 Value::Integer(3),
                 Value::String("Primer".into()),
                 Value::Integer(1),
@@ -115,7 +119,7 @@ macro_rules! test_sql {
                 Value::Float(6.9),
                 Value::Null,
             ]).unwrap();
-            storage.create_row("movies", vec![
+            txn.create("movies", vec![
                 Value::Integer(4),
                 Value::String("Heat".into()),
                 Value::Integer(2),
@@ -123,7 +127,7 @@ macro_rules! test_sql {
                 Value::Float(8.2),
                 Value::Boolean(true),
             ]).unwrap();
-            storage.create_row("movies", vec![
+            txn.create("movies", vec![
                 Value::Integer(5),
                 Value::String("The Fountain".into()),
                 Value::Integer(1),
@@ -131,6 +135,7 @@ macro_rules! test_sql {
                 Value::Float(7.2),
                 Value::Boolean(true),
             ]).unwrap();
+            txn.commit().unwrap();
 
             let mut mint = Mint::new("src/sql/testdata");
             let mut f = mint.new_goldenfile(format!("{}", stringify!($name))).unwrap();
@@ -183,13 +188,16 @@ macro_rules! test_sql {
             write!(f, "Query: {}\n\n", $sql).unwrap();
 
             write!(f, "Result:").unwrap();
-            let result = match plan.execute(Context{storage: Box::new(storage.clone())}) {
+            let mut txn = engine.begin().unwrap();
+            let ctx = Context{txn: &mut txn};
+            let result = match plan.execute(ctx) {
                 Ok(result) => result,
                 Err(err) => {
                     write!(f, " {:?}", err).unwrap();
                     return
                 }
             };
+            txn.commit().unwrap();
             let columns = result.columns();
             let rows: Vec<Row> = match result.collect() {
                 Ok(rows) => rows,
@@ -208,13 +216,15 @@ macro_rules! test_sql {
             }
 
             write!(f, "\nStorage:").unwrap();
-            for table in &storage.list_tables().unwrap() {
-                let schema = &storage.get_table(&table).unwrap().unwrap();
+            let txn = engine.begin().unwrap();
+            for table in &txn.list_tables().unwrap() {
+                let schema = &txn.read_table(&table.name).unwrap().unwrap();
                 write!(f, "\n{}\n", schema.to_query()).unwrap();
-                for row in storage.scan_rows(&table) {
+                for row in txn.scan(&table.name).unwrap() {
                     write!(f, "{:?}\n", row.unwrap()).unwrap();
                 }
             }
+            txn.rollback().unwrap();
         }
     )*
     }

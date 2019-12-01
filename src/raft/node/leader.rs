@@ -31,9 +31,13 @@ impl Leader {
     }
 }
 
-impl RoleNode<Leader> {
+impl<L: kv::storage::Storage, S: State> RoleNode<Leader, L, S> {
     /// Transforms the leader into a follower
-    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower>, Error> {
+    fn become_follower(
+        mut self,
+        term: u64,
+        leader: &str,
+    ) -> Result<RoleNode<Follower, L, S>, Error> {
         info!("Discovered new leader {} for term {}, following", leader, term);
         self.save_term(term, None)?;
         self.become_role(Follower::new(Some(leader), None))
@@ -118,7 +122,7 @@ impl RoleNode<Leader> {
     }
 
     /// Processes a message.
-    pub fn step(mut self, mut msg: Message) -> Result<Node, Error> {
+    pub fn step(mut self, mut msg: Message) -> Result<Node<L, S>, Error> {
         if !self.normalize_message(&mut msg) {
             return Ok(self.into());
         }
@@ -196,7 +200,7 @@ impl RoleNode<Leader> {
     }
 
     /// Processes a logical clock tick.
-    pub fn tick(mut self) -> Result<Node, Error> {
+    pub fn tick(mut self) -> Result<Node<L, S>, Error> {
         self.apply()?;
         self.role.heartbeat_ticks += 1;
         if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
@@ -281,10 +285,10 @@ mod tests {
     use super::*;
     use crossbeam_channel::Receiver;
 
-    fn setup() -> (RoleNode<Leader>, Receiver<Message>) {
+    fn setup() -> (RoleNode<Leader, kv::storage::Memory, TestState>, Receiver<Message>) {
         let (sender, receiver) = crossbeam_channel::unbounded();
-        let mut state = TestState::new().boxed();
-        let mut log = Log::new(kv::Memory::new()).unwrap();
+        let mut state = TestState::new();
+        let mut log = Log::new(kv::Simple::new(kv::storage::Memory::new())).unwrap();
         log.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
         log.append(Entry { term: 1, command: Some(vec![0x02]) }).unwrap();
         log.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
@@ -313,7 +317,7 @@ mod tests {
     // ConfirmLeader with has_committed has no effect without any calls
     fn step_confirmleader() {
         let (leader, rx) = setup();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         node = node
             .step(Message {
@@ -331,7 +335,7 @@ mod tests {
     // ConfirmLeader without has_committed triggers replication
     fn step_confirmleader_without_has_committed() {
         let (leader, rx) = setup();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         node = node
             .step(Message {
@@ -357,7 +361,7 @@ mod tests {
     // Heartbeats from other leaders in current term are ignored.
     fn step_heartbeat_current_term() {
         let (leader, rx) = setup();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         node = node
             .step(Message {
@@ -375,7 +379,7 @@ mod tests {
     // Heartbeats from other leaders in future term converts to follower and steps.
     fn step_heartbeat_future_term() {
         let (leader, rx) = setup();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         node = node
             .step(Message {
@@ -401,7 +405,7 @@ mod tests {
     // Heartbeats from other leaders in past terms are ignored.
     fn step_heartbeat_past_term() {
         let (leader, rx) = setup();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         node = node
             .step(Message {
@@ -418,7 +422,7 @@ mod tests {
     #[test]
     fn step_acceptentries() {
         let (leader, rx) = setup();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         node = node
             .step(Message {
@@ -460,7 +464,7 @@ mod tests {
     // Duplicate AcceptEntries from single node should not trigger commit.
     fn step_acceptentries_duplicate() {
         let (leader, rx) = setup();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         for _ in 0..5 {
             node = node
@@ -481,7 +485,7 @@ mod tests {
     fn step_acceptentries_past_term() {
         let (leader, rx) = setup();
         let peers = leader.peers.clone();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         for peer in peers.into_iter() {
             node = node
@@ -502,7 +506,7 @@ mod tests {
     fn step_acceptentries_future_index() {
         let (leader, rx) = setup();
         let peers = leader.peers.clone();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         for (i, peer) in peers.into_iter().enumerate() {
             node = node
@@ -526,7 +530,7 @@ mod tests {
     fn step_rejectentries() {
         let (leader, rx) = setup();
         let entries = leader.log.range(0..).unwrap();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         for i in 0..(entries.len() + 3) {
             node = node
@@ -565,7 +569,7 @@ mod tests {
         let (leader, rx) = setup();
         let peers = leader.peers.clone();
         let quorum = leader.quorum();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
 
         // Submit the mutate call from local sender, and observe it being
         // appended to log and replicated to peers. The mutate command will be
@@ -744,7 +748,7 @@ mod tests {
     fn tick() {
         let (leader, rx) = setup();
         let peers = leader.peers.clone();
-        let mut node: Node = leader.into();
+        let mut node: Node<_, _> = leader.into();
         for _ in 0..5 {
             for _ in 0..HEARTBEAT_INTERVAL {
                 assert_messages(&rx, vec![]);

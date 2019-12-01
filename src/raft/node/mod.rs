@@ -27,21 +27,21 @@ const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
 
 /// The local Raft node state machine.
 #[derive(Debug)]
-pub enum Node {
-    Candidate(RoleNode<Candidate>),
-    Follower(RoleNode<Follower>),
-    Leader(RoleNode<Leader>),
+pub enum Node<L: kv::storage::Storage, S: State> {
+    Candidate(RoleNode<Candidate, L, S>),
+    Follower(RoleNode<Follower, L, S>),
+    Leader(RoleNode<Leader, L, S>),
 }
 
-impl Node {
+impl<L: kv::storage::Storage, S: State> Node<L, S> {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
-    pub fn new<L: kv::Store, S: State>(
+    pub fn new(
         id: &str,
         peers: Vec<String>,
-        logstore: L,
+        logstore: kv::Simple<L>,
         state: S,
         sender: Sender<Message>,
-    ) -> Result<Node, Error> {
+    ) -> Result<Self, Error> {
         let log = Log::new(logstore)?;
         let (term, voted_for) = log.load_term()?;
         let node = RoleNode {
@@ -49,7 +49,7 @@ impl Node {
             peers,
             term,
             log,
-            state: Box::new(state),
+            state,
             sender,
             role: Follower::new(None, voted_for.as_deref()),
         };
@@ -63,7 +63,7 @@ impl Node {
     }
 
     /// Processes a message.
-    pub fn step(self, msg: Message) -> Result<Node, Error> {
+    pub fn step(self, msg: Message) -> Result<Self, Error> {
         debug!("Stepping {:?}", msg);
         match self {
             Node::Candidate(n) => n.step(msg),
@@ -73,7 +73,7 @@ impl Node {
     }
 
     /// Moves time forward by a tick.
-    pub fn tick(self) -> Result<Node, Error> {
+    pub fn tick(self) -> Result<Self, Error> {
         match self {
             Node::Candidate(n) => n.tick(),
             Node::Follower(n) => n.tick(),
@@ -82,39 +82,39 @@ impl Node {
     }
 }
 
-impl From<RoleNode<Candidate>> for Node {
-    fn from(rn: RoleNode<Candidate>) -> Self {
+impl<L: kv::storage::Storage, S: State> From<RoleNode<Candidate, L, S>> for Node<L, S> {
+    fn from(rn: RoleNode<Candidate, L, S>) -> Self {
         Node::Candidate(rn)
     }
 }
 
-impl From<RoleNode<Follower>> for Node {
-    fn from(rn: RoleNode<Follower>) -> Self {
+impl<L: kv::storage::Storage, S: State> From<RoleNode<Follower, L, S>> for Node<L, S> {
+    fn from(rn: RoleNode<Follower, L, S>) -> Self {
         Node::Follower(rn)
     }
 }
 
-impl From<RoleNode<Leader>> for Node {
-    fn from(rn: RoleNode<Leader>) -> Self {
+impl<L: kv::storage::Storage, S: State> From<RoleNode<Leader, L, S>> for Node<L, S> {
+    fn from(rn: RoleNode<Leader, L, S>) -> Self {
         Node::Leader(rn)
     }
 }
 
 // A Raft node with role R
 #[derive(Debug)]
-pub struct RoleNode<R> {
+pub struct RoleNode<R, L: kv::storage::Storage, S: State> {
     id: String,
     peers: Vec<String>,
     term: u64,
-    log: Log,
-    state: Box<dyn State>,
+    log: Log<L>,
+    state: S,
     sender: Sender<Message>,
     role: R,
 }
 
-impl<R> RoleNode<R> {
+impl<R, L: kv::storage::Storage, S: State> RoleNode<R, L, S> {
     /// Transforms the node into another role.
-    fn become_role<T>(self, role: T) -> Result<RoleNode<T>, Error> {
+    fn become_role<T>(self, role: T) -> Result<RoleNode<T, L, S>, Error> {
         Ok(RoleNode {
             id: self.id,
             peers: self.peers,
@@ -179,16 +179,16 @@ mod tests {
     use super::*;
     use crossbeam_channel::Receiver;
 
-    pub struct NodeAsserter<'a> {
-        node: &'a Node,
+    pub struct NodeAsserter<'a, L: kv::storage::Storage, S: State> {
+        node: &'a Node<L, S>,
     }
 
-    impl<'a> NodeAsserter<'a> {
-        pub fn new(node: &'a Node) -> Self {
+    impl<'a, L: kv::storage::Storage, S: State> NodeAsserter<'a, L, S> {
+        pub fn new(node: &'a Node<L, S>) -> Self {
             Self { node }
         }
 
-        fn log(&self) -> &'a Log {
+        fn log(&self) -> &'a Log<L> {
             match self.node {
                 Node::Candidate(n) => &n.log,
                 Node::Follower(n) => &n.log,
@@ -306,23 +306,25 @@ mod tests {
         }
     }
 
-    pub fn assert_node(node: &Node) -> NodeAsserter {
+    pub fn assert_node<L: kv::storage::Storage, S: State>(node: &Node<L, S>) -> NodeAsserter<L, S> {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> (RoleNode<()>, Receiver<Message>) {
+    fn setup_rolenode() -> (RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>) {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
-    fn setup_rolenode_peers(peers: Vec<String>) -> (RoleNode<()>, Receiver<Message>) {
+    fn setup_rolenode_peers(
+        peers: Vec<String>,
+    ) -> (RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>) {
         let (sender, receiver) = crossbeam_channel::unbounded();
         let node = RoleNode {
             role: (),
             id: "a".into(),
             peers,
             term: 1,
-            log: Log::new(kv::Memory::new()).unwrap(),
-            state: TestState::new().boxed(),
+            log: Log::new(kv::Simple::new(kv::storage::Memory::new())).unwrap(),
+            state: TestState::new(),
             sender,
         };
         (node, receiver)
@@ -334,7 +336,7 @@ mod tests {
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            kv::Memory::new(),
+            kv::Simple::new(kv::storage::Memory::new()),
             TestState::new(),
             sender,
         )
@@ -352,7 +354,7 @@ mod tests {
     #[test]
     fn new_loads_term() {
         let (sender, _) = crossbeam_channel::unbounded();
-        let store = kv::Memory::new();
+        let store = kv::Simple::new(kv::storage::Memory::new());
         Log::new(store.clone()).unwrap().save_term(3, Some("c")).unwrap();
         let node =
             Node::new("a", vec!["b".into(), "c".into()], store, TestState::new(), sender).unwrap();
@@ -365,7 +367,14 @@ mod tests {
     #[test]
     fn new_single() {
         let (sender, _) = crossbeam_channel::unbounded();
-        let node = Node::new("a", vec![], kv::Memory::new(), TestState::new(), sender).unwrap();
+        let node = Node::new(
+            "a",
+            vec![],
+            kv::Simple::new(kv::storage::Memory::new()),
+            TestState::new(),
+            sender,
+        )
+        .unwrap();
         match node {
             Node::Leader(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());

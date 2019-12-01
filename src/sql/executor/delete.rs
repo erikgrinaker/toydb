@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;
@@ -6,18 +7,18 @@ use crate::Error;
 pub struct Delete;
 
 impl Delete {
-    pub fn execute(
-        ctx: &mut Context,
+    pub fn execute<T: Transaction>(
+        ctx: &mut Context<T>,
         mut source: Box<dyn Executor>,
         table: String,
     ) -> Result<Box<dyn Executor>, Error> {
         let pk = ctx
-            .storage
-            .get_table(&table)?
+            .txn
+            .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?
             .primary_key;
         while let Some(row) = source.fetch()? {
-            ctx.storage.delete_row(&table, row.get(pk).unwrap())?
+            ctx.txn.delete(&table, row.get(pk).unwrap())?
         }
         Ok(Box::new(Self))
     }

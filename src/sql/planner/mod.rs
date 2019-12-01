@@ -1,6 +1,6 @@
 mod plan;
 
-pub use plan::{Node, Plan, Order};
+pub use plan::{Node, Order, Plan};
 
 use super::expression::{Environment, Expression};
 use super::parser::ast;
@@ -25,6 +25,12 @@ impl Planner {
     /// Builds a plan node for a statement
     fn build_statement(&self, statement: ast::Statement) -> Result<Node, Error> {
         Ok(match statement {
+            ast::Statement::Begin | ast::Statement::Commit | ast::Statement::Rollback => {
+                return Err(Error::Internal(format!(
+                    "Unexpected transaction statement {:?}",
+                    statement
+                )))
+            }
             ast::Statement::CreateTable { name, columns } => {
                 Node::CreateTable { schema: self.build_schema_table(name, columns)? }
             }

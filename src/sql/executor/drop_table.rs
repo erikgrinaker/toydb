@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;
@@ -6,8 +7,11 @@ use crate::Error;
 pub struct DropTable;
 
 impl DropTable {
-    pub fn execute(ctx: &mut Context, name: String) -> Result<Box<dyn Executor>, Error> {
-        ctx.storage.delete_table(&name)?;
+    pub fn execute<T: Transaction>(
+        ctx: &mut Context<T>,
+        name: String,
+    ) -> Result<Box<dyn Executor>, Error> {
+        ctx.txn.delete_table(&name)?;
         Ok(Box::new(Self))
     }
 }

@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;
@@ -5,18 +6,21 @@ use crate::Error;
 /// A table scan node
 pub struct Scan {
     columns: Vec<String>,
-    range: Box<dyn Iterator<Item = Result<Row, Error>> + Sync + Send + 'static>,
+    range: super::super::engine::Scan,
 }
 
 impl Scan {
-    pub fn execute(ctx: &mut Context, table: String) -> Result<Box<dyn Executor>, Error> {
+    pub fn execute<T: Transaction>(
+        ctx: &mut Context<T>,
+        table: String,
+    ) -> Result<Box<dyn Executor>, Error> {
         let schema = ctx
-            .storage
-            .get_table(&table)?
+            .txn
+            .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} not found", table)))?;
         Ok(Box::new(Self {
             columns: schema.columns.iter().map(|c| c.name.clone()).collect(),
-            range: ctx.storage.scan_rows(&table),
+            range: ctx.txn.scan(&table)?,
         }))
     }
 }

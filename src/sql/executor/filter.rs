@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::expression::{Environment, Expression};
 use super::super::types::{Row, Value};
 use super::{Context, Executor};
@@ -11,8 +12,8 @@ pub struct Filter {
 }
 
 impl Filter {
-    pub fn execute(
-        _: &mut Context,
+    pub fn execute<T: Transaction>(
+        _: &mut Context<T>,
         source: Box<dyn Executor>,
         predicate: Expression,
     ) -> Result<Box<dyn Executor>, Error> {

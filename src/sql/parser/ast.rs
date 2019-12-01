@@ -3,13 +3,22 @@ use std::collections::BTreeMap;
 
 /// Statements
 #[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Statement {
+    /// A BEGIN statement
+    Begin,
+    /// A COMMIT statement
+    Commit,
+    /// A ROLLBACK statement
+    Rollback,
+
     /// A CREATE TABLE statement
     CreateTable { name: String, columns: Vec<ColumnSpec> },
-    /// A DELETE statement
-    Delete { table: String, r#where: Option<WhereClause> },
     /// A DROP TABLE statement
     DropTable(String),
+
+    /// A DELETE statement
+    Delete { table: String, r#where: Option<WhereClause> },
     /// An INSERT statement
     Insert { table: String, columns: Option<Vec<String>>, values: Vec<Expressions> },
     /// A SELECT statement
@@ -23,6 +32,35 @@ pub enum Statement {
     },
     /// An UPDATE statement
     Update { table: String, set: BTreeMap<String, Expression>, r#where: Option<WhereClause> },
+}
+
+#[allow(dead_code)]
+impl Statement {
+    pub fn r#type(&self) -> StatementType {
+        match self {
+            Statement::Begin => StatementType::TCS,
+            Statement::Commit => StatementType::TCS,
+            Statement::Rollback => StatementType::TCS,
+
+            Statement::CreateTable { .. } => StatementType::DDL,
+            Statement::DropTable(_) => StatementType::DDL,
+
+            Statement::Delete { .. } => StatementType::DML,
+            Statement::Insert { .. } => StatementType::DML,
+            Statement::Select { .. } => StatementType::DML,
+            Statement::Update { .. } => StatementType::DML,
+        }
+    }
+}
+
+//// Statement types
+pub enum StatementType {
+    /// Data definition language
+    DDL,
+    /// Data manipulation language
+    DML,
+    /// Transaction control statement
+    TCS,
 }
 
 /// A column specification

@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::expression::{Environment, Expressions};
 use super::super::types::Row;
 use super::{Context, Executor};
@@ -6,15 +7,15 @@ use crate::Error;
 pub struct Insert;
 
 impl Insert {
-    pub fn execute(
-        ctx: &mut Context,
+    pub fn execute<T: Transaction>(
+        ctx: &mut Context<T>,
         table: &str,
         columns: Vec<String>,
         expressions: Vec<Expressions>,
     ) -> Result<Box<dyn Executor>, Error> {
         let table = ctx
-            .storage
-            .get_table(table)?
+            .txn
+            .read_table(table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
         for exprs in expressions {
             let mut row = Row::new();
@@ -25,7 +26,7 @@ impl Insert {
                 row,
                 if !columns.is_empty() { Some(columns.clone()) } else { None },
             )?;
-            ctx.storage.create_row(&table.name, row)?;
+            ctx.txn.create(&table.name, row)?;
         }
         Ok(Box::new(Self))
     }

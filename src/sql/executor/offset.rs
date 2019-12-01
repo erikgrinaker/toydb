@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;
@@ -8,8 +9,8 @@ pub struct Offset {
 }
 
 impl Offset {
-    pub fn execute(
-        _: &mut Context,
+    pub fn execute<T: Transaction>(
+        _: &mut Context<T>,
         mut source: Box<dyn Executor>,
         offset: u64,
     ) -> Result<Box<dyn Executor>, Error> {

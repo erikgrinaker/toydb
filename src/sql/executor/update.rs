@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::types::Row;
 use super::super::{Environment, Expression};
 use super::{Context, Executor};
@@ -8,15 +9,15 @@ use std::collections::BTreeMap;
 pub struct Update;
 
 impl Update {
-    pub fn execute(
-        ctx: &mut Context,
+    pub fn execute<T: Transaction>(
+        ctx: &mut Context<T>,
         table: String,
         mut source: Box<dyn Executor>,
         expressions: BTreeMap<String, Expression>,
     ) -> Result<Box<dyn Executor>, Error> {
         let schema = ctx
-            .storage
-            .get_table(&table)?
+            .txn
+            .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
         let pk_index = schema.primary_key;
         let columns: Vec<String> = schema.columns.iter().map(|c| c.name.clone()).collect();
@@ -26,7 +27,7 @@ impl Update {
             for (c, expr) in &expressions {
                 row[schema.column_index(&c).unwrap()] = expr.evaluate(&env)?;
             }
-            ctx.storage.update_row(&table, &pk, row)?
+            ctx.txn.update(&table, &pk, row)?
         }
         Ok(Box::new(Self))
     }

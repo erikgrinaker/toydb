@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::expression::{Environment, Expression, Expressions};
 use super::super::types::Row;
 use super::{Context, Executor};
@@ -11,8 +12,8 @@ pub struct Projection {
 }
 
 impl Projection {
-    pub fn execute(
-        _: &mut Context,
+    pub fn execute<T: Transaction>(
+        _: &mut Context<T>,
         source: Box<dyn Executor>,
         labels: Vec<Option<String>>,
         expressions: Expressions,

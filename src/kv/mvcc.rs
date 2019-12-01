@@ -1,0 +1,761 @@
+use super::storage::{Range, Storage};
+use crate::utility::{deserialize, serialize};
+use crate::Error;
+
+use std::collections::HashSet;
+use std::ops::{Bound, RangeBounds};
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
+
+/// An MVCC-based transactional key-value store
+pub struct MVCC<S: Storage> {
+    storage: Arc<RwLock<S>>,
+}
+
+impl<S: Storage> MVCC<S> {
+    /// Creates a new MVCC key-value store
+    pub fn new(storage: S) -> Self {
+        Self { storage: Arc::new(RwLock::new(storage)) }
+    }
+
+    /// Begins a new transaction
+    pub fn begin(&self) -> Result<Transaction<S>, Error> {
+        Transaction::new(self.storage.clone())
+    }
+
+    /// Begins a new read-only transaction, optionally at the given version
+    #[allow(dead_code)]
+    pub fn begin_readonly(&self, version: Option<u64>) -> Result<Transaction<S>, Error> {
+        Transaction::new_readonly(self.storage.clone(), version)
+    }
+}
+
+/// An MVCC transaction
+pub struct Transaction<S: Storage> {
+    storage: Arc<RwLock<S>>,
+    id: u64,
+    readonly: bool,
+    invisible: HashSet<u64>,
+    updated: HashSet<Vec<u8>>,
+}
+
+impl<S: Storage> Transaction<S> {
+    /// Creates a new transaction
+    fn new(storage: Arc<RwLock<S>>) -> Result<Self, Error> {
+        let mut txn = Self {
+            storage,
+            id: 0,
+            readonly: false,
+            invisible: HashSet::new(),
+            updated: HashSet::new(),
+        };
+        {
+            let mut storage = txn.storage.write()?;
+            txn.id = match storage.read(&Key::TxnNext.encode())? {
+                Some(v) => deserialize(v)?,
+                None => 0,
+            };
+            storage.write(&Key::TxnNext.encode(), serialize(txn.id + 1)?)?;
+            storage.write(&Key::TxnActive(txn.id).encode(), serialize(true)?)?;
+
+            for r in storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(txn.id).encode()) {
+                let (k, _) = r?;
+                match Key::decode(k)? {
+                    Key::TxnActive(id) => txn.invisible.insert(id),
+                    _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
+                };
+            }
+        }
+        Ok(txn)
+    }
+
+    /// Creates a new read-only transaction at the given version
+    fn new_readonly(storage: Arc<RwLock<S>>, id: Option<u64>) -> Result<Self, Error> {
+        let next_id = match storage.read()?.read(&Key::TxnNext.encode())? {
+            Some(v) => deserialize(v)?,
+            None => 1,
+        };
+        let id = id.unwrap_or_else(|| next_id - 1);
+        if id >= next_id {
+            return Err(Error::Value("Can't start read-only transaction in the future".into()));
+        }
+        let mut txn = Self {
+            storage,
+            id,
+            readonly: true,
+            invisible: HashSet::new(),
+            updated: HashSet::new(),
+        };
+        for r in
+            txn.storage.read()?.scan(&Key::TxnActive(0).encode()..=&Key::TxnActive(txn.id).encode())
+        {
+            let (k, _) = r?;
+            match Key::decode(k)? {
+                Key::TxnActive(id) => txn.invisible.insert(id),
+                _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
+            };
+        }
+        Ok(txn)
+    }
+
+    /// Returns the transaction ID
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// Commits the transaction
+    pub fn commit(self) -> Result<(), Error> {
+        if !self.readonly {
+            self.storage.write()?.remove(&Key::TxnActive(self.id).encode())?;
+        }
+        Ok(())
+    }
+
+    /// Rolls back the transaction
+    pub fn rollback(self) -> Result<(), Error> {
+        if !self.readonly {
+            let mut storage = self.storage.write()?;
+            for key in self.updated.iter() {
+                storage.remove(key)?;
+            }
+            storage.remove(&Key::TxnActive(self.id).encode())?;
+        }
+        Ok(())
+    }
+
+    /// Deletes a key
+    pub fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
+        self.assert_mutable()?;
+        let mut storage = self.storage.write()?;
+        if self.is_dirty(&mut storage, key)? {
+            return Err(Error::Serialization);
+        }
+        let key = Key::Record(key.to_vec(), self.id).encode();
+        storage.write(&key, Value::Delete.encode())?;
+        self.updated.insert(key);
+        Ok(())
+    }
+
+    /// Fetches a key
+    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        let from = Key::Record(key.to_vec(), 0).encode();
+        let to = Key::Record(key.to_vec(), self.id).encode();
+        let mut range = self.storage.read()?.scan(from..=to).rev();
+        while let Some((k, v)) = range.next().transpose()? {
+            if !self.is_visible(Key::decode(k)?.version()?)? {
+                continue;
+            }
+            return match Value::decode(v)? {
+                Value::Set(v) => Ok(Some(v)),
+                Value::Delete => Ok(None),
+            };
+        }
+        Ok(None)
+    }
+
+    /// Scans a key range
+    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
+        let from = match range.start_bound() {
+            Bound::Excluded(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
+            Bound::Included(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
+            Bound::Unbounded => Bound::Included(Key::RecordStart.encode()),
+        };
+        let to = match range.end_bound() {
+            Bound::Excluded(key) => Bound::Excluded(Key::Record(key.clone(), 0).encode()),
+            Bound::Included(key) => {
+                Bound::Included(Key::Record(key.clone(), std::u64::MAX).encode())
+            }
+            Bound::Unbounded => Bound::Included(Key::RecordEnd.encode()),
+        };
+        Ok(Box::new(Scan {
+            range: self.storage.read()?.scan((from, to)),
+            id: self.id,
+            seen: None,
+            rev_ignore: None,
+            invisible: self.invisible.clone(),
+        }))
+    }
+
+    /// Sets a key
+    pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        self.assert_mutable()?;
+        let mut storage = self.storage.write()?;
+        if self.is_dirty(&mut storage, key)? {
+            return Err(Error::Serialization);
+        }
+        let key = Key::Record(key.to_vec(), self.id).encode();
+        storage.write(&key, Value::Set(value).encode())?;
+        self.updated.insert(key);
+        Ok(())
+    }
+
+    /// Asserts that the transaction is read-write, otherwise returns an error
+    fn assert_mutable(&self) -> Result<(), Error> {
+        if self.readonly {
+            Err(Error::ReadOnly)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Checks whether the key is dirty, i.e. if it has any uncommitted changes
+    fn is_dirty(&self, storage: &mut RwLockWriteGuard<S>, key: &[u8]) -> Result<bool, Error> {
+        let mut min = self.id + 1;
+        for id in self.invisible.iter().cloned() {
+            if id < min {
+                min = id
+            }
+        }
+        let from = Key::Record(key.to_vec(), min).encode();
+        let to = Key::Record(key.to_vec(), std::u64::MAX).encode();
+        let mut range = storage.scan(from..to);
+        while let Some((k, _)) = range.next().transpose()? {
+            if !self.is_visible(Key::decode(k)?.version()?)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Checks whether the given version is visible to us
+    fn is_visible(&self, version: u64) -> Result<bool, Error> {
+        Ok(version <= self.id && self.invisible.get(&version).is_none())
+    }
+}
+
+/// A key range scan
+pub struct Scan {
+    range: Range,
+    id: u64,
+    invisible: HashSet<u64>,
+    seen: Option<(Vec<u8>, Vec<u8>)>,
+    rev_ignore: Option<(Vec<u8>)>,
+}
+
+impl Iterator for Scan {
+    type Item = Result<(Vec<u8>, Vec<u8>), Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(r) = self.range.next() {
+            match r {
+                Ok((k, v)) => {
+                    let (key, version) = match Key::decode(k).unwrap() {
+                        Key::Record(key, version) => (key, version),
+                        _ => panic!("Not implemented"),
+                    };
+                    if version > self.id || self.invisible.get(&version).is_some() {
+                        continue;
+                    }
+                    let value = match Value::decode(v).unwrap() {
+                        Value::Set(value) => value,
+                        Value::Delete => {
+                            let mut clear_seen = false;
+                            if let Some((k, _)) = &self.seen {
+                                if k == &key {
+                                    clear_seen = true;
+                                }
+                            }
+                            if clear_seen {
+                                self.seen = None;
+                            }
+                            continue;
+                        }
+                    };
+
+                    let mut ret = None;
+                    if let Some((k, v)) = &self.seen {
+                        if k != &key {
+                            ret = Some(Ok((k.clone(), v.clone())));
+                        }
+                    };
+                    self.seen = Some((key, value));
+                    if ret.is_some() {
+                        return ret;
+                    }
+                }
+                Err(err) => return Some(Err(err)),
+            }
+        }
+        let mut pair = None;
+        if let Some((k, v)) = &self.seen {
+            pair = Some(Ok((k.clone(), v.clone())));
+        }
+        self.seen = None;
+        pair
+    }
+}
+
+impl DoubleEndedIterator for Scan {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        while let Some(r) = self.range.next_back() {
+            match r {
+                Ok((k, v)) => {
+                    let (key, version) = match Key::decode(k).unwrap() {
+                        Key::Record(key, version) => (key, version),
+                        _ => panic!("Not implemented"),
+                    };
+                    if version > self.id || self.invisible.get(&version).is_some() {
+                        continue;
+                    }
+                    if let Some(ignore) = &self.rev_ignore {
+                        if &key == ignore {
+                            continue;
+                        }
+                    }
+                    self.rev_ignore = Some(key.clone());
+                    let value = match Value::decode(v).unwrap() {
+                        Value::Set(value) => value,
+                        Value::Delete => continue,
+                    };
+                    return Some(Ok((key, value)));
+                }
+                Err(err) => return Some(Err(err)),
+            }
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
+enum Key {
+    TxnNext,
+    TxnActive(u64),
+    Record(Vec<u8>, u64),
+    RecordStart,
+    RecordEnd,
+}
+
+impl Key {
+    fn decode(key: Vec<u8>) -> Result<Self, Error> {
+        let mut iter = key.into_iter();
+        match iter.next() {
+            Some(0x01) => Ok(Key::TxnNext),
+            Some(0x02) => {
+                let bytes: Vec<u8> = iter.collect();
+                if bytes.len() != 8 {
+                    return Err(Error::Value("Unable to parse MVCC active transaction ID".into()));
+                }
+                let mut id = [0; 8];
+                id.copy_from_slice(&bytes[..]);
+                Ok(Key::TxnActive(u64::from_be_bytes(id)))
+            }
+
+            Some(0xf1) => {
+                let mut key: Vec<u8> = iter.collect();
+                if key.len() < 9 {
+                    return Err(Error::Value("Unable to parse MVCC record key".into()));
+                }
+                let mut v = [0; 8];
+                v.copy_from_slice(&key.split_off(key.len() - 8)[..]);
+                assert_eq!(Some(0x00), key.pop());
+                let version = u64::from_be_bytes(v);
+
+                Ok(Self::Record(Self::unescape(key), version))
+            }
+            _ => Err(Error::Value("Unable to parse MVCC key".into())),
+        }
+    }
+
+    fn encode(self) -> Vec<u8> {
+        match self {
+            Self::TxnNext => vec![0x01],
+            Self::TxnActive(id) => [vec![0x02], id.to_be_bytes().to_vec()].concat(),
+            Self::RecordStart => vec![0xf0],
+            Self::Record(key, version) => {
+                // We have to use 0x00 as a key/version separator, and use 0x00 0xff as an
+                // escape sequence for 0x00 in order to avoid key/version overlaps from
+                // messing up the key sequence during scans. For more information, see:
+                // https://activesphere.com/blog/2018/08/17/order-preserving-serialization
+                [vec![0xf1], Self::escape(key), vec![0x00], version.to_be_bytes().to_vec()].concat()
+            }
+            Self::RecordEnd => vec![0xf2],
+        }
+    }
+
+    fn escape(bytes: Vec<u8>) -> Vec<u8> {
+        let mut escaped = vec![];
+        for b in bytes.into_iter() {
+            escaped.push(b);
+            if b == 0x00 {
+                escaped.push(0xff);
+            }
+        }
+        escaped
+    }
+
+    fn unescape(bytes: Vec<u8>) -> Vec<u8> {
+        let mut unescaped = vec![];
+        let mut iter = bytes.into_iter();
+        while let Some(b) = iter.next() {
+            unescaped.push(b);
+            if b == 0x00 {
+                assert_eq!(Some(0xff), iter.next())
+            }
+        }
+        unescaped
+    }
+
+    fn version(&self) -> Result<u64, Error> {
+        match self {
+            Self::Record(_, version) => Ok(*version),
+            _ => Err(Error::Value(format!("MVCC key {:?} has no version", self))),
+        }
+    }
+}
+
+enum Value {
+    Delete,
+    Set(Vec<u8>),
+}
+
+impl Value {
+    fn decode(value: Vec<u8>) -> Result<Self, Error> {
+        let mut iter = value.into_iter();
+        match iter.next() {
+            Some(0x00) => Ok(Value::Delete),
+            Some(0xff) => Ok(Value::Set(iter.collect())),
+            None => Err(Error::Value("No MVCC value found".into())),
+            _ => Err(Error::Value("Unable to decode invalid MVCC value".into())),
+        }
+    }
+
+    fn encode(self) -> Vec<u8> {
+        match self {
+            Self::Delete => vec![0x00],
+            Self::Set(value) => [vec![0xff], value].concat(),
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    fn setup() -> MVCC<super::super::storage::Memory> {
+        MVCC::new(super::super::storage::Memory::new())
+    }
+
+    #[test]
+    fn test_begin() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let txn = mvcc.begin()?;
+        assert_eq!(txn.id(), 0);
+        txn.commit()?;
+
+        let txn = mvcc.begin()?;
+        assert_eq!(txn.id(), 1);
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_begin_read() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let txn = mvcc.begin_readonly(None)?;
+        assert_eq!(txn.id(), 0);
+        txn.commit()?;
+
+        let txn = mvcc.begin_readonly(None)?;
+        assert_eq!(txn.id(), 0);
+        txn.commit()?;
+
+        let txn = mvcc.begin()?;
+        txn.commit()?;
+        let txn = mvcc.begin()?;
+        txn.commit()?;
+        let txn = mvcc.begin()?;
+        txn.commit()?;
+
+        let txn = mvcc.begin_readonly(None)?;
+        assert_eq!(txn.id(), 2);
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_delete_conflict() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"key", vec![0x00])?;
+        txn.commit()?;
+
+        let mut t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+        let mut t3 = mvcc.begin()?;
+
+        t2.delete(b"key")?;
+        assert_eq!(Err(Error::Serialization), t1.delete(b"key"));
+        assert_eq!(Err(Error::Serialization), t3.delete(b"key"));
+        t2.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_delete_idempotent() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut txn = mvcc.begin()?;
+        txn.delete(b"key")?;
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_get() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut txn = mvcc.begin()?;
+        assert_eq!(None, txn.get(b"a")?);
+        txn.set(b"a", vec![0x01])?;
+        assert_eq!(Some(vec![0x01]), txn.get(b"a")?);
+        txn.set(b"a", vec![0x02])?;
+        assert_eq!(Some(vec![0x02]), txn.get(b"a")?);
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_get_deleted() -> Result<(), Error> {
+        let mvcc = setup();
+        let mut txn = mvcc.begin()?;
+        txn.set(b"a", vec![0x01])?;
+        txn.commit()?;
+
+        let mut txn = mvcc.begin()?;
+        txn.delete(b"a")?;
+        txn.commit()?;
+
+        let txn = mvcc.begin()?;
+        assert_eq!(None, txn.get(b"a")?);
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_get_hides_newer() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+        let mut t3 = mvcc.begin()?;
+
+        t1.set(b"a", vec![0x01])?;
+        t1.commit()?;
+        t3.set(b"c", vec![0x03])?;
+        t3.commit()?;
+
+        assert_eq!(None, t2.get(b"a")?);
+        assert_eq!(None, t2.get(b"c")?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_get_hides_uncommitted() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t1 = mvcc.begin()?;
+        t1.set(b"a", vec![0x01])?;
+        let t2 = mvcc.begin()?;
+        let mut t3 = mvcc.begin()?;
+        t3.set(b"c", vec![0x03])?;
+
+        assert_eq!(None, t2.get(b"a")?);
+        assert_eq!(None, t2.get(b"c")?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_get_readonly_hides_uncomitted() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t1 = mvcc.begin()?;
+        t1.set(b"a", vec![0x01])?;
+        let mut t2 = mvcc.begin()?;
+        t2.set(b"c", vec![0x03])?;
+
+        let tr = mvcc.begin_readonly(None)?;
+        assert_eq!(None, tr.get(b"a")?);
+        assert_eq!(None, tr.get(b"c")?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_get_readonly_historical() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"a", vec![0x01])?;
+        txn.commit()?;
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"b", vec![0x02])?;
+        txn.commit()?;
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"c", vec![0x03])?;
+        txn.commit()?;
+
+        let tr = mvcc.begin_readonly(Some(1))?;
+        assert_eq!(Some(vec![0x01]), tr.get(b"a")?);
+        assert_eq!(Some(vec![0x02]), tr.get(b"b")?);
+        assert_eq!(None, tr.get(b"c")?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_get_serial() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"a", vec![0x01])?;
+        txn.commit()?;
+
+        let txn = mvcc.begin()?;
+        assert_eq!(Some(vec![0x01]), txn.get(b"a")?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_scan() -> Result<(), Error> {
+        let mvcc = setup();
+        let mut txn = mvcc.begin()?;
+
+        txn.set(b"a", vec![0x01])?;
+
+        txn.delete(b"b")?;
+
+        txn.set(b"c", vec![0x01])?;
+        txn.set(b"c", vec![0x02])?;
+        txn.set(b"c", vec![0x03])?;
+
+        txn.set(b"d", vec![0x01])?;
+        txn.set(b"d", vec![0x02])?;
+        txn.set(b"d", vec![0x03])?;
+        txn.set(b"d", vec![0x04])?;
+        txn.delete(b"d")?;
+
+        txn.set(b"e", vec![0x01])?;
+        txn.set(b"e", vec![0x02])?;
+        txn.set(b"e", vec![0x03])?;
+        txn.set(b"e", vec![0x04])?;
+        txn.delete(b"e")?;
+        txn.set(b"e", vec![0x05])?;
+        txn.commit()?;
+
+        let txn = mvcc.begin()?;
+        assert_eq!(
+            vec![
+                (b"a".to_vec(), vec![0x01]),
+                (b"c".to_vec(), vec![0x03]),
+                (b"e".to_vec(), vec![0x05]),
+            ],
+            txn.scan(..)?.collect::<Result<Vec<_>, _>>()?
+        );
+
+        assert_eq!(
+            vec![
+                (b"e".to_vec(), vec![0x05]),
+                (b"c".to_vec(), vec![0x03]),
+                (b"a".to_vec(), vec![0x01]),
+            ],
+            txn.scan(..)?.rev().collect::<Result<Vec<_>, _>>()?
+        );
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_scan_key_version_overlap() -> Result<(), Error> {
+        // The idea here is that with a naive key/version concatenation
+        // we get overlapping entries that mess up scans. For example:
+        //
+        // 00|00 00 00 00 00 00 00 01
+        // 00 00 00 00 00 00 00 00 02|00 00 00 00 00 00 00 02
+        // 00|00 00 00 00 00 00 00 03
+        //
+        // The key encoding should be resistant to this.
+        let mvcc = setup();
+
+        let mut txn = mvcc.begin()?;
+        txn.set(&vec![0], vec![0])?; // v0
+        txn.set(&vec![0], vec![1])?; // v1
+        txn.set(&vec![0, 0, 0, 0, 0, 0, 0, 0, 2], vec![2])?; // v2
+        txn.set(&vec![0], vec![3])?; // v3
+        txn.commit()?;
+
+        let txn = mvcc.begin()?;
+        assert_eq!(
+            vec![(vec![0].to_vec(), vec![3]), (vec![0, 0, 0, 0, 0, 0, 0, 0, 2].to_vec(), vec![2]),],
+            txn.scan(..)?.collect::<Result<Vec<_>, _>>()?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_set_conflict() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+        let mut t3 = mvcc.begin()?;
+
+        t2.set(b"key", vec![0x02])?;
+        assert_eq!(Err(Error::Serialization), t1.set(b"key", vec![0x01]));
+        assert_eq!(Err(Error::Serialization), t3.set(b"key", vec![0x03]));
+        t2.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_set_conflict_committed() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+        let mut t3 = mvcc.begin()?;
+
+        t2.set(b"key", vec![0x02])?;
+        t2.commit()?;
+        assert_eq!(Err(Error::Serialization), t1.set(b"key", vec![0x01]));
+        assert_eq!(Err(Error::Serialization), t3.set(b"key", vec![0x03]));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_set_rollback() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"key", vec![0x00])?;
+        txn.commit()?;
+
+        let t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+        let mut t3 = mvcc.begin()?;
+
+        t2.set(b"key", vec![0x02])?;
+        t2.rollback()?;
+        assert_eq!(Some(vec![0x00]), t1.get(b"key")?);
+        t1.commit()?;
+        t3.set(b"key", vec![0x03])?;
+        t3.commit()?;
+
+        Ok(())
+    }
+}

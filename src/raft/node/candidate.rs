@@ -25,16 +25,20 @@ impl Candidate {
     }
 }
 
-impl RoleNode<Candidate> {
+impl<L: kv::storage::Storage, S: State> RoleNode<Candidate, L, S> {
     /// Transition to follower role.
-    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower>, Error> {
+    fn become_follower(
+        mut self,
+        term: u64,
+        leader: &str,
+    ) -> Result<RoleNode<Follower, L, S>, Error> {
         info!("Discovered leader {} for term {}, following", leader, term);
         self.save_term(term, None)?;
         self.become_role(Follower::new(Some(leader), None))
     }
 
     /// Transition to leader role.
-    fn become_leader(self) -> Result<RoleNode<Leader>, Error> {
+    fn become_leader(self) -> Result<RoleNode<Leader, L, S>, Error> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last();
@@ -46,7 +50,7 @@ impl RoleNode<Candidate> {
     }
 
     /// Processes a message.
-    pub fn step(mut self, mut msg: Message) -> Result<Node, Error> {
+    pub fn step(mut self, mut msg: Message) -> Result<Node<L, S>, Error> {
         if !self.normalize_message(&mut msg) {
             return Ok(self.into());
         }
@@ -84,7 +88,7 @@ impl RoleNode<Candidate> {
     }
 
     /// Processes a logical clock tick.
-    pub fn tick(mut self) -> Result<Node, Error> {
+    pub fn tick(mut self) -> Result<Node<L, S>, Error> {
         while let Some(_) = self.log.apply(&mut self.state)? {}
         // If the election times out, start a new one for the next term.
         self.role.election_ticks += 1;
@@ -105,10 +109,10 @@ mod tests {
     use super::*;
     use crossbeam_channel::Receiver;
 
-    fn setup() -> (RoleNode<Candidate>, Receiver<Message>) {
+    fn setup() -> (RoleNode<Candidate, kv::storage::Memory, TestState>, Receiver<Message>) {
         let (sender, receiver) = crossbeam_channel::unbounded();
-        let mut state = TestState::new().boxed();
-        let mut log = Log::new(kv::Memory::new()).unwrap();
+        let mut state = TestState::new();
+        let mut log = Log::new(kv::Simple::new(kv::storage::Memory::new())).unwrap();
         log.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
         log.append(Entry { term: 1, command: Some(vec![0x02]) }).unwrap();
         log.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();

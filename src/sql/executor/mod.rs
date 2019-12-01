@@ -24,13 +24,13 @@ use projection::Projection;
 use scan::Scan;
 use update::Update;
 
+use super::engine::Transaction;
 use super::planner::Node;
 use super::types::Row;
-use super::Storage;
 use crate::Error;
 
 /// A plan executor
-pub trait Executor: Sync + Send + 'static {
+pub trait Executor: 'static + Sync + Send {
     //fn affected(&self) -> Option<u64>;
     fn columns(&self) -> Vec<String>;
     fn fetch(&mut self) -> Result<Option<Row>, Error>;
@@ -38,7 +38,7 @@ pub trait Executor: Sync + Send + 'static {
 
 impl dyn Executor {
     /// Executes a plan node, consuming it
-    pub fn execute(ctx: &mut Context, node: Node) -> Result<Box<Self>, Error> {
+    pub fn execute<T: Transaction>(ctx: &mut Context<T>, node: Node) -> Result<Box<Self>, Error> {
         Ok(match node {
             Node::CreateTable { schema } => CreateTable::execute(ctx, schema)?,
             Node::Delete { table, source } => {
@@ -62,7 +62,7 @@ impl dyn Executor {
                 let source = Self::execute(ctx, *source)?;
                 Offset::execute(ctx, source, offset)?
             }
-            Node::Order{source, orders} => {
+            Node::Order { source, orders } => {
                 let source = Self::execute(ctx, *source)?;
                 Order::execute(ctx, source, orders)?
             }
@@ -88,7 +88,7 @@ impl Iterator for dyn Executor {
 }
 
 /// A plan execution context
-pub struct Context {
-    /// The underlying storage
-    pub storage: Box<Storage>,
+pub struct Context<'a, T: Transaction> {
+    /// The underlying storage engine
+    pub txn: &'a mut T,
 }

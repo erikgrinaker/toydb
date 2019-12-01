@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;
@@ -8,7 +9,7 @@ pub struct Nothing {
 }
 
 impl Nothing {
-    pub fn execute(_: &mut Context) -> Result<Box<dyn Executor>, Error> {
+    pub fn execute<T: Transaction>(_: &mut Context<T>) -> Result<Box<dyn Executor>, Error> {
         Ok(Box::new(Self { done: false }))
     }
 }

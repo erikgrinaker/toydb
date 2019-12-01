@@ -14,9 +14,9 @@ pub struct Entry {
 
 /// The replicated Raft log
 #[derive(Debug)]
-pub struct Log {
+pub struct Log<S: kv::storage::Storage> {
     /// The underlying key-value store
-    kv: Box<dyn kv::Store>,
+    kv: kv::Simple<S>,
     /// The index of the last stored entry.
     last_index: u64,
     /// The term of the last stored entry.
@@ -33,9 +33,9 @@ pub struct Log {
     apply_term: u64,
 }
 
-impl Log {
+impl<S: kv::storage::Storage> Log<S> {
     /// Creates a new log, using a kv::Store for storage.
-    pub fn new<S: kv::Store>(store: S) -> Result<Self, Error> {
+    pub fn new(store: kv::Simple<S>) -> Result<Self, Error> {
         let apply_index = match store.get(b"apply_index")? {
             Some(v) => deserialize(v)?,
             None => 0,
@@ -60,7 +60,7 @@ impl Log {
             }
         }
         Ok(Self {
-            kv: Box::new(store),
+            kv: store,
             last_index,
             last_term,
             commit_index,
@@ -83,7 +83,7 @@ impl Log {
     /// Applies the next committed entry to the state machine, if any.
     /// Returns the applied entry index and output, or None if no entry.
     #[allow(clippy::borrowed_box)] // Currently this is correct
-    pub fn apply(&mut self, state: &mut Box<dyn State>) -> Result<Option<(u64, Vec<u8>)>, Error> {
+    pub fn apply(&mut self, state: &mut impl State) -> Result<Option<(u64, Vec<u8>)>, Error> {
         if self.apply_index >= self.commit_index {
             return Ok(None);
         }
@@ -250,8 +250,8 @@ mod tests {
     use super::super::tests::TestState;
     use super::*;
 
-    fn setup() -> (Log, kv::Memory) {
-        let store = kv::Memory::new();
+    fn setup() -> (Log<kv::storage::Memory>, kv::Simple<kv::storage::Memory>) {
+        let store = kv::Simple::new(kv::storage::Memory::new());
         let log = Log::new(store.clone()).unwrap();
         (log, store)
     }
@@ -307,20 +307,20 @@ mod tests {
         l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
         l.commit(3).unwrap();
 
-        let state = TestState::new();
-        assert_eq!(Ok(Some((1, vec![0xff, 0x01]))), l.apply(&mut state.boxed()));
+        let mut state = TestState::new();
+        assert_eq!(Ok(Some((1, vec![0xff, 0x01]))), l.apply(&mut state));
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(Some((2, vec![]))), l.apply(&mut state.boxed()));
+        assert_eq!(Ok(Some((2, vec![]))), l.apply(&mut state));
         assert_eq!((2, 2), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(Some((3, vec![0xff, 0x03]))), l.apply(&mut state.boxed()));
+        assert_eq!(Ok(Some((3, vec![0xff, 0x03]))), l.apply(&mut state));
         assert_eq!((3, 2), l.get_applied());
         assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
 
-        assert_eq!(Ok(None), l.apply(&mut state.boxed()));
+        assert_eq!(Ok(None), l.apply(&mut state));
         assert_eq!((3, 2), l.get_applied());
         assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
 
@@ -339,12 +339,12 @@ mod tests {
         l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
         l.commit(1).unwrap();
 
-        let state = TestState::new();
-        assert_eq!(Ok(Some((1, vec![0xff, 0x01]))), l.apply(&mut state.boxed()));
+        let mut state = TestState::new();
+        assert_eq!(Ok(Some((1, vec![0xff, 0x01]))), l.apply(&mut state));
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(None), l.apply(&mut state.boxed()));
+        assert_eq!(Ok(None), l.apply(&mut state));
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
     }

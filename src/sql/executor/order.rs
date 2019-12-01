@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::expression::{Environment, Expression};
 use super::super::planner;
 use super::super::types::{Row, Value};
@@ -11,8 +12,8 @@ pub struct Order {
 }
 
 impl Order {
-    pub fn execute(
-        _: &mut Context,
+    pub fn execute<T: Transaction>(
+        _: &mut Context<T>,
         mut source: Box<dyn Executor>,
         orders: Vec<(Expression, planner::Order)>,
     ) -> Result<Box<dyn Executor>, Error> {

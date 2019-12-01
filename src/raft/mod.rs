@@ -31,12 +31,12 @@ impl Raft {
         id: &str,
         peers: Vec<String>,
         state: S,
-        store: L,
+        store: kv::Simple<L>,
         transport: T,
     ) -> Result<Raft, Error>
     where
         S: State,
-        L: kv::Store,
+        L: kv::storage::Storage,
         T: Transport,
     {
         let ticker = crossbeam_channel::tick(TICK);
@@ -142,10 +142,6 @@ pub mod tests {
     impl TestState {
         pub fn new() -> Self {
             Self { commands: Arc::new(Mutex::new(Vec::new())) }
-        }
-
-        pub fn boxed(&self) -> Box<dyn State> {
-            Box::new(self.clone())
         }
 
         pub fn list(&self) -> Vec<Vec<u8>> {

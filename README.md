@@ -48,13 +48,15 @@ toydb> SELECT * FROM movies
 
 - [ ] **Schemas:** Compulsory singluar primary keys, unique and foreign key constraints, indexes.
 
-- [ ] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based serializable snapshot isolation.
+- [ ] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based snapshot isolation.
+
+  - [ ] Serializable snapshot isolation.
 
 - [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer.
 
-  - [ ] Predicate pushdown
+  - [ ] Predicate pushdown.
 
-  - [ ] Time travel queries
+  - [ ] Time travel queries.
 
 - [ ] **Language:** Self-written SQL parser with support for:
 
@@ -96,6 +98,10 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 * **Recovery:** there is no WAL or other form of crash recovery - unexpected termination is likely to corrupt data.
 
 * **Garbage collection:** old Raft log entries or MVCC versions are never removed, giving unbounded disk usage but also unbounded data history.
+
+### Transactions
+
+* **Abortion:** client disconnects or system crashes do not abort transactions, which may cause serialization failures for other transactions due to uncommitted writes.
 
 ### Schema
 

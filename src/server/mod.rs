@@ -6,7 +6,7 @@ use crate::error::Error;
 use crate::kv;
 use crate::raft::Raft;
 use crate::service;
-use crate::sql::Storage;
+use crate::sql;
 
 use std::collections::HashMap;
 
@@ -32,27 +32,27 @@ impl Server {
         let raft = Raft::start(
             &self.id,
             self.peers.keys().cloned().collect(),
-            kv::Raft::new_state(kv::File::new(
+            sql::engine::Raft::new_state(kv::MVCC::new(kv::storage::File::new(
                 std::fs::OpenOptions::new()
                     .read(true)
                     .write(true)
                     .create(true)
                     .open(data_path.join("state"))?,
-            )?),
-            kv::File::new(
+            )?)),
+            kv::Simple::new(kv::storage::File::new(
                 std::fs::OpenOptions::new()
                     .read(true)
                     .write(true)
                     .create(true)
                     .open(data_path.join("raft"))?,
-            )?,
+            )?),
             raft_transport,
         )?;
 
         server.add_service(service::ToyDBServer::new_service_def(ToyDB {
             id: self.id.clone(),
             raft: raft.clone(),
-            storage: Box::new(Storage::new(kv::Raft::new(raft.clone()))),
+            engine: sql::engine::Raft::new(raft.clone()),
         }));
         let _s = server.build()?;
 

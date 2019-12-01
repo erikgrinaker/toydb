@@ -94,12 +94,18 @@ impl<'a> Parser<'a> {
     /// Parses an SQL statement
     fn parse_statement(&mut self) -> Result<ast::Statement, Error> {
         match self.peek()? {
+            Some(Token::Keyword(Keyword::Begin)) => self.parse_transaction(),
+            Some(Token::Keyword(Keyword::Commit)) => self.parse_transaction(),
+            Some(Token::Keyword(Keyword::Rollback)) => self.parse_transaction(),
+
             Some(Token::Keyword(Keyword::Create)) => self.parse_ddl(),
-            Some(Token::Keyword(Keyword::Delete)) => self.parse_statement_delete(),
             Some(Token::Keyword(Keyword::Drop)) => self.parse_ddl(),
+
+            Some(Token::Keyword(Keyword::Delete)) => self.parse_statement_delete(),
             Some(Token::Keyword(Keyword::Insert)) => self.parse_statement_insert(),
             Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
             Some(Token::Keyword(Keyword::Update)) => self.parse_statement_update(),
+
             Some(token) => Err(Error::Parse(format!("Unexpected token {}", token))),
             None => Err(Error::Parse("Unexpected end of input".into())),
         }
@@ -280,6 +286,16 @@ impl<'a> Parser<'a> {
         }
 
         Ok(ast::Statement::Update { table, set, r#where: self.parse_clause_where()? })
+    }
+
+    /// Parses a transaction statement
+    fn parse_transaction(&mut self) -> Result<ast::Statement, Error> {
+        match self.next()? {
+            Token::Keyword(Keyword::Begin) => Ok(ast::Statement::Begin),
+            Token::Keyword(Keyword::Commit) => Ok(ast::Statement::Commit),
+            Token::Keyword(Keyword::Rollback) => Ok(ast::Statement::Rollback),
+            token => Err(Error::Parse(format!("Unexpected token {}", token))),
+        }
     }
 
     /// Parses a from clause

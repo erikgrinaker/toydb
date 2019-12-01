@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::executor::{Context, Executor};
 use super::super::expression::{Expression, Expressions};
 use super::super::optimizer;
@@ -22,7 +23,7 @@ impl Plan {
     }
 
     /// Executes the plan, consuming it
-    pub fn execute(self, mut ctx: Context) -> Result<ResultSet, Error> {
+    pub fn execute<T: Transaction>(self, mut ctx: Context<T>) -> Result<ResultSet, Error> {
         Ok(ResultSet::from_executor(Executor::execute(&mut ctx, self.root)?))
     }
 

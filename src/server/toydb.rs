@@ -4,11 +4,13 @@ use crate::sql;
 use crate::sql::types::{Row, Value};
 use crate::utility::serialize;
 use crate::Error;
+use sql::engine::Engine;
+use sql::engine::Transaction;
 
 pub struct ToyDB {
     pub id: String,
     pub raft: Raft,
-    pub storage: Box<sql::Storage>,
+    pub engine: sql::engine::Raft,
 }
 
 impl service::ToyDB for ToyDB {
@@ -18,7 +20,8 @@ impl service::ToyDB for ToyDB {
         req: service::GetTableRequest,
     ) -> grpc::SingleResponse<service::GetTableResponse> {
         let mut resp = service::GetTableResponse::new();
-        match self.storage.get_table(&req.name) {
+        let txn = self.engine.begin().unwrap();
+        match txn.read_table(&req.name) {
             Ok(Some(schema)) => resp.sql = schema.to_query(),
             Ok(None) => {
                 resp.error = Self::error_to_protobuf(Error::Value(format!(
@@ -28,6 +31,7 @@ impl service::ToyDB for ToyDB {
             }
             Err(err) => resp.error = Self::error_to_protobuf(err),
         };
+        txn.rollback().unwrap();
         grpc::SingleResponse::completed(resp)
     }
 
@@ -37,10 +41,15 @@ impl service::ToyDB for ToyDB {
         _: service::Empty,
     ) -> grpc::SingleResponse<service::ListTablesResponse> {
         let mut resp = service::ListTablesResponse::new();
-        match self.storage.list_tables() {
-            Ok(tables) => resp.name = protobuf::RepeatedField::from_vec(tables),
+        let txn = self.engine.begin().unwrap();
+        match txn.list_tables() {
+            Ok(tables) => {
+                resp.name =
+                    protobuf::RepeatedField::from_vec(tables.into_iter().map(|s| s.name).collect())
+            }
             Err(err) => resp.error = Self::error_to_protobuf(err),
         };
+        txn.rollback().unwrap();
         grpc::SingleResponse::completed(resp)
     }
 
@@ -88,9 +97,12 @@ impl service::ToyDB for ToyDB {
 impl ToyDB {
     /// Executes an SQL statement
     fn execute(&self, query: &str) -> Result<sql::types::ResultSet, Error> {
-        sql::Plan::build(sql::Parser::new(query).parse()?)?
+        let mut txn = self.engine.begin()?;
+        let rs = sql::Plan::build(sql::Parser::new(query).parse()?)?
             .optimize()?
-            .execute(sql::Context { storage: self.storage.clone() })
+            .execute(sql::Context { txn: &mut txn })?;
+        txn.commit()?;
+        Ok(rs)
     }
 
     /// Converts an error into a protobuf object
