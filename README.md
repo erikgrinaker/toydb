@@ -34,6 +34,39 @@ toydb> SELECT * FROM movies
 3|Her
 ```
 
+ACID transactions are supported via snapshot isolation:
+
+```
+toydb> BEGIN
+Began transaction 2
+toydb> INSERT INTO movies VALUES (4, 'Alien vs. Predator')
+toydb> ROLLBACK
+Rolled back transaction 2
+
+toydb> BEGIN
+Began transaction 3
+toydb> INSERT INTO movies VALUES (4, 'Predator')
+toydb> COMMIT
+Committed transaction 3
+
+toydb> SELECT * FROM movies
+1|Sicario
+2|Stalker
+3|Her
+4|Predator
+```
+
+Time-travel queries are also supported:
+
+```
+toydb> BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME 2
+Began read-only transaction in snapshot of version 2
+toydb> SELECT * FROM movies
+1|Sicario
+2|Stalker
+3|Her
+```
+
 ## Project Outline
 
 - [x] **Networking:** gRPC for internal and external communication, no security.
@@ -50,17 +83,17 @@ toydb> SELECT * FROM movies
 
 - [x] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based snapshot isolation.
 
-- [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer.
+- [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer and time-travel support.
 
   - [ ] Predicate pushdown.
-
-  - [ ] Time travel queries.
 
 - [ ] **Language:** Self-written SQL parser with support for:
 
   - [x] `[CREATE|DROP] TABLE ...`
   - [ ] `[CREATE|DROP] INDEX ...`
-  - [ ] `BEGIN`, `COMMIT`, and `ROLLBACK`
+  - [x] `BEGIN`, `COMMIT`, and `ROLLBACK`
+    - [x] `READ ONLY`
+    - [x] `AS OF SYSTEM TIME <txn-id>`
   - [x] `INSERT INTO ... (...) VALUES (...)`
   - [x] `UPDATE ... SET ... WHERE ...`
   - [x] `DELETE FROM ... WHERE ...`

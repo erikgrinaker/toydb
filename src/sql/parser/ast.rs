@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 #[allow(clippy::large_enum_variant)]
 pub enum Statement {
     /// A BEGIN statement
-    Begin { readonly: bool },
+    Begin { readonly: bool, version: Option<u64> },
     /// A COMMIT statement
     Commit,
     /// A ROLLBACK statement

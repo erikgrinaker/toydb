@@ -167,14 +167,19 @@ impl ToyDB {
                 }
             }
             client::Mode::Statement => match statement {
-                sql::ast::Statement::Begin { readonly: false } => {
+                sql::ast::Statement::Begin { readonly: false, version } => {
+                    if version.is_some() {
+                        return Err(Error::Value(
+                            "Can't start read-write transaction in a given version".into(),
+                        ));
+                    }
                     let txn = self.engine.begin()?;
                     let mut rs = sql::types::ResultSet::empty();
                     rs.effect = Some(client::Effect::Begin { id: txn.id(), readonly: false });
                     Ok(rs)
                 }
-                sql::ast::Statement::Begin { readonly: true } => {
-                    let txn = self.engine.snapshot(None)?;
+                sql::ast::Statement::Begin { readonly: true, version } => {
+                    let txn = self.engine.snapshot(version)?;
                     let mut rs = sql::types::ResultSet::empty();
                     rs.effect = Some(client::Effect::Begin { id: txn.id(), readonly: true });
                     Ok(rs)

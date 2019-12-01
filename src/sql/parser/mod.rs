@@ -293,6 +293,7 @@ impl<'a> Parser<'a> {
         match self.next()? {
             Token::Keyword(Keyword::Begin) => {
                 let mut readonly = false;
+                let mut version = None;
                 self.next_if_token(Keyword::Transaction.into());
                 if self.next_if_token(Keyword::Read.into()).is_some() {
                     match self.next()? {
@@ -301,7 +302,21 @@ impl<'a> Parser<'a> {
                         token => return Err(Error::Parse(format!("Unexpected token {}", token))),
                     }
                 }
-                Ok(ast::Statement::Begin { readonly })
+                if self.next_if_token(Keyword::As.into()).is_some() {
+                    self.next_expect(Some(Keyword::Of.into()))?;
+                    self.next_expect(Some(Keyword::System.into()))?;
+                    self.next_expect(Some(Keyword::Time.into()))?;
+                    match self.next()? {
+                        Token::Number(n) => version = Some(n.parse::<u64>()?),
+                        token => {
+                            return Err(Error::Parse(format!(
+                                "Unexpected token {}, wanted number",
+                                token
+                            )))
+                        }
+                    }
+                }
+                Ok(ast::Statement::Begin { readonly, version })
             }
             Token::Keyword(Keyword::Commit) => Ok(ast::Statement::Commit),
             Token::Keyword(Keyword::Rollback) => Ok(ast::Statement::Rollback),

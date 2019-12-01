@@ -68,6 +68,9 @@ impl<S: Storage> Transaction<S> {
     }
 
     /// Creates a new read-only transaction at the given version
+    // FIXME Actually, read-only transactions must be persisted as well, since we need to
+    // be able to resume them with the correct invisible transactions. This means that all
+    // of the logic in sql::engine::Snapshot must be removed.
     fn new_readonly(storage: Arc<RwLock<S>>, id: Option<u64>) -> Result<Self, Error> {
         let next_id = match storage.read()?.read(&Key::TxnNext.encode())? {
             Some(v) => deserialize(v)?,
