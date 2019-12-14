@@ -1,4 +1,5 @@
 use crate::service;
+pub use crate::sql::engine::Mode;
 use crate::sql::types::{Row, Value};
 use crate::utility::deserialize;
 use crate::Error;
@@ -8,15 +9,7 @@ use service::ToyDB;
 /// A ToyDB client
 pub struct Client {
     client: service::ToyDBClient,
-    mode: Mode,
-}
-
-#[derive(Clone, Debug)]
-/// A ToyDB client mode.
-pub enum Mode {
-    Statement,
-    Transaction(u64),
-    Snapshot(u64),
+    txn: Option<(u64, Mode)>,
 }
 
 impl Client {
@@ -24,7 +17,7 @@ impl Client {
     pub fn new(host: &str, port: u16) -> Result<Self, Error> {
         Ok(Self {
             client: service::ToyDBClient::new_plain(host, port, grpc::ClientConf::new())?,
-            mode: Mode::Statement,
+            txn: None,
         })
     }
 
@@ -49,9 +42,9 @@ impl Client {
         Ok(resp.name.to_vec())
     }
 
-    /// Returns the client mode
-    pub fn mode(&self) -> Mode {
-        self.mode.clone()
+    /// Returns the client transaction info, if any
+    pub fn txn(&self) -> Option<(u64, Mode)> {
+        self.txn.clone()
     }
 
     /// Runs a query
@@ -62,12 +55,9 @@ impl Client {
                 grpc::RequestOptions::new(),
                 service::QueryRequest {
                     query: query.to_owned(),
-                    mode: match self.mode {
-                        Mode::Statement => None,
-                        Mode::Transaction(id) => Some(service::QueryRequest_oneof_mode::txn_id(id)),
-                        Mode::Snapshot(version) => {
-                            Some(service::QueryRequest_oneof_mode::snapshot_version(version))
-                        }
+                    txn_id: match self.txn {
+                        Some((id, _)) => id,
+                        None => 0,
                     },
                     ..Default::default()
                 },
@@ -75,10 +65,9 @@ impl Client {
             .wait()?;
         let rs = ResultSet::from_grpc(metadata, iter)?;
         match rs.effect() {
-            Some(Effect::Begin { id, readonly: false }) => self.mode = Mode::Transaction(id),
-            Some(Effect::Begin { id, readonly: true }) => self.mode = Mode::Snapshot(id),
-            Some(Effect::Commit(_)) => self.mode = Mode::Statement,
-            Some(Effect::Rollback(_)) => self.mode = Mode::Statement,
+            Some(Effect::Begin { id, mode }) => self.txn = Some((id, mode)),
+            Some(Effect::Commit(_)) => self.txn = None,
+            Some(Effect::Rollback(_)) => self.txn = None,
             None => {}
         }
         Ok(rs)
@@ -103,7 +92,7 @@ pub struct ResultSet {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Effect {
-    Begin { id: u64, readonly: bool },
+    Begin { id: u64, mode: Mode },
     Commit(u64),
     Rollback(u64),
 }

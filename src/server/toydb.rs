@@ -5,8 +5,7 @@ use crate::sql;
 use crate::sql::types::{Row, Value};
 use crate::utility::serialize;
 use crate::Error;
-use sql::engine::Engine;
-use sql::engine::Transaction;
+use sql::engine::{Engine, Mode, Transaction};
 
 pub struct ToyDB {
     pub id: String,
@@ -59,14 +58,7 @@ impl service::ToyDB for ToyDB {
         _: grpc::RequestOptions,
         req: service::QueryRequest,
     ) -> grpc::StreamingResponse<service::Row> {
-        let mode = match req.mode {
-            Some(service::QueryRequest_oneof_mode::txn_id(id)) => client::Mode::Transaction(id),
-            Some(service::QueryRequest_oneof_mode::snapshot_version(version)) => {
-                client::Mode::Snapshot(version)
-            }
-            None => client::Mode::Statement,
-        };
-        let result = match self.execute(mode, &req.query) {
+        let result = match self.execute(Some(req.txn_id).filter(|&id| id > 0), &req.query) {
             Ok(result) => result,
             Err(err) => {
                 return grpc::StreamingResponse::completed(vec![service::Row {
@@ -107,66 +99,37 @@ impl service::ToyDB for ToyDB {
 
 impl ToyDB {
     /// Executes an SQL statement
-    fn execute(&self, mode: client::Mode, query: &str) -> Result<sql::types::ResultSet, Error> {
+    fn execute(&self, txn_id: Option<u64>, query: &str) -> Result<sql::types::ResultSet, Error> {
         let statement = sql::Parser::new(query).parse()?;
 
         // FIXME Needs to return effect for DDL statements as well
-        match mode {
-            // Ongoing transaction
-            client::Mode::Transaction(txn_id) => {
-                let mut txn = self.engine.resume(txn_id)?;
-                match statement {
-                    sql::ast::Statement::Begin { .. } => {
-                        Err(Error::Value("Already in a transaction".into()))
-                    }
-                    sql::ast::Statement::Commit => {
-                        let mut rs = sql::types::ResultSet::empty();
-                        rs.effect = Some(client::Effect::Commit(txn.id()));
-                        txn.commit()?;
-                        Ok(rs)
-                    }
-                    sql::ast::Statement::Rollback => {
-                        let mut rs = sql::types::ResultSet::empty();
-                        rs.effect = Some(client::Effect::Rollback(txn.id()));
-                        txn.rollback()?;
-                        Ok(rs)
-                    }
-                    _ => {
-                        let rs = sql::Plan::build(statement)?
-                            .optimize()?
-                            .execute(sql::Context { txn: &mut txn })?;
-                        Ok(rs)
-                    }
+        if let Some(txn_id) = txn_id {
+            let mut txn = self.engine.resume(txn_id)?;
+            match statement {
+                sql::ast::Statement::Begin { .. } => {
+                    Err(Error::Value("Already in a transaction".into()))
+                }
+                sql::ast::Statement::Commit => {
+                    let mut rs = sql::types::ResultSet::empty();
+                    rs.effect = Some(client::Effect::Commit(txn.id()));
+                    txn.commit()?;
+                    Ok(rs)
+                }
+                sql::ast::Statement::Rollback => {
+                    let mut rs = sql::types::ResultSet::empty();
+                    rs.effect = Some(client::Effect::Rollback(txn.id()));
+                    txn.rollback()?;
+                    Ok(rs)
+                }
+                _ => {
+                    let rs = sql::Plan::build(statement)?
+                        .optimize()?
+                        .execute(sql::Context { txn: &mut txn })?;
+                    Ok(rs)
                 }
             }
-            // Ongoing read-only snapshot transaction
-            client::Mode::Snapshot(version) => {
-                let mut txn = self.engine.snapshot(Some(version))?;
-                match statement {
-                    sql::ast::Statement::Begin { .. } => {
-                        Err(Error::Value("Already in a transaction".into()))
-                    }
-                    sql::ast::Statement::Commit => {
-                        let mut rs = sql::types::ResultSet::empty();
-                        rs.effect = Some(client::Effect::Commit(txn.id()));
-                        txn.commit()?;
-                        Ok(rs)
-                    }
-                    sql::ast::Statement::Rollback => {
-                        let mut rs = sql::types::ResultSet::empty();
-                        rs.effect = Some(client::Effect::Rollback(txn.id()));
-                        txn.rollback()?;
-                        Ok(rs)
-                    }
-                    _ => {
-                        let rs = sql::Plan::build(statement)?
-                            .optimize()?
-                            .execute(sql::Context { txn: &mut txn })?;
-                        Ok(rs)
-                    }
-                }
-            }
-            client::Mode::Statement => match statement {
+        } else {
+            match statement {
                 sql::ast::Statement::Begin { readonly: false, version } => {
                     if version.is_some() {
                         return Err(Error::Value(
@@ -175,20 +138,27 @@ impl ToyDB {
                     }
                     let txn = self.engine.begin()?;
                     let mut rs = sql::types::ResultSet::empty();
-                    rs.effect = Some(client::Effect::Begin { id: txn.id(), readonly: false });
+                    rs.effect = Some(client::Effect::Begin { id: txn.id(), mode: txn.mode() });
                     Ok(rs)
                 }
-                sql::ast::Statement::Begin { readonly: true, version } => {
-                    let txn = self.engine.snapshot(version)?;
+                sql::ast::Statement::Begin { readonly: true, version: None } => {
+                    let txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
                     let mut rs = sql::types::ResultSet::empty();
-                    rs.effect = Some(client::Effect::Begin { id: txn.id(), readonly: true });
+                    rs.effect = Some(client::Effect::Begin { id: txn.id(), mode: txn.mode() });
+                    Ok(rs)
+                }
+                sql::ast::Statement::Begin { readonly: true, version: Some(version) } => {
+                    let txn = self.engine.begin_with_mode(Mode::Snapshot { version })?;
+                    let mut rs = sql::types::ResultSet::empty();
+                    rs.effect = Some(client::Effect::Begin { id: txn.id(), mode: txn.mode() });
                     Ok(rs)
                 }
                 sql::ast::Statement::Commit | sql::ast::Statement::Rollback => {
                     Err(Error::Value("Not in a transaction".into()))
                 }
                 sql::ast::Statement::Select { .. } => {
-                    let mut txn = self.engine.snapshot(None)?;
+                    // FIXME Should use transient transaction
+                    let mut txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
                     let result = sql::Plan::build(statement)?
                         .optimize()?
                         .execute(sql::Context { txn: &mut txn });
@@ -203,7 +173,7 @@ impl ToyDB {
                     txn.commit()?;
                     result
                 }
-            },
+            }
         }
     }
 

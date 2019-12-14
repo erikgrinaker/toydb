@@ -29,10 +29,7 @@ message StatusResponse {
 
 message QueryRequest {
   string query = 1;
-  oneof mode {
-    uint64 txn_id = 2;
-    uint64 snapshot_version = 3;
-  }
+  uint64 txn_id = 2;
 };
 
 message Row {

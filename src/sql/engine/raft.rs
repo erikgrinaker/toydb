@@ -1,6 +1,7 @@
 use super::super::schema;
 use super::super::types;
 use super::Engine as _;
+use super::Mode;
 use super::Transaction as _;
 use crate::kv;
 use crate::raft;
@@ -10,7 +11,7 @@ use crate::Error;
 /// A state machine mutation
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum Mutation {
-    Begin,
+    Begin(Mode),
     Commit(u64),
     Rollback(u64),
 
@@ -25,7 +26,6 @@ enum Mutation {
 /// A state machine query
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum Query {
-    BeginReadOnly(Option<u64>),
     Resume(u64),
 
     Read { txn_id: u64, table: String, id: types::Value },
@@ -33,13 +33,6 @@ enum Query {
 
     ListTables { txn_id: u64 },
     ReadTable { txn_id: u64, table: String },
-
-    // FIXME Snapshot queries shouldn't be separate variants
-    ReadSnapshot { version: u64, table: String, id: types::Value },
-    ScanSnapshot { version: u64, table: String },
-
-    ListTablesSnapshot { version: u64 },
-    ReadTableSnapshot { version: u64, table: String },
 }
 
 pub struct Raft {
@@ -60,18 +53,13 @@ impl Raft {
 
 impl super::Engine for Raft {
     type Transaction = Transaction;
-    type Snapshot = Snapshot;
 
-    fn begin(&self) -> Result<Self::Transaction, Error> {
-        Transaction::new(self.raft.clone())
+    fn begin_with_mode(&self, mode: Mode) -> Result<Self::Transaction, Error> {
+        Transaction::begin_with_mode(self.raft.clone(), mode)
     }
 
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
         Transaction::resume(self.raft.clone(), id)
-    }
-
-    fn snapshot(&self, version: Option<u64>) -> Result<Self::Snapshot, Error> {
-        Snapshot::new(self.raft.clone(), version)
     }
 }
 
@@ -79,23 +67,28 @@ impl super::Engine for Raft {
 pub struct Transaction {
     raft: raft::Raft,
     id: u64,
+    mode: Mode,
 }
 
 impl Transaction {
-    fn new(raft: raft::Raft) -> Result<Self, Error> {
-        let id = deserialize(raft.mutate(serialize(Mutation::Begin)?)?)?;
-        Ok(Self { raft, id })
+    fn begin_with_mode(raft: raft::Raft, mode: Mode) -> Result<Self, Error> {
+        let id = deserialize(raft.mutate(serialize(Mutation::Begin(mode.clone()))?)?)?;
+        Ok(Self { raft, id, mode })
     }
 
     fn resume(raft: raft::Raft, id: u64) -> Result<Self, Error> {
-        let id = deserialize(raft.query(serialize(Query::Resume(id))?)?)?;
-        Ok(Self { raft, id })
+        let (id, mode) = deserialize(raft.query(serialize(Query::Resume(id))?)?)?;
+        Ok(Self { raft, id, mode })
     }
 }
 
 impl super::Transaction for Transaction {
     fn id(&self) -> u64 {
         self.id
+    }
+
+    fn mode(&self) -> Mode {
+        self.mode.clone()
     }
 
     fn commit(self) -> Result<(), Error> {
@@ -180,85 +173,6 @@ impl super::Transaction for Transaction {
     }
 }
 
-#[derive(Clone)]
-pub struct Snapshot {
-    raft: raft::Raft,
-    version: u64,
-}
-
-impl Snapshot {
-    fn new(raft: raft::Raft, version: Option<u64>) -> Result<Self, Error> {
-        let version = deserialize(raft.query(serialize(Query::BeginReadOnly(version))?)?)?;
-        Ok(Self { raft, version })
-    }
-}
-
-impl super::Transaction for Snapshot {
-    fn id(&self) -> u64 {
-        self.version
-    }
-
-    fn commit(self) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn rollback(self) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn create(&mut self, _table: &str, _row: types::Row) -> Result<(), Error> {
-        Err(Error::ReadOnly)
-    }
-
-    fn delete(&mut self, _table: &str, _id: &types::Value) -> Result<(), Error> {
-        Err(Error::ReadOnly)
-    }
-
-    fn read(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error> {
-        deserialize(self.raft.query(serialize(Query::ReadSnapshot {
-            version: self.version,
-            table: table.into(),
-            id: id.clone(),
-        })?)?)
-    }
-
-    fn scan(&self, table: &str) -> Result<super::Scan, Error> {
-        Ok(Box::new(
-            deserialize::<Vec<types::Row>>(self.raft.query(serialize(Query::ScanSnapshot {
-                version: self.version,
-                table: table.into(),
-            })?)?)?
-            .into_iter()
-            .map(Ok),
-        ))
-    }
-
-    fn update(&mut self, _table: &str, _id: &types::Value, _row: types::Row) -> Result<(), Error> {
-        Err(Error::ReadOnly)
-    }
-
-    fn create_table(&mut self, _table: &schema::Table) -> Result<(), Error> {
-        Err(Error::ReadOnly)
-    }
-
-    fn delete_table(&mut self, _table: &str) -> Result<(), Error> {
-        Err(Error::ReadOnly)
-    }
-
-    fn list_tables(&self) -> Result<Vec<schema::Table>, Error> {
-        deserialize(
-            self.raft.query(serialize(Query::ListTablesSnapshot { version: self.version })?)?,
-        )
-    }
-
-    fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
-        deserialize(self.raft.query(serialize(Query::ReadTableSnapshot {
-            version: self.version,
-            table: table.into(),
-        })?)?)
-    }
-}
-
 /// The underlying state machine for the Raft-based engine
 pub struct State<S: kv::storage::Storage> {
     engine: super::KV<S>,
@@ -279,7 +193,7 @@ impl<S: kv::storage::Storage> State<S> {
 impl<S: kv::storage::Storage> raft::State for State<S> {
     fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
         match deserialize(command)? {
-            Mutation::Begin => serialize(self.engine.begin()?.id()),
+            Mutation::Begin(mode) => serialize(self.engine.begin_with_mode(mode)?.id()),
             Mutation::Commit(txn_id) => serialize(self.engine.resume(txn_id)?.commit()?),
             Mutation::Rollback(txn_id) => serialize(self.engine.resume(txn_id)?.rollback()?),
 
@@ -304,8 +218,10 @@ impl<S: kv::storage::Storage> raft::State for State<S> {
 
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
         match deserialize(command)? {
-            Query::BeginReadOnly(version) => serialize(self.engine.snapshot(version)?.id()),
-            Query::Resume(id) => serialize(self.engine.resume(id)?.id()),
+            Query::Resume(id) => {
+                let txn = self.engine.resume(id)?;
+                serialize((txn.id(), txn.mode()))
+            }
 
             Query::Read { txn_id, table, id } => {
                 serialize(self.engine.resume(txn_id)?.read(&table, &id)?)
@@ -321,24 +237,6 @@ impl<S: kv::storage::Storage> raft::State for State<S> {
             Query::ListTables { txn_id } => serialize(self.engine.resume(txn_id)?.list_tables()?),
             Query::ReadTable { txn_id, table } => {
                 serialize(self.engine.resume(txn_id)?.read_table(&table)?)
-            }
-
-            Query::ReadSnapshot { version, table, id } => {
-                serialize(self.engine.snapshot(Some(version))?.read(&table, &id)?)
-            }
-            // FIXME This needs to stream rows
-            Query::ScanSnapshot { version, table } => serialize(
-                self.engine
-                    .snapshot(Some(version))?
-                    .scan(&table)?
-                    .collect::<Result<Vec<types::Row>, Error>>()?,
-            ),
-
-            Query::ListTablesSnapshot { version } => {
-                serialize(self.engine.snapshot(Some(version))?.list_tables()?)
-            }
-            Query::ReadTableSnapshot { version, table } => {
-                serialize(self.engine.snapshot(Some(version))?.read_table(&table)?)
             }
         }
     }

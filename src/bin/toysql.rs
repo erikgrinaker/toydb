@@ -148,12 +148,16 @@ Semicolons are not supported. The following !-commands are also available:
         let resultset = self.client.query(query)?;
 
         match resultset.effect() {
-            Some(toydb::client::Effect::Begin { id, readonly: false }) => {
+            Some(toydb::client::Effect::Begin { id, mode: toydb::client::Mode::ReadWrite }) => {
                 println!("Began transaction {}", id)
             }
-            Some(toydb::client::Effect::Begin { id, readonly: true }) => {
-                println!("Began read-only transaction in snapshot of version {}", id)
+            Some(toydb::client::Effect::Begin { id, mode: toydb::client::Mode::ReadOnly }) => {
+                println!("Began read-only transaction {}", id)
             }
+            Some(toydb::client::Effect::Begin {
+                id,
+                mode: toydb::client::Mode::Snapshot { version },
+            }) => println!("Began read-only transaction {} in version {} snapshot", id, version),
             Some(toydb::client::Effect::Commit(id)) => println!("Committed transaction {}", id),
             Some(toydb::client::Effect::Rollback(id)) => println!("Rolled back transaction {}", id),
             None => {}
@@ -171,10 +175,11 @@ Semicolons are not supported. The following !-commands are also available:
 
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>, toydb::Error> {
-        let prompt = match self.client.mode() {
-            toydb::client::Mode::Statement => "toydb> ".into(),
-            toydb::client::Mode::Transaction(id) => format!("toydb:{}> ", id),
-            toydb::client::Mode::Snapshot(version) => format!("toydb@{}> ", version),
+        let prompt = match self.client.txn() {
+            Some((id, toydb::client::Mode::ReadWrite)) => format!("toydb:{}> ", id),
+            Some((id, toydb::client::Mode::ReadOnly)) => format!("toydb:{}> ", id),
+            Some((_, toydb::client::Mode::Snapshot { version })) => format!("toydb@{}> ", version),
+            None => "toydb> ".into(),
         };
         match self.editor.readline(&prompt) {
             Ok(input) => {

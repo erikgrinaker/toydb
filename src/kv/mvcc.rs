@@ -4,7 +4,7 @@ use crate::Error;
 
 use std::collections::HashSet;
 use std::ops::{Bound, RangeBounds};
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// An MVCC-based transactional key-value store
 pub struct MVCC<S: Storage> {
@@ -17,21 +17,47 @@ impl<S: Storage> MVCC<S> {
         Self { storage: Arc::new(RwLock::new(storage)) }
     }
 
-    /// Begins a new transaction
+    /// Begins a new transaction in the default mutable mode
+    #[allow(dead_code)]
     pub fn begin(&self) -> Result<Transaction<S>, Error> {
-        Transaction::new(self.storage.clone())
+        Transaction::begin(self.storage.clone(), Mode::ReadWrite)
     }
 
-    /// Begins a new read-only transaction, optionally at the given version
-    #[allow(dead_code)]
-    pub fn begin_readonly(&self, version: Option<u64>) -> Result<Transaction<S>, Error> {
-        Transaction::new_readonly(self.storage.clone(), version)
+    /// Begins a new transaction in the given mode
+    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<S>, Error> {
+        Transaction::begin(self.storage.clone(), mode)
     }
 
     /// Resumes a transaction
-    #[allow(dead_code)]
     pub fn resume(&self, id: u64) -> Result<Transaction<S>, Error> {
-        Transaction::new_resume(self.storage.clone(), id)
+        Transaction::resume(self.storage.clone(), id)
+    }
+}
+
+/// An MVCC transaction mode
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Mode {
+    ReadWrite,
+    // FIXME Add transient read-only transactions
+    ReadOnly,
+    Snapshot { version: u64 },
+}
+
+impl Mode {
+    fn assert_mutable(&self) -> Result<(), Error> {
+        if self.is_mutable() {
+            Ok(())
+        } else {
+            Err(Error::ReadOnly)
+        }
+    }
+
+    fn is_mutable(&self) -> bool {
+        match self {
+            Self::ReadWrite => true,
+            Self::ReadOnly => false,
+            Self::Snapshot { .. } => false,
+        }
     }
 }
 
@@ -39,70 +65,44 @@ impl<S: Storage> MVCC<S> {
 pub struct Transaction<S: Storage> {
     storage: Arc<RwLock<S>>,
     id: u64,
-    readonly: bool,
-    invisible: HashSet<u64>,
+    mode: Mode,
+    snapshot: Snapshot,
 }
 
 impl<S: Storage> Transaction<S> {
-    /// Creates a new transaction
-    fn new(storage: Arc<RwLock<S>>) -> Result<Self, Error> {
-        let mut txn = Self { storage, id: 0, readonly: false, invisible: HashSet::new() };
-        {
-            let mut storage = txn.storage.write()?;
-            txn.id = match storage.read(&Key::TxnNext.encode())? {
+    /// Begins a new transaction
+    fn begin(storage: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
+        // FIXME Handle transient
+        let id = {
+            let mut storage = storage.write()?;
+            let id = match storage.read(&Key::TxnNext.encode())? {
                 Some(v) => deserialize(v)?,
                 None => 1,
             };
-            storage.write(&Key::TxnNext.encode(), serialize(txn.id + 1)?)?;
-
-            for r in storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(txn.id).encode()) {
-                let (k, _) = r?;
-                match Key::decode(k)? {
-                    Key::TxnActive(id) => txn.invisible.insert(id),
-                    _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
-                };
-            }
-            storage.write(&Key::TxnActive(txn.id).encode(), serialize(txn.invisible.clone())?)?;
-        }
-        Ok(txn)
-    }
-
-    /// Creates a new read-only transaction at the given version
-    // FIXME Actually, read-only transactions must be persisted as well, since we need to
-    // be able to resume them with the correct invisible transactions. This means that all
-    // of the logic in sql::engine::Snapshot must be removed.
-    fn new_readonly(storage: Arc<RwLock<S>>, id: Option<u64>) -> Result<Self, Error> {
-        let next_id = match storage.read()?.read(&Key::TxnNext.encode())? {
-            Some(v) => deserialize(v)?,
-            None => 1,
+            storage.write(&Key::TxnNext.encode(), serialize(id + 1)?)?;
+            storage.write(&Key::TxnActive(id).encode(), serialize(mode.clone())?)?;
+            id
         };
-        let id = id.unwrap_or_else(|| next_id - 1);
-        if id >= next_id {
-            return Err(Error::Value("Can't start read-only transaction in the future".into()));
-        }
-        let mut txn = Self { storage, id, readonly: true, invisible: HashSet::new() };
-        for r in
-            txn.storage.read()?.scan(&Key::TxnActive(0).encode()..=&Key::TxnActive(txn.id).encode())
-        {
-            let (k, _) = r?;
-            match Key::decode(k)? {
-                Key::TxnActive(id) => txn.invisible.insert(id),
-                _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
-            };
-        }
-        Ok(txn)
+        let snapshot = match &mode {
+            Mode::Snapshot { version } => Snapshot::restore(&storage.read()?, *version)?,
+            _ => Snapshot::take(&mut storage.write()?, id)?,
+        };
+        Ok(Self { storage, id, mode, snapshot })
     }
 
     /// Resumes a transaction
-    fn new_resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
+    fn resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
         let key = Key::TxnActive(id).encode();
-        let mut txn = Self { storage, id, readonly: false, invisible: HashSet::new() };
-        if let Some(v) = txn.storage.read()?.read(&key)? {
-            txn.invisible = deserialize(v)?;
+        let mode = if let Some(v) = storage.read()?.read(&key)? {
+            deserialize(v)?
         } else {
             return Err(Error::Value(format!("Unable to resume non-existant transaction {}", id)));
         };
-        Ok(txn)
+        let snapshot = match &mode {
+            Mode::Snapshot { version } => Snapshot::restore(&storage.read()?, *version)?,
+            _ => Snapshot::restore(&storage.read()?, id)?,
+        };
+        Ok(Self { storage, id, mode, snapshot })
     }
 
     /// Returns the transaction ID
@@ -110,9 +110,14 @@ impl<S: Storage> Transaction<S> {
         self.id
     }
 
+    /// Returns the transaction mode
+    pub fn mode(&self) -> Mode {
+        self.mode.clone()
+    }
+
     /// Commits the transaction
     pub fn commit(self) -> Result<(), Error> {
-        if !self.readonly {
+        if self.mode.is_mutable() {
             self.storage.write()?.remove(&Key::TxnActive(self.id).encode())?;
         }
         Ok(())
@@ -120,7 +125,7 @@ impl<S: Storage> Transaction<S> {
 
     /// Rolls back the transaction
     pub fn rollback(self) -> Result<(), Error> {
-        if !self.readonly {
+        if self.mode.is_mutable() {
             let mut storage = self.storage.write()?;
             let start = Key::TxnUpdatedStart(self.id).encode();
             let end = Key::TxnUpdatedEnd(self.id).encode();
@@ -140,7 +145,7 @@ impl<S: Storage> Transaction<S> {
 
     /// Deletes a key
     pub fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.assert_mutable()?;
+        self.mode.assert_mutable()?;
         let mut storage = self.storage.write()?;
         if self.is_dirty(&mut storage, key)? {
             return Err(Error::Serialization);
@@ -159,7 +164,7 @@ impl<S: Storage> Transaction<S> {
         let to = Key::Record(key.to_vec(), self.id).encode();
         let mut range = self.storage.read()?.scan(from..=to).rev();
         while let Some((k, v)) = range.next().transpose()? {
-            if !self.is_visible(Key::decode(k)?.version()?)? {
+            if !self.snapshot.is_visible(Key::decode(k)?.version()?) {
                 continue;
             }
             return match Value::decode(v)? {
@@ -186,16 +191,15 @@ impl<S: Storage> Transaction<S> {
         };
         Ok(Box::new(Scan {
             range: self.storage.read()?.scan((from, to)),
-            id: self.id,
+            snapshot: self.snapshot.clone(),
             seen: None,
             rev_ignore: None,
-            invisible: self.invisible.clone(),
         }))
     }
 
     /// Sets a key
     pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.assert_mutable()?;
+        self.mode.assert_mutable()?;
         let mut storage = self.storage.write()?;
         if self.is_dirty(&mut storage, key)? {
             return Err(Error::Serialization);
@@ -207,19 +211,10 @@ impl<S: Storage> Transaction<S> {
         Ok(())
     }
 
-    /// Asserts that the transaction is read-write, otherwise returns an error
-    fn assert_mutable(&self) -> Result<(), Error> {
-        if self.readonly {
-            Err(Error::ReadOnly)
-        } else {
-            Ok(())
-        }
-    }
-
     /// Checks whether the key is dirty, i.e. if it has any uncommitted changes
     fn is_dirty(&self, storage: &mut RwLockWriteGuard<S>, key: &[u8]) -> Result<bool, Error> {
         let mut min = self.id + 1;
-        for id in self.invisible.iter().cloned() {
+        for id in self.snapshot.invisible.iter().cloned() {
             if id < min {
                 min = id
             }
@@ -228,24 +223,56 @@ impl<S: Storage> Transaction<S> {
         let to = Key::Record(key.to_vec(), std::u64::MAX).encode();
         let mut range = storage.scan(from..to);
         while let Some((k, _)) = range.next().transpose()? {
-            if !self.is_visible(Key::decode(k)?.version()?)? {
+            if !self.snapshot.is_visible(Key::decode(k)?.version()?) {
                 return Ok(true);
             }
         }
         Ok(false)
     }
+}
+
+/// A versioned snapshot
+#[derive(Clone)]
+pub struct Snapshot {
+    version: u64,
+    invisible: HashSet<u64>,
+}
+
+impl Snapshot {
+    /// Takes a new snapshot
+    fn take(storage: &mut RwLockWriteGuard<impl Storage>, version: u64) -> Result<Self, Error> {
+        let mut snapshot = Self { version, invisible: HashSet::new() };
+        for r in storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode()) {
+            let (k, _) = r?;
+            match Key::decode(k)? {
+                Key::TxnActive(id) => snapshot.invisible.insert(id),
+                _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
+            };
+        }
+        storage
+            .write(&Key::TxnSnapshot(version).encode(), serialize(snapshot.invisible.clone())?)?;
+        Ok(snapshot)
+    }
+
+    /// Restores an existing snapshot
+    fn restore(storage: &RwLockReadGuard<impl Storage>, version: u64) -> Result<Self, Error> {
+        if let Some(v) = storage.read(&Key::TxnSnapshot(version).encode())? {
+            Ok(Self { version, invisible: deserialize(v)? })
+        } else {
+            Err(Error::Value(format!("Unable to find snapshot for version {}", version)))
+        }
+    }
 
     /// Checks whether the given version is visible to us
-    fn is_visible(&self, version: u64) -> Result<bool, Error> {
-        Ok(version <= self.id && self.invisible.get(&version).is_none())
+    fn is_visible(&self, version: u64) -> bool {
+        version <= self.version && self.invisible.get(&version).is_none()
     }
 }
 
 /// A key range scan
 pub struct Scan {
     range: Range,
-    id: u64,
-    invisible: HashSet<u64>,
+    snapshot: Snapshot,
     seen: Option<(Vec<u8>, Vec<u8>)>,
     rev_ignore: Option<(Vec<u8>)>,
 }
@@ -261,7 +288,7 @@ impl Iterator for Scan {
                         Key::Record(key, version) => (key, version),
                         _ => panic!("Not implemented"),
                     };
-                    if version > self.id || self.invisible.get(&version).is_some() {
+                    if !self.snapshot.is_visible(version) {
                         continue;
                     }
                     let value = match Value::decode(v).unwrap() {
@@ -312,7 +339,7 @@ impl DoubleEndedIterator for Scan {
                         Key::Record(key, version) => (key, version),
                         _ => panic!("Not implemented"),
                     };
-                    if version > self.id || self.invisible.get(&version).is_some() {
+                    if !self.snapshot.is_visible(version) {
                         continue;
                     }
                     if let Some(ignore) = &self.rev_ignore {
@@ -338,6 +365,7 @@ impl DoubleEndedIterator for Scan {
 enum Key {
     TxnNext,
     TxnActive(u64),
+    TxnSnapshot(u64),
     TxnUpdatedStart(u64),
     TxnUpdated(u64, Vec<u8>),
     TxnUpdatedEnd(u64),
@@ -362,6 +390,15 @@ impl Key {
             }
             Some(0x03) => {
                 let bytes: Vec<u8> = iter.collect();
+                if bytes.len() != 8 {
+                    return Err(Error::Value("Unable to parse MVCC snapshot version".into()));
+                }
+                let mut version = [0; 8];
+                version.copy_from_slice(&bytes[..]);
+                Ok(Key::TxnSnapshot(u64::from_be_bytes(version)))
+            }
+            Some(0x04) => {
+                let bytes: Vec<u8> = iter.collect();
                 if bytes.len() < 10 {
                     return Err(Error::Value("Unable to parse MVCC update key".into()));
                 }
@@ -379,7 +416,6 @@ impl Key {
                 let key = bytes[9..].to_vec();
                 Ok(Key::TxnUpdated(id, key))
             }
-
             Some(0xf1) => {
                 let mut key: Vec<u8> = iter.collect();
                 if key.len() < 9 {
@@ -400,13 +436,14 @@ impl Key {
         match self {
             Self::TxnNext => vec![0x01],
             Self::TxnActive(id) => [vec![0x02], id.to_be_bytes().to_vec()].concat(),
+            Self::TxnSnapshot(version) => [vec![0x03], version.to_be_bytes().to_vec()].concat(),
             Self::TxnUpdatedStart(id) => {
-                [vec![0x03], id.to_be_bytes().to_vec(), vec![0x00]].concat()
+                [vec![0x04], id.to_be_bytes().to_vec(), vec![0x00]].concat()
             }
             Self::TxnUpdated(id, key) => {
-                [vec![0x03], id.to_be_bytes().to_vec(), vec![0x00], key].concat()
+                [vec![0x04], id.to_be_bytes().to_vec(), vec![0x00], key].concat()
             }
-            Self::TxnUpdatedEnd(id) => [vec![0x03], id.to_be_bytes().to_vec(), vec![0xff]].concat(),
+            Self::TxnUpdatedEnd(id) => [vec![0x04], id.to_be_bytes().to_vec(), vec![0xff]].concat(),
             Self::RecordStart => vec![0xf0],
             Self::Record(key, version) => {
                 // We have to use 0x00 as a key/version separator, and use 0x00 0xff as an
@@ -498,32 +535,6 @@ pub mod tests {
     }
 
     #[test]
-    fn test_begin_readonly() -> Result<(), Error> {
-        let mvcc = setup();
-
-        let txn = mvcc.begin_readonly(None)?;
-        assert_eq!(txn.id(), 0);
-        txn.commit()?;
-
-        let txn = mvcc.begin_readonly(None)?;
-        assert_eq!(txn.id(), 0);
-        txn.commit()?;
-
-        let txn = mvcc.begin()?;
-        txn.commit()?;
-        let txn = mvcc.begin()?;
-        txn.commit()?;
-        let txn = mvcc.begin()?;
-        txn.commit()?;
-
-        let txn = mvcc.begin_readonly(None)?;
-        assert_eq!(txn.id(), 3);
-        txn.commit()?;
-
-        Ok(())
-    }
-
-    #[test]
     fn test_resume() -> Result<(), Error> {
         let mvcc = setup();
 
@@ -558,7 +569,7 @@ pub mod tests {
         assert_eq!(None, tr.get(b"c")?);
 
         // A separate transaction should not see t2's changes, but should see the others
-        let t = mvcc.begin_readonly(None)?;
+        let t = mvcc.begin()?;
         assert_eq!(Some(b"t1".to_vec()), t.get(b"a")?);
         assert_eq!(Some(b"t0".to_vec()), t.get(b"b")?);
         assert_eq!(Some(b"t3".to_vec()), t.get(b"c")?);
@@ -567,7 +578,7 @@ pub mod tests {
         // Once tr commits, a separate transaction should see t2's changes
         tr.commit()?;
 
-        let t = mvcc.begin_readonly(None)?;
+        let t = mvcc.begin()?;
         assert_eq!(Some(b"t1".to_vec()), t.get(b"a")?);
         assert_eq!(Some(b"t2".to_vec()), t.get(b"b")?);
         assert_eq!(Some(b"t3".to_vec()), t.get(b"c")?);
@@ -676,22 +687,6 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_get_readonly_hides_uncomitted() -> Result<(), Error> {
-        let mvcc = setup();
-
-        let mut t1 = mvcc.begin()?;
-        t1.set(b"a", vec![0x01])?;
-        let mut t2 = mvcc.begin()?;
-        t2.set(b"c", vec![0x03])?;
-
-        let tr = mvcc.begin_readonly(None)?;
-        assert_eq!(None, tr.get(b"a")?);
-        assert_eq!(None, tr.get(b"c")?);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_txn_get_readonly_historical() -> Result<(), Error> {
         let mvcc = setup();
 
@@ -707,7 +702,7 @@ pub mod tests {
         txn.set(b"c", vec![0x03])?;
         txn.commit()?;
 
-        let tr = mvcc.begin_readonly(Some(2))?;
+        let tr = mvcc.begin_with_mode(Mode::Snapshot { version: 2 })?;
         assert_eq!(Some(vec![0x01]), tr.get(b"a")?);
         assert_eq!(Some(vec![0x02]), tr.get(b"b")?);
         assert_eq!(None, tr.get(b"c")?);

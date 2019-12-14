@@ -1,5 +1,6 @@
 use super::super::schema;
 use super::super::types;
+use super::Mode;
 use crate::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
@@ -16,18 +17,13 @@ impl<S: kv::storage::Storage> KV<S> {
 
 impl<S: kv::storage::Storage> super::Engine for KV<S> {
     type Transaction = Transaction<S>;
-    type Snapshot = Transaction<S>;
 
-    fn begin(&self) -> Result<Self::Transaction, Error> {
-        Ok(Self::Transaction::new(self.kv.begin()?))
+    fn begin_with_mode(&self, mode: Mode) -> Result<Self::Transaction, Error> {
+        Ok(Self::Transaction::new(self.kv.begin_with_mode(mode)?))
     }
 
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
         Ok(Self::Transaction::new(self.kv.resume(id)?))
-    }
-
-    fn snapshot(&self, version: Option<u64>) -> Result<Self::Snapshot, Error> {
-        Ok(Self::Transaction::new(self.kv.begin_readonly(version)?))
     }
 }
 
@@ -44,6 +40,10 @@ impl<S: kv::storage::Storage> Transaction<S> {
 impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     fn id(&self) -> u64 {
         self.txn.id()
+    }
+
+    fn mode(&self) -> Mode {
+        self.txn.mode()
     }
 
     fn commit(self) -> Result<(), Error> {

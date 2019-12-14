@@ -1,6 +1,7 @@
 mod kv;
 mod raft;
 
+pub use crate::kv::Mode;
 pub use kv::KV;
 pub use raft::Raft;
 
@@ -10,15 +11,18 @@ use crate::Error;
 
 pub trait Engine {
     type Transaction: Transaction;
-    type Snapshot: Transaction;
 
-    fn begin(&self) -> Result<Self::Transaction, Error>;
+    fn begin(&self) -> Result<Self::Transaction, Error> {
+        self.begin_with_mode(Mode::ReadWrite)
+    }
+
+    fn begin_with_mode(&self, mode: Mode) -> Result<Self::Transaction, Error>;
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error>;
-    fn snapshot(&self, version: Option<u64>) -> Result<Self::Snapshot, Error>;
 }
 
 pub trait Transaction {
     fn id(&self) -> u64;
+    fn mode(&self) -> Mode;
     fn commit(self) -> Result<(), Error>;
     fn rollback(self) -> Result<(), Error>;
 
