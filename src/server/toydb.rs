@@ -69,8 +69,8 @@ impl service::ToyDB for ToyDB {
         };
         let mut metadata = grpc::Metadata::new();
         metadata
-            .add(grpc::MetadataKey::from("columns"), serialize(result.columns()).unwrap().into());
-        if let Some(effect) = result.effect.clone() {
+            .add(grpc::MetadataKey::from("columns"), serialize(&result.columns()).unwrap().into());
+        if let Some(effect) = &result.effect {
             metadata.add(grpc::MetadataKey::from("effect"), serialize(effect).unwrap().into());
         }
         grpc::StreamingResponse::iter_with_metadata(

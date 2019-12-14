@@ -74,11 +74,11 @@ impl<S: Storage> Transaction<S> {
         let id = {
             let mut storage = storage.write()?;
             let id = match storage.read(&Key::TxnNext.encode())? {
-                Some(v) => deserialize(v)?,
+                Some(v) => deserialize(&v)?,
                 None => 1,
             };
-            storage.write(&Key::TxnNext.encode(), serialize(id + 1)?)?;
-            storage.write(&Key::TxnActive(id).encode(), serialize(mode.clone())?)?;
+            storage.write(&Key::TxnNext.encode(), serialize(&(id + 1))?)?;
+            storage.write(&Key::TxnActive(id).encode(), serialize(&mode)?)?;
             id
         };
         let snapshot = match &mode {
@@ -92,7 +92,7 @@ impl<S: Storage> Transaction<S> {
     fn resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
         let key = Key::TxnActive(id).encode();
         let mode = if let Some(v) = storage.read()?.read(&key)? {
-            deserialize(v)?
+            deserialize(&v)?
         } else {
             return Err(Error::Value(format!("Unable to resume non-existant transaction {}", id)));
         };
@@ -247,15 +247,14 @@ impl Snapshot {
                 _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
             };
         }
-        storage
-            .write(&Key::TxnSnapshot(version).encode(), serialize(snapshot.invisible.clone())?)?;
+        storage.write(&Key::TxnSnapshot(version).encode(), serialize(&snapshot.invisible)?)?;
         Ok(snapshot)
     }
 
     /// Restores an existing snapshot
     fn restore(storage: &RwLockReadGuard<impl Storage>, version: u64) -> Result<Self, Error> {
         if let Some(v) = storage.read(&Key::TxnSnapshot(version).encode())? {
-            Ok(Self { version, invisible: deserialize(v)? })
+            Ok(Self { version, invisible: deserialize(&v)? })
         } else {
             Err(Error::Value(format!("Unable to find snapshot for version {}", version)))
         }

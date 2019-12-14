@@ -72,12 +72,12 @@ pub struct Transaction {
 
 impl Transaction {
     fn begin_with_mode(raft: raft::Raft, mode: Mode) -> Result<Self, Error> {
-        let id = deserialize(raft.mutate(serialize(Mutation::Begin(mode.clone()))?)?)?;
+        let id = deserialize(&raft.mutate(serialize(&Mutation::Begin(mode.clone()))?)?)?;
         Ok(Self { raft, id, mode })
     }
 
     fn resume(raft: raft::Raft, id: u64) -> Result<Self, Error> {
-        let (id, mode) = deserialize(raft.query(serialize(Query::Resume(id))?)?)?;
+        let (id, mode) = deserialize(&raft.query(serialize(&Query::Resume(id))?)?)?;
         Ok(Self { raft, id, mode })
     }
 }
@@ -92,15 +92,15 @@ impl super::Transaction for Transaction {
     }
 
     fn commit(self) -> Result<(), Error> {
-        deserialize(self.raft.mutate(serialize(Mutation::Commit(self.id))?)?)
+        deserialize(&self.raft.mutate(serialize(&Mutation::Commit(self.id))?)?)
     }
 
     fn rollback(self) -> Result<(), Error> {
-        deserialize(self.raft.mutate(serialize(Mutation::Rollback(self.id))?)?)
+        deserialize(&self.raft.mutate(serialize(&Mutation::Rollback(self.id))?)?)
     }
 
     fn create(&mut self, table: &str, row: types::Row) -> Result<(), Error> {
-        deserialize(self.raft.mutate(serialize(Mutation::Create {
+        deserialize(&self.raft.mutate(serialize(&Mutation::Create {
             txn_id: self.id,
             table: table.into(),
             row,
@@ -108,7 +108,7 @@ impl super::Transaction for Transaction {
     }
 
     fn delete(&mut self, table: &str, id: &types::Value) -> Result<(), Error> {
-        deserialize(self.raft.mutate(serialize(Mutation::Delete {
+        deserialize(&self.raft.mutate(serialize(&Mutation::Delete {
             txn_id: self.id,
             table: table.into(),
             id: id.clone(),
@@ -116,7 +116,7 @@ impl super::Transaction for Transaction {
     }
 
     fn read(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error> {
-        deserialize(self.raft.query(serialize(Query::Read {
+        deserialize(&self.raft.query(serialize(&Query::Read {
             txn_id: self.id,
             table: table.into(),
             id: id.clone(),
@@ -126,8 +126,9 @@ impl super::Transaction for Transaction {
     fn scan(&self, table: &str) -> Result<super::Scan, Error> {
         Ok(Box::new(
             deserialize::<Vec<types::Row>>(
-                self.raft
-                    .query(serialize(Query::Scan { txn_id: self.id, table: table.into() })?)?,
+                &self
+                    .raft
+                    .query(serialize(&Query::Scan { txn_id: self.id, table: table.into() })?)?,
             )?
             .into_iter()
             .map(Ok),
@@ -135,7 +136,7 @@ impl super::Transaction for Transaction {
     }
 
     fn update(&mut self, table: &str, id: &types::Value, row: types::Row) -> Result<(), Error> {
-        deserialize(self.raft.mutate(serialize(Mutation::Update {
+        deserialize(&self.raft.mutate(serialize(&Mutation::Update {
             txn_id: self.id,
             table: table.into(),
             id: id.clone(),
@@ -144,17 +145,15 @@ impl super::Transaction for Transaction {
     }
 
     fn create_table(&mut self, table: &schema::Table) -> Result<(), Error> {
-        deserialize(
-            self.raft.mutate(serialize(Mutation::CreateTable {
-                txn_id: self.id,
-                schema: table.clone(),
-            })?)?,
-        )
+        deserialize(&self.raft.mutate(serialize(&Mutation::CreateTable {
+            txn_id: self.id,
+            schema: table.clone(),
+        })?)?)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<(), Error> {
         deserialize(
-            self.raft.mutate(serialize(Mutation::DeleteTable {
+            &self.raft.mutate(serialize(&Mutation::DeleteTable {
                 txn_id: self.id,
                 table: table.into(),
             })?)?,
@@ -162,13 +161,14 @@ impl super::Transaction for Transaction {
     }
 
     fn list_tables(&self) -> Result<Vec<schema::Table>, Error> {
-        deserialize(self.raft.query(serialize(Query::ListTables { txn_id: self.id })?)?)
+        deserialize(&self.raft.query(serialize(&Query::ListTables { txn_id: self.id })?)?)
     }
 
     fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
         deserialize(
-            self.raft
-                .query(serialize(Query::ReadTable { txn_id: self.id, table: table.into() })?)?,
+            &self
+                .raft
+                .query(serialize(&Query::ReadTable { txn_id: self.id, table: table.into() })?)?,
         )
     }
 }
@@ -192,51 +192,52 @@ impl<S: kv::storage::Storage> State<S> {
 
 impl<S: kv::storage::Storage> raft::State for State<S> {
     fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
-        match deserialize(command)? {
-            Mutation::Begin(mode) => serialize(self.engine.begin_with_mode(mode)?.id()),
-            Mutation::Commit(txn_id) => serialize(self.engine.resume(txn_id)?.commit()?),
-            Mutation::Rollback(txn_id) => serialize(self.engine.resume(txn_id)?.rollback()?),
+        match deserialize(&command)? {
+            Mutation::Begin(mode) => serialize(&self.engine.begin_with_mode(mode)?.id()),
+            Mutation::Commit(txn_id) => serialize(&self.engine.resume(txn_id)?.commit()?),
+            Mutation::Rollback(txn_id) => serialize(&self.engine.resume(txn_id)?.rollback()?),
 
             Mutation::Create { txn_id, table, row } => {
-                serialize(self.engine.resume(txn_id)?.create(&table, row)?)
+                serialize(&self.engine.resume(txn_id)?.create(&table, row)?)
             }
             Mutation::Delete { txn_id, table, id } => {
-                serialize(self.engine.resume(txn_id)?.delete(&table, &id)?)
+                serialize(&self.engine.resume(txn_id)?.delete(&table, &id)?)
             }
             Mutation::Update { txn_id, table, id, row } => {
-                serialize(self.engine.resume(txn_id)?.update(&table, &id, row)?)
+                serialize(&self.engine.resume(txn_id)?.update(&table, &id, row)?)
             }
 
             Mutation::CreateTable { txn_id, schema } => {
-                serialize(self.engine.resume(txn_id)?.create_table(&schema)?)
+                serialize(&self.engine.resume(txn_id)?.create_table(&schema)?)
             }
             Mutation::DeleteTable { txn_id, table } => {
-                serialize(self.engine.resume(txn_id)?.delete_table(&table)?)
+                serialize(&self.engine.resume(txn_id)?.delete_table(&table)?)
             }
         }
     }
 
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
-        match deserialize(command)? {
+        match deserialize(&command)? {
             Query::Resume(id) => {
                 let txn = self.engine.resume(id)?;
-                serialize((txn.id(), txn.mode()))
+                serialize(&(txn.id(), txn.mode()))
             }
 
             Query::Read { txn_id, table, id } => {
-                serialize(self.engine.resume(txn_id)?.read(&table, &id)?)
+                serialize(&self.engine.resume(txn_id)?.read(&table, &id)?)
             }
             // FIXME This needs to stream rows
             Query::Scan { txn_id, table } => serialize(
-                self.engine
+                &self
+                    .engine
                     .resume(txn_id)?
                     .scan(&table)?
                     .collect::<Result<Vec<types::Row>, Error>>()?,
             ),
 
-            Query::ListTables { txn_id } => serialize(self.engine.resume(txn_id)?.list_tables()?),
+            Query::ListTables { txn_id } => serialize(&self.engine.resume(txn_id)?.list_tables()?),
             Query::ReadTable { txn_id, table } => {
-                serialize(self.engine.resume(txn_id)?.read_table(&table)?)
+                serialize(&self.engine.resume(txn_id)?.read_table(&table)?)
             }
         }
     }

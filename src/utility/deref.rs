@@ -3,6 +3,7 @@ use std::ops::Deref;
 /// This implements as_deref() for Option, to e.g. convert
 /// Option<String> to Option<&str>. There is a similar method in nightly:
 /// https://doc.rust-lang.org/std/option/enum.Option.html#method.deref
+// FIXME This will stabilize in Rust 1.40.
 pub trait OptionDeref<T: Deref> {
     fn as_deref(&self) -> Option<&T::Target>;
 }

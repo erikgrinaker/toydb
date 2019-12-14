@@ -37,11 +37,11 @@ impl<S: kv::storage::Storage> Log<S> {
     /// Creates a new log, using a kv::Store for storage.
     pub fn new(store: kv::Simple<S>) -> Result<Self, Error> {
         let apply_index = match store.get(b"apply_index")? {
-            Some(v) => deserialize(v)?,
+            Some(v) => deserialize(&v)?,
             None => 0,
         };
         let (commit_index, commit_term) = match store.get(&apply_index.to_string().as_bytes())? {
-            Some(raw_entry) => (apply_index, deserialize::<Entry>(raw_entry)?.term),
+            Some(raw_entry) => (apply_index, deserialize::<Entry>(&raw_entry)?.term),
             None if apply_index == 0 => (0, 0),
             None => {
                 return Err(Error::Internal(format!("Applied entry {} not found", apply_index)))
@@ -52,7 +52,7 @@ impl<S: kv::storage::Storage> Log<S> {
         let (mut last_index, mut last_term) = (0, 0);
         for i in 1..std::u64::MAX {
             if let Some(e) = store.get(&i.to_string().as_bytes())? {
-                let entry: Entry = deserialize(e)?;
+                let entry: Entry = deserialize(&e)?;
                 last_index = i;
                 last_term = entry.term;
             } else {
@@ -76,7 +76,7 @@ impl<S: kv::storage::Storage> Log<S> {
         let index = self.last_index + 1;
         self.last_index = index;
         self.last_term = entry.term;
-        self.kv.set(&index.to_string().as_bytes(), serialize(entry)?)?;
+        self.kv.set(&index.to_string().as_bytes(), serialize(&entry)?)?;
         Ok(index)
     }
 
@@ -97,7 +97,7 @@ impl<S: kv::storage::Storage> Log<S> {
             self.apply_index += 1;
             self.apply_term = entry.term;
         }
-        self.kv.set(b"apply_index", serialize(self.apply_index)?)?;
+        self.kv.set(b"apply_index", serialize(&self.apply_index)?)?;
         Ok(Some((self.apply_index, output)))
     }
 
@@ -123,7 +123,7 @@ impl<S: kv::storage::Storage> Log<S> {
     /// Fetches an entry at an index
     pub fn get(&self, index: u64) -> Result<Option<Entry>, Error> {
         if let Some(value) = self.kv.get(&index.to_string().as_bytes())? {
-            Ok(Some(deserialize(value)?))
+            Ok(Some(deserialize(&value)?))
         } else {
             Ok(None)
         }
@@ -217,9 +217,9 @@ impl<S: kv::storage::Storage> Log<S> {
     /// containing the term number (0 if none) and candidate voted for
     /// in current term (if any).
     pub fn load_term(&self) -> Result<(u64, Option<String>), Error> {
-        let term = if let Some(value) = self.kv.get(b"term")? { deserialize(value)? } else { 0 };
+        let term = if let Some(value) = self.kv.get(b"term")? { deserialize(&value)? } else { 0 };
         let voted_for = if let Some(value) = self.kv.get(b"voted_for")? {
-            Some(deserialize(value)?)
+            Some(deserialize(&value)?)
         } else {
             None
         };
@@ -231,12 +231,12 @@ impl<S: kv::storage::Storage> Log<S> {
     // FIXME Should be transactional.
     pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
         if term > 0 {
-            self.kv.set(b"term", serialize(term)?)?
+            self.kv.set(b"term", serialize(&term)?)?
         } else {
             self.kv.delete(b"term")?
         }
         if let Some(v) = voted_for {
-            self.kv.set(b"voted_for", serialize(v)?)?
+            self.kv.set(b"voted_for", serialize(&v)?)?
         } else {
             self.kv.delete(b"voted_for")?
         }

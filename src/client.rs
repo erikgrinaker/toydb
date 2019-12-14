@@ -118,13 +118,8 @@ impl ResultSet {
         metadata: grpc::Metadata,
         rows: Box<dyn std::iter::Iterator<Item = Result<service::Row, grpc::Error>>>,
     ) -> Result<Self, Error> {
-        let columns =
-            deserialize(metadata.get("columns").map(|c| c.to_vec()).unwrap_or_else(Vec::new))
-                .unwrap_or_else(|_| Vec::new());
-        let effect = match metadata.get("effect") {
-            Some(v) => deserialize(v.to_vec()).ok(),
-            None => None,
-        };
+        let columns = deserialize(metadata.get("columns").unwrap_or_else(|| &[]))?;
+        let effect = metadata.get("effect").map(deserialize).transpose()?;
         Ok(Self { effect, columns, rows })
     }
 

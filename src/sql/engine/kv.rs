@@ -66,7 +66,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
                 pk, table.name
             )));
         }
-        self.txn.set(&Key::Row(&table.name, &pk).encode(), serialize(row)?)?;
+        self.txn.set(&Key::Row(&table.name, &pk).encode(), serialize(&row)?)?;
         Ok(())
     }
 
@@ -75,14 +75,14 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 
     fn read(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error> {
-        self.txn.get(&Key::Row(table, id).encode())?.map(deserialize).transpose()
+        self.txn.get(&Key::Row(table, id).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
     fn scan(&self, table: &str) -> Result<super::Scan, Error> {
         let from = Key::RowStart(table).encode();
         let to = Key::RowEnd(table).encode();
         Ok(Box::new(self.txn.scan(&from..&to)?.map(|res| match res {
-            Ok((_, v)) => deserialize(v),
+            Ok((_, v)) => deserialize(&v),
             Err(err) => Err(err),
         })))
     }
@@ -113,12 +113,12 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
             .scan(&Key::TableStart.encode()..&Key::TableEnd.encode())?
             .collect::<Result<Vec<_>, Error>>()?
             .into_iter()
-            .map(|(_, v)| deserialize(v))
+            .map(|(_, v)| deserialize(&v))
             .collect()
     }
 
     fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
-        self.txn.get(&Key::Table(table).encode())?.map(deserialize).transpose()
+        self.txn.get(&Key::Table(table).encode())?.map(|v| deserialize(&v)).transpose()
     }
 }
 
