@@ -38,7 +38,6 @@ impl<S: Storage> MVCC<S> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Mode {
     ReadWrite,
-    // FIXME Add transient read-only transactions
     ReadOnly,
     Snapshot { version: u64 },
 }
@@ -72,7 +71,6 @@ pub struct Transaction<S: Storage> {
 impl<S: Storage> Transaction<S> {
     /// Begins a new transaction
     fn begin(storage: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
-        // FIXME Handle transient
         let id = {
             let mut storage = storage.write()?;
             let id = match storage.read(&Key::TxnNext.encode())? {

@@ -157,7 +157,6 @@ impl ToyDB {
                     Err(Error::Value("Not in a transaction".into()))
                 }
                 sql::ast::Statement::Select { .. } => {
-                    // FIXME Should use transient transaction
                     let mut txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
                     let result = sql::Plan::build(statement)?
                         .optimize()?

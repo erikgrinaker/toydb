@@ -135,6 +135,8 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 
 * **Abortion:** client disconnects or system crashes do not abort transactions, which may cause serialization failures for other transactions due to uncommitted writes.
 
+* **Transient reads:** all statements, including trivial `SELECT`s, will be wrapped in a transaction with a globally allocated, persistent transaction ID.
+
 * **Serializability:** transactions use MVCC without serializable snapshot isolation, thus are vulnerable to write skew and other anomalies.
 
 ### Schema
