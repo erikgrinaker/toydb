@@ -51,7 +51,7 @@ impl<S: Storage> Transaction<S> {
             let mut storage = txn.storage.write()?;
             txn.id = match storage.read(&Key::TxnNext.encode())? {
                 Some(v) => deserialize(v)?,
-                None => 0,
+                None => 1,
             };
             storage.write(&Key::TxnNext.encode(), serialize(txn.id + 1)?)?;
 
@@ -487,11 +487,11 @@ pub mod tests {
         let mvcc = setup();
 
         let txn = mvcc.begin()?;
-        assert_eq!(txn.id(), 0);
+        assert_eq!(txn.id(), 1);
         txn.commit()?;
 
         let txn = mvcc.begin()?;
-        assert_eq!(txn.id(), 1);
+        assert_eq!(txn.id(), 2);
         txn.commit()?;
 
         Ok(())
@@ -517,7 +517,7 @@ pub mod tests {
         txn.commit()?;
 
         let txn = mvcc.begin_readonly(None)?;
-        assert_eq!(txn.id(), 2);
+        assert_eq!(txn.id(), 3);
         txn.commit()?;
 
         Ok(())
@@ -707,7 +707,7 @@ pub mod tests {
         txn.set(b"c", vec![0x03])?;
         txn.commit()?;
 
-        let tr = mvcc.begin_readonly(Some(1))?;
+        let tr = mvcc.begin_readonly(Some(2))?;
         assert_eq!(Some(vec![0x01]), tr.get(b"a")?);
         assert_eq!(Some(vec![0x02]), tr.get(b"b")?);
         assert_eq!(None, tr.get(b"c")?);

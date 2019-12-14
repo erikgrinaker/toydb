@@ -38,16 +38,16 @@ ACID transactions are supported via snapshot isolation:
 
 ```
 toydb> BEGIN
-Began transaction 2
-toydb:2> INSERT INTO movies VALUES (4, 'Alien vs. Predator')
-toydb:2> ROLLBACK
-Rolled back transaction 2
+Began transaction 3
+toydb:3> INSERT INTO movies VALUES (4, 'Alien vs. Predator')
+toydb:3> ROLLBACK
+Rolled back transaction 3
 
 toydb> BEGIN
-Began transaction 3
-toydb:3> INSERT INTO movies VALUES (4, 'Alien'), (5, 'Predator')
-toydb:3> COMMIT
-Committed transaction 3
+Began transaction 4
+toydb:4> INSERT INTO movies VALUES (4, 'Alien'), (5, 'Predator')
+toydb:4> COMMIT
+Committed transaction 4
 
 toydb> SELECT * FROM movies
 1|Sicario
@@ -60,8 +60,8 @@ toydb> SELECT * FROM movies
 Time-travel queries are also supported:
 
 ```
-toydb> BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME 1
-Began read-only transaction in snapshot of version 1
+toydb> BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME 2
+Began read-only transaction in snapshot of version 2
 toydb@1> SELECT * FROM movies
 1|Sicario
 2|Stalker
