@@ -299,8 +299,8 @@ impl<S: Storage> Iterator for Scan<S> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let storage = self.storage.read().unwrap();
-        let mut range = storage.scan((self.mark_front.clone(), self.mark_back.clone()));
-        while let Some(r) = range.next() {
+        let range = storage.scan((self.mark_front.clone(), self.mark_back.clone()));
+        for r in range {
             match r {
                 Ok((k, v)) => {
                     self.mark_front = Bound::Excluded(k.clone());
@@ -810,10 +810,10 @@ pub mod tests {
         let mvcc = setup();
 
         let mut txn = mvcc.begin()?;
-        txn.set(&vec![0], vec![0])?; // v0
-        txn.set(&vec![0], vec![1])?; // v1
-        txn.set(&vec![0, 0, 0, 0, 0, 0, 0, 0, 2], vec![2])?; // v2
-        txn.set(&vec![0], vec![3])?; // v3
+        txn.set(&[0], vec![0])?; // v0
+        txn.set(&[0], vec![1])?; // v1
+        txn.set(&[0, 0, 0, 0, 0, 0, 0, 0, 2], vec![2])?; // v2
+        txn.set(&[0], vec![3])?; // v3
         txn.commit()?;
 
         let txn = mvcc.begin()?;

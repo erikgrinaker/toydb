@@ -310,7 +310,7 @@ use Value::*;
 test_expr! {
     lit_bool_false: "FALSE" => Boolean(false),
     lit_bool_true: "TRUE" => Boolean(true),
-    lit_float: "3.14" => Float(3.14),
+    lit_float: "3.72" => Float(3.72),
     lit_float_exp: "3.14e3" => Float(3140.0),
     lit_float_exp_neg: "2.718E-2" => Float(0.02718),
     lit_float_nodecimal: "3.0" => Float(3.0),
