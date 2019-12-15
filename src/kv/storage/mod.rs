@@ -14,8 +14,7 @@ use crate::Error;
 use std::ops::RangeBounds;
 
 /// Key/value storage backend.
-// FIXME Should not require 'static + Sync + Send, but necessary due to raft::State.
-pub trait Storage: 'static + Sync + Send {
+pub trait Storage {
     /// Reads a value for a key, or `None` if it does not exist.
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error>;
 
@@ -30,8 +29,7 @@ pub trait Storage: 'static + Sync + Send {
 }
 
 /// Iterator over a key/value range.
-pub type Range<'a> =
-    Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>), Error>> + 'a + Sync + Send>;
+pub type Range<'a> = Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>), Error>> + 'a>;
 
 #[cfg(test)]
 trait TestSuite<S: Storage> {

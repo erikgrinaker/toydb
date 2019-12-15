@@ -3,7 +3,7 @@ use crate::Error;
 use crossbeam_channel::Receiver;
 
 /// A transport for communication between a Raft node and its peers.
-pub trait Transport: 'static + Sync + Send {
+pub trait Transport {
     /// Returns a channel for receiving inbound messages.
     fn receiver(&self) -> Receiver<Message>;
 

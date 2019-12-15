@@ -17,7 +17,7 @@ use uuid::Uuid;
 const TICK: std::time::Duration = std::time::Duration::from_millis(100);
 
 /// A Raft-managed state machine.
-pub trait State: 'static + Sync + Send + std::fmt::Debug {
+pub trait State {
     /// Mutates the state machine.
     fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error>;
 
@@ -42,9 +42,9 @@ impl Raft {
         transport: T,
     ) -> Result<Raft, Error>
     where
-        S: State,
-        L: kv::storage::Storage,
-        T: Transport,
+        S: State + 'static + Send,
+        L: kv::storage::Storage + 'static + Send,
+        T: Transport + 'static + Send,
     {
         let ticker = crossbeam_channel::tick(TICK);
         let inbound_rx = transport.receiver();
