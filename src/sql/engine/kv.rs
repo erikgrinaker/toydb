@@ -81,10 +81,18 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     fn scan(&self, table: &str) -> Result<super::Scan, Error> {
         let from = Key::RowStart(table).encode();
         let to = Key::RowEnd(table).encode();
-        Ok(Box::new(self.txn.scan(&from..&to)?.map(|res| match res {
-            Ok((_, v)) => deserialize(&v),
-            Err(err) => Err(err),
-        })))
+        // FIXME We buffer results here, to avoid dealing with trait lifetimes
+        // right now
+        let iter = self
+            .txn
+            .scan(&from..&to)?
+            .map(|res| match res {
+                Ok((_, v)) => deserialize(&v),
+                Err(err) => Err(err),
+            })
+            .collect::<Vec<Result<_, Error>>>()
+            .into_iter();
+        Ok(Box::new(iter))
     }
 
     fn update(&mut self, table: &str, id: &types::Value, row: types::Row) -> Result<(), Error> {

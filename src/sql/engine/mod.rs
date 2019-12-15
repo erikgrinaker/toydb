@@ -39,4 +39,4 @@ pub trait Transaction {
 }
 
 pub type Scan =
-    Box<dyn DoubleEndedIterator<Item = Result<types::Row, Error>> + Sync + Send + 'static>;
+    Box<dyn DoubleEndedIterator<Item = Result<types::Row, Error>> + 'static + Sync + Send>;

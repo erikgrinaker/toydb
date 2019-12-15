@@ -10,12 +10,15 @@ use std::ops::RangeBounds;
 /// until a proper store is written.
 #[derive(Debug)]
 pub struct File {
+    /// The file handle of the backing file.
     file: std::fs::File,
+
+    /// The in-memory key-value store that is flushed to disk.
     data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 impl File {
-    /// Creates a new file-based key-value storage backend
+    /// Creates a new file-based key-value storage backend.
     pub fn new(file: std::fs::File) -> Result<Self, Error> {
         let data = if file.metadata()?.len() > 0 {
             rmp_serde::decode::from_read(file.try_clone()?)?
@@ -25,7 +28,7 @@ impl File {
         Ok(Self { file, data })
     }
 
-    /// Writes out the entire dataset to the file
+    /// Writes out the entire dataset to the file.
     fn flush(&mut self) -> Result<(), Error> {
         self.file.seek(std::io::SeekFrom::Start(0))?;
         rmp_serde::encode::write(&mut self.file, &self.data)?;
@@ -45,15 +48,7 @@ impl Storage for File {
     }
 
     fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Range {
-        // FIXME This copies everything into a separate vec to not have to deal with
-        // lifetimes, which is pretty terrible.
-        Box::new(
-            self.data
-                .range(range)
-                .map(|(k, v)| Ok((k.clone(), v.clone())))
-                .collect::<Vec<Result<_, Error>>>()
-                .into_iter(),
-        )
+        Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
     }
 
     fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
@@ -67,8 +62,7 @@ impl Storage for File {
 impl super::TestSuite<File> for File {
     fn setup() -> Result<Self, Error> {
         extern crate tempfile;
-        use tempfile::tempfile;
-        File::new(tempfile()?)
+        File::new(tempfile::tempfile()?)
     }
 }
 

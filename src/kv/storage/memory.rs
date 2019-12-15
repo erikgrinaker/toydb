@@ -1,16 +1,18 @@
 use super::{Range, Storage};
 use crate::Error;
+
 use std::collections::BTreeMap;
 use std::ops::RangeBounds;
 
-/// In-memory key-value storage. Primarily used for prototyping and testing.
+/// In-memory key-value storage backend. Primarily used for prototyping and testing.
 #[derive(Clone, Debug)]
 pub struct Memory {
+    /// The underlying key-value storage.
     data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 impl Memory {
-    /// Creates a new Memory key-value storage engine
+    /// Creates a new Memory key-value storage engine.
     pub fn new() -> Self {
         Self { data: BTreeMap::new() }
     }
@@ -27,15 +29,7 @@ impl Storage for Memory {
     }
 
     fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Range {
-        // FIXME This copies everything into a separate vec to not have to deal with
-        // lifetimes, which is pretty terrible.
-        Box::new(
-            self.data
-                .range(range)
-                .map(|(k, v)| Ok((k.clone(), v.clone())))
-                .collect::<Vec<Result<_, Error>>>()
-                .into_iter(),
-        )
+        Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
     }
 
     fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {

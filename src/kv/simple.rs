@@ -29,7 +29,11 @@ impl<S: Storage> Simple<S> {
     /// Scans a key range
     #[allow(dead_code)]
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
-        Ok(self.storage.read()?.scan(range))
+        // FIXME We temporarily buffer the iterator here, to avoid dealing with
+        // borrow issues.
+        Ok(Box::new(
+            self.storage.read()?.scan(range).collect::<Vec<Result<_, Error>>>().into_iter(),
+        ))
     }
 
     /// Sets a key

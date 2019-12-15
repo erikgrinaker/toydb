@@ -1,3 +1,5 @@
+//! Key-value storage backends, with primitive IO operations.
+
 mod file;
 #[cfg(test)]
 mod memory;
@@ -9,38 +11,56 @@ pub use memory::Memory;
 use crate::Error;
 use std::ops::RangeBounds;
 
-/// KV storage backend
+/// Key/value storage backend.
 pub trait Storage: 'static + Sync + Send {
-    /// Reads a value
+    /// Reads a value for a key, or `None` if it does not exist.
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error>;
 
-    /// Removes a value
+    /// Removes a key, if it exists.
     fn remove(&mut self, key: &[u8]) -> Result<(), Error>;
 
-    /// Returns an iterator over a range of pairs (inclusive)
+    /// Returns an iterator over a range of key/value pairs.
     fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Range;
 
-    /// Writes a value
+    /// Writes a value for a key, replacing the existing value if any.
     fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error>;
 }
 
-/// Iterator over a key range
-pub type Range =
-    Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>), Error>> + 'static + Sync + Send>;
+/// Iterator over a key/value range.
+pub type Range<'a> =
+    Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>), Error>> + 'a + Sync + Send>;
 
 #[cfg(test)]
 trait TestSuite<S: Storage> {
     fn setup() -> Result<S, Error>;
 
     fn test() -> Result<(), Error> {
-        Self::test_range()?;
         Self::test_read()?;
         Self::test_remove()?;
+        Self::test_scan()?;
         Self::test_write()?;
         Ok(())
     }
 
-    fn test_range() -> Result<(), Error> {
+    fn test_read() -> Result<(), Error> {
+        let mut s = Self::setup()?;
+        assert_eq!((), s.write(b"a", vec![0x01])?);
+        assert_eq!(Some(vec![0x01]), s.read(b"a")?);
+        assert_eq!(None, s.read(b"b")?);
+        Ok(())
+    }
+
+    fn test_remove() -> Result<(), Error> {
+        let mut s = Self::setup()?;
+        s.write(b"a", vec![0x01])?;
+        assert_eq!(Some(vec![0x01]), s.read(b"a")?);
+        assert_eq!((), s.remove(b"a")?);
+        assert_eq!(None, s.read(b"a")?);
+        assert_eq!((), s.remove(b"b")?);
+        Ok(())
+    }
+
+    fn test_scan() -> Result<(), Error> {
         let mut s = Self::setup()?;
         s.write(b"a", vec![0x01])?;
         s.write(b"b", vec![0x02])?;
@@ -48,6 +68,7 @@ trait TestSuite<S: Storage> {
         s.write(b"bb", vec![0x02, 0x02])?;
         s.write(b"c", vec![0x03])?;
 
+        // Forward/backward ranges
         assert_eq!(
             vec![
                 (b"b".to_vec(), vec![0x02]),
@@ -56,33 +77,59 @@ trait TestSuite<S: Storage> {
             ],
             s.scan(b"b".to_vec()..b"bz".to_vec()).collect::<Result<Vec<_>, _>>()?
         );
-        Ok(())
-    }
+        assert_eq!(
+            vec![
+                (b"bb".to_vec(), vec![0x02, 0x02]),
+                (b"ba".to_vec(), vec![0x02, 0x01]),
+                (b"b".to_vec(), vec![0x02]),
+            ],
+            s.scan(b"b".to_vec()..b"bz".to_vec()).rev().collect::<Result<Vec<_>, _>>()?
+        );
 
-    fn test_read() -> Result<(), Error> {
-        let mut b = Self::setup()?;
-        b.write(b"a", vec![0x01])?;
-        assert_eq!(Some(vec![0x01]), b.read(b"a")?);
-        assert_eq!(None, b.read(b"b")?);
-        Ok(())
-    }
+        // Inclusive/exclusive ranges
+        assert_eq!(
+            vec![(b"b".to_vec(), vec![0x02]), (b"ba".to_vec(), vec![0x02, 0x01]),],
+            s.scan(b"b".to_vec()..b"bb".to_vec()).collect::<Result<Vec<_>, _>>()?
+        );
+        assert_eq!(
+            vec![
+                (b"b".to_vec(), vec![0x02]),
+                (b"ba".to_vec(), vec![0x02, 0x01]),
+                (b"bb".to_vec(), vec![0x02, 0x02]),
+            ],
+            s.scan(b"b".to_vec()..=b"bb".to_vec()).collect::<Result<Vec<_>, _>>()?
+        );
 
-    fn test_remove() -> Result<(), Error> {
-        let mut b = Self::setup()?;
-        b.write(b"a", vec![0x01])?;
-        assert_eq!(Some(vec![0x01]), b.read(b"a")?);
-        b.remove(b"a")?;
-        assert_eq!(None, b.read(b"a")?);
-        b.remove(b"b")?;
+        // Open ranges
+        assert_eq!(
+            vec![(b"bb".to_vec(), vec![0x02, 0x02]), (b"c".to_vec(), vec![0x03]),],
+            s.scan(b"bb".to_vec()..).collect::<Result<Vec<_>, _>>()?
+        );
+        assert_eq!(
+            vec![(b"a".to_vec(), vec![0x01]), (b"b".to_vec(), vec![0x02]),],
+            s.scan(..=b"b".to_vec()).collect::<Result<Vec<_>, _>>()?
+        );
+
+        // Full range
+        assert_eq!(
+            vec![
+                (b"a".to_vec(), vec![0x01]),
+                (b"b".to_vec(), vec![0x02]),
+                (b"ba".to_vec(), vec![0x02, 0x01]),
+                (b"bb".to_vec(), vec![0x02, 0x02]),
+                (b"c".to_vec(), vec![0x03]),
+            ],
+            s.scan(..).collect::<Result<Vec<_>, _>>()?
+        );
         Ok(())
     }
 
     fn test_write() -> Result<(), Error> {
-        let mut b = Self::setup()?;
-        b.write(b"a", vec![0x01])?;
-        assert_eq!(Some(vec![0x01]), b.read(b"a")?);
-        b.write(b"a", vec![0x02])?;
-        assert_eq!(Some(vec![0x02]), b.read(b"a")?);
+        let mut s = Self::setup()?;
+        assert_eq!((), s.write(b"a", vec![0x01])?);
+        assert_eq!(Some(vec![0x01]), s.read(b"a")?);
+        assert_eq!((), s.write(b"a", vec![0x02])?);
+        assert_eq!(Some(vec![0x02]), s.read(b"a")?);
         Ok(())
     }
 }

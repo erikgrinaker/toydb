@@ -68,7 +68,7 @@ pub struct Transaction<S: Storage> {
     snapshot: Snapshot,
 }
 
-impl<S: Storage> Transaction<S> {
+impl<'a, S: Storage> Transaction<S> {
     /// Begins a new transaction
     fn begin(storage: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
         let id = {
@@ -127,14 +127,18 @@ impl<S: Storage> Transaction<S> {
             let mut storage = self.storage.write()?;
             let start = Key::TxnUpdatedStart(self.id).encode();
             let end = Key::TxnUpdatedEnd(self.id).encode();
+            let mut keys: Vec<Vec<u8>> = vec![];
             for r in storage.scan(start..end).rev() {
                 let (k, _) = r?;
                 if let Key::TxnUpdated(_, key) = Key::decode(k.clone())? {
-                    storage.remove(&key)?;
-                    storage.remove(&k)?;
+                    keys.push(key.clone());
+                    keys.push(k.clone());
                 } else {
                     return Err(Error::Internal("Unexpected key".into()));
                 }
+            }
+            for key in keys.into_iter() {
+                storage.remove(&key)?;
             }
             storage.remove(&Key::TxnActive(self.id).encode())?;
         }
@@ -160,7 +164,8 @@ impl<S: Storage> Transaction<S> {
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let from = Key::Record(key.to_vec(), 0).encode();
         let to = Key::Record(key.to_vec(), self.id).encode();
-        let mut range = self.storage.read()?.scan(from..=to).rev();
+        let storage = self.storage.read()?;
+        let mut range = storage.scan(from..=to).rev();
         while let Some((k, v)) = range.next().transpose()? {
             if !self.snapshot.is_visible(Key::decode(k)?.version()?) {
                 continue;
@@ -175,24 +180,7 @@ impl<S: Storage> Transaction<S> {
 
     /// Scans a key range
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
-        let from = match range.start_bound() {
-            Bound::Excluded(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
-            Bound::Included(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
-            Bound::Unbounded => Bound::Included(Key::RecordStart.encode()),
-        };
-        let to = match range.end_bound() {
-            Bound::Excluded(key) => Bound::Excluded(Key::Record(key.clone(), 0).encode()),
-            Bound::Included(key) => {
-                Bound::Included(Key::Record(key.clone(), std::u64::MAX).encode())
-            }
-            Bound::Unbounded => Bound::Included(Key::RecordEnd.encode()),
-        };
-        Ok(Box::new(Scan {
-            range: self.storage.read()?.scan((from, to)),
-            snapshot: self.snapshot.clone(),
-            seen: None,
-            rev_ignore: None,
-        }))
+        Ok(Box::new(Scan::new(self.storage.clone(), self.snapshot.clone(), range)?))
     }
 
     /// Sets a key
@@ -267,20 +255,55 @@ impl Snapshot {
 }
 
 /// A key range scan
-pub struct Scan {
-    range: Range,
+pub struct Scan<S: Storage> {
+    storage: Arc<RwLock<S>>,
     snapshot: Snapshot,
+    mark_front: Bound<Vec<u8>>,
+    mark_back: Bound<Vec<u8>>,
     seen: Option<(Vec<u8>, Vec<u8>)>,
     rev_ignore: Option<(Vec<u8>)>,
 }
 
-impl Iterator for Scan {
+impl<S: Storage> Scan<S> {
+    fn new(
+        storage: Arc<RwLock<S>>,
+        snapshot: Snapshot,
+        range: impl RangeBounds<Vec<u8>>,
+    ) -> Result<Self, Error> {
+        let from = match range.start_bound() {
+            Bound::Excluded(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
+            Bound::Included(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
+            Bound::Unbounded => Bound::Included(Key::RecordStart.encode()),
+        };
+        let to = match range.end_bound() {
+            Bound::Excluded(key) => Bound::Excluded(Key::Record(key.clone(), 0).encode()),
+            Bound::Included(key) => {
+                Bound::Included(Key::Record(key.clone(), std::u64::MAX).encode())
+            }
+            Bound::Unbounded => Bound::Included(Key::RecordEnd.encode()),
+        };
+
+        Ok(Self {
+            storage,
+            snapshot,
+            mark_front: from,
+            mark_back: to,
+            seen: None,
+            rev_ignore: None,
+        })
+    }
+}
+
+impl<S: Storage> Iterator for Scan<S> {
     type Item = Result<(Vec<u8>, Vec<u8>), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(r) = self.range.next() {
+        let storage = self.storage.read().unwrap();
+        let mut range = storage.scan((self.mark_front.clone(), self.mark_back.clone()));
+        while let Some(r) = range.next() {
             match r {
                 Ok((k, v)) => {
+                    self.mark_front = Bound::Excluded(k.clone());
                     let (key, version) = match Key::decode(k).unwrap() {
                         Key::Record(key, version) => (key, version),
                         _ => panic!("Not implemented"),
@@ -327,11 +350,14 @@ impl Iterator for Scan {
     }
 }
 
-impl DoubleEndedIterator for Scan {
+impl<S: Storage> DoubleEndedIterator for Scan<S> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        while let Some(r) = self.range.next_back() {
+        let storage = self.storage.read().unwrap();
+        let mut range = storage.scan((self.mark_front.clone(), self.mark_back.clone()));
+        while let Some(r) = range.next_back() {
             match r {
                 Ok((k, v)) => {
+                    self.mark_back = Bound::Excluded(k.clone());
                     let (key, version) = match Key::decode(k).unwrap() {
                         Key::Record(key, version) => (key, version),
                         _ => panic!("Not implemented"),
