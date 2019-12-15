@@ -6,43 +6,53 @@ use std::collections::HashSet;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-/// An MVCC-based transactional key-value store
+/// An MVCC-based transactional key-value store.
 pub struct MVCC<S: Storage> {
+    /// The storage backend. It is protected by a mutex so it can be shared
+    /// between multiple transactions. FIXME Can we avoid the mutex?
     storage: Arc<RwLock<S>>,
 }
 
 impl<S: Storage> MVCC<S> {
-    /// Creates a new MVCC key-value store
+    /// Creates a new MVCC key-value store with the given storage backend.
     pub fn new(storage: S) -> Self {
         Self { storage: Arc::new(RwLock::new(storage)) }
     }
 
-    /// Begins a new transaction in the default mutable mode
+    /// Begins a new transaction in read-write mode.
     #[allow(dead_code)]
     pub fn begin(&self) -> Result<Transaction<S>, Error> {
         Transaction::begin(self.storage.clone(), Mode::ReadWrite)
     }
 
-    /// Begins a new transaction in the given mode
+    /// Begins a new transaction in the given mode.
     pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<S>, Error> {
         Transaction::begin(self.storage.clone(), mode)
     }
 
-    /// Resumes a transaction
+    /// Resumes a transaction with the given ID.
     pub fn resume(&self, id: u64) -> Result<Transaction<S>, Error> {
         Transaction::resume(self.storage.clone(), id)
     }
 }
 
-/// An MVCC transaction mode
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// An MVCC transaction mode.
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Mode {
+    /// A read-write transaction.
     ReadWrite,
+    /// A read-only transaction.
     ReadOnly,
+    /// A read-only transaction running in a snapshot of a given version.
+    ///
+    /// The version must refer to a committed transaction ID. Any changes visible to the original
+    /// transaction will be visible in the snapshot (i.e. transactions that had not committed before
+    /// the snapshot transaction started will not be visible, even though they have a lower version).
     Snapshot { version: u64 },
 }
 
 impl Mode {
+    /// Asserts that the mode can mutate data, otherwise throws `Error::ReadOnly`.
     fn assert_mutable(&self) -> Result<(), Error> {
         if self.is_mutable() {
             Ok(())
@@ -51,6 +61,7 @@ impl Mode {
         }
     }
 
+    /// Checks whether the transaction mode can mutate data.
     fn is_mutable(&self) -> bool {
         match self {
             Self::ReadWrite => true,
@@ -60,16 +71,20 @@ impl Mode {
     }
 }
 
-/// An MVCC transaction
+/// An MVCC transaction.
 pub struct Transaction<S: Storage> {
+    /// The underlying storage for the transaction. Shared between transactions using a mutex.
     storage: Arc<RwLock<S>>,
-    id: u64,
-    mode: Mode,
+    /// The snapshot that the transaction is running in.
     snapshot: Snapshot,
+    /// The transaction mode.
+    mode: Mode,
+    /// The unique transaction ID.
+    id: u64,
 }
 
 impl<'a, S: Storage> Transaction<S> {
-    /// Begins a new transaction
+    /// Begins a new transaction in the given mode.
     fn begin(storage: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
         let id = {
             let mut storage = storage.write()?;
@@ -88,7 +103,8 @@ impl<'a, S: Storage> Transaction<S> {
         Ok(Self { storage, id, mode, snapshot })
     }
 
-    /// Resumes a transaction
+    /// Resumes an active transaction with the given ID. If no such active transaction exists,
+    /// an error is returned.
     fn resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
         let key = Key::TxnActive(id).encode();
         let mode = if let Some(v) = storage.read()?.read(&key)? {
@@ -103,12 +119,12 @@ impl<'a, S: Storage> Transaction<S> {
         Ok(Self { storage, id, mode, snapshot })
     }
 
-    /// Returns the transaction ID
+    /// Returns the transaction ID.
     pub fn id(&self) -> u64 {
         self.id
     }
 
-    /// Returns the transaction mode
+    /// Returns the transaction mode.
     pub fn mode(&self) -> Mode {
         self.mode.clone()
     }
@@ -180,7 +196,7 @@ impl<'a, S: Storage> Transaction<S> {
 
     /// Scans a key range
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
-        Ok(Box::new(Scan::new(self.storage.clone(), self.snapshot.clone(), range)?))
+        Ok(Box::new(Scan::new(self.storage.read()?, self.snapshot.clone(), range)?))
     }
 
     /// Sets a key
@@ -255,8 +271,8 @@ impl Snapshot {
 }
 
 /// A key range scan
-pub struct Scan<S: Storage> {
-    storage: Arc<RwLock<S>>,
+pub struct Scan<'a, S: Storage> {
+    storage: RwLockReadGuard<'a, S>,
     snapshot: Snapshot,
     mark_front: Bound<Vec<u8>>,
     mark_back: Bound<Vec<u8>>,
@@ -264,9 +280,9 @@ pub struct Scan<S: Storage> {
     rev_ignore: Option<(Vec<u8>)>,
 }
 
-impl<S: Storage> Scan<S> {
+impl<'a, S: Storage> Scan<'a, S> {
     fn new(
-        storage: Arc<RwLock<S>>,
+        storage: RwLockReadGuard<'a, S>,
         snapshot: Snapshot,
         range: impl RangeBounds<Vec<u8>>,
     ) -> Result<Self, Error> {
@@ -294,12 +310,11 @@ impl<S: Storage> Scan<S> {
     }
 }
 
-impl<S: Storage> Iterator for Scan<S> {
+impl<'a, S: Storage> Iterator for Scan<'a, S> {
     type Item = Result<(Vec<u8>, Vec<u8>), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let storage = self.storage.read().unwrap();
-        let range = storage.scan((self.mark_front.clone(), self.mark_back.clone()));
+        let range = self.storage.scan((self.mark_front.clone(), self.mark_back.clone()));
         for r in range {
             match r {
                 Ok((k, v)) => {
@@ -350,10 +365,9 @@ impl<S: Storage> Iterator for Scan<S> {
     }
 }
 
-impl<S: Storage> DoubleEndedIterator for Scan<S> {
+impl<'a, S: Storage> DoubleEndedIterator for Scan<'a, S> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        let storage = self.storage.read().unwrap();
-        let mut range = storage.scan((self.mark_front.clone(), self.mark_back.clone()));
+        let mut range = self.storage.scan((self.mark_front.clone(), self.mark_back.clone()));
         while let Some(r) = range.next_back() {
             match r {
                 Ok((k, v)) => {

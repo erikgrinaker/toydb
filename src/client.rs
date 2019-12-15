@@ -90,7 +90,7 @@ pub struct ResultSet {
     rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Effect {
     Begin { id: u64, mode: Mode },
     Commit(u64),

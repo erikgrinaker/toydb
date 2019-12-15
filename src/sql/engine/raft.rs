@@ -9,7 +9,7 @@ use crate::utility::{deserialize, serialize};
 use crate::Error;
 
 /// A state machine mutation
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 enum Mutation {
     Begin(Mode),
     Commit(u64),
@@ -24,7 +24,7 @@ enum Mutation {
 }
 
 /// A state machine query
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 enum Query {
     Resume(u64),
 
