@@ -1,20 +1,18 @@
-use super::{Range, Storage};
+use super::{Memory, Range, Storage};
 use crate::Error;
 
-use std::collections::BTreeMap;
 use std::io::Seek;
 use std::ops::RangeBounds;
 
-/// A prototype file-based key-value backend. Keeps the entire dataset in
-/// memory and writes it out to disk on every write, as a stop-gap solution
-/// until a proper store is written.
-#[derive(Debug)]
+/// A prototype file-based key-value backend. Uses a Memory store internally,
+/// and writes it out to disk on every write, as a stop-gap solution until
+/// a proper store is written.
 pub struct File {
+    /// The in-memory key-value store that is flushed to disk.
+    data: Memory,
+
     /// The file handle of the backing file.
     file: std::fs::File,
-
-    /// The in-memory key-value store that is flushed to disk.
-    data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 impl File {
@@ -23,7 +21,7 @@ impl File {
         let data = if file.metadata()?.len() > 0 {
             rmp_serde::decode::from_read(file.try_clone()?)?
         } else {
-            BTreeMap::new()
+            Memory::new()
         };
         Ok(Self { file, data })
     }
@@ -38,21 +36,21 @@ impl File {
 
 impl Storage for File {
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        Ok(self.data.get(key).cloned())
+        self.data.read(key)
     }
 
     fn remove(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.data.remove(key);
+        self.data.remove(key)?;
         self.flush()?;
         Ok(())
     }
 
     fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Range {
-        Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
+        self.data.scan(range)
     }
 
     fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.data.insert(key.to_vec(), value);
+        self.data.write(key, value)?;
         self.flush()?;
         Ok(())
     }

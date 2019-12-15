@@ -1,17 +1,20 @@
 //! Key-value storage backends, with primitive IO operations.
 
 mod file;
-#[cfg(test)]
 mod memory;
+#[cfg(test)]
+mod test;
 
 pub use file::File;
-#[cfg(test)]
 pub use memory::Memory;
+#[cfg(test)]
+pub use test::Test;
 
 use crate::Error;
 use std::ops::RangeBounds;
 
 /// Key/value storage backend.
+// FIXME Should not require 'static + Sync + Send, but necessary due to raft::State.
 pub trait Storage: 'static + Sync + Send {
     /// Reads a value for a key, or `None` if it does not exist.
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error>;

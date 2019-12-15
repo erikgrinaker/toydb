@@ -2,43 +2,38 @@ use super::storage::{Range, Storage};
 use crate::Error;
 
 use std::ops::RangeBounds;
-use std::sync::{Arc, RwLock};
 
-/// A simple key-value store
-#[derive(Clone, Debug)]
+/// A simple key-value store, which stores the key-value pairs directly in the storage backend.
 pub struct Simple<S: Storage> {
-    storage: Arc<RwLock<S>>,
+    /// The underlying storage backend.
+    storage: S,
 }
 
 impl<S: Storage> Simple<S> {
-    /// Creates a new Simple store
+    /// Creates a new Simple store.
     pub fn new(storage: S) -> Self {
-        Self { storage: Arc::new(RwLock::new(storage)) }
+        Self { storage }
     }
 
-    /// Deletes a key
+    /// Deletes a key, if it exists.
     pub fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.storage.write()?.remove(key)
+        self.storage.remove(key)
     }
 
-    /// Fetches a key
+    /// Gets a value for a key, or `None` if it does not exist.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        self.storage.read()?.read(key)
+        self.storage.read(key)
     }
 
-    /// Scans a key range
+    /// Returns an iterator over a range of key/value pairs.
     #[allow(dead_code)]
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
-        // FIXME We temporarily buffer the iterator here, to avoid dealing with
-        // borrow issues.
-        Ok(Box::new(
-            self.storage.read()?.scan(range).collect::<Vec<Result<_, Error>>>().into_iter(),
-        ))
+        Ok(self.storage.scan(range))
     }
 
-    /// Sets a key
+    /// Sets a value for a key, replacing the existing value if any.
     pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.storage.write()?.write(key, value)
+        self.storage.write(key, value)
     }
 }
 

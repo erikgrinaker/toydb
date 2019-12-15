@@ -26,7 +26,6 @@ const ELECTION_TIMEOUT_MIN: u64 = 8 * HEARTBEAT_INTERVAL;
 const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
 
 /// The local Raft node state machine.
-#[derive(Debug)]
 pub enum Node<L: kv::storage::Storage, S: State> {
     Candidate(RoleNode<Candidate, L, S>),
     Follower(RoleNode<Follower, L, S>),
@@ -101,7 +100,6 @@ impl<L: kv::storage::Storage, S: State> From<RoleNode<Leader, L, S>> for Node<L,
 }
 
 // A Raft node with role R
-#[derive(Debug)]
 pub struct RoleNode<R, L: kv::storage::Storage, S: State> {
     id: String,
     peers: Vec<String>,
@@ -354,10 +352,16 @@ mod tests {
     #[test]
     fn new_loads_term() {
         let (sender, _) = crossbeam_channel::unbounded();
-        let store = kv::Simple::new(kv::storage::Memory::new());
-        Log::new(store.clone()).unwrap().save_term(3, Some("c")).unwrap();
-        let node =
-            Node::new("a", vec!["b".into(), "c".into()], store, TestState::new(), sender).unwrap();
+        let storage = kv::storage::Test::new();
+        Log::new(kv::Simple::new(storage.clone())).unwrap().save_term(3, Some("c")).unwrap();
+        let node = Node::new(
+            "a",
+            vec!["b".into(), "c".into()],
+            kv::Simple::new(storage.clone()),
+            TestState::new(),
+            sender,
+        )
+        .unwrap();
         match node {
             Node::Follower(rolenode) => assert_eq!(rolenode.term, 3),
             _ => panic!("Expected node to start as follower"),

@@ -13,7 +13,6 @@ pub struct Entry {
 }
 
 /// The replicated Raft log
-#[derive(Debug)]
 pub struct Log<S: kv::storage::Storage> {
     /// The underlying key-value store
     kv: kv::Simple<S>,
@@ -250,9 +249,10 @@ mod tests {
     use super::super::tests::TestState;
     use super::*;
 
-    fn setup() -> (Log<kv::storage::Memory>, kv::Simple<kv::storage::Memory>) {
-        let store = kv::Simple::new(kv::storage::Memory::new());
-        let log = Log::new(store.clone()).unwrap();
+    fn setup() -> (Log<kv::storage::Test>, kv::Simple<kv::storage::Test>) {
+        let backend = kv::storage::Test::new();
+        let log = Log::new(kv::Simple::new(backend.clone())).unwrap();
+        let store = kv::Simple::new(backend.clone());
         (log, store)
     }
 
@@ -447,19 +447,21 @@ mod tests {
 
     #[test]
     fn load_save_term() {
-        let (mut l, store) = setup();
+        // Test loading empty term
+        let (l, _) = setup();
         assert_eq!(Ok((0, None)), l.load_term());
+
+        // Test loading saved term
+        let (mut l, store) = setup();
         assert_eq!(Ok(()), l.save_term(1, Some("a")));
-
-        let mut l = Log::new(store.clone()).unwrap();
+        let l = Log::new(store).unwrap();
         assert_eq!(Ok((1, Some("a".into()))), l.load_term());
-        assert_eq!(Ok(()), l.save_term(3, Some("c")));
 
-        let mut l = Log::new(store.clone()).unwrap();
-        assert_eq!(Ok((3, Some("c".into()))), l.load_term());
+        // Test replacing saved term with none
+        let (mut l, _) = setup();
+        assert_eq!(Ok(()), l.save_term(1, Some("a")));
+        assert_eq!(Ok((1, Some("a".into()))), l.load_term());
         assert_eq!(Ok(()), l.save_term(0, None));
-
-        let l = Log::new(store.clone()).unwrap();
         assert_eq!(Ok((0, None)), l.load_term());
     }
 

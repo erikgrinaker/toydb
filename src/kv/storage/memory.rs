@@ -4,8 +4,10 @@ use crate::Error;
 use std::collections::BTreeMap;
 use std::ops::RangeBounds;
 
-/// In-memory key-value storage backend. Primarily used for prototyping and testing.
-#[derive(Clone, Debug)]
+/// In-memory key-value storage backend.
+///
+/// Derives serialize/deserialize because the File backend uses this for storage.
+#[derive(Serialize, Deserialize)]
 pub struct Memory {
     /// The underlying key-value storage.
     data: BTreeMap<Vec<u8>, Vec<u8>>,
