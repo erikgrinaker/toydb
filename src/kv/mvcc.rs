@@ -37,7 +37,7 @@ impl<S: Storage> MVCC<S> {
 }
 
 /// An MVCC transaction mode.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Mode {
     /// A read-write transaction.
     ReadWrite,
@@ -86,36 +86,40 @@ pub struct Transaction<S: Storage> {
 impl<'a, S: Storage> Transaction<S> {
     /// Begins a new transaction in the given mode.
     fn begin(storage: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
-        let id = {
-            let mut storage = storage.write()?;
-            let id = match storage.read(&Key::TxnNext.encode())? {
-                Some(v) => deserialize(&v)?,
-                None => 1,
-            };
-            storage.write(&Key::TxnNext.encode(), serialize(&(id + 1))?)?;
-            storage.write(&Key::TxnActive(id).encode(), serialize(&mode)?)?;
-            id
+        let mut session = storage.write()?;
+
+        let id = match session.read(&Key::TxnNext.encode())? {
+            Some(ref v) => deserialize(v)?,
+            None => 1,
         };
-        let snapshot = match &mode {
-            Mode::Snapshot { version } => Snapshot::restore(&storage.read()?, *version)?,
-            _ => Snapshot::take(&mut storage.write()?, id)?,
-        };
-        Ok(Self { storage, id, mode, snapshot })
+        session.write(&Key::TxnNext.encode(), serialize(&(id + 1))?)?;
+        session.write(&Key::TxnActive(id).encode(), serialize(&mode)?)?;
+
+        // We always take a new snapshot, even for snapshot transactions, because all transactions
+        // increment the transaction ID and we need to properly record currently active transactions
+        // for any future snapshot transactions looking at this one.
+        let mut snapshot = Snapshot::take(&mut session, id)?;
+        std::mem::drop(session);
+
+        if let Mode::Snapshot { version } = &mode {
+            snapshot = Snapshot::restore(&storage.read()?, *version)?
+        }
+
+        Ok(Self { storage, snapshot, mode, id })
     }
 
-    /// Resumes an active transaction with the given ID. If no such active transaction exists,
-    /// an error is returned.
+    /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
     fn resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
-        let key = Key::TxnActive(id).encode();
-        let mode = if let Some(v) = storage.read()?.read(&key)? {
-            deserialize(&v)?
-        } else {
-            return Err(Error::Value(format!("Unable to resume non-existant transaction {}", id)));
+        let session = storage.read()?;
+        let mode = match session.read(&Key::TxnActive(id).encode())? {
+            Some(ref v) => deserialize(v)?,
+            None => return Err(Error::Value(format!("No active transaction {}", id))),
         };
-        let snapshot = match &mode {
-            Mode::Snapshot { version } => Snapshot::restore(&storage.read()?, *version)?,
-            _ => Snapshot::restore(&storage.read()?, id)?,
-        };
+        let snapshot = Snapshot::restore(
+            &session,
+            if let Mode::Snapshot { version } = &mode { *version } else { id },
+        )?;
+        std::mem::drop(session);
         Ok(Self { storage, id, mode, snapshot })
     }
 
@@ -131,20 +135,18 @@ impl<'a, S: Storage> Transaction<S> {
 
     /// Commits the transaction
     pub fn commit(self) -> Result<(), Error> {
-        if self.mode.is_mutable() {
-            self.storage.write()?.remove(&Key::TxnActive(self.id).encode())?;
-        }
+        self.storage.write()?.remove(&Key::TxnActive(self.id).encode())?;
         Ok(())
     }
 
     /// Rolls back the transaction
     pub fn rollback(self) -> Result<(), Error> {
+        let mut session = self.storage.write()?;
         if self.mode.is_mutable() {
-            let mut storage = self.storage.write()?;
             let start = Key::TxnUpdatedStart(self.id).encode();
             let end = Key::TxnUpdatedEnd(self.id).encode();
             let mut keys: Vec<Vec<u8>> = vec![];
-            for r in storage.scan(start..end).rev() {
+            for r in session.scan(start..end).rev() {
                 let (k, _) = r?;
                 if let Key::TxnUpdated(_, key) = Key::decode(k.clone())? {
                     keys.push(key.clone());
@@ -154,10 +156,10 @@ impl<'a, S: Storage> Transaction<S> {
                 }
             }
             for key in keys.into_iter() {
-                storage.remove(&key)?;
+                session.remove(&key)?;
             }
-            storage.remove(&Key::TxnActive(self.id).encode())?;
         }
+        session.remove(&Key::TxnActive(self.id).encode())?;
         Ok(())
     }
 
@@ -233,38 +235,41 @@ impl<'a, S: Storage> Transaction<S> {
     }
 }
 
-/// A versioned snapshot
+/// A versioned snapshot, containing visibility information about concurrent transactions.
 #[derive(Clone)]
-pub struct Snapshot {
+struct Snapshot {
+    /// The version (i.e. transaction ID) that the snapshot belongs to.
     version: u64,
+    /// The set of transaction IDs that were active at the start of the transactions,
+    /// and thus should be invisible to the snapshot.
     invisible: HashSet<u64>,
 }
 
 impl Snapshot {
-    /// Takes a new snapshot
+    /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
     fn take(storage: &mut RwLockWriteGuard<impl Storage>, version: u64) -> Result<Self, Error> {
         let mut snapshot = Self { version, invisible: HashSet::new() };
-        for r in storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode()) {
-            let (k, _) = r?;
-            match Key::decode(k)? {
+        let mut scan = storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode());
+        while let Some((key, _)) = scan.next().transpose()? {
+            match Key::decode(key)? {
                 Key::TxnActive(id) => snapshot.invisible.insert(id),
-                _ => return Err(Error::Value("Unexpected MVCC key, wanted TxnActive".into())),
+                _ => return Err(Error::Internal("Unexpected MVCC key, wanted TxnActive".into())),
             };
         }
+        std::mem::drop(scan);
         storage.write(&Key::TxnSnapshot(version).encode(), serialize(&snapshot.invisible)?)?;
         Ok(snapshot)
     }
 
-    /// Restores an existing snapshot
+    /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
     fn restore(storage: &RwLockReadGuard<impl Storage>, version: u64) -> Result<Self, Error> {
-        if let Some(v) = storage.read(&Key::TxnSnapshot(version).encode())? {
-            Ok(Self { version, invisible: deserialize(&v)? })
-        } else {
-            Err(Error::Value(format!("Unable to find snapshot for version {}", version)))
+        match storage.read(&Key::TxnSnapshot(version).encode())? {
+            Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
+            None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
         }
     }
 
-    /// Checks whether the given version is visible to us
+    /// Checks whether the given version is visible in this snapshot.
     fn is_visible(&self, version: u64) -> bool {
         version <= self.version && self.invisible.get(&version).is_none()
     }
@@ -398,10 +403,14 @@ impl<'a, S: Storage> DoubleEndedIterator for Scan<'a, S> {
     }
 }
 
+/// Key encoding and decoding
 #[derive(Debug)]
 enum Key {
+    /// The next available transaction ID.
     TxnNext,
+    /// Marker for active transactions, containing the transaction mode.
     TxnActive(u64),
+    /// Transaction snapshot, containing concurrent transactions at start.
     TxnSnapshot(u64),
     TxnUpdatedStart(u64),
     TxnUpdated(u64, Vec<u8>),
@@ -524,6 +533,12 @@ impl Key {
     }
 }
 
+impl Into<Vec<u8>> for Key {
+    fn into(self) -> Vec<u8> {
+        self.encode()
+    }
+}
+
 enum Value {
     Delete,
     Set(Vec<u8>),
@@ -550,10 +565,11 @@ impl Value {
 
 #[cfg(test)]
 pub mod tests {
+    use super::super::storage::Test;
     use super::*;
 
-    fn setup() -> MVCC<super::super::storage::Memory> {
-        MVCC::new(super::super::storage::Memory::new())
+    fn setup() -> MVCC<Test> {
+        MVCC::new(Test::new())
     }
 
     #[test]
@@ -561,11 +577,95 @@ pub mod tests {
         let mvcc = setup();
 
         let txn = mvcc.begin()?;
-        assert_eq!(txn.id(), 1);
+        assert_eq!(1, txn.id());
+        assert_eq!(Mode::ReadWrite, txn.mode());
         txn.commit()?;
 
         let txn = mvcc.begin()?;
-        assert_eq!(txn.id(), 2);
+        assert_eq!(2, txn.id());
+        txn.rollback()?;
+
+        let txn = mvcc.begin()?;
+        assert_eq!(3, txn.id());
+        txn.commit()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_begin_with_mode_readonly() -> Result<(), Error> {
+        let mvcc = setup();
+        let txn = mvcc.begin_with_mode(Mode::ReadOnly)?;
+        assert_eq!(1, txn.id());
+        assert_eq!(Mode::ReadOnly, txn.mode());
+        txn.commit()?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_begin_with_mode_readwrite() -> Result<(), Error> {
+        let mvcc = setup();
+        let txn = mvcc.begin_with_mode(Mode::ReadWrite)?;
+        assert_eq!(1, txn.id());
+        assert_eq!(Mode::ReadWrite, txn.mode());
+        txn.commit()?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_begin_with_mode_snapshot() -> Result<(), Error> {
+        let mvcc = setup();
+
+        // Write a couple of versions for a key
+        let mut txn = mvcc.begin_with_mode(Mode::ReadWrite)?;
+        txn.set(b"key", vec![0x01])?;
+        txn.commit()?;
+        let mut txn = mvcc.begin_with_mode(Mode::ReadWrite)?;
+        txn.set(b"key", vec![0x02])?;
+        txn.commit()?;
+
+        // Check that we can start a snapshot in version 1
+        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 1 })?;
+        assert_eq!(3, txn.id());
+        assert_eq!(Mode::Snapshot { version: 1 }, txn.mode());
+        assert_eq!(Some(vec![0x01]), txn.get(b"key")?);
+        txn.commit()?;
+
+        // Check that we can start a snapshot in a past snapshot transaction
+        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 3 })?;
+        assert_eq!(4, txn.id());
+        assert_eq!(Mode::Snapshot { version: 3 }, txn.mode());
+        assert_eq!(Some(vec![0x02]), txn.get(b"key")?);
+        txn.commit()?;
+
+        // Check that the current transaction ID is valid as a snapshot version
+        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 5 })?;
+        assert_eq!(5, txn.id());
+        assert_eq!(Mode::Snapshot { version: 5 }, txn.mode());
+        txn.commit()?;
+
+        // Check that any future transaction IDs are invalid
+        assert_matches!(
+            mvcc.begin_with_mode(Mode::Snapshot { version: 9 }).err(),
+            Some(Error::Value(_))
+        );
+
+        // Check that concurrent transactions are hidden from snapshots of snapshot transactions.
+        // This is because any transaction, including a snapshot transaction, allocates a new
+        // transaction ID, and we need to make sure concurrent transaction at the time the
+        // transaction began are hidden from future snapshot transactions.
+        let mut txn_active = mvcc.begin()?;
+        let txn_snapshot = mvcc.begin_with_mode(Mode::Snapshot { version: 1 })?;
+        assert_eq!(7, txn_active.id());
+        assert_eq!(8, txn_snapshot.id());
+        txn_active.set(b"key", vec![0x07])?;
+        assert_eq!(Some(vec![0x01]), txn_snapshot.get(b"key")?);
+        txn_active.commit()?;
+        txn_snapshot.commit()?;
+
+        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 8 })?;
+        assert_eq!(9, txn.id());
+        assert_eq!(Some(vec![0x02]), txn.get(b"key")?);
         txn.commit()?;
 
         Ok(())
@@ -576,50 +676,68 @@ pub mod tests {
         let mvcc = setup();
 
         // We first write a set of values that should be visible
-        let mut t0 = mvcc.begin()?;
-        t0.set(b"a", b"t0".to_vec())?;
-        t0.set(b"b", b"t0".to_vec())?;
-        t0.commit()?;
-
-        // We then start three transactions, of which we will resume t2.
-        // We commit t1 and t3's changes, which should not be visible,
-        // and write a change for t2 which should be visible.
         let mut t1 = mvcc.begin()?;
+        t1.set(b"a", b"t1".to_vec())?;
+        t1.set(b"b", b"t1".to_vec())?;
+        t1.commit()?;
+
+        // We then start three transactions, of which we will resume t3.
+        // We commit t2 and t4's changes, which should not be visible,
+        // and write a change for t3 which should be visible.
         let mut t2 = mvcc.begin()?;
         let mut t3 = mvcc.begin()?;
+        let mut t4 = mvcc.begin()?;
 
-        t1.set(b"a", b"t1".to_vec())?;
-        t2.set(b"b", b"t2".to_vec())?;
-        t3.set(b"c", b"t3".to_vec())?;
+        t2.set(b"a", b"t2".to_vec())?;
+        t3.set(b"b", b"t3".to_vec())?;
+        t4.set(b"c", b"t4".to_vec())?;
 
-        t1.commit()?;
-        t3.commit()?;
+        t2.commit()?;
+        t4.commit()?;
 
-        // We now resume t2, who should see it's own changes but none
+        // We now resume t3, who should see it's own changes but none
         // of the others'
-        let id = t2.id();
-        std::mem::drop(t2);
+        let id = t3.id();
+        std::mem::drop(t3);
         let tr = mvcc.resume(id)?;
+        assert_eq!(3, tr.id());
+        assert_eq!(Mode::ReadWrite, tr.mode());
 
-        assert_eq!(Some(b"t0".to_vec()), tr.get(b"a")?);
-        assert_eq!(Some(b"t2".to_vec()), tr.get(b"b")?);
+        assert_eq!(Some(b"t1".to_vec()), tr.get(b"a")?);
+        assert_eq!(Some(b"t3".to_vec()), tr.get(b"b")?);
         assert_eq!(None, tr.get(b"c")?);
 
-        // A separate transaction should not see t2's changes, but should see the others
+        // A separate transaction should not see t3's changes, but should see the others
         let t = mvcc.begin()?;
-        assert_eq!(Some(b"t1".to_vec()), t.get(b"a")?);
-        assert_eq!(Some(b"t0".to_vec()), t.get(b"b")?);
-        assert_eq!(Some(b"t3".to_vec()), t.get(b"c")?);
+        assert_eq!(Some(b"t2".to_vec()), t.get(b"a")?);
+        assert_eq!(Some(b"t1".to_vec()), t.get(b"b")?);
+        assert_eq!(Some(b"t4".to_vec()), t.get(b"c")?);
         t.rollback()?;
 
-        // Once tr commits, a separate transaction should see t2's changes
+        // Once tr commits, a separate transaction should see t3's changes
         tr.commit()?;
 
         let t = mvcc.begin()?;
-        assert_eq!(Some(b"t1".to_vec()), t.get(b"a")?);
-        assert_eq!(Some(b"t2".to_vec()), t.get(b"b")?);
-        assert_eq!(Some(b"t3".to_vec()), t.get(b"c")?);
+        assert_eq!(Some(b"t2".to_vec()), t.get(b"a")?);
+        assert_eq!(Some(b"t3".to_vec()), t.get(b"b")?);
+        assert_eq!(Some(b"t4".to_vec()), t.get(b"c")?);
         t.rollback()?;
+
+        // It should also be possible to start a snapshot transaction and resume it.
+        let ts = mvcc.begin_with_mode(Mode::Snapshot { version: 1 })?;
+        assert_eq!(7, ts.id());
+        assert_eq!(Some(b"t1".to_vec()), ts.get(b"a")?);
+
+        let id = ts.id();
+        std::mem::drop(ts);
+        let ts = mvcc.resume(id)?;
+        assert_eq!(7, ts.id());
+        assert_eq!(Mode::Snapshot { version: 1 }, ts.mode());
+        assert_eq!(Some(b"t1".to_vec()), ts.get(b"a")?);
+        ts.commit()?;
+
+        // Resuming an inactive transaction should error.
+        assert_matches!(mvcc.resume(7).err(), Some(Error::Value(_)));
 
         Ok(())
     }
