@@ -125,10 +125,15 @@ impl Expression {
 
             // Mathematical operations
             Self::Add(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Integer(lhs), Integer(rhs)) => Integer(lhs + rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 + rhs),
-                (Float(lhs), Integer(rhs)) => Float(lhs + rhs as f64),
+                (Integer(lhs), Integer(rhs)) => Integer(lhs + rhs),
+                (Integer(_), Null) => Null,
                 (Float(lhs), Float(rhs)) => Float(lhs + rhs),
+                (Float(lhs), Integer(rhs)) => Float(lhs + rhs as f64),
+                (Float(_), Null) => Null,
+                (Null, Float(_)) => Null,
+                (Null, Integer(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't add {} and {}", lhs, rhs))),
             },
             Self::Divide(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
