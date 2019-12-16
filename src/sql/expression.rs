@@ -24,6 +24,7 @@ pub enum Expression {
 
     // Mathematical operations
     Add(Box<Expression>, Box<Expression>),
+    Assert(Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
     Exponentiate(Box<Expression>, Box<Expression>),
     Factorial(Box<Expression>),
@@ -135,6 +136,12 @@ impl Expression {
                 (Null, Integer(_)) => Null,
                 (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't add {} and {}", lhs, rhs))),
+            },
+            Self::Assert(expr) => match expr.evaluate(e)? {
+                Float(f) => Float(f),
+                Integer(i) => Integer(i),
+                Null => Null,
+                expr => return Err(Error::Value(format!("Can't take the positive of {}", expr))),
             },
             Self::Divide(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
@@ -252,6 +259,7 @@ impl Expression {
             Self::Add(lhs, rhs) => {
                 Self::Add(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
             }
+            Self::Assert(expr) => Self::Assert(expr.transform(pre, post)?.into()),
             Self::Divide(lhs, rhs) => {
                 Self::Divide(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
             }
@@ -296,7 +304,9 @@ impl Expression {
             | Self::Or(lhs, rhs)
             | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
 
-            Self::Factorial(expr) | Self::Negate(expr) | Self::Not(expr) => expr.walk(visitor),
+            Self::Assert(expr) | Self::Factorial(expr) | Self::Negate(expr) | Self::Not(expr) => {
+                expr.walk(visitor)
+            }
 
             Self::Constant(_) | Self::Field(_) => true,
         } {

@@ -119,6 +119,7 @@ pub enum Operation {
 
     // Mathematical operators
     Add(Box<Expression>, Box<Expression>),
+    Assert(Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
     Exponentiate(Box<Expression>, Box<Expression>),
     Factorial(Box<Expression>),

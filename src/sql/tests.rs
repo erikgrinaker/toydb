@@ -272,8 +272,10 @@ test_expr! {
     op_add_error_strings: "'a' + 'b'" => Err(Error::Value("Can't add a and b".into())),
 
     op_assert: "+1" => Ok(Integer(1)),
+    op_assert_bool: "+TRUE" => Err(Error::Value("Can't take the positive of TRUE".into())),
     op_assert_float: "+3.72" => Ok(Float(3.72)),
     op_assert_multi: "+++1" => Ok(Integer(1)),
+    op_assert_null: "+NULL" => Ok(Null),
 
     op_eq_bool_false_false: "FALSE = FALSE" => Ok(Boolean(true)),
     op_eq_bool_true_false: "TRUE = FALSE" => Ok(Boolean(false)),

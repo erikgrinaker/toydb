@@ -180,6 +180,7 @@ impl From<ast::Expression> for Expression {
                 ast::Operation::CompareNE(lhs, rhs) => Self::CompareNE(lhs.into(), rhs.into()),
 
                 // Mathematical operators
+                ast::Operation::Assert(expr) => Self::Assert(expr.into()),
                 ast::Operation::Add(lhs, rhs) => Self::Add(lhs.into(), rhs.into()),
                 ast::Operation::Divide(lhs, rhs) => Self::Divide(lhs.into(), rhs.into()),
                 ast::Operation::Exponentiate(lhs, rhs) => {
