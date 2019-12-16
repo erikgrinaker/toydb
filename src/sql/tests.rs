@@ -3,8 +3,7 @@
  * and compares the results with golden files stored under src/sql/testdata/
  */
 use super::lexer::{Lexer, Token};
-use super::schema;
-use super::types::{DataType, Row, Value};
+use super::types::{Row, Value};
 use super::{Context, Engine, Parser, Plan, Transaction};
 use crate::kv;
 use crate::Error;
@@ -15,14 +14,15 @@ macro_rules! test_expr {
     ( $( $name:ident: $expr:expr => $value:expr, )* ) => {
     $(
         #[test]
-        fn $name() {
+        fn $name() -> Result<(), Error> {
             let engine = super::engine::KV::new(kv::MVCC::new(kv::storage::Memory::new()));
-            let mut txn = engine.begin().unwrap();
+            let mut txn = engine.begin()?;
             let ctx = Context{txn: &mut txn};
-            let ast = Parser::new(&format!("SELECT {}", $expr)).parse().unwrap();
-            let mut result = Plan::build(ast).unwrap().optimize().unwrap().execute(ctx).unwrap();
-            txn.rollback().unwrap();
-            assert_eq!($value, *result.next().unwrap().unwrap().get(0).unwrap())
+            let ast = Parser::new(&format!("SELECT {}", $expr)).parse()?;
+            let mut result = Plan::build(ast)?.optimize()?.execute(ctx)?;
+            txn.rollback()?;
+            assert_eq!($value, *result.next().unwrap()?.get(0).unwrap());
+            Ok(())
         }
     )*
     }
@@ -32,199 +32,130 @@ macro_rules! test_sql {
     ( $( $name:ident: $sql:expr, )* ) => {
     $(
         #[test]
-        fn $name() {
+        fn $name() -> Result<(), Error> {
+            let queries = vec![
+                "CREATE TABLE genres (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR NOT NULL
+                )",
+                "CREATE TABLE movies (
+                    id INTEGER PRIMARY KEY,
+                    title VARCHAR NOT NULL,
+                    genre_id INTEGER NOT NULL,
+                    released INTEGER NOT NULL,
+                    rating FLOAT,
+                    bluray BOOLEAN
+                )",
+                "INSERT INTO genres VALUES
+                    (1, 'Science Fiction'),
+                    (2, 'Action')",
+                "INSERT INTO movies VALUES
+                    (1, 'Stalker', 1, 1979, 8.2, FALSE),
+                    (2, 'Sicario', 2, 2015, 7.6, TRUE),
+                    (3, 'Primer', 1, 2004, 6.9, NULL),
+                    (4, 'Heat', 2, 1995, 8.2, TRUE),
+                    (5, 'The Fountain', 1, 2006, 7.2, TRUE)",
+            ];
+
             let engine = super::engine::KV::new(kv::MVCC::new(kv::storage::Memory::new()));
-            let mut txn = engine.begin().unwrap();
-            txn.create_table(&schema::Table{
-                name: "genres".into(),
-                columns: vec![
-                    schema::Column{
-                        name: "id".into(),
-                        datatype: DataType::Integer,
-                        nullable: false,
-                    },
-                    schema::Column{
-                        name: "name".into(),
-                        datatype: DataType::String,
-                        nullable: false,
-                    },
-                ],
-                primary_key: 0,
-            }).unwrap();
-            txn.create_table(&schema::Table{
-                name: "movies".into(),
-                columns: vec![
-                    schema::Column{
-                        name: "id".into(),
-                        datatype: DataType::Integer,
-                        nullable: false,
-                    },
-                    schema::Column{
-                        name: "title".into(),
-                        datatype: DataType::String,
-                        nullable: false,
-                    },
-                    schema::Column{
-                        name: "genre_id".into(),
-                        datatype: DataType::Integer,
-                        nullable: false,
-                    },
-                    schema::Column{
-                        name: "released".into(),
-                        datatype: DataType::Integer,
-                        nullable: false,
-                    },
-                    schema::Column{
-                        name: "rating".into(),
-                        datatype: DataType::Float,
-                        nullable: true,
-                    },
-                    schema::Column{
-                        name: "bluray".into(),
-                        datatype: DataType::Boolean,
-                        nullable: true,
-                    },
-                ],
-                primary_key: 0,
-            }).unwrap();
-            txn.create("genres", vec![
-                Value::Integer(1),
-                Value::String("Science Fiction".into()),
-            ]).unwrap();
-            txn.create("genres", vec![
-                Value::Integer(2),
-                Value::String("Action".into()),
-            ]).unwrap();
-            txn.create("movies", vec![
-                Value::Integer(1),
-                Value::String("Stalker".into()),
-                Value::Integer(1),
-                Value::Integer(1979),
-                Value::Float(8.2),
-                Value::Boolean(false),
-            ]).unwrap();
-            txn.create("movies", vec![
-                Value::Integer(2),
-                Value::String("Sicario".into()),
-                Value::Integer(2),
-                Value::Integer(2015),
-                Value::Float(7.6),
-                Value::Boolean(true),
-            ]).unwrap();
-            txn.create("movies", vec![
-                Value::Integer(3),
-                Value::String("Primer".into()),
-                Value::Integer(1),
-                Value::Integer(2004),
-                Value::Float(6.9),
-                Value::Null,
-            ]).unwrap();
-            txn.create("movies", vec![
-                Value::Integer(4),
-                Value::String("Heat".into()),
-                Value::Integer(2),
-                Value::Integer(1995),
-                Value::Float(8.2),
-                Value::Boolean(true),
-            ]).unwrap();
-            txn.create("movies", vec![
-                Value::Integer(5),
-                Value::String("The Fountain".into()),
-                Value::Integer(1),
-                Value::Integer(2006),
-                Value::Float(7.2),
-                Value::Boolean(true),
-            ]).unwrap();
-            txn.commit().unwrap();
+            let mut txn = engine.begin()?;
+            for query in queries {
+                let ast = Parser::new(query).parse()?;
+                let plan = Plan::build(ast)?.optimize()?;
+                plan.execute(Context{txn: &mut txn})?;
+            }
+            txn.commit()?;
 
             let mut mint = Mint::new("src/sql/testdata");
-            let mut f = mint.new_goldenfile(format!("{}", stringify!($name))).unwrap();
+            let mut f = mint.new_goldenfile(format!("{}", stringify!($name)))?;
 
-            write!(f, "Query: {}\n\n", $sql).unwrap();
+            write!(f, "Query: {}\n\n", $sql)?;
 
-            write!(f, "Tokens:\n").unwrap();
+            write!(f, "Tokens:\n")?;
             let tokens = match Lexer::new($sql).collect::<Result<Vec<Token>, Error>>() {
                 Ok(tokens) => tokens,
                 err => {
-                    write!(f, "{:?}", err).unwrap();
-                    return
+                    write!(f, "{:?}", err)?;
+                    return Ok(())
                 }
             };
             for token in tokens {
-                write!(f, "  {:?}\n", token).unwrap();
+                write!(f, "  {:?}\n", token)?;
             }
-            write!(f, "\n").unwrap();
+            write!(f, "\n")?;
 
-            write!(f, "AST: ").unwrap();
+            write!(f, "AST: ")?;
             let ast = match Parser::new($sql).parse() {
                 Ok(ast) => ast,
                 Err(err) => {
-                    write!(f, "{:?}", err).unwrap();
-                    return
+                    write!(f, "{:?}", err)?;
+                    return Ok(())
                 }
             };
-            write!(f, "{:#?}\n\n", ast).unwrap();
+            write!(f, "{:#?}\n\n", ast)?;
 
-            write!(f, "Plan: ").unwrap();
+            write!(f, "Plan: ")?;
             let plan = match Plan::build(ast) {
                 Ok(plan) => plan,
                 Err(err) => {
-                    write!(f, "{:?}", err).unwrap();
-                    return
+                    write!(f, "{:?}", err)?;
+                    return Ok(())
                 }
             };
-            write!(f, "{:#?}\n\n", plan).unwrap();
+            write!(f, "{:#?}\n\n", plan)?;
 
-            write!(f, "Optimized plan: ").unwrap();
+            write!(f, "Optimized plan: ")?;
             let plan = match plan.optimize() {
                 Ok(plan) => plan,
                 Err(err) => {
-                    write!(f, "{:?}", err).unwrap();
-                    return
+                    write!(f, "{:?}", err)?;
+                    return Ok(())
                 }
             };
-            write!(f, "{:#?}\n\n", plan).unwrap();
+            write!(f, "{:#?}\n\n", plan)?;
 
-            write!(f, "Query: {}\n\n", $sql).unwrap();
+            write!(f, "Query: {}\n\n", $sql)?;
 
-            write!(f, "Result:").unwrap();
-            let mut txn = engine.begin().unwrap();
+            write!(f, "Result:")?;
+            let mut txn = engine.begin()?;
             let ctx = Context{txn: &mut txn};
             let result = match plan.execute(ctx) {
                 Ok(result) => result,
                 Err(err) => {
-                    write!(f, " {:?}", err).unwrap();
-                    return
+                    write!(f, " {:?}", err)?;
+                    return Ok(())
                 }
             };
-            txn.commit().unwrap();
+            txn.commit()?;
             let columns = result.columns();
             let rows: Vec<Row> = match result.collect() {
                 Ok(rows) => rows,
                 Err(err) => {
-                    write!(f, " {:?}", err).unwrap();
-                    return
+                    write!(f, " {:?}", err)?;
+                    return Ok(())
                 }
             };
             if !columns.is_empty() || !rows.is_empty() {
-                write!(f, " [{:?}]\n", columns).unwrap();
+                write!(f, " [{:?}]\n", columns)?;
                 for row in rows {
-                    write!(f, "{:?}\n", row).unwrap();
+                    write!(f, "{:?}\n", row)?;
                 }
             } else {
-                write!(f, " <none>\n").unwrap();
+                write!(f, " <none>\n")?;
             }
 
-            write!(f, "\nStorage:").unwrap();
-            let txn = engine.begin().unwrap();
-            for table in &txn.list_tables().unwrap() {
-                let schema = &txn.read_table(&table.name).unwrap().unwrap();
-                write!(f, "\n{}\n", schema.to_query()).unwrap();
-                for row in txn.scan(&table.name).unwrap() {
-                    write!(f, "{:?}\n", row.unwrap()).unwrap();
+            write!(f, "\nStorage:")?;
+            let txn = engine.begin()?;
+            for table in &txn.list_tables()? {
+                let schema = &txn.read_table(&table.name)?.unwrap();
+                write!(f, "\n{}\n", schema.to_query())?;
+                for row in txn.scan(&table.name)? {
+                    write!(f, "{:?}\n", row?)?;
                 }
             }
-            txn.rollback().unwrap();
+            txn.rollback()?;
+
+            Ok(())
         }
     )*
     }
