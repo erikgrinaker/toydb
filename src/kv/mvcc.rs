@@ -100,7 +100,6 @@ impl<'a, S: Storage> Transaction<S> {
         // for any future snapshot transactions looking at this one.
         let mut snapshot = Snapshot::take(&mut session, id)?;
         std::mem::drop(session);
-
         if let Mode::Snapshot { version } = &mode {
             snapshot = Snapshot::restore(&storage.read()?, *version)?
         }
@@ -133,34 +132,31 @@ impl<'a, S: Storage> Transaction<S> {
         self.mode.clone()
     }
 
-    /// Commits the transaction
+    /// Commits the transaction.
     pub fn commit(self) -> Result<(), Error> {
-        self.storage.write()?.remove(&Key::TxnActive(self.id).encode())?;
-        Ok(())
+        self.storage.write()?.remove(&Key::TxnActive(self.id).encode())
     }
 
     /// Rolls back the transaction
     pub fn rollback(self) -> Result<(), Error> {
         let mut session = self.storage.write()?;
         if self.mode.is_mutable() {
-            let start = Key::TxnUpdatedStart(self.id).encode();
-            let end = Key::TxnUpdatedEnd(self.id).encode();
-            let mut keys: Vec<Vec<u8>> = vec![];
-            for r in session.scan(start..end).rev() {
-                let (k, _) = r?;
-                if let Key::TxnUpdated(_, key) = Key::decode(k.clone())? {
-                    keys.push(key.clone());
-                    keys.push(k.clone());
-                } else {
-                    return Err(Error::Internal("Unexpected key".into()));
+            let mut keys: Vec<Vec<u8>> = Vec::new();
+            let mut scan = session
+                .scan(&Key::TxnUpdateStart(self.id).encode()..&Key::TxnUpdateEnd(self.id).encode());
+            while let Some((key, _)) = scan.next().transpose()? {
+                keys.push(key.clone());
+                match Key::decode(key)? {
+                    Key::TxnUpdate(_, k) => keys.push(k),
+                    _ => return Err(Error::Internal("Unexpected key, wanted TxnUpdated".into())),
                 }
             }
+            std::mem::drop(scan);
             for key in keys.into_iter() {
                 session.remove(&key)?;
             }
         }
-        session.remove(&Key::TxnActive(self.id).encode())?;
-        Ok(())
+        session.remove(&Key::TxnActive(self.id).encode())
     }
 
     /// Deletes a key
@@ -172,7 +168,7 @@ impl<'a, S: Storage> Transaction<S> {
         }
 
         let key = Key::Record(key.to_vec(), self.id).encode();
-        let update_key = Key::TxnUpdated(self.id, key.clone()).encode();
+        let update_key = Key::TxnUpdate(self.id, key.clone()).encode();
         storage.write(&update_key, Vec::new())?;
         storage.write(&key, Value::Delete.encode())?;
         Ok(())
@@ -209,7 +205,7 @@ impl<'a, S: Storage> Transaction<S> {
             return Err(Error::Serialization);
         }
         let key = Key::Record(key.to_vec(), self.id).encode();
-        let update_key = Key::TxnUpdated(self.id, key.clone()).encode();
+        let update_key = Key::TxnUpdate(self.id, key.clone()).encode();
         storage.write(&update_key, Vec::new())?;
         storage.write(&key, Value::Set(value).encode())?;
         Ok(())
@@ -412,9 +408,12 @@ enum Key {
     TxnActive(u64),
     /// Transaction snapshot, containing concurrent transactions at start.
     TxnSnapshot(u64),
-    TxnUpdatedStart(u64),
-    TxnUpdated(u64, Vec<u8>),
-    TxnUpdatedEnd(u64),
+    /// Start of transaction update range for a given transaction ID.
+    TxnUpdateStart(u64),
+    /// Update entry for a transaction ID and key.
+    TxnUpdate(u64, Vec<u8>),
+    /// End of transaction update range for a given transaction ID.
+    TxnUpdateEnd(u64),
     Record(Vec<u8>, u64),
     RecordStart,
     RecordEnd,
@@ -453,14 +452,14 @@ impl Key {
                 let id = u64::from_be_bytes(id);
                 if bytes.len() == 10 {
                     return match bytes[9] {
-                        0x00 => Ok(Key::TxnUpdatedStart(id)),
-                        0xff => Ok(Key::TxnUpdatedEnd(id)),
+                        0x00 => Ok(Key::TxnUpdateStart(id)),
+                        0xff => Ok(Key::TxnUpdateEnd(id)),
                         _ => return Err(Error::Value("Invalid MVCC update key".into())),
                     };
                 }
 
                 let key = bytes[9..].to_vec();
-                Ok(Key::TxnUpdated(id, key))
+                Ok(Key::TxnUpdate(id, key))
             }
             Some(0xf1) => {
                 let mut key: Vec<u8> = iter.collect();
@@ -483,13 +482,13 @@ impl Key {
             Self::TxnNext => vec![0x01],
             Self::TxnActive(id) => [vec![0x02], id.to_be_bytes().to_vec()].concat(),
             Self::TxnSnapshot(version) => [vec![0x03], version.to_be_bytes().to_vec()].concat(),
-            Self::TxnUpdatedStart(id) => {
+            Self::TxnUpdateStart(id) => {
                 [vec![0x04], id.to_be_bytes().to_vec(), vec![0x00]].concat()
             }
-            Self::TxnUpdated(id, key) => {
+            Self::TxnUpdate(id, key) => {
                 [vec![0x04], id.to_be_bytes().to_vec(), vec![0x00], key].concat()
             }
-            Self::TxnUpdatedEnd(id) => [vec![0x04], id.to_be_bytes().to_vec(), vec![0xff]].concat(),
+            Self::TxnUpdateEnd(id) => [vec![0x04], id.to_be_bytes().to_vec(), vec![0xff]].concat(),
             Self::RecordStart => vec![0xf0],
             Self::Record(key, version) => {
                 // We have to use 0x00 as a key/version separator, and use 0x00 0xff as an
