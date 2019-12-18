@@ -125,6 +125,7 @@ impl Expression {
             },
 
             // Mathematical operations
+            // FIXME Handle infinity and NaN
             Self::Add(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 + rhs),
                 (Integer(lhs), Integer(rhs)) => Integer(lhs + rhs),
@@ -144,10 +145,18 @@ impl Expression {
                 expr => return Err(Error::Value(format!("Can't take the positive of {}", expr))),
             },
             Self::Divide(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (Integer(_), Integer(rhs)) if rhs == 0 => {
+                    return Err(Error::Value("Can't divide by zero".into()))
+                }
                 (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 / rhs),
+                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs / rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(lhs / rhs),
+                (Float(_), Null) => Null,
+                (Null, Float(_)) => Null,
+                (Null, Integer(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't divide {} and {}", lhs, rhs)))
                 }
@@ -155,9 +164,14 @@ impl Expression {
             Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 // FIXME Handle overflow
                 (Integer(lhs), Integer(rhs)) => Integer(lhs.pow(rhs as u32)),
-                (Integer(lhs), Float(rhs)) => Float((lhs as f64).powi(rhs as i32)),
+                (Integer(lhs), Float(rhs)) => Float((lhs as f64).powf(rhs)),
+                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float((lhs).powi(rhs as i32)),
                 (Float(lhs), Float(rhs)) => Float((lhs).powf(rhs)),
+                (Float(_), Null) => Null,
+                (Null, Float(_)) => Null,
+                (Null, Integer(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't exponentiate {} and {}", lhs, rhs)))
                 }
@@ -171,8 +185,13 @@ impl Expression {
                 // acrobatics to make it work right
                 (Integer(lhs), Integer(rhs)) => Integer(((lhs % rhs) + rhs) % rhs),
                 (Integer(lhs), Float(rhs)) => Float(((lhs as f64 % rhs) + rhs) % rhs),
+                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(((lhs % rhs as f64) + rhs as f64) % rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(((lhs % rhs) + rhs) % rhs),
+                (Float(_), Null) => Null,
+                (Null, Float(_)) => Null,
+                (Null, Integer(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't take modulo of {} and {}", lhs, rhs)))
                 }
@@ -180,8 +199,13 @@ impl Expression {
             Self::Multiply(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(lhs * rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 * rhs),
+                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs * rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(lhs * rhs),
+                (Float(_), Null) => Null,
+                (Null, Float(_)) => Null,
+                (Null, Integer(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't multiply {} and {}", lhs, rhs)))
                 }
@@ -189,13 +213,19 @@ impl Expression {
             Self::Negate(expr) => match expr.evaluate(e)? {
                 Integer(i) => Integer(-i),
                 Float(f) => Float(-f),
+                Null => Null,
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
             },
             Self::Subtract(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(lhs - rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 - rhs),
+                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs - rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(lhs - rhs),
+                (Float(_), Null) => Null,
+                (Null, Float(_)) => Null,
+                (Null, Integer(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't subtract {} and {}", lhs, rhs)))
                 }
