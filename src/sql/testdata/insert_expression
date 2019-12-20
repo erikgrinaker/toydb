@@ -1,4 +1,4 @@
-Query: INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)
+Query: INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1 / 1, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)
 
 Tokens:
   Keyword(Insert)
@@ -14,9 +14,9 @@ Tokens:
   Comma
   String("District 9")
   Comma
-  Number("1000")
-  Caret
-  Number("0")
+  Number("1")
+  Slash
+  Number("1")
   Comma
   Number("2")
   Asterisk
@@ -73,15 +73,15 @@ AST: Insert {
                 ),
             ),
             Operation(
-                Exponentiate(
+                Divide(
                     Literal(
                         Integer(
-                            1000,
+                            1,
                         ),
                     ),
                     Literal(
                         Integer(
-                            0,
+                            1,
                         ),
                     ),
                 ),
@@ -197,15 +197,15 @@ Plan: Plan {
                         "District 9",
                     ),
                 ),
-                Exponentiate(
+                Divide(
                     Constant(
                         Integer(
-                            1000,
+                            1,
                         ),
                     ),
                     Constant(
                         Integer(
-                            0,
+                            1,
                         ),
                     ),
                 ),
@@ -316,7 +316,7 @@ Optimized plan: Plan {
     },
 }
 
-Query: INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1000 ^ 0, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)
+Query: INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1 / 1, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)
 
 Result: <none>
 

@@ -163,7 +163,7 @@ impl Expression {
             },
             Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 // FIXME Handle overflow
-                (Integer(lhs), Integer(rhs)) => Integer(lhs.pow(rhs as u32)),
+                (Integer(lhs), Integer(rhs)) => Float((lhs as f64).powf(rhs as f64)),
                 (Integer(lhs), Float(rhs)) => Float((lhs as f64).powf(rhs)),
                 (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float((lhs).powi(rhs as i32)),
@@ -178,6 +178,7 @@ impl Expression {
             },
             Self::Factorial(expr) => match expr.evaluate(e)? {
                 Integer(i) => Integer((1..=i).fold(1, |a, b| a * b as i64)),
+                Null => Null,
                 value => return Err(Error::Value(format!("Can't take factorial of {}", value))),
             },
             Self::Modulo(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
