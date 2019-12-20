@@ -144,7 +144,7 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Leader, L, S> {
             Event::AcceptEntries { last_index } => {
                 if let Some(from) = msg.from {
                     self.role.peer_last_index.insert(from.clone(), last_index);
-                    self.role.peer_next_index.insert(from.clone(), last_index + 1);
+                    self.role.peer_next_index.insert(from, last_index + 1);
                 }
                 self.commit()?;
                 self.apply()?;
@@ -307,7 +307,7 @@ mod tests {
             log,
             state,
             sender,
-            role: Leader::new(peers.clone(), last_index),
+            role: Leader::new(peers, last_index),
         };
         node.save_term(3, None).unwrap();
         (node, receiver)

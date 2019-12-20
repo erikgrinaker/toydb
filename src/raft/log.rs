@@ -252,7 +252,7 @@ mod tests {
     fn setup() -> (Log<kv::storage::Test>, kv::Simple<kv::storage::Test>) {
         let backend = kv::storage::Test::new();
         let log = Log::new(kv::Simple::new(backend.clone())).unwrap();
-        let store = kv::Simple::new(backend.clone());
+        let store = kv::Simple::new(backend);
         (log, store)
     }
 

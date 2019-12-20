@@ -278,7 +278,7 @@ pub struct Scan<'a, S: Storage> {
     mark_front: Bound<Vec<u8>>,
     mark_back: Bound<Vec<u8>>,
     seen: Option<(Vec<u8>, Vec<u8>)>,
-    rev_ignore: Option<(Vec<u8>)>,
+    rev_ignore: Option<Vec<u8>>,
 }
 
 impl<'a, S: Storage> Scan<'a, S> {

@@ -1,6 +1,3 @@
-// FIXME While waiting for https://doc.rust-lang.org/std/option/enum.Option.html#method.deref
-#![allow(unstable_name_collisions)]
-
 mod candidate;
 mod follower;
 mod leader;
@@ -12,7 +9,6 @@ use super::log::{Entry, Log};
 use super::transport::{Event, Message};
 use super::State;
 use crate::kv;
-use crate::utility::OptionDeref;
 use crate::Error;
 use crossbeam_channel::Sender;
 
@@ -357,7 +353,7 @@ mod tests {
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            kv::Simple::new(storage.clone()),
+            kv::Simple::new(storage),
             TestState::new(),
             sender,
         )

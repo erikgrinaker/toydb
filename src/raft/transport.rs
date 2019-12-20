@@ -210,13 +210,8 @@ mod tests {
             .is_err());
 
         // Errors on other receiver
-        assert!(Message {
-            from: Some("b".into()),
-            to: Some("c".into()),
-            term: 3,
-            event: event.clone(),
-        }
-        .validate("a", 3)
-        .is_err());
+        assert!(Message { from: Some("b".into()), to: Some("c".into()), term: 3, event: event }
+            .validate("a", 3)
+            .is_err());
     }
 }
