@@ -51,14 +51,25 @@ impl Expression {
             // Logical operations
             Self::And(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs && rhs),
+                (Boolean(lhs), Null) if !lhs => Boolean(false),
+                (Boolean(_), Null) => Null,
+                (Null, Boolean(rhs)) if !rhs => Boolean(false),
+                (Null, Boolean(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't and {} and {}", lhs, rhs))),
             },
             Self::Not(expr) => match expr.evaluate(e)? {
                 Boolean(b) => Boolean(!b),
+                Null => Null,
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
             },
             Self::Or(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
+                (Boolean(lhs), Null) if lhs => Boolean(true),
+                (Boolean(_), Null) => Null,
+                (Null, Boolean(rhs)) if rhs => Boolean(true),
+                (Null, Boolean(_)) => Null,
+                (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't or {} and {}", lhs, rhs))),
             },
 
