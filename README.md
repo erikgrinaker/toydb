@@ -139,6 +139,8 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 
 * **Serializability:** transactions use MVCC without serializable snapshot isolation, thus are vulnerable to write skew and other anomalies.
 
+* **ID overflow:** transaction IDs are stored as unsigned 64-bit integers without wraparound, thus no new transactions can be started beyond transaction number 2⁶⁴-1.
+
 ### Schema
 
 * **Single database:** only a single, unnamed database is supported per ToyDB cluster.
