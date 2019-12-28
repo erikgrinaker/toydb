@@ -27,7 +27,7 @@ steps:
   environment: *env
   commands:
   - rustup component add clippy
-  - cargo clippy -- -D warnings
+  - cargo clippy --tests -- -D warnings
 
 - name: notify
   image: drillster/drone-email

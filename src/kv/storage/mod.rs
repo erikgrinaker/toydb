@@ -45,7 +45,7 @@ trait TestSuite<S: Storage> {
 
     fn test_read() -> Result<(), Error> {
         let mut s = Self::setup()?;
-        assert_eq!((), s.write(b"a", vec![0x01])?);
+        s.write(b"a", vec![0x01])?;
         assert_eq!(Some(vec![0x01]), s.read(b"a")?);
         assert_eq!(None, s.read(b"b")?);
         Ok(())
@@ -55,9 +55,9 @@ trait TestSuite<S: Storage> {
         let mut s = Self::setup()?;
         s.write(b"a", vec![0x01])?;
         assert_eq!(Some(vec![0x01]), s.read(b"a")?);
-        assert_eq!((), s.remove(b"a")?);
+        s.remove(b"a")?;
         assert_eq!(None, s.read(b"a")?);
-        assert_eq!((), s.remove(b"b")?);
+        s.remove(b"b")?;
         Ok(())
     }
 
@@ -127,9 +127,9 @@ trait TestSuite<S: Storage> {
 
     fn test_write() -> Result<(), Error> {
         let mut s = Self::setup()?;
-        assert_eq!((), s.write(b"a", vec![0x01])?);
+        s.write(b"a", vec![0x01])?;
         assert_eq!(Some(vec![0x01]), s.read(b"a")?);
-        assert_eq!((), s.write(b"a", vec![0x02])?);
+        s.write(b"a", vec![0x02])?;
         assert_eq!(Some(vec![0x02]), s.read(b"a")?);
         Ok(())
     }
