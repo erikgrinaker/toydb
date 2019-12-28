@@ -442,13 +442,13 @@ impl Key {
             }
             Some(0x04) => {
                 let bytes: Vec<u8> = iter.collect();
-                if bytes.len() < 10 {
+                if bytes.len() < 9 {
                     return Err(Error::Value("Unable to parse MVCC update key".into()));
                 }
                 let mut id = [0; 8];
                 id.copy_from_slice(&bytes[0..8]);
                 let id = u64::from_be_bytes(id);
-                let key = bytes[9..].to_vec();
+                let key = bytes[8..].to_vec();
                 Ok(Key::TxnUpdate(id, key))
             }
             Some(0xf1) => {
