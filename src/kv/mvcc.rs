@@ -36,41 +36,6 @@ impl<S: Storage> MVCC<S> {
     }
 }
 
-/// An MVCC transaction mode.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Mode {
-    /// A read-write transaction.
-    ReadWrite,
-    /// A read-only transaction.
-    ReadOnly,
-    /// A read-only transaction running in a snapshot of a given version.
-    ///
-    /// The version must refer to a committed transaction ID. Any changes visible to the original
-    /// transaction will be visible in the snapshot (i.e. transactions that had not committed before
-    /// the snapshot transaction started will not be visible, even though they have a lower version).
-    Snapshot { version: u64 },
-}
-
-impl Mode {
-    /// Asserts that the mode can mutate data, otherwise throws `Error::ReadOnly`.
-    fn assert_mutable(&self) -> Result<(), Error> {
-        if self.is_mutable() {
-            Ok(())
-        } else {
-            Err(Error::ReadOnly)
-        }
-    }
-
-    /// Checks whether the transaction mode can mutate data.
-    fn is_mutable(&self) -> bool {
-        match self {
-            Self::ReadWrite => true,
-            Self::ReadOnly => false,
-            Self::Snapshot { .. } => false,
-        }
-    }
-}
-
 /// An MVCC transaction.
 pub struct Transaction<S: Storage> {
     /// The underlying storage for the transaction. Shared between transactions using a mutex.
@@ -83,7 +48,7 @@ pub struct Transaction<S: Storage> {
     id: u64,
 }
 
-impl<'a, S: Storage> Transaction<S> {
+impl<S: Storage> Transaction<S> {
     /// Begins a new transaction in the given mode.
     fn begin(storage: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
         let mut session = storage.write()?;
@@ -142,8 +107,10 @@ impl<'a, S: Storage> Transaction<S> {
         let mut session = self.storage.write()?;
         if self.mode.is_mutable() {
             let mut keys: Vec<Vec<u8>> = Vec::new();
-            let mut scan = session
-                .scan(&Key::TxnUpdateStart(self.id).encode()..&Key::TxnUpdateEnd(self.id).encode());
+            let mut scan = session.scan(
+                &Key::TxnUpdate(self.id, vec![]).encode()
+                    ..&Key::TxnUpdate(self.id + 1, vec![]).encode(),
+            );
             while let Some((key, _)) = scan.next().transpose()? {
                 keys.push(key.clone());
                 match Key::decode(key)? {
@@ -268,6 +235,41 @@ impl Snapshot {
     /// Checks whether the given version is visible in this snapshot.
     fn is_visible(&self, version: u64) -> bool {
         version <= self.version && self.invisible.get(&version).is_none()
+    }
+}
+
+/// An MVCC transaction mode.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Mode {
+    /// A read-write transaction.
+    ReadWrite,
+    /// A read-only transaction.
+    ReadOnly,
+    /// A read-only transaction running in a snapshot of a given version.
+    ///
+    /// The version must refer to a committed transaction ID. Any changes visible to the original
+    /// transaction will be visible in the snapshot (i.e. transactions that had not committed before
+    /// the snapshot transaction started will not be visible, even though they have a lower version).
+    Snapshot { version: u64 },
+}
+
+impl Mode {
+    /// Asserts that the mode can mutate data, otherwise throws `Error::ReadOnly`.
+    fn assert_mutable(&self) -> Result<(), Error> {
+        if self.is_mutable() {
+            Ok(())
+        } else {
+            Err(Error::ReadOnly)
+        }
+    }
+
+    /// Checks whether the transaction mode can mutate data.
+    fn is_mutable(&self) -> bool {
+        match self {
+            Self::ReadWrite => true,
+            Self::ReadOnly => false,
+            Self::Snapshot { .. } => false,
+        }
     }
 }
 
@@ -408,12 +410,8 @@ enum Key {
     TxnActive(u64),
     /// Transaction snapshot, containing concurrent transactions at start.
     TxnSnapshot(u64),
-    /// Start of transaction update range for a given transaction ID.
-    TxnUpdateStart(u64),
     /// Update entry for a transaction ID and key.
     TxnUpdate(u64, Vec<u8>),
-    /// End of transaction update range for a given transaction ID.
-    TxnUpdateEnd(u64),
     Record(Vec<u8>, u64),
     RecordStart,
     RecordEnd,
@@ -450,14 +448,6 @@ impl Key {
                 let mut id = [0; 8];
                 id.copy_from_slice(&bytes[0..8]);
                 let id = u64::from_be_bytes(id);
-                if bytes.len() == 10 {
-                    return match bytes[9] {
-                        0x00 => Ok(Key::TxnUpdateStart(id)),
-                        0xff => Ok(Key::TxnUpdateEnd(id)),
-                        _ => return Err(Error::Value("Invalid MVCC update key".into())),
-                    };
-                }
-
                 let key = bytes[9..].to_vec();
                 Ok(Key::TxnUpdate(id, key))
             }
@@ -482,13 +472,7 @@ impl Key {
             Self::TxnNext => vec![0x01],
             Self::TxnActive(id) => [vec![0x02], id.to_be_bytes().to_vec()].concat(),
             Self::TxnSnapshot(version) => [vec![0x03], version.to_be_bytes().to_vec()].concat(),
-            Self::TxnUpdateStart(id) => {
-                [vec![0x04], id.to_be_bytes().to_vec(), vec![0x00]].concat()
-            }
-            Self::TxnUpdate(id, key) => {
-                [vec![0x04], id.to_be_bytes().to_vec(), vec![0x00], key].concat()
-            }
-            Self::TxnUpdateEnd(id) => [vec![0x04], id.to_be_bytes().to_vec(), vec![0xff]].concat(),
+            Self::TxnUpdate(id, key) => [vec![0x04], id.to_be_bytes().to_vec(), key].concat(),
             Self::RecordStart => vec![0xf0],
             Self::Record(key, version) => {
                 // We have to use 0x00 as a key/version separator, and use 0x00 0xff as an
@@ -529,12 +513,6 @@ impl Key {
             Self::Record(_, version) => Ok(*version),
             _ => Err(Error::Value(format!("MVCC key {:?} has no version", self))),
         }
-    }
-}
-
-impl Into<Vec<u8>> for Key {
-    fn into(self) -> Vec<u8> {
-        self.encode()
     }
 }
 
