@@ -106,20 +106,20 @@ impl<S: Storage> Transaction<S> {
     pub fn rollback(self) -> Result<(), Error> {
         let mut session = self.storage.write()?;
         if self.mode.mutable() {
-            let mut keys = Vec::new();
+            let mut rollback = Vec::new();
             let mut scan = session.scan(
                 &Key::TxnUpdate(self.id, vec![]).encode()
                     ..&Key::TxnUpdate(self.id + 1, vec![]).encode(),
             );
             while let Some((key, _)) = scan.next().transpose()? {
                 match Key::decode(&key)? {
-                    Key::TxnUpdate(_, k) => keys.push(k),
-                    _ => return Err(Error::Internal("Unexpected key, wanted TxnUpdated".into())),
-                }
-                keys.push(key);
+                    Key::TxnUpdate(_, updated_key) => rollback.push(updated_key),
+                    k => return Err(Error::Internal(format!("Expected TxnUpdate, got {:?}", k))),
+                };
+                rollback.push(key);
             }
             std::mem::drop(scan);
-            for key in keys.into_iter() {
+            for key in rollback.into_iter() {
                 session.remove(&key)?;
             }
         }
@@ -140,9 +140,14 @@ impl<S: Storage> Transaction<S> {
             )
             .rev();
         while let Some((k, v)) = scan.next().transpose()? {
-            if self.snapshot.is_visible(Key::decode(&k)?.version()?) {
-                return deserialize(&v);
-            }
+            match Key::decode(&k)? {
+                Key::Record(_, version) => {
+                    if self.snapshot.is_visible(version) {
+                        return deserialize(&v);
+                    }
+                }
+                k => return Err(Error::Internal(format!("Expected Txn::Record, got {:?}", k))),
+            };
         }
         Ok(None)
     }
@@ -174,57 +179,22 @@ impl<S: Storage> Transaction<S> {
             )
             .rev();
         while let Some((k, _)) = scan.next().transpose()? {
-            if !self.snapshot.is_visible(Key::decode(&k)?.version()?) {
-                return Err(Error::Serialization);
-            }
+            match Key::decode(&k)? {
+                Key::Record(_, version) => {
+                    if !self.snapshot.is_visible(version) {
+                        return Err(Error::Serialization);
+                    }
+                }
+                k => return Err(Error::Internal(format!("Expected Txn::Record, got {:?}", k))),
+            };
         }
         std::mem::drop(scan);
 
-        // Write the key
+        // Write the key and its update record.
         let key = Key::Record(key.to_vec(), self.id).encode();
         let update = Key::TxnUpdate(self.id, key.clone()).encode();
         session.write(&update, vec![])?;
         session.write(&key, serialize(&value)?)
-    }
-}
-
-/// A versioned snapshot, containing visibility information about concurrent transactions.
-#[derive(Clone)]
-struct Snapshot {
-    /// The version (i.e. transaction ID) that the snapshot belongs to.
-    version: u64,
-    /// The set of transaction IDs that were active at the start of the transactions,
-    /// and thus should be invisible to the snapshot.
-    invisible: HashSet<u64>,
-}
-
-impl Snapshot {
-    /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
-    fn take(storage: &mut RwLockWriteGuard<impl Storage>, version: u64) -> Result<Self, Error> {
-        let mut snapshot = Self { version, invisible: HashSet::new() };
-        let mut scan = storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode());
-        while let Some((key, _)) = scan.next().transpose()? {
-            match Key::decode(&key)? {
-                Key::TxnActive(id) => snapshot.invisible.insert(id),
-                _ => return Err(Error::Internal("Unexpected MVCC key, wanted TxnActive".into())),
-            };
-        }
-        std::mem::drop(scan);
-        storage.write(&Key::TxnSnapshot(version).encode(), serialize(&snapshot.invisible)?)?;
-        Ok(snapshot)
-    }
-
-    /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn restore(storage: &RwLockReadGuard<impl Storage>, version: u64) -> Result<Self, Error> {
-        match storage.read(&Key::TxnSnapshot(version).encode())? {
-            Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
-            None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
-        }
-    }
-
-    /// Checks whether the given version is visible in this snapshot.
-    fn is_visible(&self, version: u64) -> bool {
-        version <= self.version && self.invisible.get(&version).is_none()
     }
 }
 
@@ -251,6 +221,46 @@ impl Mode {
             Self::ReadOnly => false,
             Self::Snapshot { .. } => false,
         }
+    }
+}
+
+/// A versioned snapshot, containing visibility information about concurrent transactions.
+#[derive(Clone)]
+struct Snapshot {
+    /// The version (i.e. transaction ID) that the snapshot belongs to.
+    version: u64,
+    /// The set of transaction IDs that were active at the start of the transactions,
+    /// and thus should be invisible to the snapshot.
+    invisible: HashSet<u64>,
+}
+
+impl Snapshot {
+    /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
+    fn take(session: &mut RwLockWriteGuard<impl Storage>, version: u64) -> Result<Self, Error> {
+        let mut snapshot = Self { version, invisible: HashSet::new() };
+        let mut scan = session.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode());
+        while let Some((key, _)) = scan.next().transpose()? {
+            match Key::decode(&key)? {
+                Key::TxnActive(id) => snapshot.invisible.insert(id),
+                k => return Err(Error::Internal(format!("Expected TxnActive, got {:?}", k))),
+            };
+        }
+        std::mem::drop(scan);
+        session.write(&Key::TxnSnapshot(version).encode(), serialize(&snapshot.invisible)?)?;
+        Ok(snapshot)
+    }
+
+    /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
+    fn restore(session: &RwLockReadGuard<impl Storage>, version: u64) -> Result<Self, Error> {
+        match session.read(&Key::TxnSnapshot(version).encode())? {
+            Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
+            None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
+        }
+    }
+
+    /// Checks whether the given version is visible in this snapshot.
+    fn is_visible(&self, version: u64) -> bool {
+        version <= self.version && self.invisible.get(&version).is_none()
     }
 }
 
