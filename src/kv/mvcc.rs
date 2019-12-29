@@ -137,7 +137,7 @@ impl<S: Storage> Transaction<S> {
         let key = Key::Record(key.to_vec(), self.id).encode();
         let update_key = Key::TxnUpdate(self.id, key.clone()).encode();
         storage.write(&update_key, Vec::new())?;
-        storage.write(&key, Value::Delete.encode())?;
+        storage.write(&key, serialize(&None::<Vec<u8>>)?)?;
         Ok(())
     }
 
@@ -155,10 +155,7 @@ impl<S: Storage> Transaction<S> {
             if !self.snapshot.is_visible(version) {
                 continue;
             }
-            return match Value::decode(v)? {
-                Value::Set(v) => Ok(Some(v)),
-                Value::Delete => Ok(None),
-            };
+            return deserialize(&v);
         }
         Ok(None)
     }
@@ -178,7 +175,7 @@ impl<S: Storage> Transaction<S> {
         let key = Key::Record(key.to_vec(), self.id).encode();
         let update_key = Key::TxnUpdate(self.id, key.clone()).encode();
         storage.write(&update_key, Vec::new())?;
-        storage.write(&key, Value::Set(value).encode())?;
+        storage.write(&key, serialize(&Some(value))?)?;
         Ok(())
     }
 
@@ -339,9 +336,9 @@ impl<'a, S: Storage> Iterator for Scan<'a, S> {
                     if !self.snapshot.is_visible(version) {
                         continue;
                     }
-                    let value = match Value::decode(v).unwrap() {
-                        Value::Set(value) => value,
-                        Value::Delete => {
+                    let value = match deserialize(&v).unwrap() {
+                        Some(value) => value,
+                        None => {
                             let mut clear_seen = false;
                             if let Some((k, _)) = &self.seen {
                                 if k == &key {
@@ -398,9 +395,9 @@ impl<'a, S: Storage> DoubleEndedIterator for Scan<'a, S> {
                         }
                     }
                     self.rev_ignore = Some(key.clone());
-                    let value = match Value::decode(v).unwrap() {
-                        Value::Set(value) => value,
-                        Value::Delete => continue,
+                    let value = match deserialize(&v).unwrap() {
+                        Some(value) => value,
+                        None => continue,
                     };
                     return Some(Ok((key, value)));
                 }
@@ -506,30 +503,6 @@ impl Key {
     /// Encodes a u64.
     fn encode_u64(n: u64) -> Vec<u8> {
         n.to_be_bytes().to_vec()
-    }
-}
-
-enum Value {
-    Delete,
-    Set(Vec<u8>),
-}
-
-impl Value {
-    fn decode(value: Vec<u8>) -> Result<Self, Error> {
-        let mut iter = value.into_iter();
-        match iter.next() {
-            Some(0x00) => Ok(Value::Delete),
-            Some(0xff) => Ok(Value::Set(iter.collect())),
-            None => Err(Error::Value("No MVCC value found".into())),
-            _ => Err(Error::Value("Unable to decode invalid MVCC value".into())),
-        }
-    }
-
-    fn encode(self) -> Vec<u8> {
-        match self {
-            Self::Delete => vec![0x00],
-            Self::Set(value) => [vec![0xff], value].concat(),
-        }
     }
 }
 
