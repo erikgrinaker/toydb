@@ -40,12 +40,12 @@ impl<S: Storage> MVCC<S> {
 pub struct Transaction<S: Storage> {
     /// The underlying storage for the transaction. Shared between transactions using a mutex.
     storage: Arc<RwLock<S>>,
-    /// The snapshot that the transaction is running in.
-    snapshot: Snapshot,
-    /// The transaction mode.
-    mode: Mode,
     /// The unique transaction ID.
     id: u64,
+    /// The transaction mode.
+    mode: Mode,
+    /// The snapshot that the transaction is running in.
+    snapshot: Snapshot,
 }
 
 impl<S: Storage> Transaction<S> {
@@ -69,20 +69,20 @@ impl<S: Storage> Transaction<S> {
             snapshot = Snapshot::restore(&storage.read()?, *version)?
         }
 
-        Ok(Self { storage, snapshot, mode, id })
+        Ok(Self { storage, id, mode, snapshot })
     }
 
     /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
     fn resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
         let session = storage.read()?;
         let mode = match session.read(&Key::TxnActive(id).encode())? {
-            Some(ref v) => deserialize(v)?,
+            Some(v) => deserialize(&v)?,
             None => return Err(Error::Value(format!("No active transaction {}", id))),
         };
-        let snapshot = Snapshot::restore(
-            &session,
-            if let Mode::Snapshot { version } = &mode { *version } else { id },
-        )?;
+        let snapshot = match &mode {
+            Mode::Snapshot { version } => Snapshot::restore(&session, *version)?,
+            _ => Snapshot::restore(&session, id)?,
+        };
         std::mem::drop(session);
         Ok(Self { storage, id, mode, snapshot })
     }
@@ -97,26 +97,26 @@ impl<S: Storage> Transaction<S> {
         self.mode.clone()
     }
 
-    /// Commits the transaction.
+    /// Commits the transaction, by removing the txn from the active set.
     pub fn commit(self) -> Result<(), Error> {
         self.storage.write()?.remove(&Key::TxnActive(self.id).encode())
     }
 
-    /// Rolls back the transaction
+    /// Rolls back the transaction, by removing all updated entries.
     pub fn rollback(self) -> Result<(), Error> {
         let mut session = self.storage.write()?;
-        if self.mode.is_mutable() {
-            let mut keys: Vec<Vec<u8>> = Vec::new();
+        if self.mode.mutable() {
+            let mut keys = Vec::new();
             let mut scan = session.scan(
                 &Key::TxnUpdate(self.id, vec![]).encode()
                     ..&Key::TxnUpdate(self.id + 1, vec![]).encode(),
             );
             while let Some((key, _)) = scan.next().transpose()? {
-                keys.push(key.clone());
-                match Key::decode(key)? {
+                match Key::decode(&key)? {
                     Key::TxnUpdate(_, k) => keys.push(k),
                     _ => return Err(Error::Internal("Unexpected key, wanted TxnUpdated".into())),
                 }
+                keys.push(key);
             }
             std::mem::drop(scan);
             for key in keys.into_iter() {
@@ -126,80 +126,65 @@ impl<S: Storage> Transaction<S> {
         session.remove(&Key::TxnActive(self.id).encode())
     }
 
-    /// Deletes a key
+    /// Deletes a key.
     pub fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.mode.assert_mutable()?;
-        let mut storage = self.storage.write()?;
-        if self.is_dirty(&mut storage, key)? {
-            return Err(Error::Serialization);
-        }
-
-        let key = Key::Record(key.to_vec(), self.id).encode();
-        let update_key = Key::TxnUpdate(self.id, key.clone()).encode();
-        storage.write(&update_key, Vec::new())?;
-        storage.write(&key, serialize(&None::<Vec<u8>>)?)?;
-        Ok(())
+        self.write(key, None)
     }
 
-    /// Fetches a key
+    /// Fetches a key.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        let from = Key::Record(key.to_vec(), 0).encode();
-        let to = Key::Record(key.to_vec(), self.id).encode();
-        let storage = self.storage.read()?;
-        let mut range = storage.scan(from..=to).rev();
-        while let Some((k, v)) = range.next().transpose()? {
-            let version = match Key::decode(k)? {
-                Key::Record(_, version) => version,
-                k => return Err(Error::Value(format!("Unexpected MVCC key {:?} ", k))),
-            };
-            if !self.snapshot.is_visible(version) {
-                continue;
+        let session = self.storage.read()?;
+        let mut scan = session
+            .scan(
+                Key::Record(key.to_vec(), 0).encode()..=Key::Record(key.to_vec(), self.id).encode(),
+            )
+            .rev();
+        while let Some((k, v)) = scan.next().transpose()? {
+            if self.snapshot.is_visible(Key::decode(&k)?.version()?) {
+                return deserialize(&v);
             }
-            return deserialize(&v);
         }
         Ok(None)
     }
 
-    /// Scans a key range
+    /// Scans a key range.
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
         Ok(Box::new(Scan::new(self.storage.read()?, self.snapshot.clone(), range)?))
     }
 
-    /// Sets a key
+    /// Sets a key.
     pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.mode.assert_mutable()?;
-        let mut storage = self.storage.write()?;
-        if self.is_dirty(&mut storage, key)? {
-            return Err(Error::Serialization);
-        }
-        let key = Key::Record(key.to_vec(), self.id).encode();
-        let update_key = Key::TxnUpdate(self.id, key.clone()).encode();
-        storage.write(&update_key, Vec::new())?;
-        storage.write(&key, serialize(&Some(value))?)?;
-        Ok(())
+        self.write(key, Some(value))
     }
 
-    /// Checks whether the key is dirty, i.e. if it has any uncommitted changes
-    fn is_dirty(&self, storage: &mut RwLockWriteGuard<S>, key: &[u8]) -> Result<bool, Error> {
-        let mut min = self.id + 1;
-        for id in self.snapshot.invisible.iter().cloned() {
-            if id < min {
-                min = id
+    /// Writes a value for a key. None is used for deletion.
+    fn write(&self, key: &[u8], value: Option<Vec<u8>>) -> Result<(), Error> {
+        if !self.mode.mutable() {
+            return Err(Error::ReadOnly);
+        }
+        let mut session = self.storage.write()?;
+
+        // Check if the key is dirty, i.e. if it has any uncommitted changes, by scanning for any
+        // versions that aren't visible to us.
+        let min = self.snapshot.invisible.iter().min().cloned().unwrap_or(self.id + 1);
+        let mut scan = session
+            .scan(
+                Key::Record(key.to_vec(), min).encode()
+                    ..=Key::Record(key.to_vec(), std::u64::MAX).encode(),
+            )
+            .rev();
+        while let Some((k, _)) = scan.next().transpose()? {
+            if !self.snapshot.is_visible(Key::decode(&k)?.version()?) {
+                return Err(Error::Serialization);
             }
         }
-        let from = Key::Record(key.to_vec(), min).encode();
-        let to = Key::Record(key.to_vec(), std::u64::MAX).encode();
-        let mut range = storage.scan(from..to);
-        while let Some((k, _)) = range.next().transpose()? {
-            let version = match Key::decode(k)? {
-                Key::Record(_, version) => version,
-                k => return Err(Error::Value(format!("Unexpected MVCC key {:?} ", k))),
-            };
-            if !self.snapshot.is_visible(version) {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        std::mem::drop(scan);
+
+        // Write the key
+        let key = Key::Record(key.to_vec(), self.id).encode();
+        let update = Key::TxnUpdate(self.id, key.clone()).encode();
+        session.write(&update, vec![])?;
+        session.write(&key, serialize(&value)?)
     }
 }
 
@@ -219,7 +204,7 @@ impl Snapshot {
         let mut snapshot = Self { version, invisible: HashSet::new() };
         let mut scan = storage.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode());
         while let Some((key, _)) = scan.next().transpose()? {
-            match Key::decode(key)? {
+            match Key::decode(&key)? {
                 Key::TxnActive(id) => snapshot.invisible.insert(id),
                 _ => return Err(Error::Internal("Unexpected MVCC key, wanted TxnActive".into())),
             };
@@ -259,17 +244,8 @@ pub enum Mode {
 }
 
 impl Mode {
-    /// Asserts that the mode can mutate data, otherwise throws `Error::ReadOnly`.
-    fn assert_mutable(&self) -> Result<(), Error> {
-        if self.is_mutable() {
-            Ok(())
-        } else {
-            Err(Error::ReadOnly)
-        }
-    }
-
     /// Checks whether the transaction mode can mutate data.
-    fn is_mutable(&self) -> bool {
+    fn mutable(&self) -> bool {
         match self {
             Self::ReadWrite => true,
             Self::ReadOnly => false,
@@ -329,7 +305,7 @@ impl<'a, S: Storage> Iterator for Scan<'a, S> {
             match r {
                 Ok((k, v)) => {
                     self.mark_front = Bound::Excluded(k.clone());
-                    let (key, version) = match Key::decode(k).unwrap() {
+                    let (key, version) = match Key::decode(&k).unwrap() {
                         Key::Record(key, version) => (key, version),
                         _ => panic!("Not implemented"),
                     };
@@ -382,7 +358,7 @@ impl<'a, S: Storage> DoubleEndedIterator for Scan<'a, S> {
             match r {
                 Ok((k, v)) => {
                     self.mark_back = Bound::Excluded(k.clone());
-                    let (key, version) = match Key::decode(k).unwrap() {
+                    let (key, version) = match Key::decode(&k).unwrap() {
                         Key::Record(key, version) => (key, version),
                         _ => panic!("Not implemented"),
                     };
@@ -431,13 +407,13 @@ enum Key {
 
 impl Key {
     /// Decodes a key from a byte representation.
-    fn decode(key: Vec<u8>) -> Result<Self, Error> {
-        let mut iter = key.into_iter();
+    fn decode(key: &[u8]) -> Result<Self, Error> {
+        let mut iter = key.iter();
         match iter.next() {
             Some(0x01) => Ok(Key::TxnNext),
             Some(0x02) => Ok(Key::TxnActive(Self::decode_u64(&mut iter)?)),
             Some(0x03) => Ok(Key::TxnSnapshot(Self::decode_u64(&mut iter)?)),
-            Some(0x04) => Ok(Key::TxnUpdate(Self::decode_u64(&mut iter)?, iter.collect())),
+            Some(0x04) => Ok(Key::TxnUpdate(Self::decode_u64(&mut iter)?, iter.cloned().collect())),
             Some(0xff) => {
                 Ok(Self::Record(Self::decode_bytes(&mut iter)?, Self::decode_u64(&mut iter)?))
             }
@@ -446,7 +422,7 @@ impl Key {
     }
 
     /// Decodes a byte vector from a byte representation. See encode_bytes() for format.
-    fn decode_bytes<I: Iterator<Item = u8>>(iter: &mut I) -> Result<Vec<u8>, Error> {
+    fn decode_bytes<'a, I: Iterator<Item = &'a u8>>(iter: &mut I) -> Result<Vec<u8>, Error> {
         let mut bytes = Vec::new();
         loop {
             match iter.next() {
@@ -455,7 +431,7 @@ impl Key {
                     Some(0xff) => bytes.push(0x00), // 0x00 0xff is escape sequence for 0x00
                     b => return Err(Error::Value(format!("Unexpected 0x00 encoding {:?}", b))),
                 },
-                Some(b) => bytes.push(b),
+                Some(b) => bytes.push(*b),
                 None => return Err(Error::Value("Unexpected end of input".into())),
             }
         }
@@ -463,8 +439,8 @@ impl Key {
     }
 
     /// Decodes a u64 from a byte representation.
-    fn decode_u64<I: Iterator<Item = u8>>(iter: &mut I) -> Result<u64, Error> {
-        let bytes = iter.take(8).collect::<Vec<u8>>();
+    fn decode_u64<'a, I: Iterator<Item = &'a u8>>(iter: &mut I) -> Result<u64, Error> {
+        let bytes = iter.take(8).cloned().collect::<Vec<u8>>();
         if bytes.len() < 8 {
             return Err(Error::Value(format!("Unable to decode u64, got {} bytes", bytes.len())));
         }
@@ -503,6 +479,14 @@ impl Key {
     /// Encodes a u64.
     fn encode_u64(n: u64) -> Vec<u8> {
         n.to_be_bytes().to_vec()
+    }
+
+    /// Returns the version for a key, if it has one.
+    fn version(&self) -> Result<u64, Error> {
+        match self {
+            Self::Record(_, version) => Ok(*version),
+            key => Err(Error::Value(format!("Unexpected MVCC key {:?}", key))),
+        }
     }
 }
 
