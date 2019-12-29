@@ -148,7 +148,11 @@ impl<S: Storage> Transaction<S> {
         let storage = self.storage.read()?;
         let mut range = storage.scan(from..=to).rev();
         while let Some((k, v)) = range.next().transpose()? {
-            if !self.snapshot.is_visible(Key::decode(k)?.version()?) {
+            let version = match Key::decode(k)? {
+                Key::Record(_, version) => version,
+                k => return Err(Error::Value(format!("Unexpected MVCC key {:?} ", k))),
+            };
+            if !self.snapshot.is_visible(version) {
                 continue;
             }
             return match Value::decode(v)? {
@@ -190,7 +194,11 @@ impl<S: Storage> Transaction<S> {
         let to = Key::Record(key.to_vec(), std::u64::MAX).encode();
         let mut range = storage.scan(from..to);
         while let Some((k, _)) = range.next().transpose()? {
-            if !self.snapshot.is_visible(Key::decode(k)?.version()?) {
+            let version = match Key::decode(k)? {
+                Key::Record(_, version) => version,
+                k => return Err(Error::Value(format!("Unexpected MVCC key {:?} ", k))),
+            };
+            if !self.snapshot.is_visible(version) {
                 return Ok(true);
             }
         }
@@ -290,16 +298,18 @@ impl<'a, S: Storage> Scan<'a, S> {
         range: impl RangeBounds<Vec<u8>>,
     ) -> Result<Self, Error> {
         let from = match range.start_bound() {
-            Bound::Excluded(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
+            Bound::Excluded(key) => {
+                Bound::Included(Key::Record(key.clone(), std::u64::MAX).encode())
+            }
             Bound::Included(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
-            Bound::Unbounded => Bound::Included(Key::RecordStart.encode()),
+            Bound::Unbounded => Bound::Included(Key::Record(vec![], 0).encode()),
         };
         let to = match range.end_bound() {
             Bound::Excluded(key) => Bound::Excluded(Key::Record(key.clone(), 0).encode()),
             Bound::Included(key) => {
                 Bound::Included(Key::Record(key.clone(), std::u64::MAX).encode())
             }
-            Bound::Unbounded => Bound::Included(Key::RecordEnd.encode()),
+            Bound::Unbounded => Bound::Unbounded,
         };
 
         Ok(Self {
@@ -401,91 +411,86 @@ impl<'a, S: Storage> DoubleEndedIterator for Scan<'a, S> {
     }
 }
 
-/// Key encoding and decoding
+/// MVCC keys. The encoding must preserve the grouping and ordering of keys.
+///
+/// The first byte determines the key type. u64 is encoded in big-endian byte order. For Vec<u8>, we
+/// use 0x00 0xff as an escape sequence for 0x00, and 0x00 0x00 as a terminator, to avoid
+/// key/version overlaps from messing up the key sequence during scans - see:
+/// https://activesphere.com/blog/2018/08/17/order-preserving-serialization
 #[derive(Debug)]
 enum Key {
-    /// The next available transaction ID.
+    /// The next available txn ID. Used when starting new txns.
     TxnNext,
-    /// Marker for active transactions, containing the transaction mode.
+    /// Marker for active txns, containing the txn mode. Used to detect concurrent txns, and
+    /// to resume txns.
     TxnActive(u64),
-    /// Transaction snapshot, containing concurrent transactions at start.
+    /// Txn snapshot, containing concurrent active txns at start of txn.
     TxnSnapshot(u64),
-    /// Update entry for a transaction ID and key.
+    /// Update marker for a txn ID and key, used for rollback.
     TxnUpdate(u64, Vec<u8>),
+    /// A record for a key/version pair.
     Record(Vec<u8>, u64),
-    RecordStart,
-    RecordEnd,
 }
 
 impl Key {
+    /// Decodes a key from a byte representation.
     fn decode(key: Vec<u8>) -> Result<Self, Error> {
         let mut iter = key.into_iter();
         match iter.next() {
             Some(0x01) => Ok(Key::TxnNext),
-            Some(0x02) => {
-                let bytes: Vec<u8> = iter.collect();
-                if bytes.len() != 8 {
-                    return Err(Error::Value("Unable to parse MVCC active transaction ID".into()));
-                }
-                let mut id = [0; 8];
-                id.copy_from_slice(&bytes[..]);
-                Ok(Key::TxnActive(u64::from_be_bytes(id)))
-            }
-            Some(0x03) => {
-                let bytes: Vec<u8> = iter.collect();
-                if bytes.len() != 8 {
-                    return Err(Error::Value("Unable to parse MVCC snapshot version".into()));
-                }
-                let mut version = [0; 8];
-                version.copy_from_slice(&bytes[..]);
-                Ok(Key::TxnSnapshot(u64::from_be_bytes(version)))
-            }
-            Some(0x04) => {
-                let bytes: Vec<u8> = iter.collect();
-                if bytes.len() < 9 {
-                    return Err(Error::Value("Unable to parse MVCC update key".into()));
-                }
-                let mut id = [0; 8];
-                id.copy_from_slice(&bytes[0..8]);
-                let id = u64::from_be_bytes(id);
-                let key = bytes[8..].to_vec();
-                Ok(Key::TxnUpdate(id, key))
-            }
-            Some(0xf1) => {
-                let mut key: Vec<u8> = iter.collect();
-                if key.len() < 9 {
-                    return Err(Error::Value("Unable to parse MVCC record key".into()));
-                }
-                let mut v = [0; 8];
-                v.copy_from_slice(&key.split_off(key.len() - 8)[..]);
-                assert_eq!(Some(0x00), key.pop());
-                let version = u64::from_be_bytes(v);
-
-                Ok(Self::Record(Self::unescape(key), version))
+            Some(0x02) => Ok(Key::TxnActive(Self::decode_u64(&mut iter)?)),
+            Some(0x03) => Ok(Key::TxnSnapshot(Self::decode_u64(&mut iter)?)),
+            Some(0x04) => Ok(Key::TxnUpdate(Self::decode_u64(&mut iter)?, iter.collect())),
+            Some(0xff) => {
+                Ok(Self::Record(Self::decode_bytes(&mut iter)?, Self::decode_u64(&mut iter)?))
             }
             _ => Err(Error::Value("Unable to parse MVCC key".into())),
         }
     }
 
+    /// Decodes a byte vector from a byte representation. See encode_bytes() for format.
+    fn decode_bytes<I: Iterator<Item = u8>>(iter: &mut I) -> Result<Vec<u8>, Error> {
+        let mut bytes = Vec::new();
+        loop {
+            match iter.next() {
+                Some(0x00) => match iter.next() {
+                    Some(0x00) => break,            // 0x00 0x00 is terminator
+                    Some(0xff) => bytes.push(0x00), // 0x00 0xff is escape sequence for 0x00
+                    b => return Err(Error::Value(format!("Unexpected 0x00 encoding {:?}", b))),
+                },
+                Some(b) => bytes.push(b),
+                None => return Err(Error::Value("Unexpected end of input".into())),
+            }
+        }
+        Ok(bytes)
+    }
+
+    /// Decodes a u64 from a byte representation.
+    fn decode_u64<I: Iterator<Item = u8>>(iter: &mut I) -> Result<u64, Error> {
+        let bytes = iter.take(8).collect::<Vec<u8>>();
+        if bytes.len() < 8 {
+            return Err(Error::Value(format!("Unable to decode u64, got {} bytes", bytes.len())));
+        }
+        let mut buf = [0; 8];
+        buf.copy_from_slice(&bytes[..]);
+        Ok(u64::from_be_bytes(buf))
+    }
+
+    /// Encodes a key into a byte vector.
     fn encode(self) -> Vec<u8> {
         match self {
             Self::TxnNext => vec![0x01],
-            Self::TxnActive(id) => [vec![0x02], id.to_be_bytes().to_vec()].concat(),
-            Self::TxnSnapshot(version) => [vec![0x03], version.to_be_bytes().to_vec()].concat(),
-            Self::TxnUpdate(id, key) => [vec![0x04], id.to_be_bytes().to_vec(), key].concat(),
-            Self::RecordStart => vec![0xf0],
+            Self::TxnActive(id) => [vec![0x02], Self::encode_u64(id)].concat(),
+            Self::TxnSnapshot(version) => [vec![0x03], Self::encode_u64(version)].concat(),
+            Self::TxnUpdate(id, key) => [vec![0x04], Self::encode_u64(id), key].concat(),
             Self::Record(key, version) => {
-                // We have to use 0x00 as a key/version separator, and use 0x00 0xff as an
-                // escape sequence for 0x00 in order to avoid key/version overlaps from
-                // messing up the key sequence during scans. For more information, see:
-                // https://activesphere.com/blog/2018/08/17/order-preserving-serialization
-                [vec![0xf1], Self::escape(key), vec![0x00], version.to_be_bytes().to_vec()].concat()
+                [vec![0xff], Self::encode_bytes(key), Self::encode_u64(version)].concat()
             }
-            Self::RecordEnd => vec![0xf2],
         }
     }
 
-    fn escape(bytes: Vec<u8>) -> Vec<u8> {
+    /// Encodes a byte vector.
+    fn encode_bytes(bytes: Vec<u8>) -> Vec<u8> {
         let mut escaped = vec![];
         for b in bytes.into_iter() {
             escaped.push(b);
@@ -493,26 +498,14 @@ impl Key {
                 escaped.push(0xff);
             }
         }
+        escaped.push(0x00);
+        escaped.push(0x00);
         escaped
     }
 
-    fn unescape(bytes: Vec<u8>) -> Vec<u8> {
-        let mut unescaped = vec![];
-        let mut iter = bytes.into_iter();
-        while let Some(b) = iter.next() {
-            unescaped.push(b);
-            if b == 0x00 {
-                assert_eq!(Some(0xff), iter.next())
-            }
-        }
-        unescaped
-    }
-
-    fn version(&self) -> Result<u64, Error> {
-        match self {
-            Self::Record(_, version) => Ok(*version),
-            _ => Err(Error::Value(format!("MVCC key {:?} has no version", self))),
-        }
+    /// Encodes a u64.
+    fn encode_u64(n: u64) -> Vec<u8> {
+        n.to_be_bytes().to_vec()
     }
 }
 
