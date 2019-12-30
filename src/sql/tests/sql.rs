@@ -207,6 +207,8 @@ test_sql! {
     insert_float_min_round: "INSERT INTO movies (id, title, genre_id, released, rating) VALUES (10, 'max', 1, 2000, 1.23456789012345e-323)",
     insert_float_max: "INSERT INTO movies (id, title, genre_id, released, rating) VALUES (10, 'max', 1, 2000, 1.23456789012345e308)",
     insert_float_max_neg: "INSERT INTO movies (id, title, genre_id, released, rating) VALUES (10, 'max', 1, 2000, -1.23456789012345e308)",
+    insert_float_infinity: "INSERT INTO movies (id, title, genre_id, released, rating) VALUES (10, 'max', 1, 2000, INFINITY)",
+    insert_float_nan: "INSERT INTO movies (id, title, genre_id, released, rating) VALUES (10, 'max', 1, 2000, NAN)",
     insert_integer_float: "INSERT INTO movies (id, title, genre_id, released) VALUES (10, 'max', 1, 2000.0)",
     insert_integer_max: "INSERT INTO movies (id, title, genre_id, released) VALUES (10, 'max', 1, 9223372036854775807)",
     insert_integer_min: "INSERT INTO movies (id, title, genre_id, released) VALUES (10, 'max', 1, -9223372036854775807)",
