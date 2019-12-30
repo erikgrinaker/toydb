@@ -13,7 +13,7 @@ impl std::fmt::Display for DataType {
             Self::Boolean => "BOOLEAN",
             Self::Integer => "INTEGER",
             Self::Float => "FLOAT",
-            Self::String => "VARCHAR",
+            Self::String => "STRING",
         })
     }
 }

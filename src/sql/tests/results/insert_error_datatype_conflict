@@ -74,4 +74,4 @@ Optimized plan: Plan {
 
 Query: INSERT INTO genres VALUES (9, 3.14)
 
-Result: Value("Invalid datatype FLOAT for VARCHAR column name")
+Result: Value("Invalid datatype FLOAT for STRING column name")

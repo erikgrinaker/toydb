@@ -48,14 +48,14 @@ Result: [["id", "title", "genre_id", "released", "rating", "bluray"]]
 Storage:
 CREATE TABLE genres (
   id INTEGER PRIMARY KEY NOT NULL,
-  name VARCHAR NOT NULL
+  name STRING NOT NULL
 )
 [Integer(1), String("Science Fiction")]
 [Integer(2), String("Action")]
 
 CREATE TABLE movies (
   id INTEGER PRIMARY KEY NOT NULL,
-  title VARCHAR NOT NULL,
+  title STRING NOT NULL,
   genre_id INTEGER NOT NULL,
   released INTEGER NOT NULL,
   rating FLOAT,

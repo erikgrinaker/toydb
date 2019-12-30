@@ -16,11 +16,11 @@ macro_rules! test_sql {
             let queries = vec![
                 "CREATE TABLE genres (
                     id INTEGER PRIMARY KEY,
-                    name VARCHAR NOT NULL
+                    name STRING NOT NULL
                 )",
                 "CREATE TABLE movies (
                     id INTEGER PRIMARY KEY,
-                    title VARCHAR NOT NULL,
+                    title STRING NOT NULL,
                     genre_id INTEGER NOT NULL,
                     released INTEGER NOT NULL,
                     rating FLOAT,
@@ -145,21 +145,36 @@ test_sql! {
     create_table: r#"
         CREATE TABLE name (
             id INTEGER PRIMARY KEY,
-            string VARCHAR NOT NULL,
-            text VARCHAR,
+            name STRING NOT NULL,
             number INTEGER,
             decimal FLOAT,
-            bool BOOLEAN NULL
+            logical BOOLEAN NULL
         )"#,
+    create_table_types: r#"
+        CREATE TABLE name (
+            id INTEGER PRIMARY KEY,
+            bool_ BOOL,
+            boolean_ BOOLEAN,
+            char_ CHAR,
+            double_ DOUBLE,
+            float_ FLOAT,
+            int_ INT,
+            integer_ INTEGER,
+            string_ STRING,
+            text_ TEXT,
+            varchar_ VARCHAR
+        )
+    "#,
     create_table_single_column: "CREATE TABLE name (id INTEGER PRIMARY KEY)",
     create_table_error_bare: "CREATE TABLE",
     create_table_error_empty_columns: "CREATE TABLE name ()",
     create_table_error_exists: "CREATE TABLE movies (id INTEGER PRIMARY KEY)",
     create_table_error_no_columns: "CREATE TABLE name",
     create_table_error_no_datatype: "CREATE TABLE name (id)",
+    create_table_error_null_datatype: "CREATE TABLE name (id INTEGER PRIMARY KEY, value NULL)",
     create_table_error_no_name: "CREATE TABLE (id INTEGER)",
     create_table_error_pk_missing: "CREATE TABLE name (id INTEGER)",
-    create_table_error_pk_multiple: "CREATE TABLE name (id INTEGER PRIMARY KEY, name VARCHAR PRIMARY KEY)",
+    create_table_error_pk_multiple: "CREATE TABLE name (id INTEGER PRIMARY KEY, name STRING PRIMARY KEY)",
     create_table_error_pk_nullable: "CREATE TABLE name (id INTEGER PRIMARY KEY NULL)",
 
     delete_all: "DELETE FROM movies",

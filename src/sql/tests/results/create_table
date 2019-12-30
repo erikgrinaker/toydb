@@ -1,11 +1,10 @@
 Query: 
         CREATE TABLE name (
             id INTEGER PRIMARY KEY,
-            string VARCHAR NOT NULL,
-            text VARCHAR,
+            name STRING NOT NULL,
             number INTEGER,
             decimal FLOAT,
-            bool BOOLEAN NULL
+            logical BOOLEAN NULL
         )
 
 Tokens:
@@ -18,13 +17,10 @@ Tokens:
   Keyword(Primary)
   Keyword(Key)
   Comma
-  Ident("string")
-  Keyword(Varchar)
+  Ident("name")
+  Keyword(String)
   Keyword(Not)
   Keyword(Null)
-  Comma
-  Ident("text")
-  Keyword(Varchar)
   Comma
   Ident("number")
   Keyword(Integer)
@@ -32,7 +28,7 @@ Tokens:
   Ident("decimal")
   Keyword(Float)
   Comma
-  Ident("bool")
+  Ident("logical")
   Keyword(Boolean)
   Keyword(Null)
   CloseParen
@@ -47,18 +43,12 @@ AST: CreateTable {
             nullable: None,
         },
         ColumnSpec {
-            name: "string",
+            name: "name",
             datatype: String,
             primary_key: false,
             nullable: Some(
                 false,
             ),
-        },
-        ColumnSpec {
-            name: "text",
-            datatype: String,
-            primary_key: false,
-            nullable: None,
         },
         ColumnSpec {
             name: "number",
@@ -73,7 +63,7 @@ AST: CreateTable {
             nullable: None,
         },
         ColumnSpec {
-            name: "bool",
+            name: "logical",
             datatype: Boolean,
             primary_key: false,
             nullable: Some(
@@ -94,14 +84,9 @@ Plan: Plan {
                     nullable: false,
                 },
                 Column {
-                    name: "string",
+                    name: "name",
                     datatype: String,
                     nullable: false,
-                },
-                Column {
-                    name: "text",
-                    datatype: String,
-                    nullable: true,
                 },
                 Column {
                     name: "number",
@@ -114,7 +99,7 @@ Plan: Plan {
                     nullable: true,
                 },
                 Column {
-                    name: "bool",
+                    name: "logical",
                     datatype: Boolean,
                     nullable: true,
                 },
@@ -135,14 +120,9 @@ Optimized plan: Plan {
                     nullable: false,
                 },
                 Column {
-                    name: "string",
+                    name: "name",
                     datatype: String,
                     nullable: false,
-                },
-                Column {
-                    name: "text",
-                    datatype: String,
-                    nullable: true,
                 },
                 Column {
                     name: "number",
@@ -155,7 +135,7 @@ Optimized plan: Plan {
                     nullable: true,
                 },
                 Column {
-                    name: "bool",
+                    name: "logical",
                     datatype: Boolean,
                     nullable: true,
                 },
@@ -168,11 +148,10 @@ Optimized plan: Plan {
 Query: 
         CREATE TABLE name (
             id INTEGER PRIMARY KEY,
-            string VARCHAR NOT NULL,
-            text VARCHAR,
+            name STRING NOT NULL,
             number INTEGER,
             decimal FLOAT,
-            bool BOOLEAN NULL
+            logical BOOLEAN NULL
         )
 
 Result: <none>
@@ -180,14 +159,14 @@ Result: <none>
 Storage:
 CREATE TABLE genres (
   id INTEGER PRIMARY KEY NOT NULL,
-  name VARCHAR NOT NULL
+  name STRING NOT NULL
 )
 [Integer(1), String("Science Fiction")]
 [Integer(2), String("Action")]
 
 CREATE TABLE movies (
   id INTEGER PRIMARY KEY NOT NULL,
-  title VARCHAR NOT NULL,
+  title STRING NOT NULL,
   genre_id INTEGER NOT NULL,
   released INTEGER NOT NULL,
   rating FLOAT,
@@ -201,9 +180,8 @@ CREATE TABLE movies (
 
 CREATE TABLE name (
   id INTEGER PRIMARY KEY NOT NULL,
-  string VARCHAR NOT NULL,
-  text VARCHAR,
+  name STRING NOT NULL,
   number INTEGER,
   decimal FLOAT,
-  bool BOOLEAN
+  logical BOOLEAN
 )

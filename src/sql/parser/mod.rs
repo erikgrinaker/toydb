@@ -154,9 +154,15 @@ impl<'a> Parser<'a> {
         let mut column = ast::ColumnSpec {
             name: self.next_ident()?,
             datatype: match self.next()? {
+                Token::Keyword(Keyword::Bool) => DataType::Boolean,
                 Token::Keyword(Keyword::Boolean) => DataType::Boolean,
-                Token::Keyword(Keyword::Integer) => DataType::Integer,
+                Token::Keyword(Keyword::Char) => DataType::String,
+                Token::Keyword(Keyword::Double) => DataType::Float,
                 Token::Keyword(Keyword::Float) => DataType::Float,
+                Token::Keyword(Keyword::Int) => DataType::Integer,
+                Token::Keyword(Keyword::Integer) => DataType::Integer,
+                Token::Keyword(Keyword::String) => DataType::String,
+                Token::Keyword(Keyword::Text) => DataType::String,
                 Token::Keyword(Keyword::Varchar) => DataType::String,
                 token => return Err(Error::Parse(format!("Unexpected token {}", token))),
             },
