@@ -11,6 +11,8 @@ The following data types are supported, and can be used as column types:
 
 In addition, the special `NULL` value is used for an unknown value of unknown data type, following the rules of [three-valued logic](https://en.wikipedia.org/wiki/Three-valued_logic).
 
+Numeric types are not interchangable when stored; a float value cannot be stored in an integer column and vice-versa, even if the float value does not have a fractional part (e.g. `3.0`).
+
 ## SQL Syntax
 
 ### Keywords

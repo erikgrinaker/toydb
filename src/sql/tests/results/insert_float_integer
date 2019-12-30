@@ -1,0 +1,159 @@
+Query: INSERT INTO movies (id, title, genre_id, released, rating) VALUES (10, 'max', 1, 2000, 123)
+
+Tokens:
+  Keyword(Insert)
+  Keyword(Into)
+  Ident("movies")
+  OpenParen
+  Ident("id")
+  Comma
+  Ident("title")
+  Comma
+  Ident("genre_id")
+  Comma
+  Ident("released")
+  Comma
+  Ident("rating")
+  CloseParen
+  Keyword(Values)
+  OpenParen
+  Number("10")
+  Comma
+  String("max")
+  Comma
+  Number("1")
+  Comma
+  Number("2000")
+  Comma
+  Number("123")
+  CloseParen
+
+AST: Insert {
+    table: "movies",
+    columns: Some(
+        [
+            "id",
+            "title",
+            "genre_id",
+            "released",
+            "rating",
+        ],
+    ),
+    values: [
+        [
+            Literal(
+                Integer(
+                    10,
+                ),
+            ),
+            Literal(
+                String(
+                    "max",
+                ),
+            ),
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Integer(
+                    2000,
+                ),
+            ),
+            Literal(
+                Integer(
+                    123,
+                ),
+            ),
+        ],
+    ],
+}
+
+Plan: Plan {
+    root: Insert {
+        table: "movies",
+        columns: [
+            "id",
+            "title",
+            "genre_id",
+            "released",
+            "rating",
+        ],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        10,
+                    ),
+                ),
+                Constant(
+                    String(
+                        "max",
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        2000,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        123,
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Insert {
+        table: "movies",
+        columns: [
+            "id",
+            "title",
+            "genre_id",
+            "released",
+            "rating",
+        ],
+        expressions: [
+            [
+                Constant(
+                    Integer(
+                        10,
+                    ),
+                ),
+                Constant(
+                    String(
+                        "max",
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        2000,
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        123,
+                    ),
+                ),
+            ],
+        ],
+    },
+}
+
+Query: INSERT INTO movies (id, title, genre_id, released, rating) VALUES (10, 'max', 1, 2000, 123)
+
+Result: Value("Invalid datatype INTEGER for FLOAT column rating")
