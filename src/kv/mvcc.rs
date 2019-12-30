@@ -154,7 +154,7 @@ impl<S: Storage> Transaction<S> {
 
     /// Scans a key range.
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
-        Ok(Box::new(Scan::new(self.storage.read()?, self.snapshot.clone(), range)?))
+        Ok(Box::new(Scan::new(self.storage.clone(), self.snapshot.clone(), range)?))
     }
 
     /// Sets a key.
@@ -264,136 +264,6 @@ impl Snapshot {
     }
 }
 
-/// A key range scan
-pub struct Scan<'a, S: Storage> {
-    storage: RwLockReadGuard<'a, S>,
-    snapshot: Snapshot,
-    mark_front: Bound<Vec<u8>>,
-    mark_back: Bound<Vec<u8>>,
-    seen: Option<(Vec<u8>, Vec<u8>)>,
-    rev_ignore: Option<Vec<u8>>,
-}
-
-impl<'a, S: Storage> Scan<'a, S> {
-    fn new(
-        storage: RwLockReadGuard<'a, S>,
-        snapshot: Snapshot,
-        range: impl RangeBounds<Vec<u8>>,
-    ) -> Result<Self, Error> {
-        let from = match range.start_bound() {
-            Bound::Excluded(key) => {
-                Bound::Included(Key::Record(key.clone(), std::u64::MAX).encode())
-            }
-            Bound::Included(key) => Bound::Included(Key::Record(key.clone(), 0).encode()),
-            Bound::Unbounded => Bound::Included(Key::Record(vec![], 0).encode()),
-        };
-        let to = match range.end_bound() {
-            Bound::Excluded(key) => Bound::Excluded(Key::Record(key.clone(), 0).encode()),
-            Bound::Included(key) => {
-                Bound::Included(Key::Record(key.clone(), std::u64::MAX).encode())
-            }
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        Ok(Self {
-            storage,
-            snapshot,
-            mark_front: from,
-            mark_back: to,
-            seen: None,
-            rev_ignore: None,
-        })
-    }
-}
-
-impl<'a, S: Storage> Iterator for Scan<'a, S> {
-    type Item = Result<(Vec<u8>, Vec<u8>), Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let range = self.storage.scan((self.mark_front.clone(), self.mark_back.clone()));
-        for r in range {
-            match r {
-                Ok((k, v)) => {
-                    self.mark_front = Bound::Excluded(k.clone());
-                    let (key, version) = match Key::decode(&k).unwrap() {
-                        Key::Record(key, version) => (key, version),
-                        _ => panic!("Not implemented"),
-                    };
-                    if !self.snapshot.is_visible(version) {
-                        continue;
-                    }
-                    let value = match deserialize(&v).unwrap() {
-                        Some(value) => value,
-                        None => {
-                            let mut clear_seen = false;
-                            if let Some((k, _)) = &self.seen {
-                                if k == &key {
-                                    clear_seen = true;
-                                }
-                            }
-                            if clear_seen {
-                                self.seen = None;
-                            }
-                            continue;
-                        }
-                    };
-
-                    let mut ret = None;
-                    if let Some((k, v)) = &self.seen {
-                        if k != &key {
-                            ret = Some(Ok((k.clone(), v.clone())));
-                        }
-                    };
-                    self.seen = Some((key, value));
-                    if ret.is_some() {
-                        return ret;
-                    }
-                }
-                Err(err) => return Some(Err(err)),
-            }
-        }
-        let mut pair = None;
-        if let Some((k, v)) = &self.seen {
-            pair = Some(Ok((k.clone(), v.clone())));
-        }
-        self.seen = None;
-        pair
-    }
-}
-
-impl<'a, S: Storage> DoubleEndedIterator for Scan<'a, S> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let mut range = self.storage.scan((self.mark_front.clone(), self.mark_back.clone()));
-        while let Some(r) = range.next_back() {
-            match r {
-                Ok((k, v)) => {
-                    self.mark_back = Bound::Excluded(k.clone());
-                    let (key, version) = match Key::decode(&k).unwrap() {
-                        Key::Record(key, version) => (key, version),
-                        _ => panic!("Not implemented"),
-                    };
-                    if !self.snapshot.is_visible(version) {
-                        continue;
-                    }
-                    if let Some(ignore) = &self.rev_ignore {
-                        if &key == ignore {
-                            continue;
-                        }
-                    }
-                    self.rev_ignore = Some(key.clone());
-                    let value = match deserialize(&v).unwrap() {
-                        Some(value) => value,
-                        None => continue,
-                    };
-                    return Some(Ok((key, value)));
-                }
-                Err(err) => return Some(Err(err)),
-            }
-        }
-        None
-    }
-}
-
 /// MVCC keys. The encoding must preserve the grouping and ordering of keys.
 ///
 /// The first byte determines the key type. u64 is encoded in big-endian byte order. For Vec<u8>, we
@@ -490,13 +360,131 @@ impl Key {
     fn encode_u64(n: u64) -> Vec<u8> {
         n.to_be_bytes().to_vec()
     }
+}
 
-    /// Returns the version for a key, if it has one.
-    fn version(&self) -> Result<u64, Error> {
-        match self {
-            Self::Record(_, version) => Ok(*version),
-            key => Err(Error::Value(format!("Unexpected MVCC key {:?}", key))),
+/// A key range scan.
+/// FIXME This should really just wrap the underlying iterator via a RwLock guard for the storage,
+/// but making the lifetimes work out is non-trivial. See also:
+/// https://users.rust-lang.org/t/creating-an-iterator-over-mutex-contents-cannot-infer-an-appropriate-lifetime/24458
+pub struct Scan<S: Storage> {
+    /// The KV storage used for the scan.
+    storage: Arc<RwLock<S>>,
+    /// The snapshot the scan is running in.
+    snapshot: Snapshot,
+    /// Keeps track of the remaining range bounds we're iterating over.
+    bounds: (Bound<Vec<u8>>, Bound<Vec<u8>>),
+    /// Keeps track of next() candidate pair to be returned if no newer versions are found.
+    next_candidate: Option<(Vec<u8>, Option<Vec<u8>>)>,
+    /// Keeps track of next_back() returned key, whose older versions should be ignored.
+    next_back_returned: Option<Vec<u8>>,
+}
+
+impl<S: Storage> Scan<S> {
+    /// Creates a new scan.
+    fn new(
+        storage: Arc<RwLock<S>>,
+        snapshot: Snapshot,
+        range: impl RangeBounds<Vec<u8>>,
+    ) -> Result<Self, Error> {
+        let start = match range.start_bound() {
+            Bound::Excluded(k) => Bound::Excluded(Key::Record(k.clone(), std::u64::MAX).encode()),
+            Bound::Included(k) => Bound::Included(Key::Record(k.clone(), 0).encode()),
+            Bound::Unbounded => Bound::Included(Key::Record(vec![], 0).encode()),
+        };
+        let end = match range.end_bound() {
+            Bound::Excluded(k) => Bound::Excluded(Key::Record(k.clone(), 0).encode()),
+            Bound::Included(k) => Bound::Included(Key::Record(k.clone(), std::u64::MAX).encode()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        Ok(Self {
+            storage,
+            snapshot,
+            bounds: (start, end),
+            next_candidate: None,
+            next_back_returned: None,
+        })
+    }
+
+    // next() with error handling.
+    #[allow(clippy::type_complexity)]
+    fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>, Error> {
+        let session = self.storage.read()?;
+        let mut range = session.scan(self.bounds.clone());
+        while let Some((k, v)) = range.next().transpose()? {
+            // Keep track of iterator progress
+            self.bounds.0 = Bound::Excluded(k.clone());
+
+            let (key, version) = match Key::decode(&k)? {
+                Key::Record(key, version) => (key, version),
+                k => return Err(Error::Internal(format!("Expected Record, got {:?}", k))),
+            };
+            if !self.snapshot.is_visible(version) {
+                continue;
+            }
+
+            // Keep track of return candidate, and return current candidate if key changes.
+            let ret = match &self.next_candidate {
+                Some((k, Some(v))) if k != &key => Some((k.clone(), v.clone())),
+                _ => None,
+            };
+            self.next_candidate = Some((key, deserialize(&v)?));
+            if ret.is_some() {
+                return Ok(ret);
+            }
         }
+
+        // When iteration ends, return the last candidate if any
+        if let Some((k, Some(v))) = self.next_candidate.clone() {
+            self.next_candidate = None;
+            Ok(Some((k, v)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// next_back() with error handling.
+    #[allow(clippy::type_complexity)]
+    fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>, Error> {
+        let session = self.storage.read()?;
+        let mut range = session.scan(self.bounds.clone());
+        while let Some((k, v)) = range.next_back().transpose()? {
+            // Keep track of iterator progress
+            self.bounds.1 = Bound::Excluded(k.clone());
+
+            let (key, version) = match Key::decode(&k)? {
+                Key::Record(key, version) => (key, version),
+                k => return Err(Error::Internal(format!("Expected Record, got {:?}", k))),
+            };
+            if !self.snapshot.is_visible(version) {
+                continue;
+            }
+
+            // Keep track of keys already been seen and returned (i.e. skip older versions)
+            if self.next_back_returned.as_ref() == Some(&key) {
+                continue;
+            }
+            self.next_back_returned = Some(key.clone());
+
+            if let Some(value) = deserialize(&v)? {
+                return Ok(Some((key, value)));
+            }
+        }
+        Ok(None)
+    }
+}
+
+impl<S: Storage> Iterator for Scan<S> {
+    type Item = Result<(Vec<u8>, Vec<u8>), Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.try_next().transpose()
+    }
+}
+
+impl<S: Storage> DoubleEndedIterator for Scan<S> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.try_next_back().transpose()
     }
 }
 
@@ -827,6 +815,7 @@ pub mod tests {
 
         txn.set(b"c", vec![0x01])?;
         txn.set(b"c", vec![0x02])?;
+        txn.delete(b"c")?;
         txn.set(b"c", vec![0x03])?;
 
         txn.set(b"d", vec![0x01])?;
@@ -838,11 +827,12 @@ pub mod tests {
         txn.set(b"e", vec![0x01])?;
         txn.set(b"e", vec![0x02])?;
         txn.set(b"e", vec![0x03])?;
-        txn.set(b"e", vec![0x04])?;
         txn.delete(b"e")?;
+        txn.set(b"e", vec![0x04])?;
         txn.set(b"e", vec![0x05])?;
         txn.commit()?;
 
+        // Forward scan
         let txn = mvcc.begin()?;
         assert_eq!(
             vec![
@@ -853,6 +843,7 @@ pub mod tests {
             txn.scan(..)?.collect::<Result<Vec<_>, _>>()?
         );
 
+        // Reverse scan
         assert_eq!(
             vec![
                 (b"e".to_vec(), vec![0x05]),
@@ -861,8 +852,16 @@ pub mod tests {
             ],
             txn.scan(..)?.rev().collect::<Result<Vec<_>, _>>()?
         );
-        txn.commit()?;
 
+        // Alternate forward/backward scan
+        let mut scan = txn.scan(..)?;
+        assert_eq!(Some((b"a".to_vec(), vec![0x01])), scan.next().transpose()?);
+        assert_eq!(Some((b"e".to_vec(), vec![0x05])), scan.next_back().transpose()?);
+        assert_eq!(Some((b"c".to_vec(), vec![0x03])), scan.next_back().transpose()?);
+        assert_eq!(None, scan.next().transpose()?);
+        std::mem::drop(scan);
+
+        txn.commit()?;
         Ok(())
     }
 
