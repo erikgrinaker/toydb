@@ -1,0 +1,86 @@
+Query: CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  Ident("mixed_case")
+  OpenParen
+  Ident("äåæ")
+  Keyword(String)
+  Keyword(Primary)
+  Keyword(Key)
+  CloseParen
+
+AST: CreateTable {
+    name: "mixed_case",
+    columns: [
+        ColumnSpec {
+            name: "äåæ",
+            datatype: String,
+            primary_key: true,
+            nullable: None,
+        },
+    ],
+}
+
+Plan: Plan {
+    root: CreateTable {
+        schema: Table {
+            name: "mixed_case",
+            columns: [
+                Column {
+                    name: "äåæ",
+                    datatype: String,
+                    nullable: false,
+                },
+            ],
+            primary_key: 0,
+        },
+    },
+}
+
+Optimized plan: Plan {
+    root: CreateTable {
+        schema: Table {
+            name: "mixed_case",
+            columns: [
+                Column {
+                    name: "äåæ",
+                    datatype: String,
+                    nullable: false,
+                },
+            ],
+            primary_key: 0,
+        },
+    },
+}
+
+Query: CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)
+
+Result: <none>
+
+Storage:
+CREATE TABLE genres (
+  id INTEGER PRIMARY KEY NOT NULL,
+  name STRING NOT NULL
+)
+[Integer(1), String("Science Fiction")]
+[Integer(2), String("Action")]
+
+CREATE TABLE mixed_case (
+  äåæ STRING PRIMARY KEY NOT NULL
+)
+
+CREATE TABLE movies (
+  id INTEGER PRIMARY KEY NOT NULL,
+  title STRING NOT NULL,
+  genre_id INTEGER NOT NULL,
+  released INTEGER NOT NULL,
+  rating FLOAT,
+  bluray BOOLEAN
+)
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(true)]

@@ -1,0 +1,4 @@
+Query: CREATE TABLE _name (id INTEGER PRIMARY KEY)
+
+Tokens:
+Err(Parse("Unexpected character _"))

@@ -1,0 +1,14 @@
+Query: CREATE TABLE 'name' (id INTEGER PRIMARY KEY)
+
+Tokens:
+  Keyword(Create)
+  Keyword(Table)
+  String("name")
+  OpenParen
+  Ident("id")
+  Keyword(Integer)
+  Keyword(Primary)
+  Keyword(Key)
+  CloseParen
+
+AST: Parse("Expected identifier, got name")

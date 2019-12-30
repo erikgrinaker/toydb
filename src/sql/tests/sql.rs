@@ -165,8 +165,15 @@ test_sql! {
             varchar_ VARCHAR
         )
     "#,
+    create_table_alphanumeric: "CREATE TABLE a_123 (id INTEGER PRIMARY KEY)",
+    create_table_japanese: "CREATE TABLE 表 (身元 INTEGER PRIMARY KEY, 名前 STRING)",
+    create_table_case: "CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)",
     create_table_single_column: "CREATE TABLE name (id INTEGER PRIMARY KEY)",
     create_table_error_bare: "CREATE TABLE",
+    create_table_error_name_emoji: "CREATE TABLE 👋 (id INTEGER PRIMARY KEY)",
+    create_table_error_name_quote_single: r#"CREATE TABLE 'name' (id INTEGER PRIMARY KEY)"#,
+    create_table_error_name_quote_double: r#"CREATE TABLE "name" (id INTEGER PRIMARY KEY)"#,
+    create_table_error_name_underscore: "CREATE TABLE _name (id INTEGER PRIMARY KEY)",
     create_table_error_empty_columns: "CREATE TABLE name ()",
     create_table_error_exists: "CREATE TABLE movies (id INTEGER PRIMARY KEY)",
     create_table_error_no_columns: "CREATE TABLE name",
@@ -204,6 +211,7 @@ test_sql! {
 
     select_all_from_table: "SELECT * FROM movies",
     select_aliases: "SELECT 1, 2 b, 3 AS c",
+    select_case: "SELECT TiTlE AS Name FROM movies",
     select_error_bare: "SELECT",
     select_error_bare_as: "SELECT 1 AS, 2",
     select_error_bare_from: "SELECT 1 FROM",

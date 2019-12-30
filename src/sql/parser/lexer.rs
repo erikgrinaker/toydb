@@ -303,7 +303,9 @@ impl<'a> Lexer<'a> {
         while let Some(c) = self.next_if(|c| c.is_alphanumeric() || c == '_') {
             name.push(c)
         }
-        Keyword::from_str(&name).map(Token::Keyword).or(Some(Token::Ident(name)))
+        Keyword::from_str(&name)
+            .map(Token::Keyword)
+            .or_else(|| Some(Token::Ident(name.to_lowercase())))
     }
 
     /// Scans the input for the next number token, if any
