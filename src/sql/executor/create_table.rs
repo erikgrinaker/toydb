@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::schema;
+use super::super::types::schema;
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;

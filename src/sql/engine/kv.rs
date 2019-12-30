@@ -1,5 +1,5 @@
-use super::super::schema;
 use super::super::types;
+use super::super::types::schema;
 use super::Mode;
 use crate::kv;
 use crate::utility::{deserialize, serialize};

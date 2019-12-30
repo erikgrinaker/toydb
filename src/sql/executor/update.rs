@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
+use super::super::types::expression::{Environment, Expression};
 use super::super::types::Row;
-use super::super::{Environment, Expression};
 use super::{Context, Executor};
 use crate::Error;
 use std::collections::BTreeMap;

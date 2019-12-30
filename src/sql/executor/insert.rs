@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::expression::{Environment, Expressions};
+use super::super::types::expression::{Environment, Expressions};
 use super::super::types::Row;
 use super::{Context, Executor};
 use crate::Error;

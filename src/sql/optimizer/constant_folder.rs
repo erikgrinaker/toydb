@@ -1,5 +1,5 @@
 use super::super::planner::Node;
-use super::super::{Environment, Expression};
+use super::super::types::expression::{Environment, Expression};
 use super::Optimizer;
 use crate::Error;
 

@@ -1,5 +1,5 @@
-use super::super::schema;
 use super::super::types;
+use super::super::types::schema;
 use super::Engine as _;
 use super::Mode;
 use super::Transaction as _;

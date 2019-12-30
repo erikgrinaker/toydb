@@ -1,4 +1,4 @@
-use super::types::Value;
+use super::Value;
 use crate::Error;
 use std::collections::HashMap;
 

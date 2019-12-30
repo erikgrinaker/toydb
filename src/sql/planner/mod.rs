@@ -2,9 +2,9 @@ mod plan;
 
 pub use plan::{Node, Order, Plan};
 
-use super::expression::{Environment, Expression};
 use super::parser::ast;
-use super::schema;
+use super::types::expression::{Environment, Expression};
+use super::types::schema;
 use super::types::Value;
 use crate::Error;
 

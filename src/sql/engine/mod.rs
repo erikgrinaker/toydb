@@ -5,8 +5,8 @@ pub use crate::kv::Mode;
 pub use kv::KV;
 pub use raft::Raft;
 
-use super::schema;
 use super::types;
+use super::types::schema;
 use crate::Error;
 
 pub trait Engine {

@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
-use super::super::expression::{Environment, Expression};
 use super::super::planner;
+use super::super::types::expression::{Environment, Expression};
 use super::super::types::{Row, Value};
 use super::{Context, Executor};
 use crate::Error;
