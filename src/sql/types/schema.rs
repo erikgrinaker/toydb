@@ -124,6 +124,12 @@ impl Column {
                 datatype, self.datatype, self.name
             ))),
             _ => Ok(()),
+        }?;
+        match value {
+            Value::String(s) if s.len() > 1024 => {
+                Err(Error::Value("Strings cannot be more than 1024 bytes".into()))
+            }
+            _ => Ok(()),
         }
     }
 }
