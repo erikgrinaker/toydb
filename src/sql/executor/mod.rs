@@ -27,6 +27,7 @@ use update::Update;
 use super::engine::Transaction;
 use super::planner::Node;
 use super::types::Row;
+use crate::client;
 use crate::Error;
 
 /// A plan executor
@@ -91,4 +92,49 @@ impl Iterator for dyn Executor {
 pub struct Context<'a, T: Transaction> {
     /// The underlying storage engine
     pub txn: &'a mut T,
+}
+
+/// An execution result set
+pub struct ResultSet {
+    // FIXME Shouldn't be public, and shouldn't use client package
+    pub effect: Option<client::Effect>,
+    columns: Vec<String>,
+    executor: Option<Box<dyn Executor>>,
+}
+
+impl ResultSet {
+    /// Creates an empty result set
+    pub fn empty() -> Self {
+        Self { effect: None, columns: Vec::new(), executor: None }
+    }
+
+    /// Creates a result set from an executor
+    pub fn from_executor(executor: Box<dyn Executor>) -> Self {
+        Self { effect: None, columns: executor.columns(), executor: Some(executor) }
+    }
+
+    /// Fetches the columns of the result set
+    pub fn columns(&self) -> Vec<String> {
+        self.columns.clone()
+    }
+}
+
+impl Iterator for ResultSet {
+    type Item = Result<Row, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Make sure iteration is aborted on the first error, otherwise callers
+        // may keep calling next for as long as it keeps returning errors
+        if let Some(ref mut iter) = self.executor {
+            match iter.next() {
+                Some(Err(err)) => {
+                    self.executor = None;
+                    Some(Err(err))
+                }
+                r => r,
+            }
+        } else {
+            None
+        }
+    }
 }

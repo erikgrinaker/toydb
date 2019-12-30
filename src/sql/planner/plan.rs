@@ -1,11 +1,10 @@
 use super::super::engine::Transaction;
-use super::super::executor::{Context, Executor};
+use super::super::executor::{Context, Executor, ResultSet};
 use super::super::expression::{Expression, Expressions};
 use super::super::optimizer;
 use super::super::optimizer::Optimizer;
 use super::super::parser::ast;
 use super::super::schema;
-use super::super::types::ResultSet;
 use super::Planner;
 use crate::Error;
 use std::collections::BTreeMap;

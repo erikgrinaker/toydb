@@ -99,7 +99,7 @@ impl service::ToyDB for ToyDB {
 
 impl ToyDB {
     /// Executes an SQL statement
-    fn execute(&self, txn_id: Option<u64>, query: &str) -> Result<sql::types::ResultSet, Error> {
+    fn execute(&self, txn_id: Option<u64>, query: &str) -> Result<sql::ResultSet, Error> {
         let statement = sql::Parser::new(query).parse()?;
 
         // FIXME Needs to return effect for DDL statements as well
@@ -110,13 +110,13 @@ impl ToyDB {
                     Err(Error::Value("Already in a transaction".into()))
                 }
                 sql::ast::Statement::Commit => {
-                    let mut rs = sql::types::ResultSet::empty();
+                    let mut rs = sql::ResultSet::empty();
                     rs.effect = Some(client::Effect::Commit(txn.id()));
                     txn.commit()?;
                     Ok(rs)
                 }
                 sql::ast::Statement::Rollback => {
-                    let mut rs = sql::types::ResultSet::empty();
+                    let mut rs = sql::ResultSet::empty();
                     rs.effect = Some(client::Effect::Rollback(txn.id()));
                     txn.rollback()?;
                     Ok(rs)
@@ -137,19 +137,19 @@ impl ToyDB {
                         ));
                     }
                     let txn = self.engine.begin()?;
-                    let mut rs = sql::types::ResultSet::empty();
+                    let mut rs = sql::ResultSet::empty();
                     rs.effect = Some(client::Effect::Begin { id: txn.id(), mode: txn.mode() });
                     Ok(rs)
                 }
                 sql::ast::Statement::Begin { readonly: true, version: None } => {
                     let txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
-                    let mut rs = sql::types::ResultSet::empty();
+                    let mut rs = sql::ResultSet::empty();
                     rs.effect = Some(client::Effect::Begin { id: txn.id(), mode: txn.mode() });
                     Ok(rs)
                 }
                 sql::ast::Statement::Begin { readonly: true, version: Some(version) } => {
                     let txn = self.engine.begin_with_mode(Mode::Snapshot { version })?;
-                    let mut rs = sql::types::ResultSet::empty();
+                    let mut rs = sql::ResultSet::empty();
                     rs.effect = Some(client::Effect::Begin { id: txn.id(), mode: txn.mode() });
                     Ok(rs)
                 }
