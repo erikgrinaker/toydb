@@ -34,3 +34,21 @@ The following case-insensitive keywords evaluate to constants:
 * `NAN`: the IEEE 754 `binary64` floating-point value for NaN (not a number).
 * `NULL`: the unknown value.
 * `TRUE`: the `BOOLEAN` true value.
+
+#### String literals
+
+String literals are surrounded by single quotes `'`, and may contain any valid UTF-8 character. Single quotes must be escaped by an additional single quote, i.e. `''`, no other escape sequences are supported. For example:
+
+```
+'A string with ''quotes'' and emojis 😀'
+```
+
+#### Numeric literals
+
+Sequences of digits `0-9` are parsed as a 64-bit signed integer. Numbers with decimal points or in scientific notation are parsed as 64-bit floating point numbers. The following pattern is supported:
+
+```
+999[.[999]][e[+-]999]
+```
+
+The `-` prefix operator can be used to take negative numbers.

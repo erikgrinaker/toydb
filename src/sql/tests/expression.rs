@@ -48,12 +48,17 @@ test_expr! {
     lit_float: "3.72" => Ok(Float(3.72)),
     lit_float_exp: "3.14e3" => Ok(Float(3140.0)),
     lit_float_exp_neg: "2.718E-2" => Ok(Float(0.02718)),
-    lit_float_nodecimal: "3.0" => Ok(Float(3.0)),
-    lit_int: "3" => Ok(Integer(3)),
-    lit_int_multidigit: "314" => Ok(Integer(314)),
-    lit_int_zeroprefix: "03" => Ok(Integer(3)),
-    lit_str: "'Hi! 👋'" => Ok(String("Hi! 👋".into())),
-    lit_str_quotes: r#"'Has ''single'' and "double" quotes'"# => Ok(String(r#"Has 'single' and "double" quotes"#.into())),
+    lit_float_no_decimal: "3." => Ok(Float(3.0)),
+    lit_float_zero_decimal: "3.0" => Ok(Float(3.0)),
+
+    lit_integer: "3" => Ok(Integer(3)),
+    lit_integer_multidigit: "314" => Ok(Integer(314)),
+    lit_integer_zeroprefix: "03" => Ok(Integer(3)),
+
+    lit_string: "'Hi! 👋'" => Ok(String("Hi! 👋".into())),
+    lit_string_escape: r#"'Try \n newlines and \t tabs'"# => Ok(String(r#"Try \n newlines and \t tabs"#.into())),
+    lit_string_quotes: r#"'Has ''single'' and "double" quotes'"# => Ok(String(r#"Has 'single' and "double" quotes"#.into())),
+    lit_string_whitespace: "' Has \n newlines and \t tabs  '" => Ok(String(" Has \n newlines and \t tabs  ".into())),
 
     op_add_float_float: "3.1 + 2.71" => Ok(Float(3.1 + 2.71)),
     op_add_float_int: "3.72 + 1" => Ok(Float(3.72 + 1.0)),
