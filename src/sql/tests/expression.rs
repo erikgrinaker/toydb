@@ -16,12 +16,19 @@ fn eval_expr(expr: &str) -> Result<Value, Error> {
 }
 
 macro_rules! test_expr {
-    ( $( $name:ident: $expr:expr => $result:expr, )* ) => {
+    ( $( $name:ident: $expr:expr => $expect:expr, )* ) => {
     $(
         #[test]
         fn $name() -> Result<(), Error> {
-            let value = eval_expr($expr);
-            assert_eq!($result, value);
+            let expect: Result<Value, Error> = $expect;
+            let actual = eval_expr($expr);
+            match expect {
+                Ok(Float(e)) if e.is_nan() => match actual {
+                    Ok(Float(a)) if a.is_nan() => {},
+                    _ => panic!("Expected NaN, got {:?}", actual),
+                }
+                _ => assert_eq!($expect, actual),
+            }
             Ok(())
         }
     )*
@@ -31,8 +38,13 @@ macro_rules! test_expr {
 use Value::*;
 
 test_expr! {
-    lit_bool_false: "FALSE" => Ok(Boolean(false)),
-    lit_bool_true: "TRUE" => Ok(Boolean(true)),
+    const_case: "TrUe" => Ok(Boolean(true)),
+    const_false: "FALSE" => Ok(Boolean(false)),
+    const_infinity: "INFINITY" => Ok(Float(std::f64::INFINITY)),
+    const_nan: "NAN" => Ok(Float(std::f64::NAN)),
+    const_null: "NULL" => Ok(Null),
+    const_true: "TRUE" => Ok(Boolean(true)),
+
     lit_float: "3.72" => Ok(Float(3.72)),
     lit_float_exp: "3.14e3" => Ok(Float(3140.0)),
     lit_float_exp_neg: "2.718E-2" => Ok(Float(0.02718)),
@@ -40,7 +52,6 @@ test_expr! {
     lit_int: "3" => Ok(Integer(3)),
     lit_int_multidigit: "314" => Ok(Integer(314)),
     lit_int_zeroprefix: "03" => Ok(Integer(3)),
-    lit_null: "NULL" => Ok(Null),
     lit_str: "'Hi! 👋'" => Ok(String("Hi! 👋".into())),
     lit_str_quotes: r#"'Has ''single'' and "double" quotes'"# => Ok(String(r#"Has 'single' and "double" quotes"#.into())),
 

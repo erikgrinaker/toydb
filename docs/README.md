@@ -22,3 +22,15 @@ Keywords are reserved words that have special meaning in SQL statements, such as
 ### Identifiers
 
 Identifiers are names for database objects, such as tables and columns. Identifiers must begin with any Unicode letter, and can contain any combination of Unicode letters, numbers, and underscores (`_`). Identifiers are automatically converted to lowercase, and have no length limit. Reserved keywords (see above) cannot be used as identifiers, and it is not possible to quote or escape identifiers.
+
+### Constants
+
+#### Named constants
+
+The following case-insensitive keywords evaluate to constants:
+
+* `FALSE`: the `BOOLEAN` false value.
+* `INFINITY`: the IEEE 754 `binary64` floating-point value for infinity.
+* `NAN`: the IEEE 754 `binary64` floating-point value for NaN (not a number).
+* `NULL`: the unknown value.
+* `TRUE`: the `BOOLEAN` true value.
