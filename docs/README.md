@@ -54,3 +54,33 @@ Sequences of digits `0-9` are parsed as a 64-bit signed integer. Numbers with de
 ```
 
 The `-` prefix operator can be used to take negative numbers.
+
+### Operators
+
+#### Logical operators
+
+Logical operators apply standard logic operations on boolean operands.
+
+* `AND`: the logical conjunction, e.g. `TRUE AND TRUE` yields `TRUE`.
+* `OR`: the logical disjunction, e.g. `TRUE OR FALSE` yields `TRUE`.
+* `NOT`: the logical negation, e.g. `NOT TRUE` yields `FALSE`.
+
+The complete truth tables are:
+
+| `AND`       | `TRUE`  | `FALSE` | `NULL`  |
+|-------------|---------|---------|---------|
+| **`TRUE`**  | `TRUE`  | `FALSE` | `NULL`  |
+| **`FALSE`** | `FALSE` | `FALSE` | `FALSE` |
+| **`NULL`**  | `NULL`  | `FALSE` | `NULL`  |
+
+| `OR`        | `TRUE` | `FALSE` |
+|-------------|--------|---------|
+| **`TRUE`**  | `TRUE` | `TRUE`  |
+| **`FALSE`** | `TRUE` | `FALSE` |
+| **`NULL`**  | `TRUE` | `NULL`  |
+
+| `NOT`       |         |
+|-------------|---------|
+| **`TRUE`**  | `FALSE` |
+| **`FALSE`** | `TRUE`  |
+| **`NULL`**  | `NULL`  |
