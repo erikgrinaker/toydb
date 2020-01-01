@@ -1,8 +1,9 @@
 use super::Value;
 use crate::Error;
+
 use std::collections::HashMap;
 
-/// An expression
+/// An expression, made up of constants and operations
 #[derive(Debug)]
 pub enum Expression {
     // Values
@@ -14,7 +15,7 @@ pub enum Expression {
     Not(Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
 
-    // Comparisons
+    // Comparisons operations
     CompareEQ(Box<Expression>, Box<Expression>),
     CompareGT(Box<Expression>, Box<Expression>),
     CompareGTE(Box<Expression>, Box<Expression>),
@@ -34,19 +35,17 @@ pub enum Expression {
     Subtract(Box<Expression>, Box<Expression>),
 }
 
+/// A list of expressions
 pub type Expressions = Vec<Expression>;
 
 impl Expression {
-    /// Evaluates an expression to a value
+    /// Evaluates an expression to a value, given an environment
     pub fn evaluate(&self, e: &Environment) -> Result<Value, Error> {
         use Value::*;
         Ok(match self {
-            // Values
+            // Constant values
             Self::Constant(c) => c.clone(),
-            Self::Field(f) => match e.fields.get(f) {
-                Some(v) => v.clone(),
-                None => return Err(Error::Value(format!("Unknown field {}", f))),
-            },
+            Self::Field(f) => e.get_field(f)?,
 
             // Logical operations
             Self::And(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
@@ -326,10 +325,7 @@ impl Expression {
 
     /// Walks the expression tree depth-first, calling a closure for every element.
     /// If the closure returns false, walking is halted.
-    pub fn walk<F>(&self, visitor: &F) -> bool
-    where
-        F: Fn(&Expression) -> bool,
-    {
+    pub fn walk<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
         if match self {
             Self::Add(lhs, rhs)
             | Self::And(lhs, rhs)
@@ -359,17 +355,27 @@ impl Expression {
     }
 }
 
-/// An expression evaluation environment
+/// An expression evaluation environment, containing field values
 pub struct Environment {
     fields: HashMap<String, Value>,
 }
 
 impl Environment {
+    /// Creates a new environment from a field map
     pub fn new(fields: HashMap<String, Value>) -> Self {
         Self { fields }
     }
 
+    /// Creates an empty environment
     pub fn empty() -> Self {
         Self::new(HashMap::new())
+    }
+
+    /// Fetches a field value, or throws Error::Value if missing
+    pub fn get_field(&self, field: &str) -> Result<Value, Error> {
+        match self.fields.get(field) {
+            Some(v) => Ok(v.clone()),
+            None => Err(Error::Value(format!("Unknown field {}", field))),
+        }
     }
 }

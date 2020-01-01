@@ -1,5 +1,6 @@
 use super::{DataType, Row, Value};
 use crate::Error;
+
 use std::collections::HashMap;
 
 /// A table

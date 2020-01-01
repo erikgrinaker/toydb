@@ -18,19 +18,27 @@ impl std::fmt::Display for DataType {
     }
 }
 
-/// A value
+/// A specific value of a data type
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Value {
-    /// An unknown value
     Null,
-    /// A boolean
     Boolean(bool),
-    /// A signed 64-bit integer
     Integer(i64),
-    /// A signed 64-bit float
     Float(f64),
-    /// A UTF-8 encoded string
     String(String),
+}
+
+impl Value {
+    /// Returns the value's datatype, or None for null values
+    pub fn datatype(&self) -> Option<DataType> {
+        match self {
+            Self::Null => None,
+            Self::Boolean(_) => Some(DataType::Boolean),
+            Self::Integer(_) => Some(DataType::Integer),
+            Self::Float(_) => Some(DataType::Float),
+            Self::String(_) => Some(DataType::String),
+        }
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -46,19 +54,6 @@ impl std::fmt::Display for Value {
             }
             .as_ref(),
         )
-    }
-}
-
-impl Value {
-    /// Returns the value's datatype, or None for null values
-    pub fn datatype(&self) -> Option<DataType> {
-        match self {
-            Self::Null => None,
-            Self::Boolean(_) => Some(DataType::Boolean),
-            Self::Integer(_) => Some(DataType::Integer),
-            Self::Float(_) => Some(DataType::Float),
-            Self::String(_) => Some(DataType::String),
-        }
     }
 }
 
