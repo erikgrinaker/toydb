@@ -73,11 +73,11 @@ The complete truth tables are:
 | **`FALSE`** | `FALSE` | `FALSE` | `FALSE` |
 | **`NULL`**  | `NULL`  | `FALSE` | `NULL`  |
 
-| `OR`        | `TRUE` | `FALSE` |
-|-------------|--------|---------|
-| **`TRUE`**  | `TRUE` | `TRUE`  |
-| **`FALSE`** | `TRUE` | `FALSE` |
-| **`NULL`**  | `TRUE` | `NULL`  |
+| `OR`        | `TRUE` | `FALSE` | `NULL` |
+|-------------|--------|---------|--------|
+| **`TRUE`**  | `TRUE` | `TRUE`  | `TRUE` |
+| **`FALSE`** | `TRUE` | `FALSE` | `NULL` |
+| **`NULL`**  | `TRUE` | `NULL`  | `NULL` |
 
 | `NOT`       |         |
 |-------------|---------|
