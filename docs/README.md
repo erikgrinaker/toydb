@@ -84,3 +84,24 @@ The complete truth tables are:
 | **`TRUE`**  | `FALSE` |
 | **`FALSE`** | `TRUE`  |
 | **`NULL`**  | `NULL`  |
+
+#### Mathematical operators
+
+Mathematical operators apply standard math operations on numeric (`INTEGER` or `FLOAT`) operands. If either operand is a `FLOAT`, both operands are converted to `FLOAT` and the result is a `FLOAT`. The special values `INFINITY` and `NAN` are handled according to the IEEE 754 `binary64` spec.
+
+For `INTEGER` operands, failure conditions such as overflow and division by zero yield an error, while for `FLOAT` operands these return `INFINITY` or `NAN` as appropriate.
+
+Binary operators:
+
+* `+`: addition, e.g. `1 + 2` yields `3`.
+* `-`: subtraction, e.g. `3 - 2` yields `1`.
+* `*`: multiplication, e.g. `3 * 2` yields `6`.
+* `/`: division, e.g. `6 / 2` yields `3`.
+* `^`: exponentiation, e.g. `2 ^ 4` yields `16`.
+* `%`: modulo or remainder, e.g. `8 % 3` yields `2`. The result has the sign of the divisor.
+
+Unary operators:
+
+* `+` (prefix): identity, e.g. `+1` yields `1`.
+* `-` (prefix): negation, e.g. `- -2` yields `2`.
+* `!` (postfix): factorial, e.g. `5!` yields `15`.

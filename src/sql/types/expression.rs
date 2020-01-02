@@ -135,10 +135,11 @@ impl Expression {
             },
 
             // Mathematical operations
-            // FIXME Handle infinity and NaN
             Self::Add(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (Integer(lhs), Integer(rhs)) => Integer(
+                    lhs.checked_add(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
+                ),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 + rhs),
-                (Integer(lhs), Integer(rhs)) => Integer(lhs + rhs),
                 (Integer(_), Null) => Null,
                 (Float(lhs), Float(rhs)) => Float(lhs + rhs),
                 (Float(lhs), Integer(rhs)) => Float(lhs + rhs as f64),
@@ -172,7 +173,10 @@ impl Expression {
                 }
             },
             Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                // FIXME Handle overflow
+                (Integer(lhs), Integer(rhs)) if rhs >= 0 => Integer(
+                    lhs.checked_pow(rhs as u32)
+                        .ok_or_else(|| Error::Value("Integer overflow".into()))?,
+                ),
                 (Integer(lhs), Integer(rhs)) => Float((lhs as f64).powf(rhs as f64)),
                 (Integer(lhs), Float(rhs)) => Float((lhs as f64).powf(rhs)),
                 (Integer(_), Null) => Null,
@@ -192,13 +196,15 @@ impl Expression {
                 value => return Err(Error::Value(format!("Can't take factorial of {}", value))),
             },
             Self::Modulo(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                // The % operator in Rust is remainder, not modulo, so we have to do a bit of
-                // acrobatics to make it work right
-                (Integer(lhs), Integer(rhs)) => Integer(((lhs % rhs) + rhs) % rhs),
-                (Integer(lhs), Float(rhs)) => Float(((lhs as f64 % rhs) + rhs) % rhs),
+                // This uses remainder semantics, like Postgres.
+                (Integer(_), Integer(rhs)) if rhs == 0 => {
+                    return Err(Error::Value("Can't divide by zero".into()))
+                }
+                (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),
+                (Integer(lhs), Float(rhs)) => Float(lhs as f64 % rhs),
                 (Integer(_), Null) => Null,
-                (Float(lhs), Integer(rhs)) => Float(((lhs % rhs as f64) + rhs as f64) % rhs as f64),
-                (Float(lhs), Float(rhs)) => Float(((lhs % rhs) + rhs) % rhs),
+                (Float(lhs), Integer(rhs)) => Float(lhs % rhs as f64),
+                (Float(lhs), Float(rhs)) => Float(lhs % rhs),
                 (Float(_), Null) => Null,
                 (Null, Float(_)) => Null,
                 (Null, Integer(_)) => Null,
@@ -208,7 +214,9 @@ impl Expression {
                 }
             },
             Self::Multiply(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Integer(lhs), Integer(rhs)) => Integer(lhs * rhs),
+                (Integer(lhs), Integer(rhs)) => Integer(
+                    lhs.checked_mul(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
+                ),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 * rhs),
                 (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs * rhs as f64),
@@ -228,7 +236,9 @@ impl Expression {
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
             },
             Self::Subtract(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Integer(lhs), Integer(rhs)) => Integer(lhs - rhs),
+                (Integer(lhs), Integer(rhs)) => Integer(
+                    lhs.checked_sub(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
+                ),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 - rhs),
                 (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs - rhs as f64),
