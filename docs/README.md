@@ -85,6 +85,17 @@ The complete truth tables are:
 | **`FALSE`** | `TRUE`  |
 | **`NULL`**  | `NULL`  |
 
+#### Comparison operators
+
+Comparison operators compare values of the same data type, and return `TRUE` if the comparison holds, otherwise `FALSE`. `INTEGER` and `FLOAT` values are interchangeable. `STRING` comparisons are byte-wise, i.e. case-sensitive with `B` considered lesser than `a` due to their UTF-8 code points. `FALSE` is considered lesser than `TRUE`. Comparison with `NULL` always yields `NULL` (even `NULL = NULL`).
+
+* `=`: equality, e.g. `1 = 1` yields `TRUE`.
+* `!=`: inequality, e.g. `1 != 2` yields `TRUE`.
+* `>`: greater than, e.g. `2 > 1` yields `TRUE`.
+* `>=`: greater than or equal, e.g. `1 >= 1` yields `TRUE`.
+* `<`: lesser than, e.g. `1 < 2` yields `TRUE`.
+* `<=`: lesser than or equal, e.g. `1 <= 1` yields `TRUE`.
+
 #### Mathematical operators
 
 Mathematical operators apply standard math operations on numeric (`INTEGER` or `FLOAT`) operands. If either operand is a `FLOAT`, both operands are converted to `FLOAT` and the result is a `FLOAT`. The special values `INFINITY` and `NAN` are handled according to the IEEE 754 `binary64` spec.

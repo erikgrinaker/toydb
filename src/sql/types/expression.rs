@@ -81,42 +81,7 @@ impl Expression {
                 (Float(lhs), Integer(rhs)) => Boolean(lhs == rhs as f64),
                 (Float(lhs), Float(rhs)) => Boolean(lhs == rhs),
                 (String(lhs), String(rhs)) => Boolean(lhs == rhs),
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
-            },
-            Self::CompareGT(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Integer(lhs), Integer(rhs)) => Boolean(lhs > rhs),
-                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 > rhs),
-                (Float(lhs), Integer(rhs)) => Boolean(lhs > rhs as f64),
-                (Float(lhs), Float(rhs)) => Boolean(lhs > rhs),
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
-            },
-            Self::CompareGTE(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Integer(lhs), Integer(rhs)) => Boolean(lhs >= rhs),
-                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 >= rhs),
-                (Float(lhs), Integer(rhs)) => Boolean(lhs >= rhs as f64),
-                (Float(lhs), Float(rhs)) => Boolean(lhs >= rhs),
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
-            },
-            Self::CompareLT(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Integer(lhs), Integer(rhs)) => Boolean(lhs < rhs),
-                (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) < rhs),
-                (Float(lhs), Integer(rhs)) => Boolean(lhs < rhs as f64),
-                (Float(lhs), Float(rhs)) => Boolean(lhs < rhs),
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
-            },
-            Self::CompareLTE(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Integer(lhs), Integer(rhs)) => Boolean(lhs <= rhs),
-                (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) <= rhs),
-                (Float(lhs), Integer(rhs)) => Boolean(lhs <= rhs as f64),
-                (Float(lhs), Float(rhs)) => Boolean(lhs <= rhs),
+                (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
@@ -129,6 +94,57 @@ impl Expression {
                 (Float(lhs), Integer(rhs)) => Boolean(lhs != rhs as f64),
                 (Float(lhs), Float(rhs)) => Boolean(lhs != rhs),
                 (String(lhs), String(rhs)) => Boolean(lhs != rhs),
+                (Null, _) | (_, Null) => Null,
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
+            Self::CompareGT(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                #[allow(clippy::bool_comparison)]
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs > rhs),
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs > rhs),
+                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 > rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs > rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs > rhs),
+                (String(lhs), String(rhs)) => Boolean(lhs > rhs),
+                (Null, _) | (_, Null) => Null,
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
+            Self::CompareGTE(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs >= rhs),
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs >= rhs),
+                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 >= rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs >= rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs >= rhs),
+                (String(lhs), String(rhs)) => Boolean(lhs >= rhs),
+                (Null, _) | (_, Null) => Null,
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
+            Self::CompareLT(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                #[allow(clippy::bool_comparison)]
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs < rhs),
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs < rhs),
+                (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) < rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs < rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs < rhs),
+                (String(lhs), String(rhs)) => Boolean(lhs < rhs),
+                (Null, _) | (_, Null) => Null,
+                (lhs, rhs) => {
+                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
+                }
+            },
+            Self::CompareLTE(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs <= rhs),
+                (Integer(lhs), Integer(rhs)) => Boolean(lhs <= rhs),
+                (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) <= rhs),
+                (Float(lhs), Integer(rhs)) => Boolean(lhs <= rhs as f64),
+                (Float(lhs), Float(rhs)) => Boolean(lhs <= rhs),
+                (String(lhs), String(rhs)) => Boolean(lhs <= rhs),
+                (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
