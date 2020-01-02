@@ -71,6 +71,12 @@ impl From<log::SetLoggerError> for Error {
     }
 }
 
+impl From<regex::Error> for Error {
+    fn from(err: regex::Error) -> Self {
+        Error::Value(err.to_string())
+    }
+}
+
 impl From<rmps::decode::Error> for Error {
     fn from(err: rmps::decode::Error) -> Self {
         Error::IO(err.to_string())

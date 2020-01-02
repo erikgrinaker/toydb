@@ -1,6 +1,7 @@
 use super::Value;
 use crate::Error;
 
+use regex::Regex;
 use std::collections::HashMap;
 
 /// An expression, made up of constants and operations
@@ -23,6 +24,7 @@ pub enum Expression {
     CompareLT(Box<Expression>, Box<Expression>),
     CompareLTE(Box<Expression>, Box<Expression>),
     CompareNull(Box<Expression>),
+    Like(Box<Expression>, Box<Expression>),
 
     // Mathematical operations
     Add(Box<Expression>, Box<Expression>),
@@ -153,6 +155,22 @@ impl Expression {
             Self::CompareNull(expr) => match expr.evaluate(e)? {
                 Null => Boolean(true),
                 _ => Boolean(false),
+            },
+            Self::Like(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (String(lhs), String(rhs)) => Boolean(
+                    Regex::new(&format!(
+                        "^{}$",
+                        regex::escape(&rhs)
+                            .replace("%", ".*")
+                            .replace(".*.*", "%")
+                            .replace("_", ".")
+                            .replace("..", "_")
+                    ))?
+                    .is_match(&lhs),
+                ),
+                (String(_), Null) => Null,
+                (Null, String(_)) => Null,
+                (lhs, rhs) => return Err(Error::Value(format!("Can't LIKE {} and {}", lhs, rhs))),
             },
 
             // Mathematical operations
@@ -327,6 +345,9 @@ impl Expression {
                 Self::CompareNE(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
             }
             Self::CompareNull(expr) => Self::CompareNull(expr.transform(pre, post)?.into()),
+            Self::Like(lhs, rhs) => {
+                Self::Like(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
+            }
 
             // Mathematical operations
             Self::Add(lhs, rhs) => {
@@ -369,6 +390,7 @@ impl Expression {
             | Self::CompareNE(lhs, rhs)
             | Self::Divide(lhs, rhs)
             | Self::Exponentiate(lhs, rhs)
+            | Self::Like(lhs, rhs)
             | Self::Modulo(lhs, rhs)
             | Self::Multiply(lhs, rhs)
             | Self::Or(lhs, rhs)

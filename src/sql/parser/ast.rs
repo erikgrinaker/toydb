@@ -117,6 +117,7 @@ pub enum Operation {
     CompareLT(Box<Expression>, Box<Expression>),
     CompareLTE(Box<Expression>, Box<Expression>),
     CompareNull(Box<Expression>),
+    Like(Box<Expression>, Box<Expression>),
 
     // Mathematical operators
     Add(Box<Expression>, Box<Expression>),

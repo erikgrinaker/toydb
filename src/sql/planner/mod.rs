@@ -179,6 +179,7 @@ impl From<ast::Expression> for Expression {
                 ast::Operation::CompareLT(lhs, rhs) => Self::CompareLT(lhs.into(), rhs.into()),
                 ast::Operation::CompareLTE(lhs, rhs) => Self::CompareLTE(lhs.into(), rhs.into()),
                 ast::Operation::CompareNull(expr) => Self::CompareNull(expr.into()),
+                ast::Operation::Like(lhs, rhs) => Self::Like(lhs.into(), rhs.into()),
 
                 // Mathematical operators
                 ast::Operation::Assert(expr) => Self::Assert(expr.into()),
