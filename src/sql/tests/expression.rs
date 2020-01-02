@@ -283,6 +283,12 @@ test_expr! {
     op_lte_string_unicode_not: "'🙁' <= '😀'" => Ok(Boolean(false)),
     op_lte_conflict: "1 <= 'a'" => Err(Error::Value("Can't compare 1 and a".into())),
 
+    op_null: "NULL IS NULL" => Ok(Boolean(true)),
+    op_null_not: "NULL IS NOT NULL" => Ok(Boolean(false)),
+    op_null_bool: "TRUE IS NULL" => Ok(Boolean(false)),
+    op_null_bool_not: "TRUE IS NOT NULL" => Ok(Boolean(true)),
+    op_null_rhs_bool: "NULL IS TRUE" => Err(Error::Parse("Expected token NULL, found TRUE".into())),
+
     // Math operators
     op_add_float_float: "3.1 + 2.71" => Ok(Float(3.1 + 2.71)),
     op_add_float_int: "3.72 + 1" => Ok(Float(3.72 + 1.0)),

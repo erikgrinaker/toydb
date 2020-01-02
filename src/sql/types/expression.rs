@@ -17,11 +17,12 @@ pub enum Expression {
 
     // Comparisons operations
     CompareEQ(Box<Expression>, Box<Expression>),
+    CompareNE(Box<Expression>, Box<Expression>),
     CompareGT(Box<Expression>, Box<Expression>),
     CompareGTE(Box<Expression>, Box<Expression>),
     CompareLT(Box<Expression>, Box<Expression>),
     CompareLTE(Box<Expression>, Box<Expression>),
-    CompareNE(Box<Expression>, Box<Expression>),
+    CompareNull(Box<Expression>),
 
     // Mathematical operations
     Add(Box<Expression>, Box<Expression>),
@@ -148,6 +149,10 @@ impl Expression {
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
+            },
+            Self::CompareNull(expr) => match expr.evaluate(e)? {
+                Null => Boolean(true),
+                _ => Boolean(false),
             },
 
             // Mathematical operations
@@ -321,6 +326,7 @@ impl Expression {
             Self::CompareNE(lhs, rhs) => {
                 Self::CompareNE(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
             }
+            Self::CompareNull(expr) => Self::CompareNull(expr.transform(pre, post)?.into()),
 
             // Mathematical operations
             Self::Add(lhs, rhs) => {
@@ -368,9 +374,11 @@ impl Expression {
             | Self::Or(lhs, rhs)
             | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
 
-            Self::Assert(expr) | Self::Factorial(expr) | Self::Negate(expr) | Self::Not(expr) => {
-                expr.walk(visitor)
-            }
+            Self::Assert(expr)
+            | Self::CompareNull(expr)
+            | Self::Factorial(expr)
+            | Self::Negate(expr)
+            | Self::Not(expr) => expr.walk(visitor),
 
             Self::Constant(_) | Self::Field(_) => true,
         } {

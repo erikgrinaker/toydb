@@ -61,14 +61,18 @@ impl<'a> Parser<'a> {
     }
 
     /// Grabs the next operator if it satisfies the type and precedence
-    fn next_if_operator<O: Operator>(&mut self, min_prec: u8) -> Option<O> {
-        let operator = self
+    fn next_if_operator<O: Operator>(&mut self, min_prec: u8) -> Result<Option<O>, Error> {
+        if let Some(operator) = self
             .peek()
             .unwrap_or(None)
             .and_then(|token| O::from(&token))
-            .filter(|op| op.prec() >= min_prec)?;
-        self.next().ok();
-        Some(operator)
+            .filter(|op| op.prec() >= min_prec)
+        {
+            self.next()?;
+            Ok(Some(operator.augment(self)?))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Grabs the next lexer token if it is a keyword
@@ -402,15 +406,15 @@ impl<'a> Parser<'a> {
     /// Parses an expression consisting of at least one atom operated on by any
     /// number of operators, using the precedence climbing algorithm.
     fn parse_expression(&mut self, min_prec: u8) -> Result<ast::Expression, Error> {
-        let mut lhs = if let Some(prefix) = self.next_if_operator::<PrefixOperator>(min_prec) {
+        let mut lhs = if let Some(prefix) = self.next_if_operator::<PrefixOperator>(min_prec)? {
             prefix.build(self.parse_expression(prefix.prec() + prefix.assoc())?)
         } else {
             self.parse_expression_atom()?
         };
-        while let Some(postfix) = self.next_if_operator::<PostfixOperator>(min_prec) {
+        while let Some(postfix) = self.next_if_operator::<PostfixOperator>(min_prec)? {
             lhs = postfix.build(lhs)
         }
-        while let Some(infix) = self.next_if_operator::<InfixOperator>(min_prec) {
+        while let Some(infix) = self.next_if_operator::<InfixOperator>(min_prec)? {
             lhs = infix.build(lhs, self.parse_expression(infix.prec() + infix.assoc())?)
         }
         Ok(lhs)
@@ -442,6 +446,8 @@ impl<'a> Parser<'a> {
 trait Operator: Sized {
     /// Looks up the corresponding operator for a token, if one exists
     fn from(token: &Token) -> Option<Self>;
+    /// Augments an operator by allowing it to parse any modifiers.
+    fn augment(self, parser: &mut Parser) -> Result<Self, Error>;
     /// Returns the operator's associativity
     fn assoc(&self) -> u8;
     /// Returns the operator's precedence
@@ -479,6 +485,10 @@ impl Operator for PrefixOperator {
         }
     }
 
+    fn augment(self, _parser: &mut Parser) -> Result<Self, Error> {
+        Ok(self)
+    }
+
     fn assoc(&self) -> u8 {
         ASSOC_RIGHT
     }
@@ -492,11 +502,11 @@ enum InfixOperator {
     Add,
     And,
     CompareEQ,
+    CompareNE,
     CompareGT,
     CompareGTE,
     CompareLT,
     CompareLTE,
-    CompareNE,
     Divide,
     Exponentiate,
     Modulo,
@@ -512,11 +522,11 @@ impl InfixOperator {
             Self::Add => ast::Operation::Add(lhs, rhs),
             Self::And => ast::Operation::And(lhs, rhs),
             Self::CompareEQ => ast::Operation::CompareEQ(lhs, rhs),
+            Self::CompareNE => ast::Operation::CompareNE(lhs, rhs),
             Self::CompareGT => ast::Operation::CompareGT(lhs, rhs),
             Self::CompareGTE => ast::Operation::CompareGTE(lhs, rhs),
             Self::CompareLT => ast::Operation::CompareLT(lhs, rhs),
             Self::CompareLTE => ast::Operation::CompareLTE(lhs, rhs),
-            Self::CompareNE => ast::Operation::CompareNE(lhs, rhs),
             Self::Divide => ast::Operation::Divide(lhs, rhs),
             Self::Exponentiate => ast::Operation::Exponentiate(lhs, rhs),
             Self::Modulo => ast::Operation::Modulo(lhs, rhs),
@@ -550,6 +560,10 @@ impl Operator for InfixOperator {
         })
     }
 
+    fn augment(self, _parser: &mut Parser) -> Result<Self, Error> {
+        Ok(self)
+    }
+
     fn assoc(&self) -> u8 {
         match self {
             Self::Exponentiate => ASSOC_RIGHT,
@@ -572,12 +586,22 @@ impl Operator for InfixOperator {
 
 enum PostfixOperator {
     Factorial,
+    // FIXME Compiler bug? Why is this considered dead code?
+    #[allow(dead_code)]
+    CompareNull {
+        not: bool,
+    },
 }
 
 impl PostfixOperator {
     fn build(&self, lhs: ast::Expression) -> ast::Expression {
+        let lhs = Box::new(lhs);
         match self {
-            Self::Factorial => ast::Operation::Factorial(Box::new(lhs)),
+            Self::CompareNull { not } => match not {
+                true => ast::Operation::Not(Box::new(ast::Operation::CompareNull(lhs).into())),
+                false => ast::Operation::CompareNull(lhs),
+            },
+            Self::Factorial => ast::Operation::Factorial(lhs),
         }
         .into()
     }
@@ -587,8 +611,23 @@ impl Operator for PostfixOperator {
     fn from(token: &Token) -> Option<Self> {
         match token {
             Token::Exclamation => Some(Self::Factorial),
+            Token::Keyword(Keyword::Is) => Some(Self::CompareNull { not: false }),
             _ => None,
         }
+    }
+
+    fn augment(mut self, parser: &mut Parser) -> Result<Self, Error> {
+        #[allow(clippy::single_match)]
+        match &mut self {
+            Self::CompareNull { ref mut not } => {
+                if parser.next_if_token(Keyword::Not.into()).is_some() {
+                    *not = true
+                };
+                parser.next_expect(Some(Keyword::Null.into()))?;
+            }
+            _ => {}
+        };
+        Ok(self)
     }
 
     fn assoc(&self) -> u8 {

@@ -111,11 +111,12 @@ pub enum Operation {
 
     // Comparison operators
     CompareEQ(Box<Expression>, Box<Expression>),
+    CompareNE(Box<Expression>, Box<Expression>),
     CompareGT(Box<Expression>, Box<Expression>),
     CompareGTE(Box<Expression>, Box<Expression>),
     CompareLT(Box<Expression>, Box<Expression>),
     CompareLTE(Box<Expression>, Box<Expression>),
-    CompareNE(Box<Expression>, Box<Expression>),
+    CompareNull(Box<Expression>),
 
     // Mathematical operators
     Add(Box<Expression>, Box<Expression>),

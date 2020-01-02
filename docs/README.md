@@ -19,7 +19,7 @@ Numeric types are not interchangable when stored; a float value cannot be stored
 
 Keywords are reserved words that have special meaning in SQL statements, such as `SELECT`. These cannot be used as identifiers, e.g. table names. Keywords are case-insensitive. The complete list of keywords is:
 
-`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `DELETE`, `DESC`, `DOUBLE`, `DROP`, `FALSE`, `FLOAT`, `FROM`, `INFINITY`, `INSERT`, `INT`, `INTEGER`, `INTO`, `KEY`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ONLY`, `OR`, `ORDER`, `PRIMARY`, `READ`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
+`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `DELETE`, `DESC`, `DOUBLE`, `DROP`, `FALSE`, `FLOAT`, `FROM`, `INFINITY`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `KEY`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ONLY`, `OR`, `ORDER`, `PRIMARY`, `READ`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
@@ -89,12 +89,19 @@ The complete truth tables are:
 
 Comparison operators compare values of the same data type, and return `TRUE` if the comparison holds, otherwise `FALSE`. `INTEGER` and `FLOAT` values are interchangeable. `STRING` comparisons are byte-wise, i.e. case-sensitive with `B` considered lesser than `a` due to their UTF-8 code points. `FALSE` is considered lesser than `TRUE`. Comparison with `NULL` always yields `NULL` (even `NULL = NULL`).
 
+Binary operators:
+
 * `=`: equality, e.g. `1 = 1` yields `TRUE`.
 * `!=`: inequality, e.g. `1 != 2` yields `TRUE`.
 * `>`: greater than, e.g. `2 > 1` yields `TRUE`.
 * `>=`: greater than or equal, e.g. `1 >= 1` yields `TRUE`.
 * `<`: lesser than, e.g. `1 < 2` yields `TRUE`.
 * `<=`: lesser than or equal, e.g. `1 <= 1` yields `TRUE`.
+
+Unary operators:
+
+* `IS NULL`: checks if the value is `NULL`, e.g. `NULL IS NULL` yields `TRUE`.
+* `IS NOT NULL`: checks if the value is not `NULL`, e.g. `TRUE IS NOT NULL` yields `TRUE`.
 
 #### Mathematical operators
 
