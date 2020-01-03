@@ -945,4 +945,148 @@ pub mod tests {
 
         Ok(())
     }
+
+    #[test]
+    // A dirty write is when t2 overwrites an uncommitted value written by t1.
+    fn test_txn_anomaly_dirty_write() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+
+        t1.set(b"key", b"t1".to_vec())?;
+        assert_eq!(t2.set(b"key", b"t2".to_vec()), Err(Error::Serialization));
+
+        Ok(())
+    }
+
+    #[test]
+    // A dirty read is when t2 can read an uncommitted value set by t1.
+    fn test_txn_anomaly_dirty_read() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+
+        t1.set(b"key", b"t1".to_vec())?;
+        assert_eq!(None, t2.get(b"key")?);
+
+        Ok(())
+    }
+
+    #[test]
+    // A lost update is when t1 and t2 both read a value and update it, where t2's update replaces t1.
+    fn test_txn_anomaly_lost_update() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t0 = mvcc.begin()?;
+        t0.set(b"key", b"t0".to_vec())?;
+        t0.commit()?;
+
+        let mut t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+
+        t1.get(b"key")?;
+        t2.get(b"key")?;
+
+        t1.set(b"key", b"t1".to_vec())?;
+        assert_eq!(t2.set(b"key", b"t2".to_vec()), Err(Error::Serialization));
+
+        Ok(())
+    }
+
+    #[test]
+    // A fuzzy (or unrepeatable) read is when t2 sees a value change after t1 updates it.
+    fn test_txn_anomaly_fuzzy_read() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t0 = mvcc.begin()?;
+        t0.set(b"key", b"t0".to_vec())?;
+        t0.commit()?;
+
+        let mut t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+
+        assert_eq!(Some(b"t0".to_vec()), t2.get(b"key")?);
+        t1.set(b"key", b"t1".to_vec())?;
+        t1.commit()?;
+        assert_eq!(Some(b"t0".to_vec()), t2.get(b"key")?);
+
+        Ok(())
+    }
+
+    #[test]
+    // Read skew is when t1 reads a and b, but t2 modifies b in between the reads.
+    fn test_txn_anomaly_read_skew() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t0 = mvcc.begin()?;
+        t0.set(b"a", b"t0".to_vec())?;
+        t0.set(b"b", b"t0".to_vec())?;
+        t0.commit()?;
+
+        let t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+
+        assert_eq!(Some(b"t0".to_vec()), t1.get(b"a")?);
+        t2.set(b"a", b"t2".to_vec())?;
+        t2.set(b"b", b"t2".to_vec())?;
+        t2.commit()?;
+        assert_eq!(Some(b"t0".to_vec()), t1.get(b"b")?);
+
+        Ok(())
+    }
+
+    #[test]
+    // A phantom read is when t1 reads entries matching some predicate, but a modification by
+    // t2 changes the entries that match the predicate such that a later read by t1 returns them.
+    fn test_txn_anomaly_phantom_read() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t0 = mvcc.begin()?;
+        t0.set(b"a", b"true".to_vec())?;
+        t0.set(b"b", b"false".to_vec())?;
+        t0.commit()?;
+
+        let t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+
+        assert_eq!(Some(b"true".to_vec()), t1.get(b"a")?);
+        assert_eq!(Some(b"false".to_vec()), t1.get(b"b")?);
+
+        t2.set(b"b", b"true".to_vec())?;
+        t2.commit()?;
+
+        assert_eq!(Some(b"true".to_vec()), t1.get(b"a")?);
+        assert_eq!(Some(b"false".to_vec()), t1.get(b"b")?);
+
+        Ok(())
+    }
+
+    /* FIXME To avoid write skew we need to implement serializable snapshot isolation.
+    #[test]
+    // Write skew is when t1 reads b and writes it to a while t2 reads a and writes it to b.¨
+    fn test_txn_anomaly_write_skew() -> Result<(), Error> {
+        let mvcc = setup();
+
+        let mut t0 = mvcc.begin()?;
+        t0.set(b"a", b"1".to_vec())?;
+        t0.set(b"b", b"2".to_vec())?;
+        t0.commit()?;
+
+        let mut t1 = mvcc.begin()?;
+        let mut t2 = mvcc.begin()?;
+
+        assert_eq!(Some(b"1".to_vec()), t1.get(b"a")?);
+        assert_eq!(Some(b"2".to_vec()), t2.get(b"b")?);
+
+        // FIXME Some of the following operations should error
+        t1.set(b"a", b"2".to_vec())?;
+        t2.set(b"b", b"1".to_vec())?;
+
+        t1.commit()?;
+        t2.commit()?;
+
+        Ok(())
+    }*/
 }

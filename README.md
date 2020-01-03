@@ -137,7 +137,7 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 
 * **Transient reads:** all statements, including trivial `SELECT`s, will be wrapped in a transaction with a globally allocated, persistent transaction ID.
 
-* **Serializability:** transactions use MVCC without serializable snapshot isolation, thus are vulnerable to write skew and other anomalies.
+* **Serializability:** transactions use MVCC without serializable snapshot isolation, and are thus vulnerable to write skew anomalies.
 
 * **ID overflow:** transaction IDs are stored as unsigned 64-bit integers without wraparound, thus no new transactions can be started beyond transaction number 2⁶⁴-1.
 
