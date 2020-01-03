@@ -111,13 +111,12 @@ pub enum Operation {
 
     // Comparison operators
     Equal(Box<Expression>, Box<Expression>),
-    NotEqual(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
+    IsNull(Box<Expression>),
     LessThan(Box<Expression>, Box<Expression>),
     LessThanOrEqual(Box<Expression>, Box<Expression>),
-    IsNull(Box<Expression>),
-    Like(Box<Expression>, Box<Expression>),
+    NotEqual(Box<Expression>, Box<Expression>),
 
     // Mathematical operators
     Add(Box<Expression>, Box<Expression>),
@@ -129,4 +128,7 @@ pub enum Operation {
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
+
+    // String operators
+    Like(Box<Expression>, Box<Expression>),
 }

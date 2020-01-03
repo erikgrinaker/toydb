@@ -97,7 +97,6 @@ Binary operators:
 * `>=`: greater than or equal, e.g. `1 >= 1` yields `TRUE`.
 * `<`: lesser than, e.g. `1 < 2` yields `TRUE`.
 * `<=`: lesser than or equal, e.g. `1 <= 1` yields `TRUE`.
-* `LIKE`: compares a string with the given pattern, using `%` as multi-character wildcard and `_` as single-character wildcard, returning `TRUE` if the string matches the pattern - e.g. `'abc' LIKE 'a%'` yields `TRUE`.  Literal `%` and `_` can be escaped as `%%` and `__`.
 
 Unary operators:
 
@@ -124,6 +123,12 @@ Unary operators:
 * `+` (prefix): identity, e.g. `+1` yields `1`.
 * `-` (prefix): negation, e.g. `- -2` yields `2`.
 * `!` (postfix): factorial, e.g. `5!` yields `15`.
+
+#### String operators
+
+String operators operate on string operands.
+
+* `LIKE`: compares a string with the given pattern, using `%` as multi-character wildcard and `_` as single-character wildcard, returning `TRUE` if the string matches the pattern - e.g. `'abc' LIKE 'a%'` yields `TRUE`.  Literal `%` and `_` can be escaped as `%%` and `__`.
 
 #### Operator precedence
 

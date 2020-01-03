@@ -23,7 +23,6 @@ pub enum Expression {
     IsNull(Box<Expression>),
     LessThan(Box<Expression>, Box<Expression>),
     LessThanOrEqual(Box<Expression>, Box<Expression>),
-    Like(Box<Expression>, Box<Expression>),
     NotEqual(Box<Expression>, Box<Expression>),
 
     // Mathematical operations
@@ -36,6 +35,9 @@ pub enum Expression {
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
+
+    // String operations
+    Like(Box<Expression>, Box<Expression>),
 }
 
 /// A list of expressions
@@ -155,22 +157,6 @@ impl Expression {
             Self::IsNull(expr) => match expr.evaluate(e)? {
                 Null => Boolean(true),
                 _ => Boolean(false),
-            },
-            Self::Like(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (String(lhs), String(rhs)) => Boolean(
-                    Regex::new(&format!(
-                        "^{}$",
-                        regex::escape(&rhs)
-                            .replace("%", ".*")
-                            .replace(".*.*", "%")
-                            .replace("_", ".")
-                            .replace("..", "_")
-                    ))?
-                    .is_match(&lhs),
-                ),
-                (String(_), Null) => Null,
-                (Null, String(_)) => Null,
-                (lhs, rhs) => return Err(Error::Value(format!("Can't LIKE {} and {}", lhs, rhs))),
             },
 
             // Mathematical operations
@@ -293,6 +279,24 @@ impl Expression {
                     return Err(Error::Value(format!("Can't subtract {} and {}", lhs, rhs)))
                 }
             },
+
+            // String operations
+            Self::Like(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+                (String(lhs), String(rhs)) => Boolean(
+                    Regex::new(&format!(
+                        "^{}$",
+                        regex::escape(&rhs)
+                            .replace("%", ".*")
+                            .replace(".*.*", "%")
+                            .replace("_", ".")
+                            .replace("..", "_")
+                    ))?
+                    .is_match(&lhs),
+                ),
+                (String(_), Null) => Null,
+                (Null, String(_)) => Null,
+                (lhs, rhs) => return Err(Error::Value(format!("Can't LIKE {} and {}", lhs, rhs))),
+            },
         })
     }
 
@@ -351,9 +355,6 @@ impl Expression {
                 Self::NotEqual(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
             }
             Self::IsNull(expr) => Self::IsNull(expr.transform(pre, post)?.into()),
-            Self::Like(lhs, rhs) => {
-                Self::Like(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
 
             // Mathematical operations
             Self::Add(lhs, rhs) => {
@@ -377,6 +378,11 @@ impl Expression {
             Self::Negate(expr) => Self::Negate(expr.transform(pre, post)?.into()),
             Self::Subtract(lhs, rhs) => {
                 Self::Subtract(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
+            }
+
+            // String operations
+            Self::Like(lhs, rhs) => {
+                Self::Like(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
             }
         };
         post(self)
