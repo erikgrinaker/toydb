@@ -110,13 +110,13 @@ pub enum Operation {
     Or(Box<Expression>, Box<Expression>),
 
     // Comparison operators
-    CompareEQ(Box<Expression>, Box<Expression>),
-    CompareNE(Box<Expression>, Box<Expression>),
-    CompareGT(Box<Expression>, Box<Expression>),
-    CompareGTE(Box<Expression>, Box<Expression>),
-    CompareLT(Box<Expression>, Box<Expression>),
-    CompareLTE(Box<Expression>, Box<Expression>),
-    CompareNull(Box<Expression>),
+    Equal(Box<Expression>, Box<Expression>),
+    NotEqual(Box<Expression>, Box<Expression>),
+    GreaterThan(Box<Expression>, Box<Expression>),
+    GreaterThanOrEqual(Box<Expression>, Box<Expression>),
+    LessThan(Box<Expression>, Box<Expression>),
+    LessThanOrEqual(Box<Expression>, Box<Expression>),
+    IsNull(Box<Expression>),
     Like(Box<Expression>, Box<Expression>),
 
     // Mathematical operators

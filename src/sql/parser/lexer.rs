@@ -10,7 +10,7 @@ pub enum Token {
     Ident(String),
     Keyword(Keyword),
     Period,
-    Equals,
+    Equal,
     GreaterThan,
     GreaterThanOrEqual,
     LessThan,
@@ -38,7 +38,7 @@ impl std::fmt::Display for Token {
             Token::Ident(s) => s,
             Token::Keyword(k) => k.to_str(),
             Token::Period => ".",
-            Token::Equals => "=",
+            Token::Equal => "=",
             Token::GreaterThan => ">",
             Token::GreaterThanOrEqual => ">=",
             Token::LessThan => "<",
@@ -368,7 +368,7 @@ impl<'a> Lexer<'a> {
     fn scan_symbol(&mut self) -> Option<Token> {
         self.next_if_token(|c| match c {
             '.' => Some(Token::Period),
-            '=' => Some(Token::Equals),
+            '=' => Some(Token::Equal),
             '>' => Some(Token::GreaterThan),
             '<' => Some(Token::LessThan),
             '+' => Some(Token::Plus),

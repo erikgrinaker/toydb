@@ -5,15 +5,15 @@ Tokens:
   Ident("movies")
   Keyword(Set)
   Ident("title")
-  Equals
+  Equal
   String("X")
   Comma
   Ident("released")
-  Equals
+  Equal
   Number("0")
   Comma
   Ident("bluray")
-  Equals
+  Equal
   Keyword(Null)
 
 AST: Update {

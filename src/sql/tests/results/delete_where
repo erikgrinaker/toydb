@@ -14,7 +14,7 @@ AST: Delete {
     where: Some(
         WhereClause(
             Operation(
-                CompareGTE(
+                GreaterThanOrEqual(
                     Field(
                         "released",
                     ),
@@ -36,7 +36,7 @@ Plan: Plan {
             source: Scan {
                 table: "movies",
             },
-            predicate: CompareGTE(
+            predicate: GreaterThanOrEqual(
                 Field(
                     "released",
                 ),
@@ -57,7 +57,7 @@ Optimized plan: Plan {
             source: Scan {
                 table: "movies",
             },
-            predicate: CompareGTE(
+            predicate: GreaterThanOrEqual(
                 Field(
                     "released",
                 ),

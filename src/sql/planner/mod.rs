@@ -172,14 +172,18 @@ impl From<ast::Expression> for Expression {
                 ast::Operation::Or(lhs, rhs) => Self::Or(lhs.into(), rhs.into()),
 
                 // Comparison operators
-                ast::Operation::CompareEQ(lhs, rhs) => Self::CompareEQ(lhs.into(), rhs.into()),
-                ast::Operation::CompareNE(lhs, rhs) => Self::CompareNE(lhs.into(), rhs.into()),
-                ast::Operation::CompareGT(lhs, rhs) => Self::CompareGT(lhs.into(), rhs.into()),
-                ast::Operation::CompareGTE(lhs, rhs) => Self::CompareGTE(lhs.into(), rhs.into()),
-                ast::Operation::CompareLT(lhs, rhs) => Self::CompareLT(lhs.into(), rhs.into()),
-                ast::Operation::CompareLTE(lhs, rhs) => Self::CompareLTE(lhs.into(), rhs.into()),
-                ast::Operation::CompareNull(expr) => Self::CompareNull(expr.into()),
+                ast::Operation::Equal(lhs, rhs) => Self::Equal(lhs.into(), rhs.into()),
+                ast::Operation::GreaterThan(lhs, rhs) => Self::GreaterThan(lhs.into(), rhs.into()),
+                ast::Operation::GreaterThanOrEqual(lhs, rhs) => {
+                    Self::GreaterThanOrEqual(lhs.into(), rhs.into())
+                }
+                ast::Operation::IsNull(expr) => Self::IsNull(expr.into()),
+                ast::Operation::LessThan(lhs, rhs) => Self::LessThan(lhs.into(), rhs.into()),
+                ast::Operation::LessThanOrEqual(lhs, rhs) => {
+                    Self::LessThanOrEqual(lhs.into(), rhs.into())
+                }
                 ast::Operation::Like(lhs, rhs) => Self::Like(lhs.into(), rhs.into()),
+                ast::Operation::NotEqual(lhs, rhs) => Self::NotEqual(lhs.into(), rhs.into()),
 
                 // Mathematical operators
                 ast::Operation::Assert(expr) => Self::Assert(expr.into()),

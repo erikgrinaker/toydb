@@ -7,7 +7,7 @@ Tokens:
   Ident("genres")
   Keyword(Set)
   Ident("title")
-  Equals
+  Equal
   String("X")
 
 AST: Parse("Expected token SET, found ,")

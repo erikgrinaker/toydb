@@ -31,7 +31,7 @@ AST: Select {
             Operation(
                 And(
                     Operation(
-                        CompareGTE(
+                        GreaterThanOrEqual(
                             Field(
                                 "released",
                             ),
@@ -43,7 +43,7 @@ AST: Select {
                         ),
                     ),
                     Operation(
-                        CompareGT(
+                        GreaterThan(
                             Field(
                                 "rating",
                             ),
@@ -69,7 +69,7 @@ Plan: Plan {
             table: "movies",
         },
         predicate: And(
-            CompareGTE(
+            GreaterThanOrEqual(
                 Field(
                     "released",
                 ),
@@ -79,7 +79,7 @@ Plan: Plan {
                     ),
                 ),
             ),
-            CompareGT(
+            GreaterThan(
                 Field(
                     "rating",
                 ),
@@ -99,7 +99,7 @@ Optimized plan: Plan {
             table: "movies",
         },
         predicate: And(
-            CompareGTE(
+            GreaterThanOrEqual(
                 Field(
                     "released",
                 ),
@@ -109,7 +109,7 @@ Optimized plan: Plan {
                     ),
                 ),
             ),
-            CompareGT(
+            GreaterThan(
                 Field(
                     "rating",
                 ),

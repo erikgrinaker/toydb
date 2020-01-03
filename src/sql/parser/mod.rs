@@ -284,7 +284,7 @@ impl<'a> Parser<'a> {
         let mut set = BTreeMap::new();
         loop {
             let column = self.next_ident()?;
-            self.next_expect(Some(Token::Equals))?;
+            self.next_expect(Some(Token::Equal))?;
             let expr = self.parse_expression(0)?;
             if set.contains_key(&column) {
                 return Err(Error::Value(format!("Duplicate values given for column {}", column)));
@@ -505,17 +505,17 @@ impl Operator for PrefixOperator {
 enum InfixOperator {
     Add,
     And,
-    CompareEQ,
-    CompareNE,
-    CompareGT,
-    CompareGTE,
-    CompareLT,
-    CompareLTE,
     Divide,
+    Equal,
     Exponentiate,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
     Like,
     Modulo,
     Multiply,
+    NotEqual,
     Or,
     Subtract,
 }
@@ -526,17 +526,17 @@ impl InfixOperator {
         match self {
             Self::Add => ast::Operation::Add(lhs, rhs),
             Self::And => ast::Operation::And(lhs, rhs),
-            Self::CompareEQ => ast::Operation::CompareEQ(lhs, rhs),
-            Self::CompareNE => ast::Operation::CompareNE(lhs, rhs),
-            Self::CompareGT => ast::Operation::CompareGT(lhs, rhs),
-            Self::CompareGTE => ast::Operation::CompareGTE(lhs, rhs),
-            Self::CompareLT => ast::Operation::CompareLT(lhs, rhs),
-            Self::CompareLTE => ast::Operation::CompareLTE(lhs, rhs),
             Self::Divide => ast::Operation::Divide(lhs, rhs),
+            Self::Equal => ast::Operation::Equal(lhs, rhs),
             Self::Exponentiate => ast::Operation::Exponentiate(lhs, rhs),
+            Self::GreaterThan => ast::Operation::GreaterThan(lhs, rhs),
+            Self::GreaterThanOrEqual => ast::Operation::GreaterThanOrEqual(lhs, rhs),
+            Self::LessThan => ast::Operation::LessThan(lhs, rhs),
+            Self::LessThanOrEqual => ast::Operation::LessThanOrEqual(lhs, rhs),
             Self::Like => ast::Operation::Like(lhs, rhs),
             Self::Modulo => ast::Operation::Modulo(lhs, rhs),
             Self::Multiply => ast::Operation::Multiply(lhs, rhs),
+            Self::NotEqual => ast::Operation::NotEqual(lhs, rhs),
             Self::Or => ast::Operation::Or(lhs, rhs),
             Self::Subtract => ast::Operation::Subtract(lhs, rhs),
         }
@@ -549,17 +549,17 @@ impl Operator for InfixOperator {
         Some(match token {
             Token::Asterisk => Self::Multiply,
             Token::Caret => Self::Exponentiate,
-            Token::Equals => Self::CompareEQ,
-            Token::GreaterThan => Self::CompareGT,
-            Token::GreaterThanOrEqual => Self::CompareGTE,
+            Token::Equal => Self::Equal,
+            Token::GreaterThan => Self::GreaterThan,
+            Token::GreaterThanOrEqual => Self::GreaterThanOrEqual,
             Token::Keyword(Keyword::And) => Self::And,
             Token::Keyword(Keyword::Like) => Self::Like,
             Token::Keyword(Keyword::Or) => Self::Or,
-            Token::LessOrGreaterThan => Self::CompareNE,
-            Token::LessThan => Self::CompareLT,
-            Token::LessThanOrEqual => Self::CompareLTE,
+            Token::LessOrGreaterThan => Self::NotEqual,
+            Token::LessThan => Self::LessThan,
+            Token::LessThanOrEqual => Self::LessThanOrEqual,
             Token::Minus => Self::Subtract,
-            Token::NotEqual => Self::CompareNE,
+            Token::NotEqual => Self::NotEqual,
             Token::Percent => Self::Modulo,
             Token::Plus => Self::Add,
             Token::Slash => Self::Divide,
@@ -582,8 +582,11 @@ impl Operator for InfixOperator {
         match self {
             Self::Or => 1,
             Self::And => 2,
-            Self::CompareEQ | Self::CompareNE | Self::Like => 3,
-            Self::CompareGT | Self::CompareGTE | Self::CompareLT | Self::CompareLTE => 4,
+            Self::Equal | Self::NotEqual | Self::Like => 3,
+            Self::GreaterThan
+            | Self::GreaterThanOrEqual
+            | Self::LessThan
+            | Self::LessThanOrEqual => 4,
             Self::Add | Self::Subtract => 5,
             Self::Multiply | Self::Divide | Self::Modulo => 6,
             Self::Exponentiate => 7,
@@ -595,7 +598,7 @@ enum PostfixOperator {
     Factorial,
     // FIXME Compiler bug? Why is this considered dead code?
     #[allow(dead_code)]
-    CompareNull {
+    IsNull {
         not: bool,
     },
 }
@@ -604,9 +607,9 @@ impl PostfixOperator {
     fn build(&self, lhs: ast::Expression) -> ast::Expression {
         let lhs = Box::new(lhs);
         match self {
-            Self::CompareNull { not } => match not {
-                true => ast::Operation::Not(Box::new(ast::Operation::CompareNull(lhs).into())),
-                false => ast::Operation::CompareNull(lhs),
+            Self::IsNull { not } => match not {
+                true => ast::Operation::Not(Box::new(ast::Operation::IsNull(lhs).into())),
+                false => ast::Operation::IsNull(lhs),
             },
             Self::Factorial => ast::Operation::Factorial(lhs),
         }
@@ -618,7 +621,7 @@ impl Operator for PostfixOperator {
     fn from(token: &Token) -> Option<Self> {
         match token {
             Token::Exclamation => Some(Self::Factorial),
-            Token::Keyword(Keyword::Is) => Some(Self::CompareNull { not: false }),
+            Token::Keyword(Keyword::Is) => Some(Self::IsNull { not: false }),
             _ => None,
         }
     }
@@ -626,7 +629,7 @@ impl Operator for PostfixOperator {
     fn augment(mut self, parser: &mut Parser) -> Result<Self, Error> {
         #[allow(clippy::single_match)]
         match &mut self {
-            Self::CompareNull { ref mut not } => {
+            Self::IsNull { ref mut not } => {
                 if parser.next_if_token(Keyword::Not.into()).is_some() {
                     *not = true
                 };

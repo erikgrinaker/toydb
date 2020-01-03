@@ -5,7 +5,7 @@ Tokens:
   Ident("movies")
   Keyword(Set)
   Ident("title")
-  Equals
+  Equal
   String("X")
   Keyword(Where)
   Keyword(False)
