@@ -431,6 +431,11 @@ impl<'a> Parser<'a> {
                     ast::Literal::Float(n.parse()?).into()
                 }
             }
+            Token::OpenParen => {
+                let expr = self.parse_expression(0)?;
+                self.next_expect(Some(Token::CloseParen))?;
+                expr
+            }
             Token::String(s) => ast::Literal::String(s).into(),
             Token::Keyword(Keyword::False) => ast::Literal::Boolean(false).into(),
             Token::Keyword(Keyword::Infinity) => ast::Literal::Float(std::f64::INFINITY).into(),
@@ -477,7 +482,6 @@ impl PrefixOperator {
 impl Operator for PrefixOperator {
     fn from(token: &Token) -> Option<Self> {
         match token {
-            Token::Exclamation => Some(Self::Not),
             Token::Keyword(Keyword::Not) => Some(Self::Not),
             Token::Minus => Some(Self::Minus),
             Token::Plus => Some(Self::Plus),

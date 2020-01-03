@@ -230,6 +230,9 @@ impl Expression {
                 }
             },
             Self::Factorial(expr) => match expr.evaluate(e)? {
+                Integer(i) if i < 0 => {
+                    return Err(Error::Value("Can't take factorial of negative number".into()))
+                }
                 Integer(i) => Integer((1..=i).fold(1, |a, b| a * b as i64)),
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't take factorial of {}", value))),

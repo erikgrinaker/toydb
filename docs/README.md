@@ -124,3 +124,21 @@ Unary operators:
 * `+` (prefix): identity, e.g. `+1` yields `1`.
 * `-` (prefix): negation, e.g. `- -2` yields `2`.
 * `!` (postfix): factorial, e.g. `5!` yields `15`.
+
+#### Operator precedence
+
+The operator precedence (order of operations) is as follows:
+
+| Precedence | Operator                 | Associativity |
+|------------|--------------------------|---------------|
+| 9          | `+`, `-`, `NOT` (prefix) | Right         |
+| 8          | `!`, `IS` (postfix)      | Left          |
+| 7          | `^`                      | Right         |
+| 6          | `*`, `/`, `%`            | Left          |
+| 5          | `+`, `-`                 | Left          |
+| 4          | `>`, `>=`, `<`, `<=`     | Left          |
+| 3          | `=`, `!=`, `LIKE`        | Left          |
+| 2          | `AND`                    | Left          |
+| 1          | `OR`                     | Left          |
+
+Precedence can be overridden by wrapping an expression in parentheses, e.g. `(1 + 2) * 3`.
