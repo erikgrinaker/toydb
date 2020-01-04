@@ -16,7 +16,7 @@ pub enum Expression {
     Not(Box<Expression>),
     Or(Box<Expression>, Box<Expression>),
 
-    // Comparisons operations
+    // Comparisons operations (GTE, LTE, and NEQ are composite operations)
     Equal(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
     IsNull(Box<Expression>),
