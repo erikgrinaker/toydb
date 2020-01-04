@@ -174,16 +174,20 @@ impl From<ast::Expression> for Expression {
                 // Comparison operators
                 ast::Operation::Equal(lhs, rhs) => Self::Equal(lhs.into(), rhs.into()),
                 ast::Operation::GreaterThan(lhs, rhs) => Self::GreaterThan(lhs.into(), rhs.into()),
-                ast::Operation::GreaterThanOrEqual(lhs, rhs) => {
-                    Self::GreaterThanOrEqual(lhs.into(), rhs.into())
-                }
+                ast::Operation::GreaterThanOrEqual(lhs, rhs) => Self::Or(
+                    Self::GreaterThan(lhs.clone().into(), rhs.clone().into()).into(),
+                    Self::Equal(lhs.into(), rhs.into()).into(),
+                ),
                 ast::Operation::IsNull(expr) => Self::IsNull(expr.into()),
                 ast::Operation::LessThan(lhs, rhs) => Self::LessThan(lhs.into(), rhs.into()),
-                ast::Operation::LessThanOrEqual(lhs, rhs) => {
-                    Self::LessThanOrEqual(lhs.into(), rhs.into())
-                }
+                ast::Operation::LessThanOrEqual(lhs, rhs) => Self::Or(
+                    Self::LessThan(lhs.clone().into(), rhs.clone().into()).into(),
+                    Self::Equal(lhs.into(), rhs.into()).into(),
+                ),
                 ast::Operation::Like(lhs, rhs) => Self::Like(lhs.into(), rhs.into()),
-                ast::Operation::NotEqual(lhs, rhs) => Self::NotEqual(lhs.into(), rhs.into()),
+                ast::Operation::NotEqual(lhs, rhs) => {
+                    Self::Not(Self::Equal(lhs.into(), rhs.into()).into())
+                }
 
                 // Mathematical operators
                 ast::Operation::Assert(expr) => Self::Assert(expr.into()),

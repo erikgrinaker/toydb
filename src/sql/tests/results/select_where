@@ -69,13 +69,25 @@ Plan: Plan {
             table: "movies",
         },
         predicate: And(
-            GreaterThanOrEqual(
-                Field(
-                    "released",
+            Or(
+                GreaterThan(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
                 ),
-                Constant(
-                    Integer(
-                        2000,
+                Equal(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
                     ),
                 ),
             ),
@@ -99,13 +111,25 @@ Optimized plan: Plan {
             table: "movies",
         },
         predicate: And(
-            GreaterThanOrEqual(
-                Field(
-                    "released",
+            Or(
+                GreaterThan(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
                 ),
-                Constant(
-                    Integer(
-                        2000,
+                Equal(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
                     ),
                 ),
             ),

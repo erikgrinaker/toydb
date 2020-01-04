@@ -36,13 +36,25 @@ Plan: Plan {
             source: Scan {
                 table: "movies",
             },
-            predicate: GreaterThanOrEqual(
-                Field(
-                    "released",
+            predicate: Or(
+                GreaterThan(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
                 ),
-                Constant(
-                    Integer(
-                        2000,
+                Equal(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
                     ),
                 ),
             ),
@@ -57,13 +69,25 @@ Optimized plan: Plan {
             source: Scan {
                 table: "movies",
             },
-            predicate: GreaterThanOrEqual(
-                Field(
-                    "released",
+            predicate: Or(
+                GreaterThan(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
                 ),
-                Constant(
-                    Integer(
-                        2000,
+                Equal(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
                     ),
                 ),
             ),

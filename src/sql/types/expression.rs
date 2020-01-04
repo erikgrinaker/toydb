@@ -19,11 +19,8 @@ pub enum Expression {
     // Comparisons operations
     Equal(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
-    GreaterThanOrEqual(Box<Expression>, Box<Expression>),
     IsNull(Box<Expression>),
     LessThan(Box<Expression>, Box<Expression>),
-    LessThanOrEqual(Box<Expression>, Box<Expression>),
-    NotEqual(Box<Expression>, Box<Expression>),
 
     // Mathematical operations
     Add(Box<Expression>, Box<Expression>),
@@ -91,19 +88,6 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
-            Self::NotEqual(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs != rhs),
-                (Integer(lhs), Integer(rhs)) => Boolean(lhs != rhs),
-                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 != rhs),
-                (Float(lhs), Integer(rhs)) => Boolean(lhs != rhs as f64),
-                (Float(lhs), Float(rhs)) => Boolean(lhs != rhs),
-                (String(lhs), String(rhs)) => Boolean(lhs != rhs),
-                (Null, _) | (_, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
-            },
             Self::GreaterThan(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs > rhs),
@@ -117,18 +101,6 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            Self::GreaterThanOrEqual(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs >= rhs),
-                (Integer(lhs), Integer(rhs)) => Boolean(lhs >= rhs),
-                (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 >= rhs),
-                (Float(lhs), Integer(rhs)) => Boolean(lhs >= rhs as f64),
-                (Float(lhs), Float(rhs)) => Boolean(lhs >= rhs),
-                (String(lhs), String(rhs)) => Boolean(lhs >= rhs),
-                (Null, _) | (_, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
-            },
             Self::LessThan(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs < rhs),
@@ -137,18 +109,6 @@ impl Expression {
                 (Float(lhs), Integer(rhs)) => Boolean(lhs < rhs as f64),
                 (Float(lhs), Float(rhs)) => Boolean(lhs < rhs),
                 (String(lhs), String(rhs)) => Boolean(lhs < rhs),
-                (Null, _) | (_, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
-            },
-            Self::LessThanOrEqual(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
-                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs <= rhs),
-                (Integer(lhs), Integer(rhs)) => Boolean(lhs <= rhs),
-                (Integer(lhs), Float(rhs)) => Boolean((lhs as f64) <= rhs),
-                (Float(lhs), Integer(rhs)) => Boolean(lhs <= rhs as f64),
-                (Float(lhs), Float(rhs)) => Boolean(lhs <= rhs),
-                (String(lhs), String(rhs)) => Boolean(lhs <= rhs),
                 (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
@@ -340,19 +300,8 @@ impl Expression {
                 lhs.transform(pre, post)?.into(),
                 rhs.transform(pre, post)?.into(),
             ),
-            Self::GreaterThanOrEqual(lhs, rhs) => Self::GreaterThanOrEqual(
-                lhs.transform(pre, post)?.into(),
-                rhs.transform(pre, post)?.into(),
-            ),
             Self::LessThan(lhs, rhs) => {
                 Self::LessThan(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::LessThanOrEqual(lhs, rhs) => Self::LessThanOrEqual(
-                lhs.transform(pre, post)?.into(),
-                rhs.transform(pre, post)?.into(),
-            ),
-            Self::NotEqual(lhs, rhs) => {
-                Self::NotEqual(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
             }
             Self::IsNull(expr) => Self::IsNull(expr.transform(pre, post)?.into()),
 
@@ -398,13 +347,10 @@ impl Expression {
             | Self::Equal(lhs, rhs)
             | Self::Exponentiate(lhs, rhs)
             | Self::GreaterThan(lhs, rhs)
-            | Self::GreaterThanOrEqual(lhs, rhs)
             | Self::LessThan(lhs, rhs)
-            | Self::LessThanOrEqual(lhs, rhs)
             | Self::Like(lhs, rhs)
             | Self::Modulo(lhs, rhs)
             | Self::Multiply(lhs, rhs)
-            | Self::NotEqual(lhs, rhs)
             | Self::Or(lhs, rhs)
             | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
 
