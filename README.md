@@ -84,6 +84,8 @@ toydb@1> SELECT * FROM movies
 
 - [x] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based snapshot isolation.
 
+  - [ ] Serializable snapshot isolation.
+
 - [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer and time-travel support.
 
   - [ ] Predicate pushdown.
