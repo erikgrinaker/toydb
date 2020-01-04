@@ -12,13 +12,12 @@ impl Delete {
         mut source: Box<dyn Executor>,
         table: String,
     ) -> Result<Box<dyn Executor>, Error> {
-        let pk = ctx
+        let table = ctx
             .txn
             .read_table(&table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?
-            .primary_key;
+            .ok_or_else(|| Error::Value(format!("Table {} not found", table)))?;
         while let Some(row) = source.fetch()? {
-            ctx.txn.delete(&table, row.get(pk).unwrap())?
+            ctx.txn.delete(&table.name, &table.row_key(&row)?)?
         }
         Ok(Box::new(Self))
     }

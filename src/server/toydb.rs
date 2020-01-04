@@ -22,7 +22,7 @@ impl service::ToyDB for ToyDB {
         let mut resp = service::GetTableResponse::new();
         let txn = self.engine.begin().unwrap();
         match txn.read_table(&req.name) {
-            Ok(Some(schema)) => resp.sql = schema.to_query(),
+            Ok(Some(schema)) => resp.sql = schema.as_sql(),
             Ok(None) => {
                 resp.error = Self::error_to_protobuf(Error::Value(format!(
                     "Table {} does not exist",

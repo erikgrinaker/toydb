@@ -22,12 +22,18 @@ AST: CreateTable {
             datatype: Integer,
             primary_key: true,
             nullable: None,
+            default: None,
+            unique: false,
+            references: None,
         },
         ColumnSpec {
             name: "名前",
             datatype: String,
             primary_key: false,
             nullable: None,
+            default: None,
+            unique: false,
+            references: None,
         },
     ],
 }
@@ -40,15 +46,24 @@ Plan: Plan {
                 Column {
                     name: "身元",
                     datatype: Integer,
+                    primary_key: true,
                     nullable: false,
+                    default: None,
+                    unique: false,
+                    references: None,
                 },
                 Column {
                     name: "名前",
                     datatype: String,
+                    primary_key: false,
                     nullable: true,
+                    default: Some(
+                        Null,
+                    ),
+                    unique: false,
+                    references: None,
                 },
             ],
-            primary_key: 0,
         },
     },
 }
@@ -61,15 +76,24 @@ Optimized plan: Plan {
                 Column {
                     name: "身元",
                     datatype: Integer,
+                    primary_key: true,
                     nullable: false,
+                    default: None,
+                    unique: false,
+                    references: None,
                 },
                 Column {
                     name: "名前",
                     datatype: String,
+                    primary_key: false,
                     nullable: true,
+                    default: Some(
+                        Null,
+                    ),
+                    unique: false,
+                    references: None,
                 },
             ],
-            primary_key: 0,
         },
     },
 }
@@ -89,10 +113,10 @@ CREATE TABLE genres (
 CREATE TABLE movies (
   id INTEGER PRIMARY KEY NOT NULL,
   title STRING NOT NULL,
-  genre_id INTEGER NOT NULL,
+  genre_id INTEGER NOT NULL REFERENCES genres,
   released INTEGER NOT NULL,
-  rating FLOAT,
-  bluray BOOLEAN
+  rating FLOAT DEFAULT NULL,
+  bluray BOOLEAN DEFAULT NULL
 )
 [Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
 [Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
@@ -102,5 +126,5 @@ CREATE TABLE movies (
 
 CREATE TABLE 表 (
   身元 INTEGER PRIMARY KEY NOT NULL,
-  名前 STRING
+  名前 STRING DEFAULT NULL
 )

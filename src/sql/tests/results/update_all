@@ -99,10 +99,10 @@ CREATE TABLE genres (
 CREATE TABLE movies (
   id INTEGER PRIMARY KEY NOT NULL,
   title STRING NOT NULL,
-  genre_id INTEGER NOT NULL,
+  genre_id INTEGER NOT NULL REFERENCES genres,
   released INTEGER NOT NULL,
-  rating FLOAT,
-  bluray BOOLEAN
+  rating FLOAT DEFAULT NULL,
+  bluray BOOLEAN DEFAULT NULL
 )
 [Integer(1), String("X"), Integer(1), Integer(0), Float(8.2), Null]
 [Integer(2), String("X"), Integer(2), Integer(0), Float(7.6), Null]

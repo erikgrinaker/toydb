@@ -59,14 +59,14 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
         table.validate_row(&row)?;
-        let pk = row.get(table.primary_key).unwrap();
-        if self.read(&table.name, &pk)?.is_some() {
+        let id = table.row_key(&row)?;
+        if self.read(&table.name, &id)?.is_some() {
             return Err(Error::Value(format!(
                 "Primary key {} already exists for table {}",
-                pk, table.name
+                id, table.name
             )));
         }
-        self.txn.set(&Key::Row(&table.name, &pk).encode(), serialize(&row)?)?;
+        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)?;
         Ok(())
     }
 

@@ -130,36 +130,45 @@ impl Planner {
     fn build_schema_table(
         &self,
         name: String,
-        cols: Vec<ast::ColumnSpec>,
+        columns: Vec<ast::ColumnSpec>,
     ) -> Result<schema::Table, Error> {
-        match cols.iter().filter(|c| c.primary_key).count() {
-            0 => return Err(Error::Value(format!("No primary key defined for table {}", name))),
-            n if n > 1 => {
-                return Err(Error::Value(format!(
-                    "{} primary keys defined for table {}, must set exactly 1",
-                    n, name
-                )))
-            }
-            _ => {}
-        };
-        let table = schema::Table {
+        schema::Table::new(
             name,
-            primary_key: cols.iter().position(|c| c.primary_key).unwrap_or(0),
-            columns: cols
+            columns
                 .into_iter()
-                .map(|spec| schema::Column {
-                    name: spec.name,
-                    datatype: spec.datatype,
-                    nullable: spec.nullable.unwrap_or(!spec.primary_key),
+                .map(|c| {
+                    let nullable = c.nullable.unwrap_or(!c.primary_key);
+                    let default = if let Some(expr) = c.default {
+                        let expr = self.build_expression(expr)?;
+                        if !expr.is_constant() {
+                            return Err(Error::Value(format!(
+                                "Default expression for column {} must be constant",
+                                c.name
+                            )));
+                        }
+                        Some(expr.evaluate(&Environment::empty())?)
+                    } else if nullable {
+                        Some(Value::Null)
+                    } else {
+                        None
+                    };
+
+                    Ok(schema::Column {
+                        name: c.name,
+                        datatype: c.datatype,
+                        primary_key: c.primary_key,
+                        nullable,
+                        default,
+                        unique: c.unique,
+                        references: c.references,
+                    })
                 })
-                .collect(),
-        };
-        table.validate()?;
-        Ok(table)
+                .collect::<Result<_, Error>>()?,
+        )
     }
 }
 
-/// Helpers to convert AST expressions into plan expressions
+/// Helpers to convert AST nodes into plan nodes
 impl From<ast::Expression> for Expression {
     fn from(expr: ast::Expression) -> Self {
         match expr {

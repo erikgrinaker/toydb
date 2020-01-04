@@ -22,8 +22,11 @@ AST: CreateTable {
             nullable: Some(
                 true,
             ),
+            default: None,
+            unique: false,
+            references: None,
         },
     ],
 }
 
-Plan: Value("Primary key column id cannot be nullable")
+Plan: Value("Primary key id cannot be nullable")

@@ -24,14 +24,20 @@ AST: CreateTable {
             datatype: Integer,
             primary_key: true,
             nullable: None,
+            default: None,
+            unique: false,
+            references: None,
         },
         ColumnSpec {
             name: "name",
             datatype: String,
             primary_key: true,
             nullable: None,
+            default: None,
+            unique: false,
+            references: None,
         },
     ],
 }
 
-Plan: Value("2 primary keys defined for table name, must set exactly 1")
+Plan: Value("Multiple primary keys in table name")

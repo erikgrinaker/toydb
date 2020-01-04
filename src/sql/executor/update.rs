@@ -15,19 +15,21 @@ impl Update {
         mut source: Box<dyn Executor>,
         expressions: BTreeMap<String, Expression>,
     ) -> Result<Box<dyn Executor>, Error> {
-        let schema = ctx
+        let table = ctx
             .txn
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
-        let pk_index = schema.primary_key;
-        let columns: Vec<String> = schema.columns.iter().map(|c| c.name.clone()).collect();
-        while let Some(mut row) = source.fetch()? {
-            let pk = row.get(pk_index).unwrap().clone();
-            let env = Environment::new(columns.iter().cloned().zip(row.iter().cloned()).collect());
+        while let Some(row) = source.fetch()? {
+            let id = table.row_key(&row)?;
+            let mut keyed_row = table.row_to_hashmap(row);
+            let env = Environment::new(keyed_row.clone());
             for (c, expr) in &expressions {
-                row[schema.column_index(&c).unwrap()] = expr.evaluate(&env)?;
+                *keyed_row
+                    .get_mut(c)
+                    .ok_or_else(|| Error::Value(format!("Unknown column {}", c)))? =
+                    expr.evaluate(&env)?;
             }
-            ctx.txn.update(&table, &pk, row)?
+            ctx.txn.update(&table.name, &id, table.row_from_hashmap(keyed_row))?
         }
         Ok(Box::new(Self))
     }

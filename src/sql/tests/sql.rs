@@ -21,7 +21,7 @@ macro_rules! test_sql {
                 "CREATE TABLE movies (
                     id INTEGER PRIMARY KEY,
                     title STRING NOT NULL,
-                    genre_id INTEGER NOT NULL,
+                    genre_id INTEGER NOT NULL REFERENCES genres,
                     released INTEGER NOT NULL,
                     rating FLOAT,
                     bluray BOOLEAN
@@ -128,7 +128,7 @@ macro_rules! test_sql {
             let txn = engine.begin()?;
             for table in &txn.list_tables()? {
                 let schema = &txn.read_table(&table.name)?.unwrap();
-                write!(f, "\n{}\n", schema.to_query())?;
+                write!(f, "\n{}\n", schema.as_sql())?;
                 for row in txn.scan(&table.name)? {
                     write!(f, "{:?}\n", row?)?;
                 }

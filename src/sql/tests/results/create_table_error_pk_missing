@@ -17,8 +17,11 @@ AST: CreateTable {
             datatype: Integer,
             primary_key: false,
             nullable: None,
+            default: None,
+            unique: false,
+            references: None,
         },
     ],
 }
 
-Plan: Value("No primary key defined for table name")
+Plan: Value("No primary key in table name")

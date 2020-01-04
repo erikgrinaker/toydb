@@ -10,11 +10,29 @@ pub struct Table {
     pub name: String,
     /// The table columns
     pub columns: Vec<Column>,
-    /// The index of the primary key column
-    pub primary_key: usize,
 }
 
 impl Table {
+    /// Creates a new table schema
+    pub fn new(name: String, columns: Vec<Column>) -> Result<Self, Error> {
+        let table = Self { name, columns };
+        table.validate()?;
+        Ok(table)
+    }
+
+    /// Generates an SQL DDL query for the table schema
+    pub fn as_sql(&self) -> String {
+        format!(
+            "CREATE TABLE {} (\n{}\n)",
+            self.name,
+            self.columns
+                .iter()
+                .map(|c| format!("  {}", c.as_sql()))
+                .collect::<Vec<String>>()
+                .join(",\n")
+        )
+    }
+
     /// Returns the index of a named column, if it exists
     pub fn column_index(&self, name: &str) -> Option<usize> {
         self.columns.iter().position(|c| c.name == name)
@@ -51,37 +69,40 @@ impl Table {
         Ok(row)
     }
 
-    /// Generates an SQL DDL query for the table schema
-    pub fn to_query(&self) -> String {
-        let mut query = format!("CREATE TABLE {} (\n", self.name);
-        for (i, column) in self.columns.iter().enumerate() {
-            query += &format!("  {} {}", column.name, column.datatype);
-            if i == self.primary_key {
-                query += " PRIMARY KEY";
-            }
-            if !column.nullable {
-                query += " NOT NULL";
-            }
-            if i < self.columns.len() - 1 {
-                query += ",";
-            }
-            query += "\n";
-        }
-        query += ")";
-        query
+    /// Returns a row from a hashmap keyed by column name, padding it with nulls if needed
+    pub fn row_from_hashmap(&self, row: HashMap<String, Value>) -> Row {
+        self.columns.iter().map(|c| row.get(&c.name).cloned().unwrap_or(Value::Null)).collect()
     }
 
-    /// Validates the schema
+    /// Returns the row as a hashmap keyed by column name, padding the row with nulls if needed
+    pub fn row_to_hashmap(&self, row: Row) -> HashMap<String, Value> {
+        self.columns
+            .iter()
+            .map(|c| c.name.clone())
+            .zip(row.into_iter().chain(std::iter::repeat(Value::Null)))
+            .collect()
+    }
+
+    /// Returns the primary key value of a row
+    pub fn row_key(&self, row: &[Value]) -> Result<Value, Error> {
+        // FIXME This should be indexed
+        row.get(self.columns.iter().position(|c| c.primary_key).expect("Primary key not found"))
+            .cloned()
+            .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
+    }
+
+    /// Validates the table schema
     pub fn validate(&self) -> Result<(), Error> {
         if self.columns.is_empty() {
-            return Err(Error::Value("Table has no columns".into()));
+            return Err(Error::Value(format!("Table {} has no columns", self.name)));
         }
-        let pk = self
-            .columns
-            .get(self.primary_key)
-            .ok_or_else(|| Error::Value("Primary key column does not exist".into()))?;
-        if pk.nullable {
-            return Err(Error::Value(format!("Primary key column {} cannot be nullable", pk.name)));
+        match self.columns.iter().filter(|c| c.primary_key).count() {
+            1 => {}
+            0 => return Err(Error::Value(format!("No primary key in table {}", self.name))),
+            _ => return Err(Error::Value(format!("Multiple primary keys in table {}", self.name))),
+        };
+        for column in &self.columns {
+            column.validate()?;
         }
         Ok(())
     }
@@ -89,12 +110,7 @@ impl Table {
     /// Validates a row
     pub fn validate_row(&self, row: &[Value]) -> Result<(), Error> {
         if row.len() != self.columns.len() {
-            return Err(Error::Value(format!(
-                "Invalid row size {} for table {}, expected {}",
-                row.len(),
-                self.name,
-                self.columns.len()
-            )));
+            return Err(Error::Value(format!("Invalid row size for table {}", self.name)));
         }
         for (column, value) in self.columns.iter().zip(row.iter()) {
             column.validate_value(value)?;
@@ -110,11 +126,68 @@ pub struct Column {
     pub name: String,
     /// Column datatype
     pub datatype: DataType,
+    /// Whether the column is a primary key
+    pub primary_key: bool,
     /// Whether the column allows null values
     pub nullable: bool,
+    /// The default value of the column
+    pub default: Option<Value>,
+    /// Whether the column should only take unique values
+    pub unique: bool,
+    /// The table which is referenced by this foreign key
+    pub references: Option<String>,
 }
 
 impl Column {
+    /// Generates SQL DDL for the column
+    pub fn as_sql(&self) -> String {
+        let mut sql = format!("{} {}", self.name, self.datatype);
+        if self.primary_key {
+            sql += " PRIMARY KEY";
+        }
+        if !self.nullable {
+            sql += " NOT NULL";
+        }
+        if let Some(default) = &self.default {
+            sql += &format!(" DEFAULT {}", default);
+        }
+        if self.unique {
+            sql += " UNIQUE";
+        }
+        if let Some(reference) = &self.references {
+            sql += &format!(" REFERENCES {}", reference);
+        }
+        sql
+    }
+
+    /// Validates the column schema
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.primary_key && self.nullable {
+            return Err(Error::Value(format!("Primary key {} cannot be nullable", self.name)));
+        }
+        if let Some(default) = &self.default {
+            if let Some(datatype) = default.datatype() {
+                if datatype != self.datatype {
+                    return Err(Error::Value(format!(
+                        "Default value for column {} has datatype {}, must be {}",
+                        self.name, datatype, self.datatype
+                    )));
+                }
+            } else if !self.nullable {
+                return Err(Error::Value(format!(
+                    "Can't use NULL as default value for non-nullable column {}",
+                    self.name
+                )));
+            }
+        } else if self.nullable {
+            return Err(Error::Value(format!(
+                "Nullable column {} must have a default value",
+                self.name
+            )));
+        }
+        Ok(())
+    }
+
     /// Validates a column value
     pub fn validate_value(&self, value: &Value) -> Result<(), Error> {
         match value.datatype() {

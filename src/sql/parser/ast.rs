@@ -41,6 +41,9 @@ pub struct ColumnSpec {
     pub datatype: types::DataType,
     pub primary_key: bool,
     pub nullable: Option<bool>,
+    pub default: Option<Expression>,
+    pub unique: bool,
+    pub references: Option<String>,
 }
 
 /// A SELECT clause
