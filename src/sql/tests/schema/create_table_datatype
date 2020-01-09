@@ -1,28 +1,28 @@
 Query: CREATE TABLE name (
             id INTEGER PRIMARY KEY,
-            bool_ BOOL,
-            boolean_ BOOLEAN,
-            char_ CHAR,
-            double_ DOUBLE,
-            float_ FLOAT,
-            int_ INT,
-            integer_ INTEGER,
-            string_ STRING,
-            text_ TEXT,
-            varchar_ VARCHAR
+            "bool" BOOL,
+            "boolean" BOOLEAN,
+            "char" CHAR,
+            "double" DOUBLE,
+            "float" FLOAT,
+            "int" INT,
+            "integer" INTEGER,
+            "string" STRING,
+            "text" TEXT,
+            "varchar" VARCHAR
         )
 
 Storage:
 CREATE TABLE name (
   id INTEGER PRIMARY KEY NOT NULL,
-  bool_ BOOLEAN DEFAULT NULL,
-  boolean_ BOOLEAN DEFAULT NULL,
-  char_ STRING DEFAULT NULL,
-  double_ FLOAT DEFAULT NULL,
-  float_ FLOAT DEFAULT NULL,
-  int_ INTEGER DEFAULT NULL,
-  integer_ INTEGER DEFAULT NULL,
-  string_ STRING DEFAULT NULL,
-  text_ STRING DEFAULT NULL,
-  varchar_ STRING DEFAULT NULL
+  "bool" BOOLEAN DEFAULT NULL,
+  "boolean" BOOLEAN DEFAULT NULL,
+  "char" STRING DEFAULT NULL,
+  "double" FLOAT DEFAULT NULL,
+  "float" FLOAT DEFAULT NULL,
+  "int" INTEGER DEFAULT NULL,
+  "integer" INTEGER DEFAULT NULL,
+  "string" STRING DEFAULT NULL,
+  "text" STRING DEFAULT NULL,
+  "varchar" STRING DEFAULT NULL
 )

@@ -10,6 +10,8 @@ extern crate crossbeam_channel;
 extern crate goldenfile;
 extern crate httpbis;
 #[macro_use]
+extern crate lazy_static;
+#[macro_use]
 extern crate log;
 extern crate rand;
 extern crate regex;

@@ -1,0 +1,6 @@
+Query: CREATE TABLE "👋" ("🆔" INTEGER PRIMARY KEY)
+
+Storage:
+CREATE TABLE "👋" (
+  "🆔" INTEGER PRIMARY KEY NOT NULL
+)

@@ -126,7 +126,7 @@ pub enum Keyword {
 }
 
 impl Keyword {
-    fn from_str(ident: &str) -> Option<Self> {
+    pub fn from_str(ident: &str) -> Option<Self> {
         Some(match ident.to_uppercase().as_ref() {
             "AS" => Self::As,
             "ASC" => Self::Asc,
@@ -186,7 +186,7 @@ impl Keyword {
         })
     }
 
-    fn to_str(&self) -> &str {
+    pub fn to_str(&self) -> &str {
         match self {
             Self::As => "AS",
             Self::Asc => "ASC",
@@ -311,6 +311,7 @@ impl<'a> Lexer<'a> {
         self.consume_whitespace();
         match self.iter.peek() {
             Some('\'') => self.scan_string(),
+            Some('"') => self.scan_ident_quoted(),
             Some(c) if c.is_digit(10) => Ok(self.scan_number()),
             Some(c) if c.is_alphabetic() => Ok(self.scan_ident()),
             Some(_) => Ok(self.scan_symbol()),
@@ -327,6 +328,23 @@ impl<'a> Lexer<'a> {
         Keyword::from_str(&name)
             .map(Token::Keyword)
             .or_else(|| Some(Token::Ident(name.to_lowercase())))
+    }
+
+    /// Scans the input for the next quoted ident, if any
+    fn scan_ident_quoted(&mut self) -> Result<Option<Token>, Error> {
+        if self.next_if(|c| c == '"').is_none() {
+            return Ok(None);
+        }
+        let mut ident = String::new();
+        loop {
+            match self.iter.next() {
+                Some('"') if self.next_if(|c| c == '"').is_some() => ident.push('"'),
+                Some('"') => break,
+                Some(c) => ident.push(c),
+                None => return Err(Error::Parse("Unexpected end of quoted identifier".into())),
+            }
+        }
+        Ok(Some(Token::Ident(ident)))
     }
 
     /// Scans the input for the next number token, if any
@@ -358,13 +376,8 @@ impl<'a> Lexer<'a> {
         let mut s = String::new();
         loop {
             match self.iter.next() {
-                Some('\'') => {
-                    if let Some(c) = self.next_if(|c| c == '\'') {
-                        s.push(c)
-                    } else {
-                        break;
-                    }
-                }
+                Some('\'') if self.next_if(|c| c == '\'').is_some() => s.push('\''),
+                Some('\'') => break,
                 Some(c) => s.push(c),
                 None => return Err(Error::Parse("Unexpected end of string literal".into())),
             }

@@ -1,0 +1,6 @@
+Query: CREATE TABLE "table" (id INTEGER PRIMARY KEY)
+
+Storage:
+CREATE TABLE "table" (
+  id INTEGER PRIMARY KEY NOT NULL
+)

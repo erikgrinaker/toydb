@@ -1,0 +1,4 @@
+Query: CREATE TABLE table (id INTEGER PRIMARY KEY)
+Error: Parse("Expected identifier, got TABLE")
+
+Storage:

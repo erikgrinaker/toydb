@@ -17,13 +17,13 @@ Numeric types are not interchangable when stored; a float value cannot be stored
 
 ### Keywords
 
-Keywords are reserved words that have special meaning in SQL statements, such as `SELECT`. These cannot be used as identifiers, e.g. table names. Keywords are case-insensitive. The complete list of keywords is:
+Keywords are reserved words that have special meaning in SQL statements, such as `SELECT`. These cannot be used as identifiers (e.g. table names) unless quoted with `"`. Keywords are case-insensitive. The complete list of keywords is:
 
 `AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `FALSE`, `FLOAT`, `FROM`, `INFINITY`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `KEY`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ONLY`, `OR`, `ORDER`, `PRIMARY`, `READ`, `REFERENCES`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
-Identifiers are names for database objects, such as tables and columns. Identifiers must begin with any Unicode letter, and can contain any combination of Unicode letters, numbers, and underscores (`_`). Identifiers are automatically converted to lowercase, and have no length limit. Reserved keywords (see above) cannot be used as identifiers, and it is not possible to quote or escape identifiers.
+Identifiers are names for database objects, such as tables and columns. Unless quoted with `"`, identifiers may not be reserved keywords, must begin with any Unicode letter, and can contain any combination of Unicode letters, numbers, and underscores (`_`). Identifiers are automatically converted to lowercase, and have no length limit. In quoted identifiers, `""` can be used to escape a double quote character.
 
 ### Constants
 

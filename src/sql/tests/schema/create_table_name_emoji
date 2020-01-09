@@ -1,4 +1,4 @@
-Query: CREATE TABLE 👋 (id INTEGER PRIMARY KEY)
+Query: CREATE TABLE 👋 (🆔 INTEGER PRIMARY KEY)
 Error: Parse("Unexpected character 👋")
 
 Storage:

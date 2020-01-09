@@ -1,7 +1,13 @@
+use super::super::parser::lexer::Keyword;
 use super::{DataType, Row, Value};
 use crate::Error;
 
+use regex::Regex;
 use std::collections::HashMap;
+
+lazy_static! {
+    static ref RE_IDENT: Regex = Regex::new(r#"^\w[\w_]*$"#).unwrap();
+}
 
 /// A table
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -22,15 +28,21 @@ impl Table {
 
     /// Generates an SQL DDL query for the table schema
     pub fn as_sql(&self) -> String {
-        format!(
-            "CREATE TABLE {} (\n{}\n)",
-            self.name,
+        let mut sql = String::from("CREATE TABLE ");
+        if RE_IDENT.is_match(&self.name) && Keyword::from_str(&self.name).is_none() {
+            sql += &self.name;
+        } else {
+            sql += &format!("\"{}\"", self.name.replace("\"", "\"\""));
+        }
+        sql += &format!(
+            " (\n{}\n)",
             self.columns
                 .iter()
                 .map(|c| format!("  {}", c.as_sql()))
                 .collect::<Vec<String>>()
                 .join(",\n")
-        )
+        );
+        sql
     }
 
     /// Returns the index of a named column, if it exists
@@ -146,7 +158,13 @@ pub struct Column {
 impl Column {
     /// Generates SQL DDL for the column
     pub fn as_sql(&self) -> String {
-        let mut sql = format!("{} {}", self.name, self.datatype);
+        let mut sql = String::new();
+        if RE_IDENT.is_match(&self.name) && Keyword::from_str(&self.name).is_none() {
+            sql += &self.name;
+        } else {
+            sql += &format!("\"{}\"", self.name.replace("\"", "\"\""));
+        }
+        sql += &format!(" {}", self.datatype);
         if self.primary_key {
             sql += " PRIMARY KEY";
         }
