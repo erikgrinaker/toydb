@@ -3,7 +3,6 @@
 use super::super::lexer::{Lexer, Token};
 use super::super::types::Row;
 use super::super::{Context, Engine, Parser, Plan, Transaction};
-use crate::kv;
 use crate::Error;
 use goldenfile::Mint;
 use std::io::Write;
@@ -13,7 +12,7 @@ macro_rules! test_sql {
     $(
         #[test]
         fn $name() -> Result<(), Error> {
-            let queries = vec![
+            let engine = super::setup(vec![
                 "CREATE TABLE genres (
                     id INTEGER PRIMARY KEY,
                     name STRING NOT NULL
@@ -35,16 +34,7 @@ macro_rules! test_sql {
                     (3, 'Primer', 1, 2004, 6.9, NULL),
                     (4, 'Heat', 2, 1995, 8.2, TRUE),
                     (5, 'The Fountain', 1, 2006, 7.2, TRUE)",
-            ];
-
-            let engine = super::super::engine::KV::new(kv::MVCC::new(kv::storage::Memory::new()));
-            let mut txn = engine.begin()?;
-            for query in queries {
-                let ast = Parser::new(query).parse()?;
-                let plan = Plan::build(ast)?.optimize()?;
-                plan.execute(Context{txn: &mut txn})?;
-            }
-            txn.commit()?;
+            ])?;
 
             let mut mint = Mint::new("src/sql/tests/results");
             let mut f = mint.new_goldenfile(format!("{}", stringify!($name)))?;
