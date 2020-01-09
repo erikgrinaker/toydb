@@ -1,0 +1,8 @@
+Query: INSERT INTO "integer" VALUES (-1)
+
+Storage:
+CREATE TABLE "integer" (
+  pk INTEGER PRIMARY KEY NOT NULL
+)
+[Integer(1)]
+[Integer(-1)]

@@ -98,3 +98,77 @@ test_schema! { with [
     drop_table_missing: "DROP TABLE name",
     drop_table_multiple: "DROP TABLE a, c",
 }
+
+test_schema! { with [
+        r#"CREATE TABLE types (
+            id INTEGER PRIMARY KEY,
+            "boolean" BOOLEAN,
+            "float" FLOAT,
+            "integer" INTEGER,
+            "string" STRING
+        )"#
+    ];
+    insert_boolean_false: r#"INSERT INTO types (id, "boolean") VALUES (0, FALSE)"#,
+    insert_boolean_true: r#"INSERT INTO types (id, "boolean") VALUES (0, TRUE)"#,
+    insert_boolean_null: r#"INSERT INTO types (id, "boolean") VALUES (0, NULL)"#,
+    insert_boolean_float: r#"INSERT INTO types (id, "boolean") VALUES (0, 3.14)"#,
+    insert_boolean_integer: r#"INSERT INTO types (id, "boolean") VALUES (0, 1)"#,
+    insert_boolean_string: r#"INSERT INTO types (id, "boolean") VALUES (0, 'abc')"#,
+    insert_boolean_string_empty: r#"INSERT INTO types (id, "boolean") VALUES (0, '')"#,
+
+    insert_float: r#"INSERT INTO types (id, "float") VALUES (0, 3.14)"#,
+    insert_float_min: r#"INSERT INTO types (id, "float") VALUES (0, 1.23456789012345e-307)"#,
+    insert_float_min_negative: r#"INSERT INTO types (id, "float") VALUES (0, -1.23456789012345e-307)"#,
+    insert_float_min_round: r#"INSERT INTO types (id, "float") VALUES (0, 1.23456789012345e-323)"#,
+    insert_float_max: r#"INSERT INTO types (id, "float") VALUES (0, 1.23456789012345e308)"#,
+    insert_float_max_negative: r#"INSERT INTO types (id, "float") VALUES (0, -1.23456789012345e308)"#,
+    insert_float_infinity: r#"INSERT INTO types (id, "float") VALUES (0, INFINITY)"#,
+    insert_float_infinity_negative: r#"INSERT INTO types (id, "float") VALUES (0, -INFINITY)"#,
+    insert_float_nan: r#"INSERT INTO types (id, "float") VALUES (0, NAN)"#,
+    insert_float_null: r#"INSERT INTO types (id, "float") VALUES (0, NULL)"#,
+    insert_float_boolean: r#"INSERT INTO types (id, "float") VALUES (0, FALSE)"#,
+    insert_float_integer: r#"INSERT INTO types (id, "float") VALUES (0, 1)"#,
+    insert_float_string: r#"INSERT INTO types (id, "float") VALUES (0, 'a')"#,
+    insert_float_string_empty: r#"INSERT INTO types (id, "float") VALUES (0, '')"#,
+
+    insert_integer: r#"INSERT INTO types (id, "integer") VALUES (0, 1)"#,
+    insert_integer_max: r#"INSERT INTO types (id, "integer") VALUES (0, 9223372036854775807)"#,
+    insert_integer_min: r#"INSERT INTO types (id, "integer") VALUES (0, -9223372036854775807)"#,
+    insert_integer_null: r#"INSERT INTO types (id, "integer") VALUES (0, NULL)"#,
+    insert_integer_boolean: r#"INSERT INTO types (id, "integer") VALUES (0, FALSE)"#,
+    insert_integer_float: r#"INSERT INTO types (id, "integer") VALUES (0, 1.0)"#,
+    insert_integer_float_infinity: r#"INSERT INTO types (id, "integer") VALUES (0, INFINITY)"#,
+    insert_integer_float_nan: r#"INSERT INTO types (id, "integer") VALUES (0, NAN)"#,
+    insert_integer_string: r#"INSERT INTO types (id, "integer") VALUES (0, 'a')"#,
+    insert_integer_string_empty: r#"INSERT INTO types (id, "integer") VALUES (0, '')"#,
+
+    insert_string: r#"INSERT INTO types (id, "string") VALUES (0, 'abc')"#,
+    insert_string_empty: r#"INSERT INTO types (id, "string") VALUES (0, '')"#,
+    insert_string_unicode: r#"INSERT INTO types (id, "string") VALUES (0, ' Hi! 👋')"#,
+    insert_string_1024: &format!(r#"INSERT INTO types (id, "string") VALUES (0, '{}')"#, "a".repeat(1024)),
+    insert_string_1025: &format!(r#"INSERT INTO types (id, "string") VALUES (0, '{}')"#, "a".repeat(1025)),
+    insert_string_1024_unicode: &format!(r#"INSERT INTO types (id, "string") VALUES (0, '{}')"#, "𐍈".repeat(256)),
+    insert_string_1025_unicode: &format!(r#"INSERT INTO types (id, "string") VALUES (0, '{}x')"#, "𐍈".repeat(256)),
+    insert_string_null: r#"INSERT INTO types (id, "string") VALUES (0, NULL)"#,
+    insert_string_boolean: r#"INSERT INTO types (id, "string") VALUES (0, FALSE)"#,
+    insert_string_float: r#"INSERT INTO types (id, "string") VALUES (0, 3.14)"#,
+    insert_string_integer: r#"INSERT INTO types (id, "string") VALUES (0, 1)"#,
+}
+
+test_schema! { with [
+        // FIXME Support non-integer primary keys
+        //r#"CREATE TABLE "boolean" (pk BOOLEAN PRIMARY KEY)"#,
+        //r#"INSERT INTO "boolean" VALUES (TRUE)"#,
+        //r#"CREATE TABLE "float" (pk FLOAT PRIMARY KEY)"#,
+        //r#"INSERT INTO "float" VALUES (3.14)"#,
+        r#"CREATE TABLE "integer" (pk INTEGER PRIMARY KEY)"#,
+        r#"INSERT INTO "integer" VALUES (1)"#,
+        //r#"CREATE TABLE "string" (pk STRING PRIMARY KEY)"#,
+        //r#"INSERT INTO "string" VALUES ('a')"#,
+    ];
+    insert_pk_integer: r#"INSERT INTO "integer" VALUES (2)"#,
+    insert_pk_integer_conflict: r#"INSERT INTO "integer" VALUES (1)"#,
+    insert_pk_integer_zero: r#"INSERT INTO "integer" VALUES (0)"#,
+    insert_pk_integer_negative: r#"INSERT INTO "integer" VALUES (-1)"#,
+    insert_pk_integer_null: r#"INSERT INTO "integer" VALUES (NULL)"#,
+}

@@ -1,0 +1,8 @@
+Query: INSERT INTO "integer" VALUES (NULL)
+Error: Value("NULL value not allowed for column pk")
+
+Storage:
+CREATE TABLE "integer" (
+  pk INTEGER PRIMARY KEY NOT NULL
+)
+[Integer(1)]
