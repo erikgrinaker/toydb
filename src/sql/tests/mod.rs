@@ -1,7 +1,8 @@
 mod expression;
+mod schema;
 mod sql;
 
-use super::{Context, Engine, Parser, Plan, Transaction};
+use super::{Context, Engine, Parser, Plan, ResultSet, Transaction};
 use crate::kv;
 use crate::Error;
 
@@ -15,4 +16,17 @@ fn setup(queries: Vec<&str>) -> Result<super::engine::KV<kv::storage::Memory>, E
     }
     txn.commit()?;
     Ok(engine)
+}
+
+fn execute<E: Engine>(engine: &E, query: &str) -> Result<ResultSet, Error> {
+    let mut txn = engine.begin()?;
+    let ast = Parser::new(query).parse()?;
+    let plan = Plan::build(ast)?.optimize()?;
+    let result = plan.execute(Context { txn: &mut txn });
+    if result.is_ok() {
+        txn.commit()?;
+    } else {
+        txn.rollback()?;
+    }
+    result
 }

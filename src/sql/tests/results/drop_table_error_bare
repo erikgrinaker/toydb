@@ -1,7 +1,0 @@
-Query: DROP TABLE
-
-Tokens:
-  Keyword(Drop)
-  Keyword(Table)
-
-AST: Parse("Unexpected end of input")

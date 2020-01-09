@@ -1,7 +1,0 @@
-Query: CREATE TABLE
-
-Tokens:
-  Keyword(Create)
-  Keyword(Table)
-
-AST: Parse("Unexpected end of input")

@@ -86,9 +86,14 @@ impl Table {
     /// Returns the primary key value of a row
     pub fn row_key(&self, row: &[Value]) -> Result<Value, Error> {
         // FIXME This should be indexed
-        row.get(self.columns.iter().position(|c| c.primary_key).expect("Primary key not found"))
-            .cloned()
-            .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
+        row.get(
+            self.columns
+                .iter()
+                .position(|c| c.primary_key)
+                .ok_or_else(|| Error::Value("Primary key not found".into()))?,
+        )
+        .cloned()
+        .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
     }
 
     /// Validates the table schema

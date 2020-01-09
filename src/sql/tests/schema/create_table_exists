@@ -1,0 +1,10 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY)
+Result: ok
+
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY)
+Error: Value("Table name already exists")
+
+Storage:
+CREATE TABLE name (
+  id INTEGER PRIMARY KEY NOT NULL
+)

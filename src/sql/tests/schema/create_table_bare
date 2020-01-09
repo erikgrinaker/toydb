@@ -1,0 +1,4 @@
+Query: CREATE TABLE
+Error: Parse("Unexpected end of input")
+
+Storage:

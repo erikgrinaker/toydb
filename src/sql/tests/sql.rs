@@ -132,48 +132,6 @@ macro_rules! test_sql {
 }
 
 test_sql! {
-    create_table: r#"
-        CREATE TABLE name (
-            id INTEGER PRIMARY KEY,
-            name STRING NOT NULL,
-            number INTEGER,
-            decimal FLOAT,
-            logical BOOLEAN NULL
-        )"#,
-    create_table_types: r#"
-        CREATE TABLE name (
-            id INTEGER PRIMARY KEY,
-            bool_ BOOL,
-            boolean_ BOOLEAN,
-            char_ CHAR,
-            double_ DOUBLE,
-            float_ FLOAT,
-            int_ INT,
-            integer_ INTEGER,
-            string_ STRING,
-            text_ TEXT,
-            varchar_ VARCHAR
-        )
-    "#,
-    create_table_alphanumeric: "CREATE TABLE a_123 (id INTEGER PRIMARY KEY)",
-    create_table_japanese: "CREATE TABLE 表 (身元 INTEGER PRIMARY KEY, 名前 STRING)",
-    create_table_case: "CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)",
-    create_table_single_column: "CREATE TABLE name (id INTEGER PRIMARY KEY)",
-    create_table_error_bare: "CREATE TABLE",
-    create_table_error_name_emoji: "CREATE TABLE 👋 (id INTEGER PRIMARY KEY)",
-    create_table_error_name_quote_single: r#"CREATE TABLE 'name' (id INTEGER PRIMARY KEY)"#,
-    create_table_error_name_quote_double: r#"CREATE TABLE "name" (id INTEGER PRIMARY KEY)"#,
-    create_table_error_name_underscore: "CREATE TABLE _name (id INTEGER PRIMARY KEY)",
-    create_table_error_empty_columns: "CREATE TABLE name ()",
-    create_table_error_exists: "CREATE TABLE movies (id INTEGER PRIMARY KEY)",
-    create_table_error_no_columns: "CREATE TABLE name",
-    create_table_error_no_datatype: "CREATE TABLE name (id)",
-    create_table_error_null_datatype: "CREATE TABLE name (id INTEGER PRIMARY KEY, value NULL)",
-    create_table_error_no_name: "CREATE TABLE (id INTEGER)",
-    create_table_error_pk_missing: "CREATE TABLE name (id INTEGER)",
-    create_table_error_pk_multiple: "CREATE TABLE name (id INTEGER PRIMARY KEY, name STRING PRIMARY KEY)",
-    create_table_error_pk_nullable: "CREATE TABLE name (id INTEGER PRIMARY KEY NULL)",
-
     delete_all: "DELETE FROM movies",
     delete_error_bare: "DELETE FROM",
     delete_error_multiple: "DELETE FROM movies, genres",
@@ -182,10 +140,6 @@ test_sql! {
     delete_where_false: "DELETE FROM movies WHERE FALSE",
     delete_where_null: "DELETE FROM movies WHERE NULL",
     delete_where_true: "DELETE FROM movies WHERE TRUE",
-
-    drop_table: "DROP TABLE movies",
-    drop_table_error_bare: "DROP TABLE",
-    drop_table_error_missing: "DROP TABLE missing",
 
     insert_default_null: "INSERT INTO movies VALUES (9, 'District 9', 1, 2009)",
     insert_expression: "INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1 / 1, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)",

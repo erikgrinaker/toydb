@@ -1,0 +1,4 @@
+Query: DROP TABLE
+Error: Parse("Unexpected end of input")
+
+Storage:

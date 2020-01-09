@@ -1,4 +1,4 @@
 Query: CREATE TABLE _name (id INTEGER PRIMARY KEY)
+Error: Parse("Unexpected character _")
 
-Tokens:
-Err(Parse("Unexpected character _"))
+Storage:

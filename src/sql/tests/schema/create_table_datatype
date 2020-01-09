@@ -1,0 +1,29 @@
+Query: CREATE TABLE name (
+            id INTEGER PRIMARY KEY,
+            bool_ BOOL,
+            boolean_ BOOLEAN,
+            char_ CHAR,
+            double_ DOUBLE,
+            float_ FLOAT,
+            int_ INT,
+            integer_ INTEGER,
+            string_ STRING,
+            text_ TEXT,
+            varchar_ VARCHAR
+        )
+Result: ok
+
+Storage:
+CREATE TABLE name (
+  id INTEGER PRIMARY KEY NOT NULL,
+  bool_ BOOLEAN DEFAULT NULL,
+  boolean_ BOOLEAN DEFAULT NULL,
+  char_ STRING DEFAULT NULL,
+  double_ FLOAT DEFAULT NULL,
+  float_ FLOAT DEFAULT NULL,
+  int_ INTEGER DEFAULT NULL,
+  integer_ INTEGER DEFAULT NULL,
+  string_ STRING DEFAULT NULL,
+  text_ STRING DEFAULT NULL,
+  varchar_ STRING DEFAULT NULL
+)

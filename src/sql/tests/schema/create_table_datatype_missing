@@ -1,0 +1,4 @@
+Query: CREATE TABLE name (id)
+Error: Parse("Unexpected token )")
+
+Storage:

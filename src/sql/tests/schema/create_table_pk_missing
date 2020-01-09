@@ -1,0 +1,4 @@
+Query: CREATE TABLE name (id INTEGER)
+Error: Value("No primary key in table name")
+
+Storage:

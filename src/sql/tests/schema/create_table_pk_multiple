@@ -1,0 +1,4 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY, name STRING PRIMARY KEY)
+Error: Value("Multiple primary keys in table name")
+
+Storage:

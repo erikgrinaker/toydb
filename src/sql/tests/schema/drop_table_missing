@@ -1,0 +1,4 @@
+Query: DROP TABLE name
+Error: Value("Table name does not exist")
+
+Storage:

@@ -1,0 +1,24 @@
+Query: CREATE TABLE a (id INTEGER PRIMARY KEY)
+Result: ok
+
+Query: CREATE TABLE b (id INTEGER PRIMARY KEY)
+Result: ok
+
+Query: CREATE TABLE c (id INTEGER PRIMARY KEY)
+Result: ok
+
+Query: DROP TABLE a, c
+Error: Parse("Unexpected token ,")
+
+Storage:
+CREATE TABLE a (
+  id INTEGER PRIMARY KEY NOT NULL
+)
+
+CREATE TABLE b (
+  id INTEGER PRIMARY KEY NOT NULL
+)
+
+CREATE TABLE c (
+  id INTEGER PRIMARY KEY NOT NULL
+)
