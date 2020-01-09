@@ -1,5 +1,4 @@
 Query: CREATE TABLE 表 (身元 INTEGER PRIMARY KEY, 名前 STRING)
-Result: ok
 
 Storage:
 CREATE TABLE 表 (

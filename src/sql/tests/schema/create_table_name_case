@@ -1,5 +1,4 @@
 Query: CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)
-Result: ok
 
 Storage:
 CREATE TABLE mixed_case (

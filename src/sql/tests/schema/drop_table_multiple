@@ -1,12 +1,3 @@
-Query: CREATE TABLE a (id INTEGER PRIMARY KEY)
-Result: ok
-
-Query: CREATE TABLE b (id INTEGER PRIMARY KEY)
-Result: ok
-
-Query: CREATE TABLE c (id INTEGER PRIMARY KEY)
-Result: ok
-
 Query: DROP TABLE a, c
 Error: Parse("Unexpected token ,")
 
@@ -14,11 +5,20 @@ Storage:
 CREATE TABLE a (
   id INTEGER PRIMARY KEY NOT NULL
 )
+[Integer(11)]
+[Integer(12)]
+[Integer(13)]
 
 CREATE TABLE b (
   id INTEGER PRIMARY KEY NOT NULL
 )
+[Integer(21)]
+[Integer(22)]
+[Integer(23)]
 
 CREATE TABLE c (
   id INTEGER PRIMARY KEY NOT NULL
 )
+[Integer(31)]
+[Integer(32)]
+[Integer(33)]

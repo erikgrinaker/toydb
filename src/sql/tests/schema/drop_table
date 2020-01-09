@@ -1,17 +1,4 @@
-Query: CREATE TABLE a (id INTEGER PRIMARY KEY)
-Result: ok
-
-Query: INSERT INTO a VALUES (11), (12), (13)
-Result: ok
-
-Query: CREATE TABLE b (id INTEGER PRIMARY KEY)
-Result: ok
-
-Query: INSERT INTO b VALUES (21), (22), (23)
-Result: ok
-
 Query: DROP TABLE a
-Result: ok
 
 Storage:
 CREATE TABLE b (
@@ -20,3 +7,10 @@ CREATE TABLE b (
 [Integer(21)]
 [Integer(22)]
 [Integer(23)]
+
+CREATE TABLE c (
+  id INTEGER PRIMARY KEY NOT NULL
+)
+[Integer(31)]
+[Integer(32)]
+[Integer(33)]
