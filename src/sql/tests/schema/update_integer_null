@@ -1,0 +1,8 @@
+Query: UPDATE test SET value = NULL
+
+Storage:
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY NOT NULL,
+  value INTEGER DEFAULT NULL
+)
+[Integer(1), Null]
