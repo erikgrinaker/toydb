@@ -80,7 +80,9 @@ toydb@1> SELECT * FROM movies
 
 - [x] **Data Types:** Support for nulls, booleans, 64-bit integers, 64-bit floats, and UTF-8 strings up to 1 KB.
 
-- [ ] **Schemas:** Compulsory singluar primary keys, unique and foreign key constraints, indexes.
+- [x] **Schemas:** Compulsory singluar primary keys, default values, unique and foreign key constraints.
+
+  - [ ] Indexes.
 
 - [x] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based snapshot isolation.
 

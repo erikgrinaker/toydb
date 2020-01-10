@@ -1,0 +1,6 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY UNIQUE)
+
+Storage:
+CREATE TABLE name (
+  id INTEGER PRIMARY KEY
+)

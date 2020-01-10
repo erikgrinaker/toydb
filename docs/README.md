@@ -165,7 +165,7 @@ CREATE TABLE <b><i>table_name</i></b> (
 
 where <b><i>column_constraint</i></b> is:
 
-{ NOT NULL | NULL | PRIMARY KEY | DEFAULT <b><i>expr</i></b> | REFERENCES <b><i>ref_table</i></b> }
+{ NOT NULL | NULL | PRIMARY KEY | DEFAULT <b><i>expr</i></b> | REFERENCES <b><i>ref_table</i></b> | UNIQUE }
 </pre>
 
 * ***`table_name`***: The name of the table. Must be a [valid identifier](#identifiers). Errors if a table with this name already exists.
@@ -184,6 +184,8 @@ where <b><i>column_constraint</i></b> is:
 
 * `REFERENCES`***`ref_table`***: The column is a foreign key to ***`ref_table`***'s primary key, enforcing referential integrity.
 
+* `UNIQUE`: The column may only contain unique (distinct) values. `NULL` values are not considered equal, thus a `UNIQUE` column which allows `NULL` may contain multiple `NULL` values. `PRIMARY KEY` columns are implicitly `UNIQUE`.
+
 #### Example
 
 ```
@@ -191,6 +193,7 @@ CREATE TABLE movie (
     id INTEGER PRIMARY KEY,
     title STRING NOT NULL,
     release_year INTEGER,
+    imdb_id STRING UNIQUE,
     bluray BOOLEAN NOT NULL DEFAULT TRUE
 )
 ```

@@ -1,0 +1,12 @@
+Query: UPDATE "unique" SET "boolean" = FALSE WHERE id = 0
+
+Storage:
+CREATE TABLE "unique" (
+  id INTEGER PRIMARY KEY,
+  "boolean" BOOLEAN DEFAULT NULL UNIQUE,
+  "float" FLOAT DEFAULT NULL UNIQUE,
+  "integer" INTEGER DEFAULT NULL UNIQUE,
+  "string" STRING DEFAULT NULL UNIQUE
+)
+[Integer(0), Boolean(false), Null, Null, Null]
+[Integer(1), Boolean(true), Float(3.14), Integer(7), String("foo")]

@@ -86,6 +86,29 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
             }
         }
 
+        // Validate uniqueness
+        let unique: Vec<_> = table
+            .columns
+            .iter()
+            .zip(row.iter())
+            .enumerate()
+            .filter(|(_i, (c, v))| c.unique && !c.primary_key && v != &&types::Value::Null)
+            .map(|(i, (c, v))| (i, c, v))
+            .collect();
+        if !unique.is_empty() {
+            let mut scan = self.scan(&table.name)?;
+            while let Some(r) = scan.next().transpose()? {
+                for (i, c, v) in unique.iter() {
+                    if &r.get(*i).unwrap_or_else(|| &types::Value::Null) == v {
+                        return Err(Error::Value(format!(
+                            "Unique value {} already exists for column {}",
+                            v, c.name
+                        )));
+                    }
+                }
+            }
+        }
+
         self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
     }
 
@@ -173,6 +196,32 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
                             "Referenced primary key {} in table {} does not exist",
                             pk, target,
                         )));
+                    }
+                }
+            }
+
+            // Validate uniqueness
+            let unique: Vec<_> = table
+                .columns
+                .iter()
+                .zip(row.iter())
+                .enumerate()
+                .filter(|(_i, (c, v))| c.unique && !c.primary_key && v != &&types::Value::Null)
+                .map(|(i, (c, v))| (i, c, v))
+                .collect();
+            if !unique.is_empty() {
+                let mut scan = self.scan(&table.name)?;
+                while let Some(r) = scan.next().transpose()? {
+                    if &table.row_key(&r)? == id {
+                        continue;
+                    }
+                    for (i, c, v) in unique.iter() {
+                        if &r.get(*i).unwrap_or_else(|| &types::Value::Null) == v {
+                            return Err(Error::Value(format!(
+                                "Unique value {} already exists for column {}",
+                                v, c.name
+                            )));
+                        }
                     }
                 }
             }

@@ -84,6 +84,7 @@ test_schema! {
     create_table_pk_multiple: "CREATE TABLE name (id INTEGER PRIMARY KEY, name STRING PRIMARY KEY)",
     create_table_pk_nullable: "CREATE TABLE name (id INTEGER PRIMARY KEY NULL)",
     create_table_pk_default: "CREATE TABLE name (id INTEGER PRIMARY KEY DEFAULT 1)",
+    create_table_pk_unique: "CREATE TABLE name (id INTEGER PRIMARY KEY UNIQUE)",
 
     create_table_null: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NULL)",
     create_table_null_not: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NOT NULL)",
@@ -100,6 +101,11 @@ test_schema! {
     create_table_default_conflict: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT 7)",
     create_table_default_conflict_float_integer: "CREATE TABLE name (id INTEGER PRIMARY KEY, value FLOAT DEFAULT 7)",
     create_table_default_conflict_integer_float: "CREATE TABLE name (id INTEGER PRIMARY KEY, value INTEGER DEFAULT 3.14)",
+
+    create_table_unique: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING UNIQUE)",
+    create_table_unique_null: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NULL UNIQUE)",
+    create_table_unique_not_null: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NOT NULL UNIQUE)",
+    create_table_unique_default: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT 'foo' UNIQUE)",
 }
 test_schema! { with ["CREATE TABLE test (id INTEGER PRIMARY KEY)"];
     create_table_exists: "CREATE TABLE test (id INTEGER PRIMARY KEY)",
@@ -255,6 +261,34 @@ test_schema! { with [
     insert_default_missing: "INSERT INTO defaults (id) VALUES (1)",
     insert_default_override: "INSERT INTO defaults VALUES (1, TRUE, TRUE, FALSE, 2.718, 3, 'bar')",
     insert_default_override_null: "INSERT INTO defaults VALUES (1, TRUE, NULL, NULL, NULL, NULL, NULL)",
+}
+
+test_schema! { with [
+        r#"CREATE TABLE "unique" (
+            id INTEGER PRIMARY KEY,
+            "boolean" BOOLEAN UNIQUE,
+            "float" FLOAT UNIQUE,
+            "integer" INTEGER UNIQUE,
+            "string" STRING UNIQUE
+        )"#,
+        r#"INSERT INTO "unique" VALUES (0, NULL, NULL, NULL, NULL, NULL)"#,
+        r#"INSERT INTO "unique" VALUES (1, TRUE, 3.14, 7, 'foo')"#,
+    ];
+    insert_unique_boolean: r#"INSERT INTO "unique" (id, "boolean") VALUES (2, FALSE)"#,
+    insert_unique_boolean_duplicate: r#"INSERT INTO "unique" (id, "boolean") VALUES (2, TRUE)"#,
+    insert_unique_float: r#"INSERT INTO "unique" (id, "float") VALUES (2, 2.718)"#,
+    insert_unique_float_duplicate: r#"INSERT INTO "unique" (id, "float") VALUES (2, 3.14)"#,
+    insert_unique_integer: r#"INSERT INTO "unique" (id, "integer") VALUES (2, 3)"#,
+    insert_unique_integer_duplicate: r#"INSERT INTO "unique" (id, "integer") VALUES (2, 7)"#,
+    insert_unique_string: r#"INSERT INTO "unique" (id, "string") VALUES (2, 'bar')"#,
+    insert_unique_string_duplicate: r#"INSERT INTO "unique" (id, "string") VALUES (2, 'foo')"#,
+    insert_unique_string_case: r#"INSERT INTO "unique" (id, "string") VALUES (2, 'Foo')"#,
+    insert_unique_nulls: r#"INSERT INTO "unique" VALUES (2, NULL, NULL, NULL, NULL)"#,
+
+    update_unique_boolean: r#"UPDATE "unique" SET "boolean" = FALSE WHERE id = 0"#,
+    update_unique_boolean_duplicate: r#"UPDATE "unique" SET "boolean" = TRUE WHERE id = 0"#,
+    update_unique_boolean_same: r#"UPDATE "unique" SET "boolean" = TRUE WHERE id = 1"#,
+    update_unique_nulls: r#"UPDATE "unique" SET "boolean" = NULL, "float" = NULL, "integer" = NULL, "string" = NULL WHERE id = 1"#,
 }
 
 test_schema! { with [
