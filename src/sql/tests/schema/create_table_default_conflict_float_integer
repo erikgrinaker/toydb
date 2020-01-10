@@ -1,0 +1,4 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value FLOAT DEFAULT 7)
+Error: Value("Default value for column value has datatype INTEGER, must be FLOAT")
+
+Storage:
