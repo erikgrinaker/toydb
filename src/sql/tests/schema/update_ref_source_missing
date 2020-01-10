@@ -1,0 +1,19 @@
+Query: UPDATE source SET target_id = 9 WHERE id = 4
+Error: Value("Referenced primary key 9 in table target does not exist")
+
+Storage:
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY NOT NULL,
+  target_id INTEGER DEFAULT NULL REFERENCES target
+)
+[Integer(1), Integer(1)]
+[Integer(2), Integer(2)]
+[Integer(4), Null]
+
+CREATE TABLE target (
+  id INTEGER PRIMARY KEY NOT NULL,
+  value STRING DEFAULT NULL
+)
+[Integer(1), String("a")]
+[Integer(2), String("b")]
+[Integer(3), String("c")]

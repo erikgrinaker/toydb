@@ -1,0 +1,15 @@
+Query: INSERT INTO source (id, integer_id) VALUES (1, NULL)
+
+Storage:
+CREATE TABLE "integer" (
+  id INTEGER PRIMARY KEY NOT NULL
+)
+[Integer(1)]
+[Integer(2)]
+[Integer(3)]
+
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY NOT NULL,
+  integer_id INTEGER DEFAULT NULL REFERENCES integer
+)
+[Integer(1), Null]

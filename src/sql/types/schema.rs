@@ -96,6 +96,19 @@ impl Table {
         }
     }
 
+    /// Returns the primary key column of the table
+    pub fn primary_key(&self) -> Result<&Column, Error> {
+        self.columns
+            .iter()
+            .find(|c| c.primary_key)
+            .ok_or_else(|| Error::Value("Primary key not found".into()))
+    }
+
+    /// Returns the set of tables references by this table
+    pub fn references(&self) -> Vec<Column> {
+        self.columns.iter().filter(|c| c.references.is_some()).cloned().collect()
+    }
+
     /// Returns a row from a hashmap keyed by column name, padding it with nulls if needed
     pub fn row_from_hashmap(&self, row: HashMap<String, Value>) -> Row {
         self.columns.iter().map(|c| row.get(&c.name).cloned().unwrap_or(Value::Null)).collect()
@@ -121,6 +134,28 @@ impl Table {
         )
         .cloned()
         .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
+    }
+
+    /// Returns outbound references from a row as a table/pk hash map
+    // FIXME Should remove duplicates, for performance
+    pub fn row_references(&self, row: &[Value]) -> Result<HashMap<String, Vec<Value>>, Error> {
+        let mut refs = HashMap::new();
+        for (i, column) in self.columns.iter().enumerate() {
+            if let Some(target) = &column.references {
+                match row.get(i).cloned() {
+                    Some(Value::Null) => {}
+                    Some(Value::Float(f)) if f.is_nan() => {}
+                    Some(v) => refs.entry(target.clone()).or_insert_with(Vec::new).push(v),
+                    None => {
+                        return Err(Error::Value(format!(
+                            "No value found for column {}",
+                            column.name
+                        )))
+                    }
+                }
+            }
+        }
+        Ok(refs)
     }
 
     /// Validates the table schema

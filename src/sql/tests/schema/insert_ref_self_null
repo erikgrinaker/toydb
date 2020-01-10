@@ -1,0 +1,13 @@
+Query: INSERT INTO self VALUES (5, NULL, 'e')
+
+Storage:
+CREATE TABLE self (
+  id INTEGER PRIMARY KEY NOT NULL,
+  self_id INTEGER DEFAULT NULL REFERENCES self,
+  value STRING DEFAULT NULL
+)
+[Integer(1), Integer(1), String("a")]
+[Integer(2), Integer(1), String("b")]
+[Integer(3), Integer(3), String("c")]
+[Integer(4), Null, String("d")]
+[Integer(5), Null, String("e")]

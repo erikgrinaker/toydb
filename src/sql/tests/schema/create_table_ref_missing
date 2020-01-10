@@ -1,0 +1,7 @@
+Query: CREATE TABLE other (id INTEGER PRIMARY KEY, missing_id INTEGER REFERENCES missing)
+Error: Value("Table missing referenced by column missing_id does not exist")
+
+Storage:
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY NOT NULL
+)

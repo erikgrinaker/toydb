@@ -1,0 +1,18 @@
+Query: CREATE TABLE other (
+        id INTEGER PRIMARY KEY,
+        test_id_a INTEGER REFERENCES test,
+        test_id_b INTEGER REFERENCES test,
+        test_id_c INTEGER REFERENCES test
+    )
+
+Storage:
+CREATE TABLE other (
+  id INTEGER PRIMARY KEY NOT NULL,
+  test_id_a INTEGER DEFAULT NULL REFERENCES test,
+  test_id_b INTEGER DEFAULT NULL REFERENCES test,
+  test_id_c INTEGER DEFAULT NULL REFERENCES test
+)
+
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY NOT NULL
+)

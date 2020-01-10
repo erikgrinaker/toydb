@@ -1,0 +1,11 @@
+Query: DROP TABLE self
+
+Storage:
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY NOT NULL,
+  target_id INTEGER DEFAULT NULL REFERENCES target
+)
+
+CREATE TABLE target (
+  id INTEGER PRIMARY KEY NOT NULL
+)

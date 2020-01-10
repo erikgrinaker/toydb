@@ -1,7 +1,7 @@
-Query: CREATE TABLE name (id INTEGER PRIMARY KEY)
-Error: Value("Table name already exists")
+Query: CREATE TABLE test (id INTEGER PRIMARY KEY)
+Error: Value("Table test already exists")
 
 Storage:
-CREATE TABLE name (
+CREATE TABLE test (
   id INTEGER PRIMARY KEY NOT NULL
 )

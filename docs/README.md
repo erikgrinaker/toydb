@@ -165,7 +165,7 @@ CREATE TABLE <b><i>table_name</i></b> (
 
 where <b><i>column_constraint</i></b> is:
 
-{ NOT NULL | NULL | PRIMARY KEY | DEFAULT <b><i>expr</i></b> }
+{ NOT NULL | NULL | PRIMARY KEY | DEFAULT <b><i>expr</i></b> | REFERENCES <b><i>ref_table</i></b> }
 </pre>
 
 * ***`table_name`***: The name of the table. Must be a [valid identifier](#identifiers). Errors if a table with this name already exists.
@@ -181,6 +181,8 @@ where <b><i>column_constraint</i></b> is:
 * `PRIMARY KEY`: The column should act as a primary key, i.e. the main row identifier. A table must have exactly one primary key column, and it must be unique and non-nullable.
 
 * `DEFAULT`***`expr`***: Specifies a default value for the column when `INSERT` statements do not give a value. ***`expr`*** can be any constant expression of an appropriate data type, e.g. `'abc'` or `1 + 2 * 3`. For nullable columns, the default value is `NULL` unless specified otherwise.
+
+* `REFERENCES`***`ref_table`***: The columns is a foreign key to ***`ref_table`***'s primary key, enforcing referential integrity.
 
 #### Example
 

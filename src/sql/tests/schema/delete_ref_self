@@ -1,0 +1,11 @@
+Query: DELETE FROM self WHERE id = 3
+
+Storage:
+CREATE TABLE self (
+  id INTEGER PRIMARY KEY NOT NULL,
+  self_id INTEGER DEFAULT NULL REFERENCES self,
+  value STRING DEFAULT NULL
+)
+[Integer(1), Integer(1), String("a")]
+[Integer(2), Integer(1), String("b")]
+[Integer(4), Null, String("d")]

@@ -1,0 +1,18 @@
+Query: UPDATE target SET id = 9 WHERE id = 3
+
+Storage:
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY NOT NULL,
+  target_id INTEGER DEFAULT NULL REFERENCES target
+)
+[Integer(1), Integer(1)]
+[Integer(2), Integer(2)]
+[Integer(4), Null]
+
+CREATE TABLE target (
+  id INTEGER PRIMARY KEY NOT NULL,
+  value STRING DEFAULT NULL
+)
+[Integer(1), String("a")]
+[Integer(2), String("b")]
+[Integer(9), String("c")]

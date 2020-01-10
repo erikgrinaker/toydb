@@ -101,8 +101,20 @@ test_schema! {
     create_table_default_conflict_float_integer: "CREATE TABLE name (id INTEGER PRIMARY KEY, value FLOAT DEFAULT 7)",
     create_table_default_conflict_integer_float: "CREATE TABLE name (id INTEGER PRIMARY KEY, value INTEGER DEFAULT 3.14)",
 }
-test_schema! { with ["CREATE TABLE name (id INTEGER PRIMARY KEY)"];
-    create_table_exists: "CREATE TABLE name (id INTEGER PRIMARY KEY)",
+test_schema! { with ["CREATE TABLE test (id INTEGER PRIMARY KEY)"];
+    create_table_exists: "CREATE TABLE test (id INTEGER PRIMARY KEY)",
+
+    create_table_ref: "CREATE TABLE other (id INTEGER PRIMARY KEY, test_id INTEGER REFERENCES test)",
+    create_table_ref_multiple: "CREATE TABLE other (
+        id INTEGER PRIMARY KEY,
+        test_id_a INTEGER REFERENCES test,
+        test_id_b INTEGER REFERENCES test,
+        test_id_c INTEGER REFERENCES test
+    )",
+    create_table_ref_missing: "CREATE TABLE other (id INTEGER PRIMARY KEY, missing_id INTEGER REFERENCES missing)",
+    create_table_ref_type: "CREATE TABLE other (id INTEGER PRIMARY KEY, test_id STRING REFERENCES test)",
+    create_table_ref_self: "CREATE TABLE other (id INTEGER PRIMARY KEY, self_id INTEGER REFERENCES other)",
+    create_table_ref_self_type: "CREATE TABLE other (id INTEGER PRIMARY KEY, self_id STRING REFERENCES other)",
 }
 
 test_schema! { with [
@@ -117,6 +129,15 @@ test_schema! { with [
     drop_table_bare: "DROP TABLE",
     drop_table_missing: "DROP TABLE name",
     drop_table_multiple: "DROP TABLE a, c",
+}
+test_schema! { with [
+        "CREATE TABLE target (id INTEGER PRIMARY KEY)",
+        "CREATE TABLE source (id INTEGER PRIMARY KEY, target_id INTEGER REFERENCES target)",
+        "CREATE TABLE self (id INTEGER PRIMARY KEY, self_id INTEGER REFERENCES self)",
+    ];
+    drop_table_ref_source: "DROP TABLE source",
+    drop_table_ref_target: "DROP TABLE target",
+    drop_table_ref_self: "DROP TABLE self",
 }
 
 test_schema! { with [
@@ -234,4 +255,55 @@ test_schema! { with [
     insert_default_missing: "INSERT INTO defaults (id) VALUES (1)",
     insert_default_override: "INSERT INTO defaults VALUES (1, TRUE, TRUE, FALSE, 2.718, 3, 'bar')",
     insert_default_override_null: "INSERT INTO defaults VALUES (1, TRUE, NULL, NULL, NULL, NULL, NULL)",
+}
+
+test_schema! { with [
+        // FIXME Test non-integer references as well
+        r#"CREATE TABLE "integer" (id INTEGER PRIMARY KEY)"#,
+        r#"INSERT INTO "integer" VALUES (1), (2), (3)"#,
+        r#"CREATE TABLE source (
+            id INTEGER PRIMARY KEY,
+            integer_id INTEGER REFERENCES "integer"
+        )"#,
+    ];
+    insert_ref_integer: "INSERT INTO source (id, integer_id) VALUES (1, 1)",
+    insert_ref_integer_null: "INSERT INTO source (id, integer_id) VALUES (1, NULL)",
+    insert_ref_integer_missing: "INSERT INTO source (id, integer_id) VALUES (1, 7)",
+}
+
+test_schema! { with [
+        "CREATE TABLE target (id INTEGER PRIMARY KEY, value STRING)",
+        "INSERT INTO target VALUES (1, 'a'), (2, 'b'), (3, 'c')",
+        "CREATE TABLE source (id INTEGER PRIMARY KEY, target_id INTEGER REFERENCES target)",
+        "INSERT INTO source VALUES (1, 1), (2, 2), (4, NULL)",
+    ];
+    delete_ref_conflict: "DELETE FROM target WHERE id = 1",
+    delete_ref_noref: "DELETE FROM target WHERE id = 3",
+    delete_ref_source: "DELETE FROM source WHERE id = 1",
+
+    update_ref_value: "UPDATE target SET value = 'x' WHERE id = 1",
+    update_ref_pk: "UPDATE target SET id = 9 WHERE id = 1",
+    update_ref_pk_noref: "UPDATE target SET id = 9 WHERE id = 3",
+    update_ref_source: "UPDATE source SET target_id = 1 WHERE id = 4",
+    update_ref_source_missing: "UPDATE source SET target_id = 9 WHERE id = 4",
+    update_ref_source_null: "UPDATE source SET target_id = NULL WHERE id = 2",
+}
+
+test_schema! { with [
+        "CREATE TABLE self (id INTEGER PRIMARY KEY, self_id INTEGER REFERENCES self, value STRING)",
+        "INSERT INTO self VALUES (1, 1, 'a'), (2, 1, 'b'), (3, 3, 'c'), (4, NULL, 'd')",
+    ];
+    delete_ref_self: "DELETE FROM self WHERE id = 3",
+    delete_ref_self_all: "DELETE FROM self",
+    delete_ref_self_conflict: "DELETE FROM self WHERE id = 1",
+
+    insert_ref_self: "INSERT INTO self VALUES (5, 1, 'e')",
+    insert_ref_self_null: "INSERT INTO self VALUES (5, NULL, 'e')",
+    insert_ref_self_missing: "INSERT INTO self VALUES (5, 9, 'e')",
+    insert_ref_self_self: "INSERT INTO self VALUES (5, 5, 'e')",
+
+    update_ref_self_value: "UPDATE self SET value = 'x' WHERE id = 1",
+    update_ref_self_pk: "UPDATE self SET id = 9 WHERE id = 1",
+    update_ref_self_pk_noref: "UPDATE self SET id = 9 WHERE id = 2",
+    update_ref_self_self: "UPDATE self SET self_id = 2 WHERE id = 2",
 }

@@ -1,0 +1,13 @@
+Query: DELETE FROM self
+Error: Value("Primary key 1 is referenced by table self column self_id")
+
+Storage:
+CREATE TABLE self (
+  id INTEGER PRIMARY KEY NOT NULL,
+  self_id INTEGER DEFAULT NULL REFERENCES self,
+  value STRING DEFAULT NULL
+)
+[Integer(1), Integer(1), String("a")]
+[Integer(2), Integer(1), String("b")]
+[Integer(3), Integer(3), String("c")]
+[Integer(4), Null, String("d")]

@@ -1,0 +1,17 @@
+Query: DROP TABLE target
+Error: Value("Table target is referenced by table source column target_id")
+
+Storage:
+CREATE TABLE self (
+  id INTEGER PRIMARY KEY NOT NULL,
+  self_id INTEGER DEFAULT NULL REFERENCES self
+)
+
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY NOT NULL,
+  target_id INTEGER DEFAULT NULL REFERENCES target
+)
+
+CREATE TABLE target (
+  id INTEGER PRIMARY KEY NOT NULL
+)

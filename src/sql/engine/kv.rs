@@ -58,7 +58,11 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         let table = self
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+
+        // Validate row
         table.validate_row(&row)?;
+
+        // Validate primary key conflicts
         let id = table.row_key(&row)?;
         if self.read(&table.name, &id)?.is_some() {
             return Err(Error::Value(format!(
@@ -66,12 +70,60 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
                 id, table.name
             )));
         }
-        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)?;
-        Ok(())
+
+        // Validate referential integrity
+        for (target, pks) in table.row_references(&row)?.into_iter() {
+            for pk in pks.into_iter() {
+                if target == table.name && pk == table.row_key(&row)? {
+                    continue;
+                }
+                if self.read(&target, &pk)?.is_none() {
+                    return Err(Error::Value(format!(
+                        "Referenced primary key {} in table {} does not exist",
+                        pk, target,
+                    )));
+                }
+            }
+        }
+
+        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
     }
 
     fn delete(&mut self, table: &str, id: &types::Value) -> Result<(), Error> {
-        self.txn.delete(&Key::Row(table, id).encode())
+        let table = self
+            .read_table(&table)?
+            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+
+        // FIXME We should avoid full table scans here, but let's wait until we build the
+        // predicate pushdown infrastructure which we can use for this as well.
+        for source in self.list_tables()? {
+            let refs: Vec<_> = source
+                .references()
+                .into_iter()
+                .filter(|c| c.references == Some(table.name.clone()))
+                .collect();
+            if refs.is_empty() {
+                continue;
+            }
+            let mut scan = self.scan(&source.name)?;
+            while let Some(row) = scan.next().transpose()? {
+                let row = source.row_to_hashmap(row);
+                for r in refs.iter() {
+                    if row.get(&r.name).unwrap_or(&types::Value::Null) == id
+                        && (source.name != table.name
+                            || row.get(&table.primary_key()?.name).unwrap_or(&types::Value::Null)
+                                != id)
+                    {
+                        return Err(Error::Value(format!(
+                            "Primary key {} is referenced by table {} column {}",
+                            id, source.name, r.name
+                        )));
+                    }
+                }
+            }
+        }
+
+        self.txn.delete(&Key::Row(&table.name, id).encode())
     }
 
     fn read(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error> {
@@ -96,14 +148,67 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 
     fn update(&mut self, table: &str, id: &types::Value, row: types::Row) -> Result<(), Error> {
-        // FIXME For now, we're lazy and just do a delete + create
-        self.delete(table, id)?;
-        self.create(table, row)
+        let table = self
+            .read_table(&table)?
+            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+
+        // If the primary key changes, we do a delete and create
+        if id != &table.row_key(&row)? {
+            self.delete(&table.name, id)?;
+            self.create(&table.name, row)
+
+        // Otherwise, we validate the new row and replace the existing one
+        } else {
+            // Validate row
+            table.validate_row(&row)?;
+
+            // Validate referential integrity
+            for (target, pks) in table.row_references(&row)?.into_iter() {
+                for pk in pks.into_iter() {
+                    if target == table.name && &pk == id {
+                        continue;
+                    }
+                    if self.read(&target, &pk)?.is_none() {
+                        return Err(Error::Value(format!(
+                            "Referenced primary key {} in table {} does not exist",
+                            pk, target,
+                        )));
+                    }
+                }
+            }
+
+            self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
+        }
     }
 
     fn create_table(&mut self, table: &schema::Table) -> Result<(), Error> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
+        }
+        for column in table.references() {
+            let target = match &column.references {
+                Some(target) if target == &table.name => table.clone(),
+                Some(target) => self.read_table(&target)?.ok_or_else(|| {
+                    Error::Value(format!(
+                        "Table {} referenced by column {} does not exist",
+                        target, column.name
+                    ))
+                })?,
+                None => {
+                    return Err(Error::Internal(
+                        "Table.references() returned non-reference column".into(),
+                    ))
+                }
+            };
+            if column.datatype != target.primary_key()?.datatype {
+                return Err(Error::Value(format!(
+                    "Can't reference {} primary key of table {} from {} column {}",
+                    target.primary_key()?.datatype,
+                    target.name,
+                    column.datatype,
+                    column.name
+                )));
+            }
         }
         self.txn.set(&Key::Table(&table.name).encode(), serialize(table)?)
     }
@@ -111,6 +216,18 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     fn delete_table(&mut self, table: &str) -> Result<(), Error> {
         if self.read_table(table)?.is_none() {
             return Err(Error::Value(format!("Table {} does not exist", table)));
+        }
+        // Check for incoming references
+        // FIXME This needs to be indexed or cached
+        for source in self.list_tables()? {
+            for column in source.references() {
+                if source.name != table && column.references.as_ref() == Some(&table.to_string()) {
+                    return Err(Error::Value(format!(
+                        "Table {} is referenced by table {} column {}",
+                        table, source.name, column.name
+                    )));
+                }
+            }
         }
         // FIXME Needs to delete all table data as well
         self.txn.delete(&Key::Table(table).encode())

@@ -1,0 +1,12 @@
+Query: UPDATE self SET value = 'x' WHERE id = 1
+
+Storage:
+CREATE TABLE self (
+  id INTEGER PRIMARY KEY NOT NULL,
+  self_id INTEGER DEFAULT NULL REFERENCES self,
+  value STRING DEFAULT NULL
+)
+[Integer(1), Integer(1), String("x")]
+[Integer(2), Integer(1), String("b")]
+[Integer(3), Integer(3), String("c")]
+[Integer(4), Null, String("d")]
