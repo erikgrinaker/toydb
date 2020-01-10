@@ -182,7 +182,7 @@ where <b><i>column_constraint</i></b> is:
 
 * `DEFAULT`***`expr`***: Specifies a default value for the column when `INSERT` statements do not give a value. ***`expr`*** can be any constant expression of an appropriate data type, e.g. `'abc'` or `1 + 2 * 3`. For nullable columns, the default value is `NULL` unless specified otherwise.
 
-* `REFERENCES`***`ref_table`***: The columns is a foreign key to ***`ref_table`***'s primary key, enforcing referential integrity.
+* `REFERENCES`***`ref_table`***: The column is a foreign key to ***`ref_table`***'s primary key, enforcing referential integrity.
 
 #### Example
 
