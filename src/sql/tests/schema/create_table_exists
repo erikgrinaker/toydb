@@ -3,5 +3,5 @@ Error: Value("Table test already exists")
 
 Storage:
 CREATE TABLE test (
-  id INTEGER PRIMARY KEY NOT NULL
+  id INTEGER PRIMARY KEY
 )

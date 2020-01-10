@@ -2,7 +2,7 @@ Query: UPDATE test SET value = 3
 
 Storage:
 CREATE TABLE test (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   value INTEGER DEFAULT NULL
 )
 [Integer(1), Integer(3)]

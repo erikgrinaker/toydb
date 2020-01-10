@@ -2,5 +2,5 @@ Query: CREATE TABLE "name with "" quote" (id INTEGER PRIMARY KEY)
 
 Storage:
 CREATE TABLE "name with "" quote" (
-  id INTEGER PRIMARY KEY NOT NULL
+  id INTEGER PRIMARY KEY
 )

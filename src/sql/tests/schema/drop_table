@@ -2,14 +2,14 @@ Query: DROP TABLE a
 
 Storage:
 CREATE TABLE b (
-  id INTEGER PRIMARY KEY NOT NULL
+  id INTEGER PRIMARY KEY
 )
 [Integer(21)]
 [Integer(22)]
 [Integer(23)]
 
 CREATE TABLE c (
-  id INTEGER PRIMARY KEY NOT NULL
+  id INTEGER PRIMARY KEY
 )
 [Integer(31)]
 [Integer(32)]

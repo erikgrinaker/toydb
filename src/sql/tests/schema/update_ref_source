@@ -2,7 +2,7 @@ Query: UPDATE source SET target_id = 1 WHERE id = 4
 
 Storage:
 CREATE TABLE source (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   target_id INTEGER DEFAULT NULL REFERENCES target
 )
 [Integer(1), Integer(1)]
@@ -10,7 +10,7 @@ CREATE TABLE source (
 [Integer(4), Integer(1)]
 
 CREATE TABLE target (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   value STRING DEFAULT NULL
 )
 [Integer(1), String("a")]

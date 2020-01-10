@@ -3,7 +3,7 @@ Error: Value("Referenced primary key 9 in table target does not exist")
 
 Storage:
 CREATE TABLE source (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   target_id INTEGER DEFAULT NULL REFERENCES target
 )
 [Integer(1), Integer(1)]
@@ -11,7 +11,7 @@ CREATE TABLE source (
 [Integer(4), Null]
 
 CREATE TABLE target (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   value STRING DEFAULT NULL
 )
 [Integer(1), String("a")]

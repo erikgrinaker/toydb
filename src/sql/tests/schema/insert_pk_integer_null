@@ -3,7 +3,7 @@ Error: Value("NULL value not allowed for column pk")
 
 Storage:
 CREATE TABLE "integer" (
-  pk INTEGER PRIMARY KEY NOT NULL
+  pk INTEGER PRIMARY KEY
 )
 [Integer(1)]
 [Integer(2)]

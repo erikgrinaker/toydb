@@ -159,7 +159,7 @@ impl Planner {
                         primary_key: c.primary_key,
                         nullable,
                         default,
-                        unique: c.unique,
+                        unique: c.unique || c.primary_key,
                         references: c.references,
                     })
                 })

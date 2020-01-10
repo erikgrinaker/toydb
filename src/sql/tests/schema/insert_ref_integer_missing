@@ -3,13 +3,13 @@ Error: Value("Referenced primary key 7 in table integer does not exist")
 
 Storage:
 CREATE TABLE "integer" (
-  id INTEGER PRIMARY KEY NOT NULL
+  id INTEGER PRIMARY KEY
 )
 [Integer(1)]
 [Integer(2)]
 [Integer(3)]
 
 CREATE TABLE source (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   integer_id INTEGER DEFAULT NULL REFERENCES integer
 )

@@ -3,7 +3,7 @@ Error: Value("Primary key 1 already exists for table integer")
 
 Storage:
 CREATE TABLE "integer" (
-  pk INTEGER PRIMARY KEY NOT NULL
+  pk INTEGER PRIMARY KEY
 )
 [Integer(1)]
 [Integer(2)]

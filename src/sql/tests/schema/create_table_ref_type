@@ -3,5 +3,5 @@ Error: Value("Can\'t reference INTEGER primary key of table test from STRING col
 
 Storage:
 CREATE TABLE test (
-  id INTEGER PRIMARY KEY NOT NULL
+  id INTEGER PRIMARY KEY
 )

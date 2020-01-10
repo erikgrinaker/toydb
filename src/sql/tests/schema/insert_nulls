@@ -2,7 +2,7 @@ Query: INSERT INTO nulls (id, "null", not_null, "default") VALUES (1, NULL, TRUE
 
 Storage:
 CREATE TABLE nulls (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   "null" BOOLEAN DEFAULT NULL,
   not_null BOOLEAN NOT NULL,
   "default" BOOLEAN DEFAULT NULL

@@ -3,7 +3,7 @@ Error: Value("Referenced primary key 9 in table self does not exist")
 
 Storage:
 CREATE TABLE self (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   self_id INTEGER DEFAULT NULL REFERENCES self,
   value STRING DEFAULT NULL
 )

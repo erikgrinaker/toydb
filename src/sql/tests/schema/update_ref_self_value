@@ -2,7 +2,7 @@ Query: UPDATE self SET value = 'x' WHERE id = 1
 
 Storage:
 CREATE TABLE self (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   self_id INTEGER DEFAULT NULL REFERENCES self,
   value STRING DEFAULT NULL
 )

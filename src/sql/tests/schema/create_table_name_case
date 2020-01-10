@@ -2,5 +2,5 @@ Query: CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)
 
 Storage:
 CREATE TABLE mixed_case (
-  äåæ STRING PRIMARY KEY NOT NULL
+  äåæ STRING PRIMARY KEY
 )

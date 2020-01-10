@@ -218,13 +218,13 @@ impl Column {
         if self.primary_key {
             sql += " PRIMARY KEY";
         }
-        if !self.nullable {
+        if !self.nullable && !self.primary_key {
             sql += " NOT NULL";
         }
         if let Some(default) = &self.default {
             sql += &format!(" DEFAULT {}", default);
         }
-        if self.unique {
+        if self.unique && !self.primary_key {
             sql += " UNIQUE";
         }
         if let Some(reference) = &self.references {
@@ -237,6 +237,9 @@ impl Column {
     pub fn validate(&self) -> Result<(), Error> {
         if self.primary_key && self.nullable {
             return Err(Error::Value(format!("Primary key {} cannot be nullable", self.name)));
+        }
+        if self.primary_key && !self.unique {
+            return Err(Error::Value(format!("Primary key {} must be unique", self.name)));
         }
         if let Some(default) = &self.default {
             if let Some(datatype) = default.datatype() {

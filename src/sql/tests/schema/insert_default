@@ -2,7 +2,7 @@ Query: INSERT INTO defaults (id, required) VALUES (1, TRUE)
 
 Storage:
 CREATE TABLE defaults (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   required BOOLEAN NOT NULL,
   "null" BOOLEAN DEFAULT NULL,
   "boolean" BOOLEAN DEFAULT TRUE,

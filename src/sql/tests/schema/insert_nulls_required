@@ -3,7 +3,7 @@ Error: Value("NULL value not allowed for column not_null")
 
 Storage:
 CREATE TABLE nulls (
-  id INTEGER PRIMARY KEY NOT NULL,
+  id INTEGER PRIMARY KEY,
   "null" BOOLEAN DEFAULT NULL,
   not_null BOOLEAN NOT NULL,
   "default" BOOLEAN DEFAULT NULL
