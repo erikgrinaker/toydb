@@ -45,40 +45,55 @@ impl Table {
         sql
     }
 
-    /// Returns the index of a named column, if it exists
-    pub fn column_index(&self, name: &str) -> Option<usize> {
-        self.columns.iter().position(|c| c.name == name)
+    /// Fetches a column by name
+    /// FIXME Should index these for performance
+    pub fn get_column(&self, name: &str) -> Option<&Column> {
+        self.columns.iter().find(|c| c.name == name)
     }
 
-    /// Normalizes a partial row into a full row, and reorders it
-    /// according to the column names.
-    pub fn normalize_row(&self, mut row: Row, columns: Option<Vec<String>>) -> Result<Row, Error> {
-        if let Some(cols) = columns {
-            if row.len() != cols.len() {
+    // Builds a row from a set of values, optionally with a set of column names, padding
+    // it with default values as necessary.
+    pub fn make_row(&self, values: Vec<Value>, columns: Option<&[String]>) -> Result<Row, Error> {
+        if let Some(columns) = columns {
+            if values.len() != columns.len() {
                 return Err(Error::Value("Column and value counts do not match".into()));
             }
-            let mut column_values = HashMap::new();
-            for (c, v) in cols.into_iter().zip(row.into_iter()) {
-                if self.column_index(&c).is_none() {
+            let mut inputs = HashMap::new();
+            for (c, v) in columns.iter().zip(values.into_iter()) {
+                if self.get_column(c).is_none() {
                     return Err(Error::Value(format!(
                         "Unknown column {} in table {}",
                         c, self.name
                     )));
                 }
-                if column_values.insert(c.clone(), v).is_some() {
-                    return Err(Error::Value(format!("Column {} specified multiple times", c)));
+                if inputs.insert(c.clone(), v).is_some() {
+                    return Err(Error::Value(format!("Column {} given multiple times", c)));
                 }
             }
-            row = self
-                .columns
-                .iter()
-                .map(|c| column_values.get(&c.name).cloned().unwrap_or(Value::Null))
-                .collect();
+            let mut row = Row::new();
+            for column in self.columns.iter() {
+                if let Some(value) = inputs.get(&column.name) {
+                    row.push(value.clone())
+                } else if let Some(value) = &column.default {
+                    row.push(value.clone())
+                } else {
+                    return Err(Error::Value(format!("No value given for column {}", column.name)));
+                }
+            }
+            Ok(row)
+        } else {
+            let mut row = Row::new();
+            for (i, column) in self.columns.iter().enumerate() {
+                if let Some(value) = values.get(i) {
+                    row.push(value.clone())
+                } else if let Some(value) = &column.default {
+                    row.push(value.clone())
+                } else {
+                    return Err(Error::Value(format!("No value given for column {}", column.name)));
+                }
+            }
+            Ok(row)
         }
-        while row.len() < self.columns.len() {
-            row.push(Value::Null)
-        }
-        Ok(row)
     }
 
     /// Returns a row from a hashmap keyed by column name, padding it with nulls if needed

@@ -141,14 +141,11 @@ test_sql! {
     delete_where_null: "DELETE FROM movies WHERE NULL",
     delete_where_true: "DELETE FROM movies WHERE TRUE",
 
-    insert_default_null: "INSERT INTO movies VALUES (9, 'District 9', 1, 2009)",
     insert_expression: "INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1 / 1, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)",
     insert_partial: "INSERT INTO movies (title, released, id, genre_id, rating) VALUES ('District 9', 2009, 9, 1, 7.9)",
     insert_values: "INSERT INTO genres VALUES (9, 'Western')",
     insert_error_columns_duplicate: "INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)",
     insert_error_columns_mismatch: "INSERT INTO genres (id) VALUES (9, 'Western')",
-    insert_error_default_null_disallowed: "INSERT INTO movies VALUES (9)",
-    insert_error_null_disallowed: "INSERT INTO genres VALUES (9, NULL)",
 
     select_all_from_table: "SELECT * FROM movies",
     select_aliases: "SELECT 1, 2 b, 3 AS c",

@@ -112,4 +112,4 @@ Optimized plan: Plan {
 
 Query: INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)
 
-Result: Value("Column id specified multiple times")
+Result: Value("Column id given multiple times")

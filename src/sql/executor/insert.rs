@@ -17,16 +17,15 @@ impl Insert {
             .txn
             .read_table(table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        let env = Environment::empty();
         for exprs in expressions {
-            let mut row = Row::new();
-            for expr in exprs {
-                row.push(expr.evaluate(&Environment::empty())?);
-            }
-            row = table.normalize_row(
-                row,
-                if !columns.is_empty() { Some(columns.clone()) } else { None },
+            ctx.txn.create(
+                &table.name,
+                table.make_row(
+                    exprs.into_iter().map(|e| e.evaluate(&env)).collect::<Result<_, Error>>()?,
+                    if !columns.is_empty() { Some(&columns) } else { None },
+                )?,
             )?;
-            ctx.txn.create(&table.name, row)?;
         }
         Ok(Box::new(Self))
     }

@@ -1,0 +1,13 @@
+Query: INSERT INTO defaults VALUES (1, TRUE)
+
+Storage:
+CREATE TABLE defaults (
+  id INTEGER PRIMARY KEY NOT NULL,
+  required BOOLEAN NOT NULL,
+  "null" BOOLEAN DEFAULT NULL,
+  "boolean" BOOLEAN DEFAULT TRUE,
+  "float" FLOAT DEFAULT 3.14,
+  "integer" INTEGER DEFAULT 7,
+  "string" STRING DEFAULT foo
+)
+[Integer(1), Boolean(true), Null, Boolean(true), Float(3.14), Integer(7), String("foo")]

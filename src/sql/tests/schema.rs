@@ -186,3 +186,32 @@ test_schema! { with [
     insert_pk_integer_negative: r#"INSERT INTO "integer" VALUES (-1)"#,
     insert_pk_integer_null: r#"INSERT INTO "integer" VALUES (NULL)"#,
 }
+
+test_schema! { with [
+    r#"CREATE TABLE nulls (
+        id INTEGER PRIMARY KEY,
+        "null" BOOLEAN NULL,
+        not_null BOOLEAN NOT NULL,
+        "default" BOOLEAN
+    )"#];
+    insert_nulls: r#"INSERT INTO nulls (id, "null", not_null, "default") VALUES (1, NULL, TRUE, NULL)"#,
+    insert_nulls_default: r#"INSERT INTO nulls (id, "null", not_null) VALUES (1, NULL, TRUE)"#,
+    insert_nulls_required: r#"INSERT INTO nulls (id, "null", not_null, "default") VALUES (1, NULL, NULL, NULL)"#,
+}
+
+test_schema! { with [
+    r#"CREATE TABLE defaults (
+        id INTEGER PRIMARY KEY,
+        required BOOLEAN NOT NULL,
+        "null" BOOLEAN,
+        "boolean" BOOLEAN DEFAULT TRUE,
+        "float" FLOAT DEFAULT 3.14,
+        "integer" INTEGER DEFAULT 7,
+        "string" STRING DEFAULT 'foo'
+    )"#];
+    insert_default: "INSERT INTO defaults (id, required) VALUES (1, TRUE)",
+    insert_default_unnamed: "INSERT INTO defaults VALUES (1, TRUE)",
+    insert_default_missing: "INSERT INTO defaults (id) VALUES (1)",
+    insert_default_override: "INSERT INTO defaults VALUES (1, TRUE, TRUE, FALSE, 2.718, 3, 'bar')",
+    insert_default_override_null: "INSERT INTO defaults VALUES (1, TRUE, NULL, NULL, NULL, NULL, NULL)",
+}
