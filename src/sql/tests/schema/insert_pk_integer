@@ -1,4 +1,4 @@
-Query: INSERT INTO "integer" VALUES (2)
+Query: INSERT INTO "integer" VALUES (3)
 
 Storage:
 CREATE TABLE "integer" (
@@ -6,3 +6,4 @@ CREATE TABLE "integer" (
 )
 [Integer(1)]
 [Integer(2)]
+[Integer(3)]

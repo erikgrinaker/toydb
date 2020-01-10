@@ -174,6 +174,15 @@ test_schema! { with [
     insert_string_float: r#"INSERT INTO types (id, "string") VALUES (0, 3.14)"#,
     insert_string_integer: r#"INSERT INTO types (id, "string") VALUES (0, 1)"#,
 }
+test_schema! { with [
+        "CREATE TABLE test (id INTEGER PRIMARY KEY, value INTEGER)",
+        "INSERT INTO test VALUES (1, 7)",
+    ];
+    update_integer: "UPDATE test SET value = 3",
+    update_integer_conflict: "UPDATE test SET value = 'abc'",
+    update_integer_float: "UPDATE test SET value = 3.14",
+    update_integer_null: "UPDATE test SET value = NULL",
+}
 
 test_schema! { with [
         // FIXME Support non-integer primary keys
@@ -182,15 +191,20 @@ test_schema! { with [
         //r#"CREATE TABLE "float" (pk FLOAT PRIMARY KEY)"#,
         //r#"INSERT INTO "float" VALUES (3.14)"#,
         r#"CREATE TABLE "integer" (pk INTEGER PRIMARY KEY)"#,
-        r#"INSERT INTO "integer" VALUES (1)"#,
+        r#"INSERT INTO "integer" VALUES (1), (2)"#,
         //r#"CREATE TABLE "string" (pk STRING PRIMARY KEY)"#,
         //r#"INSERT INTO "string" VALUES ('a')"#,
     ];
-    insert_pk_integer: r#"INSERT INTO "integer" VALUES (2)"#,
+    insert_pk_integer: r#"INSERT INTO "integer" VALUES (3)"#,
     insert_pk_integer_conflict: r#"INSERT INTO "integer" VALUES (1)"#,
     insert_pk_integer_zero: r#"INSERT INTO "integer" VALUES (0)"#,
     insert_pk_integer_negative: r#"INSERT INTO "integer" VALUES (-1)"#,
     insert_pk_integer_null: r#"INSERT INTO "integer" VALUES (NULL)"#,
+
+    update_pk_integer: r#"UPDATE "integer" SET pk = 3 WHERE pk = 2"#,
+    update_pk_integer_conflict: r#"UPDATE "integer" SET pk = 1 WHERE pk = 2"#,
+    update_pk_integer_conflict_all: r#"UPDATE "integer" SET pk = 1"#,
+    update_pk_integer_null: r#"UPDATE "integer" SET pk = NULL WHERE pk = 2"#,
 }
 
 test_schema! { with [

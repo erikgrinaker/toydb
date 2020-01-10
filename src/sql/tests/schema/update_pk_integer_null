@@ -1,4 +1,4 @@
-Query: INSERT INTO "integer" VALUES (NULL)
+Query: UPDATE "integer" SET pk = NULL WHERE pk = 2
 Error: Value("NULL value not allowed for column pk")
 
 Storage:

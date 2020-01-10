@@ -1,0 +1,9 @@
+Query: UPDATE test SET value = 'abc'
+Error: Value("Invalid datatype STRING for INTEGER column value")
+
+Storage:
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY NOT NULL,
+  value INTEGER DEFAULT NULL
+)
+[Integer(1), Integer(7)]
