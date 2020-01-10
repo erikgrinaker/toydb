@@ -1,0 +1,7 @@
+Query: UPDATE "boolean" SET pk = TRUE WHERE pk = FALSE
+
+Storage:
+CREATE TABLE "boolean" (
+  pk BOOLEAN PRIMARY KEY
+)
+[Boolean(true)]

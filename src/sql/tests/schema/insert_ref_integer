@@ -1,15 +1,15 @@
-Query: INSERT INTO source (id, integer_id) VALUES (1, 1)
+Query: INSERT INTO source VALUES (1, 1)
 
 Storage:
-CREATE TABLE "integer" (
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY,
+  target_id INTEGER DEFAULT NULL REFERENCES target
+)
+[Integer(1), Integer(1)]
+
+CREATE TABLE target (
   id INTEGER PRIMARY KEY
 )
 [Integer(1)]
 [Integer(2)]
 [Integer(3)]
-
-CREATE TABLE source (
-  id INTEGER PRIMARY KEY,
-  integer_id INTEGER DEFAULT NULL REFERENCES integer
-)
-[Integer(1), Integer(1)]

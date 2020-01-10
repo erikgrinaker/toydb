@@ -1,0 +1,8 @@
+Query: UPDATE "string" SET pk = 'Bar' WHERE pk = 'foo'
+
+Storage:
+CREATE TABLE "string" (
+  pk STRING PRIMARY KEY
+)
+[String("Bar")]
+[String("bar")]

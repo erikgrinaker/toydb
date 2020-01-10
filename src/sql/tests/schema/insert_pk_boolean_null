@@ -1,0 +1,8 @@
+Query: INSERT INTO "boolean" VALUES (NULL)
+Error: Value("NULL value not allowed for column pk")
+
+Storage:
+CREATE TABLE "boolean" (
+  pk BOOLEAN PRIMARY KEY
+)
+[Boolean(false)]

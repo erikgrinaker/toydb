@@ -1,0 +1,8 @@
+Query: INSERT INTO "boolean" VALUES (FALSE)
+Error: Value("Primary key FALSE already exists for table boolean")
+
+Storage:
+CREATE TABLE "boolean" (
+  pk BOOLEAN PRIMARY KEY
+)
+[Boolean(false)]

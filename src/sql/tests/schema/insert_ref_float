@@ -1,0 +1,14 @@
+Query: INSERT INTO source VALUES (1, 3.14)
+
+Storage:
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY,
+  target_id FLOAT DEFAULT NULL REFERENCES target
+)
+[Integer(1), Float(3.14)]
+
+CREATE TABLE target (
+  id FLOAT PRIMARY KEY
+)
+[Float(2.718)]
+[Float(3.14)]

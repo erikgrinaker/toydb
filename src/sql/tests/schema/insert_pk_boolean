@@ -1,0 +1,8 @@
+Query: INSERT INTO "boolean" VALUES (TRUE)
+
+Storage:
+CREATE TABLE "boolean" (
+  pk BOOLEAN PRIMARY KEY
+)
+[Boolean(false)]
+[Boolean(true)]

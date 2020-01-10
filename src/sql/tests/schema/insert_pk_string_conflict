@@ -1,0 +1,9 @@
+Query: INSERT INTO "string" VALUES ('foo')
+Error: Value("Primary key foo already exists for table string")
+
+Storage:
+CREATE TABLE "string" (
+  pk STRING PRIMARY KEY
+)
+[String("bar")]
+[String("foo")]

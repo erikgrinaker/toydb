@@ -1,0 +1,14 @@
+Query: INSERT INTO source VALUES (1, 'foo')
+
+Storage:
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY,
+  target_id STRING DEFAULT NULL REFERENCES target
+)
+[Integer(1), String("foo")]
+
+CREATE TABLE target (
+  id STRING PRIMARY KEY
+)
+[String("bar")]
+[String("foo")]

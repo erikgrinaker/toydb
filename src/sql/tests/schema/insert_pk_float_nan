@@ -1,0 +1,11 @@
+Query: INSERT INTO "float" VALUES (NAN)
+Error: Value("Primary key NaN already exists for table float")
+
+Storage:
+CREATE TABLE "float" (
+  pk FLOAT PRIMARY KEY
+)
+[Float(2.718)]
+[Float(3.14)]
+[Float(inf)]
+[Float(NaN)]

@@ -3,13 +3,12 @@ Query: INSERT INTO source VALUES (1, NULL)
 Storage:
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id INTEGER DEFAULT NULL REFERENCES target
+  target_id STRING DEFAULT NULL REFERENCES target
 )
 [Integer(1), Null]
 
 CREATE TABLE target (
-  id INTEGER PRIMARY KEY
+  id STRING PRIMARY KEY
 )
-[Integer(1)]
-[Integer(2)]
-[Integer(3)]
+[String("bar")]
+[String("foo")]

@@ -1,0 +1,14 @@
+Query: INSERT INTO source VALUES (1, 1.618)
+Error: Value("Referenced primary key 1.618 in table target does not exist")
+
+Storage:
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY,
+  target_id FLOAT DEFAULT NULL REFERENCES target
+)
+
+CREATE TABLE target (
+  id FLOAT PRIMARY KEY
+)
+[Float(2.718)]
+[Float(3.14)]

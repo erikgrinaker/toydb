@@ -1,0 +1,11 @@
+Query: INSERT INTO "float" VALUES (NULL)
+Error: Value("NULL value not allowed for column pk")
+
+Storage:
+CREATE TABLE "float" (
+  pk FLOAT PRIMARY KEY
+)
+[Float(2.718)]
+[Float(3.14)]
+[Float(inf)]
+[Float(NaN)]

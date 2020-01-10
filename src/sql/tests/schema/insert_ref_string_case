@@ -1,0 +1,14 @@
+Query: INSERT INTO source VALUES (1, 'Foo')
+Error: Value("Referenced primary key Foo in table target does not exist")
+
+Storage:
+CREATE TABLE source (
+  id INTEGER PRIMARY KEY,
+  target_id STRING DEFAULT NULL REFERENCES target
+)
+
+CREATE TABLE target (
+  id STRING PRIMARY KEY
+)
+[String("bar")]
+[String("foo")]

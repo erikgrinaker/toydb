@@ -317,8 +317,12 @@ impl<'a> Key<'a> {
                 table.as_bytes().to_vec(),
                 vec![0x00],
                 match pk {
+                    types::Value::Boolean(b) if *b => vec![0x01],
+                    types::Value::Boolean(_) => vec![0x00],
+                    types::Value::Float(f) => f.to_be_bytes().to_vec(),
                     types::Value::Integer(i) => i.to_be_bytes().to_vec(),
-                    _ => unimplemented!(),
+                    types::Value::String(s) => s.as_bytes().to_vec(),
+                    types::Value::Null => panic!("Received NULL primary key"),
                 },
             ]
             .concat(),

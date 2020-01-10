@@ -212,15 +212,38 @@ test_schema! { with [
 }
 
 test_schema! { with [
-        // FIXME Support non-integer primary keys
-        //r#"CREATE TABLE "boolean" (pk BOOLEAN PRIMARY KEY)"#,
-        //r#"INSERT INTO "boolean" VALUES (TRUE)"#,
-        //r#"CREATE TABLE "float" (pk FLOAT PRIMARY KEY)"#,
-        //r#"INSERT INTO "float" VALUES (3.14)"#,
+        r#"CREATE TABLE "boolean" (pk BOOLEAN PRIMARY KEY)"#,
+        r#"INSERT INTO "boolean" VALUES (FALSE)"#,
+    ];
+    insert_pk_boolean: r#"INSERT INTO "boolean" VALUES (TRUE)"#,
+    insert_pk_boolean_conflict: r#"INSERT INTO "boolean" VALUES (FALSE)"#,
+    insert_pk_boolean_null: r#"INSERT INTO "boolean" VALUES (NULL)"#,
+
+    update_pk_boolean: r#"UPDATE "boolean" SET pk = TRUE WHERE pk = FALSE"#,
+    update_pk_boolean_null: r#"UPDATE "boolean" SET pk = NULL WHERE pk = FALSE"#,
+}
+
+test_schema! { with [
+        r#"CREATE TABLE "float" (pk FLOAT PRIMARY KEY)"#,
+        r#"INSERT INTO "float" VALUES (3.14), (2.718), (NAN), (INFINITY)"#,
+    ];
+    insert_pk_float: r#"INSERT INTO "float" VALUES (1.618)"#,
+    insert_pk_float_conflict: r#"INSERT INTO "float" VALUES (3.14)"#,
+    insert_pk_float_zero: r#"INSERT INTO "float" VALUES (0.0)"#,
+    insert_pk_float_negative: r#"INSERT INTO "float" VALUES (-3.14)"#,
+    insert_pk_float_nan: r#"INSERT INTO "float" VALUES (NAN)"#,
+    insert_pk_float_infinity: r#"INSERT INTO "float" VALUES (INFINITY)"#,
+    insert_pk_float_null: r#"INSERT INTO "float" VALUES (NULL)"#,
+
+    update_pk_float: r#"UPDATE "float" SET pk = 1.618 WHERE pk = 3.14"#,
+    update_pk_float_conflict: r#"UPDATE "float" SET pk = 2.718 WHERE pk = 3.14"#,
+    update_pk_float_conflict_all: r#"UPDATE "float" SET pk = 3.14"#,
+    update_pk_float_null: r#"UPDATE "float" SET pk = NULL WHERE pk = 3.14"#,
+}
+
+test_schema! { with [
         r#"CREATE TABLE "integer" (pk INTEGER PRIMARY KEY)"#,
         r#"INSERT INTO "integer" VALUES (1), (2)"#,
-        //r#"CREATE TABLE "string" (pk STRING PRIMARY KEY)"#,
-        //r#"INSERT INTO "string" VALUES ('a')"#,
     ];
     insert_pk_integer: r#"INSERT INTO "integer" VALUES (3)"#,
     insert_pk_integer_conflict: r#"INSERT INTO "integer" VALUES (1)"#,
@@ -232,6 +255,23 @@ test_schema! { with [
     update_pk_integer_conflict: r#"UPDATE "integer" SET pk = 1 WHERE pk = 2"#,
     update_pk_integer_conflict_all: r#"UPDATE "integer" SET pk = 1"#,
     update_pk_integer_null: r#"UPDATE "integer" SET pk = NULL WHERE pk = 2"#,
+}
+
+test_schema! { with [
+        r#"CREATE TABLE "string" (pk STRING PRIMARY KEY)"#,
+        r#"INSERT INTO "string" VALUES ('foo'), ('bar')"#,
+    ];
+    insert_pk_string: r#"INSERT INTO "string" VALUES ('baz')"#,
+    insert_pk_string_case: r#"INSERT INTO "string" VALUES ('Foo')"#,
+    insert_pk_string_conflict: r#"INSERT INTO "string" VALUES ('foo')"#,
+    insert_pk_string_empty: r#"INSERT INTO "string" VALUES ('')"#,
+    insert_pk_string_null: r#"INSERT INTO "string" VALUES (NULL)"#,
+
+    update_pk_string: r#"UPDATE "string" SET pk = 'baz' WHERE pk = 'foo'"#,
+    update_pk_string_case: r#"UPDATE "string" SET pk = 'Bar' WHERE pk = 'foo'"#,
+    update_pk_string_conflict: r#"UPDATE "string" SET pk = 'bar' WHERE pk = 'foo'"#,
+    update_pk_string_conflict_all: r#"UPDATE "string" SET pk = 'foo'"#,
+    update_pk_string_null: r#"UPDATE "string" SET pk = NULL WHERE pk = 'foo'"#,
 }
 
 test_schema! { with [
@@ -292,17 +332,44 @@ test_schema! { with [
 }
 
 test_schema! { with [
-        // FIXME Test non-integer references as well
-        r#"CREATE TABLE "integer" (id INTEGER PRIMARY KEY)"#,
-        r#"INSERT INTO "integer" VALUES (1), (2), (3)"#,
-        r#"CREATE TABLE source (
-            id INTEGER PRIMARY KEY,
-            integer_id INTEGER REFERENCES "integer"
-        )"#,
+        "CREATE TABLE target (id BOOLEAN PRIMARY KEY)",
+        "INSERT INTO target VALUES (TRUE)",
+        "CREATE TABLE source (id INTEGER PRIMARY KEY, target_id BOOLEAN REFERENCES target)",
     ];
-    insert_ref_integer: "INSERT INTO source (id, integer_id) VALUES (1, 1)",
-    insert_ref_integer_null: "INSERT INTO source (id, integer_id) VALUES (1, NULL)",
-    insert_ref_integer_missing: "INSERT INTO source (id, integer_id) VALUES (1, 7)",
+    insert_ref_boolean: "INSERT INTO source VALUES (1, TRUE)",
+    insert_ref_boolean_null: "INSERT INTO source VALUES (1, NULL)",
+    insert_ref_boolean_missing: "INSERT INTO source VALUES (1, FALSE)",
+}
+
+test_schema! { with [
+        "CREATE TABLE target (id FLOAT PRIMARY KEY)",
+        "INSERT INTO target VALUES (3.14), (2.718)",
+        "CREATE TABLE source (id INTEGER PRIMARY KEY, target_id FLOAT REFERENCES target)",
+    ];
+    insert_ref_float: "INSERT INTO source VALUES (1, 3.14)",
+    insert_ref_float_null: "INSERT INTO source VALUES (1, NULL)",
+    insert_ref_float_missing: "INSERT INTO source VALUES (1, 1.618)",
+}
+
+test_schema! { with [
+        "CREATE TABLE target (id INTEGER PRIMARY KEY)",
+        "INSERT INTO target VALUES (1), (2), (3)",
+        "CREATE TABLE source (id INTEGER PRIMARY KEY, target_id INTEGER REFERENCES target)",
+    ];
+    insert_ref_integer: "INSERT INTO source VALUES (1, 1)",
+    insert_ref_integer_null: "INSERT INTO source VALUES (1, NULL)",
+    insert_ref_integer_missing: "INSERT INTO source VALUES (1, 7)",
+}
+
+test_schema! { with [
+        "CREATE TABLE target (id STRING PRIMARY KEY)",
+        "INSERT INTO target VALUES ('foo'), ('bar')",
+        "CREATE TABLE source (id INTEGER PRIMARY KEY, target_id STRING REFERENCES target)",
+    ];
+    insert_ref_string: "INSERT INTO source VALUES (1, 'foo')",
+    insert_ref_string_case: "INSERT INTO source VALUES (1, 'Foo')",
+    insert_ref_string_null: "INSERT INTO source VALUES (1, NULL)",
+    insert_ref_string_missing: "INSERT INTO source VALUES (1, 'baz')",
 }
 
 test_schema! { with [

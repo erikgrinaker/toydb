@@ -1,0 +1,9 @@
+Query: INSERT INTO "string" VALUES ('baz')
+
+Storage:
+CREATE TABLE "string" (
+  pk STRING PRIMARY KEY
+)
+[String("bar")]
+[String("baz")]
+[String("foo")]
