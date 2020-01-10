@@ -55,9 +55,13 @@ Sequences of digits `0-9` are parsed as a 64-bit signed integer. Numbers with de
 
 The `-` prefix operator can be used to take negative numbers.
 
-### Operators
+### Expressions
 
-#### Logical operators
+Expressions can be used wherever a value is expected, e.g. as `SELECT` fields and `INSERT` values, and can be either a constant, a column reference, or an operator invocation.
+
+## SQL Operators
+
+### Logical operators
 
 Logical operators apply standard logic operations on boolean operands.
 
@@ -85,7 +89,7 @@ The complete truth tables are:
 | **`FALSE`** | `TRUE`  |
 | **`NULL`**  | `NULL`  |
 
-#### Comparison operators
+### Comparison operators
 
 Comparison operators compare values of the same data type, and return `TRUE` if the comparison holds, otherwise `FALSE`. `INTEGER` and `FLOAT` values are interchangeable. `STRING` comparisons are byte-wise, i.e. case-sensitive with `B` considered lesser than `a` due to their UTF-8 code points. `FALSE` is considered lesser than `TRUE`. Comparison with `NULL` always yields `NULL` (even `NULL = NULL`).
 
@@ -103,7 +107,7 @@ Unary operators:
 * `IS NULL`: checks if the value is `NULL`, e.g. `NULL IS NULL` yields `TRUE`.
 * `IS NOT NULL`: checks if the value is not `NULL`, e.g. `TRUE IS NOT NULL` yields `TRUE`.
 
-#### Mathematical operators
+### Mathematical operators
 
 Mathematical operators apply standard math operations on numeric (`INTEGER` or `FLOAT`) operands. If either operand is a `FLOAT`, both operands are converted to `FLOAT` and the result is a `FLOAT`. If either operand is `NULL`, the result is `NULL`. The special values `INFINITY` and `NAN` are handled according to the IEEE 754 `binary64` spec.
 
@@ -124,13 +128,13 @@ Unary operators:
 * `-` (prefix): negation, e.g. `- -2` yields `2`.
 * `!` (postfix): factorial, e.g. `5!` yields `15`.
 
-#### String operators
+### String operators
 
 String operators operate on string operands.
 
 * `LIKE`: compares a string with the given pattern, using `%` as multi-character wildcard and `_` as single-character wildcard, returning `TRUE` if the string matches the pattern - e.g. `'abc' LIKE 'a%'` yields `TRUE`.  Literal `%` and `_` can be escaped as `%%` and `__`.
 
-#### Operator precedence
+### Operator precedence
 
 The operator precedence (order of operations) is as follows:
 
@@ -147,3 +151,54 @@ The operator precedence (order of operations) is as follows:
 | 1          | `OR`                     | Left          |
 
 Precedence can be overridden by wrapping an expression in parentheses, e.g. `(1 + 2) * 3`.
+
+## SQL Statements
+
+### `CREATE TABLE`
+
+Creates a new table.
+
+<pre>
+CREATE TABLE <b><i>table_name</i></b> (
+    [ <b><i>column_name</i></b> <b><i>data_type</i></b> [ <b><i>column_constraint</i></b> [ ... ] ] [, ... ] ]
+)
+
+where <b><i>column_constraint</i></b> is:
+
+{ NOT NULL | NULL | PRIMARY KEY | DEFAULT <b><i>expr</i></b> }
+</pre>
+
+* ***`table_name`***: The name of the table. Must be a [valid identifier](#identifiers). Errors if a table with this name already exists.
+
+* ***`column_name`***: The name of the column. Must be a [valid identifier](#identifiers), and unique within the table.
+
+* ***`data_type`***: The data type of the column, see [data types](#data-types) for valid types.
+
+* `NOT NULL`: The column may not contain `NULL` values.
+
+* `NULL`: The column may contain `NULL` values. This is the default.
+
+* `PRIMARY KEY`: The column should act as a primary key, i.e. the main row identifier. A table must have exactly one primary key column, and it must be unique and non-nullable.
+
+* `DEFAULT`***`expr`***: Specifies a default value for the column when `INSERT` statements do not give a value. ***`expr`*** can be any constant expression of an appropriate data type, e.g. `'abc'` or `1 + 2 * 3`. For nullable columns, the default value is `NULL` unless specified otherwise.
+
+#### Example
+
+```
+CREATE TABLE movie (
+    id INTEGER PRIMARY KEY,
+    title STRING NOT NULL,
+    release_year INTEGER,
+    bluray BOOLEAN NOT NULL DEFAULT TRUE
+)
+```
+
+### `DROP TABLE`
+
+Deletes a table and all contained data.
+
+<pre>
+DROP TABLE <b><i>table_name</i></b>
+</pre>
+
+* ***`table_name`***: the table to delete. Errors if it does not exist.

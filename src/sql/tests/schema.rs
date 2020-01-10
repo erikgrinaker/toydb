@@ -85,12 +85,18 @@ test_schema! {
     create_table_pk_nullable: "CREATE TABLE name (id INTEGER PRIMARY KEY NULL)",
     create_table_pk_default: "CREATE TABLE name (id INTEGER PRIMARY KEY DEFAULT 1)",
 
+    create_table_null: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NULL)",
+    create_table_null_not: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NOT NULL)",
+    create_table_null_not_null: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NULL NOT NULL)",
+    create_table_null_default: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING)",
+
     create_table_default_boolean: "CREATE TABLE name (id INTEGER PRIMARY KEY, value BOOLEAN DEFAULT TRUE)",
     create_table_default_float: "CREATE TABLE name (id INTEGER PRIMARY KEY, value FLOAT DEFAULT 3.14)",
     create_table_default_integer: "CREATE TABLE name (id INTEGER PRIMARY KEY, value INTEGER DEFAULT 7)",
     create_table_default_string: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT 'foo')",
     create_table_default_null: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT NULL)",
     create_table_default_null_not: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NOT NULL DEFAULT NULL)",
+    create_table_default_expr: "CREATE TABLE name (id INTEGER PRIMARY KEY, value INTEGER DEFAULT 1 + 2 * 3)",
     create_table_default_conflict: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT 7)",
     create_table_default_conflict_float_integer: "CREATE TABLE name (id INTEGER PRIMARY KEY, value FLOAT DEFAULT 7)",
     create_table_default_conflict_integer_float: "CREATE TABLE name (id INTEGER PRIMARY KEY, value INTEGER DEFAULT 3.14)",
