@@ -61,10 +61,49 @@ impl Table {
         Ok(())
     }
 
+    /// Asserts that this primary key is not referenced from any other rows, otherwise errors
+    pub fn assert_pk_unreferenced(
+        &self,
+        pk: &Value,
+        txn: &mut dyn Transaction,
+    ) -> Result<(), Error> {
+        for source in txn.scan_tables()? {
+            let refs = source
+                .columns
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| c.references.as_deref() == Some(&self.name))
+                .collect::<Vec<_>>();
+            if refs.is_empty() {
+                continue;
+            }
+            let mut scan = txn.scan(&source.name)?;
+            while let Some(row) = scan.next().transpose()? {
+                for (i, column) in refs.iter() {
+                    if row.get(*i).unwrap_or(&Value::Null) == pk
+                        && (source.name != self.name || &source.row_key(&row)? != pk)
+                    {
+                        return Err(Error::Value(format!(
+                            "Primary key {} is referenced by table {} column {}",
+                            pk, source.name, column.name
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Fetches a column by name
     /// FIXME Should index these for performance
     pub fn get_column(&self, name: &str) -> Option<&Column> {
         self.columns.iter().find(|c| c.name == name)
+    }
+
+    /// Fetches a column index by name
+    /// FIXME Should index this for performance
+    pub fn get_column_index(&self, name: &str) -> Option<usize> {
+        self.columns.iter().position(|c| c.name == name)
     }
 
     // Builds a row from a set of values, optionally with a set of column names, padding
@@ -120,11 +159,6 @@ impl Table {
             .ok_or_else(|| Error::Value("Primary key not found".into()))
     }
 
-    /// Returns the set of tables references by this table
-    pub fn references(&self) -> Vec<Column> {
-        self.columns.iter().filter(|c| c.references.is_some()).cloned().collect()
-    }
-
     /// Returns a row from a hashmap keyed by column name, padding it with nulls if needed
     pub fn row_from_hashmap(&self, row: HashMap<String, Value>) -> Row {
         self.columns.iter().map(|c| row.get(&c.name).cloned().unwrap_or(Value::Null)).collect()
@@ -152,28 +186,6 @@ impl Table {
         .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
     }
 
-    /// Returns outbound references from a row as a table/pk hash map
-    // FIXME Should remove duplicates, for performance
-    pub fn row_references(&self, row: &[Value]) -> Result<HashMap<String, Vec<Value>>, Error> {
-        let mut refs = HashMap::new();
-        for (i, column) in self.columns.iter().enumerate() {
-            if let Some(target) = &column.references {
-                match row.get(i).cloned() {
-                    Some(Value::Null) => {}
-                    Some(Value::Float(f)) if f.is_nan() => {}
-                    Some(v) => refs.entry(target.clone()).or_insert_with(Vec::new).push(v),
-                    None => {
-                        return Err(Error::Value(format!(
-                            "No value found for column {}",
-                            column.name
-                        )))
-                    }
-                }
-            }
-        }
-        Ok(refs)
-    }
-
     /// Validates the table schema
     pub fn validate(&self, txn: &mut dyn Transaction) -> Result<(), Error> {
         if self.columns.is_empty() {
@@ -191,12 +203,13 @@ impl Table {
     }
 
     /// Validates a row
-    pub fn validate_row(&self, row: &[Value]) -> Result<(), Error> {
+    pub fn validate_row(&self, row: &[Value], txn: &mut dyn Transaction) -> Result<(), Error> {
         if row.len() != self.columns.len() {
             return Err(Error::Value(format!("Invalid row size for table {}", self.name)));
         }
+        let pk = self.row_key(row)?;
         for (column, value) in self.columns.iter().zip(row.iter()) {
-            column.validate_value(value)?;
+            column.validate_value(self, &pk, value, txn)?;
         }
         Ok(())
     }
@@ -302,7 +315,14 @@ impl Column {
     }
 
     /// Validates a column value
-    pub fn validate_value(&self, value: &Value) -> Result<(), Error> {
+    pub fn validate_value(
+        &self,
+        table: &Table,
+        pk: &Value,
+        value: &Value,
+        txn: &mut dyn Transaction,
+    ) -> Result<(), Error> {
+        // Validate datatype
         match value.datatype() {
             None if self.nullable => Ok(()),
             None => Err(Error::Value(format!("NULL value not allowed for column {}", self.name))),
@@ -312,11 +332,48 @@ impl Column {
             ))),
             _ => Ok(()),
         }?;
+
+        // Validate value
         match value {
             Value::String(s) if s.len() > 1024 => {
                 Err(Error::Value("Strings cannot be more than 1024 bytes".into()))
             }
             _ => Ok(()),
+        }?;
+
+        // Validate outgoing references
+        if let Some(target) = &self.references {
+            match value {
+                Value::Null => Ok(()),
+                Value::Float(f) if f.is_nan() => Ok(()),
+                v if target == &table.name && v == pk => Ok(()),
+                v if txn.read(target, v)?.is_none() => Err(Error::Value(format!(
+                    "Referenced primary key {} in table {} does not exist",
+                    v, target,
+                ))),
+                _ => Ok(()),
+            }?;
         }
+
+        // Validate uniqueness constraints
+        if self.unique && !self.primary_key && value != &Value::Null {
+            let index = table.get_column_index(&self.name).ok_or_else(|| {
+                Error::Internal(format!(
+                    "Unable to find column {} in table {}",
+                    self.name, table.name,
+                ))
+            })?;
+            let mut scan = txn.scan(&table.name)?;
+            while let Some(row) = scan.next().transpose()? {
+                if row.get(index).unwrap_or(&Value::Null) == value && &table.row_key(&row)? != pk {
+                    return Err(Error::Value(format!(
+                        "Unique value {} already exists for column {}",
+                        value, self.name
+                    )));
+                }
+            }
+        }
+
+        Ok(())
     }
 }

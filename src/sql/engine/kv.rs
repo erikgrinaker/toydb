@@ -58,11 +58,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         let table = self
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
-
-        // Validate row
-        table.validate_row(&row)?;
-
-        // Validate primary key conflicts
+        table.validate_row(&row, self)?;
         let id = table.row_key(&row)?;
         if self.read(&table.name, &id)?.is_some() {
             return Err(Error::Value(format!(
@@ -70,45 +66,6 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
                 id, table.name
             )));
         }
-
-        // Validate referential integrity
-        for (target, pks) in table.row_references(&row)?.into_iter() {
-            for pk in pks.into_iter() {
-                if target == table.name && pk == table.row_key(&row)? {
-                    continue;
-                }
-                if self.read(&target, &pk)?.is_none() {
-                    return Err(Error::Value(format!(
-                        "Referenced primary key {} in table {} does not exist",
-                        pk, target,
-                    )));
-                }
-            }
-        }
-
-        // Validate uniqueness
-        let unique: Vec<_> = table
-            .columns
-            .iter()
-            .zip(row.iter())
-            .enumerate()
-            .filter(|(_i, (c, v))| c.unique && !c.primary_key && v != &&types::Value::Null)
-            .map(|(i, (c, v))| (i, c, v))
-            .collect();
-        if !unique.is_empty() {
-            let mut scan = self.scan(&table.name)?;
-            while let Some(r) = scan.next().transpose()? {
-                for (i, c, v) in unique.iter() {
-                    if &r.get(*i).unwrap_or_else(|| &types::Value::Null) == v {
-                        return Err(Error::Value(format!(
-                            "Unique value {} already exists for column {}",
-                            v, c.name
-                        )));
-                    }
-                }
-            }
-        }
-
         self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
     }
 
@@ -116,36 +73,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         let table = self
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
-
-        // FIXME We should avoid full table scans here, but let's wait until we build the
-        // predicate pushdown infrastructure which we can use for this as well.
-        for source in self.scan_tables()? {
-            let refs: Vec<_> = source
-                .references()
-                .into_iter()
-                .filter(|c| c.references == Some(table.name.clone()))
-                .collect();
-            if refs.is_empty() {
-                continue;
-            }
-            let mut scan = self.scan(&source.name)?;
-            while let Some(row) = scan.next().transpose()? {
-                let row = source.row_to_hashmap(row);
-                for r in refs.iter() {
-                    if row.get(&r.name).unwrap_or(&types::Value::Null) == id
-                        && (source.name != table.name
-                            || row.get(&table.primary_key()?.name).unwrap_or(&types::Value::Null)
-                                != id)
-                    {
-                        return Err(Error::Value(format!(
-                            "Primary key {} is referenced by table {} column {}",
-                            id, source.name, r.name
-                        )));
-                    }
-                }
-            }
-        }
-
+        table.assert_pk_unreferenced(id, self)?;
         self.txn.delete(&Key::Row(&table.name, id).encode())
     }
 
@@ -154,78 +82,26 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 
     fn scan(&self, table: &str) -> Result<super::Scan, Error> {
-        let from = Key::RowStart(table).encode();
-        let to = Key::RowEnd(table).encode();
-        // FIXME We buffer results here, to avoid dealing with trait lifetimes
-        // right now
-        let iter = self
-            .txn
-            .scan(&from..&to)?
-            .map(|res| match res {
-                Ok((_, v)) => deserialize(&v),
-                Err(err) => Err(err),
-            })
-            .collect::<Vec<Result<_, Error>>>()
-            .into_iter();
-        Ok(Box::new(iter))
+        // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
+        Ok(Box::new(
+            self.txn
+                .scan(&Key::RowStart(table).encode()..&Key::RowEnd(table).encode())?
+                .map(|r| r.and_then(|(_, v)| deserialize(&v)))
+                .collect::<Vec<Result<_, Error>>>()
+                .into_iter(),
+        ))
     }
 
     fn update(&mut self, table: &str, id: &types::Value, row: types::Row) -> Result<(), Error> {
         let table = self
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
-
-        // If the primary key changes, we do a delete and create
+        // If the primary key changes we do a delete and create, otherwise we replace the row
         if id != &table.row_key(&row)? {
             self.delete(&table.name, id)?;
             self.create(&table.name, row)
-
-        // Otherwise, we validate the new row and replace the existing one
         } else {
-            // Validate row
-            table.validate_row(&row)?;
-
-            // Validate referential integrity
-            for (target, pks) in table.row_references(&row)?.into_iter() {
-                for pk in pks.into_iter() {
-                    if target == table.name && &pk == id {
-                        continue;
-                    }
-                    if self.read(&target, &pk)?.is_none() {
-                        return Err(Error::Value(format!(
-                            "Referenced primary key {} in table {} does not exist",
-                            pk, target,
-                        )));
-                    }
-                }
-            }
-
-            // Validate uniqueness
-            let unique: Vec<_> = table
-                .columns
-                .iter()
-                .zip(row.iter())
-                .enumerate()
-                .filter(|(_i, (c, v))| c.unique && !c.primary_key && v != &&types::Value::Null)
-                .map(|(i, (c, v))| (i, c, v))
-                .collect();
-            if !unique.is_empty() {
-                let mut scan = self.scan(&table.name)?;
-                while let Some(r) = scan.next().transpose()? {
-                    if &table.row_key(&r)? == id {
-                        continue;
-                    }
-                    for (i, c, v) in unique.iter() {
-                        if &r.get(*i).unwrap_or_else(|| &types::Value::Null) == v {
-                            return Err(Error::Value(format!(
-                                "Unique value {} already exists for column {}",
-                                v, c.name
-                            )));
-                        }
-                    }
-                }
-            }
-
+            table.validate_row(&row, self)?;
             self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
         }
     }
