@@ -12,10 +12,7 @@ impl Delete {
         mut source: Box<dyn Executor>,
         table: String,
     ) -> Result<Box<dyn Executor>, Error> {
-        let table = ctx
-            .txn
-            .read_table(&table)?
-            .ok_or_else(|| Error::Value(format!("Table {} not found", table)))?;
+        let table = ctx.txn.must_read_table(&table)?;
         while let Some(row) = source.fetch()? {
             ctx.txn.delete(&table.name, &table.get_row_key(&row)?)?
         }

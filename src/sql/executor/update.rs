@@ -15,10 +15,7 @@ impl Update {
         mut source: Box<dyn Executor>,
         expressions: BTreeMap<String, Expression>,
     ) -> Result<Box<dyn Executor>, Error> {
-        let table = ctx
-            .txn
-            .read_table(&table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        let table = ctx.txn.must_read_table(&table)?;
         while let Some(mut row) = source.fetch()? {
             let id = table.get_row_key(&row)?;
             let env = Environment::new(table.make_row_hashmap(row.clone()));

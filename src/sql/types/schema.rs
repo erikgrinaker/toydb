@@ -278,13 +278,13 @@ impl Column {
         if let Some(reference) = &self.references {
             let target = if reference == &table.name {
                 table.clone()
+            } else if let Some(table) = txn.read_table(reference)? {
+                table
             } else {
-                txn.read_table(reference)?.ok_or_else(|| {
-                    Error::Value(format!(
-                        "Table {} referenced by column {} does not exist",
-                        reference, self.name
-                    ))
-                })?
+                return Err(Error::Value(format!(
+                    "Table {} referenced by column {} does not exist",
+                    reference, self.name
+                )));
             };
             if self.datatype != target.get_primary_key()?.datatype {
                 return Err(Error::Value(format!(

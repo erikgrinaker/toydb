@@ -36,6 +36,11 @@ pub trait Transaction {
     fn delete_table(&mut self, table: &str) -> Result<(), Error>;
     fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error>;
     fn scan_tables(&self) -> Result<TableScan, Error>;
+
+    fn must_read_table(&self, table: &str) -> Result<schema::Table, Error> {
+        self.read_table(table)?
+            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
+    }
 }
 
 pub type Scan =

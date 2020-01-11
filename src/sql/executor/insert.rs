@@ -13,10 +13,7 @@ impl Insert {
         columns: Vec<String>,
         expressions: Vec<Expressions>,
     ) -> Result<Box<dyn Executor>, Error> {
-        let table = ctx
-            .txn
-            .read_table(table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        let table = ctx.txn.must_read_table(&table)?;
         let env = Environment::empty();
         for exprs in expressions {
             let mut row =

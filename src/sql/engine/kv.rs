@@ -55,9 +55,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 
     fn create(&mut self, table: &str, row: types::Row) -> Result<(), Error> {
-        let table = self
-            .read_table(&table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        let table = self.must_read_table(&table)?;
         table.validate_row(&row, self)?;
         let id = table.get_row_key(&row)?;
         if self.read(&table.name, &id)?.is_some() {
@@ -70,9 +68,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 
     fn delete(&mut self, table: &str, id: &types::Value) -> Result<(), Error> {
-        let table = self
-            .read_table(&table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        let table = self.must_read_table(&table)?;
         table.assert_unreferenced_key(id, self)?;
         self.txn.delete(&Key::Row(&table.name, id).encode())
     }
@@ -93,9 +89,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 
     fn update(&mut self, table: &str, id: &types::Value, row: types::Row) -> Result<(), Error> {
-        let table = self
-            .read_table(&table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        let table = self.must_read_table(&table)?;
         // If the primary key changes we do a delete and create, otherwise we replace the row
         if id != &table.get_row_key(&row)? {
             self.delete(&table.name, id)?;
@@ -115,9 +109,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 
     fn delete_table(&mut self, table: &str) -> Result<(), Error> {
-        let table = self
-            .read_table(table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        let table = self.must_read_table(&table)?;
         table.assert_unreferenced(self)?;
         // FIXME Needs to delete all table data as well
         self.txn.delete(&Key::Table(&table.name).encode())

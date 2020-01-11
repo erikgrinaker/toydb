@@ -14,13 +14,10 @@ impl Scan {
         ctx: &mut Context<T>,
         table: String,
     ) -> Result<Box<dyn Executor>, Error> {
-        let schema = ctx
-            .txn
-            .read_table(&table)?
-            .ok_or_else(|| Error::Value(format!("Table {} not found", table)))?;
+        let table = ctx.txn.must_read_table(&table)?;
         Ok(Box::new(Self {
-            columns: schema.columns.iter().map(|c| c.name.clone()).collect(),
-            range: ctx.txn.scan(&table)?,
+            columns: table.columns.iter().map(|c| c.name.clone()).collect(),
+            range: ctx.txn.scan(&table.name)?,
         }))
     }
 }
