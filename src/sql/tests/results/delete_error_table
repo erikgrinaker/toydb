@@ -30,4 +30,4 @@ Optimized plan: Plan {
 
 Query: DELETE FROM missing
 
-Result: Value("Table missing not found")
+Result: Value("Table missing does not exist")
