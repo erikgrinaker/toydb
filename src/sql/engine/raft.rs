@@ -31,7 +31,7 @@ enum Query {
     Read { txn_id: u64, table: String, id: types::Value },
     Scan { txn_id: u64, table: String },
 
-    ListTables { txn_id: u64 },
+    ScanTables { txn_id: u64 },
     ReadTable { txn_id: u64, table: String },
 }
 
@@ -160,16 +160,21 @@ impl super::Transaction for Transaction {
         )
     }
 
-    fn list_tables(&self) -> Result<Vec<schema::Table>, Error> {
-        deserialize(&self.raft.query(serialize(&Query::ListTables { txn_id: self.id })?)?)
-    }
-
     fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
         deserialize(
             &self
                 .raft
                 .query(serialize(&Query::ReadTable { txn_id: self.id, table: table.into() })?)?,
         )
+    }
+
+    fn scan_tables(&self) -> Result<super::TableScan, Error> {
+        Ok(Box::new(
+            deserialize::<Vec<_>>(
+                &self.raft.query(serialize(&Query::ScanTables { txn_id: self.id })?)?,
+            )?
+            .into_iter(),
+        ))
     }
 }
 
@@ -235,9 +240,11 @@ impl<S: kv::storage::Storage> raft::State for State<S> {
                     .collect::<Result<Vec<types::Row>, Error>>()?,
             ),
 
-            Query::ListTables { txn_id } => serialize(&self.engine.resume(txn_id)?.list_tables()?),
             Query::ReadTable { txn_id, table } => {
                 serialize(&self.engine.resume(txn_id)?.read_table(&table)?)
+            }
+            Query::ScanTables { txn_id } => {
+                serialize(&self.engine.resume(txn_id)?.scan_tables()?.collect::<Vec<_>>())
             }
         }
     }

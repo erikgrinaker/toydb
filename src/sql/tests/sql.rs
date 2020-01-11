@@ -116,7 +116,7 @@ macro_rules! test_sql {
 
             write!(f, "\nStorage:")?;
             let txn = engine.begin()?;
-            for table in &txn.list_tables()? {
+            for table in txn.scan_tables()? {
                 let schema = &txn.read_table(&table.name)?.unwrap();
                 write!(f, "\n{}\n", schema.as_sql())?;
                 for row in txn.scan(&table.name)? {

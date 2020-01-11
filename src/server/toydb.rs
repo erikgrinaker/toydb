@@ -42,10 +42,9 @@ impl service::ToyDB for ToyDB {
     ) -> grpc::SingleResponse<service::ListTablesResponse> {
         let mut resp = service::ListTablesResponse::new();
         let txn = self.engine.begin().unwrap();
-        match txn.list_tables() {
-            Ok(tables) => {
-                resp.name =
-                    protobuf::RepeatedField::from_vec(tables.into_iter().map(|s| s.name).collect())
+        match txn.scan_tables() {
+            Ok(iter) => {
+                resp.name = protobuf::RepeatedField::from_vec(iter.map(|s| s.name).collect())
             }
             Err(err) => resp.error = Self::error_to_protobuf(err),
         };

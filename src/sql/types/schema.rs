@@ -48,7 +48,7 @@ impl Table {
     /// Asserts that the table is not referenced by other tables, otherwise returns an error
     // FIXME Should cache or index the data
     pub fn assert_unreferenced(&self, txn: &mut dyn Transaction) -> Result<(), Error> {
-        for source in txn.list_tables()?.into_iter().filter(|t| t.name != self.name) {
+        for source in txn.scan_tables()?.filter(|t| t.name != self.name) {
             if let Some(column) =
                 source.columns.iter().find(|c| c.references.as_ref() == Some(&self.name))
             {

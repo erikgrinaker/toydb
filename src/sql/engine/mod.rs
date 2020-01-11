@@ -34,9 +34,11 @@ pub trait Transaction {
 
     fn create_table(&mut self, table: &schema::Table) -> Result<(), Error>;
     fn delete_table(&mut self, table: &str) -> Result<(), Error>;
-    fn list_tables(&self) -> Result<Vec<schema::Table>, Error>;
     fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error>;
+    fn scan_tables(&self) -> Result<TableScan, Error>;
 }
 
 pub type Scan =
     Box<dyn DoubleEndedIterator<Item = Result<types::Row, Error>> + 'static + Sync + Send>;
+
+pub type TableScan = Box<dyn DoubleEndedIterator<Item = schema::Table> + 'static + Sync + Send>;

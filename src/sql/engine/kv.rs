@@ -119,7 +119,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
 
         // FIXME We should avoid full table scans here, but let's wait until we build the
         // predicate pushdown infrastructure which we can use for this as well.
-        for source in self.list_tables()? {
+        for source in self.scan_tables()? {
             let refs: Vec<_> = source
                 .references()
                 .into_iter()
@@ -247,17 +247,18 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         self.txn.delete(&Key::Table(&table.name).encode())
     }
 
-    fn list_tables(&self) -> Result<Vec<schema::Table>, Error> {
-        self.txn
-            .scan(&Key::TableStart.encode()..&Key::TableEnd.encode())?
-            .collect::<Result<Vec<_>, Error>>()?
-            .into_iter()
-            .map(|(_, v)| deserialize(&v))
-            .collect()
-    }
-
     fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error> {
         self.txn.get(&Key::Table(table).encode())?.map(|v| deserialize(&v)).transpose()
+    }
+
+    fn scan_tables(&self) -> Result<super::TableScan, Error> {
+        Ok(Box::new(
+            self.txn
+                .scan(&Key::TableStart.encode()..&Key::TableEnd.encode())?
+                .map(|r| r.and_then(|(_, v)| deserialize(&v)))
+                .collect::<Result<Vec<_>, Error>>()?
+                .into_iter(),
+        ))
     }
 }
 
