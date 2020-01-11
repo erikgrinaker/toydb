@@ -6,11 +6,7 @@ use crate::Error;
 use regex::Regex;
 use std::collections::HashMap;
 
-lazy_static! {
-    static ref RE_IDENT: Regex = Regex::new(r#"^\w[\w_]*$"#).unwrap();
-}
-
-/// A table
+/// A table schema
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Table {
     /// The table name
@@ -28,25 +24,18 @@ impl Table {
 
     /// Generates an SQL DDL query for the table schema
     pub fn as_sql(&self) -> String {
-        let mut sql = String::from("CREATE TABLE ");
-        if RE_IDENT.is_match(&self.name) && Keyword::from_str(&self.name).is_none() {
-            sql += &self.name;
-        } else {
-            sql += &format!("\"{}\"", self.name.replace("\"", "\"\""));
-        }
-        sql += &format!(
-            " (\n{}\n)",
+        format!(
+            "CREATE TABLE {} (\n{}\n)",
+            format_ident(&self.name),
             self.columns
                 .iter()
                 .map(|c| format!("  {}", c.as_sql()))
                 .collect::<Vec<String>>()
                 .join(",\n")
-        );
-        sql
+        )
     }
 
     /// Asserts that the table is not referenced by other tables, otherwise returns an error
-    // FIXME Should cache or index the data
     pub fn assert_unreferenced(&self, txn: &mut dyn Transaction) -> Result<(), Error> {
         for source in txn.scan_tables()?.filter(|t| t.name != self.name) {
             if let Some(column) =
@@ -62,7 +51,7 @@ impl Table {
     }
 
     /// Asserts that this primary key is not referenced from any other rows, otherwise errors
-    pub fn assert_pk_unreferenced(
+    pub fn assert_unreferenced_key(
         &self,
         pk: &Value,
         txn: &mut dyn Transaction,
@@ -81,7 +70,7 @@ impl Table {
             while let Some(row) = scan.next().transpose()? {
                 for (i, column) in refs.iter() {
                     if row.get(*i).unwrap_or(&Value::Null) == pk
-                        && (source.name != self.name || &source.row_key(&row)? != pk)
+                        && (source.name != self.name || &source.get_row_key(&row)? != pk)
                     {
                         return Err(Error::Value(format!(
                             "Primary key {} is referenced by table {} column {}",
@@ -95,87 +84,29 @@ impl Table {
     }
 
     /// Fetches a column by name
-    /// FIXME Should index these for performance
-    pub fn get_column(&self, name: &str) -> Option<&Column> {
-        self.columns.iter().find(|c| c.name == name)
+    pub fn get_column(&self, name: &str) -> Result<&Column, Error> {
+        self.columns.iter().find(|c| c.name == name).ok_or_else(|| {
+            Error::Value(format!("Column {} not found in table {}", name, self.name))
+        })
     }
 
     /// Fetches a column index by name
-    /// FIXME Should index this for performance
-    pub fn get_column_index(&self, name: &str) -> Option<usize> {
-        self.columns.iter().position(|c| c.name == name)
-    }
-
-    // Builds a row from a set of values, optionally with a set of column names, padding
-    // it with default values as necessary.
-    pub fn make_row(&self, values: Vec<Value>, columns: Option<&[String]>) -> Result<Row, Error> {
-        if let Some(columns) = columns {
-            if values.len() != columns.len() {
-                return Err(Error::Value("Column and value counts do not match".into()));
-            }
-            let mut inputs = HashMap::new();
-            for (c, v) in columns.iter().zip(values.into_iter()) {
-                if self.get_column(c).is_none() {
-                    return Err(Error::Value(format!(
-                        "Unknown column {} in table {}",
-                        c, self.name
-                    )));
-                }
-                if inputs.insert(c.clone(), v).is_some() {
-                    return Err(Error::Value(format!("Column {} given multiple times", c)));
-                }
-            }
-            let mut row = Row::new();
-            for column in self.columns.iter() {
-                if let Some(value) = inputs.get(&column.name) {
-                    row.push(value.clone())
-                } else if let Some(value) = &column.default {
-                    row.push(value.clone())
-                } else {
-                    return Err(Error::Value(format!("No value given for column {}", column.name)));
-                }
-            }
-            Ok(row)
-        } else {
-            let mut row = Row::new();
-            for (i, column) in self.columns.iter().enumerate() {
-                if let Some(value) = values.get(i) {
-                    row.push(value.clone())
-                } else if let Some(value) = &column.default {
-                    row.push(value.clone())
-                } else {
-                    return Err(Error::Value(format!("No value given for column {}", column.name)));
-                }
-            }
-            Ok(row)
-        }
+    pub fn get_column_index(&self, name: &str) -> Result<usize, Error> {
+        self.columns.iter().position(|c| c.name == name).ok_or_else(|| {
+            Error::Value(format!("Column {} not found in table {}", name, self.name))
+        })
     }
 
     /// Returns the primary key column of the table
-    pub fn primary_key(&self) -> Result<&Column, Error> {
+    pub fn get_primary_key(&self) -> Result<&Column, Error> {
         self.columns
             .iter()
             .find(|c| c.primary_key)
-            .ok_or_else(|| Error::Value("Primary key not found".into()))
-    }
-
-    /// Returns a row from a hashmap keyed by column name, padding it with nulls if needed
-    pub fn row_from_hashmap(&self, row: HashMap<String, Value>) -> Row {
-        self.columns.iter().map(|c| row.get(&c.name).cloned().unwrap_or(Value::Null)).collect()
-    }
-
-    /// Returns the row as a hashmap keyed by column name, padding the row with nulls if needed
-    pub fn row_to_hashmap(&self, row: Row) -> HashMap<String, Value> {
-        self.columns
-            .iter()
-            .map(|c| c.name.clone())
-            .zip(row.into_iter().chain(std::iter::repeat(Value::Null)))
-            .collect()
+            .ok_or_else(|| Error::Value(format!("Primary key not found in table {}", self.name)))
     }
 
     /// Returns the primary key value of a row
-    pub fn row_key(&self, row: &[Value]) -> Result<Value, Error> {
-        // FIXME This should be indexed
+    pub fn get_row_key(&self, row: &[Value]) -> Result<Value, Error> {
         row.get(
             self.columns
                 .iter()
@@ -184,6 +115,60 @@ impl Table {
         )
         .cloned()
         .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
+    }
+
+    // Builds a row from a set of values, optionally with a set of column names, padding
+    // it with default values as necessary.
+    pub fn make_row(&self, columns: &[String], values: Vec<Value>) -> Result<Row, Error> {
+        if columns.len() != values.len() {
+            return Err(Error::Value("Column and value counts do not match".into()));
+        }
+        let mut inputs = HashMap::new();
+        for (c, v) in columns.iter().zip(values.into_iter()) {
+            self.get_column(c)?;
+            if inputs.insert(c.clone(), v).is_some() {
+                return Err(Error::Value(format!("Column {} given multiple times", c)));
+            }
+        }
+        let mut row = Row::new();
+        for column in self.columns.iter() {
+            if let Some(value) = inputs.get(&column.name) {
+                row.push(value.clone())
+            } else if let Some(value) = &column.default {
+                row.push(value.clone())
+            } else {
+                return Err(Error::Value(format!("No value given for column {}", column.name)));
+            }
+        }
+        Ok(row)
+    }
+
+    /// Makes a hashmap for a row
+    pub fn make_row_hashmap(&self, row: Row) -> HashMap<String, Value> {
+        self.columns
+            .iter()
+            .map(|c| c.name.clone())
+            .zip(row.into_iter().chain(std::iter::repeat(Value::Null)))
+            .collect()
+    }
+
+    /// Pads a row with default values where possible
+    pub fn pad_row(&self, mut row: Row) -> Result<Row, Error> {
+        for column in self.columns.iter().skip(row.len()) {
+            if let Some(default) = &column.default {
+                row.push(default.clone())
+            } else {
+                return Err(Error::Value(format!("No default value for column {}", column.name)));
+            }
+        }
+        Ok(row)
+    }
+
+    /// Sets a named row field to a value
+    pub fn set_row_field(&self, row: &mut Row, field: &str, value: Value) -> Result<(), Error> {
+        *row.get_mut(self.get_column_index(field)?)
+            .ok_or_else(|| Error::Value(format!("Field {} not found in row", field)))? = value;
+        Ok(())
     }
 
     /// Validates the table schema
@@ -207,7 +192,7 @@ impl Table {
         if row.len() != self.columns.len() {
             return Err(Error::Value(format!("Invalid row size for table {}", self.name)));
         }
-        let pk = self.row_key(row)?;
+        let pk = self.get_row_key(row)?;
         for (column, value) in self.columns.iter().zip(row.iter()) {
             column.validate_value(self, &pk, value, txn)?;
         }
@@ -215,7 +200,7 @@ impl Table {
     }
 }
 
-/// A table column
+/// A table column schema
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Column {
     /// Column name
@@ -237,12 +222,7 @@ pub struct Column {
 impl Column {
     /// Generates SQL DDL for the column
     pub fn as_sql(&self) -> String {
-        let mut sql = String::new();
-        if RE_IDENT.is_match(&self.name) && Keyword::from_str(&self.name).is_none() {
-            sql += &self.name;
-        } else {
-            sql += &format!("\"{}\"", self.name.replace("\"", "\"\""));
-        }
+        let mut sql = format_ident(&self.name);
         sql += &format!(" {}", self.datatype);
         if self.primary_key {
             sql += " PRIMARY KEY";
@@ -264,12 +244,15 @@ impl Column {
 
     /// Validates the column schema
     pub fn validate(&self, table: &Table, txn: &mut dyn Transaction) -> Result<(), Error> {
+        // Validate primary key
         if self.primary_key && self.nullable {
             return Err(Error::Value(format!("Primary key {} cannot be nullable", self.name)));
         }
         if self.primary_key && !self.unique {
             return Err(Error::Value(format!("Primary key {} must be unique", self.name)));
         }
+
+        // Validate default value
         if let Some(default) = &self.default {
             if let Some(datatype) = default.datatype() {
                 if datatype != self.datatype {
@@ -290,6 +273,8 @@ impl Column {
                 self.name
             )));
         }
+
+        // Validate references
         if let Some(reference) = &self.references {
             let target = if reference == &table.name {
                 table.clone()
@@ -301,16 +286,17 @@ impl Column {
                     ))
                 })?
             };
-            if self.datatype != target.primary_key()?.datatype {
+            if self.datatype != target.get_primary_key()?.datatype {
                 return Err(Error::Value(format!(
                     "Can't reference {} primary key of table {} from {} column {}",
-                    target.primary_key()?.datatype,
+                    target.get_primary_key()?.datatype,
                     target.name,
                     self.datatype,
                     self.name
                 )));
             }
         }
+
         Ok(())
     }
 
@@ -357,15 +343,12 @@ impl Column {
 
         // Validate uniqueness constraints
         if self.unique && !self.primary_key && value != &Value::Null {
-            let index = table.get_column_index(&self.name).ok_or_else(|| {
-                Error::Internal(format!(
-                    "Unable to find column {} in table {}",
-                    self.name, table.name,
-                ))
-            })?;
+            let index = table.get_column_index(&self.name)?;
             let mut scan = txn.scan(&table.name)?;
             while let Some(row) = scan.next().transpose()? {
-                if row.get(index).unwrap_or(&Value::Null) == value && &table.row_key(&row)? != pk {
+                if row.get(index).unwrap_or(&Value::Null) == value
+                    && &table.get_row_key(&row)? != pk
+                {
                     return Err(Error::Value(format!(
                         "Unique value {} already exists for column {}",
                         value, self.name
@@ -375,5 +358,18 @@ impl Column {
         }
 
         Ok(())
+    }
+}
+
+// Formats an identifier by quoting it as appropriate
+fn format_ident(ident: &str) -> String {
+    lazy_static! {
+        static ref RE_IDENT: Regex = Regex::new(r#"^\w[\w_]*$"#).unwrap();
+    }
+
+    if RE_IDENT.is_match(ident) && Keyword::from_str(ident).is_none() {
+        ident.to_string()
+    } else {
+        format!("\"{}\"", ident.replace("\"", "\"\""))
     }
 }

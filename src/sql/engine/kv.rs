@@ -59,7 +59,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
         table.validate_row(&row, self)?;
-        let id = table.row_key(&row)?;
+        let id = table.get_row_key(&row)?;
         if self.read(&table.name, &id)?.is_some() {
             return Err(Error::Value(format!(
                 "Primary key {} already exists for table {}",
@@ -73,7 +73,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         let table = self
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
-        table.assert_pk_unreferenced(id, self)?;
+        table.assert_unreferenced_key(id, self)?;
         self.txn.delete(&Key::Row(&table.name, id).encode())
     }
 
@@ -97,7 +97,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
         // If the primary key changes we do a delete and create, otherwise we replace the row
-        if id != &table.row_key(&row)? {
+        if id != &table.get_row_key(&row)? {
             self.delete(&table.name, id)?;
             self.create(&table.name, row)
         } else {

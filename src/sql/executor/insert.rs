@@ -19,13 +19,14 @@ impl Insert {
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
         let env = Environment::empty();
         for exprs in expressions {
-            ctx.txn.create(
-                &table.name,
-                table.make_row(
-                    exprs.into_iter().map(|e| e.evaluate(&env)).collect::<Result<_, Error>>()?,
-                    if !columns.is_empty() { Some(&columns) } else { None },
-                )?,
-            )?;
+            let mut row =
+                exprs.into_iter().map(|e| e.evaluate(&env)).collect::<Result<_, Error>>()?;
+            if columns.is_empty() {
+                row = table.pad_row(row)?;
+            } else {
+                row = table.make_row(&columns, row)?;
+            }
+            ctx.txn.create(&table.name, row)?;
         }
         Ok(Box::new(Self))
     }

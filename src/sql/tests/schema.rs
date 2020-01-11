@@ -311,7 +311,7 @@ test_schema! { with [
             "integer" INTEGER UNIQUE,
             "string" STRING UNIQUE
         )"#,
-        r#"INSERT INTO "unique" VALUES (0, NULL, NULL, NULL, NULL, NULL)"#,
+        r#"INSERT INTO "unique" VALUES (0, NULL, NULL, NULL, NULL)"#,
         r#"INSERT INTO "unique" VALUES (1, TRUE, 3.14, 7, 'foo')"#,
     ];
     insert_unique_boolean: r#"INSERT INTO "unique" (id, "boolean") VALUES (2, FALSE)"#,

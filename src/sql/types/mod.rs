@@ -1,10 +1,4 @@
-//! Type system for the SQL engine, containing:
-//!
-//! - Data types (e.g. integers and strings)
-//! - Values of a specific type
-//! - Rows of values
-//! - Expressions made up of values and operators
-//! - Schemas made up of tables and columns
+//! Type system for the SQL engine, containing data types, values, rows, expressions, and schemas
 
 mod datatype;
 pub mod expression;

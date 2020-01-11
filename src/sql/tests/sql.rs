@@ -144,6 +144,7 @@ test_sql! {
     insert_expression: "INSERT INTO movies VALUES (2 * 5 - 1, 'District 9', 1 / 1, 2 * 1000 + 1 * 10 - --1, 793 / 1e2, TRUE OR FALSE)",
     insert_partial: "INSERT INTO movies (title, released, id, genre_id, rating) VALUES ('District 9', 2009, 9, 1, 7.9)",
     insert_values: "INSERT INTO genres VALUES (9, 'Western')",
+    insert_values_extra: "INSERT INTO genres VALUES (9, 'Western', NULL)",
     insert_error_columns_duplicate: "INSERT INTO genres (id, name, id) VALUES (9, 'Western', 9)",
     insert_error_columns_mismatch: "INSERT INTO genres (id) VALUES (9, 'Western')",
 

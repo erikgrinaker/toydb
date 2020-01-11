@@ -17,7 +17,7 @@ impl Delete {
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} not found", table)))?;
         while let Some(row) = source.fetch()? {
-            ctx.txn.delete(&table.name, &table.row_key(&row)?)?
+            ctx.txn.delete(&table.name, &table.get_row_key(&row)?)?
         }
         Ok(Box::new(Self))
     }

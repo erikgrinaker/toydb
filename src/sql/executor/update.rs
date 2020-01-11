@@ -19,17 +19,13 @@ impl Update {
             .txn
             .read_table(&table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
-        while let Some(row) = source.fetch()? {
-            let id = table.row_key(&row)?;
-            let mut keyed_row = table.row_to_hashmap(row);
-            let env = Environment::new(keyed_row.clone());
-            for (c, expr) in &expressions {
-                *keyed_row
-                    .get_mut(c)
-                    .ok_or_else(|| Error::Value(format!("Unknown column {}", c)))? =
-                    expr.evaluate(&env)?;
+        while let Some(mut row) = source.fetch()? {
+            let id = table.get_row_key(&row)?;
+            let env = Environment::new(table.make_row_hashmap(row.clone()));
+            for (field, expr) in &expressions {
+                table.set_row_field(&mut row, field, expr.evaluate(&env)?)?;
             }
-            ctx.txn.update(&table.name, &id, table.row_from_hashmap(keyed_row))?
+            ctx.txn.update(&table.name, &id, row)?
         }
         Ok(Box::new(Self))
     }
