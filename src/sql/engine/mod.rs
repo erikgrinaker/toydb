@@ -1,49 +1,74 @@
+//! The SQL engine provides fundamental CRUD storage operations.
 mod kv;
 mod raft;
 
-pub use crate::kv::Mode;
 pub use kv::KV;
 pub use raft::Raft;
 
-use super::types;
-use super::types::schema;
+use super::types::schema::Table;
+use super::types::{Row, Value};
 use crate::Error;
 
+/// The SQL engine interface
 pub trait Engine {
+    /// The transaction type
     type Transaction: Transaction;
 
+    /// Begins a typical read-write transaction
     fn begin(&self) -> Result<Self::Transaction, Error> {
         self.begin_with_mode(Mode::ReadWrite)
     }
 
+    /// Begins a transaction in the given mode
     fn begin_with_mode(&self, mode: Mode) -> Result<Self::Transaction, Error>;
+
+    /// Resumes an active transaction with the given ID
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error>;
 }
 
+/// An SQL transaction
 pub trait Transaction {
+    /// The transaction ID
     fn id(&self) -> u64;
+    /// The transaction mode
     fn mode(&self) -> Mode;
+    /// Commits the transaction
     fn commit(self) -> Result<(), Error>;
+    /// Rolls back the transaction
     fn rollback(self) -> Result<(), Error>;
 
-    fn create(&mut self, table: &str, row: types::Row) -> Result<(), Error>;
-    fn delete(&mut self, table: &str, id: &types::Value) -> Result<(), Error>;
-    fn read(&self, table: &str, id: &types::Value) -> Result<Option<types::Row>, Error>;
+    /// Creates a new table row
+    fn create(&mut self, table: &str, row: Row) -> Result<(), Error>;
+    /// Deletes a table row
+    fn delete(&mut self, table: &str, id: &Value) -> Result<(), Error>;
+    /// Reads a table row, if it exists
+    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error>;
+    /// Scans a table's rows
     fn scan(&self, table: &str) -> Result<Scan, Error>;
-    fn update(&mut self, table: &str, id: &types::Value, row: types::Row) -> Result<(), Error>;
+    /// Updates a table row
+    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error>;
 
-    fn create_table(&mut self, table: &schema::Table) -> Result<(), Error>;
+    /// Creates a new table
+    fn create_table(&mut self, table: &Table) -> Result<(), Error>;
+    /// Deletes an existing table, or errors if it does not exist
     fn delete_table(&mut self, table: &str) -> Result<(), Error>;
-    fn read_table(&self, table: &str) -> Result<Option<schema::Table>, Error>;
+    /// Reads a table, if it exists
+    fn read_table(&self, table: &str) -> Result<Option<Table>, Error>;
+    /// Iterates over all tables
     fn scan_tables(&self) -> Result<TableScan, Error>;
 
-    fn must_read_table(&self, table: &str) -> Result<schema::Table, Error> {
+    /// Reads a table, and errors if it does not exist
+    fn must_read_table(&self, table: &str) -> Result<Table, Error> {
         self.read_table(table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
     }
 }
 
-pub type Scan =
-    Box<dyn DoubleEndedIterator<Item = Result<types::Row, Error>> + 'static + Sync + Send>;
+/// The transaction mode
+pub type Mode = crate::kv::Mode;
 
-pub type TableScan = Box<dyn DoubleEndedIterator<Item = schema::Table> + 'static + Sync + Send>;
+/// A row scan iterator
+pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row, Error>> + 'static + Sync + Send>;
+
+/// A table scan iterator
+pub type TableScan = Box<dyn DoubleEndedIterator<Item = Table> + 'static + Sync + Send>;
