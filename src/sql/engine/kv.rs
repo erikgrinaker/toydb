@@ -234,52 +234,17 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
         }
-        for column in table.references() {
-            let target = match &column.references {
-                Some(target) if target == &table.name => table.clone(),
-                Some(target) => self.read_table(&target)?.ok_or_else(|| {
-                    Error::Value(format!(
-                        "Table {} referenced by column {} does not exist",
-                        target, column.name
-                    ))
-                })?,
-                None => {
-                    return Err(Error::Internal(
-                        "Table.references() returned non-reference column".into(),
-                    ))
-                }
-            };
-            if column.datatype != target.primary_key()?.datatype {
-                return Err(Error::Value(format!(
-                    "Can't reference {} primary key of table {} from {} column {}",
-                    target.primary_key()?.datatype,
-                    target.name,
-                    column.datatype,
-                    column.name
-                )));
-            }
-        }
+        table.validate(self)?;
         self.txn.set(&Key::Table(&table.name).encode(), serialize(table)?)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<(), Error> {
-        if self.read_table(table)?.is_none() {
-            return Err(Error::Value(format!("Table {} does not exist", table)));
-        }
-        // Check for incoming references
-        // FIXME This needs to be indexed or cached
-        for source in self.list_tables()? {
-            for column in source.references() {
-                if source.name != table && column.references.as_ref() == Some(&table.to_string()) {
-                    return Err(Error::Value(format!(
-                        "Table {} is referenced by table {} column {}",
-                        table, source.name, column.name
-                    )));
-                }
-            }
-        }
+        let table = self
+            .read_table(table)?
+            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))?;
+        table.assert_unreferenced(self)?;
         // FIXME Needs to delete all table data as well
-        self.txn.delete(&Key::Table(table).encode())
+        self.txn.delete(&Key::Table(&table.name).encode())
     }
 
     fn list_tables(&self) -> Result<Vec<schema::Table>, Error> {

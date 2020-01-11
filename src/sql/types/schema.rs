@@ -1,3 +1,4 @@
+use super::super::engine::Transaction;
 use super::super::parser::lexer::Keyword;
 use super::{DataType, Row, Value};
 use crate::Error;
@@ -22,7 +23,6 @@ impl Table {
     /// Creates a new table schema
     pub fn new(name: String, columns: Vec<Column>) -> Result<Self, Error> {
         let table = Self { name, columns };
-        table.validate()?;
         Ok(table)
     }
 
@@ -43,6 +43,22 @@ impl Table {
                 .join(",\n")
         );
         sql
+    }
+
+    /// Asserts that the table is not referenced by other tables, otherwise returns an error
+    // FIXME Should cache or index the data
+    pub fn assert_unreferenced(&self, txn: &mut dyn Transaction) -> Result<(), Error> {
+        for source in txn.list_tables()?.into_iter().filter(|t| t.name != self.name) {
+            if let Some(column) =
+                source.columns.iter().find(|c| c.references.as_ref() == Some(&self.name))
+            {
+                return Err(Error::Value(format!(
+                    "Table {} is referenced by table {} column {}",
+                    self.name, source.name, column.name
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// Fetches a column by name
@@ -159,7 +175,7 @@ impl Table {
     }
 
     /// Validates the table schema
-    pub fn validate(&self) -> Result<(), Error> {
+    pub fn validate(&self, txn: &mut dyn Transaction) -> Result<(), Error> {
         if self.columns.is_empty() {
             return Err(Error::Value(format!("Table {} has no columns", self.name)));
         }
@@ -169,7 +185,7 @@ impl Table {
             _ => return Err(Error::Value(format!("Multiple primary keys in table {}", self.name))),
         };
         for column in &self.columns {
-            column.validate()?;
+            column.validate(self, txn)?;
         }
         Ok(())
     }
@@ -234,7 +250,7 @@ impl Column {
     }
 
     /// Validates the column schema
-    pub fn validate(&self) -> Result<(), Error> {
+    pub fn validate(&self, table: &Table, txn: &mut dyn Transaction) -> Result<(), Error> {
         if self.primary_key && self.nullable {
             return Err(Error::Value(format!("Primary key {} cannot be nullable", self.name)));
         }
@@ -260,6 +276,27 @@ impl Column {
                 "Nullable column {} must have a default value",
                 self.name
             )));
+        }
+        if let Some(reference) = &self.references {
+            let target = if reference == &table.name {
+                table.clone()
+            } else {
+                txn.read_table(reference)?.ok_or_else(|| {
+                    Error::Value(format!(
+                        "Table {} referenced by column {} does not exist",
+                        reference, self.name
+                    ))
+                })?
+            };
+            if self.datatype != target.primary_key()?.datatype {
+                return Err(Error::Value(format!(
+                    "Can't reference {} primary key of table {} from {} column {}",
+                    target.primary_key()?.datatype,
+                    target.name,
+                    self.datatype,
+                    self.name
+                )));
+            }
         }
         Ok(())
     }
