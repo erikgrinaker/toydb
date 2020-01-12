@@ -1,11 +1,13 @@
-Query: INSERT INTO a, b VALUES (1)
+Query: INSERT INTO test, other VALUES (1)
 Error: Parse("Expected token VALUES, found ,")
 
 Storage:
-CREATE TABLE a (
+CREATE TABLE other (
   id INTEGER PRIMARY KEY
 )
 
-CREATE TABLE b (
-  id INTEGER PRIMARY KEY
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY DEFAULT 0,
+  name STRING DEFAULT NULL,
+  value INTEGER DEFAULT NULL
 )

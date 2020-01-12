@@ -74,14 +74,9 @@ test_dml! { with [
     insert_empty_both: "INSERT INTO test () VALUES ()",
     insert_missing_column: "INSERT INTO test (id, missing) VALUES (0, 'x')",
     insert_missing_table: "INSERT INTO missing (id) VALUES (0)",
+    insert_multiple_tables: "INSERT INTO test, other VALUES (1)",
     insert_case: "INSERT INTO TeSt (ID, Name) VALUES (1, 'a')",
     insert_bare: "INSERT INTO test",
     insert_bare_no_table: "INSERT INTO",
     insert_bare_values: "INSERT INTO test VALUES",
-}
-test_dml! { with [
-        "CREATE TABLE a (id INTEGER PRIMARY KEY)",
-        "CREATE TABLE b (id INTEGER PRIMARY KEY)",
-    ];
-    insert_multiple_tables: "INSERT INTO a, b VALUES (1)",
 }
