@@ -1,0 +1,19 @@
+Query: UPDATE test SET name = 'x' WHERE TRUE
+Effect: Update { count: 3 }
+
+Storage:
+CREATE TABLE other (
+  id INTEGER PRIMARY KEY
+)
+[Integer(1)]
+[Integer(2)]
+[Integer(3)]
+
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY DEFAULT 0,
+  name STRING DEFAULT NULL,
+  value INTEGER DEFAULT NULL
+)
+[Integer(1), String("x"), Integer(100)]
+[Integer(2), String("x"), Integer(102)]
+[Integer(3), String("x"), Integer(103)]

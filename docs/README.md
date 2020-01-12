@@ -236,3 +236,31 @@ VALUES
     (2, 'Stalker', 1979),
     (3, 'Her', 2013
 ```
+
+### `UPDATE`
+
+Updates rows in a table.
+
+<pre>
+UPDATE <b><i>table_name</i></b>
+    SET <b><i>column_name</i></b> = <b><i>expression</i></b> [, ... ]
+    [ WHERE <b><i>predicate</i></b> ]
+</pre>
+
+Updates columns given by ***`column_name`*** to the corresponding ***`expression`*** for all rows where ***`predicate`*** evaluates to `TRUE`. If no `WHERE` clause is given, all rows are updated.
+
+* ***`table_name`***: the table to update. Errors if it does not exist.
+
+* ***`column_name`***: a column to update. Errors if it does not exist.
+
+* ***`expression`***: an expression whose evaluated value will be set for the corresponding column and row. Expressions can refer to column values, and must evaluate to the same datatype as the updated column.
+
+* ***`predicate`***: an expression which determines which rows to update by evaluting to `TRUE`. Must evaluate to a `BOOLEAN` or `NULL`, otherwise an error is returned.
+
+#### Example
+
+```sql
+UPDATE movie
+SET bluray = TRUE
+WHERE release_year >= 2000 AND bluray = FALSE
+```

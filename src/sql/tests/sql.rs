@@ -162,11 +162,4 @@ test_sql! {
     select_where_false: "SELECT * FROM movies WHERE FALSE",
     select_where_null: "SELECT * FROM movies WHERE NULL",
     select_where_true: "SELECT * FROM movies WHERE TRUE",
-
-    update_all: "UPDATE movies SET title = 'X', released = 0, bluray = NULL",
-    update_error_multiple_tables: "UPDATE movies, genres SET title = 'X'",
-    update_error_no_set: "UPDATE movies",
-    update_error_no_set_where: "UPDATE movies WHERE TRUE",
-    update_false: "UPDATE movies SET title = 'X' WHERE FALSE",
-    update_where: "UPDATE movies SET rating = NULL, bluray = NULL WHERE released < 2000",
 }

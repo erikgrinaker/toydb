@@ -1,9 +1,0 @@
-Query: UPDATE movies WHERE TRUE
-
-Tokens:
-  Keyword(Update)
-  Ident("movies")
-  Keyword(Where)
-  Keyword(True)
-
-AST: Parse("Expected token SET, found WHERE")

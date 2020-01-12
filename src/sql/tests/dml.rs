@@ -80,3 +80,35 @@ test_dml! { with [
     insert_bare_no_table: "INSERT INTO",
     insert_bare_values: "INSERT INTO test VALUES",
 }
+
+test_dml! { with [
+        "CREATE TABLE test (
+            id INTEGER PRIMARY KEY DEFAULT 0,
+            name STRING,
+            value INTEGER
+        )",
+        "INSERT INTO test VALUES (1, 'a', 100), (2, 'b', 102), (3, 'c', 103)",
+        "CREATE TABLE other (id INTEGER PRIMARY KEY)",
+        "INSERT INTO other VALUES (1), (2), (3)",
+    ];
+
+    update_all: "UPDATE test SET name = 'x', value = 999",
+    update_where: "UPDATE test SET name = 'x' WHERE id = 1",
+    update_where_and: "UPDATE test SET name = 'x' WHERE id = 1 AND name = 'a'",
+    update_where_expr: "UPDATE test SET name = 'x' WHERE id = 3 - 2 AND name LIKE 'a%'",
+    update_where_true: "UPDATE test SET name = 'x' WHERE TRUE",
+    update_where_false: "UPDATE test SET name = 'x' WHERE FALSE",
+    update_where_null: "UPDATE test SET name = 'x' WHERE NULL",
+    update_where_float: "UPDATE test SET name = 'x' WHERE 3.14",
+    update_where_integer: "UPDATE test SET name = 'x' WHERE 1",
+    update_where_string: "UPDATE test SET name = 'x' WHERE 'a'",
+    update_where_full: "UPDATE test SET id = 9, name = 'x', value = 999 WHERE id = 1",
+    update_missing_column_set: "UPDATE test SET missing = 0",
+    update_missing_column_where: "UPDATE test SET name = 'x' WHERE missing = TRUE",
+    update_missing_table: "UPDATE missing SET id = 0",
+    update_multiple_tables: "UPDATE test, other SET id = 9 WHERE id = 1",
+    update_bare: "UPDATE test",
+    update_bare_set: "UPDATE test SET",
+    update_bare_where: "UPDATE test SET name = 'x' WHERE",
+    update_bare_no_table: "UPDATE",
+}
