@@ -188,7 +188,7 @@ where <b><i>column_constraint</i></b> is:
 
 #### Example
 
-```
+```sql
 CREATE TABLE movie (
     id INTEGER PRIMARY KEY,
     title STRING NOT NULL,
@@ -207,3 +207,32 @@ DROP TABLE <b><i>table_name</i></b>
 </pre>
 
 * ***`table_name`***: the table to delete. Errors if it does not exist.
+
+### `INSERT`
+
+Inserts rows into a table.
+
+<pre>
+INSERT INTO <b><i>table_name</i></b>
+    [ ( <b><i>column_name</i></b> [, ... ] ) ]
+    VALUES ( <b><i>expression</i></b> [, ... ] ) [, ... ]
+</pre>
+
+If column names are given, an identical number of values must be given. If no column names are given, values must be given in the table's column order. Omitted columns will get a default value if specified, otherwise an error will be returned.
+
+* ***`table_name`***: the table to insert into. Errors if it does not exist.
+
+* ***`column_name`***: a column to insert into in the given table. Errors if it does not exist.
+
+* ***`expression`***: an expression to insert into the corresponding column. Must be a constant expression, i.e. it cannot refer to table fields.
+
+#### Example
+
+```sql
+INSERT INTO movie
+    (id, title, release_year)
+VALUES
+    (1, 'Sicario', 2015),
+    (2, 'Stalker', 1979),
+    (3, 'Her', 2013
+```

@@ -1,0 +1,11 @@
+Query: INSERT INTO a, b VALUES (1)
+Error: Parse("Expected token VALUES, found ,")
+
+Storage:
+CREATE TABLE a (
+  id INTEGER PRIMARY KEY
+)
+
+CREATE TABLE b (
+  id INTEGER PRIMARY KEY
+)

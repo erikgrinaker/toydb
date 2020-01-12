@@ -1,0 +1,13 @@
+Query: INSERT INTO test (id, name) VALUES (1, 'a', 100)
+Error: Value("Column and value counts do not match")
+
+Storage:
+CREATE TABLE other (
+  id INTEGER PRIMARY KEY
+)
+
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY DEFAULT 0,
+  name STRING DEFAULT NULL,
+  value INTEGER DEFAULT NULL
+)

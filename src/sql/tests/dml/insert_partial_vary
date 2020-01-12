@@ -1,0 +1,16 @@
+Query: INSERT INTO test VALUES (1, 'a', 100), (2, 'b'), (3)
+Effect: Create { count: 3 }
+
+Storage:
+CREATE TABLE other (
+  id INTEGER PRIMARY KEY
+)
+
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY DEFAULT 0,
+  name STRING DEFAULT NULL,
+  value INTEGER DEFAULT NULL
+)
+[Integer(1), String("a"), Integer(100)]
+[Integer(2), String("b"), Null]
+[Integer(3), Null, Null]

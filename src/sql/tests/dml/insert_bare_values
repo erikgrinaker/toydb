@@ -1,0 +1,13 @@
+Query: INSERT INTO test VALUES
+Error: Parse("Unexpected end of input")
+
+Storage:
+CREATE TABLE other (
+  id INTEGER PRIMARY KEY
+)
+
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY DEFAULT 0,
+  name STRING DEFAULT NULL,
+  value INTEGER DEFAULT NULL
+)

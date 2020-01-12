@@ -1,3 +1,4 @@
+mod dml;
 mod expression;
 mod schema;
 mod sql;

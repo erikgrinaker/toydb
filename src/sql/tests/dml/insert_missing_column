@@ -1,0 +1,13 @@
+Query: INSERT INTO test (id, missing) VALUES (0, 'x')
+Error: Value("Column missing not found in table test")
+
+Storage:
+CREATE TABLE other (
+  id INTEGER PRIMARY KEY
+)
+
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY DEFAULT 0,
+  name STRING DEFAULT NULL,
+  value INTEGER DEFAULT NULL
+)
