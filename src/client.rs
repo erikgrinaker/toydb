@@ -1,6 +1,5 @@
 use crate::service;
-use crate::sql::types::{Row, Value};
-pub use crate::sql::{Effect, Mode};
+pub use crate::sql::{Effect, Mode, ResultSet, Row, Value};
 use crate::utility::deserialize;
 use crate::Error;
 use grpc::ClientStubExt;
@@ -63,7 +62,7 @@ impl Client {
                 },
             )
             .wait()?;
-        let rs = ResultSet::from_grpc(metadata, iter)?;
+        let rs = resultset_from_grpc(metadata, iter)?;
         match rs.effect() {
             Some(Effect::Begin { id, mode }) => self.txn = Some((id, mode)),
             Some(Effect::Commit { .. }) => self.txn = None,
@@ -83,48 +82,6 @@ impl Client {
     }
 }
 
-/// A query result set
-pub struct ResultSet {
-    effect: Option<Effect>,
-    columns: Vec<String>,
-    rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>>>,
-}
-
-impl Iterator for ResultSet {
-    type Item = Result<Row, Error>;
-
-    fn next(&mut self) -> Option<Result<Row, Error>> {
-        match self.rows.next()? {
-            Ok(row) => {
-                if let Err(err) = error_from_protobuf(row.error.clone()) {
-                    return Some(Err(err));
-                }
-                Some(Ok(row_from_protobuf(row)))
-            }
-            Err(err) => Some(Err(err.into())),
-        }
-    }
-}
-
-impl ResultSet {
-    fn from_grpc(
-        metadata: grpc::Metadata,
-        rows: Box<dyn std::iter::Iterator<Item = Result<service::Row, grpc::Error>>>,
-    ) -> Result<Self, Error> {
-        let columns = deserialize(metadata.get("columns").unwrap_or_else(|| &[]))?;
-        let effect = metadata.get("effect").map(deserialize).transpose()?;
-        Ok(Self { effect, columns, rows })
-    }
-
-    pub fn columns(&self) -> Vec<String> {
-        self.columns.clone()
-    }
-
-    pub fn effect(&self) -> Option<Effect> {
-        self.effect.clone()
-    }
-}
-
 /// Server status
 pub struct Status {
     pub id: String,
@@ -137,6 +94,26 @@ fn error_from_protobuf(err: protobuf::SingularPtrField<service::Error>) -> Resul
         Some(err) => Err(Error::Internal(err.message)),
         _ => Ok(()),
     }
+}
+
+/// Converts a GRPC result into a resultset
+fn resultset_from_grpc(
+    metadata: grpc::Metadata,
+    rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>> + Send>,
+) -> Result<ResultSet, Error> {
+    let columns = deserialize(metadata.get("columns").unwrap_or_else(|| &[]))?;
+    let effect = metadata.get("effect").map(deserialize).transpose()?;
+    let rows = rows.map(|r| match r {
+        Ok(protorow) => {
+            if let Err(err) = error_from_protobuf(protorow.error.clone()) {
+                Err(err)
+            } else {
+                Ok(row_from_protobuf(protorow))
+            }
+        }
+        Err(err) => Err(err.into()),
+    });
+    Ok(ResultSet::new(effect, columns, Some(Box::new(rows))))
 }
 
 /// Converts a protobuf row into a proper row

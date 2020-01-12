@@ -78,6 +78,11 @@ pub struct ResultSet {
 }
 
 impl ResultSet {
+    /// Creates a new result set
+    pub fn new(effect: Option<Effect>, columns: Vec<String>, rows: Option<ResultRows>) -> Self {
+        Self { effect, columns, rows }
+    }
+
     /// Creates a new result set for an effect
     pub fn from_effect(effect: Effect) -> Self {
         Self { effect: Some(effect), columns: Vec::new(), rows: None }
@@ -117,7 +122,7 @@ impl Iterator for ResultSet {
     }
 }
 
-type ResultRows = Box<dyn Iterator<Item = Result<Row, Error>> + 'static + Sync + Send>;
+type ResultRows = Box<dyn Iterator<Item = Result<Row, Error>> + Send>;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// An executor effect
