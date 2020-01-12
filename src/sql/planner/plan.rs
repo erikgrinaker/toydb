@@ -22,8 +22,11 @@ impl Plan {
     }
 
     /// Executes the plan, consuming it
-    pub fn execute<T: Transaction>(self, mut ctx: Context<T>) -> Result<ResultSet, Error> {
-        Ok(ResultSet::from_executor(Executor::execute(&mut ctx, self.root)?))
+    pub fn execute<T: Transaction + 'static>(
+        self,
+        mut ctx: Context<T>,
+    ) -> Result<ResultSet, Error> {
+        Executor::build(self.root).execute(&mut ctx)
     }
 
     /// Optimizes the plan, consuming it
@@ -44,7 +47,7 @@ pub enum Node {
     Limit { source: Box<Self>, limit: u64 },
     Nothing,
     Offset { source: Box<Self>, offset: u64 },
-    Order { source: Box<Self>, orders: Vec<(Expression, Order)> },
+    Order { source: Box<Self>, orders: Vec<(Expression, Direction)> },
     Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
     Scan { table: String },
     // Uses BTreeMap for test stability
@@ -145,16 +148,16 @@ impl Node {
     }
 }
 
-/// A sort order
+/// A sort order direction
 #[derive(Debug, PartialEq)]
-pub enum Order {
+pub enum Direction {
     Ascending,
     Descending,
 }
 
-impl From<ast::Order> for Order {
-    fn from(o: ast::Order) -> Self {
-        match o {
+impl From<ast::Order> for Direction {
+    fn from(order: ast::Order) -> Self {
+        match order {
             ast::Order::Ascending => Self::Ascending,
             ast::Order::Descending => Self::Descending,
         }

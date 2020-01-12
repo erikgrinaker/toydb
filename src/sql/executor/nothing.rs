@@ -1,30 +1,19 @@
 use super::super::engine::Transaction;
 use super::super::types::Row;
-use super::{Context, Executor};
+use super::{Context, Executor, ResultSet};
 use crate::Error;
 
-/// A source node which produces a single empty row
-pub struct Nothing {
-    done: bool,
-}
+/// An executor that produces a single empty row
+pub struct Nothing;
 
 impl Nothing {
-    pub fn execute<T: Transaction>(_: &mut Context<T>) -> Result<Box<dyn Executor>, Error> {
-        Ok(Box::new(Self { done: false }))
+    pub fn new() -> Box<Self> {
+        Box::new(Self)
     }
 }
 
-impl Executor for Nothing {
-    fn columns(&self) -> Vec<String> {
-        Vec::new()
-    }
-
-    fn fetch(&mut self) -> Result<Option<Row>, Error> {
-        if self.done {
-            Ok(None)
-        } else {
-            self.done = true;
-            Ok(Some(Row::new()))
-        }
+impl<T: Transaction> Executor<T> for Nothing {
+    fn execute(self: Box<Self>, _ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+        Ok(ResultSet::from_rows(Vec::new(), Box::new(std::iter::once(Ok(Row::new())))))
     }
 }

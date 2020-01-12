@@ -27,95 +27,75 @@ use update::Update;
 use super::engine::Transaction;
 use super::planner::Node;
 use super::types::Row;
-use crate::client;
 use crate::Error;
 
 /// A plan executor
-pub trait Executor: 'static + Sync + Send {
-    //fn affected(&self) -> Option<u64>;
-    fn columns(&self) -> Vec<String>;
-    fn fetch(&mut self) -> Result<Option<Row>, Error>;
+pub trait Executor<T: Transaction> {
+    /// Executes the executor, consuming it and returning a result set
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error>;
 }
 
-impl dyn Executor {
-    /// Executes a plan node, consuming it
-    pub fn execute<T: Transaction>(ctx: &mut Context<T>, node: Node) -> Result<Box<Self>, Error> {
-        Ok(match node {
-            Node::CreateTable { schema } => CreateTable::execute(ctx, schema)?,
-            Node::Delete { table, source } => {
-                let source = Self::execute(ctx, *source)?;
-                Delete::execute(ctx, source, table)?
-            }
-            Node::DropTable { name } => DropTable::execute(ctx, name)?,
-            Node::Filter { source, predicate } => {
-                let source = Self::execute(ctx, *source)?;
-                Filter::execute(ctx, source, predicate)?
-            }
+impl<T: Transaction + 'static> dyn Executor<T> {
+    /// Builds an executor for a plan node, consuming it
+    pub fn build(node: Node) -> Box<dyn Executor<T>> {
+        match node {
+            Node::CreateTable { schema } => CreateTable::new(schema),
+            Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
+            Node::DropTable { name } => DropTable::new(name),
+            Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
             Node::Insert { table, columns, expressions } => {
-                Insert::execute(ctx, &table, columns, expressions)?
+                Insert::new(table, columns, expressions)
             }
-            Node::Limit { source, limit } => {
-                let source = Self::execute(ctx, *source)?;
-                Limit::execute(ctx, source, limit)?
-            }
-            Node::Nothing => Nothing::execute(ctx)?,
-            Node::Offset { source, offset } => {
-                let source = Self::execute(ctx, *source)?;
-                Offset::execute(ctx, source, offset)?
-            }
-            Node::Order { source, orders } => {
-                let source = Self::execute(ctx, *source)?;
-                Order::execute(ctx, source, orders)?
-            }
+            Node::Limit { source, limit } => Limit::new(Self::build(*source), limit),
+            Node::Nothing => Nothing::new(),
+            Node::Offset { source, offset } => Offset::new(Self::build(*source), offset),
+            Node::Order { source, orders } => Order::new(Self::build(*source), orders),
             Node::Projection { source, labels, expressions } => {
-                let source = Self::execute(ctx, *source)?;
-                Projection::execute(ctx, source, labels, expressions)?
+                Projection::new(Self::build(*source), labels, expressions)
             }
-            Node::Scan { table } => Scan::execute(ctx, table)?,
+            Node::Scan { table } => Scan::new(table),
             Node::Update { table, source, expressions } => {
-                let source = Self::execute(ctx, *source)?;
-                Update::execute(ctx, table, source, expressions)?
+                Update::new(table, Self::build(*source), expressions)
             }
-        })
+        }
     }
 }
 
-impl Iterator for dyn Executor {
-    type Item = Result<Row, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.fetch().transpose()
-    }
-}
-
-/// A plan execution context
+/// An execution context
 pub struct Context<'a, T: Transaction> {
-    /// The underlying storage engine
+    /// The transaction to execute in
     pub txn: &'a mut T,
 }
 
-/// An execution result set
+/// An executor result
 pub struct ResultSet {
-    // FIXME Shouldn't be public, and shouldn't use client package
-    pub effect: Option<client::Effect>,
+    /// The executor effect (i.e. mutation), if any
+    effect: Option<Effect>,
+    /// The column names of the result
     columns: Vec<String>,
-    executor: Option<Box<dyn Executor>>,
+    /// The result rows
+    rows: Option<ResultRows>,
 }
 
 impl ResultSet {
-    /// Creates an empty result set
-    pub fn empty() -> Self {
-        Self { effect: None, columns: Vec::new(), executor: None }
+    /// Creates a new result set for an effect
+    pub fn from_effect(effect: Effect) -> Self {
+        Self { effect: Some(effect), columns: Vec::new(), rows: None }
     }
 
-    /// Creates a result set from an executor
-    pub fn from_executor(executor: Box<dyn Executor>) -> Self {
-        Self { effect: None, columns: executor.columns(), executor: Some(executor) }
+    /// Creates a new result set for a row iterator
+    pub fn from_rows(columns: Vec<String>, rows: ResultRows) -> Self {
+        Self { effect: None, columns, rows: Some(rows) }
     }
 
-    /// Fetches the columns of the result set
+    /// Returns the result columns
     pub fn columns(&self) -> Vec<String> {
         self.columns.clone()
+    }
+
+    /// Returns the query effect, if any
+    pub fn effect(&self) -> Option<Effect> {
+        self.effect.clone()
     }
 }
 
@@ -124,17 +104,38 @@ impl Iterator for ResultSet {
 
     fn next(&mut self) -> Option<Self::Item> {
         // Make sure iteration is aborted on the first error, otherwise callers
-        // may keep calling next for as long as it keeps returning errors
-        if let Some(ref mut iter) = self.executor {
-            match iter.next() {
-                Some(Err(err)) => {
-                    self.executor = None;
-                    Some(Err(err))
-                }
-                r => r,
+        // will keep calling next for as long as it keeps returning errors
+        if let Some(ref mut iter) = self.rows {
+            let result = iter.next();
+            if let Some(Err(_)) = result {
+                self.rows = None
             }
+            result
         } else {
             None
         }
     }
+}
+
+type ResultRows = Box<dyn Iterator<Item = Result<Row, Error>> + 'static + Sync + Send>;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+/// An executor effect
+pub enum Effect {
+    // Transaction started
+    Begin { id: u64, mode: super::engine::Mode },
+    // Transaction committed
+    Commit { id: u64 },
+    // Transaction rolled back
+    Rollback { id: u64 },
+    // Rows created
+    Create { count: u64 },
+    // Rows deleted
+    Delete { count: u64 },
+    // Rows updated
+    Update { count: u64 },
+    // Table created
+    CreateTable { name: String },
+    // Table dropped
+    DropTable { name: String },
 }

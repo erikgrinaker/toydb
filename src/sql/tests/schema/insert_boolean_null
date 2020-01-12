@@ -1,4 +1,5 @@
 Query: INSERT INTO types (id, "boolean") VALUES (0, NULL)
+Effect: Create { count: 1 }
 
 Storage:
 CREATE TABLE types (

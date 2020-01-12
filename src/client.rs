@@ -1,6 +1,6 @@
 use crate::service;
-pub use crate::sql::engine::Mode;
 use crate::sql::types::{Row, Value};
+pub use crate::sql::{Effect, Mode};
 use crate::utility::deserialize;
 use crate::Error;
 use grpc::ClientStubExt;
@@ -66,9 +66,9 @@ impl Client {
         let rs = ResultSet::from_grpc(metadata, iter)?;
         match rs.effect() {
             Some(Effect::Begin { id, mode }) => self.txn = Some((id, mode)),
-            Some(Effect::Commit(_)) => self.txn = None,
-            Some(Effect::Rollback(_)) => self.txn = None,
-            None => {}
+            Some(Effect::Commit { .. }) => self.txn = None,
+            Some(Effect::Rollback { .. }) => self.txn = None,
+            _ => {}
         }
         Ok(rs)
     }
@@ -88,13 +88,6 @@ pub struct ResultSet {
     effect: Option<Effect>,
     columns: Vec<String>,
     rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>>>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub enum Effect {
-    Begin { id: u64, mode: Mode },
-    Commit(u64),
-    Rollback(u64),
 }
 
 impl Iterator for ResultSet {

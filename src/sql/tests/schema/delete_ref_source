@@ -1,4 +1,5 @@
 Query: DELETE FROM source WHERE id = 1
+Effect: Delete { count: 1 }
 
 Storage:
 CREATE TABLE source (

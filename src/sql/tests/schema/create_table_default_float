@@ -1,4 +1,5 @@
 Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value FLOAT DEFAULT 3.14)
+Effect: CreateTable { name: "name" }
 
 Storage:
 CREATE TABLE name (

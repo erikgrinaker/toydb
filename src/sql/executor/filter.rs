@@ -1,47 +1,47 @@
 use super::super::engine::Transaction;
 use super::super::types::expression::{Environment, Expression};
-use super::super::types::{Row, Value};
-use super::{Context, Executor};
+use super::super::types::Value;
+use super::{Context, Executor, ResultSet};
 use crate::Error;
 
 /// A filter executor
-pub struct Filter {
-    source: Box<dyn Executor>,
-    columns: Vec<String>,
+pub struct Filter<T: Transaction> {
+    /// The source of rows to filter
+    source: Box<dyn Executor<T>>,
+    /// The predicate to filter by
     predicate: Expression,
 }
 
-impl Filter {
-    pub fn execute<T: Transaction>(
-        _: &mut Context<T>,
-        source: Box<dyn Executor>,
-        predicate: Expression,
-    ) -> Result<Box<dyn Executor>, Error> {
-        Ok(Box::new(Self { columns: source.columns(), source, predicate }))
+impl<T: Transaction> Filter<T> {
+    pub fn new(source: Box<dyn Executor<T>>, predicate: Expression) -> Box<Self> {
+        Box::new(Self { source, predicate })
     }
 }
 
-impl Executor for Filter {
-    fn columns(&self) -> Vec<String> {
-        self.columns.clone()
-    }
-
-    fn fetch(&mut self) -> Result<Option<Row>, Error> {
-        while let Some(row) = self.source.fetch()? {
-            let env =
-                Environment::new(self.columns.iter().cloned().zip(row.iter().cloned()).collect());
-            match self.predicate.evaluate(&env)? {
-                Value::Boolean(true) => return Ok(Some(row)),
-                Value::Boolean(false) => {}
-                Value::Null => {}
-                value => {
-                    return Err(Error::Value(format!(
-                        "Unexpected value {} for filter, expected boolean",
-                        value
-                    )))
-                }
-            }
+impl<T: Transaction> Executor<T> for Filter<T> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+        let mut result = self.source.execute(ctx)?;
+        if let Some(rows) = result.rows {
+            let columns = result.columns.clone();
+            let predicate = self.predicate;
+            result.rows = Some(Box::new(rows.filter_map(move |r| {
+                r.and_then(|row| {
+                    let env = Environment::new(
+                        columns.iter().cloned().zip(row.iter().cloned()).collect(),
+                    );
+                    match predicate.evaluate(&env)? {
+                        Value::Boolean(true) => Ok(Some(row)),
+                        Value::Boolean(false) => Ok(None),
+                        Value::Null => Ok(None),
+                        value => Err(Error::Value(format!(
+                            "Filter returned {}, expected boolean",
+                            value
+                        ))),
+                    }
+                })
+                .transpose()
+            })));
         }
-        Ok(None)
+        Ok(result)
     }
 }

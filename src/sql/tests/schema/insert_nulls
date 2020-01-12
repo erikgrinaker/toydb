@@ -1,4 +1,5 @@
 Query: INSERT INTO nulls (id, "null", not_null, "default") VALUES (1, NULL, TRUE, NULL)
+Effect: Create { count: 1 }
 
 Storage:
 CREATE TABLE nulls (

@@ -1,4 +1,5 @@
 Query: INSERT INTO "unique" (id, "boolean") VALUES (2, FALSE)
+Effect: Create { count: 1 }
 
 Storage:
 CREATE TABLE "unique" (

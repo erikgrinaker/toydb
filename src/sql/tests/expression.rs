@@ -1,17 +1,12 @@
 ///! Evaluates SQL expressions and compares with expectations.
 use super::super::types::Value;
-use super::super::{Context, Engine, Parser, Plan, Transaction};
-use crate::kv;
+use super::super::Engine;
 use crate::Error;
 
 fn eval_expr(expr: &str) -> Result<Value, Error> {
-    let engine = super::super::engine::KV::new(kv::MVCC::new(kv::storage::Memory::new()));
-    let mut txn = engine.begin()?;
-    let ctx = Context { txn: &mut txn };
-    let ast = Parser::new(&format!("SELECT {}", expr)).parse()?;
-    let mut result = Plan::build(ast)?.optimize()?.execute(ctx)?;
+    let engine = super::setup(Vec::new())?;
+    let mut result = engine.session(None)?.execute(&format!("SELECT {}", expr))?;
     let value = result.next().unwrap().unwrap().get(0).unwrap().clone();
-    txn.rollback()?;
     Ok(value)
 }
 

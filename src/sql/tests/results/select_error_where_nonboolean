@@ -62,4 +62,4 @@ Optimized plan: Plan {
 
 Query: SELECT * FROM movies WHERE 1
 
-Result: Value("Unexpected value 1 for filter, expected boolean")
+Result: Value("Filter returned 1, expected boolean")

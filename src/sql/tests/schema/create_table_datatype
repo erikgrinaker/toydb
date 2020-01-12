@@ -11,6 +11,7 @@ Query: CREATE TABLE name (
             "text" TEXT,
             "varchar" VARCHAR
         )
+Effect: CreateTable { name: "name" }
 
 Storage:
 CREATE TABLE name (

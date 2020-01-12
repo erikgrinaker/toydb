@@ -1,6 +1,6 @@
 mod plan;
 
-pub use plan::{Node, Order, Plan};
+pub use plan::{Direction, Node, Plan};
 
 use super::parser::ast;
 use super::types::expression::{Environment, Expression};

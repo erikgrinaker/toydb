@@ -1,27 +1,22 @@
 use super::super::engine::Transaction;
-use super::super::types::Row;
-use super::{Context, Executor};
+use super::{Context, Effect, Executor, ResultSet};
 use crate::Error;
 
 /// A DROP TABLE executor
-pub struct DropTable;
+pub struct DropTable {
+    /// Table name to drop
+    table: String,
+}
 
 impl DropTable {
-    pub fn execute<T: Transaction>(
-        ctx: &mut Context<T>,
-        name: String,
-    ) -> Result<Box<dyn Executor>, Error> {
-        ctx.txn.delete_table(&name)?;
-        Ok(Box::new(Self))
+    pub fn new(table: String) -> Box<Self> {
+        Box::new(Self { table })
     }
 }
 
-impl Executor for DropTable {
-    fn columns(&self) -> Vec<String> {
-        Vec::new()
-    }
-
-    fn fetch(&mut self) -> Result<Option<Row>, Error> {
-        Ok(None)
+impl<T: Transaction> Executor<T> for DropTable {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+        ctx.txn.delete_table(&self.table)?;
+        Ok(ResultSet::from_effect(Effect::DropTable { name: self.table }))
     }
 }

@@ -1,4 +1,5 @@
 Query: INSERT INTO "float" VALUES (1.618)
+Effect: Create { count: 1 }
 
 Storage:
 CREATE TABLE "float" (

@@ -1,33 +1,25 @@
 use super::super::engine::Transaction;
-use super::super::types::Row;
-use super::{Context, Executor};
+use super::{Context, Executor, ResultSet};
 use crate::Error;
 
-/// A table scan node
+/// A table scan executor
 pub struct Scan {
-    columns: Vec<String>,
-    range: super::super::engine::Scan,
+    /// The table to scan
+    table: String,
 }
 
 impl Scan {
-    pub fn execute<T: Transaction>(
-        ctx: &mut Context<T>,
-        table: String,
-    ) -> Result<Box<dyn Executor>, Error> {
-        let table = ctx.txn.must_read_table(&table)?;
-        Ok(Box::new(Self {
-            columns: table.columns.iter().map(|c| c.name.clone()).collect(),
-            range: ctx.txn.scan(&table.name)?,
-        }))
+    pub fn new(table: String) -> Box<Self> {
+        Box::new(Self { table })
     }
 }
 
-impl Executor for Scan {
-    fn columns(&self) -> Vec<String> {
-        self.columns.clone()
-    }
-
-    fn fetch(&mut self) -> Result<Option<Row>, Error> {
-        self.range.next().transpose()
+impl<T: Transaction> Executor<T> for Scan {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+        let table = ctx.txn.must_read_table(&self.table)?;
+        let columns = table.columns.into_iter().map(|c| c.name).collect();
+        let rows = ctx.txn.scan(&table.name)?;
+        // FIXME We use extra Box to cast to ResultRows iterator (apparently)
+        Ok(ResultSet::from_rows(columns, Box::new(rows)))
     }
 }

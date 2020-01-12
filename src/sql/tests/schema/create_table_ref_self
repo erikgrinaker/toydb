@@ -1,4 +1,5 @@
 Query: CREATE TABLE other (id INTEGER PRIMARY KEY, self_id INTEGER REFERENCES other)
+Effect: CreateTable { name: "other" }
 
 Storage:
 CREATE TABLE other (

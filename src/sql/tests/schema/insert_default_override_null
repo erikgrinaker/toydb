@@ -1,4 +1,5 @@
 Query: INSERT INTO defaults VALUES (1, TRUE, NULL, NULL, NULL, NULL, NULL)
+Effect: Create { count: 1 }
 
 Storage:
 CREATE TABLE defaults (

@@ -48,6 +48,7 @@ enum Query {
 }
 
 /// An SQL engine that wraps a Raft cluster.
+#[derive(Clone)]
 pub struct Raft {
     /// The underlying Raft cluster.
     raft: raft::Raft,

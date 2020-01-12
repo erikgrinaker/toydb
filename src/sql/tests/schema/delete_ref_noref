@@ -1,4 +1,5 @@
 Query: DELETE FROM target WHERE id = 3
+Effect: Delete { count: 1 }
 
 Storage:
 CREATE TABLE source (

@@ -1,4 +1,5 @@
 Query: CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)
+Effect: CreateTable { name: "mixed_case" }
 
 Storage:
 CREATE TABLE mixed_case (

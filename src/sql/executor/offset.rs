@@ -1,33 +1,27 @@
 use super::super::engine::Transaction;
-use super::super::types::Row;
-use super::{Context, Executor};
+use super::{Context, Executor, ResultSet};
 use crate::Error;
 
-/// An offset executor
-pub struct Offset {
-    source: Box<dyn Executor>,
+/// An OFFSET executor
+pub struct Offset<T: Transaction> {
+    /// The source of rows to limit
+    source: Box<dyn Executor<T>>,
+    /// The number of rows to skip
+    offset: u64,
 }
 
-impl Offset {
-    pub fn execute<T: Transaction>(
-        _: &mut Context<T>,
-        mut source: Box<dyn Executor>,
-        offset: u64,
-    ) -> Result<Box<dyn Executor>, Error> {
-        let mut fetched = 0;
-        while fetched < offset && source.fetch()?.is_some() {
-            fetched += 1
+impl<T: Transaction> Offset<T> {
+    pub fn new(source: Box<dyn Executor<T>>, offset: u64) -> Box<Self> {
+        Box::new(Self { source, offset })
+    }
+}
+
+impl<T: Transaction> Executor<T> for Offset<T> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+        let mut result = self.source.execute(ctx)?;
+        if let Some(rows) = result.rows {
+            result.rows = Some(Box::new(rows.skip(self.offset as usize)))
         }
-        Ok(Box::new(Self { source }))
-    }
-}
-
-impl Executor for Offset {
-    fn columns(&self) -> Vec<String> {
-        self.source.columns()
-    }
-
-    fn fetch(&mut self) -> Result<Option<Row>, Error> {
-        self.source.fetch()
+        Ok(result)
     }
 }

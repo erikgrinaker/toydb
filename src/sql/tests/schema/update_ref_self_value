@@ -1,4 +1,5 @@
 Query: UPDATE self SET value = 'x' WHERE id = 1
+Effect: Update { count: 1 }
 
 Storage:
 CREATE TABLE self (

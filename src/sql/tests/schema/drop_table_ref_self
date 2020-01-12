@@ -1,4 +1,5 @@
 Query: DROP TABLE self
+Effect: DropTable { name: "self" }
 
 Storage:
 CREATE TABLE source (

@@ -1,4 +1,5 @@
 Query: UPDATE "unique" SET "boolean" = NULL, "float" = NULL, "integer" = NULL, "string" = NULL WHERE id = 1
+Effect: Update { count: 1 }
 
 Storage:
 CREATE TABLE "unique" (

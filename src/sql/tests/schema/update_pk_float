@@ -1,4 +1,5 @@
 Query: UPDATE "float" SET pk = 1.618 WHERE pk = 3.14
+Effect: Update { count: 1 }
 
 Storage:
 CREATE TABLE "float" (

@@ -13,6 +13,13 @@ pub struct MVCC<S: Storage> {
     storage: Arc<RwLock<S>>,
 }
 
+// FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
+impl<S: Storage> Clone for MVCC<S> {
+    fn clone(&self) -> Self {
+        MVCC { storage: self.storage.clone() }
+    }
+}
+
 impl<S: Storage> MVCC<S> {
     /// Creates a new MVCC key-value store with the given storage backend.
     pub fn new(storage: S) -> Self {

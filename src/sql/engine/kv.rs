@@ -10,6 +10,13 @@ pub struct KV<S: kv::storage::Storage> {
     kv: kv::MVCC<S>,
 }
 
+// FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
+impl<S: kv::storage::Storage> std::clone::Clone for KV<S> {
+    fn clone(&self) -> Self {
+        KV::new(self.kv.clone())
+    }
+}
+
 impl<S: kv::storage::Storage> KV<S> {
     /// Creates a new key/value-based SQL engine
     pub fn new(kv: kv::MVCC<S>) -> Self {

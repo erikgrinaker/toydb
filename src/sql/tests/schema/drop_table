@@ -1,4 +1,5 @@
 Query: DROP TABLE a
+Effect: DropTable { name: "a" }
 
 Storage:
 CREATE TABLE b (

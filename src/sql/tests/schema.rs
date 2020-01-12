@@ -20,9 +20,14 @@ macro_rules! test_schema {
                 let mut f = mint.new_goldenfile(stringify!($name))?;
 
                 write!(f, "Query: {}\n", $query.trim())?;
-                match super::execute(&engine, $query) {
-                    // FIXME We need to output something sensible here.
-                    Ok(_) => write!(f, "\n")?,
+                match engine.session(None)?.execute($query) {
+                    Ok(resultset) => {
+                        write!(f, "Effect:")?;
+                        if let Some(effect) = resultset.effect() {
+                            write!(f, " {:?}", effect)?;
+                        }
+                        write!(f, "\n\n")?;
+                    },
                     Err(err) => write!(f, "Error: {:?}\n\n", err)?,
                 };
 

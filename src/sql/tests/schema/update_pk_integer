@@ -1,4 +1,5 @@
 Query: UPDATE "integer" SET pk = 3 WHERE pk = 2
+Effect: Update { count: 1 }
 
 Storage:
 CREATE TABLE "integer" (

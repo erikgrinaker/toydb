@@ -11,6 +11,7 @@ extern crate rustyline;
 extern crate toydb;
 
 use rustyline::error::ReadlineError;
+use toydb::client::{Effect, Mode};
 
 fn main() -> Result<(), toydb::Error> {
     let opts = app_from_crate!()
@@ -148,18 +149,22 @@ Semicolons are not supported. The following !-commands are also available:
         let resultset = self.client.query(query)?;
 
         match resultset.effect() {
-            Some(toydb::client::Effect::Begin { id, mode: toydb::client::Mode::ReadWrite }) => {
+            Some(Effect::Begin { id, mode: Mode::ReadWrite }) => {
                 println!("Began transaction {}", id)
             }
-            Some(toydb::client::Effect::Begin { id, mode: toydb::client::Mode::ReadOnly }) => {
+            Some(Effect::Begin { id, mode: Mode::ReadOnly }) => {
                 println!("Began read-only transaction {}", id)
             }
-            Some(toydb::client::Effect::Begin {
-                id,
-                mode: toydb::client::Mode::Snapshot { version },
-            }) => println!("Began read-only transaction {} in version {} snapshot", id, version),
-            Some(toydb::client::Effect::Commit(id)) => println!("Committed transaction {}", id),
-            Some(toydb::client::Effect::Rollback(id)) => println!("Rolled back transaction {}", id),
+            Some(Effect::Begin { id, mode: Mode::Snapshot { version } }) => {
+                println!("Began read-only transaction {} in version {} snapshot", id, version)
+            }
+            Some(Effect::Commit { id }) => println!("Committed transaction {}", id),
+            Some(Effect::Rollback { id }) => println!("Rolled back transaction {}", id),
+            Some(Effect::Create { count }) => println!("Created {} rows", count),
+            Some(Effect::Delete { count }) => println!("Deleted {} rows", count),
+            Some(Effect::Update { count }) => println!("Updated {} rows", count),
+            Some(Effect::CreateTable { name }) => println!("Created table {}", name),
+            Some(Effect::DropTable { name }) => println!("Dropped table {}", name),
             None => {}
         }
 

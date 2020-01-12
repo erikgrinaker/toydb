@@ -1,4 +1,5 @@
 Query: CREATE TABLE "name with ' quote" (id INTEGER PRIMARY KEY)
+Effect: CreateTable { name: "name with \' quote" }
 
 Storage:
 CREATE TABLE "name with ' quote" (

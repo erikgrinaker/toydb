@@ -5,18 +5,27 @@ mod raft;
 pub use kv::KV;
 pub use raft::Raft;
 
+use super::executor::{Context, Effect, ResultSet};
+use super::parser::{ast, Parser};
+use super::planner::Plan;
 use super::types::schema::Table;
 use super::types::{Row, Value};
 use crate::Error;
 
 /// The SQL engine interface
-pub trait Engine {
+pub trait Engine: Clone {
     /// The transaction type
     type Transaction: Transaction;
 
     /// Begins a typical read-write transaction
     fn begin(&self) -> Result<Self::Transaction, Error> {
         self.begin_with_mode(Mode::ReadWrite)
+    }
+
+    /// Begins a session, optionally resuming an active transaction with the given ID
+    fn session(&self, id: Option<u64>) -> Result<Session<Self>, Error> {
+        let txn = if let Some(id) = id { Some(self.resume(id)?) } else { None };
+        Ok(Session { engine: self.clone(), txn })
     }
 
     /// Begins a transaction in the given mode
@@ -61,6 +70,81 @@ pub trait Transaction {
     fn must_read_table(&self, table: &str) -> Result<Table, Error> {
         self.read_table(table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
+    }
+}
+
+/// An SQL session, which handles transaction control and simplified query execution
+pub struct Session<E: Engine> {
+    /// The underlying engine
+    engine: E,
+    /// The current session transaction, if any
+    txn: Option<E::Transaction>,
+}
+
+impl<E: Engine + 'static> Session<E> {
+    /// Executes a query, managing transaction status for the session
+    pub fn execute(&mut self, query: &str) -> Result<ResultSet, Error> {
+        // FIXME We should match on self.txn as well, but get this error:
+        // error[E0009]: cannot bind by-move and by-ref in the same pattern
+        // ...which seems like an arbitrary compiler limitation
+        match Parser::new(query).parse()? {
+            ast::Statement::Begin { .. } if self.txn.is_some() => {
+                Err(Error::Value("Already in a transaction".into()))
+            }
+            ast::Statement::Begin { readonly: true, version: None } => {
+                let txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
+                let effect = Effect::Begin { id: txn.id(), mode: txn.mode() };
+                self.txn = Some(txn);
+                Ok(ResultSet::from_effect(effect))
+            }
+            ast::Statement::Begin { readonly: true, version: Some(version) } => {
+                let txn = self.engine.begin_with_mode(Mode::Snapshot { version })?;
+                let effect = Effect::Begin { id: txn.id(), mode: txn.mode() };
+                self.txn = Some(txn);
+                Ok(ResultSet::from_effect(effect))
+            }
+            ast::Statement::Begin { readonly: false, version: Some(_) } => {
+                Err(Error::Value("Can't start read-write transaction in a given version".into()))
+            }
+            ast::Statement::Begin { readonly: false, version: None } => {
+                let txn = self.engine.begin_with_mode(Mode::ReadWrite)?;
+                let effect = Effect::Begin { id: txn.id(), mode: txn.mode() };
+                self.txn = Some(txn);
+                Ok(ResultSet::from_effect(effect))
+            }
+            ast::Statement::Commit | ast::Statement::Rollback if self.txn.is_none() => {
+                Err(Error::Value("Not in a transaction".into()))
+            }
+            ast::Statement::Commit => {
+                let txn = std::mem::replace(&mut self.txn, None).unwrap();
+                let effect = Effect::Commit { id: txn.id() };
+                txn.commit()?;
+                Ok(ResultSet::from_effect(effect))
+            }
+            ast::Statement::Rollback => {
+                let txn = std::mem::replace(&mut self.txn, None).unwrap();
+                let effect = Effect::Rollback { id: txn.id() };
+                txn.rollback()?;
+                Ok(ResultSet::from_effect(effect))
+            }
+            statement if self.txn.is_some() => Plan::build(statement)?
+                .optimize()?
+                .execute(Context { txn: self.txn.as_mut().unwrap() }),
+            statement @ ast::Statement::Select { .. } => {
+                let mut txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
+                let result =
+                    Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn })?;
+                txn.commit()?;
+                Ok(result)
+            }
+            statement => {
+                let mut txn = self.engine.begin_with_mode(Mode::ReadWrite)?;
+                let result =
+                    Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn })?;
+                txn.commit()?;
+                Ok(result)
+            }
+        }
     }
 }
 
