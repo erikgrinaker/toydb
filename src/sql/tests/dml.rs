@@ -54,6 +54,36 @@ test_dml! { with [
             name STRING,
             value INTEGER
         )",
+        "INSERT INTO test VALUES (1, 'a', 101), (2, 'b', 102), (3, 'c', 103)",
+        "CREATE TABLE other (id INTEGER PRIMARY KEY)",
+        "INSERT INTO other VALUES (1), (2), (3)",
+    ];
+
+    delete_all: "DELETE FROM test",
+    delete_where: "DELETE FROM test WHERE id = 1",
+    delete_where_and: "DELETE FROM test WHERE id = 1 AND name = 'a'",
+    delete_where_expr: "DELETE FROM test WHERE id = 3 - 2 AND name LIKE 'a%'",
+    delete_where_true: "DELETE FROM test WHERE TRUE",
+    delete_where_false: "DELETE FROM test WHERE FALSE",
+    delete_where_null: "DELETE FROM test WHERE NULL",
+    delete_where_float: "DELETE FROM test WHERE 3.14",
+    delete_where_integer: "DELETE FROM test WHERE 1",
+    delete_where_string: "DELETE FROM test WHERE 'a'",
+    delete_case: "DELETE FROM TeSt WHERE ID = 1",
+    delete_missing_column_where: "DELETE FROM test WHERE missing = TRUE",
+    delete_missing_table: "DELETE FROM missing",
+    delete_multiple_tables: "DELETE FROM test, other WHERE id = 1",
+    delete_bare: "DELETE",
+    delete_bare_from: "DELETE FROM",
+    delete_bare_where: "DELETE FROM test WHERE",
+}
+
+test_dml! { with [
+        "CREATE TABLE test (
+            id INTEGER PRIMARY KEY DEFAULT 0,
+            name STRING,
+            value INTEGER
+        )",
         "CREATE TABLE other (id INTEGER PRIMARY KEY)"
     ];
 
@@ -103,6 +133,7 @@ test_dml! { with [
     update_where_integer: "UPDATE test SET name = 'x' WHERE 1",
     update_where_string: "UPDATE test SET name = 'x' WHERE 'a'",
     update_where_full: "UPDATE test SET id = 9, name = 'x', value = 999 WHERE id = 1",
+    update_case: "UPDATE TeSt SET Name = 'x' WHERE ID = 1",
     update_missing_column_set: "UPDATE test SET missing = 0",
     update_missing_column_where: "UPDATE test SET name = 'x' WHERE missing = TRUE",
     update_missing_table: "UPDATE missing SET id = 0",

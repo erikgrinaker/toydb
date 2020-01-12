@@ -198,6 +198,28 @@ CREATE TABLE movie (
 )
 ```
 
+### `DELETE`
+
+Deletes rows in a table.
+
+<pre>
+DELETE FROM <b><i>table_name</i></b>
+    [ WHERE <b><i>predicate</i></b> ]
+</pre>
+
+Deletes rows where ***`predicate`*** evaluates to `TRUE`, or all rows if no `WHERE` clause is given.
+
+* ***`table_name`***: the table to delete from. Errors if it does not exist.
+
+* ***`predicate`***: an expression which determines which rows to delete by evaluting to `TRUE`. Must evaluate to a `BOOLEAN` or `NULL`, otherwise an error is returned.
+
+#### Example
+
+```sql
+DELETE FROM movie
+WHERE release_year < 2000 AND bluray = FALSE
+```
+
 ### `DROP TABLE`
 
 Deletes a table and all contained data.

@@ -132,15 +132,6 @@ macro_rules! test_sql {
 }
 
 test_sql! {
-    delete_all: "DELETE FROM movies",
-    delete_error_bare: "DELETE FROM",
-    delete_error_multiple: "DELETE FROM movies, genres",
-    delete_error_table: "DELETE FROM missing",
-    delete_where: "DELETE FROM movies WHERE released >= 2000",
-    delete_where_false: "DELETE FROM movies WHERE FALSE",
-    delete_where_null: "DELETE FROM movies WHERE NULL",
-    delete_where_true: "DELETE FROM movies WHERE TRUE",
-
     select_all_from_table: "SELECT * FROM movies",
     select_aliases: "SELECT 1, 2 b, 3 AS c",
     select_case: "SELECT TiTlE AS Name FROM movies",

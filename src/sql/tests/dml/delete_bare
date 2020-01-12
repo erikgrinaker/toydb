@@ -1,0 +1,19 @@
+Query: DELETE
+Error: Parse("Unexpected end of input")
+
+Storage:
+CREATE TABLE other (
+  id INTEGER PRIMARY KEY
+)
+[Integer(1)]
+[Integer(2)]
+[Integer(3)]
+
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY DEFAULT 0,
+  name STRING DEFAULT NULL,
+  value INTEGER DEFAULT NULL
+)
+[Integer(1), String("a"), Integer(101)]
+[Integer(2), String("b"), Integer(102)]
+[Integer(3), String("c"), Integer(103)]
