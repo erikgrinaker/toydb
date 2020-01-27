@@ -1,0 +1,162 @@
+Query: SELECT 1, 2 b, 3 AS c, 4 AS "👋", id AS "some id" FROM movies
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Integer(
+                    2,
+                ),
+            ),
+            Literal(
+                Integer(
+                    3,
+                ),
+            ),
+            Literal(
+                Integer(
+                    4,
+                ),
+            ),
+            Field(
+                "id",
+            ),
+        ],
+        labels: [
+            None,
+            Some(
+                "b",
+            ),
+            Some(
+                "c",
+            ),
+            Some(
+                "👋",
+            ),
+            Some(
+                "some id",
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            None,
+            Some(
+                "b",
+            ),
+            Some(
+                "c",
+            ),
+            Some(
+                "👋",
+            ),
+            Some(
+                "some id",
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+            Constant(
+                Integer(
+                    3,
+                ),
+            ),
+            Constant(
+                Integer(
+                    4,
+                ),
+            ),
+            Field(
+                "id",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            None,
+            Some(
+                "b",
+            ),
+            Some(
+                "c",
+            ),
+            Some(
+                "👋",
+            ),
+            Some(
+                "some id",
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+            Constant(
+                Integer(
+                    3,
+                ),
+            ),
+            Constant(
+                Integer(
+                    4,
+                ),
+            ),
+            Field(
+                "id",
+            ),
+        ],
+    },
+}
+
+Query: SELECT 1, 2 b, 3 AS c, 4 AS "👋", id AS "some id" FROM movies
+
+Result: ["?", "b", "c", "👋", "some id"]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(1)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(2)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(3)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(4)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(5)]

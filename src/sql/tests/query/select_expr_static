@@ -1,0 +1,130 @@
+Query: SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Operation(
+                Add(
+                    Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                    Operation(
+                        Multiply(
+                            Literal(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                            Literal(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            Operation(
+                Like(
+                    Literal(
+                        String(
+                            "abc",
+                        ),
+                    ),
+                    Literal(
+                        String(
+                            "x%",
+                        ),
+                    ),
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            Some(
+                "nope",
+            ),
+        ],
+    },
+    from: None,
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            Some(
+                "nope",
+            ),
+        ],
+        expressions: [
+            Add(
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Multiply(
+                    Constant(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ),
+            ),
+            Like(
+                Constant(
+                    String(
+                        "abc",
+                    ),
+                ),
+                Constant(
+                    String(
+                        "x%",
+                    ),
+                ),
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+            Some(
+                "nope",
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    7,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope
+
+Result: ["?", "nope"]
+[Integer(7), Boolean(false)]

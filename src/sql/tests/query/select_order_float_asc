@@ -1,0 +1,67 @@
+Query: SELECT * FROM floats ORDER BY value ASC
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "floats",
+            ],
+        },
+    ),
+    where: None,
+    order: [
+        (
+            Field(
+                "value",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Scan {
+            table: "floats",
+        },
+        orders: [
+            (
+                Field(
+                    "value",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Scan {
+            table: "floats",
+        },
+        orders: [
+            (
+                Field(
+                    "value",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT * FROM floats ORDER BY value ASC
+
+Result: ["id", "value"]
+[Integer(3), Null]
+[Integer(2), Float(-2.718)]
+[Integer(5), Float(0.0)]
+[Integer(4), Float(2.718)]
+[Integer(1), Float(3.14)]

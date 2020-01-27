@@ -1,0 +1,3 @@
+Query: SELECT * FROM movies WHERE TRUE, TRUE
+
+AST: Parse("Unexpected token ,")

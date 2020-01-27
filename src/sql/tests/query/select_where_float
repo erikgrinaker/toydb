@@ -1,0 +1,57 @@
+Query: SELECT * FROM movies WHERE 3.14
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Literal(
+                Float(
+                    3.14,
+                ),
+            ),
+        ),
+    ),
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Float(
+                3.14,
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Float(
+                3.14,
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies WHERE 3.14
+
+Result: Value("Filter returned 3.14, expected boolean")

@@ -1,0 +1,51 @@
+Query: SELECT unknown
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                "unknown",
+            ),
+        ],
+        labels: [
+            None,
+        ],
+    },
+    from: None,
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+        ],
+        expressions: [
+            Field(
+                "unknown",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+        ],
+        expressions: [
+            Field(
+                "unknown",
+            ),
+        ],
+    },
+}
+
+Query: SELECT unknown
+
+Result: Value("Unknown field unknown")

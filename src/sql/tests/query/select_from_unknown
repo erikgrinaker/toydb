@@ -1,0 +1,35 @@
+Query: SELECT * FROM unknown
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "unknown",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Scan {
+        table: "unknown",
+    },
+}
+
+Optimized plan: Plan {
+    root: Scan {
+        table: "unknown",
+    },
+}
+
+Query: SELECT * FROM unknown
+
+Result: Value("Table unknown does not exist")

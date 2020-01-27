@@ -1,0 +1,27 @@
+Query: SELECT * FROM movies OFFSET TRUE
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: Some(
+        Literal(
+            Boolean(
+                true,
+            ),
+        ),
+    ),
+}
+
+Plan: Value("Invalid value TRUE for offset")

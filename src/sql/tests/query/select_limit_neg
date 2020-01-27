@@ -1,0 +1,31 @@
+Query: SELECT * FROM movies LIMIT -1
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: Some(
+        Operation(
+            Negate(
+                Literal(
+                    Integer(
+                        1,
+                    ),
+                ),
+            ),
+        ),
+    ),
+    offset: None,
+}
+
+Plan: Value("Invalid value -1 for limit")

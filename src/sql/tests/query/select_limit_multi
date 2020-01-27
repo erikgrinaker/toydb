@@ -1,0 +1,3 @@
+Query: SELECT * FROM movies LIMIT 3, 4
+
+AST: Parse("Unexpected token ,")

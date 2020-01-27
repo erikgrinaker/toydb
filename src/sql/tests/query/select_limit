@@ -1,0 +1,50 @@
+Query: SELECT * FROM movies LIMIT 3
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: Some(
+        Literal(
+            Integer(
+                3,
+            ),
+        ),
+    ),
+    offset: None,
+}
+
+Plan: Plan {
+    root: Limit {
+        source: Scan {
+            table: "movies",
+        },
+        limit: 3,
+    },
+}
+
+Optimized plan: Plan {
+    root: Limit {
+        source: Scan {
+            table: "movies",
+        },
+        limit: 3,
+    },
+}
+
+Query: SELECT * FROM movies LIMIT 3
+
+Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]

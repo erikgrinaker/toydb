@@ -1,0 +1,57 @@
+Query: SELECT * FROM movies WHERE 'abc'
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Literal(
+                String(
+                    "abc",
+                ),
+            ),
+        ),
+    ),
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            String(
+                "abc",
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            String(
+                "abc",
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies WHERE 'abc'
+
+Result: Value("Filter returned abc, expected boolean")

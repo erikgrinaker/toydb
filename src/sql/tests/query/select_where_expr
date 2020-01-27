@@ -1,0 +1,116 @@
+Query: SELECT * FROM movies WHERE released >= 2000 AND ultrahd
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Operation(
+                And(
+                    Operation(
+                        GreaterThanOrEqual(
+                            Field(
+                                "released",
+                            ),
+                            Literal(
+                                Integer(
+                                    2000,
+                                ),
+                            ),
+                        ),
+                    ),
+                    Field(
+                        "ultrahd",
+                    ),
+                ),
+            ),
+        ),
+    ),
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: And(
+            Or(
+                GreaterThan(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
+                ),
+                Equal(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
+                ),
+            ),
+            Field(
+                "ultrahd",
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: And(
+            Or(
+                GreaterThan(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
+                ),
+                Equal(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            2000,
+                        ),
+                    ),
+                ),
+            ),
+            Field(
+                "ultrahd",
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies WHERE released >= 2000 AND ultrahd
+
+Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]

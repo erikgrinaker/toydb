@@ -1,0 +1,181 @@
+Query: SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                "id",
+            ),
+            Field(
+                "title",
+            ),
+            Field(
+                "released",
+            ),
+            Operation(
+                Modulo(
+                    Field(
+                        "released",
+                    ),
+                    Literal(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                ),
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            Some(
+                "ord",
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [
+        (
+            Operation(
+                Modulo(
+                    Field(
+                        "released",
+                    ),
+                    Literal(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                ),
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Scan {
+                table: "movies",
+            },
+            labels: [
+                None,
+                None,
+                None,
+                Some(
+                    "ord",
+                ),
+            ],
+            expressions: [
+                Field(
+                    "id",
+                ),
+                Field(
+                    "title",
+                ),
+                Field(
+                    "released",
+                ),
+                Modulo(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                ),
+            ],
+        },
+        orders: [
+            (
+                Modulo(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Scan {
+                table: "movies",
+            },
+            labels: [
+                None,
+                None,
+                None,
+                Some(
+                    "ord",
+                ),
+            ],
+            expressions: [
+                Field(
+                    "id",
+                ),
+                Field(
+                    "title",
+                ),
+                Field(
+                    "released",
+                ),
+                Modulo(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                ),
+            ],
+        },
+        orders: [
+            (
+                Modulo(
+                    Field(
+                        "released",
+                    ),
+                    Constant(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC
+
+Result: ["id", "title", "released", "ord"]
+[Integer(3), String("Primer"), Integer(2004), Integer(0)]
+[Integer(5), String("The Fountain"), Integer(2006), Integer(2)]
+[Integer(1), String("Stalker"), Integer(1979), Integer(3)]
+[Integer(2), String("Sicario"), Integer(2015), Integer(3)]
+[Integer(4), String("Heat"), Integer(1995), Integer(3)]

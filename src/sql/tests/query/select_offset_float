@@ -1,0 +1,27 @@
+Query: SELECT * FROM movies OFFSET 3.14
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: Some(
+        Literal(
+            Float(
+                3.14,
+            ),
+        ),
+    ),
+}
+
+Plan: Value("Invalid value 3.14 for offset")

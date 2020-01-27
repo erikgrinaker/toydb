@@ -1,7 +1,7 @@
 mod dml;
 mod expression;
+mod query;
 mod schema;
-mod sql;
 
 use super::Engine;
 use crate::kv;

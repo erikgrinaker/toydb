@@ -1,0 +1,70 @@
+Query: SELECT * FROM strings ORDER BY value ASC
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "strings",
+            ],
+        },
+    ),
+    where: None,
+    order: [
+        (
+            Field(
+                "value",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Scan {
+            table: "strings",
+        },
+        orders: [
+            (
+                Field(
+                    "value",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Scan {
+            table: "strings",
+        },
+        orders: [
+            (
+                Field(
+                    "value",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT * FROM strings ORDER BY value ASC
+
+Result: ["id", "value"]
+[Integer(5), Null]
+[Integer(4), String("A")]
+[Integer(1), String("a")]
+[Integer(6), String("aA")]
+[Integer(3), String("aaa")]
+[Integer(2), String("ab")]
+[Integer(8), String("Åa")]
+[Integer(7), String("åa")]

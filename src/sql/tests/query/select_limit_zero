@@ -1,0 +1,47 @@
+Query: SELECT * FROM movies LIMIT 0
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: Some(
+        Literal(
+            Integer(
+                0,
+            ),
+        ),
+    ),
+    offset: None,
+}
+
+Plan: Plan {
+    root: Limit {
+        source: Scan {
+            table: "movies",
+        },
+        limit: 0,
+    },
+}
+
+Optimized plan: Plan {
+    root: Limit {
+        source: Scan {
+            table: "movies",
+        },
+        limit: 0,
+    },
+}
+
+Query: SELECT * FROM movies LIMIT 0
+
+Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]

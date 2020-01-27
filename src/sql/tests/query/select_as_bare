@@ -1,0 +1,3 @@
+Query: SELECT 1 AS
+
+AST: Parse("Unexpected end of input")

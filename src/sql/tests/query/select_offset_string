@@ -1,0 +1,27 @@
+Query: SELECT * FROM movies OFFSET 'abc'
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: Some(
+        Literal(
+            String(
+                "abc",
+            ),
+        ),
+    ),
+}
+
+Plan: Value("Invalid value abc for offset")

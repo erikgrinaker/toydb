@@ -1,0 +1,52 @@
+Query: SELECT * FROM movies LIMIT 9223372036854775807
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: Some(
+        Literal(
+            Integer(
+                9223372036854775807,
+            ),
+        ),
+    ),
+    offset: None,
+}
+
+Plan: Plan {
+    root: Limit {
+        source: Scan {
+            table: "movies",
+        },
+        limit: 9223372036854775807,
+    },
+}
+
+Optimized plan: Plan {
+    root: Limit {
+        source: Scan {
+            table: "movies",
+        },
+        limit: 9223372036854775807,
+    },
+}
+
+Query: SELECT * FROM movies LIMIT 9223372036854775807
+
+Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]
+[Integer(1), String("Stalker"), Integer(1), Integer(1979), Float(8.2), Boolean(false)]
+[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(4), String("Heat"), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(5), String("The Fountain"), Integer(1), Integer(2006), Float(7.2), Boolean(false)]

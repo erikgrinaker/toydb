@@ -1,0 +1,27 @@
+Query: SELECT * FROM movies LIMIT 'abc'
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: Some(
+        Literal(
+            String(
+                "abc",
+            ),
+        ),
+    ),
+    offset: None,
+}
+
+Plan: Value("Invalid value abc for limit")

@@ -1,0 +1,57 @@
+Query: SELECT * FROM movies WHERE FALSE
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Literal(
+                Boolean(
+                    false,
+                ),
+            ),
+        ),
+    ),
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Boolean(
+                false,
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Boolean(
+                false,
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies WHERE FALSE
+
+Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]

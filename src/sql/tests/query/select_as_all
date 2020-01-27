@@ -1,0 +1,3 @@
+Query: SELECT * AS all FROM movies
+
+AST: Parse("Unexpected token AS")

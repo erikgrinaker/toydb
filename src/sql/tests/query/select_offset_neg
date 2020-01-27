@@ -1,0 +1,31 @@
+Query: SELECT * FROM movies OFFSET -1
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: Some(
+        Operation(
+            Negate(
+                Literal(
+                    Integer(
+                        1,
+                    ),
+                ),
+            ),
+        ),
+    ),
+}
+
+Plan: Value("Invalid value -1 for offset")

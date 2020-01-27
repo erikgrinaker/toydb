@@ -1,0 +1,62 @@
+Query: SELECT * FROM movies ORDER BY unknown
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [
+        (
+            Field(
+                "unknown",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Scan {
+            table: "movies",
+        },
+        orders: [
+            (
+                Field(
+                    "unknown",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Scan {
+            table: "movies",
+        },
+        orders: [
+            (
+                Field(
+                    "unknown",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT * FROM movies ORDER BY unknown
+
+Result: Value("Unknown field unknown")

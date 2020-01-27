@@ -1,0 +1,58 @@
+Query: select 1
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+        ],
+        labels: [
+            None,
+        ],
+    },
+    from: None,
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            None,
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: select 1
+
+Result: ["?"]
+[Integer(1)]

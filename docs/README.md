@@ -259,6 +259,46 @@ VALUES
     (3, 'Her', 2013
 ```
 
+### `SELECT`
+
+Selects rows from a table.
+
+<pre>
+SELECT [ * | <b><i>expression</i></b> [ [ AS ] <b><i>output_name</i></b> [, ...] ]
+    [ FROM [ <b><i>table_name</i></b> ] ]
+    [ WHERE [ <b><i>predicate</i></b> ] ]
+    [ ORDER BY <b><i>order_expr</i></b> [ ASC | DESC ] [, ...] ]
+    [ LIMIT <b><i>count</i></b> ]
+    [ OFFSET <b><i>start</i></b> ]
+</pre>
+
+Fetches rows or expressions, either from table ***`table_name`*** (if given) or generated.
+
+* ***`expression`***: [expression](#expressions) to fetch (can be a simple field name).
+
+* ***`output_name`***: output column [identifier](#identifier), defaults to field name (if single field) otherwise nothing (displayed as `?`).
+
+* ***`table_name`***: table to fetch rows from.
+
+* ***`predicate`***: only return rows for which this [expression](#expressions) evaluates to `TRUE`.
+
+* ***`order_expr`***: order rows by this expression (can be a simple field name).
+
+* ***`count`***: maximum number of rows to return. Must be a constant integer expression.
+
+* ***`start`***: number of rows to skip. Must be a constant integer expression.
+
+#### Example
+
+```sql
+SELECT id, title, 2020 - released AS age
+FROM movies
+WHERE released >= 2000 AND ultrahd
+ORDER BY released DESC, title ASC
+LIMIT 10
+OFFSET 10
+```
+
 ### `UPDATE`
 
 Updates rows in a table.

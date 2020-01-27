@@ -1,0 +1,34 @@
+Query: SELECT * FROM movies LIMIT 2000 - released
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: Some(
+        Operation(
+            Subtract(
+                Literal(
+                    Integer(
+                        2000,
+                    ),
+                ),
+                Field(
+                    "released",
+                ),
+            ),
+        ),
+    ),
+    offset: None,
+}
+
+Plan: Value("Limit must be constant value")

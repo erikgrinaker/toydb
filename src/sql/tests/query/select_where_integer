@@ -1,0 +1,57 @@
+Query: SELECT * FROM movies WHERE 7
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            tables: [
+                "movies",
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Literal(
+                Integer(
+                    7,
+                ),
+            ),
+        ),
+    ),
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Integer(
+                7,
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: Scan {
+            table: "movies",
+        },
+        predicate: Constant(
+            Integer(
+                7,
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies WHERE 7
+
+Result: Value("Filter returned 7, expected boolean")

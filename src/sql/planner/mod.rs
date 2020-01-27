@@ -79,10 +79,14 @@ impl Planner {
                 }
                 // FIXME Limit and offset need to check that the expression is constant
                 if let Some(expr) = offset {
+                    let expr = Expression::from(expr);
+                    if !expr.is_constant() {
+                        return Err(Error::Value("Offset must be constant value".into()));
+                    }
                     n = Node::Offset {
                         source: Box::new(n),
-                        offset: match Expression::from(expr).evaluate(&Environment::empty())? {
-                            Value::Integer(i) => i as u64,
+                        offset: match expr.evaluate(&Environment::empty())? {
+                            Value::Integer(i) if i >= 0 => i as u64,
                             v => {
                                 return Err(Error::Value(format!("Invalid value {} for offset", v)))
                             }
@@ -90,10 +94,14 @@ impl Planner {
                     }
                 }
                 if let Some(expr) = limit {
+                    let expr = Expression::from(expr);
+                    if !expr.is_constant() {
+                        return Err(Error::Value("Limit must be constant value".into()));
+                    }
                     n = Node::Limit {
                         source: Box::new(n),
-                        limit: match Expression::from(expr).evaluate(&Environment::empty())? {
-                            Value::Integer(i) => i as u64,
+                        limit: match expr.evaluate(&Environment::empty())? {
+                            Value::Integer(i) if i >= 0 => i as u64,
                             v => {
                                 return Err(Error::Value(format!("Invalid value {} for limit", v)))
                             }
