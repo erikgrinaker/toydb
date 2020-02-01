@@ -18,6 +18,14 @@ macro_rules! test_query {
         fn $name() -> Result<(), Error> {
             let mut setup = $setup.to_vec();
             setup.extend(vec![
+                "CREATE TABLE countries (
+                    id STRING PRIMARY KEY,
+                    name STRING NOT NULL
+                )",
+                "INSERT INTO countries VALUES
+                    ('fr', 'France'),
+                    ('ru', 'Russia'),
+                    ('us', 'United States of America')",
                 "CREATE TABLE genres (
                     id INTEGER PRIMARY KEY,
                     name STRING NOT NULL
@@ -25,20 +33,31 @@ macro_rules! test_query {
                 "INSERT INTO genres VALUES
                     (1, 'Science Fiction'),
                     (2, 'Action')",
+                "CREATE TABLE studios (
+                    id INTEGER PRIMARY KEY,
+                    name STRING NOT NULL,
+                    country_id STRING REFERENCES countries
+                )",
+                "INSERT INTO studios VALUES
+                    (1, 'Mosfilm', 'ru'),
+                    (2, 'Lionsgate', 'us'),
+                    (3, 'StudioCanal', 'fr'),
+                    (4, 'Warner Bros', 'us')",
                 "CREATE TABLE movies (
                     id INTEGER PRIMARY KEY,
                     title STRING NOT NULL,
+                    studio_id INTEGER NOT NULL REFERENCES studios,
                     genre_id INTEGER NOT NULL REFERENCES genres,
                     released INTEGER NOT NULL,
                     rating FLOAT,
                     ultrahd BOOLEAN
                 )",
                 "INSERT INTO movies VALUES
-                    (1, 'Stalker', 1, 1979, 8.2, FALSE),
-                    (2, 'Sicario', 2, 2015, 7.6, TRUE),
-                    (3, 'Primer', 1, 2004, 6.9, NULL),
-                    (4, 'Heat', 2, 1995, 8.2, TRUE),
-                    (5, 'The Fountain', 1, 2006, 7.2, FALSE)"
+                    (1, 'Stalker', 1, 1, 1979, 8.2, FALSE),
+                    (2, 'Sicario', 2, 2, 2015, 7.6, TRUE),
+                    (3, 'Primer', 3, 1, 2004, 6.9, NULL),
+                    (4, 'Heat', 4, 2, 1995, 8.2, TRUE),
+                    (5, 'The Fountain', 4, 1, 2006, 7.2, FALSE)",
             ]);
             let engine = super::setup(setup)?;
 

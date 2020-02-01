@@ -112,5 +112,5 @@ Optimized plan: Plan {
 
 Query: SELECT * FROM movies WHERE released >= 2000 AND ultrahd
 
-Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]
-[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]

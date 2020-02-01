@@ -56,6 +56,6 @@ Optimized plan: Plan {
 
 Query: SELECT * FROM movies LIMIT 2 OFFSET 1
 
-Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]
-[Integer(2), String("Sicario"), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
-[Integer(3), String("Primer"), Integer(1), Integer(2004), Float(6.9), Null]
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]

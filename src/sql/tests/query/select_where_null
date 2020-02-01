@@ -48,4 +48,4 @@ Optimized plan: Plan {
 
 Query: SELECT * FROM movies WHERE NULL
 
-Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]

@@ -44,4 +44,4 @@ Optimized plan: Plan {
 
 Query: SELECT * FROM movies OFFSET 9223372036854775807
 
-Result: ["id", "title", "genre_id", "released", "rating", "ultrahd"]
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
