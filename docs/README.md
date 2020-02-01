@@ -265,7 +265,7 @@ Selects rows from a table.
 
 <pre>
 SELECT [ * | <b><i>expression</i></b> [ [ AS ] <b><i>output_name</i></b> [, ...] ] ]
-    [ FROM <b><i>table_name</i></b> [ CROSS JOIN <b><i>table_name</i></b> [ ... ] ] ]
+    [ FROM <b><i>table_name</i></b> [ CROSS JOIN <b><i>table_name</i></b> [ ... ] ] [, ...] ]
     [ WHERE <b><i>predicate</i></b> ]
     [ ORDER BY <b><i>order_expr</i></b> [ ASC | DESC ] [, ...] ]
     [ LIMIT <b><i>count</i></b> ]

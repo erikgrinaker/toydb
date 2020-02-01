@@ -52,8 +52,20 @@ impl Planner {
             },
             ast::Statement::Select { select, from, r#where, order, limit, offset } => {
                 let mut n: Node = match from {
-                    // FIXME Handle multiple FROM items
-                    Some(from) => self.build_from_item(from.items[0].clone())?,
+                    Some(from) => {
+                        let mut items = from.items.into_iter().rev();
+                        let mut node = match items.next() {
+                            Some(item) => self.build_from_item(item)?,
+                            None => return Err(Error::Value("No from items given".into())),
+                        };
+                        for item in items {
+                            node = Node::NestedLoopJoin {
+                                outer: Box::new(self.build_from_item(item)?),
+                                inner: Box::new(node),
+                            }
+                        }
+                        node
+                    }
                     None if select.expressions.is_empty() => {
                         return Err(Error::Value("Can't select * without a table".into()))
                     }

@@ -1,0 +1,96 @@
+Query: SELECT * FROM movies, genres, countries
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: None,
+                },
+                FromItem {
+                    table: "genres",
+                    join: None,
+                },
+                FromItem {
+                    table: "countries",
+                    join: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+        },
+        inner: NestedLoopJoin {
+            outer: Scan {
+                table: "genres",
+            },
+            inner: Scan {
+                table: "countries",
+            },
+        },
+    },
+}
+
+Optimized plan: Plan {
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+        },
+        inner: NestedLoopJoin {
+            outer: Scan {
+                table: "genres",
+            },
+            inner: Scan {
+                table: "countries",
+            },
+        },
+    },
+}
+
+Query: SELECT * FROM movies, genres, countries
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name", "id", "name"]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("fr"), String("France")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("ru"), String("Russia")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("us"), String("United States of America")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("us"), String("United States of America")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America")]

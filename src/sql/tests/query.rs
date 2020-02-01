@@ -149,6 +149,7 @@ test_query! {
 
     from_bare: "SELECT * FROM",
     from_unknown: "SELECT * FROM unknown",
+    from_multiple: "SELECT * FROM movies, genres, countries",
 
     where_bare: "SELECT * FROM movies WHERE",
     where_true: "SELECT * FROM movies WHERE TRUE",
