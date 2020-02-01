@@ -42,12 +42,12 @@ pub type Expressions = Vec<Expression>;
 
 impl Expression {
     /// Evaluates an expression to a value, given an environment
-    pub fn evaluate(&self, e: &Environment) -> Result<Value, Error> {
+    pub fn evaluate<E: Environment>(&self, e: &E) -> Result<Value, Error> {
         use Value::*;
         Ok(match self {
             // Constant values
             Self::Constant(c) => c.clone(),
-            Self::Field(f) => e.get_field(f)?,
+            Self::Field(f) => e.lookup(f)?,
 
             // Logical operations
             Self::And(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
@@ -369,27 +369,22 @@ impl Expression {
     }
 }
 
-/// An expression evaluation environment, containing field values
-pub struct Environment {
-    fields: HashMap<String, Value>,
-}
+/// An expression evaluation environment
+pub trait Environment {
+    /// Attempts to fetch a field value from the environment
+    fn get(&self, field: &str) -> Option<Value>;
 
-impl Environment {
-    /// Creates a new environment from a field map
-    pub fn new(fields: HashMap<String, Value>) -> Self {
-        Self { fields }
-    }
-
-    /// Creates an empty environment
-    pub fn empty() -> Self {
-        Self::new(HashMap::new())
-    }
-
-    /// Fetches a field value, or throws Error::Value if missing
-    pub fn get_field(&self, field: &str) -> Result<Value, Error> {
-        match self.fields.get(field) {
-            Some(v) => Ok(v.clone()),
+    /// Fetches a field value from the environment, otherwise errors
+    fn lookup(&self, field: &str) -> Result<Value, Error> {
+        match self.get(field) {
+            Some(value) => Ok(value),
             None => Err(Error::Value(format!("Unknown field {}", field))),
         }
+    }
+}
+
+impl Environment for HashMap<String, Value> {
+    fn get(&self, field: &str) -> Option<Value> {
+        self.get(field).cloned()
     }
 }

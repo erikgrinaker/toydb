@@ -1,8 +1,10 @@
 use super::super::engine::Transaction;
-use super::super::types::expression::{Environment, Expression};
+use super::super::types::expression::Expression;
 use super::super::types::Value;
 use super::{Context, Executor, ResultSet};
 use crate::Error;
+
+use std::collections::HashMap;
 
 /// A filter executor
 pub struct Filter<T: Transaction> {
@@ -26,9 +28,8 @@ impl<T: Transaction> Executor<T> for Filter<T> {
             let predicate = self.predicate;
             result.rows = Some(Box::new(rows.filter_map(move |r| {
                 r.and_then(|row| {
-                    let env = Environment::new(
-                        columns.iter().cloned().zip(row.iter().cloned()).collect(),
-                    );
+                    let env: HashMap<_, _> =
+                        columns.iter().cloned().zip(row.iter().cloned()).collect();
                     match predicate.evaluate(&env)? {
                         Value::Boolean(true) => Ok(Some(row)),
                         Value::Boolean(false) => Ok(None),

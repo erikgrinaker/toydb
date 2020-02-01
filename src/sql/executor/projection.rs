@@ -1,7 +1,9 @@
 use super::super::engine::Transaction;
-use super::super::types::expression::{Environment, Expression, Expressions};
+use super::super::types::expression::{Expression, Expressions};
 use super::{Context, Executor, ResultSet};
 use crate::Error;
+
+use std::collections::HashMap;
 
 /// A filter executor
 pub struct Projection<T: Transaction> {
@@ -46,8 +48,7 @@ impl<T: Transaction> Executor<T> for Projection<T> {
             let expressions = self.expressions;
             result.rows = Some(Box::new(rows.map(move |r| {
                 r.and_then(|row| {
-                    let env =
-                        Environment::new(columns.iter().cloned().zip(row.into_iter()).collect());
+                    let env: HashMap<_, _> = columns.iter().cloned().zip(row.into_iter()).collect();
                     Ok(expressions
                         .iter()
                         .map(|e| e.evaluate(&env))

@@ -1,7 +1,8 @@
 use super::super::engine::Transaction;
-use super::super::types::expression::{Environment, Expression};
+use super::super::types::expression::Expression;
 use super::{Context, Effect, Executor, ResultSet};
 use crate::Error;
+
 use std::collections::BTreeMap;
 
 /// An UPDATE executor
@@ -32,7 +33,7 @@ impl<T: Transaction> Executor<T> for Update<T> {
         let mut count = 0;
         while let Some(mut row) = source.next().transpose()? {
             let id = table.get_row_key(&row)?;
-            let env = Environment::new(table.make_row_hashmap(row.clone()));
+            let env = table.make_row_hashmap(row.clone());
             for (field, expr) in &self.expressions {
                 table.set_row_field(&mut row, field, expr.evaluate(&env)?)?;
             }

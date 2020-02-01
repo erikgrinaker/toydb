@@ -1,9 +1,11 @@
 use super::super::engine::Transaction;
 use super::super::planner::Direction;
-use super::super::types::expression::{Environment, Expression};
+use super::super::types::expression::Expression;
 use super::super::types::{Row, Value};
 use super::{Context, Executor, ResultSet};
 use crate::Error;
+
+use std::collections::HashMap;
 
 /// An order executor
 pub struct Order<T: Transaction> {
@@ -34,9 +36,8 @@ impl<T: Transaction> Executor<T> for Order<T> {
             };
             let mut items = Vec::new();
             while let Some(row) = rows.next().transpose()? {
-                let env = Environment::new(
-                    result.columns.iter().cloned().zip(row.iter().cloned()).collect(),
-                );
+                let env: HashMap<_, _> =
+                    result.columns.iter().cloned().zip(row.iter().cloned()).collect();
                 let mut values = Vec::new();
                 for (expr, _) in self.order.iter() {
                     values.push(expr.evaluate(&env)?);
