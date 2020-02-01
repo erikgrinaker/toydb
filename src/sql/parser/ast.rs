@@ -58,7 +58,27 @@ pub struct SelectClause {
 /// A FROM clause
 #[derive(Clone, Debug, PartialEq)]
 pub struct FromClause {
-    pub tables: Vec<String>,
+    pub items: Vec<FromItem>,
+}
+
+/// A FROM item
+#[derive(Clone, Debug, PartialEq)]
+pub struct FromItem {
+    pub table: String,
+    pub join: Option<Join>,
+}
+
+/// A JOIN clause
+#[derive(Clone, Debug, PartialEq)]
+pub struct Join {
+    pub item: Box<FromItem>,
+    pub r#type: JoinType,
+}
+
+/// A JOIN type
+#[derive(Clone, Debug, PartialEq)]
+pub enum JoinType {
+    Cross,
 }
 
 /// A WHERE clause

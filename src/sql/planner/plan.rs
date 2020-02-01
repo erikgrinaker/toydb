@@ -45,6 +45,7 @@ pub enum Node {
     Filter { source: Box<Self>, predicate: Expression },
     Insert { table: String, columns: Vec<String>, expressions: Vec<Expressions> },
     Limit { source: Box<Self>, limit: u64 },
+    NestedLoopJoin { outer: Box<Self>, inner: Box<Self> },
     Nothing,
     Offset { source: Box<Self>, offset: u64 },
     Order { source: Box<Self>, orders: Vec<(Expression, Direction)> },
@@ -77,6 +78,10 @@ impl Node {
             Self::Limit { source, limit } => {
                 Self::Limit { source: source.transform(pre, post)?.into(), limit }
             }
+            Self::NestedLoopJoin { outer, inner } => Self::NestedLoopJoin {
+                outer: outer.transform(pre, post)?.into(),
+                inner: inner.transform(pre, post)?.into(),
+            },
             Self::Offset { source, offset } => {
                 Self::Offset { source: source.transform(pre, post)?.into(), offset }
             }
@@ -107,6 +112,7 @@ impl Node {
             n @ Self::Delete { .. } => n,
             n @ Self::DropTable { .. } => n,
             n @ Self::Limit { .. } => n,
+            n @ Self::NestedLoopJoin { .. } => n,
             n @ Self::Nothing => n,
             n @ Self::Offset { .. } => n,
             n @ Self::Scan { .. } => n,

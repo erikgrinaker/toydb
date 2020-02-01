@@ -4,6 +4,7 @@ mod drop_table;
 mod filter;
 mod insert;
 mod limit;
+mod nested_loop_join;
 mod nothing;
 mod offset;
 mod order;
@@ -17,6 +18,7 @@ use drop_table::DropTable;
 use filter::Filter;
 use insert::Insert;
 use limit::Limit;
+use nested_loop_join::NestedLoopJoin;
 use nothing::Nothing;
 use offset::Offset;
 use order::Order;
@@ -47,6 +49,9 @@ impl<T: Transaction + 'static> dyn Executor<T> {
                 Insert::new(table, columns, expressions)
             }
             Node::Limit { source, limit } => Limit::new(Self::build(*source), limit),
+            Node::NestedLoopJoin { outer, inner } => {
+                NestedLoopJoin::new(Self::build(*outer), Self::build(*inner))
+            }
             Node::Nothing => Nothing::new(),
             Node::Offset { source, offset } => Offset::new(Self::build(*source), offset),
             Node::Order { source, orders } => Order::new(Self::build(*source), orders),

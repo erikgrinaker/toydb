@@ -52,8 +52,8 @@ impl Planner {
             },
             ast::Statement::Select { select, from, r#where, order, limit, offset } => {
                 let mut n: Node = match from {
-                    // FIXME Handle multiple FROM tables
-                    Some(from) => Node::Scan { table: from.tables[0].clone() },
+                    // FIXME Handle multiple FROM items
+                    Some(from) => self.build_from_item(from.items[0].clone())?,
                     None if select.expressions.is_empty() => {
                         return Err(Error::Value("Can't select * without a table".into()))
                     }
@@ -132,6 +132,20 @@ impl Planner {
     /// Builds an array of plan expressions from AST expressions
     fn build_expressions(&self, exprs: Vec<ast::Expression>) -> Result<Vec<Expression>, Error> {
         exprs.into_iter().map(|e| self.build_expression(e)).collect()
+    }
+
+    /// Builds FROM items
+    fn build_from_item(&self, item: ast::FromItem) -> Result<Node, Error> {
+        let mut node = Node::Scan { table: item.table.clone() };
+        if let Some(join) = item.join {
+            node = match join.r#type {
+                ast::JoinType::Cross => Node::NestedLoopJoin {
+                    outer: Box::new(node),
+                    inner: Box::new(self.build_from_item(*join.item)?),
+                },
+            }
+        }
+        Ok(node)
     }
 
     /// Builds a table schema from an AST CreateTable node

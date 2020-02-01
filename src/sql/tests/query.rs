@@ -234,4 +234,7 @@ test_query! {
     offset_boolean: "SELECT * FROM movies OFFSET TRUE",
     offset_float: "SELECT * FROM movies OFFSET 3.14",
     offset_string: "SELECT * FROM movies OFFSET 'abc'",
+
+    join_cross: "SELECT * FROM movies CROSS JOIN genres",
+    join_cross_multi: "SELECT * FROM movies CROSS JOIN genres CROSS JOIN countries CROSS JOIN studios",
 }

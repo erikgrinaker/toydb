@@ -7,8 +7,11 @@ AST: Select {
     },
     from: Some(
         FromClause {
-            tables: [
-                "strings",
+            items: [
+                FromItem {
+                    table: "strings",
+                    join: None,
+                },
             ],
         },
     ),

@@ -1,0 +1,212 @@
+Query: SELECT * FROM movies CROSS JOIN genres CROSS JOIN countries CROSS JOIN studios
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: Some(
+                        Join {
+                            item: FromItem {
+                                table: "genres",
+                                join: Some(
+                                    Join {
+                                        item: FromItem {
+                                            table: "countries",
+                                            join: Some(
+                                                Join {
+                                                    item: FromItem {
+                                                        table: "studios",
+                                                        join: None,
+                                                    },
+                                                    type: Cross,
+                                                },
+                                            ),
+                                        },
+                                        type: Cross,
+                                    },
+                                ),
+                            },
+                            type: Cross,
+                        },
+                    ),
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+        },
+        inner: NestedLoopJoin {
+            outer: Scan {
+                table: "genres",
+            },
+            inner: NestedLoopJoin {
+                outer: Scan {
+                    table: "countries",
+                },
+                inner: Scan {
+                    table: "studios",
+                },
+            },
+        },
+    },
+}
+
+Optimized plan: Plan {
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+        },
+        inner: NestedLoopJoin {
+            outer: Scan {
+                table: "genres",
+            },
+            inner: NestedLoopJoin {
+                outer: Scan {
+                    table: "countries",
+                },
+                inner: Scan {
+                    table: "studios",
+                },
+            },
+        },
+    },
+}
+
+Query: SELECT * FROM movies CROSS JOIN genres CROSS JOIN countries CROSS JOIN studios
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name", "id", "name", "id", "name", "country_id"]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(2), String("Action"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("fr"), String("France"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("ru"), String("Russia"), Integer(4), String("Warner Bros"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(1), String("Mosfilm"), String("ru")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(2), String("Lionsgate"), String("us")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(3), String("StudioCanal"), String("fr")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(2), String("Action"), String("us"), String("United States of America"), Integer(4), String("Warner Bros"), String("us")]

@@ -345,9 +345,27 @@ impl<'a> Parser<'a> {
         if self.next_if_token(Keyword::From.into()).is_none() {
             return Ok(None);
         }
-        let mut clause = ast::FromClause { tables: Vec::new() };
-        clause.tables.push(self.next_ident()?);
+        let mut clause = ast::FromClause { items: Vec::new() };
+        loop {
+            clause.items.push(self.parse_clause_from_item()?);
+            if self.next_if_token(Token::Comma).is_none() {
+                break;
+            }
+        }
         Ok(Some(clause))
+    }
+
+    /// Parses a from clause item
+    fn parse_clause_from_item(&mut self) -> Result<ast::FromItem, Error> {
+        let mut item = ast::FromItem { table: self.next_ident()?, join: None };
+        if self.next_if_token(Keyword::Cross.into()).is_some() {
+            self.next_expect(Some(Keyword::Join.into()))?;
+            item.join = Some(ast::Join {
+                item: Box::new(self.parse_clause_from_item()?),
+                r#type: ast::JoinType::Cross,
+            })
+        }
+        Ok(item)
     }
 
     /// Parses an order clause
