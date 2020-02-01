@@ -9,7 +9,6 @@ fn main() {
         out_dir: "src/service",
         includes: &[],
         rust_protobuf: true,
-        ..Default::default()
     })
     .expect("protoc-rust-grpc");
 
