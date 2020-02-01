@@ -10,6 +10,7 @@ AST: Select {
             items: [
                 FromItem {
                     table: "floats",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -33,6 +34,7 @@ Plan: Plan {
     root: Order {
         source: Scan {
             table: "floats",
+            alias: None,
         },
         orders: [
             (
@@ -50,6 +52,7 @@ Optimized plan: Plan {
     root: Order {
         source: Scan {
             table: "floats",
+            alias: None,
         },
         orders: [
             (

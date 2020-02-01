@@ -29,7 +29,6 @@ use update::Update;
 use super::engine::Transaction;
 use super::planner::Node;
 use super::types::expression::Environment;
-use super::types::schema::Table;
 use super::types::{Row, Value};
 use crate::Error;
 
@@ -60,7 +59,7 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Projection { source, labels, expressions } => {
                 Projection::new(Self::build(*source), labels, expressions)
             }
-            Node::Scan { table } => Scan::new(table),
+            Node::Scan { table, alias } => Scan::new(table, alias),
             Node::Update { table, source, expressions } => {
                 Update::new(table, Self::build(*source), expressions)
             }
@@ -140,16 +139,6 @@ pub struct ResultColumns {
 impl ResultColumns {
     pub fn new(columns: Vec<(Option<String>, Option<String>)>) -> Self {
         Self { columns }
-    }
-
-    pub fn from_table(table: &Table) -> Self {
-        Self {
-            columns: table
-                .columns
-                .iter()
-                .map(|c| (Some(table.name.clone()), Some(c.name.clone())))
-                .collect(),
-        }
     }
 
     fn as_env<'b>(&'b self, row: &'b [Value]) -> ResultEnv<'b> {

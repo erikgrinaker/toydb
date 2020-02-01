@@ -1,11 +1,11 @@
-Query: SELECT unknown.id FROM movies
+Query: SELECT movies.id FROM movies AS m
 
 AST: Select {
     select: SelectClause {
         expressions: [
             Field(
                 Some(
-                    "unknown",
+                    "movies",
                 ),
                 "id",
             ),
@@ -19,7 +19,9 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
-                    alias: None,
+                    alias: Some(
+                        "m",
+                    ),
                     join: None,
                 },
             ],
@@ -35,7 +37,9 @@ Plan: Plan {
     root: Projection {
         source: Scan {
             table: "movies",
-            alias: None,
+            alias: Some(
+                "m",
+            ),
         },
         labels: [
             None,
@@ -43,7 +47,7 @@ Plan: Plan {
         expressions: [
             Field(
                 Some(
-                    "unknown",
+                    "movies",
                 ),
                 "id",
             ),
@@ -55,7 +59,9 @@ Optimized plan: Plan {
     root: Projection {
         source: Scan {
             table: "movies",
-            alias: None,
+            alias: Some(
+                "m",
+            ),
         },
         labels: [
             None,
@@ -63,7 +69,7 @@ Optimized plan: Plan {
         expressions: [
             Field(
                 Some(
-                    "unknown",
+                    "movies",
                 ),
                 "id",
             ),
@@ -71,6 +77,6 @@ Optimized plan: Plan {
     },
 }
 
-Query: SELECT unknown.id FROM movies
+Query: SELECT movies.id FROM movies AS m
 
-Result: Value("Unknown field unknown.id")
+Result: Value("Unknown field movies.id")

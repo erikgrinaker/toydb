@@ -10,6 +10,7 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -38,6 +39,7 @@ Plan: Plan {
         source: Offset {
             source: Scan {
                 table: "movies",
+                alias: None,
             },
             offset: 1,
         },
@@ -50,6 +52,7 @@ Optimized plan: Plan {
         source: Offset {
             source: Scan {
                 table: "movies",
+                alias: None,
             },
             offset: 1,
         },

@@ -43,6 +43,7 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -76,6 +77,7 @@ Plan: Plan {
         source: Projection {
             source: Scan {
                 table: "movies",
+                alias: None,
             },
             labels: [
                 None,
@@ -135,6 +137,7 @@ Optimized plan: Plan {
         source: Projection {
             source: Scan {
                 table: "movies",
+                alias: None,
             },
             labels: [
                 None,

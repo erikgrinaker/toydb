@@ -10,6 +10,7 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -32,6 +33,7 @@ Plan: Plan {
     root: Filter {
         source: Scan {
             table: "movies",
+            alias: None,
         },
         predicate: Field(
             None,
@@ -44,6 +46,7 @@ Optimized plan: Plan {
     root: Filter {
         source: Scan {
             table: "movies",
+            alias: None,
         },
         predicate: Field(
             None,

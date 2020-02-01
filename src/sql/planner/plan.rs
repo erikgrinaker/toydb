@@ -50,7 +50,7 @@ pub enum Node {
     Offset { source: Box<Self>, offset: u64 },
     Order { source: Box<Self>, orders: Vec<(Expression, Direction)> },
     Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
-    Scan { table: String },
+    Scan { table: String, alias: Option<String> },
     // Uses BTreeMap for test stability
     Update { table: String, source: Box<Self>, expressions: BTreeMap<String, Expression> },
 }

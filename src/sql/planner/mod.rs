@@ -37,7 +37,7 @@ impl Planner {
                 Node::CreateTable { schema: self.build_schema_table(name, columns)? }
             }
             ast::Statement::Delete { table, r#where } => {
-                let mut source = Node::Scan { table: table.clone() };
+                let mut source = Node::Scan { table: table.clone(), alias: None };
                 if let Some(ast::WhereClause(expr)) = r#where {
                     source = Node::Filter { source: Box::new(source), predicate: expr.into() };
                 }
@@ -91,7 +91,6 @@ impl Planner {
                         orders: order.into_iter().map(|(e, o)| (e.into(), o.into())).collect(),
                     };
                 }
-                // FIXME Limit and offset need to check that the expression is constant
                 if let Some(expr) = offset {
                     let expr = Expression::from(expr);
                     if !expr.is_constant() {
@@ -125,7 +124,7 @@ impl Planner {
                 n
             }
             ast::Statement::Update { table, set, r#where } => {
-                let mut source = Node::Scan { table: table.clone() };
+                let mut source = Node::Scan { table: table.clone(), alias: None };
                 if let Some(ast::WhereClause(expr)) = r#where {
                     source = Node::Filter { source: Box::new(source), predicate: expr.into() };
                 }
@@ -150,7 +149,7 @@ impl Planner {
 
     /// Builds FROM items
     fn build_from_item(&self, item: ast::FromItem) -> Result<Node, Error> {
-        let mut node = Node::Scan { table: item.table.clone() };
+        let mut node = Node::Scan { table: item.table.clone(), alias: item.alias.clone() };
         if let Some(join) = item.join {
             node = match join.r#type {
                 ast::JoinType::Cross => Node::NestedLoopJoin {

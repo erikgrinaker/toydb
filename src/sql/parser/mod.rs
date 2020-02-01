@@ -359,7 +359,12 @@ impl<'a> Parser<'a> {
 
     /// Parses a from clause item
     fn parse_clause_from_item(&mut self) -> Result<ast::FromItem, Error> {
-        let mut item = ast::FromItem { table: self.next_ident()?, join: None };
+        let mut item = ast::FromItem { table: self.next_ident()?, alias: None, join: None };
+        if self.next_if_token(Keyword::As.into()).is_some() {
+            item.alias = Some(self.next_ident()?);
+        } else if let Some(Token::Ident(_)) = self.peek()? {
+            item.alias = Some(self.next_ident()?)
+        }
         if self.next_if_token(Keyword::Cross.into()).is_some() {
             self.next_expect(Some(Keyword::Join.into()))?;
             item.join = Some(ast::Join {

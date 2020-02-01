@@ -65,6 +65,7 @@ pub struct FromClause {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FromItem {
     pub table: String,
+    pub alias: Option<String>,
     pub join: Option<Join>,
 }
 

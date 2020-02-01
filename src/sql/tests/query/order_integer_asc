@@ -10,6 +10,7 @@ AST: Select {
             items: [
                 FromItem {
                     table: "integers",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -33,6 +34,7 @@ Plan: Plan {
     root: Order {
         source: Scan {
             table: "integers",
+            alias: None,
         },
         orders: [
             (
@@ -50,6 +52,7 @@ Optimized plan: Plan {
     root: Order {
         source: Scan {
             table: "integers",
+            alias: None,
         },
         orders: [
             (

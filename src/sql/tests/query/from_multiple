@@ -10,14 +10,17 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: None,
                 },
                 FromItem {
                     table: "genres",
+                    alias: None,
                     join: None,
                 },
                 FromItem {
                     table: "countries",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -33,13 +36,16 @@ Plan: Plan {
     root: NestedLoopJoin {
         outer: Scan {
             table: "movies",
+            alias: None,
         },
         inner: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
+                alias: None,
             },
             inner: Scan {
                 table: "countries",
+                alias: None,
             },
         },
     },
@@ -49,13 +55,16 @@ Optimized plan: Plan {
     root: NestedLoopJoin {
         outer: Scan {
             table: "movies",
+            alias: None,
         },
         inner: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
+                alias: None,
             },
             inner: Scan {
                 table: "countries",
+                alias: None,
             },
         },
     },

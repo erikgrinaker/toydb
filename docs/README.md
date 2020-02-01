@@ -267,7 +267,7 @@ Selects rows from a table.
 
 <pre>
 SELECT [ * | <b><i>expression</i></b> [ [ AS ] <b><i>output_name</i></b> [, ...] ] ]
-    [ FROM <b><i>table_name</i></b> [ CROSS JOIN <b><i>table_name</i></b> [ ... ] ] [, ...] ]
+    [ FROM <b><i>table_name</i></b> [ [ AS ] <b><i>alias</i></b> ] [ CROSS JOIN <b><i>table_name</i></b> [ ... ] ] [, ...] ]
     [ WHERE <b><i>predicate</i></b> ]
     [ ORDER BY <b><i>order_expr</i></b> [ ASC | DESC ] [, ...] ]
     [ LIMIT <b><i>count</i></b> ]
@@ -281,6 +281,8 @@ Fetches rows or expressions, either from table ***`table_name`*** (if given) or 
 * ***`output_name`***: output column [identifier](#identifier), defaults to field name (if single field) otherwise nothing (displayed as `?`).
 
 * ***`table_name`***: table to fetch rows from.
+
+* ***`alias`***: table alias.
 
 * ***`predicate`***: only return rows for which this [expression](#expressions) evaluates to `TRUE`.
 

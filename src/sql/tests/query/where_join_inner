@@ -10,10 +10,12 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: None,
                 },
                 FromItem {
                     table: "genres",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -49,9 +51,11 @@ Plan: Plan {
         source: NestedLoopJoin {
             outer: Scan {
                 table: "movies",
+                alias: None,
             },
             inner: Scan {
                 table: "genres",
+                alias: None,
             },
         },
         predicate: Equal(
@@ -76,9 +80,11 @@ Optimized plan: Plan {
         source: NestedLoopJoin {
             outer: Scan {
                 table: "movies",
+                alias: None,
             },
             inner: Scan {
                 table: "genres",
+                alias: None,
             },
         },
         predicate: Equal(

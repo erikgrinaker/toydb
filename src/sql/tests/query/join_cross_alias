@@ -1,0 +1,435 @@
+Query: 
+        SELECT m.id, m.title, g.id, g.name, c.id, c.name
+        FROM movies AS m CROSS JOIN genres g CROSS JOIN countries c
+        WHERE m.id >= 3 AND g.id = 2 AND c.id != 'us'
+    
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+            Field(
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+            Field(
+                Some(
+                    "c",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "c",
+                ),
+                "name",
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                    join: Some(
+                        Join {
+                            item: FromItem {
+                                table: "genres",
+                                alias: Some(
+                                    "g",
+                                ),
+                                join: Some(
+                                    Join {
+                                        item: FromItem {
+                                            table: "countries",
+                                            alias: Some(
+                                                "c",
+                                            ),
+                                            join: None,
+                                        },
+                                        type: Cross,
+                                    },
+                                ),
+                            },
+                            type: Cross,
+                        },
+                    ),
+                },
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Operation(
+                And(
+                    Operation(
+                        And(
+                            Operation(
+                                GreaterThanOrEqual(
+                                    Field(
+                                        Some(
+                                            "m",
+                                        ),
+                                        "id",
+                                    ),
+                                    Literal(
+                                        Integer(
+                                            3,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            Operation(
+                                Equal(
+                                    Field(
+                                        Some(
+                                            "g",
+                                        ),
+                                        "id",
+                                    ),
+                                    Literal(
+                                        Integer(
+                                            2,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                    Operation(
+                        NotEqual(
+                            Field(
+                                Some(
+                                    "c",
+                                ),
+                                "id",
+                            ),
+                            Literal(
+                                String(
+                                    "us",
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Filter {
+            source: NestedLoopJoin {
+                outer: Scan {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                },
+                inner: NestedLoopJoin {
+                    outer: Scan {
+                        table: "genres",
+                        alias: Some(
+                            "g",
+                        ),
+                    },
+                    inner: Scan {
+                        table: "countries",
+                        alias: Some(
+                            "c",
+                        ),
+                    },
+                },
+            },
+            predicate: And(
+                And(
+                    Or(
+                        GreaterThan(
+                            Field(
+                                Some(
+                                    "m",
+                                ),
+                                "id",
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                        Equal(
+                            Field(
+                                Some(
+                                    "m",
+                                ),
+                                "id",
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                    ),
+                    Equal(
+                        Field(
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                    ),
+                ),
+                Not(
+                    Equal(
+                        Field(
+                            Some(
+                                "c",
+                            ),
+                            "id",
+                        ),
+                        Constant(
+                            String(
+                                "us",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+            Field(
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+            Field(
+                Some(
+                    "c",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "c",
+                ),
+                "name",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Filter {
+            source: NestedLoopJoin {
+                outer: Scan {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                },
+                inner: NestedLoopJoin {
+                    outer: Scan {
+                        table: "genres",
+                        alias: Some(
+                            "g",
+                        ),
+                    },
+                    inner: Scan {
+                        table: "countries",
+                        alias: Some(
+                            "c",
+                        ),
+                    },
+                },
+            },
+            predicate: And(
+                And(
+                    Or(
+                        GreaterThan(
+                            Field(
+                                Some(
+                                    "m",
+                                ),
+                                "id",
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                        Equal(
+                            Field(
+                                Some(
+                                    "m",
+                                ),
+                                "id",
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                    ),
+                    Equal(
+                        Field(
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                    ),
+                ),
+                Not(
+                    Equal(
+                        Field(
+                            Some(
+                                "c",
+                            ),
+                            "id",
+                        ),
+                        Constant(
+                            String(
+                                "us",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+            Field(
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+            Field(
+                Some(
+                    "c",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "c",
+                ),
+                "name",
+            ),
+        ],
+    },
+}
+
+Query: 
+        SELECT m.id, m.title, g.id, g.name, c.id, c.name
+        FROM movies AS m CROSS JOIN genres g CROSS JOIN countries c
+        WHERE m.id >= 3 AND g.id = 2 AND c.id != 'us'
+    
+
+Result: ["id", "title", "id", "name", "id", "name"]
+[Integer(3), String("Primer"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(3), String("Primer"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(4), String("Heat"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(4), String("Heat"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(5), String("The Fountain"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(5), String("The Fountain"), Integer(2), String("Action"), String("ru"), String("Russia")]

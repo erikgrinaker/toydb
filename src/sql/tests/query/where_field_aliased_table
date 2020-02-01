@@ -1,17 +1,17 @@
-Query: SELECT movies.id, genres.id FROM movies, genres WHERE movies.id >= 3 AND genres.id = 1
+Query: SELECT m.id, g.id FROM movies m, genres g WHERE m.id >= 3 AND g.id = 1
 
 AST: Select {
     select: SelectClause {
         expressions: [
             Field(
                 Some(
-                    "movies",
+                    "m",
                 ),
                 "id",
             ),
             Field(
                 Some(
-                    "genres",
+                    "g",
                 ),
                 "id",
             ),
@@ -26,12 +26,16 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
-                    alias: None,
+                    alias: Some(
+                        "m",
+                    ),
                     join: None,
                 },
                 FromItem {
                     table: "genres",
-                    alias: None,
+                    alias: Some(
+                        "g",
+                    ),
                     join: None,
                 },
             ],
@@ -45,7 +49,7 @@ AST: Select {
                         GreaterThanOrEqual(
                             Field(
                                 Some(
-                                    "movies",
+                                    "m",
                                 ),
                                 "id",
                             ),
@@ -60,7 +64,7 @@ AST: Select {
                         Equal(
                             Field(
                                 Some(
-                                    "genres",
+                                    "g",
                                 ),
                                 "id",
                             ),
@@ -86,11 +90,15 @@ Plan: Plan {
             source: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    alias: Some(
+                        "m",
+                    ),
                 },
                 inner: Scan {
                     table: "genres",
-                    alias: None,
+                    alias: Some(
+                        "g",
+                    ),
                 },
             },
             predicate: And(
@@ -98,7 +106,7 @@ Plan: Plan {
                     GreaterThan(
                         Field(
                             Some(
-                                "movies",
+                                "m",
                             ),
                             "id",
                         ),
@@ -111,7 +119,7 @@ Plan: Plan {
                     Equal(
                         Field(
                             Some(
-                                "movies",
+                                "m",
                             ),
                             "id",
                         ),
@@ -125,7 +133,7 @@ Plan: Plan {
                 Equal(
                     Field(
                         Some(
-                            "genres",
+                            "g",
                         ),
                         "id",
                     ),
@@ -144,13 +152,13 @@ Plan: Plan {
         expressions: [
             Field(
                 Some(
-                    "movies",
+                    "m",
                 ),
                 "id",
             ),
             Field(
                 Some(
-                    "genres",
+                    "g",
                 ),
                 "id",
             ),
@@ -164,11 +172,15 @@ Optimized plan: Plan {
             source: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    alias: Some(
+                        "m",
+                    ),
                 },
                 inner: Scan {
                     table: "genres",
-                    alias: None,
+                    alias: Some(
+                        "g",
+                    ),
                 },
             },
             predicate: And(
@@ -176,7 +188,7 @@ Optimized plan: Plan {
                     GreaterThan(
                         Field(
                             Some(
-                                "movies",
+                                "m",
                             ),
                             "id",
                         ),
@@ -189,7 +201,7 @@ Optimized plan: Plan {
                     Equal(
                         Field(
                             Some(
-                                "movies",
+                                "m",
                             ),
                             "id",
                         ),
@@ -203,7 +215,7 @@ Optimized plan: Plan {
                 Equal(
                     Field(
                         Some(
-                            "genres",
+                            "g",
                         ),
                         "id",
                     ),
@@ -222,13 +234,13 @@ Optimized plan: Plan {
         expressions: [
             Field(
                 Some(
-                    "movies",
+                    "m",
                 ),
                 "id",
             ),
             Field(
                 Some(
-                    "genres",
+                    "g",
                 ),
                 "id",
             ),
@@ -236,7 +248,7 @@ Optimized plan: Plan {
     },
 }
 
-Query: SELECT movies.id, genres.id FROM movies, genres WHERE movies.id >= 3 AND genres.id = 1
+Query: SELECT m.id, g.id FROM movies m, genres g WHERE m.id >= 3 AND g.id = 1
 
 Result: ["id", "id"]
 [Integer(3), Integer(1)]

@@ -10,6 +10,7 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -24,12 +25,14 @@ AST: Select {
 Plan: Plan {
     root: Scan {
         table: "movies",
+        alias: None,
     },
 }
 
 Optimized plan: Plan {
     root: Scan {
         table: "movies",
+        alias: None,
     },
 }
 

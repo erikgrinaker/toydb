@@ -10,18 +10,22 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: Some(
                         Join {
                             item: FromItem {
                                 table: "genres",
+                                alias: None,
                                 join: Some(
                                     Join {
                                         item: FromItem {
                                             table: "countries",
+                                            alias: None,
                                             join: Some(
                                                 Join {
                                                     item: FromItem {
                                                         table: "studios",
+                                                        alias: None,
                                                         join: None,
                                                     },
                                                     type: Cross,
@@ -49,17 +53,21 @@ Plan: Plan {
     root: NestedLoopJoin {
         outer: Scan {
             table: "movies",
+            alias: None,
         },
         inner: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
+                alias: None,
             },
             inner: NestedLoopJoin {
                 outer: Scan {
                     table: "countries",
+                    alias: None,
                 },
                 inner: Scan {
                     table: "studios",
+                    alias: None,
                 },
             },
         },
@@ -70,17 +78,21 @@ Optimized plan: Plan {
     root: NestedLoopJoin {
         outer: Scan {
             table: "movies",
+            alias: None,
         },
         inner: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
+                alias: None,
             },
             inner: NestedLoopJoin {
                 outer: Scan {
                     table: "countries",
+                    alias: None,
                 },
                 inner: Scan {
                     table: "studios",
+                    alias: None,
                 },
             },
         },

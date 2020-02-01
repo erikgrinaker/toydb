@@ -10,6 +10,7 @@ AST: Select {
             items: [
                 FromItem {
                     table: "movies",
+                    alias: None,
                     join: None,
                 },
             ],
@@ -40,6 +41,7 @@ Plan: Plan {
     root: Order {
         source: Scan {
             table: "movies",
+            alias: None,
         },
         orders: [
             (
@@ -64,6 +66,7 @@ Optimized plan: Plan {
     root: Order {
         source: Scan {
             table: "movies",
+            alias: None,
         },
         orders: [
             (

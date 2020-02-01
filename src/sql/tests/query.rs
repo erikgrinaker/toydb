@@ -148,8 +148,10 @@ test_query! {
     field_qualified_multi: "SELECT movies.id, genres.id FROM movies, genres",
     field_qualified_nested: "SELECT movies.id.value FROM movies",
     field_unknown: "SELECT unknown FROM movies",
+    field_unknown_aliased: "SELECT movies.id FROM movies AS m",
     field_unknown_qualified: "SELECT movies.unknown FROM movies",
     field_unknown_table: "SELECT unknown.id FROM movies",
+    field_aliased: "SELECT m.id, g.id FROM movies AS m, genres g",
 
     expr_dynamic: "SELECT 2020 - year AS age FROM movies",
     expr_static: "SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope",
@@ -177,6 +179,8 @@ test_query! {
     where_field_unknown: "SELECT * FROM movies WHERE unknown",
     where_field_qualified: "SELECT movies.id, genres.id FROM movies, genres WHERE movies.id >= 3 AND genres.id = 1",
     where_field_ambiguous: "SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3",
+    where_field_aliased_select: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m, genres g WHERE movie_id >= 3 AND genre_id = 1",
+    where_field_aliased_table: "SELECT m.id, g.id FROM movies m, genres g WHERE m.id >= 3 AND g.id = 1",
     where_join_inner: "SELECT * FROM movies, genres WHERE movies.genre_id = genres.id",
 
     order: "SELECT * FROM movies ORDER BY released",
@@ -257,5 +261,10 @@ test_query! {
     offset_string: "SELECT * FROM movies OFFSET 'abc'",
 
     join_cross: "SELECT * FROM movies CROSS JOIN genres",
+    join_cross_alias: r#"
+        SELECT m.id, m.title, g.id, g.name, c.id, c.name
+        FROM movies AS m CROSS JOIN genres g CROSS JOIN countries c
+        WHERE m.id >= 3 AND g.id = 2 AND c.id != 'us'
+    "#,
     join_cross_multi: "SELECT * FROM movies CROSS JOIN genres CROSS JOIN countries CROSS JOIN studios",
 }
