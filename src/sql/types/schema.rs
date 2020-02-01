@@ -1,9 +1,8 @@
 use super::super::engine::Transaction;
-use super::super::parser::lexer::Keyword;
+use super::super::parser::format_ident;
 use super::{DataType, Row, Value};
 use crate::Error;
 
-use regex::Regex;
 use std::collections::HashMap;
 
 /// A table schema
@@ -358,18 +357,5 @@ impl Column {
         }
 
         Ok(())
-    }
-}
-
-// Formats an identifier by quoting it as appropriate
-fn format_ident(ident: &str) -> String {
-    lazy_static! {
-        static ref RE_IDENT: Regex = Regex::new(r#"^\w[\w_]*$"#).unwrap();
-    }
-
-    if RE_IDENT.is_match(ident) && Keyword::from_str(ident).is_none() {
-        ident.to_string()
-    } else {
-        format!("\"{}\"", ident.replace("\"", "\"\""))
     }
 }

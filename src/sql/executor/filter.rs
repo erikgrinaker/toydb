@@ -4,8 +4,6 @@ use super::super::types::Value;
 use super::{Context, Executor, ResultSet};
 use crate::Error;
 
-use std::collections::HashMap;
-
 /// A filter executor
 pub struct Filter<T: Transaction> {
     /// The source of rows to filter
@@ -27,17 +25,12 @@ impl<T: Transaction> Executor<T> for Filter<T> {
             let columns = result.columns.clone();
             let predicate = self.predicate;
             result.rows = Some(Box::new(rows.filter_map(move |r| {
-                r.and_then(|row| {
-                    let env: HashMap<_, _> =
-                        columns.iter().cloned().zip(row.iter().cloned()).collect();
-                    match predicate.evaluate(&env)? {
-                        Value::Boolean(true) => Ok(Some(row)),
-                        Value::Boolean(false) => Ok(None),
-                        Value::Null => Ok(None),
-                        value => Err(Error::Value(format!(
-                            "Filter returned {}, expected boolean",
-                            value
-                        ))),
+                r.and_then(|row| match predicate.evaluate(&columns.as_env(&row))? {
+                    Value::Boolean(true) => Ok(Some(row)),
+                    Value::Boolean(false) => Ok(None),
+                    Value::Null => Ok(None),
+                    value => {
+                        Err(Error::Value(format!("Filter returned {}, expected boolean", value)))
                     }
                 })
                 .transpose()

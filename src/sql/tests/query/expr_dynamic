@@ -11,6 +11,7 @@ AST: Select {
                         ),
                     ),
                     Field(
+                        None,
                         "year",
                     ),
                 ),
@@ -56,6 +57,7 @@ Plan: Plan {
                     ),
                 ),
                 Field(
+                    None,
                     "year",
                 ),
             ),
@@ -81,6 +83,7 @@ Optimized plan: Plan {
                     ),
                 ),
                 Field(
+                    None,
                     "year",
                 ),
             ),

@@ -1,0 +1,88 @@
+Query: SELECT 1 AS a, 2 AS a
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Literal(
+                Integer(
+                    1,
+                ),
+            ),
+            Literal(
+                Integer(
+                    2,
+                ),
+            ),
+        ],
+        labels: [
+            Some(
+                "a",
+            ),
+            Some(
+                "a",
+            ),
+        ],
+    },
+    from: None,
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            Some(
+                "a",
+            ),
+            Some(
+                "a",
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Nothing,
+        labels: [
+            Some(
+                "a",
+            ),
+            Some(
+                "a",
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+        ],
+    },
+}
+
+Query: SELECT 1 AS a, 2 AS a
+
+Result: ["a", "a"]
+[Integer(1), Integer(2)]

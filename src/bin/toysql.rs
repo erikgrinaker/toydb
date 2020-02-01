@@ -169,7 +169,15 @@ Semicolons are not supported. The following !-commands are also available:
         }
 
         if self.show_headers {
-            println!("{}", resultset.columns().join("|"));
+            println!(
+                "{}",
+                resultset
+                    .columns()
+                    .into_iter()
+                    .map(|c| c.unwrap_or_else(|| "?".into()))
+                    .collect::<Vec<_>>()
+                    .join("|")
+            );
         }
         for result in resultset {
             let formatted: Vec<String> = result?.into_iter().map(|v| format!("{}", v)).collect();

@@ -1,0 +1,3 @@
+Query: SELECT 1 AS a.b FROM movies
+
+AST: Parse("Unexpected token .")

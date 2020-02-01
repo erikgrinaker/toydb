@@ -1,0 +1,3 @@
+Query: SELECT movies.id.value FROM movies
+
+AST: Parse("Unexpected token .")

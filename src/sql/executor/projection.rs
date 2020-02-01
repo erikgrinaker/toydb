@@ -1,9 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::expression::{Expression, Expressions};
-use super::{Context, Executor, ResultSet};
+use super::{Context, Executor, ResultColumns, ResultSet};
 use crate::Error;
-
-use std::collections::HashMap;
 
 /// A filter executor
 pub struct Projection<T: Transaction> {
@@ -30,25 +28,27 @@ impl<T: Transaction> Executor<T> for Projection<T> {
         let mut result = self.source.execute(ctx)?;
         let columns = result.columns;
         let labels = self.labels;
-        result.columns = self
-            .expressions
-            .iter()
-            .enumerate()
-            .map(|(i, e)| {
-                if let Some(Some(label)) = labels.get(i) {
-                    label.clone()
-                } else if let Expression::Field(field) = e {
-                    field.clone()
-                } else {
-                    "?".to_string()
-                }
-            })
-            .collect();
+        result.columns = ResultColumns::new(
+            self.expressions
+                .iter()
+                .enumerate()
+                .map(|(i, e)| {
+                    Ok(if let Some(Some(label)) = labels.get(i) {
+                        (None, Some(label.clone()))
+                    } else if let Expression::Field(relation, field) = e {
+                        let (r, f) = columns.get(relation.as_deref(), field)?;
+                        (r, Some(f))
+                    } else {
+                        (None, None)
+                    })
+                })
+                .collect::<Result<Vec<_>, Error>>()?,
+        );
         if let Some(rows) = result.rows {
             let expressions = self.expressions;
             result.rows = Some(Box::new(rows.map(move |r| {
                 r.and_then(|row| {
-                    let env: HashMap<_, _> = columns.iter().cloned().zip(row.into_iter()).collect();
+                    let env = columns.as_env(&row);
                     Ok(expressions
                         .iter()
                         .map(|e| e.evaluate(&env))

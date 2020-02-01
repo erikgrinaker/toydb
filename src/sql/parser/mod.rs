@@ -4,6 +4,8 @@ pub mod lexer;
 use super::types::DataType;
 use crate::Error;
 use lexer::{Keyword, Lexer, Token};
+
+use regex::Regex;
 use std::collections::BTreeMap;
 
 /// An SQL parser
@@ -447,7 +449,15 @@ impl<'a> Parser<'a> {
     /// Parses an expression atom
     fn parse_expression_atom(&mut self) -> Result<ast::Expression, Error> {
         Ok(match self.next()? {
-            Token::Ident(i) => ast::Expression::Field(i),
+            Token::Ident(i) => {
+                let mut relation = None;
+                let mut field = i;
+                if self.next_if_token(Token::Period).is_some() {
+                    relation = Some(field);
+                    field = self.next_ident()?;
+                }
+                ast::Expression::Field(relation, field)
+            }
             Token::Number(n) => {
                 if n.chars().all(|c| c.is_digit(10)) {
                     ast::Literal::Integer(n.parse()?).into()
@@ -670,5 +680,18 @@ impl Operator for PostfixOperator {
 
     fn prec(&self) -> u8 {
         8
+    }
+}
+
+// Formats an identifier by quoting it as appropriate
+pub(super) fn format_ident(ident: &str) -> String {
+    lazy_static! {
+        static ref RE_IDENT: Regex = Regex::new(r#"^\w[\w_]*$"#).unwrap();
+    }
+
+    if RE_IDENT.is_match(ident) && Keyword::from_str(ident).is_none() {
+        ident.to_string()
+    } else {
+        format!("\"{}\"", ident.replace("\"", "\"\""))
     }
 }

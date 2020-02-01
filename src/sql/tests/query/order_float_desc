@@ -19,6 +19,7 @@ AST: Select {
     order: [
         (
             Field(
+                None,
                 "value",
             ),
             Descending,
@@ -36,6 +37,7 @@ Plan: Plan {
         orders: [
             (
                 Field(
+                    None,
                     "value",
                 ),
                 Descending,
@@ -52,6 +54,7 @@ Optimized plan: Plan {
         orders: [
             (
                 Field(
+                    None,
                     "value",
                 ),
                 Descending,

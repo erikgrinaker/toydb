@@ -18,6 +18,7 @@ AST: Select {
     where: Some(
         WhereClause(
             Field(
+                None,
                 "unknown",
             ),
         ),
@@ -33,6 +34,7 @@ Plan: Plan {
             table: "movies",
         },
         predicate: Field(
+            None,
             "unknown",
         ),
     },
@@ -44,6 +46,7 @@ Optimized plan: Plan {
             table: "movies",
         },
         predicate: Field(
+            None,
             "unknown",
         ),
     },

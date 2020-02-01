@@ -5,8 +5,6 @@ use super::super::types::{Row, Value};
 use super::{Context, Executor, ResultSet};
 use crate::Error;
 
-use std::collections::HashMap;
-
 /// An order executor
 pub struct Order<T: Transaction> {
     /// The source of rows to filter
@@ -36,8 +34,7 @@ impl<T: Transaction> Executor<T> for Order<T> {
             };
             let mut items = Vec::new();
             while let Some(row) = rows.next().transpose()? {
-                let env: HashMap<_, _> =
-                    result.columns.iter().cloned().zip(row.iter().cloned()).collect();
+                let env = result.columns.as_env(&row);
                 let mut values = Vec::new();
                 for (expr, _) in self.order.iter() {
                     values.push(expr.evaluate(&env)?);

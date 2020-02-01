@@ -27,6 +27,7 @@ AST: Select {
                     ),
                 ),
                 Field(
+                    None,
                     "released",
                 ),
             ),

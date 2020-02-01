@@ -19,6 +19,7 @@ AST: Select {
     order: [
         (
             Field(
+                None,
                 "released",
             ),
             Ascending,
@@ -36,6 +37,7 @@ Plan: Plan {
         orders: [
             (
                 Field(
+                    None,
                     "released",
                 ),
                 Ascending,
@@ -52,6 +54,7 @@ Optimized plan: Plan {
         orders: [
             (
                 Field(
+                    None,
                     "released",
                 ),
                 Ascending,

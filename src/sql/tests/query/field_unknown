@@ -1,9 +1,10 @@
-Query: SELECT unknown
+Query: SELECT unknown FROM movies
 
 AST: Select {
     select: SelectClause {
         expressions: [
             Field(
+                None,
                 "unknown",
             ),
         ],
@@ -11,7 +12,16 @@ AST: Select {
             None,
         ],
     },
-    from: None,
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: None,
+                },
+            ],
+        },
+    ),
     where: None,
     order: [],
     limit: None,
@@ -20,12 +30,15 @@ AST: Select {
 
 Plan: Plan {
     root: Projection {
-        source: Nothing,
+        source: Scan {
+            table: "movies",
+        },
         labels: [
             None,
         ],
         expressions: [
             Field(
+                None,
                 "unknown",
             ),
         ],
@@ -34,18 +47,21 @@ Plan: Plan {
 
 Optimized plan: Plan {
     root: Projection {
-        source: Nothing,
+        source: Scan {
+            table: "movies",
+        },
         labels: [
             None,
         ],
         expressions: [
             Field(
+                None,
                 "unknown",
             ),
         ],
     },
 }
 
-Query: SELECT unknown
+Query: SELECT unknown FROM movies
 
 Result: Value("Unknown field unknown")

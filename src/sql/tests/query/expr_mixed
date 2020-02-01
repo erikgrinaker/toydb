@@ -34,6 +34,7 @@ AST: Select {
                         ),
                     ),
                     Field(
+                        None,
                         "released",
                     ),
                 ),
@@ -100,6 +101,7 @@ Plan: Plan {
                     ),
                 ),
                 Field(
+                    None,
                     "released",
                 ),
             ),
@@ -131,6 +133,7 @@ Optimized plan: Plan {
                     ),
                 ),
                 Field(
+                    None,
                     "released",
                 ),
             ),

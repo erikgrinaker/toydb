@@ -28,7 +28,9 @@ use update::Update;
 
 use super::engine::Transaction;
 use super::planner::Node;
-use super::types::Row;
+use super::types::expression::Environment;
+use super::types::schema::Table;
+use super::types::{Row, Value};
 use crate::Error;
 
 /// A plan executor
@@ -77,30 +79,30 @@ pub struct ResultSet {
     /// The executor effect (i.e. mutation), if any
     effect: Option<Effect>,
     /// The column names of the result
-    columns: Vec<String>,
+    columns: ResultColumns,
     /// The result rows
     rows: Option<ResultRows>,
 }
 
 impl ResultSet {
     /// Creates a new result set
-    pub fn new(effect: Option<Effect>, columns: Vec<String>, rows: Option<ResultRows>) -> Self {
+    pub fn new(effect: Option<Effect>, columns: ResultColumns, rows: Option<ResultRows>) -> Self {
         Self { effect, columns, rows }
     }
 
     /// Creates a new result set for an effect
     pub fn from_effect(effect: Effect) -> Self {
-        Self { effect: Some(effect), columns: Vec::new(), rows: None }
+        Self { effect: Some(effect), columns: ResultColumns::new(Vec::new()), rows: None }
     }
 
-    /// Creates a new result set for a row iterator
-    pub fn from_rows(columns: Vec<String>, rows: ResultRows) -> Self {
+    /// Creates a new result set for a scan iterator
+    pub fn from_rows(columns: ResultColumns, rows: ResultRows) -> Self {
         Self { effect: None, columns, rows: Some(rows) }
     }
 
-    /// Returns the result columns
-    pub fn columns(&self) -> Vec<String> {
-        self.columns.clone()
+    /// Returns the result column names
+    pub fn columns(&self) -> Vec<Option<String>> {
+        self.columns.names()
     }
 
     /// Returns the query effect, if any
@@ -128,6 +130,109 @@ impl Iterator for ResultSet {
 }
 
 type ResultRows = Box<dyn Iterator<Item = Result<Row, Error>> + Send>;
+
+/// Column metadata for a result
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ResultColumns {
+    columns: Vec<(Option<String>, Option<String>)>,
+}
+
+impl ResultColumns {
+    pub fn new(columns: Vec<(Option<String>, Option<String>)>) -> Self {
+        Self { columns }
+    }
+
+    pub fn from_table(table: &Table) -> Self {
+        Self {
+            columns: table
+                .columns
+                .iter()
+                .map(|c| (Some(table.name.clone()), Some(c.name.clone())))
+                .collect(),
+        }
+    }
+
+    fn as_env<'b>(&'b self, row: &'b [Value]) -> ResultEnv<'b> {
+        ResultEnv { columns: &self, row }
+    }
+
+    fn format(&self, relation: Option<&str>, field: &str) -> String {
+        let mut s = super::parser::format_ident(field);
+        if let Some(relation) = relation {
+            s = format!("{}.{}", super::parser::format_ident(relation), s)
+        }
+        s
+    }
+
+    fn get(&self, relation: Option<&str>, field: &str) -> Result<(Option<String>, String), Error> {
+        let matches: Vec<_> = self
+            .columns
+            .iter()
+            .filter_map(|(r, c)| {
+                if c.as_deref() == Some(field) {
+                    if relation.is_none() || r.as_deref() == relation {
+                        Some((r.clone(), c.clone().unwrap()))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+        match matches.len() {
+            0 => Err(Error::Value(format!("Unknown field {}", self.format(relation, field)))),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => Err(Error::Value(format!("Field reference {} is ambiguous", field))),
+        }
+    }
+
+    pub fn index(&self, relation: Option<&str>, field: &str) -> Result<usize, Error> {
+        let matches: Vec<_> = self
+            .columns
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (r, c))| {
+                if c.as_deref() == Some(field) {
+                    if relation.is_none() || r.as_deref() == relation {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+        match matches.len() {
+            0 => Err(Error::Value(format!("Unknown field {}", self.format(relation, field)))),
+            1 => Ok(matches.into_iter().next().unwrap()),
+            _ => Err(Error::Value(format!("Field reference {} is ambiguous", field))),
+        }
+    }
+
+    pub fn merge(self, other: Self) -> Self {
+        let mut columns = self.columns;
+        columns.extend(other.columns);
+        Self::new(columns)
+    }
+
+    pub fn names(&self) -> Vec<Option<String>> {
+        self.columns.iter().map(|(_, c)| c.clone()).collect()
+    }
+}
+
+// Environment for a result row
+struct ResultEnv<'a> {
+    columns: &'a ResultColumns,
+    row: &'a [Value],
+}
+
+impl<'a> Environment for ResultEnv<'a> {
+    fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error> {
+        Ok(self.row.get(self.columns.index(relation, field)?).cloned().unwrap_or(Value::Null))
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 /// An executor effect

@@ -1,0 +1,87 @@
+Query: SELECT id, title FROM movies
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+            Field(
+                None,
+                "title",
+            ),
+        ],
+        labels: [
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            None,
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+            Field(
+                None,
+                "title",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            None,
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+            Field(
+                None,
+                "title",
+            ),
+        ],
+    },
+}
+
+Query: SELECT id, title FROM movies
+
+Result: ["id", "title"]
+[Integer(1), String("Stalker")]
+[Integer(2), String("Sicario")]
+[Integer(3), String("Primer")]
+[Integer(4), String("Heat")]
+[Integer(5), String("The Fountain")]

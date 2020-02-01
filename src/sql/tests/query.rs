@@ -118,7 +118,10 @@ macro_rules! test_query {
                 }
             };
             if !columns.is_empty() || !rows.is_empty() {
-                write!(f, " {:?}\n", columns)?;
+                write!(f, " {:?}\n", columns
+                    .into_iter()
+                    .map(|c| c.unwrap_or_else(|| "?".to_string()))
+                    .collect::<Vec<_>>())?;
                 for row in rows {
                     write!(f, "{:?}\n", row)?;
                 }
@@ -136,8 +139,17 @@ test_query! {
     all: "SELECT * FROM movies",
     bare: "SELECT",
     trailing_comma: "SELECT 1,",
-    unknown: "SELECT unknown",
     lowercase: "select 1",
+
+    field_single: "SELECT id FROM movies",
+    field_multi: "SELECT id, title FROM movies",
+    field_ambiguous: "SELECT id FROM movies, genres",
+    field_qualified: "SELECT movies.id FROM movies",
+    field_qualified_multi: "SELECT movies.id, genres.id FROM movies, genres",
+    field_qualified_nested: "SELECT movies.id.value FROM movies",
+    field_unknown: "SELECT unknown FROM movies",
+    field_unknown_qualified: "SELECT movies.unknown FROM movies",
+    field_unknown_table: "SELECT unknown.id FROM movies",
 
     expr_dynamic: "SELECT 2020 - year AS age FROM movies",
     expr_static: "SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope",
@@ -146,6 +158,8 @@ test_query! {
     as_: r#"SELECT 1, 2 b, 3 AS c, 4 AS "👋", id AS "some id" FROM movies"#,
     as_bare: "SELECT 1 AS",
     as_all: "SELECT * AS all FROM movies",
+    as_duplicate: "SELECT 1 AS a, 2 AS a",
+    as_qualified: r#"SELECT 1 AS a.b FROM movies"#,
 
     from_bare: "SELECT * FROM",
     from_unknown: "SELECT * FROM unknown",
@@ -160,7 +174,10 @@ test_query! {
     where_integer: "SELECT * FROM movies WHERE 7",
     where_string: "SELECT * FROM movies WHERE 'abc'",
     where_multi: "SELECT * FROM movies WHERE TRUE, TRUE",
-    where_unknown: "SELECT * FROM movies WHERE unknown",
+    where_field_unknown: "SELECT * FROM movies WHERE unknown",
+    where_field_qualified: "SELECT movies.id, genres.id FROM movies, genres WHERE movies.id >= 3 AND genres.id = 1",
+    where_field_ambiguous: "SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3",
+    where_join_inner: "SELECT * FROM movies, genres WHERE movies.genre_id = genres.id",
 
     order: "SELECT * FROM movies ORDER BY released",
     order_asc: "SELECT * FROM movies ORDER BY released ASC",
@@ -169,8 +186,11 @@ test_query! {
     order_desc_lowercase: "SELECT * FROM movies ORDER BY released desc",
     order_expr: "SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC",
     order_multi: "SELECT * FROM movies ORDER BY ultrahd ASC, id DESC",
-    order_unknown: "SELECT * FROM movies ORDER BY unknown",
     order_unknown_dir: "SELECT * FROM movies ORDER BY id X",
+    order_field_unknown: "SELECT * FROM movies ORDER BY unknown",
+    order_field_qualified: "SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title",
+    order_field_aliased: "SELECT movies.id, title, genres.name AS genre FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genre, title",
+    order_field_ambiguous: "SELECT * FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY id",
     order_trailing_comma: "SELECT * FROM movies ORDER BY id,",
 }
 test_query! { with [

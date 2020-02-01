@@ -19,12 +19,14 @@ AST: Select {
     order: [
         (
             Field(
+                None,
                 "ultrahd",
             ),
             Ascending,
         ),
         (
             Field(
+                None,
                 "id",
             ),
             Descending,
@@ -42,12 +44,14 @@ Plan: Plan {
         orders: [
             (
                 Field(
+                    None,
                     "ultrahd",
                 ),
                 Ascending,
             ),
             (
                 Field(
+                    None,
                     "id",
                 ),
                 Descending,
@@ -64,12 +68,14 @@ Optimized plan: Plan {
         orders: [
             (
                 Field(
+                    None,
                     "ultrahd",
                 ),
                 Ascending,
             ),
             (
                 Field(
+                    None,
                     "id",
                 ),
                 Descending,

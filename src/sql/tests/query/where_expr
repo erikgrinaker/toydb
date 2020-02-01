@@ -22,6 +22,7 @@ AST: Select {
                     Operation(
                         GreaterThanOrEqual(
                             Field(
+                                None,
                                 "released",
                             ),
                             Literal(
@@ -32,6 +33,7 @@ AST: Select {
                         ),
                     ),
                     Field(
+                        None,
                         "ultrahd",
                     ),
                 ),
@@ -52,6 +54,7 @@ Plan: Plan {
             Or(
                 GreaterThan(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(
@@ -62,6 +65,7 @@ Plan: Plan {
                 ),
                 Equal(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(
@@ -72,6 +76,7 @@ Plan: Plan {
                 ),
             ),
             Field(
+                None,
                 "ultrahd",
             ),
         ),
@@ -87,6 +92,7 @@ Optimized plan: Plan {
             Or(
                 GreaterThan(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(
@@ -97,6 +103,7 @@ Optimized plan: Plan {
                 ),
                 Equal(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(
@@ -107,6 +114,7 @@ Optimized plan: Plan {
                 ),
             ),
             Field(
+                None,
                 "ultrahd",
             ),
         ),

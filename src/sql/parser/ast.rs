@@ -95,7 +95,7 @@ pub enum Order {
 /// Expressions
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
-    Field(String),
+    Field(Option<String>, String),
     Literal(Literal),
     Operation(Operation),
 }

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 pub enum Expression {
     // Values
     Constant(Value),
-    Field(String),
+    Field(Option<String>, String),
 
     // Logical operations
     And(Box<Expression>, Box<Expression>),
@@ -47,7 +47,7 @@ impl Expression {
         Ok(match self {
             // Constant values
             Self::Constant(c) => c.clone(),
-            Self::Field(f) => e.lookup(f)?,
+            Self::Field(r, f) => e.lookup(r.as_deref(), f)?,
 
             // Logical operations
             Self::And(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
@@ -263,7 +263,7 @@ impl Expression {
     /// Checks whether the expression is constant
     pub fn is_constant(&self) -> bool {
         self.walk(&|expr| match expr {
-            Self::Field(_) => false,
+            Self::Field(_, _) => false,
             _ => true,
         })
     }
@@ -281,7 +281,7 @@ impl Expression {
         // to use mutable references over ownership.
         self = match self {
             // Constants
-            node @ Self::Constant(_) | node @ Self::Field(_) => node,
+            node @ Self::Constant(_) | node @ Self::Field(_, _) => node,
 
             // Logical operations
             Self::And(lhs, rhs) => {
@@ -360,7 +360,7 @@ impl Expression {
             | Self::Negate(expr)
             | Self::Not(expr) => expr.walk(visitor),
 
-            Self::Constant(_) | Self::Field(_) => true,
+            Self::Constant(_) | Self::Field(_, _) => true,
         } {
             visitor(self)
         } else {
@@ -371,20 +371,18 @@ impl Expression {
 
 /// An expression evaluation environment
 pub trait Environment {
-    /// Attempts to fetch a field value from the environment
-    fn get(&self, field: &str) -> Option<Value>;
-
-    /// Fetches a field value from the environment, otherwise errors
-    fn lookup(&self, field: &str) -> Result<Value, Error> {
-        match self.get(field) {
-            Some(value) => Ok(value),
-            None => Err(Error::Value(format!("Unknown field {}", field))),
-        }
-    }
+    /// Fetches a field value from the environment
+    fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error>;
 }
 
 impl Environment for HashMap<String, Value> {
-    fn get(&self, field: &str) -> Option<Value> {
-        self.get(field).cloned()
+    fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error> {
+        if relation.is_some() {
+            Err(Error::Value("Qualified fields not supported for HashMap environments".into()))
+        } else if let Some(value) = self.get(field) {
+            Ok(value.clone())
+        } else {
+            Err(Error::Value(format!("Unknown field {}", field)))
+        }
     }
 }

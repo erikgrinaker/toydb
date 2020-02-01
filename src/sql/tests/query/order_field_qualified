@@ -1,0 +1,236 @@
+Query: SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+            Field(
+                None,
+                "title",
+            ),
+            Field(
+                None,
+                "name",
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: None,
+                },
+                FromItem {
+                    table: "genres",
+                    join: None,
+                },
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Operation(
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
+                    ),
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
+        ),
+    ),
+    order: [
+        (
+            Field(
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+            Ascending,
+        ),
+        (
+            Field(
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Filter {
+                source: NestedLoopJoin {
+                    outer: Scan {
+                        table: "movies",
+                    },
+                    inner: Scan {
+                        table: "genres",
+                    },
+                },
+                predicate: Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
+                    ),
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
+                ),
+            },
+            labels: [
+                None,
+                None,
+                None,
+            ],
+            expressions: [
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
+                ),
+                Field(
+                    None,
+                    "title",
+                ),
+                Field(
+                    None,
+                    "name",
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "name",
+                ),
+                Ascending,
+            ),
+            (
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "title",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Filter {
+                source: NestedLoopJoin {
+                    outer: Scan {
+                        table: "movies",
+                    },
+                    inner: Scan {
+                        table: "genres",
+                    },
+                },
+                predicate: Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
+                    ),
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
+                ),
+            },
+            labels: [
+                None,
+                None,
+                None,
+            ],
+            expressions: [
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
+                ),
+                Field(
+                    None,
+                    "title",
+                ),
+                Field(
+                    None,
+                    "name",
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "name",
+                ),
+                Ascending,
+            ),
+            (
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "title",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title
+
+Result: ["id", "title", "name"]
+[Integer(4), String("Heat"), String("Action")]
+[Integer(2), String("Sicario"), String("Action")]
+[Integer(3), String("Primer"), String("Science Fiction")]
+[Integer(1), String("Stalker"), String("Science Fiction")]
+[Integer(5), String("The Fountain"), String("Science Fiction")]

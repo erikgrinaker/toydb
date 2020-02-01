@@ -20,7 +20,7 @@ impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
         let mut result = self.outer.execute(ctx)?;
         let inner = self.inner.execute(ctx)?;
-        result.columns.extend(inner.columns);
+        result.columns = result.columns.merge(inner.columns);
 
         let mut inner_rows = vec![];
         if let Some(mut rows) = inner.rows {

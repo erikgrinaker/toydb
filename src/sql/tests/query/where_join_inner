@@ -1,0 +1,108 @@
+Query: SELECT * FROM movies, genres WHERE movies.genre_id = genres.id
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: None,
+                },
+                FromItem {
+                    table: "genres",
+                    join: None,
+                },
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Operation(
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
+                    ),
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
+        ),
+    ),
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+            },
+            inner: Scan {
+                table: "genres",
+            },
+        },
+        predicate: Equal(
+            Field(
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+            Field(
+                Some(
+                    "genres",
+                ),
+                "id",
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+            },
+            inner: Scan {
+                table: "genres",
+            },
+        },
+        predicate: Equal(
+            Field(
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+            Field(
+                Some(
+                    "genres",
+                ),
+                "id",
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies, genres WHERE movies.genre_id = genres.id
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action")]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction")]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action")]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false), Integer(1), String("Science Fiction")]

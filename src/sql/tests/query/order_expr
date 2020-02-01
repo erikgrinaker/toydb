@@ -4,17 +4,21 @@ AST: Select {
     select: SelectClause {
         expressions: [
             Field(
+                None,
                 "id",
             ),
             Field(
+                None,
                 "title",
             ),
             Field(
+                None,
                 "released",
             ),
             Operation(
                 Modulo(
                     Field(
+                        None,
                         "released",
                     ),
                     Literal(
@@ -50,6 +54,7 @@ AST: Select {
             Operation(
                 Modulo(
                     Field(
+                        None,
                         "released",
                     ),
                     Literal(
@@ -82,16 +87,20 @@ Plan: Plan {
             ],
             expressions: [
                 Field(
+                    None,
                     "id",
                 ),
                 Field(
+                    None,
                     "title",
                 ),
                 Field(
+                    None,
                     "released",
                 ),
                 Modulo(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(
@@ -106,6 +115,7 @@ Plan: Plan {
             (
                 Modulo(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(
@@ -136,16 +146,20 @@ Optimized plan: Plan {
             ],
             expressions: [
                 Field(
+                    None,
                     "id",
                 ),
                 Field(
+                    None,
                     "title",
                 ),
                 Field(
+                    None,
                     "released",
                 ),
                 Modulo(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(
@@ -160,6 +174,7 @@ Optimized plan: Plan {
             (
                 Modulo(
                     Field(
+                        None,
                         "released",
                     ),
                     Constant(

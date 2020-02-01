@@ -1,0 +1,81 @@
+Query: SELECT id FROM movies, genres
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+        ],
+        labels: [
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: None,
+                },
+                FromItem {
+                    table: "genres",
+                    join: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+            },
+            inner: Scan {
+                table: "genres",
+            },
+        },
+        labels: [
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+            },
+            inner: Scan {
+                table: "genres",
+            },
+        },
+        labels: [
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+        ],
+    },
+}
+
+Query: SELECT id FROM movies, genres
+
+Result: Value("Field reference id is ambiguous")

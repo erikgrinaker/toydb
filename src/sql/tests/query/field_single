@@ -1,0 +1,72 @@
+Query: SELECT id FROM movies
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+        ],
+        labels: [
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                FromItem {
+                    table: "movies",
+                    join: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Scan {
+            table: "movies",
+        },
+        labels: [
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+        ],
+    },
+}
+
+Query: SELECT id FROM movies
+
+Result: ["id"]
+[Integer(1)]
+[Integer(2)]
+[Integer(3)]
+[Integer(4)]
+[Integer(5)]

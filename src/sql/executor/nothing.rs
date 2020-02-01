@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::Row;
-use super::{Context, Executor, ResultSet};
+use super::{Context, Executor, ResultColumns, ResultSet};
 use crate::Error;
 
 /// An executor that produces a single empty row
@@ -14,6 +14,9 @@ impl Nothing {
 
 impl<T: Transaction> Executor<T> for Nothing {
     fn execute(self: Box<Self>, _ctx: &mut Context<T>) -> Result<ResultSet, Error> {
-        Ok(ResultSet::from_rows(Vec::new(), Box::new(std::iter::once(Ok(Row::new())))))
+        Ok(ResultSet::from_rows(
+            ResultColumns::new(Vec::new()),
+            Box::new(std::iter::once(Ok(Row::new()))),
+        ))
     }
 }
