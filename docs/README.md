@@ -281,7 +281,6 @@ where <b><i>from_item</i></b> is one of:
 where <b><i>join_type</i></b> is one of:
 
 CROSS JOIN
-FULL [ OUTER ] JOIN
 [ INNER ] JOIN
 LEFT [ OUTER ] JOIN
 RIGHT [ OUTER ] JOIN
@@ -313,6 +312,10 @@ Join types:
 * `CROSS JOIN`: returns the Carthesian product of the joined tables. Does not accept a join predicate (`ON` clause).
 
 * `INNER JOIN`: returns the rows of the tables' Carthesian product for which  ***`join_predicate`*** evaluates to `TRUE`.
+
+* `LEFT OUTER JOIN`: returns the rows joined on the ***`join_predicate`***, or for any rows in the left table that does not have a match in the right table a single row is returned with the right table's columns set to `NULL`.
+
+* `RIGHT OUTER JOIN`: the same as a `LEFT OUTER JOIN` but with the left and right tables switched.
 
 #### Example
 
