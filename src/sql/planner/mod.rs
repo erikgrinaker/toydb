@@ -149,16 +149,21 @@ impl Planner {
 
     /// Builds FROM items
     fn build_from_item(&self, item: ast::FromItem) -> Result<Node, Error> {
-        let mut node = Node::Scan { table: item.table.clone(), alias: item.alias.clone() };
-        if let Some(join) = item.join {
-            node = match join.r#type {
-                ast::JoinType::Cross => Node::NestedLoopJoin {
-                    outer: Box::new(node),
-                    inner: Box::new(self.build_from_item(*join.item)?),
-                },
+        Ok(match item {
+            ast::FromItem::Table { name, alias } => Node::Scan { table: name, alias },
+            ast::FromItem::Join { left, right, r#type, predicate } => {
+                let mut node = match r#type {
+                    ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
+                        outer: Box::new(self.build_from_item(*left)?),
+                        inner: Box::new(self.build_from_item(*right)?),
+                    },
+                };
+                if let Some(predicate) = predicate {
+                    node = Node::Filter { source: Box::new(node), predicate: predicate.into() }
+                };
+                node
             }
-        }
-        Ok(node)
+        })
     }
 
     /// Builds a table schema from an AST CreateTable node

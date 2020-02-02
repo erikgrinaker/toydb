@@ -61,25 +61,25 @@ pub struct FromClause {
     pub items: Vec<FromItem>,
 }
 
-/// A FROM item
 #[derive(Clone, Debug, PartialEq)]
-pub struct FromItem {
-    pub table: String,
-    pub alias: Option<String>,
-    pub join: Option<Join>,
-}
-
-/// A JOIN clause
-#[derive(Clone, Debug, PartialEq)]
-pub struct Join {
-    pub item: Box<FromItem>,
-    pub r#type: JoinType,
+pub enum FromItem {
+    Table {
+        name: String,
+        alias: Option<String>,
+    },
+    Join {
+        left: Box<FromItem>,
+        right: Box<FromItem>,
+        r#type: JoinType,
+        predicate: Option<Expression>,
+    },
 }
 
 /// A JOIN type
 #[derive(Clone, Debug, PartialEq)]
 pub enum JoinType {
     Cross,
+    Inner,
 }
 
 /// A WHERE clause

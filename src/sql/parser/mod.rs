@@ -349,7 +349,21 @@ impl<'a> Parser<'a> {
         }
         let mut clause = ast::FromClause { items: Vec::new() };
         loop {
-            clause.items.push(self.parse_clause_from_item()?);
+            let mut item = self.parse_clause_from_item()?;
+            while let Some(jointype) = self.parse_clause_from_jointype()? {
+                let left = Box::new(item);
+                let right = Box::new(self.parse_clause_from_item()?);
+                let predicate = match &jointype {
+                    ast::JoinType::Cross => None,
+                    _ => {
+                        self.next_expect(Some(Keyword::On.into()))?;
+                        Some(self.parse_expression(0)?)
+                    }
+                };
+                let r#type = jointype;
+                item = ast::FromItem::Join { left, right, r#type, predicate };
+            }
+            clause.items.push(item);
             if self.next_if_token(Token::Comma).is_none() {
                 break;
             }
@@ -359,20 +373,35 @@ impl<'a> Parser<'a> {
 
     /// Parses a from clause item
     fn parse_clause_from_item(&mut self) -> Result<ast::FromItem, Error> {
-        let mut item = ast::FromItem { table: self.next_ident()?, alias: None, join: None };
-        if self.next_if_token(Keyword::As.into()).is_some() {
-            item.alias = Some(self.next_ident()?);
+        self.parse_clause_from_table()
+    }
+
+    // Parses a from clause table
+    fn parse_clause_from_table(&mut self) -> Result<ast::FromItem, Error> {
+        let name = self.next_ident()?;
+        let alias = if self.next_if_token(Keyword::As.into()).is_some() {
+            Some(self.next_ident()?)
         } else if let Some(Token::Ident(_)) = self.peek()? {
-            item.alias = Some(self.next_ident()?)
-        }
+            Some(self.next_ident()?)
+        } else {
+            None
+        };
+        Ok(ast::FromItem::Table { name, alias })
+    }
+
+    // Parses a from clause join type
+    fn parse_clause_from_jointype(&mut self) -> Result<Option<ast::JoinType>, Error> {
         if self.next_if_token(Keyword::Cross.into()).is_some() {
             self.next_expect(Some(Keyword::Join.into()))?;
-            item.join = Some(ast::Join {
-                item: Box::new(self.parse_clause_from_item()?),
-                r#type: ast::JoinType::Cross,
-            })
+            Ok(Some(ast::JoinType::Cross))
+        } else if self.next_if_token(Keyword::Inner.into()).is_some() {
+            self.next_expect(Some(Keyword::Join.into()))?;
+            Ok(Some(ast::JoinType::Inner))
+        } else if self.next_if_token(Keyword::Join.into()).is_some() {
+            Ok(Some(ast::JoinType::Inner))
+        } else {
+            Ok(None)
         }
-        Ok(item)
     }
 
     /// Parses an order clause

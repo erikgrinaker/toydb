@@ -1,0 +1,3 @@
+Query: SELECT * FROM movies INNER JOIN genres
+
+AST: Parse("Unexpected end of input")

@@ -1,0 +1,80 @@
+Query: SELECT * FROM movies INNER JOIN genres ON FALSE
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Join {
+                    left: Table {
+                        name: "movies",
+                        alias: None,
+                    },
+                    right: Table {
+                        name: "genres",
+                        alias: None,
+                    },
+                    type: Inner,
+                    predicate: Some(
+                        Literal(
+                            Boolean(
+                                false,
+                            ),
+                        ),
+                    ),
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+            },
+            inner: Scan {
+                table: "genres",
+                alias: None,
+            },
+        },
+        predicate: Constant(
+            Boolean(
+                false,
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+            },
+            inner: Scan {
+                table: "genres",
+                alias: None,
+            },
+        },
+        predicate: Constant(
+            Boolean(
+                false,
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies INNER JOIN genres ON FALSE
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]

@@ -8,37 +8,33 @@ AST: Select {
     from: Some(
         FromClause {
             items: [
-                FromItem {
-                    table: "movies",
-                    alias: None,
-                    join: Some(
-                        Join {
-                            item: FromItem {
-                                table: "genres",
+                Join {
+                    left: Join {
+                        left: Join {
+                            left: Table {
+                                name: "movies",
                                 alias: None,
-                                join: Some(
-                                    Join {
-                                        item: FromItem {
-                                            table: "countries",
-                                            alias: None,
-                                            join: Some(
-                                                Join {
-                                                    item: FromItem {
-                                                        table: "studios",
-                                                        alias: None,
-                                                        join: None,
-                                                    },
-                                                    type: Cross,
-                                                },
-                                            ),
-                                        },
-                                        type: Cross,
-                                    },
-                                ),
+                            },
+                            right: Table {
+                                name: "genres",
+                                alias: None,
                             },
                             type: Cross,
+                            predicate: None,
                         },
-                    ),
+                        right: Table {
+                            name: "countries",
+                            alias: None,
+                        },
+                        type: Cross,
+                        predicate: None,
+                    },
+                    right: Table {
+                        name: "studios",
+                        alias: None,
+                    },
+                    type: Cross,
+                    predicate: None,
                 },
             ],
         },
@@ -51,50 +47,50 @@ AST: Select {
 
 Plan: Plan {
     root: NestedLoopJoin {
-        outer: Scan {
-            table: "movies",
-            alias: None,
-        },
-        inner: NestedLoopJoin {
-            outer: Scan {
-                table: "genres",
-                alias: None,
-            },
-            inner: NestedLoopJoin {
+        outer: NestedLoopJoin {
+            outer: NestedLoopJoin {
                 outer: Scan {
-                    table: "countries",
+                    table: "movies",
                     alias: None,
                 },
                 inner: Scan {
-                    table: "studios",
+                    table: "genres",
                     alias: None,
                 },
             },
+            inner: Scan {
+                table: "countries",
+                alias: None,
+            },
+        },
+        inner: Scan {
+            table: "studios",
+            alias: None,
         },
     },
 }
 
 Optimized plan: Plan {
     root: NestedLoopJoin {
-        outer: Scan {
-            table: "movies",
-            alias: None,
-        },
-        inner: NestedLoopJoin {
-            outer: Scan {
-                table: "genres",
-                alias: None,
-            },
-            inner: NestedLoopJoin {
+        outer: NestedLoopJoin {
+            outer: NestedLoopJoin {
                 outer: Scan {
-                    table: "countries",
+                    table: "movies",
                     alias: None,
                 },
                 inner: Scan {
-                    table: "studios",
+                    table: "genres",
                     alias: None,
                 },
             },
+            inner: Scan {
+                table: "countries",
+                alias: None,
+            },
+        },
+        inner: Scan {
+            table: "studios",
+            alias: None,
         },
     },
 }

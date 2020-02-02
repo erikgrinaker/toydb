@@ -1,0 +1,163 @@
+Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id AND movies.id = genres.id
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Join {
+                    left: Table {
+                        name: "movies",
+                        alias: None,
+                    },
+                    right: Table {
+                        name: "genres",
+                        alias: None,
+                    },
+                    type: Inner,
+                    predicate: Some(
+                        Operation(
+                            And(
+                                Operation(
+                                    Equal(
+                                        Field(
+                                            Some(
+                                                "movies",
+                                            ),
+                                            "genre_id",
+                                        ),
+                                        Field(
+                                            Some(
+                                                "genres",
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                                Operation(
+                                    Equal(
+                                        Field(
+                                            Some(
+                                                "movies",
+                                            ),
+                                            "id",
+                                        ),
+                                        Field(
+                                            Some(
+                                                "genres",
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+            },
+            inner: Scan {
+                table: "genres",
+                alias: None,
+            },
+        },
+        predicate: And(
+            Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "genre_id",
+                ),
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
+                ),
+            ),
+            Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
+                ),
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
+                ),
+            ),
+        ),
+    },
+}
+
+Optimized plan: Plan {
+    root: Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+            },
+            inner: Scan {
+                table: "genres",
+                alias: None,
+            },
+        },
+        predicate: And(
+            Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "genre_id",
+                ),
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
+                ),
+            ),
+            Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
+                ),
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
+                ),
+            ),
+        ),
+    },
+}
+
+Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id AND movies.id = genres.id
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction")]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action")]

@@ -27,15 +27,13 @@ AST: Select {
     from: Some(
         FromClause {
             items: [
-                FromItem {
-                    table: "movies",
+                Table {
+                    name: "movies",
                     alias: None,
-                    join: None,
                 },
-                FromItem {
-                    table: "genres",
+                Table {
+                    name: "genres",
                     alias: None,
-                    join: None,
                 },
             ],
         },

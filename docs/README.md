@@ -19,7 +19,7 @@ Numeric types are not interchangable when stored; a float value cannot be stored
 
 Keywords are reserved words that have special meaning in SQL statements, such as `SELECT`. These cannot be used as identifiers (e.g. table names) unless quoted with `"`. Keywords are case-insensitive. The complete list of keywords is:
 
-`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `FALSE`, `FLOAT`, `FROM`, `INFINITY`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ONLY`, `OR`, `ORDER`, `PRIMARY`, `READ`, `REFERENCES`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
+`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `FALSE`, `FLOAT`, `FROM`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `PRIMARY`, `READ`, `REFERENCES`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
@@ -267,11 +267,22 @@ Selects rows from a table.
 
 <pre>
 SELECT [ * | <b><i>expression</i></b> [ [ AS ] <b><i>output_name</i></b> [, ...] ] ]
-    [ FROM <b><i>table_name</i></b> [ [ AS ] <b><i>alias</i></b> ] [ CROSS JOIN <b><i>table_name</i></b> [ ... ] ] [, ...] ]
+    [ FROM <b><i>from_item</i></b> [ CROSS JOIN <b><i>table_name</i></b> [ ... ] ] [, ...] ]
     [ WHERE <b><i>predicate</i></b> ]
     [ ORDER BY <b><i>order_expr</i></b> [ ASC | DESC ] [, ...] ]
     [ LIMIT <b><i>count</i></b> ]
     [ OFFSET <b><i>start</i></b> ]
+
+where <b><i>from_item</i></b> is one of:
+
+<b><i>table_name</i></b> [ [ AS ] <b><i>alias</i></b> ]
+<b><i>from_item</i></b> <b><i>join_type</i></b> <b><i>from_item</i></b> [ ON <b><i>join_predicate</i></b> ]
+
+where <b><i>join_item</i></b> is one of:
+
+[ INNER ] JOIN
+CROSS JOIN
+
 </pre>
 
 Fetches rows or expressions, either from table ***`table_name`*** (if given) or generated.
@@ -292,9 +303,13 @@ Fetches rows or expressions, either from table ***`table_name`*** (if given) or 
 
 * ***`start`***: number of rows to skip. Must be a constant integer expression.
 
+* ***`join_predicate`***: only return rows for which this [expression](#expressions) evaluates to `TRUE`.
+
 Join types:
 
-* `CROSS JOIN`: returns the Carthesian product of the joined tables.
+* `CROSS JOIN`: returns the Carthesian product of the joined tables. Does not accept a join predicate (`ON` clause).
+
+* `INNER JOIN`: returns the rows of the tables' Carthesian product for which  ***`join_predicate`*** evaluates to `TRUE`.
 
 #### Example
 

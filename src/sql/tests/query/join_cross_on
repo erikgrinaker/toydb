@@ -1,0 +1,3 @@
+Query: SELECT * FROM movies CROSS JOIN genres ON movies.genre_id = genres.id
+
+AST: Parse("Unexpected token ON")

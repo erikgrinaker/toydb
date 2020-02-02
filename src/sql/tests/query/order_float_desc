@@ -8,10 +8,9 @@ AST: Select {
     from: Some(
         FromClause {
             items: [
-                FromItem {
-                    table: "floats",
+                Table {
+                    name: "floats",
                     alias: None,
-                    join: None,
                 },
             ],
         },

@@ -1,0 +1,280 @@
+Query: 
+        SELECT movies.title, genres.name AS genre, studios.name AS studio
+        FROM movies
+            INNER JOIN genres ON movies.genre_id = genres.id
+            INNER JOIN studios ON movies.studio_id = studios.id
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+            Field(
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+            Field(
+                Some(
+                    "studios",
+                ),
+                "name",
+            ),
+        ],
+        labels: [
+            None,
+            Some(
+                "genre",
+            ),
+            Some(
+                "studio",
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Join {
+                    left: Join {
+                        left: Table {
+                            name: "movies",
+                            alias: None,
+                        },
+                        right: Table {
+                            name: "genres",
+                            alias: None,
+                        },
+                        type: Inner,
+                        predicate: Some(
+                            Operation(
+                                Equal(
+                                    Field(
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "genre_id",
+                                    ),
+                                    Field(
+                                        Some(
+                                            "genres",
+                                        ),
+                                        "id",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    },
+                    right: Table {
+                        name: "studios",
+                        alias: None,
+                    },
+                    type: Inner,
+                    predicate: Some(
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                                Field(
+                                    Some(
+                                        "studios",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                    ),
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Filter {
+            source: NestedLoopJoin {
+                outer: Filter {
+                    source: NestedLoopJoin {
+                        outer: Scan {
+                            table: "movies",
+                            alias: None,
+                        },
+                        inner: Scan {
+                            table: "genres",
+                            alias: None,
+                        },
+                    },
+                    predicate: Equal(
+                        Field(
+                            Some(
+                                "movies",
+                            ),
+                            "genre_id",
+                        ),
+                        Field(
+                            Some(
+                                "genres",
+                            ),
+                            "id",
+                        ),
+                    ),
+                },
+                inner: Scan {
+                    table: "studios",
+                    alias: None,
+                },
+            },
+            predicate: Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "studio_id",
+                ),
+                Field(
+                    Some(
+                        "studios",
+                    ),
+                    "id",
+                ),
+            ),
+        },
+        labels: [
+            None,
+            Some(
+                "genre",
+            ),
+            Some(
+                "studio",
+            ),
+        ],
+        expressions: [
+            Field(
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+            Field(
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+            Field(
+                Some(
+                    "studios",
+                ),
+                "name",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Filter {
+            source: NestedLoopJoin {
+                outer: Filter {
+                    source: NestedLoopJoin {
+                        outer: Scan {
+                            table: "movies",
+                            alias: None,
+                        },
+                        inner: Scan {
+                            table: "genres",
+                            alias: None,
+                        },
+                    },
+                    predicate: Equal(
+                        Field(
+                            Some(
+                                "movies",
+                            ),
+                            "genre_id",
+                        ),
+                        Field(
+                            Some(
+                                "genres",
+                            ),
+                            "id",
+                        ),
+                    ),
+                },
+                inner: Scan {
+                    table: "studios",
+                    alias: None,
+                },
+            },
+            predicate: Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "studio_id",
+                ),
+                Field(
+                    Some(
+                        "studios",
+                    ),
+                    "id",
+                ),
+            ),
+        },
+        labels: [
+            None,
+            Some(
+                "genre",
+            ),
+            Some(
+                "studio",
+            ),
+        ],
+        expressions: [
+            Field(
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+            Field(
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+            Field(
+                Some(
+                    "studios",
+                ),
+                "name",
+            ),
+        ],
+    },
+}
+
+Query: 
+        SELECT movies.title, genres.name AS genre, studios.name AS studio
+        FROM movies
+            INNER JOIN genres ON movies.genre_id = genres.id
+            INNER JOIN studios ON movies.studio_id = studios.id
+
+Result: ["title", "genre", "studio"]
+[String("Stalker"), String("Science Fiction"), String("Mosfilm")]
+[String("Sicario"), String("Action"), String("Lionsgate")]
+[String("Primer"), String("Science Fiction"), String("StudioCanal")]
+[String("Heat"), String("Action"), String("Warner Bros")]
+[String("The Fountain"), String("Science Fiction"), String("Warner Bros")]

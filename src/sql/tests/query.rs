@@ -267,4 +267,19 @@ test_query! {
         WHERE m.id >= 3 AND g.id = 2 AND c.id != 'us'
     "#,
     join_cross_multi: "SELECT * FROM movies CROSS JOIN genres CROSS JOIN countries CROSS JOIN studios",
+    join_cross_on: "SELECT * FROM movies CROSS JOIN genres ON movies.genre_id = genres.id",
+
+    join_inner: "SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id",
+    join_inner_implicit: "SELECT * FROM movies JOIN genres ON movies.genre_id = genres.id",
+    join_inner_on_true: "SELECT * FROM movies INNER JOIN genres ON TRUE",
+    join_inner_on_false: "SELECT * FROM movies INNER JOIN genres ON FALSE",
+    join_inner_on_aliased: "SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id",
+    join_inner_on_multi: "SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id AND movies.id = genres.id",
+    join_inner_on_missing: "SELECT * FROM movies INNER JOIN genres",
+    join_inner_on_where: "SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id WHERE movies.id >= 3",
+    join_inner_multi: r#"
+        SELECT movies.title, genres.name AS genre, studios.name AS studio
+        FROM movies
+            INNER JOIN genres ON movies.genre_id = genres.id
+            INNER JOIN studios ON movies.studio_id = studios.id"#,
 }

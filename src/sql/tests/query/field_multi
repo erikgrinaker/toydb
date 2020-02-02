@@ -20,10 +20,9 @@ AST: Select {
     from: Some(
         FromClause {
             items: [
-                FromItem {
-                    table: "movies",
+                Table {
+                    name: "movies",
                     alias: None,
-                    join: None,
                 },
             ],
         },

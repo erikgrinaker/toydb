@@ -8,19 +8,17 @@ AST: Select {
     from: Some(
         FromClause {
             items: [
-                FromItem {
-                    table: "movies",
-                    alias: None,
-                    join: Some(
-                        Join {
-                            item: FromItem {
-                                table: "genres",
-                                alias: None,
-                                join: None,
-                            },
-                            type: Cross,
-                        },
-                    ),
+                Join {
+                    left: Table {
+                        name: "movies",
+                        alias: None,
+                    },
+                    right: Table {
+                        name: "genres",
+                        alias: None,
+                    },
+                    type: Cross,
+                    predicate: None,
                 },
             ],
         },

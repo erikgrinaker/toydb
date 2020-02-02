@@ -1,4 +1,4 @@
-Query: SELECT * FROM movies, genres WHERE movies.genre_id = genres.id
+Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id
 
 AST: Select {
     select: SelectClause {
@@ -8,37 +8,39 @@ AST: Select {
     from: Some(
         FromClause {
             items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-                Table {
-                    name: "genres",
-                    alias: None,
+                Join {
+                    left: Table {
+                        name: "movies",
+                        alias: None,
+                    },
+                    right: Table {
+                        name: "genres",
+                        alias: None,
+                    },
+                    type: Inner,
+                    predicate: Some(
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "genre_id",
+                                ),
+                                Field(
+                                    Some(
+                                        "genres",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                    ),
                 },
             ],
         },
     ),
-    where: Some(
-        WhereClause(
-            Operation(
-                Equal(
-                    Field(
-                        Some(
-                            "movies",
-                        ),
-                        "genre_id",
-                    ),
-                    Field(
-                        Some(
-                            "genres",
-                        ),
-                        "id",
-                    ),
-                ),
-            ),
-        ),
-    ),
+    where: None,
     order: [],
     limit: None,
     offset: None,
@@ -102,7 +104,7 @@ Optimized plan: Plan {
     },
 }
 
-Query: SELECT * FROM movies, genres WHERE movies.genre_id = genres.id
+Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
 [Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Boolean(false), Integer(1), String("Science Fiction")]
