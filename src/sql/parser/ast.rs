@@ -100,6 +100,7 @@ pub enum Order {
 pub enum Expression {
     Field(Option<String>, String),
     Literal(Literal),
+    Function(String, Expressions),
     Operation(Operation),
 }
 

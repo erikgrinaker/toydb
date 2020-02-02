@@ -69,6 +69,14 @@ test_expr! {
     lit_string_whitespace: "' Has \n newlines and \t tabs  '" => Ok(String(" Has \n newlines and \t tabs  ".into())),
     lit_string_long: &format!("'{}'", "a".repeat(4096)) => Ok("a".repeat(4096).into()),
 
+    // Functions
+    func_unknown: "unknown()" => Err(Error::Value("Unknown function unknown".into())),
+    func_unknown_case: "UnKnown ( )" => Err(Error::Value("Unknown function unknown".into())),
+    func_unknown_space: "unknown ( )" => Err(Error::Value("Unknown function unknown".into())),
+    func_unknown_args: "unknown(a, b, c)" => Err(Error::Value("Unknown function unknown".into())),
+    func_unknown_open: "unknown(a, b, c" => Err(Error::Parse("Unexpected end of input".into())),
+    func_unknown_trailing_comma: "unknown(a, b, c,)" => Err(Error::Parse("Expected expression atom, found )".into())),
+
     // Logical operators
     op_and_true_true: "TRUE AND TRUE" => Ok(Boolean(true)),
     op_and_true_false: "TRUE AND FALSE" => Ok(Boolean(false)),

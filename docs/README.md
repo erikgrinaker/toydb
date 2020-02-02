@@ -57,7 +57,7 @@ The `-` prefix operator can be used to take negative numbers.
 
 ### Expressions
 
-Expressions can be used wherever a value is expected, e.g. as `SELECT` fields and `INSERT` values, and can be either a constant, a column reference, or an operator invocation.
+Expressions can be used wherever a value is expected, e.g. as `SELECT` fields and `INSERT` values, and can be either a constant, a column reference, an operator invocation, or a function call.
 
 Column references can either be unqualified, e.g. `name`, or prefixed with the relation identifier separated by `.`, e.g. `person.name`. Unqualified identifiers must be unambiguous, otherwise an error is returned.
 

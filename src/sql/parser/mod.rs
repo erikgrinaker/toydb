@@ -492,13 +492,24 @@ impl<'a> Parser<'a> {
     fn parse_expression_atom(&mut self) -> Result<ast::Expression, Error> {
         Ok(match self.next()? {
             Token::Ident(i) => {
-                let mut relation = None;
-                let mut field = i;
-                if self.next_if_token(Token::Period).is_some() {
-                    relation = Some(field);
-                    field = self.next_ident()?;
+                if self.next_if_token(Token::OpenParen).is_some() {
+                    let mut args = Vec::new();
+                    while self.next_if_token(Token::CloseParen).is_none() {
+                        if !args.is_empty() {
+                            self.next_expect(Some(Token::Comma))?;
+                        }
+                        args.push(self.parse_expression(0)?);
+                    }
+                    ast::Expression::Function(i, args)
+                } else {
+                    let mut relation = None;
+                    let mut field = i;
+                    if self.next_if_token(Token::Period).is_some() {
+                        relation = Some(field);
+                        field = self.next_ident()?;
+                    }
+                    ast::Expression::Field(relation, field)
                 }
-                ast::Expression::Field(relation, field)
             }
             Token::Number(n) => {
                 if n.chars().all(|c| c.is_digit(10)) {

@@ -142,7 +142,12 @@ impl Planner {
 
     /// Builds a plan expression from an AST expression
     fn build_expression(&self, expr: ast::Expression) -> Result<Expression, Error> {
-        Ok(expr.into())
+        if let ast::Expression::Function(name, _) = expr {
+            // All functions right now are aggregate functions
+            Err(Error::Value(format!("Unknown function {}", name)))
+        } else {
+            Ok(expr.into())
+        }
     }
 
     /// Builds an array of plan expressions from AST expressions
@@ -228,6 +233,7 @@ impl From<ast::Expression> for Expression {
         match expr {
             ast::Expression::Literal(l) => Expression::Constant(l.into()),
             ast::Expression::Field(rel, name) => Expression::Field(rel, name),
+            ast::Expression::Function(_, _) => unimplemented!(), // Not supported
             ast::Expression::Operation(op) => match op {
                 // Logical operators
                 ast::Operation::And(lhs, rhs) => Self::And(lhs.into(), rhs.into()),
