@@ -51,68 +51,72 @@ AST: Select {
 }
 
 Plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: Some(
-                    "m",
-                ),
-            },
-            inner: Scan {
-                table: "genres",
-                alias: Some(
-                    "g",
-                ),
-            },
-        },
-        predicate: Equal(
-            Field(
-                Some(
-                    "m",
-                ),
-                "genre_id",
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: Some(
+                "m",
             ),
-            Field(
-                Some(
-                    "g",
+        },
+        inner: Scan {
+            table: "genres",
+            alias: Some(
+                "g",
+            ),
+        },
+        predicate: Some(
+            Equal(
+                Field(
+                    Some(
+                        "m",
+                    ),
+                    "genre_id",
                 ),
-                "id",
+                Field(
+                    Some(
+                        "g",
+                    ),
+                    "id",
+                ),
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 
 Optimized plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: Some(
-                    "m",
-                ),
-            },
-            inner: Scan {
-                table: "genres",
-                alias: Some(
-                    "g",
-                ),
-            },
-        },
-        predicate: Equal(
-            Field(
-                Some(
-                    "m",
-                ),
-                "genre_id",
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: Some(
+                "m",
             ),
-            Field(
-                Some(
-                    "g",
+        },
+        inner: Scan {
+            table: "genres",
+            alias: Some(
+                "g",
+            ),
+        },
+        predicate: Some(
+            Equal(
+                Field(
+                    Some(
+                        "m",
+                    ),
+                    "genre_id",
                 ),
-                "id",
+                Field(
+                    Some(
+                        "g",
+                    ),
+                    "id",
+                ),
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 

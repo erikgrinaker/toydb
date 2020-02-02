@@ -80,6 +80,8 @@ pub enum FromItem {
 pub enum JoinType {
     Cross,
     Inner,
+    Left,
+    Right,
 }
 
 /// A WHERE clause

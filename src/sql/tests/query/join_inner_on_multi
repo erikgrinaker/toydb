@@ -67,92 +67,96 @@ AST: Select {
 }
 
 Plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: None,
-            },
-            inner: Scan {
-                table: "genres",
-                alias: None,
-            },
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: None,
         },
-        predicate: And(
-            Equal(
-                Field(
-                    Some(
-                        "movies",
+        inner: Scan {
+            table: "genres",
+            alias: None,
+        },
+        predicate: Some(
+            And(
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
                     ),
-                    "genre_id",
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
                 ),
-                Field(
-                    Some(
-                        "genres",
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "id",
                     ),
-                    "id",
-                ),
-            ),
-            Equal(
-                Field(
-                    Some(
-                        "movies",
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
                     ),
-                    "id",
-                ),
-                Field(
-                    Some(
-                        "genres",
-                    ),
-                    "id",
                 ),
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 
 Optimized plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: None,
-            },
-            inner: Scan {
-                table: "genres",
-                alias: None,
-            },
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: None,
         },
-        predicate: And(
-            Equal(
-                Field(
-                    Some(
-                        "movies",
+        inner: Scan {
+            table: "genres",
+            alias: None,
+        },
+        predicate: Some(
+            And(
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
                     ),
-                    "genre_id",
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
                 ),
-                Field(
-                    Some(
-                        "genres",
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "id",
                     ),
-                    "id",
-                ),
-            ),
-            Equal(
-                Field(
-                    Some(
-                        "movies",
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
                     ),
-                    "id",
-                ),
-                Field(
-                    Some(
-                        "genres",
-                    ),
-                    "id",
                 ),
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 

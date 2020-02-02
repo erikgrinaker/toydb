@@ -36,42 +36,46 @@ AST: Select {
 }
 
 Plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: None,
-            },
-            inner: Scan {
-                table: "genres",
-                alias: None,
-            },
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: None,
         },
-        predicate: Constant(
-            Boolean(
-                false,
+        inner: Scan {
+            table: "genres",
+            alias: None,
+        },
+        predicate: Some(
+            Constant(
+                Boolean(
+                    false,
+                ),
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 
 Optimized plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: None,
-            },
-            inner: Scan {
-                table: "genres",
-                alias: None,
-            },
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: None,
         },
-        predicate: Constant(
-            Boolean(
-                false,
+        inner: Scan {
+            table: "genres",
+            alias: None,
+        },
+        predicate: Some(
+            Constant(
+                Boolean(
+                    false,
+                ),
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 

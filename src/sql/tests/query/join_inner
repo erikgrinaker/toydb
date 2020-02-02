@@ -47,60 +47,64 @@ AST: Select {
 }
 
 Plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: None,
-            },
-            inner: Scan {
-                table: "genres",
-                alias: None,
-            },
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: None,
         },
-        predicate: Equal(
-            Field(
-                Some(
-                    "movies",
+        inner: Scan {
+            table: "genres",
+            alias: None,
+        },
+        predicate: Some(
+            Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "genre_id",
                 ),
-                "genre_id",
-            ),
-            Field(
-                Some(
-                    "genres",
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
                 ),
-                "id",
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 
 Optimized plan: Plan {
-    root: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: None,
-            },
-            inner: Scan {
-                table: "genres",
-                alias: None,
-            },
+    root: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: None,
         },
-        predicate: Equal(
-            Field(
-                Some(
-                    "movies",
+        inner: Scan {
+            table: "genres",
+            alias: None,
+        },
+        predicate: Some(
+            Equal(
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "genre_id",
                 ),
-                "genre_id",
-            ),
-            Field(
-                Some(
-                    "genres",
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
                 ),
-                "id",
             ),
         ),
+        pad: false,
+        flip: false,
     },
 }
 

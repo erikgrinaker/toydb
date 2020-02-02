@@ -60,6 +60,9 @@ Plan: Plan {
                     "g",
                 ),
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
         labels: [
             None,
@@ -97,6 +100,9 @@ Optimized plan: Plan {
                     "g",
                 ),
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
         labels: [
             None,

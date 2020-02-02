@@ -1,0 +1,195 @@
+Query: SELECT g.id AS genre_id, m.id AS movie_id FROM genres g LEFT JOIN movies m ON m.id = g.id
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ],
+        labels: [
+            Some(
+                "genre_id",
+            ),
+            Some(
+                "movie_id",
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Join {
+                    left: Table {
+                        name: "genres",
+                        alias: Some(
+                            "g",
+                        ),
+                    },
+                    right: Table {
+                        name: "movies",
+                        alias: Some(
+                            "m",
+                        ),
+                    },
+                    type: Left,
+                    predicate: Some(
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "id",
+                                ),
+                                Field(
+                                    Some(
+                                        "g",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                    ),
+                },
+            ],
+        },
+    ),
+    where: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "genres",
+                alias: Some(
+                    "g",
+                ),
+            },
+            inner: Scan {
+                table: "movies",
+                alias: Some(
+                    "m",
+                ),
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        Some(
+                            "m",
+                        ),
+                        "id",
+                    ),
+                    Field(
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
+            pad: true,
+            flip: false,
+        },
+        labels: [
+            Some(
+                "genre_id",
+            ),
+            Some(
+                "movie_id",
+            ),
+        ],
+        expressions: [
+            Field(
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "genres",
+                alias: Some(
+                    "g",
+                ),
+            },
+            inner: Scan {
+                table: "movies",
+                alias: Some(
+                    "m",
+                ),
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        Some(
+                            "m",
+                        ),
+                        "id",
+                    ),
+                    Field(
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
+            pad: true,
+            flip: false,
+        },
+        labels: [
+            Some(
+                "genre_id",
+            ),
+            Some(
+                "movie_id",
+            ),
+        ],
+        expressions: [
+            Field(
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ],
+    },
+}
+
+Query: SELECT g.id AS genre_id, m.id AS movie_id FROM genres g LEFT JOIN movies m ON m.id = g.id
+
+Result: ["genre_id", "movie_id"]
+[Integer(1), Integer(1)]
+[Integer(2), Integer(2)]

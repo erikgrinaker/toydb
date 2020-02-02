@@ -43,6 +43,9 @@ Plan: Plan {
                 table: "genres",
                 alias: None,
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
         labels: [
             None,
@@ -67,6 +70,9 @@ Optimized plan: Plan {
                 table: "genres",
                 alias: None,
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
         labels: [
             None,

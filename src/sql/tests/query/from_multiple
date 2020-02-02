@@ -44,7 +44,13 @@ Plan: Plan {
                 table: "countries",
                 alias: None,
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
+        predicate: None,
+        pad: false,
+        flip: false,
     },
 }
 
@@ -63,7 +69,13 @@ Optimized plan: Plan {
                 table: "countries",
                 alias: None,
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
+        predicate: None,
+        pad: false,
+        flip: false,
     },
 }
 

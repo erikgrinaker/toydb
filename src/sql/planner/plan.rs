@@ -39,20 +39,60 @@ impl Plan {
 /// A plan node
 #[derive(Debug)]
 pub enum Node {
-    CreateTable { schema: schema::Table },
-    Delete { table: String, source: Box<Self> },
-    DropTable { name: String },
-    Filter { source: Box<Self>, predicate: Expression },
-    Insert { table: String, columns: Vec<String>, expressions: Vec<Expressions> },
-    Limit { source: Box<Self>, limit: u64 },
-    NestedLoopJoin { outer: Box<Self>, inner: Box<Self> },
+    CreateTable {
+        schema: schema::Table,
+    },
+    Delete {
+        table: String,
+        source: Box<Self>,
+    },
+    DropTable {
+        name: String,
+    },
+    Filter {
+        source: Box<Self>,
+        predicate: Expression,
+    },
+    Insert {
+        table: String,
+        columns: Vec<String>,
+        expressions: Vec<Expressions>,
+    },
+    Limit {
+        source: Box<Self>,
+        limit: u64,
+    },
+    NestedLoopJoin {
+        outer: Box<Self>,
+        inner: Box<Self>,
+        predicate: Option<Expression>,
+        pad: bool,
+        flip: bool,
+    },
     Nothing,
-    Offset { source: Box<Self>, offset: u64 },
-    Order { source: Box<Self>, orders: Vec<(Expression, Direction)> },
-    Projection { source: Box<Self>, labels: Vec<Option<String>>, expressions: Expressions },
-    Scan { table: String, alias: Option<String> },
+    Offset {
+        source: Box<Self>,
+        offset: u64,
+    },
+    Order {
+        source: Box<Self>,
+        orders: Vec<(Expression, Direction)>,
+    },
+    Projection {
+        source: Box<Self>,
+        labels: Vec<Option<String>>,
+        expressions: Expressions,
+    },
+    Scan {
+        table: String,
+        alias: Option<String>,
+    },
     // Uses BTreeMap for test stability
-    Update { table: String, source: Box<Self>, expressions: BTreeMap<String, Expression> },
+    Update {
+        table: String,
+        source: Box<Self>,
+        expressions: BTreeMap<String, Expression>,
+    },
 }
 
 impl Node {
@@ -78,9 +118,12 @@ impl Node {
             Self::Limit { source, limit } => {
                 Self::Limit { source: source.transform(pre, post)?.into(), limit }
             }
-            Self::NestedLoopJoin { outer, inner } => Self::NestedLoopJoin {
+            Self::NestedLoopJoin { outer, inner, predicate, pad, flip } => Self::NestedLoopJoin {
                 outer: outer.transform(pre, post)?.into(),
                 inner: inner.transform(pre, post)?.into(),
+                predicate,
+                pad,
+                flip,
             },
             Self::Offset { source, offset } => {
                 Self::Offset { source: source.transform(pre, post)?.into(), offset }

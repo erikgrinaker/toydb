@@ -164,6 +164,9 @@ Plan: Plan {
                             "g",
                         ),
                     },
+                    predicate: None,
+                    pad: false,
+                    flip: false,
                 },
                 inner: Scan {
                     table: "countries",
@@ -171,6 +174,9 @@ Plan: Plan {
                         "c",
                     ),
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             predicate: And(
                 And(
@@ -299,6 +305,9 @@ Optimized plan: Plan {
                             "g",
                         ),
                     },
+                    predicate: None,
+                    pad: false,
+                    flip: false,
                 },
                 inner: Scan {
                     table: "countries",
@@ -306,6 +315,9 @@ Optimized plan: Plan {
                         "c",
                     ),
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             predicate: And(
                 And(

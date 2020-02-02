@@ -282,4 +282,12 @@ test_query! {
         FROM movies
             INNER JOIN genres ON movies.genre_id = genres.id
             INNER JOIN studios ON movies.studio_id = studios.id"#,
+
+    join_left: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT JOIN genres g ON m.id = g.id",
+    join_left_outer: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN genres g ON m.id = g.id",
+    join_left_truncate: "SELECT g.id AS genre_id, m.id AS movie_id FROM genres g LEFT JOIN movies m ON m.id = g.id",
+
+    join_right: "SELECT g.id AS genre_id, m.id AS movie_id FROM genres g RIGHT JOIN movies m ON m.id = g.id",
+    join_right_outer: "SELECT g.id AS genre_id, m.id AS movie_id FROM genres g RIGHT OUTER JOIN movies m ON m.id = g.id",
+    join_right_truncate: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m RIGHT JOIN genres g ON m.id = g.id",
 }

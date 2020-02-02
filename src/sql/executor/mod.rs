@@ -50,8 +50,8 @@ impl<T: Transaction + 'static> dyn Executor<T> {
                 Insert::new(table, columns, expressions)
             }
             Node::Limit { source, limit } => Limit::new(Self::build(*source), limit),
-            Node::NestedLoopJoin { outer, inner } => {
-                NestedLoopJoin::new(Self::build(*outer), Self::build(*inner))
+            Node::NestedLoopJoin { outer, inner, predicate, pad, flip } => {
+                NestedLoopJoin::new(Self::build(*outer), Self::build(*inner), predicate, pad, flip)
             }
             Node::Nothing => Nothing::new(),
             Node::Offset { source, offset } => Offset::new(Self::build(*source), offset),

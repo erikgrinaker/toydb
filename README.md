@@ -104,7 +104,7 @@ toydb@1> SELECT * FROM movies
   - [x] `DELETE FROM ... WHERE ...`
   - [x] `SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT ... OFFSET ...`
     - [ ] `GROUP BY ... HAVING ...`
-    - [ ] `[INNER|LEFT|RIGHT|FULL|CROSS] JOIN`
+    - [x] `[INNER|LEFT|RIGHT|CROSS] JOIN`
   - [ ] `EXPLAIN SELECT ...`
 
 - [ ] **Verification:** [Jepsen](https://github.com/jepsen-io/jepsen) test suite.

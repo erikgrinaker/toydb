@@ -104,20 +104,18 @@ AST: Select {
 
 Plan: Plan {
     root: Projection {
-        source: Filter {
-            source: NestedLoopJoin {
-                outer: Filter {
-                    source: NestedLoopJoin {
-                        outer: Scan {
-                            table: "movies",
-                            alias: None,
-                        },
-                        inner: Scan {
-                            table: "genres",
-                            alias: None,
-                        },
-                    },
-                    predicate: Equal(
+        source: NestedLoopJoin {
+            outer: NestedLoopJoin {
+                outer: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                inner: Scan {
+                    table: "genres",
+                    alias: None,
+                },
+                predicate: Some(
+                    Equal(
                         Field(
                             Some(
                                 "movies",
@@ -131,26 +129,32 @@ Plan: Plan {
                             "id",
                         ),
                     ),
-                },
-                inner: Scan {
-                    table: "studios",
-                    alias: None,
-                },
-            },
-            predicate: Equal(
-                Field(
-                    Some(
-                        "movies",
-                    ),
-                    "studio_id",
                 ),
-                Field(
-                    Some(
-                        "studios",
+                pad: false,
+                flip: false,
+            },
+            inner: Scan {
+                table: "studios",
+                alias: None,
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "studio_id",
                     ),
-                    "id",
+                    Field(
+                        Some(
+                            "studios",
+                        ),
+                        "id",
+                    ),
                 ),
             ),
+            pad: false,
+            flip: false,
         },
         labels: [
             None,
@@ -186,20 +190,18 @@ Plan: Plan {
 
 Optimized plan: Plan {
     root: Projection {
-        source: Filter {
-            source: NestedLoopJoin {
-                outer: Filter {
-                    source: NestedLoopJoin {
-                        outer: Scan {
-                            table: "movies",
-                            alias: None,
-                        },
-                        inner: Scan {
-                            table: "genres",
-                            alias: None,
-                        },
-                    },
-                    predicate: Equal(
+        source: NestedLoopJoin {
+            outer: NestedLoopJoin {
+                outer: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                inner: Scan {
+                    table: "genres",
+                    alias: None,
+                },
+                predicate: Some(
+                    Equal(
                         Field(
                             Some(
                                 "movies",
@@ -213,26 +215,32 @@ Optimized plan: Plan {
                             "id",
                         ),
                     ),
-                },
-                inner: Scan {
-                    table: "studios",
-                    alias: None,
-                },
-            },
-            predicate: Equal(
-                Field(
-                    Some(
-                        "movies",
-                    ),
-                    "studio_id",
                 ),
-                Field(
-                    Some(
-                        "studios",
+                pad: false,
+                flip: false,
+            },
+            inner: Scan {
+                table: "studios",
+                alias: None,
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "studio_id",
                     ),
-                    "id",
+                    Field(
+                        Some(
+                            "studios",
+                        ),
+                        "id",
+                    ),
                 ),
             ),
+            pad: false,
+            flip: false,
         },
         labels: [
             None,

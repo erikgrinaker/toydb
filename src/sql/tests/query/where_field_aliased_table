@@ -98,6 +98,9 @@ Plan: Plan {
                         "g",
                     ),
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             predicate: And(
                 Or(
@@ -180,6 +183,9 @@ Optimized plan: Plan {
                         "g",
                     ),
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             predicate: And(
                 Or(

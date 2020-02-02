@@ -64,6 +64,9 @@ impl Planner {
                             node = Node::NestedLoopJoin {
                                 outer: Box::new(self.build_from_item(item)?),
                                 inner: Box::new(node),
+                                predicate: None,
+                                pad: false,
+                                flip: false,
                             }
                         }
                         node
@@ -151,18 +154,29 @@ impl Planner {
     fn build_from_item(&self, item: ast::FromItem) -> Result<Node, Error> {
         Ok(match item {
             ast::FromItem::Table { name, alias } => Node::Scan { table: name, alias },
-            ast::FromItem::Join { left, right, r#type, predicate } => {
-                let mut node = match r#type {
-                    ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
-                        outer: Box::new(self.build_from_item(*left)?),
-                        inner: Box::new(self.build_from_item(*right)?),
-                    },
-                };
-                if let Some(predicate) = predicate {
-                    node = Node::Filter { source: Box::new(node), predicate: predicate.into() }
-                };
-                node
-            }
+            ast::FromItem::Join { left, right, r#type, predicate } => match r#type {
+                ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
+                    outer: Box::new(self.build_from_item(*left)?),
+                    inner: Box::new(self.build_from_item(*right)?),
+                    predicate: predicate.map(|e| e.into()),
+                    pad: false,
+                    flip: false,
+                },
+                ast::JoinType::Left => Node::NestedLoopJoin {
+                    outer: Box::new(self.build_from_item(*left)?),
+                    inner: Box::new(self.build_from_item(*right)?),
+                    predicate: predicate.map(|e| e.into()),
+                    pad: true,
+                    flip: false,
+                },
+                ast::JoinType::Right => Node::NestedLoopJoin {
+                    outer: Box::new(self.build_from_item(*left)?),
+                    inner: Box::new(self.build_from_item(*right)?),
+                    predicate: predicate.map(|e| e.into()),
+                    pad: true,
+                    flip: true,
+                },
+            },
         })
     }
 

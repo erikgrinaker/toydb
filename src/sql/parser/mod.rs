@@ -399,6 +399,14 @@ impl<'a> Parser<'a> {
             Ok(Some(ast::JoinType::Inner))
         } else if self.next_if_token(Keyword::Join.into()).is_some() {
             Ok(Some(ast::JoinType::Inner))
+        } else if self.next_if_token(Keyword::Left.into()).is_some() {
+            self.next_if_token(Keyword::Outer.into());
+            self.next_expect(Some(Keyword::Join.into()))?;
+            Ok(Some(ast::JoinType::Left))
+        } else if self.next_if_token(Keyword::Right.into()).is_some() {
+            self.next_if_token(Keyword::Outer.into());
+            self.next_expect(Some(Keyword::Join.into()))?;
+            Ok(Some(ast::JoinType::Right))
         } else {
             Ok(None)
         }

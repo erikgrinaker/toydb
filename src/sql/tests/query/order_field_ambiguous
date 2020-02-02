@@ -64,6 +64,9 @@ Plan: Plan {
                     table: "genres",
                     alias: None,
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             predicate: Equal(
                 Field(
@@ -104,6 +107,9 @@ Optimized plan: Plan {
                     table: "genres",
                     alias: None,
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             predicate: Equal(
                 Field(

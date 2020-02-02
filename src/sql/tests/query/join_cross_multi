@@ -57,16 +57,25 @@ Plan: Plan {
                     table: "genres",
                     alias: None,
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             inner: Scan {
                 table: "countries",
                 alias: None,
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
         inner: Scan {
             table: "studios",
             alias: None,
         },
+        predicate: None,
+        pad: false,
+        flip: false,
     },
 }
 
@@ -82,16 +91,25 @@ Optimized plan: Plan {
                     table: "genres",
                     alias: None,
                 },
+                predicate: None,
+                pad: false,
+                flip: false,
             },
             inner: Scan {
                 table: "countries",
                 alias: None,
             },
+            predicate: None,
+            pad: false,
+            flip: false,
         },
         inner: Scan {
             table: "studios",
             alias: None,
         },
+        predicate: None,
+        pad: false,
+        flip: false,
     },
 }
 
