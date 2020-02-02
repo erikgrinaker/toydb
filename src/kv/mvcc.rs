@@ -106,7 +106,9 @@ impl<S: Storage> Transaction<S> {
 
     /// Commits the transaction, by removing the txn from the active set.
     pub fn commit(self) -> Result<(), Error> {
-        self.storage.write()?.remove(&Key::TxnActive(self.id).encode())
+        let mut session = self.storage.write()?;
+        session.remove(&Key::TxnActive(self.id).encode())?;
+        session.flush()
     }
 
     /// Rolls back the transaction, by removing all updated entries.

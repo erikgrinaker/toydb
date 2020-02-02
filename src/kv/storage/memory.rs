@@ -21,6 +21,10 @@ impl Memory {
 }
 
 impl Storage for Memory {
+    fn flush(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         Ok(self.data.get(key).cloned())
     }

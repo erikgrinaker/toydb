@@ -15,6 +15,9 @@ use std::ops::RangeBounds;
 
 /// Key/value storage backend.
 pub trait Storage {
+    /// Flushes data to disk.
+    fn flush(&mut self) -> Result<(), Error>;
+
     /// Reads a value for a key, or `None` if it does not exist.
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error>;
 

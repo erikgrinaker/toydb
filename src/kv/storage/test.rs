@@ -20,6 +20,10 @@ impl Test {
 }
 
 impl Storage for Test {
+    fn flush(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         self.data.read()?.read(key)
     }

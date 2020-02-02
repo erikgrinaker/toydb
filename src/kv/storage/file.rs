@@ -25,24 +25,21 @@ impl File {
         };
         Ok(Self { file, data })
     }
+}
 
-    /// Writes out the entire dataset to the file.
+impl Storage for File {
     fn flush(&mut self) -> Result<(), Error> {
         self.file.seek(std::io::SeekFrom::Start(0))?;
         rmp_serde::encode::write(&mut self.file, &self.data)?;
         Ok(())
     }
-}
 
-impl Storage for File {
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         self.data.read(key)
     }
 
     fn remove(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.data.remove(key)?;
-        self.flush()?;
-        Ok(())
+        self.data.remove(key)
     }
 
     fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Range {
@@ -50,9 +47,7 @@ impl Storage for File {
     }
 
     fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.data.write(key, value)?;
-        self.flush()?;
-        Ok(())
+        self.data.write(key, value)
     }
 }
 
