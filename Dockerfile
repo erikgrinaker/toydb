@@ -1,5 +1,5 @@
 # Initial build
-FROM rust:1.41 AS build
+FROM rust:1.42 AS build
 
 ARG TARGET=x86_64-unknown-linux-musl
 ENV RUSTFLAGS=-Clinker=musl-gcc
