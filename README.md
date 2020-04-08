@@ -2,9 +2,17 @@
 
 [![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
 
-Distributed SQL database in Rust, written as a learning project. For details, see the [documentation](docs/README.md).
+Distributed SQL database in Rust, written as a learning project. Most components have been written from scratch, including:
 
-The primary goal is to build a minimally functional yet correct distributed database. Performance, security, reliability, and convenience are non-goals.
+* Raft-based distributed consensus engine for linearizable state machine replication.
+
+* ACID-compliant transaction engine with MVCC-based snapshot isolation.
+
+* Iterator-based relational query engine with time-travel support.
+
+* SQL interface including projections, filters, joins, and aggregations.
+
+For details, see the [reference documentation](REFERENCE.md).
 
 ## Usage
 
@@ -68,50 +76,9 @@ toydb@1> SELECT * FROM movies
 3|Her
 ```
 
-## Project Outline
-
-- [x] **Networking:** gRPC for internal and external communication, no security.
-
-- [x] **Client:** Simple interactive REPL client over gRPC.
-
-- [x] **Consensus:** Self-written Raft implementation with linearizable replication of arbitrary state machines.
-
-- [ ] **Storage:** Self-written key-value store using B+trees and possibly LSM-trees, with MessagePack for serialization.
-
-- [x] **Data Types:** Support for nulls, booleans, 64-bit integers, 64-bit floats, and UTF-8 strings up to 1 KB.
-
-- [x] **Schemas:** Compulsory singluar primary keys, default values, unique and foreign key constraints.
-
-  - [ ] Indexes.
-
-- [x] **Transactions:** Self-written ACID-compliant transaction engine with MVCC-based snapshot isolation.
-
-  - [ ] Serializable snapshot isolation.
-
-- [x] **Query Engine:** Self-written iterator-based engine with simple heuristic optimizer and time-travel support.
-
-  - [ ] Predicate pushdown.
-
-- [ ] **Language:** Self-written SQL parser with support for:
-
-  - [x] `[CREATE|DROP] TABLE ...`
-  - [ ] `[CREATE|DROP] INDEX ...`
-  - [x] `BEGIN`, `COMMIT`, and `ROLLBACK`
-    - [x] `READ ONLY`
-    - [x] `AS OF SYSTEM TIME <txn-id>`
-  - [x] `INSERT INTO ... (...) VALUES (...)`
-  - [x] `UPDATE ... SET ... WHERE ...`
-  - [x] `DELETE FROM ... WHERE ...`
-  - [x] `SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT ... OFFSET ...`
-    - [x] `GROUP BY ... HAVING ...`
-    - [x] `[INNER|LEFT|RIGHT|CROSS] JOIN`
-  - [ ] `EXPLAIN SELECT ...`
-
-- [ ] **Verification:** [Jepsen](https://github.com/jepsen-io/jepsen) test suite.
-
 ## Known Issues
 
-Below is an incomplete list of known issues preventing this from being a "real" database.
+The primary goal is to build a minimally functional yet correct distributed database. Performance, security, reliability, and convenience are non-goals. Below is an incomplete list of known issues preventing this from being a "real" database.
 
 ### Networking
 
@@ -155,4 +122,4 @@ Below is an incomplete list of known issues preventing this from being a "real" 
 
 * **Type checking:** query type checking (e.g. `SELECT a + b` must receive two numbers) is done at query evaluation time, not at query compile time.
 
-* **Ordering:** it's only possible to order on output columns of the `SELECT` statement.
+* **Streamed evaluation:** it's not possible to operate on fields that were not output by a preceding plan node - e.g. it's only possible to order on `SELECT` output columns.
