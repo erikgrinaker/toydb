@@ -32,7 +32,8 @@ macro_rules! test_query {
                 )",
                 "INSERT INTO genres VALUES
                     (1, 'Science Fiction'),
-                    (2, 'Action')",
+                    (2, 'Action'),
+                    (3, 'Comedy')",
                 "CREATE TABLE studios (
                     id INTEGER PRIMARY KEY,
                     name STRING NOT NULL,
@@ -53,11 +54,16 @@ macro_rules! test_query {
                     ultrahd BOOLEAN
                 )",
                 "INSERT INTO movies VALUES
-                    (1, 'Stalker', 1, 1, 1979, 8.2, FALSE),
+                    (1, 'Stalker', 1, 1, 1979, 8.2, NULL),
                     (2, 'Sicario', 2, 2, 2015, 7.6, TRUE),
                     (3, 'Primer', 3, 1, 2004, 6.9, NULL),
                     (4, 'Heat', 4, 2, 1995, 8.2, TRUE),
-                    (5, 'The Fountain', 4, 1, 2006, 7.2, FALSE)",
+                    (5, 'The Fountain', 4, 1, 2006, 7.2, FALSE),
+                    (6, 'Solaris', 1, 1, 1972, 8.1, NULL),
+                    (7, 'Gravity', 4, 1, 2013, 7.7, TRUE),
+                    (8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE),
+                    (9, 'Birdman', 4, 3, 2014, 7.7, TRUE),
+                    (10, 'Inception', 4, 1, 2010, 8.8, TRUE)",
             ]);
             let engine = super::setup(setup)?;
 
@@ -206,7 +212,7 @@ test_query! { with [
 }
 test_query! { with [
         "CREATE TABLE floats (id INTEGER PRIMARY KEY, value FLOAT)",
-        "INSERT INTO floats VALUES (1, 3.14), (2, -2.718), (3, NULL), (4, 2.718), (5, 0.0)",
+        "INSERT INTO floats VALUES (1, 3.14), (2, -2.718), (3, NULL), (4, 1.618), (5, 0.0)",
     ];
     order_float_asc: "SELECT * FROM floats ORDER BY value ASC",
     order_float_desc: "SELECT * FROM floats ORDER BY value DESC",
@@ -290,4 +296,69 @@ test_query! {
     join_right: "SELECT g.id AS genre_id, m.id AS movie_id FROM genres g RIGHT JOIN movies m ON m.id = g.id",
     join_right_outer: "SELECT g.id AS genre_id, m.id AS movie_id FROM genres g RIGHT OUTER JOIN movies m ON m.id = g.id",
     join_right_truncate: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m RIGHT JOIN genres g ON m.id = g.id",
+
+    agg_count_star: "SELECT COUNT(*) FROM movies",
+    agg_expr: "SELECT SUM(rating * 10) / COUNT(*) FROM movies",
+    agg_nested: "SELECT MAX(MIN(rating)) FROM movies",
+    agg_ungrouped: "SELECT studio_id, COUNT(*) FROM movies",
+    agg_const: "SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3)",
+    agg_const_from: "SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3) FROM genres",
+}
+test_query! { with [
+        "CREATE TABLE booleans (id INTEGER PRIMARY KEY, b BOOLEAN)",
+        "INSERT INTO booleans VALUES (1, TRUE), (2, NULL), (3, FALSE)",
+    ];
+    agg_boolean: "SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans WHERE b IS NOT NULL",
+    agg_boolean_null: "SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans",
+}
+test_query! { with [
+        "CREATE TABLE floats (id INTEGER PRIMARY KEY, f FLOAT)",
+        "INSERT INTO floats VALUES (1, 3.14), (2, -2.718), (3, NULL), (4, 1.618), (5, 0.0)",
+    ];
+    agg_float: "SELECT MIN(f), MAX(f), SUM(f), COUNT(f), AVG(f) FROM floats WHERE f IS NOT NULL",
+    agg_float_null: "SELECT MIN(f), MAX(f), SUM(f), COUNT(f), AVG(f) FROM floats",
+}
+test_query! { with [
+        "CREATE TABLE integers (id INTEGER PRIMARY KEY, i INTEGER)",
+        "INSERT INTO integers VALUES (1, 7), (2, NULL), (3, -3), (4, 5), (5, 0)",
+    ];
+    agg_integer: "SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers WHERE i IS NOT NULL",
+    agg_integer_null: "SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers",
+}
+test_query! { with [
+        "CREATE TABLE strings (id INTEGER PRIMARY KEY, s STRING)",
+        "INSERT INTO strings VALUES
+            (1, 'a'),
+            (2, 'ab'),
+            (3, 'aaa'),
+            (4, 'A'),
+            (5, NULL),
+            (6, 'aA'),
+            (7, 'åa'),
+            (8, 'Åa')
+        ",
+    ];
+    agg_string: "SELECT MIN(s), MAX(s), SUM(s), COUNT(s), AVG(s) FROM strings WHERE s IS NOT NULL",
+    agg_string_null: "SELECT MIN(s), MAX(s), SUM(s), COUNT(s), AVG(s) FROM strings",
+}
+test_query! {
+    group_simple: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY studio_id",
+    group_noselect: "SELECT MAX(rating) AS best FROM movies GROUP BY studio_id ORDER BY best DESC",
+    group_noaggregate: "SELECT title FROM movies GROUP BY title ORDER BY title ASC",
+    group_unknown: "SELECT COUNT(*) FROM movies GROUP BY unknown",
+    group_join: "SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC",
+    group_order_agg: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)",
+    group_expr: "SELECT MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating",
+    group_expr_aliased: "SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORDER BY twice",
+    group_expr_both: "SELECT studio_id * 2, MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating",
+    group_expr_extended: "SELECT studio_id * 2 + 1, MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating",
+    group_expr_select: "SELECT studio_id * 2, MAX(rating) AS rating FROM movies GROUP BY studio_id ORDER BY rating",
+    group_expr_aggr: "SELECT studio_id, SUM(rating * 10) / COUNT(*) FROM movies GROUP BY studio_id ORDER BY studio_id",
+    group_expr_aggr_selfref: "SELECT studio_id, SUM(rating * 10) / COUNT(*) + studio_id FROM movies GROUP BY studio_id ORDER BY studio_id",
+    group_expr_aggr_nogroupref: "SELECT studio_id, SUM(rating * 10) / COUNT(*) + id FROM movies GROUP BY studio_id ORDER BY studio_id",
+    group_expr_multigroup: "SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi",
+
+
+    having: "SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id",
+    having_nogroup: "SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id",
 }

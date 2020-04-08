@@ -58,6 +58,8 @@ AST: Select {
         },
     ),
     where: None,
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,
@@ -151,3 +153,8 @@ Result: ["?", "age"]
 [Integer(7), Integer(16)]
 [Integer(7), Integer(25)]
 [Integer(7), Integer(14)]
+[Integer(7), Integer(48)]
+[Integer(7), Integer(7)]
+[Integer(7), Integer(2)]
+[Integer(7), Integer(6)]
+[Integer(7), Integer(10)]

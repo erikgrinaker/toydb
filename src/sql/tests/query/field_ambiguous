@@ -27,6 +27,8 @@ AST: Select {
         },
     ),
     where: None,
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,

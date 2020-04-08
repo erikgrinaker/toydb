@@ -1,0 +1,128 @@
+Query: SELECT COUNT(*) FROM movies GROUP BY unknown
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "count",
+                [
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    None,
+                    "unknown",
+                ),
+            ],
+        ),
+    ),
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Constant(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                    Field(
+                        None,
+                        "unknown",
+                    ),
+                ],
+            },
+            aggregates: [
+                Count,
+            ],
+        },
+        labels: [
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Constant(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                    Field(
+                        None,
+                        "unknown",
+                    ),
+                ],
+            },
+            aggregates: [
+                Count,
+            ],
+        },
+        labels: [
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+        ],
+    },
+}
+
+Query: SELECT COUNT(*) FROM movies GROUP BY unknown
+
+Result: Value("Unknown field unknown")

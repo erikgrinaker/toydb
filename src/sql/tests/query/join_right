@@ -65,6 +65,8 @@ AST: Select {
         },
     ),
     where: None,
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,
@@ -193,6 +195,11 @@ Query: SELECT g.id AS genre_id, m.id AS movie_id FROM genres g RIGHT JOIN movies
 Result: ["genre_id", "movie_id"]
 [Integer(1), Integer(1)]
 [Integer(2), Integer(2)]
-[Null, Integer(3)]
+[Integer(3), Integer(3)]
 [Null, Integer(4)]
 [Null, Integer(5)]
+[Null, Integer(6)]
+[Null, Integer(7)]
+[Null, Integer(8)]
+[Null, Integer(9)]
+[Null, Integer(10)]

@@ -1,0 +1,242 @@
+Query: SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3) FROM genres
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "min",
+                [
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ],
+            ),
+            Function(
+                "max",
+                [
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ],
+            ),
+            Function(
+                "sum",
+                [
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ],
+            ),
+            Function(
+                "count",
+                [
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ],
+            ),
+            Function(
+                "avg",
+                [
+                    Literal(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "genres",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "genres",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "genres",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Query: SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3) FROM genres
+
+Result: ["?", "?", "?", "?", "?"]
+[Integer(3), Integer(3), Integer(9), Integer(3), Integer(3)]

@@ -19,7 +19,7 @@ Numeric types are not interchangable when stored; a float value cannot be stored
 
 Keywords are reserved words that have special meaning in SQL statements, such as `SELECT`. These cannot be used as identifiers (e.g. table names) unless quoted with `"`. Keywords are case-insensitive. The complete list of keywords is:
 
-`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `FALSE`, `FLOAT`, `FROM`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
+`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
@@ -74,19 +74,19 @@ Logical operators apply standard logic operations on boolean operands.
 The complete truth tables are:
 
 | `AND`       | `TRUE`  | `FALSE` | `NULL`  |
-|-------------|---------|---------|---------|
+| ----------- | ------- | ------- | ------- |
 | **`TRUE`**  | `TRUE`  | `FALSE` | `NULL`  |
 | **`FALSE`** | `FALSE` | `FALSE` | `FALSE` |
 | **`NULL`**  | `NULL`  | `FALSE` | `NULL`  |
 
 | `OR`        | `TRUE` | `FALSE` | `NULL` |
-|-------------|--------|---------|--------|
+| ----------- | ------ | ------- | ------ |
 | **`TRUE`**  | `TRUE` | `TRUE`  | `TRUE` |
 | **`FALSE`** | `TRUE` | `FALSE` | `NULL` |
 | **`NULL`**  | `TRUE` | `NULL`  | `NULL` |
 
 | `NOT`       |         |
-|-------------|---------|
+| ----------- | ------- |
 | **`TRUE`**  | `FALSE` |
 | **`FALSE`** | `TRUE`  |
 | **`NULL`**  | `NULL`  |
@@ -141,7 +141,7 @@ String operators operate on string operands.
 The operator precedence (order of operations) is as follows:
 
 | Precedence | Operator                 | Associativity |
-|------------|--------------------------|---------------|
+| ---------- | ------------------------ | ------------- |
 | 9          | `+`, `-`, `NOT` (prefix) | Right         |
 | 8          | `!`, `IS` (postfix)      | Left          |
 | 7          | `^`                      | Right         |
@@ -153,6 +153,20 @@ The operator precedence (order of operations) is as follows:
 | 1          | `OR`                     | Left          |
 
 Precedence can be overridden by wrapping an expression in parentheses, e.g. `(1 + 2) * 3`.
+
+### Aggregate functions
+
+Aggregate function aggregate an expression across all rows, optionally grouped into buckets given by `GROUP BY`, and results can be filtered via `HAVING`.
+
+* `AVG(expr)`: returns the average of numerical values.
+
+* `COUNT(expr)`: returns the number of rows for which ***`expr`*** evaluates to a non-`NULL` value. `COUNT(*)` can be used to count all rows.
+
+* `MIN(expr)`: returns the minimum value, according to the datatype's ordering.
+
+* `MIN(expr)`: returns the maximum value, according to the datatype's ordering.
+* 
+* `SUM(expr)`: returns the sum of numerical values.
 
 ## SQL Statements
 
@@ -269,6 +283,8 @@ Selects rows from a table.
 SELECT [ * | <b><i>expression</i></b> [ [ AS ] <b><i>output_name</i></b> [, ...] ] ]
     [ FROM <b><i>from_item</i></b> [, ...] ]
     [ WHERE <b><i>predicate</i></b> ]
+    [ GROUP BY <b><i>group_expr</i></b> [, ...] ]
+    [ HAVING <b><i>having_expr</i></b> ]
     [ ORDER BY <b><i>order_expr</i></b> [ ASC | DESC ] [, ...] ]
     [ LIMIT <b><i>count</i></b> ]
     [ OFFSET <b><i>start</i></b> ]
@@ -298,6 +314,10 @@ Fetches rows or expressions, either from table ***`table_name`*** (if given) or 
 * ***`alias`***: table alias.
 
 * ***`predicate`***: only return rows for which this [expression](#expressions) evaluates to `TRUE`.
+
+* ***`group_expr`***: an expression to group aggregates by. Non-aggregate `SELECT` expressions must either reference a field given in `group_expr`, be idential with a `group_expr`, or have an `output_name` that is referenced by a `group_expr` field.
+
+* ***`having_expr`***: only return aggregate results for which this [expression](#expressions) evaluates to `TRUE`.
 
 * ***`order_expr`***: order rows by this expression (can be a simple field name).
 

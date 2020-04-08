@@ -38,6 +38,9 @@ impl<T: Transaction> Executor<T> for Projection<T> {
                     } else if let Expression::Field(relation, field) = e {
                         let (r, f) = columns.get(relation.as_deref(), field)?;
                         (r, Some(f))
+                    } else if let Expression::Column(i) = e {
+                        let (r, f) = columns.columns[*i].clone(); // FIXME Should have method for this
+                        (r, f)
                     } else {
                         (None, None)
                     })

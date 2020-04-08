@@ -39,6 +39,10 @@ impl Plan {
 /// A plan node
 #[derive(Debug)]
 pub enum Node {
+    Aggregation {
+        source: Box<Self>,
+        aggregates: Vec<Aggregate>,
+    },
     CreateTable {
         schema: schema::Table,
     },
@@ -109,6 +113,9 @@ impl Node {
             n @ Self::Insert { .. } => n,
             n @ Self::Nothing => n,
             n @ Self::Scan { .. } => n,
+            Self::Aggregation { source, aggregates } => {
+                Self::Aggregation { source: source.transform(pre, post)?.into(), aggregates }
+            }
             Self::Delete { table, source } => {
                 Self::Delete { table, source: source.transform(pre, post)?.into() }
             }
@@ -151,6 +158,7 @@ impl Node {
         A: Fn(Expression) -> Result<Expression, Error>,
     {
         Ok(match self {
+            n @ Self::Aggregation { .. } => n,
             n @ Self::CreateTable { .. } => n,
             n @ Self::Delete { .. } => n,
             n @ Self::DropTable { .. } => n,
@@ -196,6 +204,18 @@ impl Node {
         })
     }
 }
+
+/// An aggregate operation
+#[derive(Debug)]
+pub enum Aggregate {
+    Average,
+    Count,
+    Max,
+    Min,
+    Sum,
+}
+
+pub type Aggregates = Vec<Aggregate>;
 
 /// A sort order direction
 #[derive(Debug, PartialEq)]

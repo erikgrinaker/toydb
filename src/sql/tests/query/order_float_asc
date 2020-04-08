@@ -16,6 +16,8 @@ AST: Select {
         },
     ),
     where: None,
+    group_by: None,
+    having: None,
     order: [
         (
             Field(
@@ -71,5 +73,5 @@ Result: ["id", "value"]
 [Integer(3), Null]
 [Integer(2), Float(-2.718)]
 [Integer(5), Float(0.0)]
-[Integer(4), Float(2.718)]
+[Integer(4), Float(1.618)]
 [Integer(1), Float(3.14)]

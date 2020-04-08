@@ -1,0 +1,165 @@
+Query: SELECT MAX(rating) AS best FROM movies GROUP BY studio_id ORDER BY best DESC
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            Some(
+                "best",
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    None,
+                    "studio_id",
+                ),
+            ],
+        ),
+    ),
+    having: None,
+    order: [
+        (
+            Field(
+                None,
+                "best",
+            ),
+            Descending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    labels: [
+                        None,
+                        None,
+                    ],
+                    expressions: [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                        Field(
+                            None,
+                            "studio_id",
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                Some(
+                    "best",
+                ),
+            ],
+            expressions: [
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "best",
+                ),
+                Descending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    labels: [
+                        None,
+                        None,
+                    ],
+                    expressions: [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                        Field(
+                            None,
+                            "studio_id",
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                Some(
+                    "best",
+                ),
+            ],
+            expressions: [
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "best",
+                ),
+                Descending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT MAX(rating) AS best FROM movies GROUP BY studio_id ORDER BY best DESC
+
+Result: ["best"]
+[Float(8.8)]
+[Float(8.2)]
+[Float(7.6)]
+[Float(6.9)]

@@ -40,6 +40,8 @@ AST: Select {
             ),
         ),
     ),
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,
@@ -127,3 +129,7 @@ Query: SELECT * FROM movies WHERE released >= 2000 AND ultrahd
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(7), String("Gravity"), Integer(4), Integer(1), Integer(2013), Float(7.7), Boolean(true)]
+[Integer(8), String("Blindspotting"), Integer(2), Integer(3), Integer(2018), Float(7.4), Boolean(true)]
+[Integer(9), String("Birdman"), Integer(4), Integer(3), Integer(2014), Float(7.7), Boolean(true)]
+[Integer(10), String("Inception"), Integer(4), Integer(1), Integer(2010), Float(8.8), Boolean(true)]

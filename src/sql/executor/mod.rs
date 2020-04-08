@@ -1,3 +1,4 @@
+mod aggregation;
 mod create_table;
 mod delete;
 mod drop_table;
@@ -12,6 +13,7 @@ mod projection;
 mod scan;
 mod update;
 
+use aggregation::Aggregation;
 use create_table::CreateTable;
 use delete::Delete;
 use drop_table::DropTable;
@@ -42,6 +44,9 @@ impl<T: Transaction + 'static> dyn Executor<T> {
     /// Builds an executor for a plan node, consuming it
     pub fn build(node: Node) -> Box<dyn Executor<T>> {
         match node {
+            Node::Aggregation { source, aggregates } => {
+                Aggregation::new(Self::build(*source), aggregates)
+            }
             Node::CreateTable { schema } => CreateTable::new(schema),
             Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
             Node::DropTable { name } => DropTable::new(name),
@@ -200,6 +205,10 @@ impl ResultColumns {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.columns.len()
+    }
+
     pub fn merge(self, other: Self) -> Self {
         let mut columns = self.columns;
         columns.extend(other.columns);
@@ -219,7 +228,11 @@ struct ResultEnv<'a> {
 
 impl<'a> Environment for ResultEnv<'a> {
     fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error> {
-        Ok(self.row.get(self.columns.index(relation, field)?).cloned().unwrap_or(Value::Null))
+        self.lookup_index(self.columns.index(relation, field)?)
+    }
+
+    fn lookup_index(&self, index: usize) -> Result<Value, Error> {
+        self.row.get(index).cloned().ok_or_else(|| Error::Value("index out of bounds".into()))
     }
 }
 

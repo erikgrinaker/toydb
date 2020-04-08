@@ -1,0 +1,43 @@
+Query: SELECT MAX(MIN(rating)) FROM movies
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "max",
+                [
+                    Function(
+                        "min",
+                        [
+                            Field(
+                                None,
+                                "rating",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Value("Aggregate function MIN() not allowed here")

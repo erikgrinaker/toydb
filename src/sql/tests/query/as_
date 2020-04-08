@@ -55,6 +55,8 @@ AST: Select {
         },
     ),
     where: None,
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,
@@ -168,3 +170,8 @@ Result: ["?", "b", "c", "👋", "some id"]
 [Integer(1), Integer(2), Integer(3), Integer(4), Integer(3)]
 [Integer(1), Integer(2), Integer(3), Integer(4), Integer(4)]
 [Integer(1), Integer(2), Integer(3), Integer(4), Integer(5)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(6)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(7)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(8)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(9)]
+[Integer(1), Integer(2), Integer(3), Integer(4), Integer(10)]

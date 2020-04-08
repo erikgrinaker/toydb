@@ -39,6 +39,8 @@ AST: Select {
             ),
         ),
     ),
+    group_by: None,
+    having: None,
     order: [
         (
             Field(

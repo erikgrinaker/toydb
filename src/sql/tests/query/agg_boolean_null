@@ -1,0 +1,227 @@
+Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
+            ),
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
+            ),
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
+            ),
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
+            ),
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "booleans",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "booleans",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "booleans",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans
+
+Result: ["?", "?", "?", "?", "?"]
+[Null, Null, Null, Integer(2), Null]

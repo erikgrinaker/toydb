@@ -77,6 +77,8 @@ AST: Select {
             ),
         ),
     ),
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,
@@ -258,3 +260,8 @@ Result: ["id", "id"]
 [Integer(3), Integer(1)]
 [Integer(4), Integer(1)]
 [Integer(5), Integer(1)]
+[Integer(6), Integer(1)]
+[Integer(7), Integer(1)]
+[Integer(8), Integer(1)]
+[Integer(9), Integer(1)]
+[Integer(10), Integer(1)]

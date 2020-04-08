@@ -1,0 +1,124 @@
+Query: SELECT studio_id, COUNT(*) FROM movies
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                None,
+                "studio_id",
+            ),
+            Function(
+                "count",
+                [
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                ],
+                expressions: [
+                    Constant(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                ],
+            },
+            aggregates: [
+                Count,
+            ],
+        },
+        labels: [
+            None,
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "studio_id",
+            ),
+            Column(
+                0,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                ],
+                expressions: [
+                    Constant(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                ],
+            },
+            aggregates: [
+                Count,
+            ],
+        },
+        labels: [
+            None,
+            None,
+        ],
+        expressions: [
+            Field(
+                None,
+                "studio_id",
+            ),
+            Column(
+                0,
+            ),
+        ],
+    },
+}
+
+Query: SELECT studio_id, COUNT(*) FROM movies
+
+Result: Value("Unknown field studio_id")

@@ -103,7 +103,7 @@ toydb@1> SELECT * FROM movies
   - [x] `UPDATE ... SET ... WHERE ...`
   - [x] `DELETE FROM ... WHERE ...`
   - [x] `SELECT ... FROM ... WHERE ... ORDER BY ... LIMIT ... OFFSET ...`
-    - [ ] `GROUP BY ... HAVING ...`
+    - [x] `GROUP BY ... HAVING ...`
     - [x] `[INNER|LEFT|RIGHT|CROSS] JOIN`
   - [ ] `EXPLAIN SELECT ...`
 

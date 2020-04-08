@@ -1,0 +1,274 @@
+Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                Some(
+                    "s",
+                ),
+                "name",
+            ),
+            Function(
+                "count",
+                [
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Join {
+                    left: Table {
+                        name: "movies",
+                        alias: Some(
+                            "m",
+                        ),
+                    },
+                    right: Table {
+                        name: "studios",
+                        alias: Some(
+                            "s",
+                        ),
+                    },
+                    type: Inner,
+                    predicate: Some(
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "studio_id",
+                                ),
+                                Field(
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                    ),
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    Some(
+                        "s",
+                    ),
+                    "name",
+                ),
+            ],
+        ),
+    ),
+    having: None,
+    order: [
+        (
+            Field(
+                Some(
+                    "s",
+                ),
+                "name",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: NestedLoopJoin {
+                        outer: Scan {
+                            table: "movies",
+                            alias: Some(
+                                "m",
+                            ),
+                        },
+                        inner: Scan {
+                            table: "studios",
+                            alias: Some(
+                                "s",
+                            ),
+                        },
+                        predicate: Some(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "studio_id",
+                                ),
+                                Field(
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        pad: false,
+                        flip: false,
+                    },
+                    labels: [
+                        None,
+                        None,
+                    ],
+                    expressions: [
+                        Constant(
+                            Boolean(
+                                true,
+                            ),
+                        ),
+                        Field(
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Count,
+                ],
+            },
+            labels: [
+                None,
+                None,
+            ],
+            expressions: [
+                Column(
+                    1,
+                ),
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    Some(
+                        "s",
+                    ),
+                    "name",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: NestedLoopJoin {
+                        outer: Scan {
+                            table: "movies",
+                            alias: Some(
+                                "m",
+                            ),
+                        },
+                        inner: Scan {
+                            table: "studios",
+                            alias: Some(
+                                "s",
+                            ),
+                        },
+                        predicate: Some(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "studio_id",
+                                ),
+                                Field(
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        pad: false,
+                        flip: false,
+                    },
+                    labels: [
+                        None,
+                        None,
+                    ],
+                    expressions: [
+                        Constant(
+                            Boolean(
+                                true,
+                            ),
+                        ),
+                        Field(
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Count,
+                ],
+            },
+            labels: [
+                None,
+                None,
+            ],
+            expressions: [
+                Column(
+                    1,
+                ),
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    Some(
+                        "s",
+                    ),
+                    "name",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC
+
+Result: ["name", "?"]
+[String("Lionsgate"), Integer(2)]
+[String("Mosfilm"), Integer(2)]
+[String("StudioCanal"), Integer(1)]
+[String("Warner Bros"), Integer(5)]

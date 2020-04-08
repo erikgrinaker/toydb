@@ -36,6 +36,8 @@ AST: Select {
         },
     ),
     where: None,
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,
@@ -118,11 +120,31 @@ Query: SELECT movies.id, genres.id FROM movies, genres
 Result: ["id", "id"]
 [Integer(1), Integer(1)]
 [Integer(1), Integer(2)]
+[Integer(1), Integer(3)]
 [Integer(2), Integer(1)]
 [Integer(2), Integer(2)]
+[Integer(2), Integer(3)]
 [Integer(3), Integer(1)]
 [Integer(3), Integer(2)]
+[Integer(3), Integer(3)]
 [Integer(4), Integer(1)]
 [Integer(4), Integer(2)]
+[Integer(4), Integer(3)]
 [Integer(5), Integer(1)]
 [Integer(5), Integer(2)]
+[Integer(5), Integer(3)]
+[Integer(6), Integer(1)]
+[Integer(6), Integer(2)]
+[Integer(6), Integer(3)]
+[Integer(7), Integer(1)]
+[Integer(7), Integer(2)]
+[Integer(7), Integer(3)]
+[Integer(8), Integer(1)]
+[Integer(8), Integer(2)]
+[Integer(8), Integer(3)]
+[Integer(9), Integer(1)]
+[Integer(9), Integer(2)]
+[Integer(9), Integer(3)]
+[Integer(10), Integer(1)]
+[Integer(10), Integer(2)]
+[Integer(10), Integer(3)]

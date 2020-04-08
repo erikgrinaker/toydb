@@ -62,6 +62,8 @@ AST: Select {
             ),
         ),
     ),
+    group_by: None,
+    having: None,
     order: [
         (
             Field(
@@ -241,6 +243,11 @@ Query: SELECT movies.id, title, genres.name AS genre FROM movies, genres WHERE m
 Result: ["id", "title", "genre"]
 [Integer(4), String("Heat"), String("Action")]
 [Integer(2), String("Sicario"), String("Action")]
+[Integer(9), String("Birdman"), String("Comedy")]
+[Integer(8), String("Blindspotting"), String("Comedy")]
+[Integer(7), String("Gravity"), String("Science Fiction")]
+[Integer(10), String("Inception"), String("Science Fiction")]
 [Integer(3), String("Primer"), String("Science Fiction")]
+[Integer(6), String("Solaris"), String("Science Fiction")]
 [Integer(1), String("Stalker"), String("Science Fiction")]
 [Integer(5), String("The Fountain"), String("Science Fiction")]

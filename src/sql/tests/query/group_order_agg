@@ -1,0 +1,65 @@
+Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                None,
+                "studio_id",
+            ),
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    None,
+                    "studio_id",
+                ),
+            ],
+        ),
+    ),
+    having: None,
+    order: [
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Value("Aggregate function MAX() not allowed here")

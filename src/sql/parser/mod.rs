@@ -269,6 +269,8 @@ impl<'a> Parser<'a> {
             select: self.parse_clause_select()?.unwrap(),
             from: self.parse_clause_from()?,
             r#where: self.parse_clause_where()?,
+            group_by: self.parse_clause_group_by()?,
+            having: self.parse_clause_having()?,
             order: self.parse_clause_order()?,
             limit: if self.next_if_token(Keyword::Limit.into()).is_some() {
                 Some(self.parse_expression(0)?)
@@ -412,6 +414,30 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parses a group by clause
+    fn parse_clause_group_by(&mut self) -> Result<Option<ast::GroupByClause>, Error> {
+        if self.next_if_token(Keyword::Group.into()).is_none() {
+            return Ok(None);
+        }
+        self.next_expect(Some(Keyword::By.into()))?;
+        let mut exprs = Vec::new();
+        loop {
+            exprs.push(self.parse_expression(0)?);
+            if self.next_if_token(Token::Comma).is_none() {
+                break;
+            }
+        }
+        Ok(Some(ast::GroupByClause(exprs)))
+    }
+
+    /// Parses a HAVING clause
+    fn parse_clause_having(&mut self) -> Result<Option<ast::HavingClause>, Error> {
+        if self.next_if_token(Keyword::Having.into()).is_none() {
+            return Ok(None);
+        }
+        Ok(Some(ast::HavingClause(self.parse_expression(0)?)))
+    }
+
     /// Parses an order clause
     fn parse_clause_order(&mut self) -> Result<Vec<(ast::Expression, ast::Order)>, Error> {
         if self.next_if_token(Keyword::Order.into()).is_none() {
@@ -498,7 +524,12 @@ impl<'a> Parser<'a> {
                         if !args.is_empty() {
                             self.next_expect(Some(Token::Comma))?;
                         }
-                        args.push(self.parse_expression(0)?);
+                        if i == "count" && self.next_if_token(Token::Asterisk).is_some() {
+                            // FIXME Ugly hack to handle COUNT(*)
+                            args.push(ast::Expression::Literal(ast::Literal::Boolean(true)));
+                        } else {
+                            args.push(self.parse_expression(0)?);
+                        }
                     }
                     ast::Expression::Function(i, args)
                 } else {

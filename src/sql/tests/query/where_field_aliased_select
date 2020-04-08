@@ -77,6 +77,8 @@ AST: Select {
             ),
         ),
     ),
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,

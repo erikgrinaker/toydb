@@ -1,0 +1,227 @@
+Query: SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
+            ),
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
+            ),
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
+            ),
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
+            ),
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "integers",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "integers",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "integers",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Query: SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers
+
+Result: ["?", "?", "?", "?", "?"]
+[Null, Null, Null, Integer(4), Null]

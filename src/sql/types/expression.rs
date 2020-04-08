@@ -5,11 +5,12 @@ use regex::Regex;
 use std::collections::HashMap;
 
 /// An expression, made up of constants and operations
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Expression {
     // Values
     Constant(Value),
     Field(Option<String>, String),
+    Column(usize),
 
     // Logical operations
     And(Box<Expression>, Box<Expression>),
@@ -48,6 +49,7 @@ impl Expression {
             // Constant values
             Self::Constant(c) => c.clone(),
             Self::Field(r, f) => e.lookup(r.as_deref(), f)?,
+            Self::Column(i) => e.lookup_index(*i)?,
 
             // Logical operations
             Self::And(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
@@ -263,6 +265,7 @@ impl Expression {
     /// Checks whether the expression is constant
     pub fn is_constant(&self) -> bool {
         self.walk(&|expr| match expr {
+            Self::Column(_) => false,
             Self::Field(_, _) => false,
             _ => true,
         })
@@ -281,7 +284,7 @@ impl Expression {
         // to use mutable references over ownership.
         self = match self {
             // Constants
-            node @ Self::Constant(_) | node @ Self::Field(_, _) => node,
+            node @ Self::Constant(_) | node @ Self::Field(_, _) | node @ Self::Column(_) => node,
 
             // Logical operations
             Self::And(lhs, rhs) => {
@@ -360,7 +363,7 @@ impl Expression {
             | Self::Negate(expr)
             | Self::Not(expr) => expr.walk(visitor),
 
-            Self::Constant(_) | Self::Field(_, _) => true,
+            Self::Constant(_) | Self::Field(_, _) | Self::Column(_) => true,
         } {
             visitor(self)
         } else {
@@ -373,6 +376,9 @@ impl Expression {
 pub trait Environment {
     /// Fetches a field value from the environment
     fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error>;
+
+    /// Fetches a field value by index from the environment
+    fn lookup_index(&self, index: usize) -> Result<Value, Error>;
 }
 
 impl Environment for HashMap<String, Value> {
@@ -384,5 +390,13 @@ impl Environment for HashMap<String, Value> {
         } else {
             Err(Error::Value(format!("Unknown field {}", field)))
         }
+    }
+
+    fn lookup_index(&self, index: usize) -> Result<Value, Error> {
+        self.iter()
+            .nth(index)
+            .map(|(_, value)| value)
+            .cloned()
+            .ok_or_else(|| Error::Value("Index out of bounds".into()))
     }
 }

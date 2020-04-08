@@ -28,6 +28,8 @@ AST: Select {
         },
     ),
     where: None,
+    group_by: None,
+    having: None,
     order: [],
     limit: None,
     offset: None,
@@ -87,3 +89,8 @@ Result: ["id", "title"]
 [Integer(3), String("Primer")]
 [Integer(4), String("Heat")]
 [Integer(5), String("The Fountain")]
+[Integer(6), String("Solaris")]
+[Integer(7), String("Gravity")]
+[Integer(8), String("Blindspotting")]
+[Integer(9), String("Birdman")]
+[Integer(10), String("Inception")]

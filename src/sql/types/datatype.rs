@@ -1,5 +1,8 @@
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
+
 /// A datatype
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum DataType {
     Boolean,
     Integer,
@@ -26,6 +29,22 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     String(String),
+}
+
+impl std::cmp::Eq for Value {}
+
+#[allow(clippy::derive_hash_xor_eq)]
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.datatype().hash(state);
+        match self {
+            Value::Null => self.hash(state),
+            Value::Boolean(v) => v.hash(state),
+            Value::Integer(v) => v.hash(state),
+            Value::Float(v) => v.to_be_bytes().hash(state), // FIXME Is this sane?
+            Value::String(v) => v.hash(state),
+        }
+    }
 }
 
 impl Value {
@@ -58,11 +77,11 @@ impl std::fmt::Display for Value {
 }
 
 impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            (Self::Null, Self::Null) => Some(std::cmp::Ordering::Equal),
-            (Self::Null, _) => Some(std::cmp::Ordering::Less),
-            (_, Self::Null) => Some(std::cmp::Ordering::Greater),
+            (Self::Null, Self::Null) => Some(Ordering::Equal),
+            (Self::Null, _) => Some(Ordering::Less),
+            (_, Self::Null) => Some(Ordering::Greater),
             (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
             (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
             (Self::Float(a), Self::Integer(b)) => a.partial_cmp(&(*b as f64)),

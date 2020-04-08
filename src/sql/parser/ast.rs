@@ -26,6 +26,8 @@ pub enum Statement {
         select: SelectClause,
         from: Option<FromClause>,
         r#where: Option<WhereClause>,
+        group_by: Option<GroupByClause>,
+        having: Option<HavingClause>,
         order: Vec<(Expression, Order)>,
         limit: Option<Expression>,
         offset: Option<Expression>,
@@ -87,6 +89,14 @@ pub enum JoinType {
 /// A WHERE clause
 #[derive(Clone, Debug, PartialEq)]
 pub struct WhereClause(pub Expression);
+
+/// A GROUP BY clause
+#[derive(Clone, Debug, PartialEq)]
+pub struct GroupByClause(pub Vec<Expression>);
+
+/// A HAVING clause
+#[derive(Clone, Debug, PartialEq)]
+pub struct HavingClause(pub Expression);
 
 /// Sort orders
 #[derive(Clone, Debug, PartialEq)]

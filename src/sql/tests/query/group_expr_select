@@ -1,0 +1,203 @@
+Query: SELECT studio_id * 2, MAX(rating) AS rating FROM movies GROUP BY studio_id ORDER BY rating
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Operation(
+                Multiply(
+                    Field(
+                        None,
+                        "studio_id",
+                    ),
+                    Literal(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                ),
+            ),
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            Some(
+                "rating",
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    None,
+                    "studio_id",
+                ),
+            ],
+        ),
+    ),
+    having: None,
+    order: [
+        (
+            Field(
+                None,
+                "rating",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    labels: [
+                        None,
+                        None,
+                    ],
+                    expressions: [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                        Field(
+                            None,
+                            "studio_id",
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                None,
+                Some(
+                    "rating",
+                ),
+            ],
+            expressions: [
+                Multiply(
+                    Field(
+                        None,
+                        "studio_id",
+                    ),
+                    Constant(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                ),
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "rating",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    labels: [
+                        None,
+                        None,
+                    ],
+                    expressions: [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                        Field(
+                            None,
+                            "studio_id",
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                None,
+                Some(
+                    "rating",
+                ),
+            ],
+            expressions: [
+                Multiply(
+                    Field(
+                        None,
+                        "studio_id",
+                    ),
+                    Constant(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                ),
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "rating",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT studio_id * 2, MAX(rating) AS rating FROM movies GROUP BY studio_id ORDER BY rating
+
+Result: ["?", "rating"]
+[Integer(6), Float(6.9)]
+[Integer(4), Float(7.6)]
+[Integer(2), Float(8.2)]
+[Integer(8), Float(8.8)]

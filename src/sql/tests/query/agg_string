@@ -1,0 +1,262 @@
+Query: SELECT MIN(s), MAX(s), SUM(s), COUNT(s), AVG(s) FROM strings WHERE s IS NOT NULL
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
+            ),
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
+            ),
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
+            ),
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
+            ),
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "strings",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Operation(
+                Not(
+                    Operation(
+                        IsNull(
+                            Field(
+                                None,
+                                "s",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    group_by: None,
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Filter {
+                    source: Scan {
+                        table: "strings",
+                        alias: None,
+                    },
+                    predicate: Not(
+                        IsNull(
+                            Field(
+                                None,
+                                "s",
+                            ),
+                        ),
+                    ),
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Filter {
+                    source: Scan {
+                        table: "strings",
+                        alias: None,
+                    },
+                    predicate: Not(
+                        IsNull(
+                            Field(
+                                None,
+                                "s",
+                            ),
+                        ),
+                    ),
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Query: SELECT MIN(s), MAX(s), SUM(s), COUNT(s), AVG(s) FROM strings WHERE s IS NOT NULL
+
+Result: ["?", "?", "?", "?", "?"]
+[String("A"), String("åa"), Null, Integer(7), Null]

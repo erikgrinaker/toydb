@@ -1,0 +1,162 @@
+Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Field(
+                None,
+                "id",
+            ),
+            Field(
+                None,
+                "rating",
+            ),
+        ],
+        labels: [
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: Some(
+        HavingClause(
+            Operation(
+                GreaterThan(
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                    Literal(
+                        Integer(
+                            8,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    order: [
+        (
+            Field(
+                None,
+                "id",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Filter {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            },
+            predicate: GreaterThan(
+                Field(
+                    None,
+                    "rating",
+                ),
+                Constant(
+                    Integer(
+                        8,
+                    ),
+                ),
+            ),
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "id",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Filter {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                },
+                labels: [
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            },
+            predicate: GreaterThan(
+                Field(
+                    None,
+                    "rating",
+                ),
+                Constant(
+                    Integer(
+                        8,
+                    ),
+                ),
+            ),
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "id",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
+
+Result: ["id", "rating"]
+[Integer(1), Float(8.2)]
+[Integer(4), Float(8.2)]
+[Integer(6), Float(8.1)]
+[Integer(10), Float(8.8)]

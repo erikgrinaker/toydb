@@ -1,9 +1,9 @@
 mod plan;
 
-pub use plan::{Direction, Node, Plan};
+pub use plan::{Aggregate, Aggregates, Direction, Node, Plan};
 
 use super::parser::ast;
-use super::types::expression::Expression;
+use super::types::expression::{Expression, Expressions};
 use super::types::schema;
 use super::types::Value;
 use crate::Error;
@@ -39,7 +39,10 @@ impl Planner {
             ast::Statement::Delete { table, r#where } => {
                 let mut source = Node::Scan { table: table.clone(), alias: None };
                 if let Some(ast::WhereClause(expr)) = r#where {
-                    source = Node::Filter { source: Box::new(source), predicate: expr.into() };
+                    source = Node::Filter {
+                        source: Box::new(source),
+                        predicate: self.build_expression(expr)?,
+                    };
                 }
                 Node::Delete { table, source: Box::new(source) }
             }
@@ -49,10 +52,19 @@ impl Planner {
                 columns: columns.unwrap_or_else(Vec::new),
                 expressions: values
                     .into_iter()
-                    .map(|exprs| exprs.into_iter().map(|expr| expr.into()).collect())
-                    .collect(),
+                    .map(|exprs| self.build_expressions(exprs))
+                    .collect::<Result<_, Error>>()?,
             },
-            ast::Statement::Select { select, from, r#where, order, limit, offset } => {
+            ast::Statement::Select {
+                select,
+                from,
+                r#where,
+                group_by,
+                having,
+                order,
+                limit,
+                offset,
+            } => {
                 let mut n: Node = match from {
                     Some(from) => {
                         let mut items = from.items.into_iter().rev();
@@ -77,25 +89,99 @@ impl Planner {
                     None => Node::Nothing,
                 };
                 if let Some(ast::WhereClause(expr)) = r#where {
-                    n = Node::Filter { source: Box::new(n), predicate: expr.into() };
+                    n = Node::Filter {
+                        source: Box::new(n),
+                        predicate: self.build_expression(expr)?,
+                    };
                 };
                 if !select.expressions.is_empty() {
+                    let (mut pre, aggregates, mut post) =
+                        self.build_aggregate_expressions(select.expressions)?;
+                    let mut pre_labels: Vec<Option<String>> =
+                        std::iter::repeat(None).take(pre.len()).collect();
+                    if let Some(ast::GroupByClause(exprs)) = group_by {
+                        for group in self.build_expressions(exprs)? {
+                            if let Expression::Field(None, label) = &group {
+                                // If the group is a field reference to an AS label in the output,
+                                // move the SELECT expression to the pre-projection and reference it
+                                // in post unless it contains an aggregate. This handles e.g.:
+                                // SELECT a * 2 AS p, SUM(b) FROM t GROUP BY p
+                                if let Some(index) =
+                                    select.labels.iter().position(|l| l.as_deref() == Some(label))
+                                {
+                                    if !post[index].walk(&|expr| match expr {
+                                        Expression::Column(i) if i < &aggregates.len() => false,
+                                        _ => true,
+                                    }) {
+                                        return Err(Error::Value(
+                                            "cannot group by aggregate column".into(),
+                                        ));
+                                    }
+                                    pre.push(std::mem::replace(
+                                        &mut post[index],
+                                        Expression::Column(pre.len()),
+                                    ));
+                                    pre_labels.push(Some(label.clone()));
+                                } else {
+                                    pre.push(group);
+                                    pre_labels.push(None);
+                                }
+                            } else {
+                                // If the group expression is exactly equal as a SELECT expression,
+                                // push them both to the pre-projection.
+                                let mut pushed = false;
+                                while let Some(index) = post.iter().position(|e| e == &group) {
+                                    pre.push(std::mem::replace(
+                                        &mut post[index],
+                                        Expression::Column(pre.len()),
+                                    ));
+                                    pre_labels.push(None);
+                                    pushed = true;
+                                }
+                                if !pushed {
+                                    pre.push(group);
+                                    pre_labels.push(None);
+                                }
+                            }
+                        }
+                    }
+                    if !pre.is_empty() {
+                        n = Node::Projection {
+                            source: Box::new(n),
+                            labels: pre_labels,
+                            expressions: pre,
+                        };
+                    }
+                    if !aggregates.is_empty() {
+                        n = Node::Aggregation { source: Box::new(n), aggregates };
+                    }
                     n = Node::Projection {
                         source: Box::new(n),
                         labels: select.labels,
-                        expressions: self.build_expressions(select.expressions)?,
+                        expressions: post,
+                    }
+                };
+
+                if let Some(ast::HavingClause(expr)) = having {
+                    n = Node::Filter {
+                        source: Box::new(n),
+                        predicate: self.build_expression(expr)?,
                     };
                 };
+
                 // FIXME Because the projection doesn't retain original table values, we can't
                 // order by fields which are not in the result set.
                 if !order.is_empty() {
                     n = Node::Order {
                         source: Box::new(n),
-                        orders: order.into_iter().map(|(e, o)| (e.into(), o.into())).collect(),
+                        orders: order
+                            .into_iter()
+                            .map(|(e, o)| self.build_expression(e).map(|e| (e, o.into())))
+                            .collect::<Result<_, _>>()?,
                     };
                 }
                 if let Some(expr) = offset {
-                    let expr = Expression::from(expr);
+                    let expr = self.build_expression(expr)?;
                     if !expr.is_constant() {
                         return Err(Error::Value("Offset must be constant value".into()));
                     }
@@ -110,7 +196,7 @@ impl Planner {
                     }
                 }
                 if let Some(expr) = limit {
-                    let expr = Expression::from(expr);
+                    let expr = self.build_expression(expr)?;
                     if !expr.is_constant() {
                         return Err(Error::Value("Limit must be constant value".into()));
                     }
@@ -129,30 +215,21 @@ impl Planner {
             ast::Statement::Update { table, set, r#where } => {
                 let mut source = Node::Scan { table: table.clone(), alias: None };
                 if let Some(ast::WhereClause(expr)) = r#where {
-                    source = Node::Filter { source: Box::new(source), predicate: expr.into() };
+                    source = Node::Filter {
+                        source: Box::new(source),
+                        predicate: self.build_expression(expr)?,
+                    };
                 }
                 Node::Update {
                     table,
                     source: Box::new(source),
-                    expressions: set.into_iter().map(|(c, e)| (c, e.into())).collect(),
+                    expressions: set
+                        .into_iter()
+                        .map(|(c, e)| self.build_expression(e).map(|e| (c, e)))
+                        .collect::<Result<_, _>>()?,
                 }
             }
         })
-    }
-
-    /// Builds a plan expression from an AST expression
-    fn build_expression(&self, expr: ast::Expression) -> Result<Expression, Error> {
-        if let ast::Expression::Function(name, _) = expr {
-            // All functions right now are aggregate functions
-            Err(Error::Value(format!("Unknown function {}", name)))
-        } else {
-            Ok(expr.into())
-        }
-    }
-
-    /// Builds an array of plan expressions from AST expressions
-    fn build_expressions(&self, exprs: Vec<ast::Expression>) -> Result<Vec<Expression>, Error> {
-        exprs.into_iter().map(|e| self.build_expression(e)).collect()
     }
 
     /// Builds FROM items
@@ -163,26 +240,44 @@ impl Planner {
                 ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
                     outer: Box::new(self.build_from_item(*left)?),
                     inner: Box::new(self.build_from_item(*right)?),
-                    predicate: predicate.map(|e| e.into()),
+                    predicate: predicate.map(|e| self.build_expression(e)).transpose()?,
                     pad: false,
                     flip: false,
                 },
                 ast::JoinType::Left => Node::NestedLoopJoin {
                     outer: Box::new(self.build_from_item(*left)?),
                     inner: Box::new(self.build_from_item(*right)?),
-                    predicate: predicate.map(|e| e.into()),
+                    predicate: predicate.map(|e| self.build_expression(e)).transpose()?,
                     pad: true,
                     flip: false,
                 },
                 ast::JoinType::Right => Node::NestedLoopJoin {
                     outer: Box::new(self.build_from_item(*left)?),
                     inner: Box::new(self.build_from_item(*right)?),
-                    predicate: predicate.map(|e| e.into()),
+                    predicate: predicate.map(|e| self.build_expression(e)).transpose()?,
                     pad: true,
                     flip: true,
                 },
             },
         })
+    }
+
+    /// Builds an expression from an AST expression
+    fn build_expression(&self, expr: ast::Expression) -> Result<Expression, Error> {
+        ExpressionBuilder::build(expr)
+    }
+
+    /// Builds expressions from AST expressions
+    fn build_expressions(&self, exprs: ast::Expressions) -> Result<Expressions, Error> {
+        ExpressionBuilder::build_many(exprs)
+    }
+
+    /// Builds partitioned aggregate expressions from AST expressions
+    fn build_aggregate_expressions(
+        &self,
+        exprs: ast::Expressions,
+    ) -> Result<(Expressions, Vec<Aggregate>, Expressions), Error> {
+        ExpressionBuilder::build_aggregates(exprs)
     }
 
     /// Builds a table schema from an AST CreateTable node
@@ -227,68 +322,140 @@ impl Planner {
     }
 }
 
-/// Helpers to convert AST nodes into plan nodes
-impl From<ast::Expression> for Expression {
-    fn from(expr: ast::Expression) -> Self {
-        match expr {
-            ast::Expression::Literal(l) => Expression::Constant(l.into()),
-            ast::Expression::Field(rel, name) => Expression::Field(rel, name),
-            ast::Expression::Function(_, _) => unimplemented!(), // Not supported
+/// Builds expressions.
+struct ExpressionBuilder {
+    agg_allow: bool,
+    aggs: Vec<Aggregate>,
+    agg_args: Expressions,
+}
+
+impl ExpressionBuilder {
+    /// Builds a single expression.
+    fn build(expr: ast::Expression) -> Result<Expression, Error> {
+        Ok(*ExpressionBuilder { agg_allow: false, aggs: Vec::new(), agg_args: Vec::new() }
+            .make(Box::new(expr))?)
+    }
+
+    /// Builds multiple expressions.
+    fn build_many(exprs: ast::Expressions) -> Result<Expressions, Error> {
+        exprs.into_iter().map(Self::build).collect()
+    }
+
+    /// Builds aggregate expressions as a pre-projection, aggregation, and post-projection. All
+    /// non-constant, non-aggregate expressions are pushed to the pre-projection as grouping
+    /// expressions (caller should validate against GROUP BY), following expressions referenced by
+    /// the aggregates.
+    fn build_aggregates(
+        exprs: ast::Expressions,
+    ) -> Result<(Expressions, Aggregates, Expressions), Error> {
+        let mut builder =
+            ExpressionBuilder { agg_allow: true, aggs: Vec::new(), agg_args: Vec::new() };
+
+        let mut post = Vec::new();
+        for expr in exprs.into_iter() {
+            post.push(*builder.make(Box::new(expr))?);
+        }
+        let pre = builder.agg_args;
+        let aggs = builder.aggs;
+
+        Ok((pre, aggs, post))
+    }
+
+    /// Used internally, with more convenient signature.
+    #[allow(clippy::boxed_local)]
+    fn make(&mut self, expr: Box<ast::Expression>) -> Result<Box<Expression>, Error> {
+        use Expression::*;
+        Ok(Box::new(match *expr {
+            ast::Expression::Literal(l) => Constant(match l {
+                ast::Literal::Null => Value::Null,
+                ast::Literal::Boolean(b) => Value::Boolean(b),
+                ast::Literal::Integer(i) => Value::Integer(i),
+                ast::Literal::Float(f) => Value::Float(f),
+                ast::Literal::String(s) => Value::String(s),
+            }),
+            ast::Expression::Field(rel, name) => Field(rel, name),
+            ast::Expression::Function(name, mut args) => match name.as_str() {
+                "avg" | "count" | "max" | "min" | "sum" if args.len() == 1 => {
+                    *self.make_aggregate(&name, Box::new(args.remove(0)))?
+                }
+                _ => {
+                    return Err(Error::Value(format!(
+                        "Unknown function {} with {} arguments",
+                        name,
+                        args.len()
+                    )))
+                }
+            },
             ast::Expression::Operation(op) => match op {
                 // Logical operators
-                ast::Operation::And(lhs, rhs) => Self::And(lhs.into(), rhs.into()),
-                ast::Operation::Not(expr) => Self::Not(expr.into()),
-                ast::Operation::Or(lhs, rhs) => Self::Or(lhs.into(), rhs.into()),
+                ast::Operation::And(lhs, rhs) => And(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::Not(expr) => Not(self.make(expr)?),
+                ast::Operation::Or(lhs, rhs) => Or(self.make(lhs)?, self.make(rhs)?),
 
                 // Comparison operators
-                ast::Operation::Equal(lhs, rhs) => Self::Equal(lhs.into(), rhs.into()),
-                ast::Operation::GreaterThan(lhs, rhs) => Self::GreaterThan(lhs.into(), rhs.into()),
-                ast::Operation::GreaterThanOrEqual(lhs, rhs) => Self::Or(
-                    Self::GreaterThan(lhs.clone().into(), rhs.clone().into()).into(),
-                    Self::Equal(lhs.into(), rhs.into()).into(),
+                ast::Operation::Equal(lhs, rhs) => Equal(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::GreaterThan(lhs, rhs) => {
+                    GreaterThan(self.make(lhs)?, self.make(rhs)?)
+                }
+                ast::Operation::GreaterThanOrEqual(lhs, rhs) => Or(
+                    GreaterThan(self.make(lhs.clone())?, self.make(rhs.clone())?).into(),
+                    Equal(self.make(lhs)?, self.make(rhs)?).into(),
                 ),
-                ast::Operation::IsNull(expr) => Self::IsNull(expr.into()),
-                ast::Operation::LessThan(lhs, rhs) => Self::LessThan(lhs.into(), rhs.into()),
-                ast::Operation::LessThanOrEqual(lhs, rhs) => Self::Or(
-                    Self::LessThan(lhs.clone().into(), rhs.clone().into()).into(),
-                    Self::Equal(lhs.into(), rhs.into()).into(),
+                ast::Operation::IsNull(expr) => IsNull(self.make(expr)?),
+                ast::Operation::LessThan(lhs, rhs) => LessThan(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::LessThanOrEqual(lhs, rhs) => Or(
+                    LessThan(self.make(lhs.clone())?, self.make(rhs.clone())?).into(),
+                    Equal(self.make(lhs)?, self.make(rhs)?).into(),
                 ),
-                ast::Operation::Like(lhs, rhs) => Self::Like(lhs.into(), rhs.into()),
+                ast::Operation::Like(lhs, rhs) => Like(self.make(lhs)?, self.make(rhs)?),
                 ast::Operation::NotEqual(lhs, rhs) => {
-                    Self::Not(Self::Equal(lhs.into(), rhs.into()).into())
+                    Not(Equal(self.make(lhs)?, self.make(rhs)?).into())
                 }
 
                 // Mathematical operators
-                ast::Operation::Assert(expr) => Self::Assert(expr.into()),
-                ast::Operation::Add(lhs, rhs) => Self::Add(lhs.into(), rhs.into()),
-                ast::Operation::Divide(lhs, rhs) => Self::Divide(lhs.into(), rhs.into()),
+                ast::Operation::Assert(expr) => Assert(self.make(expr)?),
+                ast::Operation::Add(lhs, rhs) => Add(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::Divide(lhs, rhs) => Divide(self.make(lhs)?, self.make(rhs)?),
                 ast::Operation::Exponentiate(lhs, rhs) => {
-                    Self::Exponentiate(lhs.into(), rhs.into())
+                    Exponentiate(self.make(lhs)?, self.make(rhs)?)
                 }
-                ast::Operation::Factorial(expr) => Self::Factorial(expr.into()),
-                ast::Operation::Modulo(lhs, rhs) => Self::Modulo(lhs.into(), rhs.into()),
-                ast::Operation::Multiply(lhs, rhs) => Self::Multiply(lhs.into(), rhs.into()),
-                ast::Operation::Negate(expr) => Self::Negate(expr.into()),
-                ast::Operation::Subtract(lhs, rhs) => Self::Subtract(lhs.into(), rhs.into()),
+                ast::Operation::Factorial(expr) => Factorial(self.make(expr)?),
+                ast::Operation::Modulo(lhs, rhs) => Modulo(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::Multiply(lhs, rhs) => Multiply(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::Negate(expr) => Negate(self.make(expr)?),
+                ast::Operation::Subtract(lhs, rhs) => Subtract(self.make(lhs)?, self.make(rhs)?),
             },
-        }
+        }))
     }
-}
 
-impl From<Box<ast::Expression>> for Box<Expression> {
-    fn from(expr: Box<ast::Expression>) -> Self {
-        Box::new((*expr).into())
-    }
-}
-
-impl From<ast::Literal> for Value {
-    fn from(literal: ast::Literal) -> Self {
-        match literal {
-            ast::Literal::Null => Value::Null,
-            ast::Literal::Boolean(b) => b.into(),
-            ast::Literal::Float(f) => f.into(),
-            ast::Literal::Integer(i) => i.into(),
-            ast::Literal::String(s) => s.into(),
+    fn make_aggregate(
+        &mut self,
+        name: &str,
+        expr: Box<ast::Expression>,
+    ) -> Result<Box<Expression>, Error> {
+        if !self.agg_allow {
+            return Err(Error::Value(format!(
+                "Aggregate function {}() not allowed here",
+                name.to_uppercase()
+            )));
         }
+        self.aggs.push(match name {
+            "avg" => Aggregate::Average,
+            "count" => Aggregate::Count,
+            "max" => Aggregate::Max,
+            "min" => Aggregate::Min,
+            "sum" => Aggregate::Sum,
+            _ => {
+                return Err(Error::Internal(format!(
+                    "Invalid aggregate function {}()",
+                    name.to_uppercase()
+                )))
+            }
+        });
+        self.agg_allow = false;
+        let arg = *self.make(expr)?;
+        self.agg_args.push(arg);
+        self.agg_allow = true;
+        Ok(Box::new(Expression::Column(self.aggs.len() - 1)))
     }
 }

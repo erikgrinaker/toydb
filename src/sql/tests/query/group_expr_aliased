@@ -1,0 +1,205 @@
+Query: SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORDER BY twice
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Operation(
+                Multiply(
+                    Field(
+                        None,
+                        "studio_id",
+                    ),
+                    Literal(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                ),
+            ),
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            Some(
+                "twice",
+            ),
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    None,
+                    "twice",
+                ),
+            ],
+        ),
+    ),
+    having: None,
+    order: [
+        (
+            Field(
+                None,
+                "twice",
+            ),
+            Ascending,
+        ),
+    ],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    labels: [
+                        None,
+                        Some(
+                            "twice",
+                        ),
+                    ],
+                    expressions: [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                        Multiply(
+                            Field(
+                                None,
+                                "studio_id",
+                            ),
+                            Constant(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                Some(
+                    "twice",
+                ),
+                None,
+            ],
+            expressions: [
+                Column(
+                    1,
+                ),
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "twice",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Order {
+        source: Projection {
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    labels: [
+                        None,
+                        Some(
+                            "twice",
+                        ),
+                    ],
+                    expressions: [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                        Multiply(
+                            Field(
+                                None,
+                                "studio_id",
+                            ),
+                            Constant(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                Some(
+                    "twice",
+                ),
+                None,
+            ],
+            expressions: [
+                Column(
+                    1,
+                ),
+                Column(
+                    0,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "twice",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+}
+
+Query: SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORDER BY twice
+
+Result: ["twice", "?"]
+[Integer(2), Float(8.2)]
+[Integer(4), Float(7.6)]
+[Integer(6), Float(6.9)]
+[Integer(8), Float(8.8)]
