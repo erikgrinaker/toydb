@@ -2,7 +2,7 @@
 
 [![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
 
-Distributed SQL database in Rust, written as a learning project. Most components have been written from scratch, including:
+Distributed SQL database in Rust, written as a learning project. Most components have been built from scratch, including:
 
 * Raft-based distributed consensus engine for linearizable state machine replication.
 
@@ -10,7 +10,7 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 * Iterator-based relational query engine with time-travel support.
 
-* SQL interface including projections, filters, joins, and aggregations.
+* SQL interface including projections, filters, joins, and aggregates.
 
 For details, see the [reference documentation](REFERENCE.md).
 
