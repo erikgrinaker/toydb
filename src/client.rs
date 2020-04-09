@@ -1,5 +1,5 @@
 use crate::service;
-pub use crate::sql::{Effect, Mode, ResultSet, Row, Value};
+pub use crate::sql::{Effect, Mode, ResultColumns, ResultSet, Row, Value};
 use crate::utility::deserialize;
 use crate::Error;
 use grpc::ClientStubExt;
@@ -101,8 +101,6 @@ fn resultset_from_grpc(
     metadata: grpc::Metadata,
     rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>> + Send>,
 ) -> Result<ResultSet, Error> {
-    let columns = deserialize(metadata.get("columns").unwrap_or_else(|| &[]))?;
-    let effect = metadata.get("effect").map(deserialize).transpose()?;
     let rows = rows.map(|r| match r {
         Ok(protorow) => {
             if let Err(err) = error_from_protobuf(protorow.error.clone()) {
@@ -113,6 +111,11 @@ fn resultset_from_grpc(
         }
         Err(err) => Err(err.into()),
     });
+    let columns = match metadata.get("columns") {
+        Some(c) => ResultColumns::from(deserialize(c)?),
+        None => ResultColumns::new(Vec::new()),
+    };
+    let effect = metadata.get("effect").map(deserialize).transpose()?;
     Ok(ResultSet::new(effect, columns, Some(Box::new(rows))))
 }
 

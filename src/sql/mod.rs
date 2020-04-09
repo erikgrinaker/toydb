@@ -8,7 +8,7 @@ mod tests;
 pub mod types;
 
 pub use engine::{Engine, Mode, Transaction};
-pub use executor::{Context, Effect, ResultSet};
+pub use executor::{Context, Effect, ResultColumns, ResultSet};
 pub use parser::{ast, lexer, Parser};
 pub use planner::Plan;
 pub use types::{Row, Value};

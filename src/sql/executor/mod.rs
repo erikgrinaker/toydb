@@ -146,6 +146,10 @@ impl ResultColumns {
         Self { columns }
     }
 
+    pub fn from(columns: Vec<Option<String>>) -> Self {
+        Self { columns: columns.into_iter().map(|c| (None, c)).collect() }
+    }
+
     fn as_env<'b>(&'b self, row: &'b [Value]) -> ResultEnv<'b> {
         ResultEnv { columns: &self, row }
     }
