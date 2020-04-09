@@ -301,6 +301,8 @@ test_query! {
     agg_expr: "SELECT SUM(rating * 10) / COUNT(*) FROM movies",
     agg_nested: "SELECT MAX(MIN(rating)) FROM movies",
     agg_ungrouped: "SELECT studio_id, COUNT(*) FROM movies",
+    agg_norows: "SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE",
+    agg_norows_group: "SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE GROUP BY id",
     agg_const: "SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3)",
     agg_const_from: "SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3) FROM genres",
 }
@@ -357,7 +359,6 @@ test_query! {
     group_expr_aggr_selfref: "SELECT studio_id, SUM(rating * 10) / COUNT(*) + studio_id FROM movies GROUP BY studio_id ORDER BY studio_id",
     group_expr_aggr_nogroupref: "SELECT studio_id, SUM(rating * 10) / COUNT(*) + id FROM movies GROUP BY studio_id ORDER BY studio_id",
     group_expr_multigroup: "SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi",
-
 
     having: "SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id",
     having_nogroup: "SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id",

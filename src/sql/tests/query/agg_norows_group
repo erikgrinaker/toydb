@@ -1,0 +1,267 @@
+Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE GROUP BY id
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
+            ),
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
+            ),
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
+            ),
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
+            ),
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
+            ),
+        ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: Some(
+        WhereClause(
+            Literal(
+                Boolean(
+                    false,
+                ),
+            ),
+        ),
+    ),
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    None,
+                    "id",
+                ),
+            ],
+        ),
+    ),
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Filter {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    predicate: Constant(
+                        Boolean(
+                            false,
+                        ),
+                    ),
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Optimized plan: Plan {
+    root: Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Filter {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                    },
+                    predicate: Constant(
+                        Boolean(
+                            false,
+                        ),
+                    ),
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Column(
+                0,
+            ),
+            Column(
+                1,
+            ),
+            Column(
+                2,
+            ),
+            Column(
+                3,
+            ),
+            Column(
+                4,
+            ),
+        ],
+    },
+}
+
+Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE GROUP BY id
+
+Result: ["?", "?", "?", "?", "?"]

@@ -37,6 +37,14 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                     .zip(row)
                     .try_for_each(|(acc, value)| acc.accumulate(&value))?
             }
+            // If there were no rows and no group-by columns, return a row of empty accumulators:
+            // SELECT COUNT(*) FROM t WHERE FALSE
+            if self.accumulators.is_empty() && self.aggregates.len() == result.columns.len() {
+                self.accumulators.insert(
+                    Vec::new(),
+                    self.aggregates.iter().map(|agg| Accumulator::from(agg)).collect(),
+                );
+            }
             result = ResultSet::from_rows(
                 ResultColumns::new(
                     result
