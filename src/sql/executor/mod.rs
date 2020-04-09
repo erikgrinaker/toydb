@@ -209,6 +209,10 @@ impl ResultColumns {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.columns.len() == 0
+    }
+
     pub fn len(&self) -> usize {
         self.columns.len()
     }
