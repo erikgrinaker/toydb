@@ -9,10 +9,12 @@ default-run = "toydb"
 [dependencies]
 clap = "~2.33.0"
 config = "~0.9.3"
-crossbeam-channel = "~0.4.0"
+crossbeam = "~0.4.0"
+crossbeam-channel = "~0.4.0" # FIXME Use crossbeam instead
 grpc = "~0.6.1"
 lazy_static = "~1.4.0"
 log = "~0.4.6"
+names = "0.9.0"
 protobuf = "~2.8.1"
 rand = "~0.7.2"
 regex = "~1.3.1"
