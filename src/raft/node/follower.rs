@@ -109,15 +109,12 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Follower, L, S> {
             }
             Event::ReplicateEntries { base_index, base_term, entries } => {
                 if self.is_leader(msg.from.as_deref()) {
-                    match self.log.splice(base_index, base_term, entries) {
-                        Ok(last_index) => {
-                            self.send(msg.from.as_deref(), Event::AcceptEntries { last_index })?
-                        }
-                        Err(Error::RaftBaseNotFound { .. }) => {
-                            debug!("Rejecting log entries at base {}", base_index);
-                            self.send(msg.from.as_deref(), Event::RejectEntries)?
-                        }
-                        Err(err) => return Err(err),
+                    if base_index > 0 && !self.log.has(base_index, base_term)? {
+                        debug!("Rejecting log entries at base {}", base_index);
+                        self.send(msg.from.as_deref(), Event::RejectEntries)?
+                    } else {
+                        let last_index = self.log.splice(base_index, base_term, entries)?;
+                        self.send(msg.from.as_deref(), Event::AcceptEntries { last_index })?
                     }
                 }
             }

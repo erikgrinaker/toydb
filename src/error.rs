@@ -1,6 +1,5 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Error {
-    RaftBaseNotFound { index: u64, term: u64 },
     Serialization,
     ReadOnly,
     Config(String),
@@ -20,9 +19,6 @@ impl std::fmt::Display for Error {
             | Error::Network(s)
             | Error::Parse(s)
             | Error::Value(s) => write!(f, "{}", s),
-            Error::RaftBaseNotFound { index, term } => {
-                write!(f, "Base entry at index {} with term {} not found", index, term)
-            }
             Error::Serialization => write!(f, "Serialization failure, retry transaction"),
             Error::ReadOnly => write!(f, "Read-only transaction"),
         }

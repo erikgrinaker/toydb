@@ -167,10 +167,9 @@ impl<S: kv::storage::Storage> Log<S> {
         Ok(entries)
     }
 
-    /// Splices a set of entries onto an offset. The semantics are a bit unusual,
-    /// since this is primarily used when replicating Raft entries:
+    /// Splices a set of entries onto an offset, with Raft-specific semantics:
     ///
-    /// * If the base and base term does not match an existing entry, raise Error::RaftBaseNotFound
+    /// * If the base and base term does not match an existing entry, return error
     /// * If no existing entry exists at an index, append it
     /// * If the existing entry has a different term, replace it and following entries
     /// * If the existing entry has the same term, assume entry is equal and skip it
@@ -178,7 +177,8 @@ impl<S: kv::storage::Storage> Log<S> {
     // FIXME Needs to be transactional
     pub fn splice(&mut self, base: u64, base_term: u64, entries: Vec<Entry>) -> Result<u64, Error> {
         if base > 0 && !self.has(base, base_term)? {
-            return Err(Error::RaftBaseNotFound { index: base, term: base_term });
+            // The caller should have checked this already
+            return Err(Error::Internal("Base not found".into()));
         }
 
         for (i, entry) in entries.into_iter().enumerate() {
@@ -545,7 +545,7 @@ mod tests {
 
         assert_matches!(
             l.splice(3, 3, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
-            Err(Error::RaftBaseNotFound { index, term }) if index == 3 && term == 3
+            Err(Error::Internal(_))
         );
         assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
         assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
@@ -560,11 +560,11 @@ mod tests {
 
         assert_matches!(
             l.splice(2, 3, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
-            Err(Error::RaftBaseNotFound { index, term }) if index == 2 && term == 3
+            Err(Error::Internal(_))
         );
         assert_matches!(
             l.splice(2, 0, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
-            Err(Error::RaftBaseNotFound { index, term }) if index == 2 && term == 0
+            Err(Error::Internal(_))
         );
         assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
         assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
