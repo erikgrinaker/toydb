@@ -11,19 +11,27 @@ use crate::sql;
 use std::collections::HashMap;
 
 pub struct Server {
-    pub id: String,
-    pub addr: String,
-    pub threads: usize,
-    pub peers: HashMap<String, std::net::SocketAddr>,
-    pub data_dir: String,
+    id: String,
+    peers: HashMap<String, std::net::SocketAddr>,
+    data_dir: String,
+    grpc: Option<grpc::Server>,
+    raft: Option<Raft>,
 }
 
 impl Server {
-    pub fn listen(&self) -> Result<(), Error> {
-        info!("Starting ToyDB node with ID {} on {}", self.id, self.addr);
+    pub fn new(
+        id: &str,
+        peers: HashMap<String, std::net::SocketAddr>,
+        data_dir: &str,
+    ) -> Result<Self, Error> {
+        Ok(Server { id: id.into(), peers, data_dir: data_dir.into(), grpc: None, raft: None })
+    }
+
+    pub fn listen(&mut self, addr: &str, threads: usize) -> Result<(), Error> {
+        info!("Starting ToyDB node with ID {} on {}", self.id, addr);
         let mut server = grpc::ServerBuilder::new_plain();
-        server.http.set_addr(&self.addr)?;
-        server.http.set_cpu_pool_threads(self.threads);
+        server.http.set_addr(addr)?;
+        server.http.set_cpu_pool_threads(threads);
         let data_path = std::path::Path::new(&self.data_dir);
         std::fs::create_dir_all(data_path)?;
 
@@ -54,8 +62,17 @@ impl Server {
             raft: raft.clone(),
             engine: sql::engine::Raft::new(raft.clone()),
         }));
-        let _s = server.build()?;
 
-        raft.join()
+        self.grpc = Some(server.build()?);
+        self.raft = Some(raft);
+        Ok(())
+    }
+
+    pub fn join(self) -> Result<(), Error> {
+        self.raft.map(|r| r.join()).unwrap_or(Ok(()))
+    }
+
+    pub fn shutdown(self) -> Result<(), Error> {
+        self.raft.map(|r| r.shutdown()).unwrap_or(Ok(()))
     }
 }

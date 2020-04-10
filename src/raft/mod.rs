@@ -30,6 +30,7 @@ pub trait State {
 pub struct Raft {
     call_tx: Sender<(Event, Sender<Event>)>,
     join_rx: Receiver<Result<(), Error>>,
+    shutdown_tx: Sender<()>,
 }
 
 impl Raft {
@@ -51,6 +52,7 @@ impl Raft {
         let (outbound_tx, outbound_rx) = crossbeam_channel::unbounded();
         let (call_tx, call_rx) = crossbeam_channel::unbounded::<(Event, Sender<Event>)>();
         let (join_tx, join_rx) = crossbeam_channel::unbounded();
+        let (shutdown_tx, shutdown_rx) = crossbeam_channel::unbounded();
         let mut response_txs: HashMap<Vec<u8>, Sender<Event>> = HashMap::new();
         let mut node = Node::new(id, peers, store, state, outbound_tx)?;
 
@@ -61,6 +63,9 @@ impl Raft {
                 select! {
                     // Handle ticks
                     recv(ticker) -> _ => node = node.tick()?,
+
+                    // Handle shutdown
+                    recv(shutdown_rx) -> _ => return Ok(()),
 
                     // Handle local method calls
                     recv(call_rx) -> recv => {
@@ -95,12 +100,18 @@ impl Raft {
             join_tx.send(result).unwrap()
         });
 
-        Ok(Raft { call_tx, join_rx })
+        Ok(Raft { call_tx, join_rx, shutdown_tx })
     }
 
     /// Waits for the Raft node to complete
     pub fn join(&self) -> Result<(), Error> {
         self.join_rx.recv()?
+    }
+
+    /// Shuts down the server.
+    pub fn shutdown(self) -> Result<(), Error> {
+        self.shutdown_tx.send(())?;
+        self.join()
     }
 
     /// Runs a synchronous client call on the Raft cluster

@@ -31,21 +31,15 @@ fn main() -> Result<(), toydb::Error> {
     }
     simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
-    toydb::Server {
-        id: cfg.id.clone(),
-        peers: cfg.parse_peers()?,
-        addr: cfg.listen,
-        threads: cfg.threads,
-        data_dir: cfg.data_dir,
-    }
-    .listen()
+    let mut server = toydb::Server::new(&cfg.id, cfg.parse_peers()?, &cfg.data_dir)?;
+    server.listen(&cfg.listen, 8)?;
+    server.join()
 }
 
 #[derive(Debug, Deserialize)]
 struct Config {
     id: String,
     listen: String,
-    threads: usize,
     log_level: String,
     data_dir: String,
     peers: HashMap<String, String>,
@@ -56,7 +50,6 @@ impl Config {
         let mut c = config::Config::new();
         c.set_default("id", "toydb")?;
         c.set_default("listen", "0.0.0.0:9605")?;
-        c.set_default("threads", 4)?;
         c.set_default("log_level", "info")?;
         c.set_default("data_dir", "/var/lib/toydb")?;
 
