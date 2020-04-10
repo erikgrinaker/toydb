@@ -6,7 +6,7 @@ use crate::Error;
 use std::collections::HashMap;
 
 /// A table schema
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Table {
     /// The table name
     pub name: String,
@@ -200,7 +200,7 @@ impl Table {
 }
 
 /// A table column schema
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Column {
     /// Column name
     pub name: String,

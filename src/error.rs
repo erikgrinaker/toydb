@@ -1,5 +1,5 @@
 /// Errors, all except Internal are considered user-facing
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Error {
     Config(String),
     Internal(String),

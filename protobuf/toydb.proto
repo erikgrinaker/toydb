@@ -1,31 +1,22 @@
 syntax = "proto3";
 
-// The main ToyDB service used by ToyDB clients.
+// The main ToyDB service used by ToyDB clients. Passes byte buffers since we'll be
+// transitioning away from Protobuf and gRPC for client/server communication.
 service ToyDB {
-  // GetTable fetches the schema for a table
-  rpc GetTable(GetTableRequest) returns (GetTableResponse) {};
-
-  // ListTables lists the database tables
-  rpc ListTables(Empty) returns (ListTablesResponse) {};
-
-  // Status asks the server for its status.
-  rpc Status(StatusRequest) returns (StatusResponse) {};
-
-  // Query runs an SQL query.
+  rpc Call(Request) returns (Result) {};
   rpc Query(QueryRequest) returns (stream Row) {};
 };
 
-message Empty {}
-
 message Error { string message = 1; }
 
-message StatusRequest {};
+message Request {
+  bytes body = 1;
+}
 
-message StatusResponse {
-  Error error = 1;
-  string id = 2;
-  string version = 3;
-};
+message Result {
+  bytes ok = 1;
+  bytes err = 2;
+}
 
 message QueryRequest {
   string query = 1;
@@ -44,18 +35,4 @@ message Field {
     double float = 3;
     string string = 4;
   };
-}
-
-message GetTableRequest { string name = 1; }
-
-// FIXME We currently just return the CREATE TABLE query for the table,
-// to avoid having to map the entire schema data structure to Protobuf.
-message GetTableResponse {
-  Error error = 1;
-  string sql = 2;
-}
-
-message ListTablesResponse {
-  Error error = 1;
-  repeated string name = 2;
 }

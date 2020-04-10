@@ -11,4 +11,4 @@ pub use engine::{Engine, Mode, Transaction};
 pub use executor::{Context, Effect, ResultColumns, ResultSet};
 pub use parser::{ast, lexer, Parser};
 pub use planner::Plan;
-pub use types::{Row, Value};
+pub use types::{schema::Table, Row, Value};

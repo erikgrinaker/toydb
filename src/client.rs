@@ -1,6 +1,10 @@
+pub use crate::server::Status;
+use crate::server::{Request, Response};
 use crate::service;
-pub use crate::sql::{Effect, Mode, ResultColumns, ResultSet, Row, Value};
-use crate::utility::deserialize;
+pub use crate::sql::types::schema::Column;
+pub use crate::sql::types::DataType;
+pub use crate::sql::{Effect, Mode, ResultColumns, ResultSet, Row, Table, Value};
+use crate::utility::{deserialize, serialize};
 use crate::Error;
 use grpc::ClientStubExt;
 use service::ToyDB;
@@ -20,25 +24,36 @@ impl Client {
         })
     }
 
-    /// Fetches the table schema as SQL
-    pub fn get_table(&self, table: &str) -> Result<String, Error> {
+    /// Call a server method
+    fn call(&self, req: Request) -> Result<Response, Error> {
         let (_, resp, _) = self
             .client
-            .get_table(
+            .call(
                 grpc::RequestOptions::new(),
-                service::GetTableRequest { name: table.to_string(), ..Default::default() },
+                service::Request { body: serialize(&req)?, ..Default::default() },
             )
             .wait()?;
-        error_from_protobuf(resp.error)?;
-        Ok(resp.sql)
+        if !resp.err.is_empty() {
+            Err(deserialize(&resp.err)?)
+        } else {
+            Ok(deserialize(&resp.ok)?)
+        }
+    }
+
+    /// Fetches the table schema as SQL
+    pub fn get_table(&self, table: &str) -> Result<Table, Error> {
+        match self.call(Request::GetTable(table.into()))? {
+            Response::GetTable(t) => Ok(t),
+            resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
+        }
     }
 
     /// Lists database tables
     pub fn list_tables(&self) -> Result<Vec<String>, Error> {
-        let (_, resp, _) =
-            self.client.list_tables(grpc::RequestOptions::new(), service::Empty::new()).wait()?;
-        error_from_protobuf(resp.error)?;
-        Ok(resp.name.to_vec())
+        match self.call(Request::ListTables)? {
+            Response::ListTables(t) => Ok(t),
+            resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
+        }
     }
 
     /// Returns the client transaction info, if any
@@ -74,18 +89,11 @@ impl Client {
 
     /// Checks server status
     pub fn status(&self) -> Result<Status, Error> {
-        let (_, resp, _) = self
-            .client
-            .status(grpc::RequestOptions::new(), service::StatusRequest::new())
-            .wait()?;
-        Ok(Status { id: resp.id, version: resp.version })
+        match self.call(Request::Status)? {
+            Response::Status(s) => Ok(s),
+            resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
+        }
     }
-}
-
-/// Server status
-pub struct Status {
-    pub id: String,
-    pub version: String,
 }
 
 /// Converts a protobuf error into a toyDB error

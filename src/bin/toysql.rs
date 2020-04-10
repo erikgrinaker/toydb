@@ -122,7 +122,7 @@ Semicolons are not supported. The following !-commands are also available:
             ),
             "!table" => {
                 let args = getargs(1)?;
-                println!("{}", self.client.get_table(args[0])?);
+                println!("{}", self.client.get_table(args[0])?.as_sql());
             }
             "!tables" => {
                 getargs(0)?;

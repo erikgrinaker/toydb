@@ -2,9 +2,29 @@ use crate::raft::Raft;
 use crate::service;
 use crate::sql;
 use crate::sql::types::{Row, Value};
-use crate::utility::serialize;
+use crate::utility::{deserialize, serialize};
 use crate::Error;
 use sql::engine::{Engine, Transaction};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Request {
+    GetTable(String),
+    ListTables,
+    Status,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Response {
+    GetTable(sql::Table),
+    ListTables(Vec<String>),
+    Status(Status),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    pub id: String,
+    pub version: String,
+}
 
 pub struct ToyDB {
     pub id: String,
@@ -13,41 +33,25 @@ pub struct ToyDB {
 }
 
 impl service::ToyDB for ToyDB {
-    fn get_table(
+    fn call(
         &self,
         _: grpc::RequestOptions,
-        req: service::GetTableRequest,
-    ) -> grpc::SingleResponse<service::GetTableResponse> {
-        let mut resp = service::GetTableResponse::new();
-        let txn = self.engine.begin().unwrap();
-        match txn.read_table(&req.name) {
-            Ok(Some(schema)) => resp.sql = schema.as_sql(),
-            Ok(None) => {
-                resp.error = Self::error_to_protobuf(Error::Value(format!(
-                    "Table {} does not exist",
-                    req.name
+        req: service::Request,
+    ) -> grpc::SingleResponse<service::Result> {
+        let mut resp = service::Result::new();
+        match deserialize(&req.body) {
+            Ok(req) => match self.call(req) {
+                Ok(r) => resp.ok = serialize(&r).unwrap(),
+                Err(e) => resp.err = serialize(&e).unwrap(),
+            },
+            Err(e) => {
+                resp.err = serialize(&Error::Value(format!(
+                    "Failed to deserialize request request: {}",
+                    e
                 )))
+                .unwrap()
             }
-            Err(err) => resp.error = Self::error_to_protobuf(err),
-        };
-        txn.rollback().unwrap();
-        grpc::SingleResponse::completed(resp)
-    }
-
-    fn list_tables(
-        &self,
-        _: grpc::RequestOptions,
-        _: service::Empty,
-    ) -> grpc::SingleResponse<service::ListTablesResponse> {
-        let mut resp = service::ListTablesResponse::new();
-        let txn = self.engine.begin().unwrap();
-        match txn.scan_tables() {
-            Ok(iter) => {
-                resp.name = protobuf::RepeatedField::from_vec(iter.map(|s| s.name).collect())
-            }
-            Err(err) => resp.error = Self::error_to_protobuf(err),
-        };
-        txn.rollback().unwrap();
+        }
         grpc::SingleResponse::completed(resp)
     }
 
@@ -86,21 +90,32 @@ impl service::ToyDB for ToyDB {
             }),
         )
     }
-
-    fn status(
-        &self,
-        _: grpc::RequestOptions,
-        _: service::StatusRequest,
-    ) -> grpc::SingleResponse<service::StatusResponse> {
-        grpc::SingleResponse::completed(service::StatusResponse {
-            id: self.id.clone(),
-            version: env!("CARGO_PKG_VERSION").into(),
-            ..Default::default()
-        })
-    }
 }
 
 impl ToyDB {
+    fn call(&self, req: Request) -> Result<Response, Error> {
+        Ok(match req {
+            Request::GetTable(table) => Response::GetTable(self.get_table(&table)?),
+            Request::ListTables => Response::ListTables(self.list_tables()?),
+            Request::Status => Response::Status(Status {
+                id: self.id.clone(),
+                version: env!("CARGO_PKG_VERSION").into(),
+            }),
+        })
+    }
+
+    fn get_table(&self, name: &str) -> Result<sql::Table, Error> {
+        self.engine.with_txn(sql::Mode::ReadOnly, |txn| match txn.read_table(name)? {
+            Some(t) => Ok(t),
+            None => Err(Error::Value(format!("Table {} does not exist", name))),
+        })
+    }
+
+    fn list_tables(&self) -> Result<Vec<String>, Error> {
+        self.engine
+            .with_txn(sql::Mode::ReadOnly, |txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
+    }
+
     /// Converts an error into a protobuf object
     fn error_to_protobuf(err: Error) -> protobuf::SingularPtrField<service::Error> {
         protobuf::SingularPtrField::from(Some(service::Error {

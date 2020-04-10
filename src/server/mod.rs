@@ -1,6 +1,8 @@
 mod raft;
 mod toydb;
 
+pub use self::toydb::{Request, Response, Status};
+
 use self::toydb::ToyDB;
 use crate::error::Error;
 use crate::kv;
