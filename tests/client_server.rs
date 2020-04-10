@@ -11,6 +11,7 @@ use pretty_assertions::assert_eq;
 use serial_test::serial;
 use std::collections::HashMap;
 
+#[allow(clippy::type_complexity)]
 fn setup(queries: Vec<&str>) -> Result<(toydb::Client, Box<dyn FnOnce()>), Error> {
     let data_dir = tempdir::TempDir::new("toydb")?;
     let mut srv = toydb::Server::new("test", HashMap::new(), &data_dir.path().to_string_lossy())?;
@@ -34,6 +35,7 @@ fn setup(queries: Vec<&str>) -> Result<(toydb::Client, Box<dyn FnOnce()>), Error
     ))
 }
 
+#[allow(clippy::type_complexity)]
 fn setup_movies() -> Result<(toydb::Client, Box<dyn FnOnce()>), Error> {
     setup(vec![
         "CREATE TABLE countries (
@@ -87,7 +89,7 @@ fn setup_movies() -> Result<(toydb::Client, Box<dyn FnOnce()>), Error> {
 
 #[test]
 #[serial]
-fn test_get_table() -> Result<(), Error> {
+fn get_table() -> Result<(), Error> {
     let (c, teardown) = setup_movies()?;
     defer!(teardown());
 
@@ -168,7 +170,7 @@ fn test_get_table() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn test_list_tables() -> Result<(), Error> {
+fn list_tables() -> Result<(), Error> {
     let (c, teardown) = setup_movies()?;
     defer!(teardown());
 
@@ -178,7 +180,7 @@ fn test_list_tables() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn test_status() -> Result<(), Error> {
+fn status() -> Result<(), Error> {
     let (c, teardown) = setup_movies()?;
     defer!(teardown());
 
