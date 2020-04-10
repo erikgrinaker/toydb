@@ -7,7 +7,7 @@ pub use self::transport::{Event, Message, Transport};
 
 use crate::kv;
 use crate::Error;
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, Sender};
 use node::Node;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -47,12 +47,12 @@ impl Raft {
         L: kv::storage::Storage + 'static + Send,
         T: Transport + 'static + Send,
     {
-        let ticker = crossbeam_channel::tick(TICK);
+        let ticker = crossbeam::channel::tick(TICK);
         let inbound_rx = transport.receiver();
-        let (outbound_tx, outbound_rx) = crossbeam_channel::unbounded();
-        let (call_tx, call_rx) = crossbeam_channel::unbounded::<(Event, Sender<Event>)>();
-        let (join_tx, join_rx) = crossbeam_channel::unbounded();
-        let (shutdown_tx, shutdown_rx) = crossbeam_channel::unbounded();
+        let (outbound_tx, outbound_rx) = crossbeam::channel::unbounded();
+        let (call_tx, call_rx) = crossbeam::channel::unbounded::<(Event, Sender<Event>)>();
+        let (join_tx, join_rx) = crossbeam::channel::unbounded();
+        let (shutdown_tx, shutdown_rx) = crossbeam::channel::unbounded();
         let mut response_txs: HashMap<Vec<u8>, Sender<Event>> = HashMap::new();
         let mut node = Node::new(id, peers, store, state, outbound_tx)?;
 
@@ -116,7 +116,7 @@ impl Raft {
 
     /// Runs a synchronous client call on the Raft cluster
     fn call(&self, event: Event) -> Result<Event, Error> {
-        let (response_tx, response_rx) = crossbeam_channel::unbounded();
+        let (response_tx, response_rx) = crossbeam::channel::unbounded();
         self.call_tx.send((event, response_tx))?;
         match response_rx.recv()? {
             Event::RespondError { error, .. } => Err(Error::Internal(error)),
@@ -149,7 +149,7 @@ impl Raft {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crossbeam_channel::Receiver;
+    use crossbeam::channel::Receiver;
     use std::sync::{Arc, Mutex};
 
     #[derive(Clone, Debug)]

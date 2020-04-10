@@ -10,7 +10,7 @@ use super::transport::{Event, Message};
 use super::State;
 use crate::kv;
 use crate::Error;
-use crossbeam_channel::Sender;
+use crossbeam::channel::Sender;
 
 /// The interval between leader heartbeats, in ticks.
 const HEARTBEAT_INTERVAL: u64 = 1;
@@ -171,7 +171,7 @@ mod tests {
     pub use super::super::tests::*;
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
-    use crossbeam_channel::Receiver;
+    use crossbeam::channel::Receiver;
 
     pub struct NodeAsserter<'a, L: kv::storage::Storage, S: State> {
         node: &'a Node<L, S>,
@@ -311,7 +311,7 @@ mod tests {
     fn setup_rolenode_peers(
         peers: Vec<String>,
     ) -> (RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>) {
-        let (sender, receiver) = crossbeam_channel::unbounded();
+        let (sender, receiver) = crossbeam::channel::unbounded();
         let node = RoleNode {
             role: (),
             id: "a".into(),
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn new() {
-        let (sender, _) = crossbeam_channel::unbounded();
+        let (sender, _) = crossbeam::channel::unbounded();
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
@@ -347,7 +347,7 @@ mod tests {
 
     #[test]
     fn new_loads_term() {
-        let (sender, _) = crossbeam_channel::unbounded();
+        let (sender, _) = crossbeam::channel::unbounded();
         let storage = kv::storage::Test::new();
         Log::new(kv::Simple::new(storage.clone())).unwrap().save_term(3, Some("c")).unwrap();
         let node = Node::new(
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn new_single() {
-        let (sender, _) = crossbeam_channel::unbounded();
+        let (sender, _) = crossbeam::channel::unbounded();
         let node = Node::new(
             "a",
             vec![],

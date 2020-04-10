@@ -2,7 +2,7 @@ use crate::raft::{Entry, Event, Message, Transport};
 use crate::service;
 use crate::service::Raft;
 use crate::Error;
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, Sender};
 use grpc::ClientStubExt;
 use std::collections::HashMap;
 
@@ -39,7 +39,7 @@ impl Transport for GRPC {
 impl GRPC {
     /// Creates a new GRPC transport
     pub fn new(peers: HashMap<String, std::net::SocketAddr>) -> Result<Self, Error> {
-        let (node_tx, node_rx) = crossbeam_channel::unbounded();
+        let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let mut t = GRPC { peers: HashMap::new(), node_tx, node_rx };
         for (id, addr) in peers.into_iter() {
             t.peers.insert(id, t.build_client(addr)?);

@@ -151,7 +151,7 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Follower, L, S> {
 pub mod tests {
     use super::super::tests::{assert_messages, assert_node, TestState};
     use super::*;
-    use crossbeam_channel::Receiver;
+    use crossbeam::channel::Receiver;
 
     pub fn follower_leader<L: kv::storage::Storage, S: State>(
         node: &RoleNode<Follower, L, S>,
@@ -166,7 +166,7 @@ pub mod tests {
     }
 
     fn setup() -> (RoleNode<Follower, kv::storage::Memory, TestState>, Receiver<Message>) {
-        let (sender, receiver) = crossbeam_channel::unbounded();
+        let (sender, receiver) = crossbeam::channel::unbounded();
         let mut state = TestState::new();
         let mut log = Log::new(kv::Simple::new(kv::storage::Memory::new())).unwrap();
         log.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();

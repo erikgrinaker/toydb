@@ -1,6 +1,6 @@
 use super::log::Entry;
 use crate::Error;
-use crossbeam_channel::Receiver;
+use crossbeam::channel::Receiver;
 
 /// A transport for communication between a Raft node and its peers.
 pub trait Transport {

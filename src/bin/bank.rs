@@ -99,7 +99,7 @@ impl Bank {
 
         crossbeam::thread::scope(|scope| {
             let (tx, rx) = crossbeam::channel::unbounded();
-            scope.spawn(move || {
+            scope.spawn(move |_| {
                 let dist = rand::distributions::Uniform::from(0..self.customers);
                 let mut rng = rand::thread_rng();
                 for _ in 0..transactions {
@@ -108,7 +108,7 @@ impl Bank {
                     while from == to {
                         to = dist.sample(&mut rng)
                     }
-                    tx.send((from, to));
+                    tx.send((from, to)).unwrap();
                 }
                 std::mem::drop(tx)
             });
@@ -116,9 +116,10 @@ impl Bank {
             println!();
             for i in 0..concurrency {
                 let r = rx.clone();
-                scope.spawn(move || self.process(i, r).unwrap());
+                scope.spawn(move |_| self.process(i, r).unwrap());
             }
-        });
+        })
+        .unwrap();
 
         let elapsed = start.elapsed().as_secs_f64();
         println!();

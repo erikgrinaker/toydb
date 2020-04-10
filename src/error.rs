@@ -27,14 +27,14 @@ impl From<config::ConfigError> for Error {
     }
 }
 
-impl From<crossbeam_channel::RecvError> for Error {
-    fn from(err: crossbeam_channel::RecvError) -> Self {
+impl From<crossbeam::channel::RecvError> for Error {
+    fn from(err: crossbeam::channel::RecvError) -> Self {
         Error::Internal(err.to_string())
     }
 }
 
-impl<T> From<crossbeam_channel::SendError<T>> for Error {
-    fn from(err: crossbeam_channel::SendError<T>) -> Self {
+impl<T> From<crossbeam::channel::SendError<T>> for Error {
+    fn from(err: crossbeam::channel::SendError<T>) -> Self {
         Error::Internal(err.to_string())
     }
 }
