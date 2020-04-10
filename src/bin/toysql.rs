@@ -11,7 +11,7 @@ extern crate rustyline;
 extern crate toydb;
 
 use rustyline::error::ReadlineError;
-use toydb::client::{Effect, Mode};
+use toydb::client::{Mode, ResultSet};
 use toydb::Error;
 
 fn main() -> Result<(), Error> {
@@ -137,42 +137,39 @@ Semicolons are not supported. The following !-commands are also available:
 
     /// Runs a query and displays the results
     fn execute_query(&mut self, query: &str) -> Result<(), Error> {
-        let resultset = self.client.query(query)?;
-
-        match resultset.effect() {
-            Some(Effect::Begin { id, mode: Mode::ReadWrite }) => {
-                println!("Began transaction {}", id)
-            }
-            Some(Effect::Begin { id, mode: Mode::ReadOnly }) => {
+        match self.client.query(query)? {
+            ResultSet::Begin { id, mode: Mode::ReadWrite } => println!("Began transaction {}", id),
+            ResultSet::Begin { id, mode: Mode::ReadOnly } => {
                 println!("Began read-only transaction {}", id)
             }
-            Some(Effect::Begin { id, mode: Mode::Snapshot { version } }) => {
+            ResultSet::Begin { id, mode: Mode::Snapshot { version } } => {
                 println!("Began read-only transaction {} in version {} snapshot", id, version)
             }
-            Some(Effect::Commit { id }) => println!("Committed transaction {}", id),
-            Some(Effect::Rollback { id }) => println!("Rolled back transaction {}", id),
-            Some(Effect::Create { count }) => println!("Created {} rows", count),
-            Some(Effect::Delete { count }) => println!("Deleted {} rows", count),
-            Some(Effect::Update { count }) => println!("Updated {} rows", count),
-            Some(Effect::CreateTable { name }) => println!("Created table {}", name),
-            Some(Effect::DropTable { name }) => println!("Dropped table {}", name),
-            None => {}
-        }
-
-        if self.show_headers {
-            println!(
-                "{}",
-                resultset
-                    .columns()
-                    .into_iter()
-                    .map(|c| c.unwrap_or_else(|| "?".into()))
-                    .collect::<Vec<_>>()
-                    .join("|")
-            );
-        }
-        for result in resultset {
-            let formatted: Vec<String> = result?.into_iter().map(|v| format!("{}", v)).collect();
-            println!("{}", formatted.join("|"));
+            ResultSet::Commit { id } => println!("Committed transaction {}", id),
+            ResultSet::Rollback { id } => println!("Rolled back transaction {}", id),
+            ResultSet::Create { count } => println!("Created {} rows", count),
+            ResultSet::Delete { count } => println!("Deleted {} rows", count),
+            ResultSet::Update { count } => println!("Updated {} rows", count),
+            ResultSet::CreateTable { name } => println!("Created table {}", name),
+            ResultSet::DropTable { name } => println!("Dropped table {}", name),
+            ResultSet::Query { mut relation } => {
+                if self.show_headers {
+                    println!(
+                        "{}",
+                        relation
+                            .columns
+                            .iter()
+                            .map(|c| c.name.clone().unwrap_or_else(|| "?".into()))
+                            .collect::<Vec<_>>()
+                            .join("|")
+                    );
+                }
+                while let Some(row) = relation.next().transpose()? {
+                    let formatted: Vec<String> =
+                        row.into_iter().map(|v| format!("{}", v)).collect();
+                    println!("{}", formatted.join("|"));
+                }
+            }
         }
         Ok(())
     }

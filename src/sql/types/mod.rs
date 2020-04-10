@@ -4,4 +4,4 @@ mod datatype;
 pub mod expression;
 pub mod schema;
 
-pub use datatype::{DataType, Row, Value};
+pub use datatype::{Column, Columns, DataType, Relation, Row, Rows, Value};

@@ -23,11 +23,7 @@ macro_rules! test_dml {
                 write!(f, "Query: {}\n", $query.trim())?;
                 match engine.session(None)?.execute($query) {
                     Ok(resultset) => {
-                        write!(f, "Effect:")?;
-                        if let Some(effect) = resultset.effect() {
-                            write!(f, " {:?}", effect)?;
-                        }
-                        write!(f, "\n\n")?;
+                        write!(f, "Result: {:?}\n\n", resultset)?;
                     },
                     Err(err) => write!(f, "Error: {:?}\n\n", err)?,
                 };

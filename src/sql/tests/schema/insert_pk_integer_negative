@@ -1,5 +1,5 @@
 Query: INSERT INTO "integer" VALUES (-1)
-Effect: Create { count: 1 }
+Result: Create { count: 1 }
 
 Storage:
 CREATE TABLE "integer" (

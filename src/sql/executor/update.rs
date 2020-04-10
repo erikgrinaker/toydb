@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::expression::Expression;
-use super::{Context, Effect, Executor, ResultSet};
+use super::{Context, Executor, ResultSet};
 use crate::Error;
 
 use std::collections::BTreeMap;
@@ -28,18 +28,22 @@ impl<T: Transaction> Update<T> {
 
 impl<T: Transaction> Executor<T> for Update<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
-        let mut source = self.source.execute(ctx)?;
-        let table = ctx.txn.must_read_table(&self.table)?;
-        let mut count = 0;
-        while let Some(mut row) = source.next().transpose()? {
-            let id = table.get_row_key(&row)?;
-            let env = table.make_row_hashmap(row.clone());
-            for (field, expr) in &self.expressions {
-                table.set_row_field(&mut row, field, expr.evaluate(&env)?)?;
+        match self.source.execute(ctx)? {
+            ResultSet::Query { mut relation } => {
+                let table = ctx.txn.must_read_table(&self.table)?;
+                let mut count = 0;
+                while let Some(mut row) = relation.next().transpose()? {
+                    let id = table.get_row_key(&row)?;
+                    let env = table.make_row_hashmap(row.clone());
+                    for (field, expr) in &self.expressions {
+                        table.set_row_field(&mut row, field, expr.evaluate(&env)?)?;
+                    }
+                    ctx.txn.update(&table.name, &id, row)?;
+                    count += 1
+                }
+                Ok(ResultSet::Update { count })
             }
-            ctx.txn.update(&table.name, &id, row)?;
-            count += 1
+            r => Err(Error::Internal(format!("Unexpected response {:?}", r))),
         }
-        Ok(ResultSet::from_effect(Effect::Update { count }))
     }
 }

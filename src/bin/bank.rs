@@ -14,7 +14,7 @@ extern crate toydb;
 
 use rand::distributions::Distribution;
 use rand::prelude::*;
-use toydb::client::{Row, Value};
+use toydb::client::{ResultSet, Value};
 use toydb::Error;
 
 fn main() -> Result<(), Error> {
@@ -255,15 +255,17 @@ impl Bank {
 }
 
 // FIXME This should be a row or result method
-fn get_integers<I: Iterator<Item = Result<Row, Error>>>(mut result: I) -> Result<Vec<i64>, Error> {
-    if let Some(row) = result.next().transpose()? {
-        row.into_iter()
-            .map(|f| match f {
-                Value::Integer(i) => Ok(i),
-                _ => Err(Error::Internal("no value received".into())),
-            })
-            .collect()
-    } else {
-        Err(Error::Internal("no row received".into()))
+fn get_integers(result: ResultSet) -> Result<Vec<i64>, Error> {
+    if let ResultSet::Query { mut relation } = result {
+        if let Some(row) = relation.next().transpose()? {
+            return row
+                .into_iter()
+                .map(|f| match f {
+                    Value::Integer(i) => Ok(i),
+                    _ => Err(Error::Internal("no value received".into())),
+                })
+                .collect();
+        }
     }
+    Err(Error::Internal("no row received".into()))
 }

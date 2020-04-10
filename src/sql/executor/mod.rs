@@ -28,10 +28,10 @@ use projection::Projection;
 use scan::Scan;
 use update::Update;
 
-use super::engine::Transaction;
+use super::engine::{Mode, Transaction};
 use super::planner::Node;
 use super::types::expression::Environment;
-use super::types::{Row, Value};
+use super::types::{Columns, Relation, Row, Value};
 use crate::Error;
 
 /// A plan executor
@@ -78,64 +78,31 @@ pub struct Context<'a, T: Transaction> {
     pub txn: &'a mut T,
 }
 
-/// An executor result
-pub struct ResultSet {
-    /// The executor effect (i.e. mutation), if any
-    effect: Option<Effect>,
-    /// The column names of the result
-    columns: ResultColumns,
-    /// The result rows
-    rows: Option<ResultRows>,
+/// An executor result set
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ResultSet {
+    // Transaction started
+    Begin { id: u64, mode: Mode },
+    // Transaction committed
+    Commit { id: u64 },
+    // Transaction rolled back
+    Rollback { id: u64 },
+    // Rows created
+    Create { count: u64 },
+    // Rows deleted
+    Delete { count: u64 },
+    // Rows updated
+    Update { count: u64 },
+    // Table created
+    CreateTable { name: String },
+    // Table dropped
+    DropTable { name: String },
+    // Query result
+    Query { relation: Relation },
 }
 
-impl ResultSet {
-    /// Creates a new result set
-    pub fn new(effect: Option<Effect>, columns: ResultColumns, rows: Option<ResultRows>) -> Self {
-        Self { effect, columns, rows }
-    }
-
-    /// Creates a new result set for an effect
-    pub fn from_effect(effect: Effect) -> Self {
-        Self { effect: Some(effect), columns: ResultColumns::new(Vec::new()), rows: None }
-    }
-
-    /// Creates a new result set for a scan iterator
-    pub fn from_rows(columns: ResultColumns, rows: ResultRows) -> Self {
-        Self { effect: None, columns, rows: Some(rows) }
-    }
-
-    /// Returns the result column names
-    pub fn columns(&self) -> Vec<Option<String>> {
-        self.columns.names()
-    }
-
-    /// Returns the query effect, if any
-    pub fn effect(&self) -> Option<Effect> {
-        self.effect.clone()
-    }
-}
-
-impl Iterator for ResultSet {
-    type Item = Result<Row, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Make sure iteration is aborted on the first error, otherwise callers
-        // will keep calling next for as long as it keeps returning errors
-        if let Some(ref mut iter) = self.rows {
-            let result = iter.next();
-            if let Some(Err(_)) = result {
-                self.rows = None
-            }
-            result
-        } else {
-            None
-        }
-    }
-}
-
-type ResultRows = Box<dyn Iterator<Item = Result<Row, Error>> + Send>;
-
-/// Column metadata for a result
+/// Column metadata for a result.
+/// FIXME This is outdated and should be removed.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ResultColumns {
     columns: Vec<(Option<String>, Option<String>)>,
@@ -148,6 +115,10 @@ impl ResultColumns {
 
     pub fn from(columns: Vec<Option<String>>) -> Self {
         Self { columns: columns.into_iter().map(|c| (None, c)).collect() }
+    }
+
+    pub fn from_new_columns(columns: Columns) -> Self {
+        Self { columns: columns.into_iter().map(|c| (c.relation, c.name)).collect() }
     }
 
     fn as_env<'b>(&'b self, row: &'b [Value]) -> ResultEnv<'b> {
@@ -229,6 +200,7 @@ impl ResultColumns {
 }
 
 // Environment for a result row
+// FIXME This should be removed
 struct ResultEnv<'a> {
     columns: &'a ResultColumns,
     row: &'a [Value],
@@ -242,25 +214,4 @@ impl<'a> Environment for ResultEnv<'a> {
     fn lookup_index(&self, index: usize) -> Result<Value, Error> {
         self.row.get(index).cloned().ok_or_else(|| Error::Value("index out of bounds".into()))
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-/// An executor effect
-pub enum Effect {
-    // Transaction started
-    Begin { id: u64, mode: super::engine::Mode },
-    // Transaction committed
-    Commit { id: u64 },
-    // Transaction rolled back
-    Rollback { id: u64 },
-    // Rows created
-    Create { count: u64 },
-    // Rows deleted
-    Delete { count: u64 },
-    // Rows updated
-    Update { count: u64 },
-    // Table created
-    CreateTable { name: String },
-    // Table dropped
-    DropTable { name: String },
 }

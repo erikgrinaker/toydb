@@ -1,13 +1,16 @@
 ///! Evaluates SQL expressions and compares with expectations.
 use super::super::types::Value;
-use super::super::Engine;
+use super::super::{Engine, ResultSet};
 use crate::Error;
 
 fn eval_expr(expr: &str) -> Result<Value, Error> {
     let engine = super::setup(Vec::new())?;
-    let mut result = engine.session(None)?.execute(&format!("SELECT {}", expr))?;
-    let value = result.next().unwrap().unwrap().get(0).unwrap().clone();
-    Ok(value)
+    match engine.session(None)?.execute(&format!("SELECT {}", expr))? {
+        ResultSet::Query { mut relation } => {
+            Ok(relation.next().unwrap().unwrap().get(0).unwrap().clone())
+        }
+        r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
+    }
 }
 
 macro_rules! test_expr {

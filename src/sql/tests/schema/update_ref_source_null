@@ -1,5 +1,5 @@
 Query: UPDATE source SET target_id = NULL WHERE id = 2
-Effect: Update { count: 1 }
+Result: Update { count: 1 }
 
 Storage:
 CREATE TABLE source (

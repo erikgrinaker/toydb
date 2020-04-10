@@ -1,5 +1,5 @@
 Query: INSERT INTO "string" VALUES ('Foo')
-Effect: Create { count: 1 }
+Result: Create { count: 1 }
 
 Storage:
 CREATE TABLE "string" (

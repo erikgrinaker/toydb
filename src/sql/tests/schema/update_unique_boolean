@@ -1,5 +1,5 @@
 Query: UPDATE "unique" SET "boolean" = FALSE WHERE id = 0
-Effect: Update { count: 1 }
+Result: Update { count: 1 }
 
 Storage:
 CREATE TABLE "unique" (

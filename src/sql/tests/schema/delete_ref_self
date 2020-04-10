@@ -1,5 +1,5 @@
 Query: DELETE FROM self WHERE id = 3
-Effect: Delete { count: 1 }
+Result: Delete { count: 1 }
 
 Storage:
 CREATE TABLE self (

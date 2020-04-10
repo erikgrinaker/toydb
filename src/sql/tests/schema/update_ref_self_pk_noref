@@ -1,5 +1,5 @@
 Query: UPDATE self SET id = 9 WHERE id = 2
-Effect: Update { count: 1 }
+Result: Update { count: 1 }
 
 Storage:
 CREATE TABLE self (

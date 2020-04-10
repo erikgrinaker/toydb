@@ -1,5 +1,8 @@
 use super::super::engine::Transaction;
-use super::super::types::expression::{Expression, Expressions};
+use super::super::types::{
+    expression::{Expression, Expressions},
+    Column, Relation,
+};
 use super::{Context, Executor, ResultColumns, ResultSet};
 use crate::Error;
 
@@ -25,40 +28,46 @@ impl<T: Transaction> Projection<T> {
 
 impl<T: Transaction> Executor<T> for Projection<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
-        let mut result = self.source.execute(ctx)?;
-        let columns = result.columns;
-        let labels = self.labels;
-        result.columns = ResultColumns::new(
-            self.expressions
-                .iter()
-                .enumerate()
-                .map(|(i, e)| {
-                    Ok(if let Some(Some(label)) = labels.get(i) {
-                        (None, Some(label.clone()))
-                    } else if let Expression::Field(relation, field) = e {
-                        let (r, f) = columns.get(relation.as_deref(), field)?;
-                        (r, Some(f))
-                    } else if let Expression::Column(i) = e {
-                        let (r, f) = columns.columns[*i].clone(); // FIXME Should have method for this
-                        (r, f)
-                    } else {
-                        (None, None)
-                    })
-                })
-                .collect::<Result<Vec<_>, Error>>()?,
-        );
-        if let Some(rows) = result.rows {
-            let expressions = self.expressions;
-            result.rows = Some(Box::new(rows.map(move |r| {
-                r.and_then(|row| {
-                    let env = columns.as_env(&row);
-                    Ok(expressions
+        match self.source.execute(ctx)? {
+            ResultSet::Query { relation } => {
+                let labels = self.labels;
+                let columns = ResultColumns::from_new_columns(relation.columns);
+                let mut projection = Relation {
+                    columns: self
+                        .expressions
                         .iter()
-                        .map(|e| e.evaluate(&env))
-                        .collect::<Result<_, Error>>()?)
-                })
-            })));
+                        .enumerate()
+                        .map(|(i, e)| {
+                            Ok(if let Some(Some(label)) = labels.get(i) {
+                                Column { relation: None, name: Some(label.clone()) }
+                            } else if let Expression::Field(relation, field) = e {
+                                let (r, f) = columns.get(relation.as_deref(), field)?;
+                                Column { relation: r, name: Some(f) }
+                            } else if let Expression::Column(i) = e {
+                                let (r, f) = columns.columns[*i].clone(); // FIXME Should have method for this
+                                Column { relation: r, name: f }
+                            } else {
+                                Column { relation: None, name: None }
+                            })
+                        })
+                        .collect::<Result<Vec<_>, Error>>()?,
+                    rows: None,
+                };
+                if let Some(rows) = relation.rows {
+                    let expressions = self.expressions;
+                    projection.rows = Some(Box::new(rows.map(move |r| {
+                        r.and_then(|row| {
+                            let env = columns.as_env(&row);
+                            Ok(expressions
+                                .iter()
+                                .map(|e| e.evaluate(&env))
+                                .collect::<Result<_, Error>>()?)
+                        })
+                    })));
+                }
+                Ok(ResultSet::Query { relation: projection })
+            }
+            r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
         }
-        Ok(result)
     }
 }

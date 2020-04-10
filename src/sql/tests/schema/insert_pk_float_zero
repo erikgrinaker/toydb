@@ -1,5 +1,5 @@
 Query: INSERT INTO "float" VALUES (0.0)
-Effect: Create { count: 1 }
+Result: Create { count: 1 }
 
 Storage:
 CREATE TABLE "float" (

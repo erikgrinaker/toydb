@@ -3,7 +3,7 @@ use crate::server::{Request, Response};
 use crate::service;
 pub use crate::sql::types::schema::Column;
 pub use crate::sql::types::DataType;
-pub use crate::sql::{Effect, Mode, ResultColumns, ResultSet, Row, Table, Value};
+pub use crate::sql::{Mode, ResultColumns, ResultSet, Row, Rows, Table, Value};
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 use grpc::ClientStubExt;
@@ -63,28 +63,47 @@ impl Client {
 
     /// Runs a query
     pub fn query(&mut self, query: &str) -> Result<ResultSet, Error> {
-        let (metadata, iter) = self
+        let (_, mut stream) = self
             .client
-            .query(
+            .execute(
                 grpc::RequestOptions::new(),
-                service::QueryRequest {
-                    query: query.to_owned(),
+                service::Query {
                     txn_id: match self.txn {
                         Some((id, _)) => id,
                         None => 0,
                     },
+                    query: query.to_owned(),
                     ..Default::default()
                 },
             )
             .wait()?;
-        let rs = resultset_from_grpc(metadata, iter)?;
-        match rs.effect() {
-            Some(Effect::Begin { id, mode }) => self.txn = Some((id, mode)),
-            Some(Effect::Commit { .. }) => self.txn = None,
-            Some(Effect::Rollback { .. }) => self.txn = None,
-            _ => {}
+
+        let resp =
+            stream.next().ok_or_else(|| Error::Internal("Unexpected end of stream".into()))??;
+        if !resp.err.is_empty() {
+            return Err(deserialize(&resp.err)?);
         }
-        Ok(rs)
+        let mut result = deserialize(&resp.ok)?;
+        match &mut result {
+            ResultSet::Query { relation } => {
+                relation.rows = Some(Box::new(stream.map(Self::stream_to_row)))
+            }
+            ResultSet::Begin { id, mode } => self.txn = Some((*id, mode.clone())),
+            ResultSet::Commit { .. } => self.txn = None,
+            ResultSet::Rollback { .. } => self.txn = None,
+            _ => {}
+        };
+        Ok(result)
+    }
+
+    /// Transform the gRPC result stream into a row iterator
+    fn stream_to_row(item: Result<service::Result, grpc::Error>) -> Result<Row, Error> {
+        let item = item?;
+        if !item.err.is_empty() {
+            return Err(deserialize(&item.err)?);
+        }
+        let row = deserialize(&item.ok)?;
+        Ok(row)
     }
 
     /// Checks server status
@@ -93,52 +112,5 @@ impl Client {
             Response::Status(s) => Ok(s),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
         }
-    }
-}
-
-/// Converts a protobuf error into a toyDB error
-fn error_from_protobuf(err: protobuf::SingularPtrField<service::Error>) -> Result<(), Error> {
-    match err.into_option() {
-        Some(err) => Err(Error::Internal(err.message)),
-        _ => Ok(()),
-    }
-}
-
-/// Converts a GRPC result into a resultset
-fn resultset_from_grpc(
-    metadata: grpc::Metadata,
-    rows: Box<dyn Iterator<Item = Result<service::Row, grpc::Error>> + Send>,
-) -> Result<ResultSet, Error> {
-    let rows = rows.map(|r| match r {
-        Ok(protorow) => {
-            if let Err(err) = error_from_protobuf(protorow.error.clone()) {
-                Err(err)
-            } else {
-                Ok(row_from_protobuf(protorow))
-            }
-        }
-        Err(err) => Err(err.into()),
-    });
-    let columns = match metadata.get("columns") {
-        Some(c) => ResultColumns::from(deserialize(c)?),
-        None => ResultColumns::new(Vec::new()),
-    };
-    let effect = metadata.get("effect").map(deserialize).transpose()?;
-    Ok(ResultSet::new(effect, columns, Some(Box::new(rows))))
-}
-
-/// Converts a protobuf row into a proper row
-fn row_from_protobuf(row: service::Row) -> Row {
-    row.field.into_iter().map(value_from_protobuf).collect()
-}
-
-/// Converts a protobuf field into a proper value
-fn value_from_protobuf(field: service::Field) -> Value {
-    match field.value {
-        None => Value::Null,
-        Some(service::Field_oneof_value::boolean(b)) => Value::Boolean(b),
-        Some(service::Field_oneof_value::float(f)) => Value::Float(f),
-        Some(service::Field_oneof_value::integer(f)) => Value::Integer(f),
-        Some(service::Field_oneof_value::string(s)) => Value::String(s),
     }
 }

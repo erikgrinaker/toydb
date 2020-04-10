@@ -1,5 +1,5 @@
 Query: INSERT INTO types (id, "integer") VALUES (0, NULL)
-Effect: Create { count: 1 }
+Result: Create { count: 1 }
 
 Storage:
 CREATE TABLE types (

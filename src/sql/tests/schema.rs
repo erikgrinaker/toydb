@@ -21,13 +21,7 @@ macro_rules! test_schema {
 
                 write!(f, "Query: {}\n", $query.trim())?;
                 match engine.session(None)?.execute($query) {
-                    Ok(resultset) => {
-                        write!(f, "Effect:")?;
-                        if let Some(effect) = resultset.effect() {
-                            write!(f, " {:?}", effect)?;
-                        }
-                        write!(f, "\n\n")?;
-                    },
+                    Ok(result) => write!(f, "Result: {:?}\n\n", result)?,
                     Err(err) => write!(f, "Error: {:?}\n\n", err)?,
                 };
 

@@ -1,7 +1,7 @@
 ///! Tests for the SQL query engine. Runs SQL queries against an in-memory database,
 ///! and compares the results with golden files stored under src/sql/tests/results/
 use super::super::types::Row;
-use super::super::{Context, Engine, Parser, Plan, Transaction};
+use super::super::{Context, Engine, Parser, Plan, ResultSet, Transaction};
 use crate::Error;
 use goldenfile::Mint;
 use std::io::Write;
@@ -115,27 +115,29 @@ macro_rules! test_query {
                 }
             };
             txn.commit()?;
-            let columns = result.columns();
-            let rows: Vec<Row> = match result.collect() {
-                Ok(rows) => rows,
-                Err(err) => {
-                    write!(f, " {:?}", err)?;
-                    return Ok(())
+            if let ResultSet::Query{relation} = result {
+                let columns = relation.columns.clone();
+                let rows: Vec<Row> = match relation.collect() {
+                    Ok(rows) => rows,
+                    Err(err) => {
+                        write!(f, " {:?}", err)?;
+                        return Ok(())
+                    }
+                };
+                if !columns.is_empty() || !rows.is_empty() {
+                    write!(f, " {:?}\n", columns
+                        .into_iter()
+                        .map(|c| c.name.unwrap_or_else(|| "?".to_string()))
+                        .collect::<Vec<_>>())?;
+                    for row in rows {
+                        write!(f, "{:?}\n", row)?;
+                    }
+                } else {
+                    write!(f, " <none>\n")?;
                 }
-            };
-            if !columns.is_empty() || !rows.is_empty() {
-                write!(f, " {:?}\n", columns
-                    .into_iter()
-                    .map(|c| c.unwrap_or_else(|| "?".to_string()))
-                    .collect::<Vec<_>>())?;
-                for row in rows {
-                    write!(f, "{:?}\n", row)?;
-                }
-            } else {
-                write!(f, " <none>\n")?;
+                return Ok(())
             }
-
-            Ok(())
+            Err(Error::Internal("Unexpected result".into()))
         }
     )*
     }

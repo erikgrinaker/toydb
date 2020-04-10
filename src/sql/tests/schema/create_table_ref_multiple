@@ -4,7 +4,7 @@ Query: CREATE TABLE other (
         test_id_b INTEGER REFERENCES test,
         test_id_c INTEGER REFERENCES test
     )
-Effect: CreateTable { name: "other" }
+Result: CreateTable { name: "other" }
 
 Storage:
 CREATE TABLE other (

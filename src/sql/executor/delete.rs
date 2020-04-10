@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::{Context, Effect, Executor, ResultSet};
+use super::{Context, Executor, ResultSet};
 use crate::Error;
 
 /// A DELETE executor
@@ -20,11 +20,15 @@ impl<T: Transaction> Executor<T> for Delete<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
         let table = ctx.txn.must_read_table(&self.table)?;
         let mut count = 0;
-        let mut rows = self.source.execute(ctx)?;
-        while let Some(row) = rows.next().transpose()? {
-            ctx.txn.delete(&table.name, &table.get_row_key(&row)?)?;
-            count += 1
+        match self.source.execute(ctx)? {
+            ResultSet::Query { mut relation } => {
+                while let Some(row) = relation.next().transpose()? {
+                    ctx.txn.delete(&table.name, &table.get_row_key(&row)?)?;
+                    count += 1
+                }
+                Ok(ResultSet::Delete { count })
+            }
+            r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
         }
-        Ok(ResultSet::from_effect(Effect::Delete { count }))
     }
 }

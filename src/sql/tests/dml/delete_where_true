@@ -1,5 +1,5 @@
 Query: DELETE FROM test WHERE TRUE
-Effect: Delete { count: 3 }
+Result: Delete { count: 3 }
 
 Storage:
 CREATE TABLE other (

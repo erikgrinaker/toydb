@@ -1,5 +1,5 @@
 Query: INSERT INTO TeSt (ID, Name) VALUES (1, 'a')
-Effect: Create { count: 1 }
+Result: Create { count: 1 }
 
 Storage:
 CREATE TABLE other (

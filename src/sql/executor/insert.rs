@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::expression::Expressions;
-use super::{Context, Effect, Executor, ResultSet};
+use super::{Context, Executor, ResultSet};
 use crate::Error;
 
 use std::collections::HashMap;
@@ -39,6 +39,6 @@ impl<T: Transaction> Executor<T> for Insert {
             ctx.txn.create(&table.name, row)?;
             count += 1;
         }
-        Ok(ResultSet::from_effect(Effect::Create { count }))
+        Ok(ResultSet::Create { count })
     }
 }

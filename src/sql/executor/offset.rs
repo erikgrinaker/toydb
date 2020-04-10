@@ -18,10 +18,13 @@ impl<T: Transaction> Offset<T> {
 
 impl<T: Transaction> Executor<T> for Offset<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
-        let mut result = self.source.execute(ctx)?;
-        if let Some(rows) = result.rows {
-            result.rows = Some(Box::new(rows.skip(self.offset as usize)))
+        let result = self.source.execute(ctx)?;
+        if let ResultSet::Query { mut relation } = result {
+            if let Some(rows) = relation.rows {
+                relation.rows = Some(Box::new(rows.skip(self.offset as usize)))
+            }
+            return Ok(ResultSet::Query { relation });
         }
-        Ok(result)
+        Err(Error::Internal("Unexpected result".into()))
     }
 }

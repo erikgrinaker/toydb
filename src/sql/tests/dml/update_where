@@ -1,5 +1,5 @@
 Query: UPDATE test SET name = 'x' WHERE id = 1
-Effect: Update { count: 1 }
+Result: Update { count: 1 }
 
 Storage:
 CREATE TABLE other (

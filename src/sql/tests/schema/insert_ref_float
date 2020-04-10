@@ -1,5 +1,5 @@
 Query: INSERT INTO source VALUES (1, 3.14)
-Effect: Create { count: 1 }
+Result: Create { count: 1 }
 
 Storage:
 CREATE TABLE source (

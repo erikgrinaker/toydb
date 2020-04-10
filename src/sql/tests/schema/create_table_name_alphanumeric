@@ -1,5 +1,5 @@
 Query: CREATE TABLE a_123 (id INTEGER PRIMARY KEY)
-Effect: CreateTable { name: "a_123" }
+Result: CreateTable { name: "a_123" }
 
 Storage:
 CREATE TABLE a_123 (

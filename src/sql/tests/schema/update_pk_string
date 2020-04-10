@@ -1,5 +1,5 @@
 Query: UPDATE "string" SET pk = 'baz' WHERE pk = 'foo'
-Effect: Update { count: 1 }
+Result: Update { count: 1 }
 
 Storage:
 CREATE TABLE "string" (

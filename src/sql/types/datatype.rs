@@ -1,3 +1,5 @@
+use crate::Error;
+
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
@@ -125,3 +127,46 @@ impl From<&str> for Value {
 
 /// A row of values
 pub type Row = Vec<Value>;
+
+/// A row iterator
+pub type Rows = Box<dyn Iterator<Item = Result<Row, Error>> + Send>;
+
+/// A column (in a result set, see schema::Column for table columns)
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Column {
+    pub relation: Option<String>,
+    pub name: Option<String>,
+}
+
+/// A set of columns
+pub type Columns = Vec<Column>;
+
+/// A relation, i.e. combination of columns and rows - used for query results.
+/// FIXME This should possibly have a name as well, and be used to qualify query fields.
+#[derive(Derivative, Serialize, Deserialize)]
+#[derivative(Debug, PartialEq)]
+pub struct Relation {
+    pub columns: Columns,
+    #[derivative(Debug = "ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[serde(skip)]
+    pub rows: Option<Rows>,
+}
+
+impl Iterator for Relation {
+    type Item = Result<Row, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Make sure iteration is aborted on the first error, otherwise callers
+        // will keep calling next for as long as it keeps returning errors
+        if let Some(ref mut rows) = self.rows {
+            let result = rows.next();
+            if let Some(Err(_)) = result {
+                self.rows = None;
+            }
+            result
+        } else {
+            None
+        }
+    }
+}

@@ -1,5 +1,5 @@
 Query: CREATE TABLE "👋" ("🆔" INTEGER PRIMARY KEY)
-Effect: CreateTable { name: "👋" }
+Result: CreateTable { name: "👋" }
 
 Storage:
 CREATE TABLE "👋" (

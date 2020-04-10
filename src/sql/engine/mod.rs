@@ -5,7 +5,7 @@ mod raft;
 pub use kv::KV;
 pub use raft::Raft;
 
-use super::executor::{Context, Effect, ResultSet};
+use super::executor::{Context, ResultSet};
 use super::parser::{ast, Parser};
 use super::planner::Plan;
 use super::types::schema::Table;
@@ -104,39 +104,39 @@ impl<E: Engine + 'static> Session<E> {
             }
             ast::Statement::Begin { readonly: true, version: None } => {
                 let txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
-                let effect = Effect::Begin { id: txn.id(), mode: txn.mode() };
+                let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
                 self.txn = Some(txn);
-                Ok(ResultSet::from_effect(effect))
+                Ok(result)
             }
             ast::Statement::Begin { readonly: true, version: Some(version) } => {
                 let txn = self.engine.begin_with_mode(Mode::Snapshot { version })?;
-                let effect = Effect::Begin { id: txn.id(), mode: txn.mode() };
+                let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
                 self.txn = Some(txn);
-                Ok(ResultSet::from_effect(effect))
+                Ok(result)
             }
             ast::Statement::Begin { readonly: false, version: Some(_) } => {
                 Err(Error::Value("Can't start read-write transaction in a given version".into()))
             }
             ast::Statement::Begin { readonly: false, version: None } => {
                 let txn = self.engine.begin_with_mode(Mode::ReadWrite)?;
-                let effect = Effect::Begin { id: txn.id(), mode: txn.mode() };
+                let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
                 self.txn = Some(txn);
-                Ok(ResultSet::from_effect(effect))
+                Ok(result)
             }
             ast::Statement::Commit | ast::Statement::Rollback if self.txn.is_none() => {
                 Err(Error::Value("Not in a transaction".into()))
             }
             ast::Statement::Commit => {
                 let txn = std::mem::replace(&mut self.txn, None).unwrap();
-                let effect = Effect::Commit { id: txn.id() };
+                let result = ResultSet::Commit { id: txn.id() };
                 txn.commit()?;
-                Ok(ResultSet::from_effect(effect))
+                Ok(result)
             }
             ast::Statement::Rollback => {
                 let txn = std::mem::replace(&mut self.txn, None).unwrap();
-                let effect = Effect::Rollback { id: txn.id() };
+                let result = ResultSet::Rollback { id: txn.id() };
                 txn.rollback()?;
-                Ok(ResultSet::from_effect(effect))
+                Ok(result)
             }
             statement if self.txn.is_some() => Plan::build(statement)?
                 .optimize()?

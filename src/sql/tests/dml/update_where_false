@@ -1,5 +1,5 @@
 Query: UPDATE test SET name = 'x' WHERE FALSE
-Effect: Update { count: 0 }
+Result: Update { count: 0 }
 
 Storage:
 CREATE TABLE other (

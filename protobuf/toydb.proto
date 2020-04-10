@@ -4,35 +4,19 @@ syntax = "proto3";
 // transitioning away from Protobuf and gRPC for client/server communication.
 service ToyDB {
   rpc Call(Request) returns (Result) {};
-  rpc Query(QueryRequest) returns (stream Row) {};
+  rpc Execute(Query) returns (stream Result) {};
 };
-
-message Error { string message = 1; }
 
 message Request {
   bytes body = 1;
 }
 
+message Query {
+  uint64 txn_id = 1;
+  string query = 2;
+};
+
 message Result {
   bytes ok = 1;
   bytes err = 2;
-}
-
-message QueryRequest {
-  string query = 1;
-  uint64 txn_id = 2;
-};
-
-message Row {
-  Error error = 1;
-  repeated Field field = 2;
-};
-
-message Field {
-  oneof value {
-    bool boolean = 1;
-    int64 integer = 2;
-    double float = 3;
-    string string = 4;
-  };
 }
