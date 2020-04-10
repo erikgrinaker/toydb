@@ -28,10 +28,10 @@ impl Transport for GRPC {
                 client.step(grpc::RequestOptions::new(), message_to_protobuf(msg));
                 Ok(())
             } else {
-                Err(Error::Network(format!("Unknown Raft peer {}", to)))
+                Err(Error::Internal(format!("Unknown Raft peer {}", to)))
             }
         } else {
-            Err(Error::Network("No receiver".into()))
+            Err(Error::Internal("No receiver".into()))
         }
     }
 }
@@ -125,7 +125,7 @@ fn message_from_protobuf(pb: service::Message) -> Result<Message, Error> {
                 Event::AcceptEntries { last_index: e.last_index }
             }
             Some(service::Message_oneof_event::reject_entries(_)) => Event::RejectEntries,
-            None => return Err(Error::Network("No event found in protobuf message".into())),
+            None => return Err(Error::Internal("No event found in protobuf message".into())),
         },
     })
 }

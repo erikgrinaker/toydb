@@ -39,21 +39,24 @@ impl Message {
     pub fn validate(&self, node_id: &str, term: u64) -> Result<(), Error> {
         // Don't allow local messages without call ID
         if self.from.is_none() && self.event.call_id().is_none() {
-            return Err(Error::Network(format!("Received local non-call event: {:?}", self.event)));
+            return Err(Error::Internal(format!(
+                "Received local non-call event: {:?}",
+                self.event
+            )));
         }
 
         // Ignore messages from past term
         if self.term < term {
-            return Err(Error::Network(format!("Ignoring message from stale term {}", self.term)));
+            return Err(Error::Internal(format!("Ignoring message from stale term {}", self.term)));
         }
 
         // Ignore messages addressed to peers or local client
         if let Some(to) = &self.to {
             if to != node_id {
-                return Err(Error::Network(format!("Ignoring message for other node {}", to)));
+                return Err(Error::Internal(format!("Ignoring message for other node {}", to)));
             }
         } else {
-            return Err(Error::Network("Ignoring message for local client".into()));
+            return Err(Error::Internal("Ignoring message for local client".into()));
         }
         Ok(())
     }

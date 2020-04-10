@@ -12,8 +12,9 @@ extern crate toydb;
 
 use rustyline::error::ReadlineError;
 use toydb::client::{Effect, Mode};
+use toydb::Error;
 
-fn main() -> Result<(), toydb::Error> {
+fn main() -> Result<(), Error> {
     let opts = app_from_crate!()
         .arg(clap::Arg::with_name("command"))
         .arg(clap::Arg::with_name("headers").short("H").long("headers").help("Show column headers"))
@@ -60,7 +61,7 @@ struct ToySQL {
 
 impl ToySQL {
     /// Creates a new ToySQL REPL for the given server host and port
-    fn new(host: &str, port: u16) -> Result<Self, toydb::Error> {
+    fn new(host: &str, port: u16) -> Result<Self, Error> {
         Ok(Self {
             client: toydb::Client::new(host, port)?,
             editor: rustyline::Editor::<()>::new(),
@@ -71,7 +72,7 @@ impl ToySQL {
     }
 
     /// Executes a line of input
-    fn execute(&mut self, input: &str) -> Result<(), toydb::Error> {
+    fn execute(&mut self, input: &str) -> Result<(), Error> {
         if input.starts_with('!') {
             self.execute_command(&input)
         } else if !input.is_empty() {
@@ -82,7 +83,7 @@ impl ToySQL {
     }
 
     /// Handles a REPL command (prefixed by !, e.g. !help)
-    fn execute_command(&mut self, input: &str) -> Result<(), toydb::Error> {
+    fn execute_command(&mut self, input: &str) -> Result<(), Error> {
         let mut input = input.split_ascii_whitespace();
         let command =
             input.next().ok_or_else(|| toydb::Error::Parse("Expected command.".to_string()))?;
@@ -90,12 +91,7 @@ impl ToySQL {
         let getargs = |n| {
             let args: Vec<&str> = input.collect();
             if args.len() != n {
-                Err(toydb::Error::Parse(format!(
-                    "{}: expected {} args, got {}",
-                    command,
-                    n,
-                    args.len()
-                )))
+                Err(Error::Parse(format!("{}: expected {} args, got {}", command, n, args.len())))
             } else {
                 Ok(args)
             }
@@ -111,12 +107,7 @@ impl ToySQL {
                     self.show_headers = false;
                     println!("Headers disabled");
                 }
-                v => {
-                    return Err(toydb::Error::Parse(format!(
-                        "Invalid value {}, expected on or off",
-                        v
-                    )))
-                }
+                v => return Err(Error::Parse(format!("Invalid value {}, expected on or off", v))),
             },
             "!help" => println!(
                 r#"
@@ -139,13 +130,13 @@ Semicolons are not supported. The following !-commands are also available:
                     println!("{}", table)
                 }
             }
-            c => return Err(toydb::Error::Parse(format!("Unknown command {}", c))),
+            c => return Err(Error::Parse(format!("Unknown command {}", c))),
         }
         Ok(())
     }
 
     /// Runs a query and displays the results
-    fn execute_query(&mut self, query: &str) -> Result<(), toydb::Error> {
+    fn execute_query(&mut self, query: &str) -> Result<(), Error> {
         let resultset = self.client.query(query)?;
 
         match resultset.effect() {
@@ -187,7 +178,7 @@ Semicolons are not supported. The following !-commands are also available:
     }
 
     /// Prompts the user for input
-    fn prompt(&mut self) -> Result<Option<String>, toydb::Error> {
+    fn prompt(&mut self) -> Result<Option<String>, Error> {
         let prompt = match self.client.txn() {
             Some((id, toydb::client::Mode::ReadWrite)) => format!("toydb:{}> ", id),
             Some((id, toydb::client::Mode::ReadOnly)) => format!("toydb:{}> ", id),
@@ -205,7 +196,7 @@ Semicolons are not supported. The following !-commands are also available:
     }
 
     /// Runs the ToySQL REPL
-    fn run(&mut self) -> Result<(), toydb::Error> {
+    fn run(&mut self) -> Result<(), Error> {
         if let Some(path) = &self.history_path {
             match self.editor.load_history(path) {
                 Ok(_) => {}

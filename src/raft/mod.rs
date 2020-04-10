@@ -108,7 +108,7 @@ impl Raft {
         let (response_tx, response_rx) = crossbeam_channel::unbounded();
         self.call_tx.send((event, response_tx))?;
         match response_rx.recv()? {
-            Event::RespondError { error, .. } => Err(Error::Network(error)),
+            Event::RespondError { error, .. } => Err(Error::Internal(error)),
             e => Ok(e),
         }
     }

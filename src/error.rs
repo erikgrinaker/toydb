@@ -1,24 +1,20 @@
+/// Errors, all except Internal are considered user-facing
 #[derive(Clone, Debug, PartialEq)]
 pub enum Error {
-    Serialization,
-    ReadOnly,
     Config(String),
-    IO(String),
     Internal(String),
-    Network(String),
     Parse(String),
+    ReadOnly,
+    Serialization,
     Value(String),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::Config(s)
-            | Error::IO(s)
-            | Error::Internal(s)
-            | Error::Network(s)
-            | Error::Parse(s)
-            | Error::Value(s) => write!(f, "{}", s),
+            Error::Config(s) | Error::Internal(s) | Error::Parse(s) | Error::Value(s) => {
+                write!(f, "{}", s)
+            }
             Error::Serialization => write!(f, "Serialization failure, retry transaction"),
             Error::ReadOnly => write!(f, "Read-only transaction"),
         }
@@ -33,25 +29,25 @@ impl From<config::ConfigError> for Error {
 
 impl From<crossbeam_channel::RecvError> for Error {
     fn from(err: crossbeam_channel::RecvError) -> Self {
-        Error::Network(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
 impl<T> From<crossbeam_channel::SendError<T>> for Error {
     fn from(err: crossbeam_channel::SendError<T>) -> Self {
-        Error::Network(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
 impl From<grpc::Error> for Error {
     fn from(err: grpc::Error) -> Self {
-        Error::Network(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
 impl From<httpbis::Error> for Error {
     fn from(err: httpbis::Error) -> Self {
-        Error::Network(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
@@ -75,13 +71,13 @@ impl From<regex::Error> for Error {
 
 impl From<rmps::decode::Error> for Error {
     fn from(err: rmps::decode::Error) -> Self {
-        Error::IO(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
 impl From<rmps::encode::Error> for Error {
     fn from(err: rmps::encode::Error) -> Self {
-        Error::IO(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
@@ -93,13 +89,13 @@ impl From<rustyline::error::ReadlineError> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
-        Error::IO(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
 impl From<std::net::AddrParseError> for Error {
     fn from(err: std::net::AddrParseError) -> Self {
-        Error::Network(err.to_string())
+        Error::Internal(err.to_string())
     }
 }
 
