@@ -33,6 +33,17 @@ pub trait Engine: Clone {
 
     /// Resumes an active transaction with the given ID
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error>;
+
+    /// Runs a closure in a transaction
+    fn with_txn<R, F>(&self, mode: Mode, f: F) -> Result<R, Error>
+    where
+        F: FnOnce(&mut Self::Transaction) -> Result<R, Error>,
+    {
+        let mut txn = self.begin_with_mode(mode)?;
+        let res = f(&mut txn);
+        txn.rollback()?;
+        res
+    }
 }
 
 /// An SQL transaction
