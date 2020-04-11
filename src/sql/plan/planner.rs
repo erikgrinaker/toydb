@@ -1,26 +1,23 @@
-mod plan;
-
-pub use plan::{Aggregate, Aggregates, Direction, Node, Plan};
-
-use super::parser::ast;
-use super::schema;
-use super::types::{Expression, Expressions, Value};
+use super::super::parser::ast;
+use super::super::schema;
+use super::super::types::{Expression, Expressions, Value};
+use super::{Aggregate, Aggregates, Node, Plan};
 use crate::Error;
 
 use std::collections::HashMap;
 
 /// The plan builder
-struct Planner {}
+pub struct Planner {}
 
 impl Planner {
     /// Creates a new planner
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 
     /// Builds a plan tree for an AST statement
-    fn build(&self, statement: ast::Statement) -> Result<Plan, Error> {
-        Ok(Plan { root: self.build_statement(statement)? })
+    pub fn build(&self, statement: ast::Statement) -> Result<Plan, Error> {
+        Ok(Plan(self.build_statement(statement)?))
     }
 
     /// Builds a plan node for a statement

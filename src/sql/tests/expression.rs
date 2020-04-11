@@ -1,6 +1,7 @@
 ///! Evaluates SQL expressions and compares with expectations.
+use super::super::engine::Engine;
+use super::super::execution::ResultSet;
 use super::super::types::Value;
-use super::super::{Engine, ResultSet};
 use crate::Error;
 
 fn eval_expr(expr: &str) -> Result<Value, Error> {

@@ -1,4 +1,5 @@
-use super::super::types;
+use super::super::types::DataType;
+
 use std::collections::BTreeMap;
 
 /// Statements
@@ -40,7 +41,7 @@ pub enum Statement {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColumnSpec {
     pub name: String,
-    pub datatype: types::DataType,
+    pub datatype: DataType,
     pub primary_key: bool,
     pub nullable: Option<bool>,
     pub default: Option<Expression>,

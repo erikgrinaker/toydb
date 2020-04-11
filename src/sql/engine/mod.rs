@@ -1,13 +1,12 @@
 //! The SQL engine provides fundamental CRUD storage operations.
 mod kv;
 mod raft;
-
 pub use kv::KV;
 pub use raft::Raft;
 
-use super::executor::{Context, ResultSet};
+use super::execution::{Context, ResultSet};
 use super::parser::{ast, Parser};
-use super::planner::Plan;
+use super::plan::Plan;
 use super::schema::Table;
 use super::types::{Row, Value};
 use crate::Error;
@@ -163,7 +162,7 @@ impl<E: Engine + 'static> Session<E> {
 pub type Mode = crate::kv::Mode;
 
 /// A row scan iterator
-pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row, Error>> + 'static + Sync + Send>;
+pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row, Error>> + Send>;
 
 /// A table scan iterator
-pub type TableScan = Box<dyn DoubleEndedIterator<Item = Table> + 'static + Sync + Send>;
+pub type TableScan = Box<dyn DoubleEndedIterator<Item = Table> + Send>;

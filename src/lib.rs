@@ -28,9 +28,9 @@ pub mod client;
 mod error;
 mod kv;
 mod raft;
-mod server;
+pub mod server;
 mod service;
-mod sql;
+pub mod sql;
 mod utility;
 
 pub use client::Client;

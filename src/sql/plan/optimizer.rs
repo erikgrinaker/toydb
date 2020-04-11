@@ -1,9 +1,13 @@
-use super::super::planner::Node;
 use super::super::types::Expression;
-use super::Optimizer;
+use super::Node;
 use crate::Error;
 
 use std::collections::HashMap;
+
+/// A plan optimizer
+pub trait Optimizer {
+    fn optimize(&mut self, node: Node) -> Result<Node, Error>;
+}
 
 /// A constant folding optimizer, which replaces constant expressions
 /// with their evaluated value, to prevent it from being re-evaluated

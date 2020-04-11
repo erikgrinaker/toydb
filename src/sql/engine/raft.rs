@@ -1,7 +1,6 @@
 use super::super::schema::Table;
 use super::super::types::{Row, Value};
-use super::Engine as _;
-use super::Transaction as _;
+use super::{Engine as _, Transaction as _};
 use crate::kv;
 use crate::raft;
 use crate::utility::{deserialize, serialize};

@@ -14,7 +14,8 @@ extern crate toydb;
 
 use rand::distributions::Distribution;
 use rand::prelude::*;
-use toydb::client::{ResultSet, Value};
+use toydb::sql::execution::ResultSet;
+use toydb::sql::types::Value;
 use toydb::Error;
 
 fn main() -> Result<(), Error> {

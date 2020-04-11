@@ -4,7 +4,9 @@ extern crate serial_test;
 extern crate tempdir;
 extern crate toydb;
 
-use toydb::client::{Column, DataType, Status, Table, Value};
+use toydb::server::Status;
+use toydb::sql::schema::{Column, Table};
+use toydb::sql::types::{DataType, Value};
 use toydb::Error;
 
 use pretty_assertions::assert_eq;

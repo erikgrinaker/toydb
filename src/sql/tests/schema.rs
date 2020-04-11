@@ -1,6 +1,7 @@
 ///! Schema-related tests, using an in-memory database against golden files in src/sql/tests/schema/
-use super::super::{Engine, Transaction};
+use super::super::engine::{Engine, Transaction};
 use crate::Error;
+
 use goldenfile::Mint;
 use std::io::Write;
 

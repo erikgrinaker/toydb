@@ -1,19 +1,20 @@
-use super::super::engine::Transaction;
-use super::super::executor::{Context, Executor, ResultSet};
-use super::super::optimizer;
-use super::super::optimizer::Optimizer;
-use super::super::parser::ast;
-use super::super::schema;
-use super::super::types::{Expression, Expressions};
-use super::Planner;
+mod optimizer;
+mod planner;
+use optimizer::Optimizer as _;
+use planner::Planner;
+
+use super::engine::Transaction;
+use super::execution::{Context, Executor, ResultSet};
+use super::parser::ast;
+use super::schema::Table;
+use super::types::{Expression, Expressions};
 use crate::Error;
+
 use std::collections::BTreeMap;
 
 /// A query plan
 #[derive(Debug)]
-pub struct Plan {
-    pub root: Node,
-}
+pub struct Plan(Node);
 
 impl Plan {
     /// Builds a plan from an AST statement
@@ -26,13 +27,12 @@ impl Plan {
         self,
         mut ctx: Context<T>,
     ) -> Result<ResultSet, Error> {
-        Executor::build(self.root).execute(&mut ctx)
+        Executor::build(self.0).execute(&mut ctx)
     }
 
     /// Optimizes the plan, consuming it
-    pub fn optimize(mut self) -> Result<Self, Error> {
-        self.root = optimizer::ConstantFolder.optimize(self.root)?;
-        Ok(self)
+    pub fn optimize(self) -> Result<Self, Error> {
+        Ok(Plan(optimizer::ConstantFolder.optimize(self.0)?))
     }
 }
 
@@ -44,7 +44,7 @@ pub enum Node {
         aggregates: Vec<Aggregate>,
     },
     CreateTable {
-        schema: schema::Table,
+        schema: Table,
     },
     Delete {
         table: String,

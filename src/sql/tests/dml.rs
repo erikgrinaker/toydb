@@ -1,6 +1,6 @@
 ///! DML-related tests, using an in-memory database against golden files in src/sql/tests/dml/
 ///! Note that schema-related tests are in schema.rs, this is just for the basic DML functionality
-use super::super::{Engine, Transaction};
+use super::super::engine::{Engine, Transaction};
 use crate::Error;
 use goldenfile::Mint;
 use std::io::Write;

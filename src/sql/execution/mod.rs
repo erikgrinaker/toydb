@@ -29,7 +29,7 @@ use scan::Scan;
 use update::Update;
 
 use super::engine::{Mode, Transaction};
-use super::planner::Node;
+use super::plan::Node;
 use super::types::Environment;
 use super::types::{Columns, Relation, Row, Value};
 use crate::Error;

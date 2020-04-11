@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::planner::Aggregate;
+use super::super::plan::Aggregate;
 use super::super::types::{Column, Relation, Value};
 use super::{Context, Executor, ResultSet};
 use crate::Error;

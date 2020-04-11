@@ -11,7 +11,8 @@ extern crate rustyline;
 extern crate toydb;
 
 use rustyline::error::ReadlineError;
-use toydb::client::{Mode, ResultSet};
+use toydb::sql::engine::Mode;
+use toydb::sql::execution::ResultSet;
 use toydb::Error;
 
 fn main() -> Result<(), Error> {
@@ -177,9 +178,9 @@ Semicolons are not supported. The following !-commands are also available:
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>, Error> {
         let prompt = match self.client.txn() {
-            Some((id, toydb::client::Mode::ReadWrite)) => format!("toydb:{}> ", id),
-            Some((id, toydb::client::Mode::ReadOnly)) => format!("toydb:{}> ", id),
-            Some((_, toydb::client::Mode::Snapshot { version })) => format!("toydb@{}> ", version),
+            Some((id, Mode::ReadWrite)) => format!("toydb:{}> ", id),
+            Some((id, Mode::ReadOnly)) => format!("toydb:{}> ", id),
+            Some((_, Mode::Snapshot { version })) => format!("toydb@{}> ", version),
             None => "toydb> ".into(),
         };
         match self.editor.readline(&prompt) {

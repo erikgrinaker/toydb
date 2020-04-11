@@ -1,8 +1,12 @@
 ///! Tests for the SQL query engine. Runs SQL queries against an in-memory database,
 ///! and compares the results with golden files stored under src/sql/tests/results/
-use super::super::types::Row;
-use super::super::{Context, Engine, Parser, Plan, ResultSet, Transaction};
+use crate::sql::engine::{Engine, Transaction};
+use crate::sql::execution::{Context, ResultSet};
+use crate::sql::parser::Parser;
+use crate::sql::plan::Plan;
+use crate::sql::types::Row;
 use crate::Error;
+
 use goldenfile::Mint;
 use std::io::Write;
 

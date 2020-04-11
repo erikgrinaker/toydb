@@ -1,9 +1,9 @@
 pub mod ast;
-pub mod lexer;
+mod lexer;
+pub use lexer::{Keyword, Lexer, Token};
 
 use super::types::DataType;
 use crate::Error;
-use lexer::{Keyword, Lexer, Token};
 
 use regex::Regex;
 use std::collections::BTreeMap;

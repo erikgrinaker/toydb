@@ -3,12 +3,12 @@ mod expression;
 mod query;
 mod schema;
 
-use super::Engine;
+use super::engine::{Engine, KV};
 use crate::kv;
 use crate::Error;
 
-fn setup(queries: Vec<&str>) -> Result<super::engine::KV<kv::storage::Memory>, Error> {
-    let engine = super::engine::KV::new(kv::MVCC::new(kv::storage::Memory::new()));
+fn setup(queries: Vec<&str>) -> Result<KV<kv::storage::Memory>, Error> {
+    let engine = KV::new(kv::MVCC::new(kv::storage::Memory::new()));
     let mut session = engine.session(None)?;
     session.execute("BEGIN")?;
     for query in queries {
