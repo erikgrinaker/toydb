@@ -409,6 +409,60 @@ fn query_txn_concurrent() -> Result<(), Error> {
     Ok(())
 }
 
+#[test]
+#[serial]
+fn query_with_txn() -> Result<(), Error> {
+    let (mut a, teardown) = setup_movies()?;
+    let mut b = toydb::Client::new("127.0.0.1", 9605)?;
+    defer!(teardown());
+
+    // We first let with_txn() time out after retrying.
+    let start = std::time::Instant::now();
+    a.query("BEGIN")?;
+    a.query("UPDATE genres SET name = 'x' WHERE id = 1")?;
+
+    assert_eq!(
+        b.with_txn(|t| {
+            t.query("UPDATE genres SET name = 'y' WHERE id = 1")?;
+            Ok(())
+        }),
+        Err(Error::Serialization)
+    );
+    assert_eq!(b.txn(), None);
+    assert!(start.elapsed() > std::time::Duration::from_millis(500));
+    a.query("ROLLBACK")?;
+
+    // We then start two txns, and commit the first after 200 ms. Both should be committed, and we
+    // should see both changes.
+    assert_rows(
+        a.query("SELECT id, released FROM movies WHERE id = 10")?,
+        vec![vec![Value::Integer(10), Value::Integer(2010)]],
+    );
+
+    a.query("BEGIN")?;
+    a.query("UPDATE movies SET released = released + 1 WHERE id = 10")?;
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        a.query("COMMIT").unwrap()
+    });
+
+    assert_matches!(
+        b.with_txn(|t| {
+            t.query("UPDATE movies SET released = released + 1 WHERE id = 10")?;
+            Ok(())
+        }),
+        Ok(ResultSet::Commit { id: _ })
+    );
+    assert_eq!(b.txn(), None);
+
+    assert_rows(
+        b.query("SELECT id, released FROM movies WHERE id = 10")?,
+        vec![vec![Value::Integer(10), Value::Integer(2012)]],
+    );
+
+    Ok(())
+}
+
 fn assert_rows(result: ResultSet, expect: Vec<Row>) {
     match result {
         ResultSet::Query { relation: Relation { rows: Some(rows), .. } } => {

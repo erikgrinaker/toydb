@@ -1,15 +1,15 @@
-use crate::server::Status;
-
-use crate::server::{Request, Response};
+use crate::server::{Request, Response, Status};
 use crate::service;
+use crate::service::ToyDB;
 use crate::sql::engine::Mode;
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::Table;
 use crate::sql::types::Row;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
+
 use grpc::ClientStubExt;
-use service::ToyDB;
+use rand::Rng as _;
 
 /// A ToyDB client
 pub struct Client {
@@ -96,6 +96,37 @@ impl Client {
             _ => {}
         };
         Ok(result)
+    }
+
+    /// Runs a transaction as a closure, automatically handling serialization failures by
+    /// retrying the closure with exponential backoff. The returned result is from the final commit.
+    pub fn with_txn<F>(&mut self, f: F) -> Result<ResultSet, Error>
+    where
+        F: Fn(&mut Self) -> Result<(), Error>,
+    {
+        let mut rng = rand::thread_rng();
+        for i in 0..5 {
+            if i > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(
+                    2_u64.pow(i as u32 - 1) * rng.gen_range(75, 125),
+                ));
+            }
+            // Ugly workaround to use ?, while waiting for try_blocks:
+            // https://doc.rust-lang.org/unstable-book/language-features/try-blocks.html
+            let result = (|| {
+                self.query("BEGIN")?;
+                f(self)?;
+                self.query("COMMIT")
+            })();
+            if self.txn().is_some() {
+                self.query("ROLLBACK")?;
+            }
+            if let Err(Error::Serialization) = result {
+                continue;
+            }
+            return result;
+        }
+        Err(Error::Serialization)
     }
 
     /// Transform the gRPC result stream into a row iterator
