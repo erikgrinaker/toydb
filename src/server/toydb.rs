@@ -96,7 +96,6 @@ impl ToyDB {
     }
 
     fn execute(&self, txn_id: u64, query: &str) -> Result<ResultSet, Error> {
-        error!("txn_id: {}", txn_id);
         let txn_id = if txn_id > 0 { Some(txn_id) } else { None };
         self.engine.session(txn_id)?.execute(query)
     }
