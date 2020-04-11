@@ -74,19 +74,19 @@ Logical operators apply standard logic operations on boolean operands.
 The complete truth tables are:
 
 | `AND`       | `TRUE`  | `FALSE` | `NULL`  |
-| ----------- | ------- | ------- | ------- |
+|-------------|---------|---------|---------|
 | **`TRUE`**  | `TRUE`  | `FALSE` | `NULL`  |
 | **`FALSE`** | `FALSE` | `FALSE` | `FALSE` |
 | **`NULL`**  | `NULL`  | `FALSE` | `NULL`  |
 
 | `OR`        | `TRUE` | `FALSE` | `NULL` |
-| ----------- | ------ | ------- | ------ |
+|-------------|--------|---------|--------|
 | **`TRUE`**  | `TRUE` | `TRUE`  | `TRUE` |
 | **`FALSE`** | `TRUE` | `FALSE` | `NULL` |
 | **`NULL`**  | `TRUE` | `NULL`  | `NULL` |
 
 | `NOT`       |         |
-| ----------- | ------- |
+|-------------|---------|
 | **`TRUE`**  | `FALSE` |
 | **`FALSE`** | `TRUE`  |
 | **`NULL`**  | `NULL`  |
@@ -141,7 +141,7 @@ String operators operate on string operands.
 The operator precedence (order of operations) is as follows:
 
 | Precedence | Operator                 | Associativity |
-| ---------- | ------------------------ | ------------- |
+|------------|--------------------------|---------------|
 | 9          | `+`, `-`, `NOT` (prefix) | Right         |
 | 8          | `!`, `IS` (postfix)      | Left          |
 | 7          | `^`                      | Right         |
@@ -169,6 +169,20 @@ Aggregate function aggregate an expression across all rows, optionally grouped i
 * `SUM(expr)`: returns the sum of numerical values.
 
 ## SQL Statements
+
+### `BEGIN`
+
+Starts a new [transaction](#transactions).
+
+<pre>
+BEGIN [ TRANSACTION ] [ READ ONLY | READ WRITE ] [ AS OF SYSTEM TIME <b><i>txn_id</i></b> ]
+</pre>
+
+* ***`txn_id`***: A past transaction ID to run a read-only transaction for, for time-travel queries.
+
+### `COMMIT`
+
+Commits an active [transaction](#transactions).
 
 ### `CREATE TABLE`
 
@@ -275,6 +289,10 @@ VALUES
     (3, 'Her', 2013
 ```
 
+### `ROLLBACK`
+
+Rolls back an active [transaction](#transactions).
+
 ### `SELECT`
 
 Selects rows from a table.
@@ -375,3 +393,22 @@ UPDATE movie
 SET bluray = TRUE
 WHERE release_year >= 2000 AND bluray = FALSE
 ```
+
+## Transactions
+
+ToyDB supports ACID transactions using MVCC-based snapshot isolation. A new transaction is started with `BEGIN`, and ended with either `COMMIT` (atomically writing all changes) or `ROLLBACK` (discarding all changes). If any conflicts occur between concurrent transactions, the one with the lowest transaction ID wins and the others will receive a serialization error and must retry.
+
+Snapshot isolation protects against the following anomalies:
+
+* Dirty writes
+* Dirty reads
+* Lost updates
+* Fuzzy reads
+* Read skew
+* Phantom read
+
+However, since ToyDB doesn't use serializable snapshot isolation it exhibits write skew anomalies.
+
+All past data is versioned and retained, and can be queried as of a given transaction ID via `BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME <txn_id>`.
+
+A transaction is still valid for use if a containing statement returns an error, it is up to the client to take appropriate action.
