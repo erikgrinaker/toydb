@@ -1,6 +1,7 @@
 use crate::raft::{Entry, Event, Message, Transport};
 use crate::service;
 use crate::service::Raft;
+use crate::utility::{deserialize, serialize};
 use crate::Error;
 use crossbeam::channel::{Receiver, Sender};
 use grpc::ClientStubExt;
@@ -106,7 +107,7 @@ fn message_from_protobuf(pb: service::Message) -> Result<Message, Error> {
                 Event::RespondState { call_id: e.call_id, response: e.response }
             }
             Some(service::Message_oneof_event::respond_error(e)) => {
-                Event::RespondError { call_id: e.call_id, error: e.error }
+                Event::RespondError { call_id: e.call_id, error: deserialize(&e.error)? }
             }
             Some(service::Message_oneof_event::replicate_entries(e)) => Event::ReplicateEntries {
                 base_index: e.base_index,
@@ -183,7 +184,7 @@ fn message_to_protobuf(msg: Message) -> service::Message {
             Event::RespondError { call_id, error } => {
                 service::Message_oneof_event::respond_error(service::RespondError {
                     call_id,
-                    error,
+                    error: serialize(&error).unwrap(),
                     ..Default::default()
                 })
             }

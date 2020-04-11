@@ -766,7 +766,7 @@ pub mod tests {
             Event::QueryState { call_id: vec![0x01], command: vec![0x01] },
         ];
         let responses = vec![
-            Event::RespondError { call_id: vec![], error: "b00m".into() },
+            Event::RespondError { call_id: vec![], error: Error::Internal("b00m".into()) },
             Event::RespondState { call_id: vec![], response: vec![0xaf] },
         ];
         let (follower, rx) = setup();

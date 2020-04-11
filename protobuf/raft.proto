@@ -77,5 +77,5 @@ message RespondState {
 
 message RespondError {
   bytes call_id = 1;
-  string error = 2;
+  bytes error = 2;
 }

@@ -132,7 +132,7 @@ pub enum Event {
         /// The call ID.
         call_id: Vec<u8>,
         /// The error.
-        error: String,
+        error: Error,
     },
 }
 

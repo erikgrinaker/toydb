@@ -18,10 +18,11 @@ const TICK: std::time::Duration = std::time::Duration::from_millis(100);
 
 /// A Raft-managed state machine.
 pub trait State {
-    /// Mutates the state machine.
+    /// Mutates the state machine. If the state machine returns Error::Internal, the Raft node
+    /// halts. For any other error, the state is applied and the error propagated to the caller.
     fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error>;
 
-    /// Queries the state machine.
+    /// Queries the state machine. All errors are propagated to the caller.
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error>;
 }
 
@@ -76,7 +77,7 @@ impl Raft {
                         } else {
                             response_tx.send(Event::RespondError{
                                 call_id: vec![],
-                                error: format!("Call ID not found for event {:?}", event),
+                                error: Error::Internal(format!("Call ID not found for event {:?}", event)),
                             })?;
                         }
                     },
@@ -119,7 +120,7 @@ impl Raft {
         let (response_tx, response_rx) = crossbeam::channel::unbounded();
         self.call_tx.send((event, response_tx))?;
         match response_rx.recv()? {
-            Event::RespondError { error, .. } => Err(Error::Internal(error)),
+            Event::RespondError { error, .. } => Err(error),
             e => Ok(e),
         }
     }
@@ -168,11 +169,15 @@ pub mod tests {
     }
 
     impl State for TestState {
-        // Appends the command to the internal commands list, and
-        // returns the command prefixed with a 0xff byte.
+        // Appends the command to the internal commands list, and returns the command prefixed with
+        // a 0xff byte. Returns Error::Internal if the payload is != 1 byte, and Error::Value if
+        // the value is 0xff.
         fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
             if command.len() != 1 {
-                return Err(Error::Value("Mutation payload must be 1 byte".into()));
+                return Err(Error::Internal("Command must be 1 byte".into()));
+            }
+            if command[0] == 0xff {
+                return Err(Error::Value("Command cannot be 0xff".into()));
             }
             self.commands.lock()?.push(command.clone());
             Ok(vec![0xff, command[0]])

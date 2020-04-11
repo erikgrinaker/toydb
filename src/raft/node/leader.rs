@@ -60,7 +60,10 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Leader, L, S> {
             if let Some(call) = self.role.calls.log_applied(index) {
                 self.send(
                     call.from.as_deref(),
-                    Event::RespondState { call_id: call.id, response: output },
+                    match output {
+                        Ok(resp) => Event::RespondState { call_id: call.id, response: resp },
+                        Err(err) => Event::RespondError { call_id: call.id, error: err },
+                    },
                 )?
             }
         }

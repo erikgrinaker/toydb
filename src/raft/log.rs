@@ -79,19 +79,28 @@ impl<S: kv::storage::Storage> Log<S> {
         Ok(index)
     }
 
-    /// Applies the next committed entry to the state machine, if any.
-    /// Returns the applied entry index and output, or None if no entry.
+    /// Applies the next committed entry to the state machine, if any. Returns the applied entry
+    /// index and its result, or None if no entry. If the state machine returns Error::Internal, the
+    /// entry is not applied and the error is propagated. If the state machine returns any other
+    /// error, the entry is applied and the error returned to the caller.
     #[allow(clippy::borrowed_box)] // Currently this is correct
-    pub fn apply(&mut self, state: &mut impl State) -> Result<Option<(u64, Vec<u8>)>, Error> {
+    #[allow(clippy::type_complexity)]
+    pub fn apply(
+        &mut self,
+        state: &mut impl State,
+    ) -> Result<Option<(u64, Result<Vec<u8>, Error>)>, Error> {
         if self.apply_index >= self.commit_index {
             return Ok(None);
         }
 
-        let mut output = vec![];
+        let mut output = Ok(vec![]);
         if let Some(entry) = self.get(self.apply_index + 1)? {
             debug!("Applying log entry {}: {:?}", self.apply_index + 1, entry);
             if let Some(command) = entry.command {
-                output = state.mutate(command)?;
+                output = match state.mutate(command) {
+                    Err(err @ Error::Internal(_)) => return Err(err),
+                    o => o,
+                }
             }
             self.apply_index += 1;
             self.apply_term = entry.term;
@@ -306,15 +315,15 @@ mod tests {
         l.commit(3).unwrap();
 
         let mut state = TestState::new();
-        assert_eq!(Ok(Some((1, vec![0xff, 0x01]))), l.apply(&mut state));
+        assert_eq!(Ok(Some((1, Ok(vec![0xff, 0x01])))), l.apply(&mut state));
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(Some((2, vec![]))), l.apply(&mut state));
+        assert_eq!(Ok(Some((2, Ok(vec![])))), l.apply(&mut state));
         assert_eq!((2, 2), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(Some((3, vec![0xff, 0x03]))), l.apply(&mut state));
+        assert_eq!(Ok(Some((3, Ok(vec![0xff, 0x03])))), l.apply(&mut state));
         assert_eq!((3, 2), l.get_applied());
         assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
 
@@ -338,13 +347,59 @@ mod tests {
         l.commit(1).unwrap();
 
         let mut state = TestState::new();
-        assert_eq!(Ok(Some((1, vec![0xff, 0x01]))), l.apply(&mut state));
+        assert_eq!(Ok(Some((1, Ok(vec![0xff, 0x01])))), l.apply(&mut state));
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
         assert_eq!(Ok(None), l.apply(&mut state));
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
+    }
+
+    #[test]
+    fn apply_errors() -> Result<(), Error> {
+        let (mut l, store) = setup();
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 1, command: Some(vec![0xff]) })?; // Error::Value
+        l.append(Entry { term: 1, command: Some(vec![0x03]) })?;
+        l.append(Entry { term: 1, command: Some(vec![0x04, 0x04]) })?; // Error::Internal
+        l.append(Entry { term: 1, command: Some(vec![0x05]) })?;
+        l.commit(5)?;
+        assert_eq!((5, 1), l.get_committed(), "committed entry");
+
+        let mut state = TestState::new();
+        assert_eq!(Ok(Some((1, Ok(vec![0xff, 0x01])))), l.apply(&mut state));
+        assert_eq!((1, 1), l.get_applied());
+        assert_eq!(vec![vec![0x01],], state.list());
+
+        assert_eq!(
+            Ok(Some((2, Err(Error::Value("Command cannot be 0xff".into()))))),
+            l.apply(&mut state)
+        );
+        assert_eq!((2, 1), l.get_applied());
+        assert_eq!(vec![vec![0x01],], state.list());
+
+        assert_eq!(Ok(Some((3, Ok(vec![0xff, 0x03])))), l.apply(&mut state));
+        assert_eq!((3, 1), l.get_applied());
+        assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
+
+        assert_eq!(Err(Error::Internal("Command must be 1 byte".into())), l.apply(&mut state));
+        assert_eq!((3, 1), l.get_applied());
+        assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
+
+        assert_eq!(Err(Error::Internal("Command must be 1 byte".into())), l.apply(&mut state));
+        assert_eq!((3, 1), l.get_applied());
+        assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
+
+        // The last applied entry should be persisted, and also used for last committed,
+        // and the erroring log entry should still be there.
+        let mut l = Log::new(store).unwrap();
+        assert_eq!((5, 1), l.get_last(), "last entry");
+        assert_eq!((3, 1), l.get_committed(), "committed entry");
+        assert_eq!((3, 1), l.get_applied(), "applied entry");
+        l.commit(4)?;
+        assert_eq!(Err(Error::Internal("Command must be 1 byte".into())), l.apply(&mut state));
+        Ok(())
     }
 
     #[test]
