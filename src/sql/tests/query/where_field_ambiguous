@@ -59,8 +59,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Filter {
             source: NestedLoopJoin {
                 outer: Scan {
@@ -119,10 +119,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Filter {
             source: NestedLoopJoin {
                 outer: Scan {
@@ -181,7 +181,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3
 

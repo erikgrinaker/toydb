@@ -80,8 +80,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -154,10 +154,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -230,7 +230,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi
 

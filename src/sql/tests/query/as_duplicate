@@ -32,8 +32,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Nothing,
         labels: [
             Some(
@@ -56,10 +56,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Nothing,
         labels: [
             Some(
@@ -82,7 +82,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT 1 AS a, 2 AS a
 

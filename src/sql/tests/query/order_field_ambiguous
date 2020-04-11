@@ -54,8 +54,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Filter {
             source: NestedLoopJoin {
                 outer: Scan {
@@ -95,10 +95,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Filter {
             source: NestedLoopJoin {
                 outer: Scan {
@@ -138,7 +138,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT * FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY id
 

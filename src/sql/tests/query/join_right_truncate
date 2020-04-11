@@ -72,8 +72,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: NestedLoopJoin {
             outer: Scan {
                 table: "movies",
@@ -129,10 +129,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: NestedLoopJoin {
             outer: Scan {
                 table: "movies",
@@ -188,7 +188,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m RIGHT JOIN genres g ON m.id = g.id
 

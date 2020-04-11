@@ -23,19 +23,19 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Scan {
+Plan: Plan(
+    Scan {
         table: "unknown",
         alias: None,
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Scan {
+Optimized plan: Plan(
+    Scan {
         table: "unknown",
         alias: None,
     },
-}
+)
 
 Query: SELECT * FROM unknown
 

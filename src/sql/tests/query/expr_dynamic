@@ -41,8 +41,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Scan {
             table: "movies",
             alias: None,
@@ -66,10 +66,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Scan {
             table: "movies",
             alias: None,
@@ -93,7 +93,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT 2020 - year AS age FROM movies
 

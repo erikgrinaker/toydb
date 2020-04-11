@@ -29,25 +29,25 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Limit {
+Plan: Plan(
+    Limit {
         source: Scan {
             table: "movies",
             alias: None,
         },
         limit: 3,
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Limit {
+Optimized plan: Plan(
+    Limit {
         source: Scan {
             table: "movies",
             alias: None,
         },
         limit: 3,
     },
-}
+)
 
 Query: SELECT * FROM movies LIMIT 3
 

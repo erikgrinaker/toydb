@@ -31,8 +31,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Filter {
+Plan: Plan(
+    Filter {
         source: Scan {
             table: "movies",
             alias: None,
@@ -43,10 +43,10 @@ Plan: Plan {
             ),
         ),
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Filter {
+Optimized plan: Plan(
+    Filter {
         source: Scan {
             table: "movies",
             alias: None,
@@ -57,7 +57,7 @@ Optimized plan: Plan {
             ),
         ),
     },
-}
+)
 
 Query: SELECT * FROM movies WHERE FALSE
 

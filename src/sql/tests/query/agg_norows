@@ -83,8 +83,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Filter {
@@ -161,10 +161,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Filter {
@@ -241,7 +241,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE
 

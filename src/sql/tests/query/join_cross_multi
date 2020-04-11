@@ -47,8 +47,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: NestedLoopJoin {
+Plan: Plan(
+    NestedLoopJoin {
         outer: NestedLoopJoin {
             outer: NestedLoopJoin {
                 outer: Scan {
@@ -79,10 +79,10 @@ Plan: Plan {
         pad: false,
         flip: false,
     },
-}
+)
 
-Optimized plan: Plan {
-    root: NestedLoopJoin {
+Optimized plan: Plan(
+    NestedLoopJoin {
         outer: NestedLoopJoin {
             outer: NestedLoopJoin {
                 outer: Scan {
@@ -113,7 +113,7 @@ Optimized plan: Plan {
         pad: false,
         flip: false,
     },
-}
+)
 
 Query: SELECT * FROM movies CROSS JOIN genres CROSS JOIN countries CROSS JOIN studios
 

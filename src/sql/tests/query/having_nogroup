@@ -59,8 +59,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Filter {
             source: Projection {
                 source: Scan {
@@ -104,10 +104,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Filter {
             source: Projection {
                 source: Scan {
@@ -151,7 +151,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
 

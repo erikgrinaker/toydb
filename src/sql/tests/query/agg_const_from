@@ -80,8 +80,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -156,10 +156,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -234,7 +234,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3) FROM genres
 

@@ -90,8 +90,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Filter {
@@ -171,10 +171,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Filter {
@@ -254,7 +254,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans WHERE b IS NOT NULL
 

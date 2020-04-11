@@ -75,8 +75,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Filter {
             source: Projection {
                 source: Aggregation {
@@ -142,10 +142,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Filter {
             source: Projection {
                 source: Aggregation {
@@ -211,7 +211,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id
 

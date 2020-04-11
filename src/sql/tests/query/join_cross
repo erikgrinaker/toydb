@@ -31,8 +31,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: NestedLoopJoin {
+Plan: Plan(
+    NestedLoopJoin {
         outer: Scan {
             table: "movies",
             alias: None,
@@ -45,10 +45,10 @@ Plan: Plan {
         pad: false,
         flip: false,
     },
-}
+)
 
-Optimized plan: Plan {
-    root: NestedLoopJoin {
+Optimized plan: Plan(
+    NestedLoopJoin {
         outer: Scan {
             table: "movies",
             alias: None,
@@ -61,7 +61,7 @@ Optimized plan: Plan {
         pad: false,
         flip: false,
     },
-}
+)
 
 Query: SELECT * FROM movies CROSS JOIN genres
 

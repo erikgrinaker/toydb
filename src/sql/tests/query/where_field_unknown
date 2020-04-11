@@ -30,8 +30,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Filter {
+Plan: Plan(
+    Filter {
         source: Scan {
             table: "movies",
             alias: None,
@@ -41,10 +41,10 @@ Plan: Plan {
             "unknown",
         ),
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Filter {
+Optimized plan: Plan(
+    Filter {
         source: Scan {
             table: "movies",
             alias: None,
@@ -54,7 +54,7 @@ Optimized plan: Plan {
             "unknown",
         ),
     },
-}
+)
 
 Query: SELECT * FROM movies WHERE unknown
 

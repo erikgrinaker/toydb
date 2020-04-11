@@ -38,8 +38,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Scan {
             table: "movies",
             alias: None,
@@ -61,10 +61,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Scan {
             table: "movies",
             alias: None,
@@ -86,7 +86,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT * FROM movies ORDER BY ultrahd ASC, id DESC
 

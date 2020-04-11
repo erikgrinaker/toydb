@@ -73,8 +73,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Projection {
             source: Scan {
                 table: "movies",
@@ -131,10 +131,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Projection {
             source: Scan {
                 table: "movies",
@@ -191,7 +191,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC
 

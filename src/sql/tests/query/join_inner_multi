@@ -104,8 +104,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: NestedLoopJoin {
             outer: NestedLoopJoin {
                 outer: Scan {
@@ -188,10 +188,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: NestedLoopJoin {
             outer: NestedLoopJoin {
                 outer: Scan {
@@ -274,7 +274,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: 
         SELECT movies.title, genres.name AS genre, studios.name AS studio

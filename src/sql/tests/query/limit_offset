@@ -35,8 +35,8 @@ AST: Select {
     ),
 }
 
-Plan: Plan {
-    root: Limit {
+Plan: Plan(
+    Limit {
         source: Offset {
             source: Scan {
                 table: "movies",
@@ -46,10 +46,10 @@ Plan: Plan {
         },
         limit: 2,
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Limit {
+Optimized plan: Plan(
+    Limit {
         source: Offset {
             source: Scan {
                 table: "movies",
@@ -59,7 +59,7 @@ Optimized plan: Plan {
         },
         limit: 2,
     },
-}
+)
 
 Query: SELECT * FROM movies LIMIT 2 OFFSET 1
 

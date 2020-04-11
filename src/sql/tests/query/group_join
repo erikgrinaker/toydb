@@ -93,8 +93,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -177,10 +177,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -263,7 +263,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC
 

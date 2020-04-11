@@ -31,8 +31,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Scan {
             table: "floats",
             alias: None,
@@ -47,10 +47,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Scan {
             table: "floats",
             alias: None,
@@ -65,7 +65,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT * FROM floats ORDER BY value DESC
 

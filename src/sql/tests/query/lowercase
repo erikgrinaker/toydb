@@ -22,8 +22,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Nothing,
         labels: [
             None,
@@ -36,10 +36,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Nothing,
         labels: [
             None,
@@ -52,7 +52,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: select 1
 

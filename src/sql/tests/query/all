@@ -23,19 +23,19 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Scan {
+Plan: Plan(
+    Scan {
         table: "movies",
         alias: None,
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Scan {
+Optimized plan: Plan(
+    Scan {
         table: "movies",
         alias: None,
     },
-}
+)
 
 Query: SELECT * FROM movies
 

@@ -41,8 +41,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -78,10 +78,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -117,7 +117,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT studio_id, COUNT(*) FROM movies
 

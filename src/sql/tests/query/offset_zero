@@ -29,25 +29,25 @@ AST: Select {
     ),
 }
 
-Plan: Plan {
-    root: Offset {
+Plan: Plan(
+    Offset {
         source: Scan {
             table: "movies",
             alias: None,
         },
         offset: 0,
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Offset {
+Optimized plan: Plan(
+    Offset {
         source: Scan {
             table: "movies",
             alias: None,
         },
         offset: 0,
     },
-}
+)
 
 Query: SELECT * FROM movies OFFSET 0
 

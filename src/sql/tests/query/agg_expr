@@ -58,8 +58,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -108,10 +108,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -160,7 +160,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT SUM(rating * 10) / COUNT(*) FROM movies
 

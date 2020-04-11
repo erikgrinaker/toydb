@@ -149,8 +149,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Projection {
+Plan: Plan(
+    Projection {
         source: Filter {
             source: NestedLoopJoin {
                 outer: NestedLoopJoin {
@@ -288,10 +288,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Projection {
+Optimized plan: Plan(
+    Projection {
         source: Filter {
             source: NestedLoopJoin {
                 outer: NestedLoopJoin {
@@ -429,7 +429,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: 
         SELECT m.id, m.title, g.id, g.name, c.id, c.name

@@ -47,8 +47,8 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan {
-    root: Order {
+Plan: Plan(
+    Order {
         source: Projection {
             source: Projection {
                 source: Scan {
@@ -85,10 +85,10 @@ Plan: Plan {
             ),
         ],
     },
-}
+)
 
-Optimized plan: Plan {
-    root: Order {
+Optimized plan: Plan(
+    Order {
         source: Projection {
             source: Projection {
                 source: Scan {
@@ -125,7 +125,7 @@ Optimized plan: Plan {
             ),
         ],
     },
-}
+)
 
 Query: SELECT title FROM movies GROUP BY title ORDER BY title ASC
 
