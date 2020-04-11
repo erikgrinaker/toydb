@@ -7,4 +7,7 @@ extern crate tempdir;
 extern crate toydb;
 
 mod client;
+mod cluster;
+mod setup;
 mod sql;
+mod util;
