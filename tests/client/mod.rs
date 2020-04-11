@@ -414,6 +414,7 @@ fn query_txn_concurrent() -> Result<(), Error> {
 fn query_with_txn() -> Result<(), Error> {
     let (mut a, teardown) = setup_movies()?;
     let mut b = toydb::Client::new("127.0.0.1", 9605)?;
+    b.txn_retries = 4;
     defer!(teardown());
 
     // We first let with_txn() time out after retrying.

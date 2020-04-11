@@ -47,7 +47,7 @@ fn main() -> Result<(), Error> {
                 .help("Concurrent workers to spawn")
                 .takes_value(true)
                 .required(true)
-                .default_value("1"),
+                .default_value("4"),
         )
         .arg(
             clap::Arg::with_name("transactions")
@@ -136,51 +136,71 @@ impl Bank {
     }
 
     // Processes transactions for a customer
-    fn process(&self, i: i64, rx: crossbeam::channel::Receiver<(i64, i64)>) -> Result<(), Error> {
+    fn process(&self, tid: i64, rx: crossbeam::channel::Receiver<(i64, i64)>) -> Result<(), Error> {
         let mut rng = rand::thread_rng();
         let mut client = self.client()?;
         for (from, to) in rx {
+            let mut amount = 0;
+            let mut from_account = 0;
+            let mut to_account = 0;
+            let mut attempts = 0;
             let start = std::time::Instant::now();
-            client.query("BEGIN")?;
-            let f = get_integers(client.query(&format!(
-                "SELECT a.id, a.balance
-                FROM account a JOIN customer c ON a.customer_id = c.id
-                WHERE c.id = {}
-                ORDER BY a.balance DESC
-                LIMIT 1",
-                from
-            ))?)?;
-            let (from_account, from_balance) = (f[0], f[1]);
-            let to_account = get_integers(client.query(&format!(
-                "SELECT a.id, a.balance
-                FROM account a JOIN customer c ON a.customer_id = c.id
-                WHERE c.id = {}
-                ORDER BY a.balance ASC
-                LIMIT 1",
-                to
-            ))?)?[0];
 
-            let amount = rng.gen_range(0, from_balance);
+            let result = client.with_txn(|t| {
+                attempts += 1;
+                let f = get_integers(t.query(&format!(
+                    "SELECT a.id, a.balance
+                    FROM account a JOIN customer c ON a.customer_id = c.id
+                    WHERE c.id = {}
+                    ORDER BY a.balance DESC
+                    LIMIT 1",
+                    from
+                ))?)?;
+                from_account = f[0];
+                let from_balance = f[1];
+                to_account = get_integers(t.query(&format!(
+                    "SELECT a.id, a.balance
+                    FROM account a JOIN customer c ON a.customer_id = c.id
+                    WHERE c.id = {}
+                    ORDER BY a.balance ASC
+                    LIMIT 1",
+                    to
+                ))?)?[0];
 
-            client.query(&format!(
-                "UPDATE account SET balance = balance - {} WHERE id = {}",
-                amount, from_account,
-            ))?;
-            client.query(&format!(
-                "UPDATE account SET balance = balance + {} WHERE id = {}",
-                amount, to_account,
-            ))?;
-            client.query("COMMIT")?;
-            println!(
-                "Thread {} transferred {: >4} from {: >3} ({:0>4}) to {: >3} ({:0>4}) in {:.3}s",
-                i,
-                amount,
-                from,
-                from_account,
-                to,
-                to_account,
-                start.elapsed().as_secs_f64()
-            );
+                amount = rng.gen_range(0, from_balance);
+
+                t.query(&format!(
+                    "UPDATE account SET balance = balance - {} WHERE id = {}",
+                    amount, from_account,
+                ))?;
+                t.query(&format!(
+                    "UPDATE account SET balance = balance + {} WHERE id = {}",
+                    amount, to_account,
+                ))?;
+                Ok(())
+            });
+            match result {
+                Err(Error::Serialization) => println!(
+                    "Thread {} serialization failure for {} to {}, giving up after {:.3}s ({} attempts)",
+                    tid,
+                    from,
+                    to,
+                    start.elapsed().as_secs_f64(),
+                    attempts
+                ),
+                Ok(_) => println!(
+                    "Thread {} transferred {: >4} from {: >3} ({:0>4}) to {: >3} ({:0>4}) in {:.3}s ({} attempts)",
+                    tid,
+                    amount,
+                    from,
+                    from_account,
+                    to,
+                    to_account,
+                    start.elapsed().as_secs_f64(),
+                    attempts
+                ),
+                Err(err) => return Err(err),
+            }
         }
         Ok(())
     }

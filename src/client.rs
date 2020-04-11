@@ -15,6 +15,7 @@ use rand::Rng as _;
 pub struct Client {
     client: service::ToyDBClient,
     txn: Option<(u64, Mode)>,
+    pub txn_retries: u64,
 }
 
 impl Client {
@@ -23,6 +24,7 @@ impl Client {
         Ok(Self {
             client: service::ToyDBClient::new_plain(host, port, grpc::ClientConf::new())?,
             txn: None,
+            txn_retries: 8,
         })
     }
 
@@ -100,12 +102,12 @@ impl Client {
 
     /// Runs a transaction as a closure, automatically handling serialization failures by
     /// retrying the closure with exponential backoff. The returned result is from the final commit.
-    pub fn with_txn<F>(&mut self, f: F) -> Result<ResultSet, Error>
+    pub fn with_txn<F>(&mut self, mut f: F) -> Result<ResultSet, Error>
     where
-        F: Fn(&mut Self) -> Result<(), Error>,
+        F: FnMut(&mut Self) -> Result<(), Error>,
     {
         let mut rng = rand::thread_rng();
-        for i in 0..5 {
+        for i in 0..self.txn_retries {
             if i > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(
                     2_u64.pow(i as u32 - 1) * rng.gen_range(75, 125),
