@@ -451,7 +451,7 @@ fn query_with_txn() -> Result<(), Error> {
             t.query("UPDATE movies SET released = released + 1 WHERE id = 10")?;
             Ok(())
         }),
-        Ok(ResultSet::Commit { id: _ })
+        Ok(ResultSet::Commit { .. })
     );
     assert_eq!(b.txn(), None);
 
