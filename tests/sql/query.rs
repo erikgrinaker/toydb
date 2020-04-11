@@ -1,11 +1,11 @@
 ///! Tests for the SQL query engine. Runs SQL queries against an in-memory database,
-///! and compares the results with golden files stored under src/sql/tests/results/
-use crate::sql::engine::{Engine, Transaction};
-use crate::sql::execution::{Context, ResultSet};
-use crate::sql::parser::Parser;
-use crate::sql::plan::Plan;
-use crate::sql::types::Row;
-use crate::Error;
+///! and compares the results with golden files stored under tests/sql/query/
+use toydb::sql::engine::{Engine, Transaction};
+use toydb::sql::execution::{Context, ResultSet};
+use toydb::sql::parser::Parser;
+use toydb::sql::plan::Plan;
+use toydb::sql::types::Row;
+use toydb::Error;
 
 use goldenfile::Mint;
 use std::io::Write;
@@ -71,7 +71,7 @@ macro_rules! test_query {
             ]);
             let engine = super::setup(setup)?;
 
-            let mut mint = Mint::new("src/sql/tests/query");
+            let mut mint = Mint::new("tests/sql/query");
             let mut f = mint.new_goldenfile(format!("{}", stringify!($name)))?;
 
             write!(f, "Query: {}\n\n", $query)?;

@@ -1,9 +1,3 @@
-#[macro_use]
-extern crate scopeguard;
-extern crate serial_test;
-extern crate tempdir;
-extern crate toydb;
-
 use toydb::server::Status;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;

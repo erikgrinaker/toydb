@@ -1,6 +1,6 @@
-///! Schema-related tests, using an in-memory database against golden files in src/sql/tests/schema/
-use super::super::engine::{Engine, Transaction};
-use crate::Error;
+///! Schema-related tests, using an in-memory database against golden files in tests/sql/chema/
+use toydb::sql::engine::{Engine, Transaction};
+use toydb::Error;
 
 use goldenfile::Mint;
 use std::io::Write;
@@ -17,7 +17,7 @@ macro_rules! test_schema {
             fn $name() -> Result<(), Error> {
                 let setup: &[&str] = &$setup;
                 let engine = super::setup(setup.into())?;
-                let mut mint = Mint::new("src/sql/tests/schema");
+                let mut mint = Mint::new("tests/sql/schema");
                 let mut f = mint.new_goldenfile(stringify!($name))?;
 
                 write!(f, "Query: {}\n", $query.trim())?;

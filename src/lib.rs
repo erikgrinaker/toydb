@@ -26,7 +26,7 @@ extern crate uuid;
 
 pub mod client;
 mod error;
-mod kv;
+pub mod kv;
 mod raft;
 pub mod server;
 mod service;

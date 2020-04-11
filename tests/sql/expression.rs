@@ -1,8 +1,8 @@
 ///! Evaluates SQL expressions and compares with expectations.
-use super::super::engine::Engine;
-use super::super::execution::ResultSet;
-use super::super::types::Value;
-use crate::Error;
+use toydb::sql::engine::Engine;
+use toydb::sql::execution::ResultSet;
+use toydb::sql::types::Value;
+use toydb::Error;
 
 fn eval_expr(expr: &str) -> Result<Value, Error> {
     let engine = super::setup(Vec::new())?;
