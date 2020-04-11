@@ -1,4 +1,6 @@
+use toydb::client::Client;
 use toydb::server::Status;
+use toydb::sql::engine::Mode;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Relation, Row, Value};
@@ -9,7 +11,7 @@ use serial_test::serial;
 use std::collections::HashMap;
 
 #[allow(clippy::type_complexity)]
-fn setup(queries: Vec<&str>) -> Result<(toydb::Client, Box<dyn FnOnce()>), Error> {
+fn setup(queries: Vec<&str>) -> Result<(Client, Box<dyn FnOnce()>), Error> {
     let data_dir = tempdir::TempDir::new("toydb")?;
     let mut srv = toydb::Server::new("test", HashMap::new(), &data_dir.path().to_string_lossy())?;
     srv.listen("127.0.0.1:9605", 4)?;
@@ -210,18 +212,14 @@ fn query() -> Result<(), Error> {
             }
         }
     );
-    if let ResultSet::Query { relation: Relation { rows: Some(rows), .. } } = result {
-        assert_eq!(
-            rows.collect::<Result<Vec<_>, _>>()?,
-            vec![
-                vec![Value::Integer(1), Value::String("Science Fiction".into())],
-                vec![Value::Integer(2), Value::String("Action".into())],
-                vec![Value::Integer(3), Value::String("Comedy".into())]
-            ]
-        )
-    } else {
-        panic!("result returned no rows")
-    }
+    assert_rows(
+        result,
+        vec![
+            vec![Value::Integer(1), Value::String("Science Fiction".into())],
+            vec![Value::Integer(2), Value::String("Action".into())],
+            vec![Value::Integer(3), Value::String("Comedy".into())],
+        ],
+    );
 
     let result = c.query("SELECT * FROM genres WHERE FALSE")?;
     assert_eq!(
@@ -236,11 +234,7 @@ fn query() -> Result<(), Error> {
             }
         }
     );
-    if let ResultSet::Query { relation: Relation { rows: Some(rows), .. } } = result {
-        assert_eq!(rows.collect::<Result<Vec<_>, _>>()?, Vec::<Row>::new())
-    } else {
-        panic!("result returned no rows")
-    }
+    assert_rows(result, Vec::new());
 
     assert_eq!(c.query("SELECT * FROM x"), Err(Error::Value("Table x does not exist".into())));
 
@@ -282,4 +276,107 @@ fn query() -> Result<(), Error> {
     );
 
     Ok(())
+}
+
+#[test]
+#[serial]
+fn query_txn() -> Result<(), Error> {
+    let (mut c, teardown) = setup_movies()?;
+    defer!(teardown());
+
+    // Committing a change in a txn should work
+    assert_eq!(c.txn(), None);
+    assert_eq!(c.query("BEGIN")?, ResultSet::Begin { id: 2, mode: Mode::ReadWrite });
+    assert_eq!(c.txn(), Some((2, Mode::ReadWrite)));
+
+    c.query("INSERT INTO genres VALUES (4, 'Drama')")?;
+    assert_eq!(c.txn(), Some((2, Mode::ReadWrite)));
+
+    assert_eq!(c.query("COMMIT")?, ResultSet::Commit { id: 2 });
+    assert_eq!(c.txn(), None);
+
+    assert_rows(
+        c.query("SELECT * FROM genres WHERE id = 4")?,
+        vec![vec![Value::Integer(4), Value::String("Drama".into())]],
+    );
+
+    // Rolling back a change in a txn should also work
+    assert_eq!(c.query("BEGIN")?, ResultSet::Begin { id: 4, mode: Mode::ReadWrite });
+    c.query("INSERT INTO genres VALUES (5, 'Musical')")?;
+    assert_rows(
+        c.query("SELECT * FROM genres WHERE id = 5")?,
+        vec![vec![Value::Integer(5), Value::String("Musical".into())]],
+    );
+    assert_eq!(c.query("ROLLBACK")?, ResultSet::Rollback { id: 4 });
+    assert_eq!(c.txn(), None);
+    assert_rows(c.query("SELECT * FROM genres WHERE id = 5")?, Vec::new());
+
+    // Starting a read-only txn should block writes
+    assert_eq!(c.query("BEGIN READ ONLY")?, ResultSet::Begin { id: 6, mode: Mode::ReadOnly });
+    assert_eq!(c.txn(), Some((6, Mode::ReadOnly)));
+    assert_rows(
+        c.query("SELECT * FROM genres WHERE id = 4")?,
+        vec![vec![Value::Integer(4), Value::String("Drama".into())]],
+    );
+    assert_eq!(c.query("INSERT INTO genres VALUES (5, 'Musical')"), Err(Error::ReadOnly));
+    assert_eq!(c.txn(), Some((6, Mode::ReadOnly)));
+    assert_rows(
+        c.query("SELECT * FROM genres WHERE id = 4")?,
+        vec![vec![Value::Integer(4), Value::String("Drama".into())]],
+    );
+    assert_eq!(c.query("COMMIT")?, ResultSet::Commit { id: 6 });
+    assert_eq!(c.txn(), None);
+
+    // Starting a time-travel txn should work, it shouldn't see recent changes, and it should
+    // block writes
+    assert_eq!(
+        c.query("BEGIN READ ONLY AS OF SYSTEM TIME 1")?,
+        ResultSet::Begin { id: 7, mode: Mode::Snapshot { version: 1 } }
+    );
+    assert_eq!(c.txn(), Some((7, Mode::Snapshot { version: 1 })));
+    assert_rows(
+        c.query("SELECT * FROM genres")?,
+        vec![
+            vec![Value::Integer(1), Value::String("Science Fiction".into())],
+            vec![Value::Integer(2), Value::String("Action".into())],
+            vec![Value::Integer(3), Value::String("Comedy".into())],
+        ],
+    );
+    assert_eq!(c.query("INSERT INTO genres VALUES (5, 'Musical')"), Err(Error::ReadOnly));
+    assert_eq!(c.query("COMMIT")?, ResultSet::Commit { id: 7 });
+    assert_eq!(c.txn(), None);
+
+    // A txn should still be usable after an error occurs
+    assert_eq!(c.query("BEGIN")?, ResultSet::Begin { id: 8, mode: Mode::ReadWrite });
+    c.query("INSERT INTO genres VALUES (5, 'Horror')")?;
+    assert_eq!(
+        c.query("INSERT INTO genres VALUES (5, 'Musical')"),
+        Err(Error::Value("Primary key 5 already exists for table genres".into()))
+    );
+    c.query("INSERT INTO genres VALUES (6, 'Western')")?;
+    assert_eq!(c.txn(), Some((8, Mode::ReadWrite)));
+    assert_eq!(c.query("COMMIT")?, ResultSet::Commit { id: 8 });
+    assert_eq!(c.txn(), None);
+    assert_rows(
+        c.query("SELECT * FROM genres")?,
+        vec![
+            vec![Value::Integer(1), Value::String("Science Fiction".into())],
+            vec![Value::Integer(2), Value::String("Action".into())],
+            vec![Value::Integer(3), Value::String("Comedy".into())],
+            vec![Value::Integer(4), Value::String("Drama".into())],
+            vec![Value::Integer(5), Value::String("Horror".into())],
+            vec![Value::Integer(6), Value::String("Western".into())],
+        ],
+    );
+
+    Ok(())
+}
+
+fn assert_rows(result: ResultSet, expect: Vec<Row>) {
+    match result {
+        ResultSet::Query { relation: Relation { rows: Some(rows), .. } } => {
+            assert_eq!(rows.collect::<Result<Vec<_>, _>>().unwrap(), expect)
+        }
+        r => panic!("Unexpected result {:?}", r),
+    }
 }
