@@ -136,6 +136,7 @@ pub enum Keyword {
 }
 
 impl Keyword {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(ident: &str) -> Option<Self> {
         Some(match ident.to_uppercase().as_ref() {
             "AS" => Self::As,

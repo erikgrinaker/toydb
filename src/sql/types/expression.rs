@@ -382,7 +382,7 @@ pub trait Environment {
     fn lookup_index(&self, index: usize) -> Result<Value, Error>;
 }
 
-impl Environment for HashMap<String, Value> {
+impl<S: std::hash::BuildHasher> Environment for HashMap<String, Value, S> {
     fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error> {
         if relation.is_some() {
             Err(Error::Value("Qualified fields not supported for HashMap environments".into()))

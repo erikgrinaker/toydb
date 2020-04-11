@@ -1,4 +1,5 @@
 #![warn(clippy::all)]
+#![allow(clippy::new_without_default)]
 
 #[cfg(test)]
 #[macro_use]
