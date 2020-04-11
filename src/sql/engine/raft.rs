@@ -1,4 +1,4 @@
-use super::super::types::schema::Table;
+use super::super::schema::Table;
 use super::super::types::{Row, Value};
 use super::Engine as _;
 use super::Transaction as _;

@@ -3,9 +3,8 @@ mod plan;
 pub use plan::{Aggregate, Aggregates, Direction, Node, Plan};
 
 use super::parser::ast;
-use super::types::expression::{Expression, Expressions};
-use super::types::schema;
-use super::types::Value;
+use super::schema;
+use super::types::{Expression, Expressions, Value};
 use crate::Error;
 
 use std::collections::HashMap;

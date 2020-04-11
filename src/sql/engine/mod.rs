@@ -8,7 +8,7 @@ pub use raft::Raft;
 use super::executor::{Context, ResultSet};
 use super::parser::{ast, Parser};
 use super::planner::Plan;
-use super::types::schema::Table;
+use super::schema::Table;
 use super::types::{Row, Value};
 use crate::Error;
 

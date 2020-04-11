@@ -1,4 +1,4 @@
-use super::super::types::schema::Table;
+use super::super::schema::Table;
 use super::super::types::{Row, Value};
 use crate::kv;
 use crate::utility::{deserialize, serialize};

@@ -1,7 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::planner::Direction;
-use super::super::types::expression::Expression;
-use super::super::types::{Row, Value};
+use super::super::types::{Expression, Row, Value};
 use super::{Context, Executor, ResultColumns, ResultSet};
 use crate::Error;
 

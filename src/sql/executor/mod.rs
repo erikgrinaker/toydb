@@ -30,7 +30,7 @@ use update::Update;
 
 use super::engine::{Mode, Transaction};
 use super::planner::Node;
-use super::types::expression::Environment;
+use super::types::Environment;
 use super::types::{Columns, Relation, Row, Value};
 use crate::Error;
 

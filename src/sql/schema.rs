@@ -1,6 +1,6 @@
-use super::super::engine::Transaction;
-use super::super::parser::format_ident;
-use super::{DataType, Row, Value};
+use super::engine::Transaction;
+use super::parser::format_ident;
+use super::types::{DataType, Row, Value};
 use crate::Error;
 
 use std::collections::HashMap;

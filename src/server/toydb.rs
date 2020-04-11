@@ -1,10 +1,10 @@
 use crate::raft::Raft;
 use crate::service;
-use crate::sql;
+use crate::sql::engine::{Engine, Mode, Transaction};
+use crate::sql::schema::Table;
 use crate::sql::{Relation, ResultSet, Row};
 use crate::utility::{deserialize, serialize};
 use crate::Error;
-use sql::engine::{Engine, Transaction};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Request {
@@ -15,7 +15,7 @@ pub enum Request {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Response {
-    GetTable(sql::Table),
+    GetTable(Table),
     ListTables(Vec<String>),
     Status(Status),
 }
@@ -29,7 +29,7 @@ pub struct Status {
 pub struct ToyDB {
     pub id: String,
     pub raft: Raft,
-    pub engine: sql::engine::Raft,
+    pub engine: crate::sql::engine::Raft,
 }
 
 impl service::ToyDB for ToyDB {
@@ -107,15 +107,14 @@ impl ToyDB {
         }
     }
 
-    fn get_table(&self, name: &str) -> Result<sql::Table, Error> {
-        self.engine.with_txn(sql::Mode::ReadOnly, |txn| match txn.read_table(name)? {
+    fn get_table(&self, name: &str) -> Result<Table, Error> {
+        self.engine.with_txn(Mode::ReadOnly, |txn| match txn.read_table(name)? {
             Some(t) => Ok(t),
             None => Err(Error::Value(format!("Table {} does not exist", name))),
         })
     }
 
     fn list_tables(&self) -> Result<Vec<String>, Error> {
-        self.engine
-            .with_txn(sql::Mode::ReadOnly, |txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
+        self.engine.with_txn(Mode::ReadOnly, |txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
     }
 }

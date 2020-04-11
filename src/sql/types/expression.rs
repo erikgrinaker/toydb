@@ -373,6 +373,7 @@ impl Expression {
 }
 
 /// An expression evaluation environment
+/// FIXME Redesign this
 pub trait Environment {
     /// Fetches a field value from the environment
     fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error>;

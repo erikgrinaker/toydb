@@ -1,9 +1,9 @@
 pub use crate::server::Status;
 use crate::server::{Request, Response};
 use crate::service;
-pub use crate::sql::types::schema::Column;
+pub use crate::sql::schema::{Column, Table};
 pub use crate::sql::types::DataType;
-pub use crate::sql::{Mode, ResultColumns, ResultSet, Row, Rows, Table, Value};
+pub use crate::sql::{Mode, ResultColumns, ResultSet, Row, Rows, Value};
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 use grpc::ClientStubExt;

@@ -1,8 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::types::{
-    expression::{Expression, Expressions},
-    Column, Relation,
-};
+use super::super::types::{Column, Expression, Expressions, Relation};
 use super::{Context, Executor, ResultColumns, ResultSet};
 use crate::Error;
 
