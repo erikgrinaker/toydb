@@ -79,7 +79,7 @@ pub struct Context<'a, T: Transaction> {
 }
 
 /// An executor result set
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum ResultSet {
     // Transaction started
     Begin { id: u64, mode: Mode },

@@ -5,8 +5,9 @@ extern crate tempdir;
 extern crate toydb;
 
 use toydb::server::Status;
-use toydb::sql::schema::{Column, Table};
-use toydb::sql::types::{DataType, Value};
+use toydb::sql::execution::ResultSet;
+use toydb::sql::schema;
+use toydb::sql::types::{Column, DataType, Relation, Row, Value};
 use toydb::Error;
 
 use pretty_assertions::assert_eq;
@@ -98,10 +99,10 @@ fn get_table() -> Result<(), Error> {
     assert_eq!(c.get_table("unknown"), Err(Error::Value("Table unknown does not exist".into())));
     assert_eq!(
         c.get_table("movies")?,
-        Table {
+        schema::Table {
             name: "movies".into(),
             columns: vec![
-                Column {
+                schema::Column {
                     name: "id".into(),
                     datatype: DataType::Integer,
                     primary_key: true,
@@ -110,7 +111,7 @@ fn get_table() -> Result<(), Error> {
                     unique: true,
                     references: None,
                 },
-                Column {
+                schema::Column {
                     name: "title".into(),
                     datatype: DataType::String,
                     primary_key: false,
@@ -119,7 +120,7 @@ fn get_table() -> Result<(), Error> {
                     unique: false,
                     references: None,
                 },
-                Column {
+                schema::Column {
                     name: "studio_id".into(),
                     datatype: DataType::Integer,
                     primary_key: false,
@@ -128,7 +129,7 @@ fn get_table() -> Result<(), Error> {
                     unique: false,
                     references: Some("studios".into()),
                 },
-                Column {
+                schema::Column {
                     name: "genre_id".into(),
                     datatype: DataType::Integer,
                     primary_key: false,
@@ -137,7 +138,7 @@ fn get_table() -> Result<(), Error> {
                     unique: false,
                     references: Some("genres".into()),
                 },
-                Column {
+                schema::Column {
                     name: "released".into(),
                     datatype: DataType::Integer,
                     primary_key: false,
@@ -146,7 +147,7 @@ fn get_table() -> Result<(), Error> {
                     unique: false,
                     references: None,
                 },
-                Column {
+                schema::Column {
                     name: "rating".into(),
                     datatype: DataType::Float,
                     primary_key: false,
@@ -155,7 +156,7 @@ fn get_table() -> Result<(), Error> {
                     unique: false,
                     references: None,
                 },
-                Column {
+                schema::Column {
                     name: "ultrahd".into(),
                     datatype: DataType::Boolean,
                     primary_key: false,
@@ -190,5 +191,101 @@ fn status() -> Result<(), Error> {
         c.status()?,
         Status { id: "test".into(), version: env!("CARGO_PKG_VERSION").into() }
     );
+    Ok(())
+}
+
+#[test]
+#[serial]
+fn query() -> Result<(), Error> {
+    // The SQL engine is thoroughly tested in a separate suite, this just exercises the
+    // basic client/server integration.
+    let (mut c, teardown) = setup_movies()?;
+    defer!(teardown());
+
+    // SELECT
+    let result = c.query("SELECT * FROM genres")?;
+    assert_eq!(
+        result,
+        ResultSet::Query {
+            relation: Relation {
+                columns: vec![
+                    Column { relation: Some("genres".into()), name: Some("id".into()) },
+                    Column { relation: Some("genres".into()), name: Some("name".into()) }
+                ],
+                rows: None
+            }
+        }
+    );
+    if let ResultSet::Query { relation: Relation { rows: Some(rows), .. } } = result {
+        assert_eq!(
+            rows.collect::<Result<Vec<_>, _>>()?,
+            vec![
+                vec![Value::Integer(1), Value::String("Science Fiction".into())],
+                vec![Value::Integer(2), Value::String("Action".into())],
+                vec![Value::Integer(3), Value::String("Comedy".into())]
+            ]
+        )
+    } else {
+        panic!("result returned no rows")
+    }
+
+    let result = c.query("SELECT * FROM genres WHERE FALSE")?;
+    assert_eq!(
+        result,
+        ResultSet::Query {
+            relation: Relation {
+                columns: vec![
+                    Column { relation: Some("genres".into()), name: Some("id".into()) },
+                    Column { relation: Some("genres".into()), name: Some("name".into()) }
+                ],
+                rows: None
+            }
+        }
+    );
+    if let ResultSet::Query { relation: Relation { rows: Some(rows), .. } } = result {
+        assert_eq!(rows.collect::<Result<Vec<_>, _>>()?, Vec::<Row>::new())
+    } else {
+        panic!("result returned no rows")
+    }
+
+    assert_eq!(c.query("SELECT * FROM x"), Err(Error::Value("Table x does not exist".into())));
+
+    // INSERT
+    assert_eq!(
+        c.query("INSERT INTO genres VALUES (1, 'Western')"),
+        Err(Error::Value("Primary key 1 already exists for table genres".into())),
+    );
+    assert_eq!(
+        c.query("INSERT INTO genres VALUES (9, 'Western')"),
+        Ok(ResultSet::Create { count: 1 }),
+    );
+    assert_eq!(
+        c.query("INSERT INTO x VALUES (9, 'Western')"),
+        Err(Error::Value("Table x does not exist".into()))
+    );
+
+    // UPDATE
+    assert_eq!(
+        c.query("UPDATE genres SET name = 'Horror' WHERE FALSE"),
+        Ok(ResultSet::Update { count: 0 }),
+    );
+    assert_eq!(
+        c.query("UPDATE genres SET name = 'Horror' WHERE id = 9"),
+        Ok(ResultSet::Update { count: 1 }),
+    );
+    assert_eq!(
+        c.query("UPDATE genres SET id = 1 WHERE id = 9"),
+        Err(Error::Value("Primary key 1 already exists for table genres".into()))
+    );
+
+    // DELETE
+    assert_eq!(c.query("DELETE FROM genres WHERE FALSE"), Ok(ResultSet::Delete { count: 0 }),);
+    // FIXME https://github.com/erikgrinaker/toydb/issues/16
+    //assert_eq!(c.query("DELETE FROM genres WHERE id = 9"), Ok(ResultSet::Delete { count: 1 }),);
+    assert_eq!(
+        c.query("DELETE FROM genres WHERE x = 1"),
+        Err(Error::Value("Unknown field x".into()))
+    );
+
     Ok(())
 }
