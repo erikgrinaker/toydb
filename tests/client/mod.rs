@@ -372,6 +372,43 @@ fn query_txn() -> Result<(), Error> {
     Ok(())
 }
 
+#[test]
+#[serial]
+fn query_txn_concurrent() -> Result<(), Error> {
+    let (mut a, teardown) = setup_movies()?;
+    let mut b = toydb::Client::new("127.0.0.1", 9605)?;
+    defer!(teardown());
+
+    // Concurrent updates should throw a serialization failure on conflict.
+    assert_eq!(a.query("BEGIN")?, ResultSet::Begin { id: 2, mode: Mode::ReadWrite });
+    assert_eq!(b.query("BEGIN")?, ResultSet::Begin { id: 3, mode: Mode::ReadWrite });
+
+    assert_rows(
+        a.query("SELECT * FROM genres WHERE id = 1")?,
+        vec![vec![Value::Integer(1), Value::String("Science Fiction".into())]],
+    );
+    assert_rows(
+        b.query("SELECT * FROM genres WHERE id = 1")?,
+        vec![vec![Value::Integer(1), Value::String("Science Fiction".into())]],
+    );
+
+    assert_eq!(
+        a.query("UPDATE genres SET name = 'x' WHERE id = 1"),
+        Ok(ResultSet::Update { count: 1 })
+    );
+    assert_eq!(b.query("UPDATE genres SET name = 'y' WHERE id = 1"), Err(Error::Serialization));
+
+    assert_eq!(a.query("COMMIT"), Ok(ResultSet::Commit { id: 2 }));
+    assert_eq!(b.query("ROLLBACK"), Ok(ResultSet::Rollback { id: 3 }));
+
+    assert_rows(
+        a.query("SELECT * FROM genres WHERE id = 1")?,
+        vec![vec![Value::Integer(1), Value::String("x".into())]],
+    );
+
+    Ok(())
+}
+
 fn assert_rows(result: ResultSet, expect: Vec<Row>) {
     match result {
         ResultSet::Query { relation: Relation { rows: Some(rows), .. } } => {
