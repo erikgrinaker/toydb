@@ -142,17 +142,22 @@ impl<E: Engine + 'static> Session<E> {
                 .execute(Context { txn: self.txn.as_mut().unwrap() }),
             statement @ ast::Statement::Select { .. } => {
                 let mut txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
-                let result =
-                    Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn })?;
-                txn.commit()?;
-                Ok(result)
+                let result = Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn });
+                txn.rollback()?;
+                result
             }
             statement => {
                 let mut txn = self.engine.begin_with_mode(Mode::ReadWrite)?;
-                let result =
-                    Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn })?;
-                txn.commit()?;
-                Ok(result)
+                match Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn }) {
+                    Ok(result) => {
+                        txn.commit()?;
+                        Ok(result)
+                    }
+                    Err(error) => {
+                        txn.rollback()?;
+                        Err(error)
+                    }
+                }
             }
         }
     }

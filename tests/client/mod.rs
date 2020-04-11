@@ -268,8 +268,7 @@ fn query() -> Result<(), Error> {
 
     // DELETE
     assert_eq!(c.query("DELETE FROM genres WHERE FALSE"), Ok(ResultSet::Delete { count: 0 }),);
-    // FIXME https://github.com/erikgrinaker/toydb/issues/16
-    //assert_eq!(c.query("DELETE FROM genres WHERE id = 9"), Ok(ResultSet::Delete { count: 1 }),);
+    assert_eq!(c.query("DELETE FROM genres WHERE id = 9"), Ok(ResultSet::Delete { count: 1 }),);
     assert_eq!(
         c.query("DELETE FROM genres WHERE x = 1"),
         Err(Error::Value("Unknown field x".into()))
@@ -411,7 +410,7 @@ fn query_txn_concurrent() -> Result<(), Error> {
 
 #[test]
 #[serial]
-fn query_with_txn() -> Result<(), Error> {
+fn with_txn() -> Result<(), Error> {
     let (mut a, teardown) = setup_movies()?;
     let mut b = toydb::Client::new("127.0.0.1", 9605)?;
     b.txn_retries = 4;
