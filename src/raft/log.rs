@@ -173,14 +173,12 @@ impl<S: kv::storage::Storage> Log<S> {
     /// * If no existing entry exists at an index, append it
     /// * If the existing entry has a different term, replace it and following entries
     /// * If the existing entry has the same term, assume entry is equal and skip it
+    ///
+    /// The caller must have checked that the base is valid first (i.e. that it exists
+    /// and has the correct term).
     //
-    // FIXME Needs to be transactional
-    pub fn splice(&mut self, base: u64, base_term: u64, entries: Vec<Entry>) -> Result<u64, Error> {
-        if base > 0 && !self.has(base, base_term)? {
-            // The caller should have checked this already
-            return Err(Error::Internal("Base not found".into()));
-        }
-
+    // FIXME Should be atomic
+    pub fn splice(&mut self, base: u64, entries: Vec<Entry>) -> Result<u64, Error> {
         for (i, entry) in entries.into_iter().enumerate() {
             if let Some(ref current) = self.get(base + i as u64 + 1)? {
                 if current.term == entry.term {
@@ -476,7 +474,6 @@ mod tests {
             Ok(4),
             l.splice(
                 2,
-                2,
                 vec![
                     Entry { term: 3, command: Some(vec![0x03]) },
                     Entry { term: 4, command: Some(vec![0x04]) },
@@ -501,7 +498,6 @@ mod tests {
             Ok(2),
             l.splice(
                 0,
-                0,
                 vec![
                     Entry { term: 4, command: Some(vec![0x0a]) },
                     Entry { term: 4, command: Some(vec![0x0b]) },
@@ -523,7 +519,6 @@ mod tests {
             Ok(4),
             l.splice(
                 2,
-                2,
                 vec![
                     Entry { term: 3, command: Some(vec![0x03]) },
                     Entry { term: 4, command: Some(vec![0x04]) },
@@ -544,26 +539,7 @@ mod tests {
         l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
 
         assert_matches!(
-            l.splice(3, 3, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
-            Err(Error::Internal(_))
-        );
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
-        assert_eq!((2, 2), l.get_last());
-    }
-
-    #[test]
-    fn splice_base_term_conflict() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-
-        assert_matches!(
-            l.splice(2, 3, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
-            Err(Error::Internal(_))
-        );
-        assert_matches!(
-            l.splice(2, 0, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
+            l.splice(3, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
             Err(Error::Internal(_))
         );
         assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
@@ -582,7 +558,6 @@ mod tests {
         assert_eq!(
             Ok(3),
             l.splice(
-                1,
                 1,
                 vec![
                     Entry { term: 3, command: Some(vec![0x0b]) },
@@ -603,7 +578,7 @@ mod tests {
         l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
         l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
 
-        assert_eq!(Ok(3), l.splice(1, 1, vec![Entry { term: 2, command: Some(vec![0x02]) },]));
+        assert_eq!(Ok(3), l.splice(1, vec![Entry { term: 2, command: Some(vec![0x02]) },]));
         assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
         assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
         assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x03]) })), l.get(3));

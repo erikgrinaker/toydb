@@ -113,7 +113,7 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Follower, L, S> {
                         debug!("Rejecting log entries at base {}", base_index);
                         self.send(msg.from.as_deref(), Event::RejectEntries)?
                     } else {
-                        let last_index = self.log.splice(base_index, base_term, entries)?;
+                        let last_index = self.log.splice(base_index, entries)?;
                         self.send(msg.from.as_deref(), Event::AcceptEntries { last_index })?
                     }
                 }
