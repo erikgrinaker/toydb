@@ -533,21 +533,6 @@ mod tests {
     }
 
     #[test]
-    fn splice_base_missing() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-
-        assert_matches!(
-            l.splice(3, vec![Entry { term: 4, command: Some(vec![0x04]) },]),
-            Err(Error::Internal(_))
-        );
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
-        assert_eq!((2, 2), l.get_last());
-    }
-
-    #[test]
     fn splice_conflict_term() {
         let (mut l, _) = setup();
         l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
