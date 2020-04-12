@@ -112,9 +112,9 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
                                 if name == pk =>
                             {
                                 return Ok(Node::KeyLookup {
-                                    table: table.name.clone(),
+                                    table: table.name,
                                     alias,
-                                    keys: vec![v.clone()],
+                                    keys: vec![v],
                                 });
                             }
                             _ => {}
