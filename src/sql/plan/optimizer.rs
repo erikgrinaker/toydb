@@ -1,8 +1,6 @@
-use super::super::types::Expression;
+use super::super::types::{Environment, Expression};
 use super::Node;
 use crate::Error;
-
-use std::collections::HashMap;
 
 /// A plan optimizer
 pub trait Optimizer {
@@ -16,7 +14,7 @@ pub struct ConstantFolder;
 
 impl Optimizer for ConstantFolder {
     fn optimize(&mut self, node: Node) -> Result<Node, Error> {
-        let env = HashMap::new();
+        let env = Environment::new();
         node.transform(&|n| Ok(n), &|n| {
             n.transform_expressions(&|e| Ok(e), &|e| {
                 Ok(if e.is_constant() { Expression::Constant(e.evaluate(&env)?) } else { e })

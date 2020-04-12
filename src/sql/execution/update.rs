@@ -32,13 +32,14 @@ impl<T: Transaction> Executor<T> for Update<T> {
             ResultSet::Query { mut relation } => {
                 let table = ctx.txn.must_read_table(&self.table)?;
                 let mut count = 0;
-                while let Some(mut row) = relation.next().transpose()? {
+                while let Some(row) = relation.next().transpose()? {
                     let id = table.get_row_key(&row)?;
-                    let env = table.make_row_hashmap(row.clone());
+                    let env = table.row_env(&row);
+                    let mut new = row.clone();
                     for (field, expr) in &self.expressions {
-                        table.set_row_field(&mut row, field, expr.evaluate(&env)?)?;
+                        table.set_row_field(&mut new, field, expr.evaluate(&env)?)?;
                     }
-                    ctx.txn.update(&table.name, &id, row)?;
+                    ctx.txn.update(&table.name, &id, new)?;
                     count += 1
                 }
                 Ok(ResultSet::Update { count })

@@ -142,4 +142,4 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY id
 
-Result: Value("Field reference id is ambiguous")
+Result: Value("Ambiguous field id")

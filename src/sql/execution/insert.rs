@@ -1,9 +1,7 @@
 use super::super::engine::Transaction;
-use super::super::types::Expressions;
+use super::super::types::{Environment, Expressions};
 use super::{Context, Executor, ResultSet};
 use crate::Error;
-
-use std::collections::HashMap;
 
 /// An INSERT executor
 pub struct Insert {
@@ -24,7 +22,7 @@ impl Insert {
 impl<T: Transaction> Executor<T> for Insert {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
         let table = ctx.txn.must_read_table(&self.table)?;
-        let env = HashMap::new();
+        let env = Environment::new();
         let mut count = 0;
         for expressions in self.rows {
             let mut row = expressions

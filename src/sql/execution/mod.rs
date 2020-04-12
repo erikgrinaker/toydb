@@ -126,8 +126,12 @@ impl ResultColumns {
         Self { columns: columns.into_iter().map(|c| (c.relation, c.name)).collect() }
     }
 
-    fn as_env<'b>(&'b self, row: &'b [Value]) -> ResultEnv<'b> {
-        ResultEnv { columns: &self, row }
+    fn as_env<'b>(&'b self, row: &'b [Value]) -> Environment<'b> {
+        let mut env = Environment::new();
+        for ((relation, field), value) in self.columns.iter().zip(row.iter()) {
+            env.append(relation.as_deref(), field.as_deref(), value)
+        }
+        env
     }
 
     fn format(&self, relation: Option<&str>, field: &str) -> String {
@@ -201,22 +205,5 @@ impl ResultColumns {
 
     pub fn names(&self) -> Vec<Option<String>> {
         self.columns.iter().map(|(_, c)| c.clone()).collect()
-    }
-}
-
-// Environment for a result row
-// FIXME This should be removed
-struct ResultEnv<'a> {
-    columns: &'a ResultColumns,
-    row: &'a [Value],
-}
-
-impl<'a> Environment for ResultEnv<'a> {
-    fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error> {
-        self.lookup_index(self.columns.index(relation, field)?)
-    }
-
-    fn lookup_index(&self, index: usize) -> Result<Value, Error> {
-        self.row.get(index).cloned().ok_or_else(|| Error::Value("index out of bounds".into()))
     }
 }

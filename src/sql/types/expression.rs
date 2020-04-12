@@ -2,10 +2,10 @@ use super::Value;
 use crate::Error;
 
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// An expression, made up of constants and operations
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expression {
     // Values
     Constant(Value),
@@ -43,16 +43,16 @@ pub type Expressions = Vec<Expression>;
 
 impl Expression {
     /// Evaluates an expression to a value, given an environment
-    pub fn evaluate<E: Environment>(&self, e: &E) -> Result<Value, Error> {
+    pub fn evaluate(&self, env: &Environment) -> Result<Value, Error> {
         use Value::*;
         Ok(match self {
             // Constant values
             Self::Constant(c) => c.clone(),
-            Self::Field(r, f) => e.lookup(r.as_deref(), f)?,
-            Self::Column(i) => e.lookup_index(*i)?,
+            Self::Field(r, f) => env.lookup_field(r.as_deref(), f)?,
+            Self::Column(i) => env.lookup_index(*i)?,
 
             // Logical operations
-            Self::And(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::And(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs && rhs),
                 (Boolean(lhs), Null) if !lhs => Boolean(false),
                 (Boolean(_), Null) => Null,
@@ -61,12 +61,12 @@ impl Expression {
                 (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't and {} and {}", lhs, rhs))),
             },
-            Self::Not(expr) => match expr.evaluate(e)? {
+            Self::Not(expr) => match expr.evaluate(env)? {
                 Boolean(b) => Boolean(!b),
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
             },
-            Self::Or(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Or(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
                 (Boolean(lhs), Null) if lhs => Boolean(true),
                 (Boolean(_), Null) => Null,
@@ -78,7 +78,7 @@ impl Expression {
 
             // Comparison operations
             #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
-            Self::Equal(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Equal(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 == rhs),
@@ -90,7 +90,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            Self::GreaterThan(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::GreaterThan(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs > rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs > rhs),
@@ -103,7 +103,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            Self::LessThan(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::LessThan(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs < rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs < rhs),
@@ -116,13 +116,13 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            Self::IsNull(expr) => match expr.evaluate(e)? {
+            Self::IsNull(expr) => match expr.evaluate(env)? {
                 Null => Boolean(true),
                 _ => Boolean(false),
             },
 
             // Mathematical operations
-            Self::Add(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Add(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(
                     lhs.checked_add(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
                 ),
@@ -136,13 +136,13 @@ impl Expression {
                 (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't add {} and {}", lhs, rhs))),
             },
-            Self::Assert(expr) => match expr.evaluate(e)? {
+            Self::Assert(expr) => match expr.evaluate(env)? {
                 Float(f) => Float(f),
                 Integer(i) => Integer(i),
                 Null => Null,
                 expr => return Err(Error::Value(format!("Can't take the positive of {}", expr))),
             },
-            Self::Divide(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Divide(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Integer(_), Integer(rhs)) if rhs == 0 => {
                     return Err(Error::Value("Can't divide by zero".into()))
                 }
@@ -159,7 +159,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't divide {} and {}", lhs, rhs)))
                 }
             },
-            Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Integer(lhs), Integer(rhs)) if rhs >= 0 => Integer(
                     lhs.checked_pow(rhs as u32)
                         .ok_or_else(|| Error::Value("Integer overflow".into()))?,
@@ -177,7 +177,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't exponentiate {} and {}", lhs, rhs)))
                 }
             },
-            Self::Factorial(expr) => match expr.evaluate(e)? {
+            Self::Factorial(expr) => match expr.evaluate(env)? {
                 Integer(i) if i < 0 => {
                     return Err(Error::Value("Can't take factorial of negative number".into()))
                 }
@@ -185,7 +185,7 @@ impl Expression {
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't take factorial of {}", value))),
             },
-            Self::Modulo(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Modulo(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 // This uses remainder semantics, like Postgres.
                 (Integer(_), Integer(rhs)) if rhs == 0 => {
                     return Err(Error::Value("Can't divide by zero".into()))
@@ -203,7 +203,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't take modulo of {} and {}", lhs, rhs)))
                 }
             },
-            Self::Multiply(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Multiply(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(
                     lhs.checked_mul(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
                 ),
@@ -219,13 +219,13 @@ impl Expression {
                     return Err(Error::Value(format!("Can't multiply {} and {}", lhs, rhs)))
                 }
             },
-            Self::Negate(expr) => match expr.evaluate(e)? {
+            Self::Negate(expr) => match expr.evaluate(env)? {
                 Integer(i) => Integer(-i),
                 Float(f) => Float(-f),
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
             },
-            Self::Subtract(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Subtract(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(
                     lhs.checked_sub(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
                 ),
@@ -243,7 +243,7 @@ impl Expression {
             },
 
             // String operations
-            Self::Like(lhs, rhs) => match (lhs.evaluate(e)?, rhs.evaluate(e)?) {
+            Self::Like(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
                 (String(lhs), String(rhs)) => Boolean(
                     Regex::new(&format!(
                         "^{}$",
@@ -373,31 +373,65 @@ impl Expression {
 }
 
 /// An expression evaluation environment
-/// FIXME Redesign this
-pub trait Environment {
-    /// Fetches a field value from the environment
-    fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error>;
-
-    /// Fetches a field value by index from the environment
-    fn lookup_index(&self, index: usize) -> Result<Value, Error>;
+pub struct Environment<'a> {
+    // For lookups by index (i.e. column number)
+    index: Vec<&'a Value>,
+    // For qualified lookups, with both relation and field name
+    qualified: HashMap<(&'a str, &'a str), &'a Value>,
+    // For unqualified lookups. Multiple fields with same unqualified name are ambiguous.
+    unqualified: HashMap<&'a str, &'a Value>,
+    ambiguous: HashSet<&'a str>,
 }
 
-impl<S: std::hash::BuildHasher> Environment for HashMap<String, Value, S> {
-    fn lookup(&self, relation: Option<&str>, field: &str) -> Result<Value, Error> {
-        if relation.is_some() {
-            Err(Error::Value("Qualified fields not supported for HashMap environments".into()))
-        } else if let Some(value) = self.get(field) {
-            Ok(value.clone())
-        } else {
-            Err(Error::Value(format!("Unknown field {}", field)))
+impl<'a> Environment<'a> {
+    /// Creates a new environment
+    pub fn new() -> Self {
+        Self {
+            index: Vec::new(),
+            qualified: HashMap::new(),
+            unqualified: HashMap::new(),
+            ambiguous: HashSet::new(),
         }
     }
 
-    fn lookup_index(&self, index: usize) -> Result<Value, Error> {
-        self.iter()
-            .nth(index)
-            .map(|(_, value)| value)
-            .cloned()
-            .ok_or_else(|| Error::Value("Index out of bounds".into()))
+    /// Appends a value to the environment
+    pub fn append(&mut self, relation: Option<&'a str>, field: Option<&'a str>, value: &'a Value) {
+        self.index.push(value);
+        if let Some(field) = field {
+            if self.unqualified.contains_key(field) {
+                self.unqualified.remove(field);
+                self.ambiguous.insert(field);
+            } else {
+                self.unqualified.insert(field, value);
+            }
+        }
+        if let (Some(relation), Some(field)) = (relation, field) {
+            self.qualified.insert((relation, field), value);
+        }
+    }
+
+    /// Looks up a value by field
+    pub fn lookup_field(&self, relation: Option<&'a str>, field: &'a str) -> Result<Value, Error> {
+        if let Some(relation) = relation {
+            match self.qualified.get(&(relation, field)) {
+                Some(r) => Ok(r.clone().clone()),
+                None => Err(Error::Value(format!("Unknown field {}.{}", relation, field))),
+            }
+        } else if self.ambiguous.contains(field) {
+            Err(Error::Value(format!("Ambiguous field {}", field)))
+        } else {
+            match self.unqualified.get(field) {
+                Some(r) => Ok(r.clone().clone()),
+                None => Err(Error::Value(format!("Unknown field {}", field))),
+            }
+        }
+    }
+
+    /// Looks up a value by index
+    pub fn lookup_index(&self, index: usize) -> Result<Value, Error> {
+        match self.index.get(index) {
+            Some(r) => Ok(r.clone().clone()),
+            None => Err(Error::Value(format!("Index {} out of bounds", index))),
+        }
     }
 }

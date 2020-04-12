@@ -1,6 +1,6 @@
 use super::engine::Transaction;
 use super::parser::format_ident;
-use super::types::{DataType, Row, Value};
+use super::types::{DataType, Environment, Row, Value};
 use crate::Error;
 
 use std::collections::HashMap;
@@ -142,15 +142,6 @@ impl Table {
         Ok(row)
     }
 
-    /// Makes a hashmap for a row
-    pub fn make_row_hashmap(&self, row: Row) -> HashMap<String, Value> {
-        self.columns
-            .iter()
-            .map(|c| c.name.clone())
-            .zip(row.into_iter().chain(std::iter::repeat(Value::Null)))
-            .collect()
-    }
-
     /// Pads a row with default values where possible
     pub fn pad_row(&self, mut row: Row) -> Result<Row, Error> {
         for column in self.columns.iter().skip(row.len()) {
@@ -161,6 +152,15 @@ impl Table {
             }
         }
         Ok(row)
+    }
+
+    /// Creates an expression environment for a row in a table
+    pub fn row_env<'a>(&'a self, row: &'a Row) -> Environment<'a> {
+        let mut env = Environment::new();
+        for (c, v) in self.columns.iter().zip(row.iter().chain(std::iter::repeat(&Value::Null))) {
+            env.append(Some(&self.name), Some(&c.name), v)
+        }
+        env
     }
 
     /// Sets a named row field to a value

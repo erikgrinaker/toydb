@@ -1,10 +1,8 @@
 use super::super::parser::ast;
 use super::super::schema;
-use super::super::types::{Expression, Expressions, Value};
+use super::super::types::{Environment, Expression, Expressions, Value};
 use super::{Aggregate, Aggregates, Node, Plan};
 use crate::Error;
-
-use std::collections::HashMap;
 
 /// The plan builder
 pub struct Planner {}
@@ -184,7 +182,7 @@ impl Planner {
                     }
                     n = Node::Offset {
                         source: Box::new(n),
-                        offset: match expr.evaluate(&HashMap::new())? {
+                        offset: match expr.evaluate(&Environment::new())? {
                             Value::Integer(i) if i >= 0 => i as u64,
                             v => {
                                 return Err(Error::Value(format!("Invalid value {} for offset", v)))
@@ -199,7 +197,7 @@ impl Planner {
                     }
                     n = Node::Limit {
                         source: Box::new(n),
-                        limit: match expr.evaluate(&HashMap::new())? {
+                        limit: match expr.evaluate(&Environment::new())? {
                             Value::Integer(i) if i >= 0 => i as u64,
                             v => {
                                 return Err(Error::Value(format!("Invalid value {} for limit", v)))
@@ -297,7 +295,7 @@ impl Planner {
                                 c.name
                             )));
                         }
-                        Some(expr.evaluate(&HashMap::new())?)
+                        Some(expr.evaluate(&Environment::new())?)
                     } else if nullable {
                         Some(Value::Null)
                     } else {
