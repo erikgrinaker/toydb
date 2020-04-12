@@ -10,7 +10,8 @@ use std::ops::RangeBounds;
 pub struct File {
     /// The in-memory key-value store that is flushed to disk.
     data: Memory,
-
+    /// Set to true if there is any changes not yet flushed to disk.
+    dirty: bool,
     /// The file handle of the backing file.
     file: std::fs::File,
 }
@@ -23,14 +24,17 @@ impl File {
         } else {
             Memory::new()
         };
-        Ok(Self { file, data })
+        Ok(Self { file, data, dirty: false })
     }
 }
 
 impl Storage for File {
     fn flush(&mut self) -> Result<(), Error> {
-        self.file.seek(std::io::SeekFrom::Start(0))?;
-        rmp_serde::encode::write(&mut self.file, &self.data)?;
+        if self.dirty {
+            self.file.seek(std::io::SeekFrom::Start(0))?;
+            rmp_serde::encode::write(&mut self.file, &self.data)?;
+            self.dirty = false;
+        }
         Ok(())
     }
 
@@ -39,6 +43,7 @@ impl Storage for File {
     }
 
     fn remove(&mut self, key: &[u8]) -> Result<(), Error> {
+        self.dirty = true;
         self.data.remove(key)
     }
 
@@ -47,6 +52,7 @@ impl Storage for File {
     }
 
     fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        self.dirty = true;
         self.data.write(key, value)
     }
 }

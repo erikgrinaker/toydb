@@ -116,6 +116,7 @@ impl<S: kv::storage::Storage> Log<S> {
         if index != self.commit_index {
             if let Some(entry) = self.get(index)? {
                 debug!("Committing log entry {}", index);
+                self.kv.flush()?;
                 self.commit_index = index;
                 self.commit_term = entry.term;
             } else {
@@ -246,6 +247,7 @@ impl<S: kv::storage::Storage> Log<S> {
         } else {
             self.kv.delete(b"voted_for")?
         }
+        self.kv.flush()?;
         debug!("Saved term={} and voted_for={:?}", term, voted_for);
         Ok(())
     }

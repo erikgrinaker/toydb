@@ -17,7 +17,11 @@ impl<S: Storage> Simple<S> {
 
     /// Deletes a key, if it exists.
     pub fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.storage.remove(key)?;
+        self.storage.remove(key)
+    }
+
+    /// Flushes data to disk
+    pub fn flush(&mut self) -> Result<(), Error> {
         self.storage.flush()
     }
 
@@ -34,8 +38,7 @@ impl<S: Storage> Simple<S> {
 
     /// Sets a value for a key, replacing the existing value if any.
     pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.storage.write(key, value)?;
-        self.storage.flush()
+        self.storage.write(key, value)
     }
 }
 

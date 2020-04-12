@@ -76,13 +76,13 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Follower, L, S> {
             Event::Heartbeat { commit_index, commit_term } => {
                 if self.is_leader(msg.from.as_deref()) {
                     let has_committed = self.log.has(commit_index, commit_term)?;
+                    if has_committed {
+                        self.log.commit(commit_index)?;
+                    }
                     self.send(
                         msg.from.as_deref(),
                         Event::ConfirmLeader { commit_index, has_committed },
                     )?;
-                    if has_committed {
-                        self.log.commit(commit_index)?;
-                    }
                 }
             }
             Event::SolicitVote { last_index, last_term } => {
