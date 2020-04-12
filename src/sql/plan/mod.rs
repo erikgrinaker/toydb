@@ -170,7 +170,7 @@ impl Node {
             n @ Self::NestedLoopJoin { .. } => n,
             n @ Self::Nothing => n,
             n @ Self::Offset { .. } => n,
-            n @ Self::Scan { .. } => n,
+            n @ Self::Scan { filter: None, .. } => n,
             Self::Filter { source, predicate } => {
                 Self::Filter { source, predicate: predicate.transform(pre, post)? }
             }
@@ -197,6 +197,9 @@ impl Node {
                     .map(|e| e.transform(pre, post))
                     .collect::<Result<_, Error>>()?,
             },
+            Self::Scan { table, alias, filter: Some(filter) } => {
+                Self::Scan { table, alias, filter: Some(filter.transform(pre, post)?) }
+            }
             Self::Update { table, source, expressions } => Self::Update {
                 table,
                 source,
