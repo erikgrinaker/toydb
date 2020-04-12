@@ -19,7 +19,11 @@ For details, see the [reference documentation](REFERENCE.md).
 A local five-node cluster can be started on `localhost` ports `9601` to `9605` by running:
 
 ```
-$ (cd sandbox && docker-compose up --build)
+# Local processes
+$ (cd clusters/local && ./run.sh)
+
+# Docker containers 
+$ (cd clusters/docker && docker-compose up --build)
 ```
 
 A command-line REPL client can be built and used with the node on `localhost` port `9605`

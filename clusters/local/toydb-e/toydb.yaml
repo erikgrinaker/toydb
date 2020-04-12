@@ -1,0 +1,8 @@
+id: toydb-e
+data_dir: toydb-e/data
+listen: 127.0.0.1:9605
+peers:
+  toydb-a: 127.0.0.1:9601
+  toydb-b: 127.0.0.1:9602
+  toydb-c: 127.0.0.1:9603
+  toydb-d: 127.0.0.1:9604

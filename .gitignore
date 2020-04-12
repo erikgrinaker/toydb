@@ -1,4 +1,4 @@
-/sandbox/toydb-?/data
+/clusters/*/toydb-?/data
 /src/service/*.rs
 /target
 **/*.rs.bk
