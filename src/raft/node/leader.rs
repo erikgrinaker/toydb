@@ -116,7 +116,11 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Leader, L, S> {
             match call.operation {
                 Operation::ReadState { command, .. } => self.send(
                     call.from.as_deref(),
-                    Event::RespondState { call_id: call.id, response: self.state.query(command)? },
+                    match self.state.query(command) {
+                        Ok(response) => Event::RespondState { call_id: call.id, response },
+                        Err(err @ Error::Internal(_)) => return Err(err),
+                        Err(err) => Event::RespondError { call_id: call.id, error: err },
+                    },
                 )?,
                 _ => return Err(Error::Internal(format!("Unsupported call {:?}", call))),
             }
