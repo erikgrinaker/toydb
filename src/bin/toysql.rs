@@ -153,6 +153,7 @@ Semicolons are not supported. The following !-commands are also available:
             ResultSet::Update { count } => println!("Updated {} rows", count),
             ResultSet::CreateTable { name } => println!("Created table {}", name),
             ResultSet::DropTable { name } => println!("Dropped table {}", name),
+            ResultSet::Explain(plan) => println!("{:#?}", plan),
             ResultSet::Query { mut relation } => {
                 if self.show_headers {
                     println!(

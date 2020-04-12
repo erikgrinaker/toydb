@@ -119,29 +119,34 @@ macro_rules! test_query {
                 }
             };
             txn.commit()?;
-            if let ResultSet::Query{relation} = result {
-                let columns = relation.columns.clone();
-                let rows: Vec<Row> = match relation.collect() {
-                    Ok(rows) => rows,
-                    Err(err) => {
-                        write!(f, " {:?}", err)?;
-                        return Ok(())
+            match result {
+                ResultSet::Query{relation} => {
+                    let columns = relation.columns.clone();
+                    let rows: Vec<Row> = match relation.collect() {
+                        Ok(rows) => rows,
+                        Err(err) => {
+                            write!(f, " {:?}", err)?;
+                            return Ok(())
+                        }
+                    };
+                    if !columns.is_empty() || !rows.is_empty() {
+                        write!(f, " {:?}\n", columns
+                            .into_iter()
+                            .map(|c| c.name.unwrap_or_else(|| "?".to_string()))
+                            .collect::<Vec<_>>())?;
+                        for row in rows {
+                            write!(f, "{:?}\n", row)?;
+                        }
+                    } else {
+                        write!(f, " <none>\n")?;
                     }
-                };
-                if !columns.is_empty() || !rows.is_empty() {
-                    write!(f, " {:?}\n", columns
-                        .into_iter()
-                        .map(|c| c.name.unwrap_or_else(|| "?".to_string()))
-                        .collect::<Vec<_>>())?;
-                    for row in rows {
-                        write!(f, "{:?}\n", row)?;
-                    }
-                } else {
-                    write!(f, " <none>\n")?;
                 }
-                return Ok(())
+                ResultSet::Explain(plan) => {
+                    write!(f, " {:#?}", plan)?;
+                }
+                result => return Err(Error::Internal(format!("Unexpected result {:?}", result))),
             }
-            Err(Error::Internal("Unexpected result".into()))
+            Ok(())
         }
     )*
     }
@@ -152,6 +157,7 @@ test_query! {
     bare: "SELECT",
     trailing_comma: "SELECT 1,",
     lowercase: "select 1",
+    explain: "EXPLAIN SELECT m.id, m.title, g.name FROM movies m JOIN GENRES g ON m.genre_id = g.id WHERE m.released >= 2000",
 
     field_single: "SELECT id FROM movies",
     field_multi: "SELECT id, title FROM movies",

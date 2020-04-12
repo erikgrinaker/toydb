@@ -37,10 +37,10 @@ impl Plan {
 }
 
 /// A plan node
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
     Aggregation {
-        source: Box<Self>,
+        source: Box<Node>,
         aggregates: Vec<Aggregate>,
     },
     CreateTable {
@@ -48,13 +48,14 @@ pub enum Node {
     },
     Delete {
         table: String,
-        source: Box<Self>,
+        source: Box<Node>,
     },
     DropTable {
         name: String,
     },
+    Explain(Box<Node>),
     Filter {
-        source: Box<Self>,
+        source: Box<Node>,
         predicate: Expression,
     },
     Insert {
@@ -63,27 +64,27 @@ pub enum Node {
         expressions: Vec<Expressions>,
     },
     Limit {
-        source: Box<Self>,
+        source: Box<Node>,
         limit: u64,
     },
     NestedLoopJoin {
-        outer: Box<Self>,
-        inner: Box<Self>,
+        outer: Box<Node>,
+        inner: Box<Node>,
         predicate: Option<Expression>,
         pad: bool,
         flip: bool,
     },
     Nothing,
     Offset {
-        source: Box<Self>,
+        source: Box<Node>,
         offset: u64,
     },
     Order {
-        source: Box<Self>,
+        source: Box<Node>,
         orders: Vec<(Expression, Direction)>,
     },
     Projection {
-        source: Box<Self>,
+        source: Box<Node>,
         labels: Vec<Option<String>>,
         expressions: Expressions,
     },
@@ -94,7 +95,7 @@ pub enum Node {
     // Uses BTreeMap for test stability
     Update {
         table: String,
-        source: Box<Self>,
+        source: Box<Node>,
         expressions: BTreeMap<String, Expression>,
     },
 }
@@ -119,6 +120,7 @@ impl Node {
             Self::Delete { table, source } => {
                 Self::Delete { table, source: source.transform(pre, post)?.into() }
             }
+            Self::Explain(node) => Self::Explain(node.transform(pre, post)?.into()),
             Self::Filter { source, predicate } => {
                 Self::Filter { source: source.transform(pre, post)?.into(), predicate }
             }
@@ -162,6 +164,7 @@ impl Node {
             n @ Self::CreateTable { .. } => n,
             n @ Self::Delete { .. } => n,
             n @ Self::DropTable { .. } => n,
+            n @ Self::Explain { .. } => n,
             n @ Self::Limit { .. } => n,
             n @ Self::NestedLoopJoin { .. } => n,
             n @ Self::Nothing => n,
@@ -206,7 +209,7 @@ impl Node {
 }
 
 /// An aggregate operation
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Aggregate {
     Average,
     Count,
@@ -218,7 +221,7 @@ pub enum Aggregate {
 pub type Aggregates = Vec<Aggregate>;
 
 /// A sort order direction
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Direction {
     Ascending,
     Descending,

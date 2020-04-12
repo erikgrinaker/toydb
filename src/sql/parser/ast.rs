@@ -35,6 +35,9 @@ pub enum Statement {
     },
     /// An UPDATE statement
     Update { table: String, set: BTreeMap<String, Expression>, r#where: Option<WhereClause> },
+
+    /// An EXPLAIN statement
+    Explain(Box<Statement>),
 }
 
 /// A column specification

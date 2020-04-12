@@ -112,6 +112,8 @@ impl<'a> Parser<'a> {
             Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
             Some(Token::Keyword(Keyword::Update)) => self.parse_statement_update(),
 
+            Some(Token::Keyword(Keyword::Explain)) => self.parse_statement_explain(),
+
             Some(token) => Err(Error::Parse(format!("Unexpected token {}", token))),
             None => Err(Error::Parse("Unexpected end of input".into())),
         }
@@ -218,6 +220,15 @@ impl<'a> Parser<'a> {
         self.next_expect(Some(Keyword::From.into()))?;
         let table = self.next_ident()?;
         Ok(ast::Statement::Delete { table, r#where: self.parse_clause_where()? })
+    }
+
+    /// Parses a delete statement
+    fn parse_statement_explain(&mut self) -> Result<ast::Statement, Error> {
+        self.next_expect(Some(Keyword::Explain.into()))?;
+        if let Some(Token::Keyword(Keyword::Explain)) = self.peek()? {
+            return Err(Error::Parse("Cannot nest EXPLAIN statements".into()));
+        }
+        Ok(ast::Statement::Explain(Box::new(self.parse_statement()?)))
     }
 
     /// Parses an insert statement

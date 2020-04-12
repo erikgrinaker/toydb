@@ -5,7 +5,7 @@ use regex::Regex;
 use std::collections::HashMap;
 
 /// An expression, made up of constants and operations
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expression {
     // Values
     Constant(Value),

@@ -43,6 +43,7 @@ impl Planner {
                 Node::Delete { table, source: Box::new(source) }
             }
             ast::Statement::DropTable(name) => Node::DropTable { name },
+            ast::Statement::Explain(stmt) => Node::Explain(Box::new(self.build_statement(*stmt)?)),
             ast::Statement::Insert { table, columns, values } => Node::Insert {
                 table,
                 columns: columns.unwrap_or_else(Vec::new),
