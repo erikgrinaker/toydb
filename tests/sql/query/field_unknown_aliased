@@ -41,6 +41,7 @@ Plan: Plan(
             alias: Some(
                 "m",
             ),
+            filter: None,
         },
         labels: [
             None,
@@ -63,6 +64,7 @@ Optimized plan: Plan(
             alias: Some(
                 "m",
             ),
+            filter: None,
         },
         labels: [
             None,

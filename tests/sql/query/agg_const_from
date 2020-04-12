@@ -87,6 +87,7 @@ Plan: Plan(
                 source: Scan {
                     table: "genres",
                     alias: None,
+                    filter: None,
                 },
                 labels: [
                     None,
@@ -165,6 +166,7 @@ Optimized plan: Plan(
                 source: Scan {
                     table: "genres",
                     alias: None,
+                    filter: None,
                 },
                 labels: [
                     None,

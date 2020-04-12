@@ -46,6 +46,7 @@ Plan: Plan(
         source: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         labels: [
             Some(
@@ -73,6 +74,7 @@ Optimized plan: Plan(
         source: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         labels: [
             Some(

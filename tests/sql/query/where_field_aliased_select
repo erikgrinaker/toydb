@@ -93,12 +93,14 @@ Plan: Plan(
                     alias: Some(
                         "m",
                     ),
+                    filter: None,
                 },
                 inner: Scan {
                     table: "genres",
                     alias: Some(
                         "g",
                     ),
+                    filter: None,
                 },
                 predicate: None,
                 pad: false,
@@ -176,12 +178,14 @@ Optimized plan: Plan(
                     alias: Some(
                         "m",
                     ),
+                    filter: None,
                 },
                 inner: Scan {
                     table: "genres",
                     alias: Some(
                         "g",
                     ),
+                    filter: None,
                 },
                 predicate: None,
                 pad: false,

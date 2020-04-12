@@ -98,6 +98,7 @@ Plan: Plan(
                     source: Scan {
                         table: "floats",
                         alias: None,
+                        filter: None,
                     },
                     predicate: Not(
                         IsNull(
@@ -181,6 +182,7 @@ Optimized plan: Plan(
                     source: Scan {
                         table: "floats",
                         alias: None,
+                        filter: None,
                     },
                     predicate: Not(
                         IsNull(

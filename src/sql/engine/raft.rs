@@ -1,5 +1,5 @@
 use super::super::schema::Table;
-use super::super::types::{Row, Value};
+use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, Transaction as _};
 use crate::kv;
 use crate::raft;
@@ -38,7 +38,7 @@ enum Query {
     /// Reads a row
     Read { txn_id: u64, table: String, id: Value },
     /// Scans a table's rows
-    Scan { txn_id: u64, table: String },
+    Scan { txn_id: u64, table: String, filter: Option<Expression> },
 
     /// Scans the tables
     ScanTables { txn_id: u64 },
@@ -143,14 +143,13 @@ impl super::Transaction for Transaction {
         })?)?)
     }
 
-    fn scan(&self, table: &str) -> Result<super::Scan, Error> {
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan, Error> {
         Ok(Box::new(
-            deserialize::<Vec<_>>(
-                &self.raft.query(serialize(&Query::Scan {
-                    txn_id: self.id,
-                    table: table.to_string(),
-                })?)?,
-            )?
+            deserialize::<Vec<_>>(&self.raft.query(serialize(&Query::Scan {
+                txn_id: self.id,
+                table: table.to_string(),
+                filter,
+            })?)?)?
             .into_iter()
             .map(Ok),
         ))
@@ -248,8 +247,12 @@ impl<S: kv::storage::Storage> raft::State for State<S> {
                 serialize(&self.engine.resume(txn_id)?.read(&table, &id)?)
             }
             // FIXME This needs to stream rows somehow
-            Query::Scan { txn_id, table } => serialize(
-                &self.engine.resume(txn_id)?.scan(&table)?.collect::<Result<Vec<_>, Error>>()?,
+            Query::Scan { txn_id, table, filter } => serialize(
+                &self
+                    .engine
+                    .resume(txn_id)?
+                    .scan(&table, filter)?
+                    .collect::<Result<Vec<_>, Error>>()?,
             ),
 
             Query::ReadTable { txn_id, table } => {

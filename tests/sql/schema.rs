@@ -30,7 +30,7 @@ macro_rules! test_schema {
                 let txn = engine.begin()?;
                 for table in txn.scan_tables()? {
                     write!(f, "\n{}\n", table.as_sql())?;
-                    for row in txn.scan(&table.name)? {
+                    for row in txn.scan(&table.name, None)? {
                         write!(f, "{:?}\n", row?)?;
                     }
                 }

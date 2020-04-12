@@ -73,10 +73,12 @@ Plan: Plan(
         outer: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         inner: Scan {
             table: "genres",
             alias: None,
+            filter: None,
         },
         predicate: Some(
             And(
@@ -120,10 +122,12 @@ Optimized plan: Plan(
         outer: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         inner: Scan {
             table: "genres",
             alias: None,
+            filter: None,
         },
         predicate: Some(
             And(

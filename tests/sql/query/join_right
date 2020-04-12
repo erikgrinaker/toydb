@@ -80,12 +80,14 @@ Plan: Plan(
                 alias: Some(
                     "g",
                 ),
+                filter: None,
             },
             inner: Scan {
                 table: "movies",
                 alias: Some(
                     "m",
                 ),
+                filter: None,
             },
             predicate: Some(
                 Equal(
@@ -139,12 +141,14 @@ Optimized plan: Plan(
                 alias: Some(
                     "g",
                 ),
+                filter: None,
             },
             inner: Scan {
                 table: "movies",
                 alias: Some(
                     "m",
                 ),
+                filter: None,
             },
             predicate: Some(
                 Equal(

@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::types::{Column, Relation};
+use super::super::types::{Column, Expression, Relation};
 use super::{Context, Executor, ResultSet};
 use crate::Error;
 
@@ -9,11 +9,13 @@ pub struct Scan {
     table: String,
     /// The table alias to use
     alias: Option<String>,
+    /// The row filter to apply
+    filter: Option<Expression>,
 }
 
 impl Scan {
-    pub fn new(table: String, alias: Option<String>) -> Box<Self> {
-        Box::new(Self { table, alias })
+    pub fn new(table: String, alias: Option<String>, filter: Option<Expression>) -> Box<Self> {
+        Box::new(Self { table, alias, filter })
     }
 }
 
@@ -28,7 +30,7 @@ impl<T: Transaction> Executor<T> for Scan {
                     .iter()
                     .map(|c| Column { relation: Some(name.clone()), name: Some(c.name.clone()) })
                     .collect(),
-                rows: Some(Box::new(ctx.txn.scan(&table.name)?)),
+                rows: Some(Box::new(ctx.txn.scan(&table.name, self.filter)?)),
             },
         })
     }

@@ -35,6 +35,7 @@ Plan: Plan(
         source: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         predicate: Field(
             None,
@@ -48,6 +49,7 @@ Optimized plan: Plan(
         source: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         predicate: Field(
             None,

@@ -111,10 +111,12 @@ Plan: Plan(
                 outer: Scan {
                     table: "movies",
                     alias: None,
+                    filter: None,
                 },
                 inner: Scan {
                     table: "genres",
                     alias: None,
+                    filter: None,
                 },
                 predicate: Some(
                     Equal(
@@ -138,6 +140,7 @@ Plan: Plan(
             inner: Scan {
                 table: "studios",
                 alias: None,
+                filter: None,
             },
             predicate: Some(
                 Equal(
@@ -197,10 +200,12 @@ Optimized plan: Plan(
                 outer: Scan {
                     table: "movies",
                     alias: None,
+                    filter: None,
                 },
                 inner: Scan {
                     table: "genres",
                     alias: None,
+                    filter: None,
                 },
                 predicate: Some(
                     Equal(
@@ -224,6 +229,7 @@ Optimized plan: Plan(
             inner: Scan {
                 table: "studios",
                 alias: None,
+                filter: None,
             },
             predicate: Some(
                 Equal(

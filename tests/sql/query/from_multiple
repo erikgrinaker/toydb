@@ -36,15 +36,18 @@ Plan: Plan(
         outer: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         inner: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
                 alias: None,
+                filter: None,
             },
             inner: Scan {
                 table: "countries",
                 alias: None,
+                filter: None,
             },
             predicate: None,
             pad: false,
@@ -61,15 +64,18 @@ Optimized plan: Plan(
         outer: Scan {
             table: "movies",
             alias: None,
+            filter: None,
         },
         inner: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
                 alias: None,
+                filter: None,
             },
             inner: Scan {
                 table: "countries",
                 alias: None,
+                filter: None,
             },
             predicate: None,
             pad: false,

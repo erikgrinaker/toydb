@@ -1,5 +1,5 @@
 use super::super::schema::Table;
-use super::super::types::{Row, Value};
+use super::super::types::{Expression, Row, Value};
 use crate::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
@@ -88,15 +88,30 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         self.txn.get(&Key::Row(table, id).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
-    fn scan(&self, table: &str) -> Result<super::Scan, Error> {
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan, Error> {
+        let table = self.must_read_table(&table)?;
+        let scan = self
+            .txn
+            .scan(&Key::RowStart(&table.name).encode()..&Key::RowEnd(&table.name).encode())?
+            .map(|r| r.and_then(|(_, v)| deserialize(&v)))
+            .filter_map(|r| match r {
+                Ok(row) => match &filter {
+                    Some(filter) => match filter.evaluate(&table.row_env(&row)) {
+                        Ok(Value::Boolean(b)) if b => Some(Ok(row)),
+                        Ok(Value::Boolean(_)) | Ok(Value::Null) => None,
+                        Ok(v) => Some(Err(Error::Value(format!(
+                            "Filter returned {}, expected boolean",
+                            v
+                        )))),
+                        Err(err) => Some(Err(err)),
+                    },
+                    None => Some(Ok(row)),
+                },
+                err => Some(err),
+            });
+
         // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
-        Ok(Box::new(
-            self.txn
-                .scan(&Key::RowStart(table).encode()..&Key::RowEnd(table).encode())?
-                .map(|r| r.and_then(|(_, v)| deserialize(&v)))
-                .collect::<Vec<Result<_, Error>>>()
-                .into_iter(),
-        ))
+        Ok(Box::new(scan.collect::<Vec<Result<Row, Error>>>().into_iter()))
     }
 
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error> {
@@ -122,7 +137,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     fn delete_table(&mut self, table: &str) -> Result<(), Error> {
         let table = self.must_read_table(&table)?;
         table.assert_unreferenced(self)?;
-        let mut scan = self.scan(&table.name)?;
+        let mut scan = self.scan(&table.name, None)?;
         while let Some(row) = scan.next().transpose()? {
             self.delete(&table.name, &table.get_row_key(&row)?)?
         }

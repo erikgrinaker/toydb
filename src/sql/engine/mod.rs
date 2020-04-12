@@ -8,7 +8,7 @@ use super::execution::{Context, ResultSet};
 use super::parser::{ast, Parser};
 use super::plan::Plan;
 use super::schema::Table;
-use super::types::{Row, Value};
+use super::types::{Expression, Row, Value};
 use crate::Error;
 
 /// The SQL engine interface
@@ -63,7 +63,7 @@ pub trait Transaction {
     /// Reads a table row, if it exists
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error>;
     /// Scans a table's rows
-    fn scan(&self, table: &str) -> Result<Scan, Error>;
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan, Error>;
     /// Updates a table row
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error>;
 

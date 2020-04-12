@@ -91,6 +91,7 @@ pub enum Node {
     Scan {
         table: String,
         alias: Option<String>,
+        filter: Option<Expression>,
     },
     // Uses BTreeMap for test stability
     Update {

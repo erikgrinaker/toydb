@@ -66,6 +66,7 @@ Plan: Plan(
                 source: Scan {
                     table: "movies",
                     alias: None,
+                    filter: None,
                 },
                 labels: [
                     None,
@@ -113,6 +114,7 @@ Optimized plan: Plan(
                 source: Scan {
                     table: "movies",
                     alias: None,
+                    filter: None,
                 },
                 labels: [
                     None,

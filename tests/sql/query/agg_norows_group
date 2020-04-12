@@ -100,6 +100,7 @@ Plan: Plan(
                     source: Scan {
                         table: "movies",
                         alias: None,
+                        filter: None,
                     },
                     predicate: Constant(
                         Boolean(
@@ -185,6 +186,7 @@ Optimized plan: Plan(
                     source: Scan {
                         table: "movies",
                         alias: None,
+                        filter: None,
                     },
                     predicate: Constant(
                         Boolean(

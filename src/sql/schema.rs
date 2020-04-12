@@ -65,7 +65,7 @@ impl Table {
             if refs.is_empty() {
                 continue;
             }
-            let mut scan = txn.scan(&source.name)?;
+            let mut scan = txn.scan(&source.name, None)?;
             while let Some(row) = scan.next().transpose()? {
                 for (i, column) in refs.iter() {
                     if row.get(*i).unwrap_or(&Value::Null) == pk
@@ -343,7 +343,7 @@ impl Column {
         // Validate uniqueness constraints
         if self.unique && !self.primary_key && value != &Value::Null {
             let index = table.get_column_index(&self.name)?;
-            let mut scan = txn.scan(&table.name)?;
+            let mut scan = txn.scan(&table.name, None)?;
             while let Some(row) = scan.next().transpose()? {
                 if row.get(index).unwrap_or(&Value::Null) == value
                     && &table.get_row_key(&row)? != pk

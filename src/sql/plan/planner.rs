@@ -30,16 +30,17 @@ impl Planner {
             ast::Statement::CreateTable { name, columns } => {
                 Node::CreateTable { schema: self.build_schema_table(name, columns)? }
             }
-            ast::Statement::Delete { table, r#where } => {
-                let mut source = Node::Scan { table: table.clone(), alias: None };
-                if let Some(ast::WhereClause(expr)) = r#where {
-                    source = Node::Filter {
-                        source: Box::new(source),
-                        predicate: self.build_expression(expr)?,
-                    };
-                }
-                Node::Delete { table, source: Box::new(source) }
-            }
+            ast::Statement::Delete { table, r#where } => Node::Delete {
+                table: table.clone(),
+                source: Box::new(Node::Scan {
+                    table,
+                    alias: None,
+                    filter: match r#where {
+                        Some(ast::WhereClause(expr)) => Some(self.build_expression(expr)?),
+                        None => None,
+                    },
+                }),
+            },
             ast::Statement::DropTable(name) => Node::DropTable { name },
             ast::Statement::Explain(stmt) => Node::Explain(Box::new(self.build_statement(*stmt)?)),
             ast::Statement::Insert { table, columns, values } => Node::Insert {
@@ -207,30 +208,28 @@ impl Planner {
                 }
                 n
             }
-            ast::Statement::Update { table, set, r#where } => {
-                let mut source = Node::Scan { table: table.clone(), alias: None };
-                if let Some(ast::WhereClause(expr)) = r#where {
-                    source = Node::Filter {
-                        source: Box::new(source),
-                        predicate: self.build_expression(expr)?,
-                    };
-                }
-                Node::Update {
+            ast::Statement::Update { table, set, r#where } => Node::Update {
+                table: table.clone(),
+                source: Box::new(Node::Scan {
                     table,
-                    source: Box::new(source),
-                    expressions: set
-                        .into_iter()
-                        .map(|(c, e)| self.build_expression(e).map(|e| (c, e)))
-                        .collect::<Result<_, _>>()?,
-                }
-            }
+                    alias: None,
+                    filter: match r#where {
+                        Some(ast::WhereClause(expr)) => Some(self.build_expression(expr)?),
+                        None => None,
+                    },
+                }),
+                expressions: set
+                    .into_iter()
+                    .map(|(c, e)| self.build_expression(e).map(|e| (c, e)))
+                    .collect::<Result<_, _>>()?,
+            },
         })
     }
 
     /// Builds FROM items
     fn build_from_item(&self, item: ast::FromItem) -> Result<Node, Error> {
         Ok(match item {
-            ast::FromItem::Table { name, alias } => Node::Scan { table: name, alias },
+            ast::FromItem::Table { name, alias } => Node::Scan { table: name, alias, filter: None },
             ast::FromItem::Join { left, right, r#type, predicate } => match r#type {
                 ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
                     outer: Box::new(self.build_from_item(*left)?),

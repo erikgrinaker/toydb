@@ -41,6 +41,7 @@ Plan: Plan(
             source: Scan {
                 table: "movies",
                 alias: None,
+                filter: None,
             },
             offset: 1,
         },
@@ -54,6 +55,7 @@ Optimized plan: Plan(
             source: Scan {
                 table: "movies",
                 alias: None,
+                filter: None,
             },
             offset: 1,
         },
