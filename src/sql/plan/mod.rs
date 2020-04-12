@@ -6,8 +6,8 @@ use planner::Planner;
 use super::engine::Transaction;
 use super::execution::{Context, Executor, ResultSet};
 use super::parser::ast;
-use super::schema::Table;
-use super::types::{Expression, Expressions};
+use super::schema::{Catalog, Table};
+use super::types::{Expression, Expressions, Value};
 use crate::Error;
 
 use std::collections::BTreeMap;
@@ -31,10 +31,11 @@ impl Plan {
     }
 
     /// Optimizes the plan, consuming it
-    pub fn optimize(self) -> Result<Self, Error> {
+    pub fn optimize<C: Catalog + 'static>(self, catalog: &mut C) -> Result<Self, Error> {
         let mut root = self.0;
         root = optimizer::ConstantFolder.optimize(root)?;
         root = optimizer::FilterPushdown.optimize(root)?;
+        root = optimizer::IndexLookup::new(catalog).optimize(root)?;
         Ok(Plan(root))
     }
 }
@@ -65,6 +66,11 @@ pub enum Node {
         table: String,
         columns: Vec<String>,
         expressions: Vec<Expressions>,
+    },
+    KeyLookup {
+        table: String,
+        alias: Option<String>,
+        keys: Vec<Value>,
     },
     Limit {
         source: Box<Node>,
@@ -116,6 +122,7 @@ impl Node {
             n @ Self::CreateTable { .. } => n,
             n @ Self::DropTable { .. } => n,
             n @ Self::Insert { .. } => n,
+            n @ Self::KeyLookup { .. } => n,
             n @ Self::Nothing => n,
             n @ Self::Scan { .. } => n,
             Self::Aggregation { source, aggregates } => {
@@ -169,6 +176,7 @@ impl Node {
             n @ Self::Delete { .. } => n,
             n @ Self::DropTable { .. } => n,
             n @ Self::Explain { .. } => n,
+            n @ Self::KeyLookup { .. } => n,
             n @ Self::Limit { .. } => n,
             n @ Self::NestedLoopJoin { .. } => n,
             n @ Self::Nothing => n,

@@ -5,6 +5,7 @@ mod drop_table;
 mod explain;
 mod filter;
 mod insert;
+mod key_lookup;
 mod limit;
 mod nested_loop_join;
 mod nothing;
@@ -21,6 +22,7 @@ use drop_table::DropTable;
 use explain::Explain;
 use filter::Filter;
 use insert::Insert;
+use key_lookup::KeyLookup;
 use limit::Limit;
 use nested_loop_join::NestedLoopJoin;
 use nothing::Nothing;
@@ -57,6 +59,7 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Insert { table, columns, expressions } => {
                 Insert::new(table, columns, expressions)
             }
+            Node::KeyLookup { table, alias, keys } => KeyLookup::new(table, alias, keys),
             Node::Limit { source, limit } => Limit::new(Self::build(*source), limit),
             Node::NestedLoopJoin { outer, inner, predicate, pad, flip } => {
                 NestedLoopJoin::new(Self::build(*outer), Self::build(*inner), predicate, pad, flip)

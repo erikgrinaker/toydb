@@ -1,3 +1,4 @@
+use super::super::schema::Catalog;
 use super::super::types::{Environment, Expression};
 use super::Node;
 use crate::Error;
@@ -83,5 +84,47 @@ impl FilterPushdown {
             },
             expr => expr,
         })
+    }
+}
+
+/// An index lookup optimizer, which converts table scans to index lookups or scans.
+pub struct IndexLookup<'a, C: Catalog> {
+    catalog: &'a mut C,
+}
+
+impl<'a, C: Catalog> IndexLookup<'a, C> {
+    pub fn new(catalog: &'a mut C) -> Self {
+        Self { catalog }
+    }
+}
+
+impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
+    fn optimize(&mut self, node: Node) -> Result<Node, Error> {
+        node.transform(
+            &|n| match n {
+                // FIXME This needs to be smarter - at least handle ORs. Could be prettier too.
+                Node::Scan { table, alias, filter: Some(Expression::Equal(lhs, rhs)) } => {
+                    if let Some(table) = self.catalog.read_table(&table)? {
+                        let pk = table.get_primary_key()?.name.clone();
+                        match (*lhs.clone(), *rhs.clone()) {
+                            (Expression::Field(None, name), Expression::Constant(v))
+                            | (Expression::Constant(v), Expression::Field(None, name))
+                                if name == pk =>
+                            {
+                                return Ok(Node::KeyLookup {
+                                    table: table.name.clone(),
+                                    alias,
+                                    keys: vec![v.clone()],
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
+                    Ok(Node::Scan { table, alias, filter: Some(Expression::Equal(lhs, rhs)) })
+                }
+                n => Ok(n),
+            },
+            &|n| Ok(n),
+        )
     }
 }

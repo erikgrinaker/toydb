@@ -123,17 +123,19 @@ impl<E: Engine + 'static> Session<E> {
                 Ok(result)
             }
             statement if self.txn.is_some() => Plan::build(statement)?
-                .optimize()?
+                .optimize(self.txn.as_mut().unwrap())?
                 .execute(Context { txn: self.txn.as_mut().unwrap() }),
             statement @ ast::Statement::Select { .. } => {
                 let mut txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
-                let result = Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn });
+                let result =
+                    Plan::build(statement)?.optimize(&mut txn)?.execute(Context { txn: &mut txn });
                 txn.rollback()?;
                 result
             }
             statement => {
                 let mut txn = self.engine.begin_with_mode(Mode::ReadWrite)?;
-                match Plan::build(statement)?.optimize()?.execute(Context { txn: &mut txn }) {
+                match Plan::build(statement)?.optimize(&mut txn)?.execute(Context { txn: &mut txn })
+                {
                     Ok(result) => {
                         txn.commit()?;
                         Ok(result)

@@ -96,8 +96,9 @@ macro_rules! test_query {
             };
             write!(f, "{:#?}\n\n", plan)?;
 
+            let mut txn = engine.begin()?;
             write!(f, "Optimized plan: ")?;
-            let plan = match plan.optimize() {
+            let plan = match plan.optimize(&mut txn) {
                 Ok(plan) => plan,
                 Err(err) => {
                     write!(f, "{:?}", err)?;
@@ -109,7 +110,6 @@ macro_rules! test_query {
             write!(f, "Query: {}\n\n", $query)?;
 
             write!(f, "Result:")?;
-            let mut txn = engine.begin()?;
             let ctx = Context{txn: &mut txn};
             let result = match plan.execute(ctx) {
                 Ok(result) => result,
@@ -194,6 +194,7 @@ test_query! {
     where_integer: "SELECT * FROM movies WHERE 7",
     where_string: "SELECT * FROM movies WHERE 'abc'",
     where_multi: "SELECT * FROM movies WHERE TRUE, TRUE",
+    where_primary_key: "SELECT * FROM movies WHERE id = 3",
     where_field_unknown: "SELECT * FROM movies WHERE unknown",
     where_field_qualified: "SELECT movies.id, genres.id FROM movies, genres WHERE movies.id >= 3 AND genres.id = 1",
     where_field_ambiguous: "SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3",
