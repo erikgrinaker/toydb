@@ -88,40 +88,39 @@ Plan: Plan(
 )
 
 Optimized plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        predicate: And(
-            Or(
-                GreaterThan(
-                    Field(
-                        None,
-                        "released",
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            And(
+                Or(
+                    GreaterThan(
+                        Field(
+                            None,
+                            "released",
+                        ),
+                        Constant(
+                            Integer(
+                                2000,
+                            ),
+                        ),
                     ),
-                    Constant(
-                        Integer(
-                            2000,
+                    Equal(
+                        Field(
+                            None,
+                            "released",
+                        ),
+                        Constant(
+                            Integer(
+                                2000,
+                            ),
                         ),
                     ),
                 ),
-                Equal(
-                    Field(
-                        None,
-                        "released",
-                    ),
-                    Constant(
-                        Integer(
-                            2000,
-                        ),
-                    ),
+                Field(
+                    None,
+                    "ultrahd",
                 ),
-            ),
-            Field(
-                None,
-                "ultrahd",
             ),
         ),
     },

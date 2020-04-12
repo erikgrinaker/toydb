@@ -32,7 +32,10 @@ impl Plan {
 
     /// Optimizes the plan, consuming it
     pub fn optimize(self) -> Result<Self, Error> {
-        Ok(Plan(optimizer::ConstantFolder.optimize(self.0)?))
+        let mut root = self.0;
+        root = optimizer::ConstantFolder.optimize(root)?;
+        root = optimizer::FilterPushdown.optimize(root)?;
+        Ok(Plan(root))
     }
 }
 

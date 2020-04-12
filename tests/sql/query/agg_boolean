@@ -178,17 +178,16 @@ Optimized plan: Plan(
     Projection {
         source: Aggregation {
             source: Projection {
-                source: Filter {
-                    source: Scan {
-                        table: "booleans",
-                        alias: None,
-                        filter: None,
-                    },
-                    predicate: Not(
-                        IsNull(
-                            Field(
-                                None,
-                                "b",
+                source: Scan {
+                    table: "booleans",
+                    alias: None,
+                    filter: Some(
+                        Not(
+                            IsNull(
+                                Field(
+                                    None,
+                                    "b",
+                                ),
                             ),
                         ),
                     ),

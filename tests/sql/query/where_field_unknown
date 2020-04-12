@@ -45,15 +45,14 @@ Plan: Plan(
 )
 
 Optimized plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        predicate: Field(
-            None,
-            "unknown",
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            Field(
+                None,
+                "unknown",
+            ),
         ),
     },
 )

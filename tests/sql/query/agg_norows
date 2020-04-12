@@ -168,15 +168,14 @@ Optimized plan: Plan(
     Projection {
         source: Aggregation {
             source: Projection {
-                source: Filter {
-                    source: Scan {
-                        table: "movies",
-                        alias: None,
-                        filter: None,
-                    },
-                    predicate: Constant(
-                        Boolean(
-                            false,
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                    filter: Some(
+                        Constant(
+                            Boolean(
+                                false,
+                            ),
                         ),
                     ),
                 },

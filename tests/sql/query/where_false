@@ -47,15 +47,14 @@ Plan: Plan(
 )
 
 Optimized plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        predicate: Constant(
-            Boolean(
-                false,
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            Constant(
+                Boolean(
+                    false,
+                ),
             ),
         ),
     },

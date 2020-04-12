@@ -178,17 +178,16 @@ Optimized plan: Plan(
     Projection {
         source: Aggregation {
             source: Projection {
-                source: Filter {
-                    source: Scan {
-                        table: "integers",
-                        alias: None,
-                        filter: None,
-                    },
-                    predicate: Not(
-                        IsNull(
-                            Field(
-                                None,
-                                "i",
+                source: Scan {
+                    table: "integers",
+                    alias: None,
+                    filter: Some(
+                        Not(
+                            IsNull(
+                                Field(
+                                    None,
+                                    "i",
+                                ),
                             ),
                         ),
                     ),
