@@ -6,18 +6,6 @@ authors = ["Erik Grinaker <erik@grinaker.org>"]
 edition = "2018"
 default-run = "toydb"
 
-[[bin]]
-name = "toydb"
-test = false
-
-[[bin]]
-name = "toysql"
-test = false
-
-[[bin]]
-name = "bank"
-test = false
-
 [dependencies]
 clap = "~2.33.0"
 config = "~0.9.3"
