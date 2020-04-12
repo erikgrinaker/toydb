@@ -165,65 +165,64 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Projection {
-        source: Filter {
-            source: NestedLoopJoin {
-                outer: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                inner: Scan {
-                    table: "genres",
-                    alias: None,
-                    filter: None,
-                },
-                predicate: None,
-                pad: false,
-                flip: false,
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+                filter: None,
             },
-            predicate: And(
-                Or(
-                    GreaterThan(
-                        Field(
-                            Some(
-                                "movies",
+            inner: Scan {
+                table: "genres",
+                alias: None,
+                filter: None,
+            },
+            predicate: Some(
+                And(
+                    Or(
+                        GreaterThan(
+                            Field(
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
                             ),
-                            "id",
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
                         ),
-                        Constant(
-                            Integer(
-                                3,
+                        Equal(
+                            Field(
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
                             ),
                         ),
                     ),
                     Equal(
                         Field(
                             Some(
-                                "movies",
+                                "genres",
                             ),
                             "id",
                         ),
                         Constant(
                             Integer(
-                                3,
+                                1,
                             ),
                         ),
                     ),
                 ),
-                Equal(
-                    Field(
-                        Some(
-                            "genres",
-                        ),
-                        "id",
-                    ),
-                    Constant(
-                        Integer(
-                            1,
-                        ),
-                    ),
-                ),
             ),
+            pad: false,
+            flip: false,
         },
         labels: [
             None,

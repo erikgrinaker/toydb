@@ -295,31 +295,19 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Projection {
-        source: Filter {
-            source: NestedLoopJoin {
-                outer: NestedLoopJoin {
-                    outer: Scan {
-                        table: "movies",
-                        alias: Some(
-                            "m",
-                        ),
-                        filter: None,
-                    },
-                    inner: Scan {
-                        table: "genres",
-                        alias: Some(
-                            "g",
-                        ),
-                        filter: None,
-                    },
-                    predicate: None,
-                    pad: false,
-                    flip: false,
+        source: NestedLoopJoin {
+            outer: NestedLoopJoin {
+                outer: Scan {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                    filter: None,
                 },
                 inner: Scan {
-                    table: "countries",
+                    table: "genres",
                     alias: Some(
-                        "c",
+                        "g",
                     ),
                     filter: None,
                 },
@@ -327,66 +315,77 @@ Optimized plan: Plan(
                 pad: false,
                 flip: false,
             },
-            predicate: And(
+            inner: Scan {
+                table: "countries",
+                alias: Some(
+                    "c",
+                ),
+                filter: None,
+            },
+            predicate: Some(
                 And(
-                    Or(
-                        GreaterThan(
-                            Field(
-                                Some(
-                                    "m",
+                    And(
+                        Or(
+                            GreaterThan(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "id",
                                 ),
-                                "id",
+                                Constant(
+                                    Integer(
+                                        3,
+                                    ),
+                                ),
                             ),
-                            Constant(
-                                Integer(
-                                    3,
+                            Equal(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "id",
+                                ),
+                                Constant(
+                                    Integer(
+                                        3,
+                                    ),
                                 ),
                             ),
                         ),
                         Equal(
                             Field(
                                 Some(
-                                    "m",
+                                    "g",
                                 ),
                                 "id",
                             ),
                             Constant(
                                 Integer(
-                                    3,
+                                    2,
                                 ),
                             ),
                         ),
                     ),
-                    Equal(
-                        Field(
-                            Some(
-                                "g",
+                    Not(
+                        Equal(
+                            Field(
+                                Some(
+                                    "c",
+                                ),
+                                "id",
                             ),
-                            "id",
-                        ),
-                        Constant(
-                            Integer(
-                                2,
-                            ),
-                        ),
-                    ),
-                ),
-                Not(
-                    Equal(
-                        Field(
-                            Some(
-                                "c",
-                            ),
-                            "id",
-                        ),
-                        Constant(
-                            String(
-                                "us",
+                            Constant(
+                                String(
+                                    "us",
+                                ),
                             ),
                         ),
                     ),
                 ),
             ),
+            pad: false,
+            flip: false,
         },
         labels: [
             None,

@@ -42,25 +42,31 @@ impl Optimizer for FilterPushdown {
 }
 
 impl FilterPushdown {
-    /// Attempts to push a filter down into a target node, or returns a regular filter node.
-    fn pushdown(filter: Expression, target: Node) -> Result<Node, Error> {
+    /// Attempts to push a predicate down into a target node, or returns a regular filter node.
+    fn pushdown(mut predicate: Expression, target: Node) -> Result<Node, Error> {
         Ok(match target {
-            // Filter nodes immediately before a scan node without a filter can be trivially pushed
-            // down, as long as we remove any qualified fields (e.g. movies table aliased as m).
-            Node::Scan { table, alias, filter: None } => {
+            // Filter nodes immediately before a scan node can be trivially pushed down, as long as
+            // we remove any field qualifyers (e.g. movies table aliased as m).
+            Node::Scan { table, alias, filter } => {
                 let mut map = HashMap::new();
                 map.insert(Some(table.clone()), None);
                 if let Some(alias) = &alias {
                     map.insert(Some(alias.clone()), None);
                 }
-                Node::Scan {
-                    table,
-                    alias,
-                    filter: Some(filter.transform(&|e| Self::requalify(e, &map), &|e| Ok(e))?),
+                predicate = predicate.transform(&|e| Self::requalify(e, &map), &|e| Ok(e))?;
+                if let Some(filter) = filter {
+                    predicate = Expression::And(Box::new(predicate), Box::new(filter))
                 }
+                Node::Scan { table, alias, filter: Some(predicate) }
             }
-            // FIXME We need to handle joins.
-            n => Node::Filter { predicate: filter, source: Box::new(n) },
+            // Filter nodes immediately before a nested loop join can be trivially pushed down.
+            Node::NestedLoopJoin { outer, inner, predicate: join_predicate, pad, flip } => {
+                if let Some(join_predicate) = join_predicate {
+                    predicate = Expression::And(Box::new(predicate), Box::new(join_predicate));
+                }
+                Node::NestedLoopJoin { outer, inner, predicate: Some(predicate), pad, flip }
+            }
+            n => Node::Filter { predicate, source: Box::new(n) },
         })
     }
 

@@ -194,23 +194,51 @@ Plan: Plan(
 Optimized plan: Plan(
     Explain(
         Projection {
-            source: Filter {
-                source: NestedLoopJoin {
-                    outer: Scan {
-                        table: "movies",
-                        alias: Some(
-                            "m",
+            source: NestedLoopJoin {
+                outer: Scan {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                    filter: None,
+                },
+                inner: Scan {
+                    table: "genres",
+                    alias: Some(
+                        "g",
+                    ),
+                    filter: None,
+                },
+                predicate: Some(
+                    And(
+                        Or(
+                            GreaterThan(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "released",
+                                ),
+                                Constant(
+                                    Integer(
+                                        2000,
+                                    ),
+                                ),
+                            ),
+                            Equal(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "released",
+                                ),
+                                Constant(
+                                    Integer(
+                                        2000,
+                                    ),
+                                ),
+                            ),
                         ),
-                        filter: None,
-                    },
-                    inner: Scan {
-                        table: "genres",
-                        alias: Some(
-                            "g",
-                        ),
-                        filter: None,
-                    },
-                    predicate: Some(
                         Equal(
                             Field(
                                 Some(
@@ -226,37 +254,9 @@ Optimized plan: Plan(
                             ),
                         ),
                     ),
-                    pad: false,
-                    flip: false,
-                },
-                predicate: Or(
-                    GreaterThan(
-                        Field(
-                            Some(
-                                "m",
-                            ),
-                            "released",
-                        ),
-                        Constant(
-                            Integer(
-                                2000,
-                            ),
-                        ),
-                    ),
-                    Equal(
-                        Field(
-                            Some(
-                                "m",
-                            ),
-                            "released",
-                        ),
-                        Constant(
-                            Integer(
-                                2000,
-                            ),
-                        ),
-                    ),
                 ),
+                pad: false,
+                flip: false,
             },
             labels: [
                 None,
@@ -290,23 +290,51 @@ Optimized plan: Plan(
 Query: EXPLAIN SELECT m.id, m.title, g.name FROM movies m JOIN GENRES g ON m.genre_id = g.id WHERE m.released >= 2000
 
 Result: Projection {
-    source: Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: Some(
-                    "m",
+    source: NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: Some(
+                "m",
+            ),
+            filter: None,
+        },
+        inner: Scan {
+            table: "genres",
+            alias: Some(
+                "g",
+            ),
+            filter: None,
+        },
+        predicate: Some(
+            And(
+                Or(
+                    GreaterThan(
+                        Field(
+                            Some(
+                                "m",
+                            ),
+                            "released",
+                        ),
+                        Constant(
+                            Integer(
+                                2000,
+                            ),
+                        ),
+                    ),
+                    Equal(
+                        Field(
+                            Some(
+                                "m",
+                            ),
+                            "released",
+                        ),
+                        Constant(
+                            Integer(
+                                2000,
+                            ),
+                        ),
+                    ),
                 ),
-                filter: None,
-            },
-            inner: Scan {
-                table: "genres",
-                alias: Some(
-                    "g",
-                ),
-                filter: None,
-            },
-            predicate: Some(
                 Equal(
                     Field(
                         Some(
@@ -322,37 +350,9 @@ Result: Projection {
                     ),
                 ),
             ),
-            pad: false,
-            flip: false,
-        },
-        predicate: Or(
-            GreaterThan(
-                Field(
-                    Some(
-                        "m",
-                    ),
-                    "released",
-                ),
-                Constant(
-                    Integer(
-                        2000,
-                    ),
-                ),
-            ),
-            Equal(
-                Field(
-                    Some(
-                        "m",
-                    ),
-                    "released",
-                ),
-                Constant(
-                    Integer(
-                        2000,
-                    ),
-                ),
-            ),
         ),
+        pad: false,
+        flip: false,
     },
     labels: [
         None,

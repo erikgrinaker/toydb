@@ -125,46 +125,45 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Projection {
-        source: Filter {
-            source: NestedLoopJoin {
-                outer: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                inner: Scan {
-                    table: "genres",
-                    alias: None,
-                    filter: None,
-                },
-                predicate: None,
-                pad: false,
-                flip: false,
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+                filter: None,
             },
-            predicate: Or(
-                GreaterThan(
-                    Field(
-                        None,
-                        "id",
-                    ),
-                    Constant(
-                        Integer(
-                            3,
+            inner: Scan {
+                table: "genres",
+                alias: None,
+                filter: None,
+            },
+            predicate: Some(
+                Or(
+                    GreaterThan(
+                        Field(
+                            None,
+                            "id",
+                        ),
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
                     ),
-                ),
-                Equal(
-                    Field(
-                        None,
-                        "id",
-                    ),
-                    Constant(
-                        Integer(
-                            3,
+                    Equal(
+                        Field(
+                            None,
+                            "id",
+                        ),
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
                     ),
                 ),
             ),
+            pad: false,
+            flip: false,
         },
         labels: [
             None,

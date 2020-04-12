@@ -101,36 +101,35 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Order {
-        source: Filter {
-            source: NestedLoopJoin {
-                outer: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                inner: Scan {
-                    table: "genres",
-                    alias: None,
-                    filter: None,
-                },
-                predicate: None,
-                pad: false,
-                flip: false,
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+                filter: None,
             },
-            predicate: Equal(
-                Field(
-                    Some(
-                        "movies",
+            inner: Scan {
+                table: "genres",
+                alias: None,
+                filter: None,
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
                     ),
-                    "genre_id",
-                ),
-                Field(
-                    Some(
-                        "genres",
+                    Field(
+                        Some(
+                            "genres",
+                        ),
+                        "id",
                     ),
-                    "id",
                 ),
             ),
+            pad: false,
+            flip: false,
         },
         orders: [
             (
