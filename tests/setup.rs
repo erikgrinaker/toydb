@@ -1,3 +1,6 @@
+#![allow(clippy::implicit_hasher)]
+#![allow(clippy::type_complexity)]
+
 use toydb::client::Client;
 use toydb::server::Server;
 use toydb::Error;
@@ -50,7 +53,7 @@ pub fn cluster_with_clients(size: u64) -> Result<(Vec<Client>, Box<dyn FnOnce()>
     let teardown = cluster(nodes.clone())?;
     let mut clients = Vec::<Client>::new();
     for (id, addr) in nodes {
-        let mut parts = addr.split(":");
+        let mut parts = addr.split(':');
         let client = Client::new(parts.next().unwrap(), parts.next().unwrap().parse()?)?;
         assert_eq!(id, client.status()?.id);
         clients.push(client);
