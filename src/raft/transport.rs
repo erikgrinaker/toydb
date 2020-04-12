@@ -12,7 +12,7 @@ pub trait Transport {
 }
 
 /// A message passed between Raft nodes.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     /// The current term of the sender.
     pub term: u64,
@@ -63,7 +63,7 @@ impl Message {
 }
 
 /// An event contained within messages.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Event {
     /// Leaders send periodic heartbeats to its followers.
     Heartbeat {

@@ -1,81 +1,18 @@
 syntax = "proto3";
 
-// An asynchronous Raft service used for intra-cluster message passing.
-// For details on messages, see toydb::raft::transport module.
+// An asynchronous Raft service used for intra-cluster message passing. For details on messages,
+// see toydb::raft::transport module. Simply passes serialized bytes, since we'll be transitioning
+// away from gRPC/Protobuf.
 
 service Raft {
-  rpc Step(Message) returns (Success) {};
+  rpc Step(Message) returns (Empty) {};
 };
-
-message Success {}
 
 message Message {
   uint64 term = 1;
   string from = 2;
   string to = 3;
-  oneof event {
-    Heartbeat heartbeat = 4;
-    ConfirmLeader confirm_leader = 5;
-    SolicitVote solicit_vote = 6;
-    GrantVote grant_vote = 7;
-    ReplicateEntries replicate_entries = 8;
-    AcceptEntries accept_entries = 9;
-    RejectEntries reject_entries = 10;
-    QueryState query_state = 11;
-    MutateState mutate_state = 12;
-    RespondState respond_state = 13;
-    RespondError respond_error = 14;
-  }
+  bytes event = 4;
 }
 
-message Heartbeat {
-  uint64 commit_index = 1;
-  uint64 commit_term = 2;
-}
-
-message ConfirmLeader {
-  uint64 commit_index = 1;
-  bool has_committed = 2;
-}
-
-message SolicitVote {
-  uint64 last_index = 1;
-  uint64 last_term = 2;
-}
-
-message GrantVote {}
-
-message Entry {
-  uint64 term = 1;
-  bytes command = 2;
-}
-
-message ReplicateEntries {
-  uint64 base_index = 1;
-  uint64 base_term = 2;
-  repeated Entry entries = 3;
-}
-
-message AcceptEntries { uint64 last_index = 1; }
-
-message RejectEntries {}
-
-message QueryState {
-  bytes call_id = 1;
-  bytes command = 2;
-}
-
-message MutateState {
-  bytes call_id = 1;
-  bytes command = 2;
-}
-
-message RespondState {
-  bytes call_id = 1;
-  bytes response = 2;
-}
-
-message RespondError {
-  bytes call_id = 1;
-  bytes error = 2;
-}
+message Empty {}

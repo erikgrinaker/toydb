@@ -1,4 +1,4 @@
-use crate::raft::{Entry, Event, Message, Transport};
+use crate::raft::{Message, Transport};
 use crate::service;
 use crate::service::Raft;
 use crate::utility::{deserialize, serialize};
@@ -73,9 +73,9 @@ impl service::Raft for GRPCService {
         &self,
         _: grpc::RequestOptions,
         pb: service::Message,
-    ) -> grpc::SingleResponse<service::Success> {
+    ) -> grpc::SingleResponse<service::Empty> {
         self.local.send(message_from_protobuf(pb).unwrap()).unwrap();
-        grpc::SingleResponse::completed(service::Success::new())
+        grpc::SingleResponse::completed(service::Empty::new())
     }
 }
 
@@ -85,49 +85,7 @@ fn message_from_protobuf(pb: service::Message) -> Result<Message, Error> {
         term: pb.term,
         from: Some(pb.from),
         to: Some(pb.to),
-        event: match pb.event {
-            Some(service::Message_oneof_event::heartbeat(e)) => {
-                Event::Heartbeat { commit_index: e.commit_index, commit_term: e.commit_term }
-            }
-            Some(service::Message_oneof_event::confirm_leader(e)) => Event::ConfirmLeader {
-                commit_index: e.commit_index,
-                has_committed: e.has_committed,
-            },
-            Some(service::Message_oneof_event::solicit_vote(e)) => {
-                Event::SolicitVote { last_index: e.last_index, last_term: e.last_term }
-            }
-            Some(service::Message_oneof_event::grant_vote(_)) => Event::GrantVote,
-            Some(service::Message_oneof_event::query_state(e)) => {
-                Event::QueryState { call_id: e.call_id, command: e.command }
-            }
-            Some(service::Message_oneof_event::mutate_state(e)) => {
-                Event::MutateState { call_id: e.call_id, command: e.command }
-            }
-            Some(service::Message_oneof_event::respond_state(e)) => {
-                Event::RespondState { call_id: e.call_id, response: e.response }
-            }
-            Some(service::Message_oneof_event::respond_error(e)) => {
-                Event::RespondError { call_id: e.call_id, error: deserialize(&e.error)? }
-            }
-            Some(service::Message_oneof_event::replicate_entries(e)) => Event::ReplicateEntries {
-                base_index: e.base_index,
-                base_term: e.base_term,
-                entries: e
-                    .entries
-                    .to_vec()
-                    .into_iter()
-                    .map(|entry| Entry {
-                        term: entry.term,
-                        command: if entry.command.is_empty() { None } else { Some(entry.command) },
-                    })
-                    .collect(),
-            },
-            Some(service::Message_oneof_event::accept_entries(e)) => {
-                Event::AcceptEntries { last_index: e.last_index }
-            }
-            Some(service::Message_oneof_event::reject_entries(_)) => Event::RejectEntries,
-            None => return Err(Error::Internal("No event found in protobuf message".into())),
-        },
+        event: deserialize(&pb.event)?,
     })
 }
 
@@ -137,88 +95,7 @@ fn message_to_protobuf(msg: Message) -> service::Message {
         term: msg.term,
         from: msg.from.unwrap(),
         to: msg.to.unwrap(),
-        event: Some(match msg.event {
-            Event::Heartbeat { commit_index, commit_term } => {
-                service::Message_oneof_event::heartbeat(service::Heartbeat {
-                    commit_index,
-                    commit_term,
-                    ..Default::default()
-                })
-            }
-            Event::ConfirmLeader { commit_index, has_committed } => {
-                service::Message_oneof_event::confirm_leader(service::ConfirmLeader {
-                    commit_index,
-                    has_committed,
-                    ..Default::default()
-                })
-            }
-            Event::SolicitVote { last_index, last_term } => {
-                service::Message_oneof_event::solicit_vote(service::SolicitVote {
-                    last_index,
-                    last_term,
-                    ..Default::default()
-                })
-            }
-            Event::GrantVote => service::Message_oneof_event::grant_vote(service::GrantVote::new()),
-            Event::QueryState { call_id, command } => {
-                service::Message_oneof_event::query_state(service::QueryState {
-                    call_id,
-                    command,
-                    ..Default::default()
-                })
-            }
-            Event::MutateState { call_id, command } => {
-                service::Message_oneof_event::mutate_state(service::MutateState {
-                    call_id,
-                    command,
-                    ..Default::default()
-                })
-            }
-            Event::RespondState { call_id, response } => {
-                service::Message_oneof_event::respond_state(service::RespondState {
-                    call_id,
-                    response,
-                    ..Default::default()
-                })
-            }
-            Event::RespondError { call_id, error } => {
-                service::Message_oneof_event::respond_error(service::RespondError {
-                    call_id,
-                    error: serialize(&error).unwrap(),
-                    ..Default::default()
-                })
-            }
-            Event::ReplicateEntries { base_index, base_term, entries } => {
-                service::Message_oneof_event::replicate_entries(service::ReplicateEntries {
-                    base_index,
-                    base_term,
-                    entries: protobuf::RepeatedField::from_vec(
-                        entries
-                            .into_iter()
-                            .map(|entry| service::Entry {
-                                term: entry.term,
-                                command: if let Some(bytes) = entry.command {
-                                    bytes
-                                } else {
-                                    vec![]
-                                },
-                                ..Default::default()
-                            })
-                            .collect(),
-                    ),
-                    ..Default::default()
-                })
-            }
-            Event::AcceptEntries { last_index } => {
-                service::Message_oneof_event::accept_entries(service::AcceptEntries {
-                    last_index,
-                    ..Default::default()
-                })
-            }
-            Event::RejectEntries => {
-                service::Message_oneof_event::reject_entries(service::RejectEntries::new())
-            }
-        }),
+        event: serialize(&msg.event).unwrap(),
         ..Default::default()
     }
 }
