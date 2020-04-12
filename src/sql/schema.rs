@@ -5,6 +5,27 @@ use crate::Error;
 
 use std::collections::HashMap;
 
+/// The catalog stores schema information
+pub trait Catalog {
+    /// Creates a new table
+    fn create_table(&mut self, table: &Table) -> Result<(), Error>;
+    /// Deletes an existing table, or errors if it does not exist
+    fn delete_table(&mut self, table: &str) -> Result<(), Error>;
+    /// Reads a table, if it exists
+    fn read_table(&self, table: &str) -> Result<Option<Table>, Error>;
+    /// Iterates over all tables
+    fn scan_tables(&self) -> Result<Tables, Error>;
+
+    /// Reads a table, and errors if it does not exist
+    fn must_read_table(&self, table: &str) -> Result<Table, Error> {
+        self.read_table(table)?
+            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
+    }
+}
+
+/// A table scan iterator
+pub type Tables = Box<dyn DoubleEndedIterator<Item = Table> + Send>;
+
 /// A table schema
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Table {

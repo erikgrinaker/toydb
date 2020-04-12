@@ -1,6 +1,7 @@
 ///! DML-related tests, using an in-memory database against golden files in tests/sql/dml/
 ///! Note that schema-related tests are in schema.rs, this is just for the basic DML functionality
-use toydb::sql::engine::{Engine, Transaction};
+use toydb::sql::engine::{Engine as _, Transaction as _};
+use toydb::sql::schema::Catalog as _;
 use toydb::Error;
 
 use goldenfile::Mint;

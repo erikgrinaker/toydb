@@ -1,5 +1,6 @@
-use super::super::schema::Table;
+use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
+use super::Transaction as _;
 use crate::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
@@ -125,7 +126,9 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
             self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
         }
     }
+}
 
+impl<S: kv::storage::Storage> Catalog for Transaction<S> {
     fn create_table(&mut self, table: &Table) -> Result<(), Error> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
@@ -148,7 +151,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         self.txn.get(&Key::Table(table).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
-    fn scan_tables(&self) -> Result<super::TableScan, Error> {
+    fn scan_tables(&self) -> Result<Tables, Error> {
         Ok(Box::new(
             self.txn
                 .scan(&Key::TableStart.encode()..&Key::TableEnd.encode())?

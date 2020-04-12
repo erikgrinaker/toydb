@@ -7,7 +7,7 @@ pub use raft::Raft;
 use super::execution::{Context, ResultSet};
 use super::parser::{ast, Parser};
 use super::plan::Plan;
-use super::schema::Table;
+use super::schema::Catalog;
 use super::types::{Expression, Row, Value};
 use crate::Error;
 
@@ -46,7 +46,7 @@ pub trait Engine: Clone {
 }
 
 /// An SQL transaction
-pub trait Transaction {
+pub trait Transaction: Catalog {
     /// The transaction ID
     fn id(&self) -> u64;
     /// The transaction mode
@@ -66,21 +66,6 @@ pub trait Transaction {
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan, Error>;
     /// Updates a table row
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error>;
-
-    /// Creates a new table
-    fn create_table(&mut self, table: &Table) -> Result<(), Error>;
-    /// Deletes an existing table, or errors if it does not exist
-    fn delete_table(&mut self, table: &str) -> Result<(), Error>;
-    /// Reads a table, if it exists
-    fn read_table(&self, table: &str) -> Result<Option<Table>, Error>;
-    /// Iterates over all tables
-    fn scan_tables(&self) -> Result<TableScan, Error>;
-
-    /// Reads a table, and errors if it does not exist
-    fn must_read_table(&self, table: &str) -> Result<Table, Error> {
-        self.read_table(table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
-    }
 }
 
 /// An SQL session, which handles transaction control and simplified query execution
@@ -168,6 +153,3 @@ pub type Mode = crate::kv::Mode;
 
 /// A row scan iterator
 pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row, Error>> + Send>;
-
-/// A table scan iterator
-pub type TableScan = Box<dyn DoubleEndedIterator<Item = Table> + Send>;

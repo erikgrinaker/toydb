@@ -1,4 +1,4 @@
-use super::super::schema::Table;
+use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, Transaction as _};
 use crate::kv;
@@ -163,7 +163,9 @@ impl super::Transaction for Transaction {
             row,
         })?)?)
     }
+}
 
+impl Catalog for Transaction {
     fn create_table(&mut self, table: &Table) -> Result<(), Error> {
         deserialize(&self.raft.mutate(serialize(&Mutation::CreateTable {
             txn_id: self.id,
@@ -187,7 +189,7 @@ impl super::Transaction for Transaction {
         )
     }
 
-    fn scan_tables(&self) -> Result<super::TableScan, Error> {
+    fn scan_tables(&self) -> Result<Tables, Error> {
         Ok(Box::new(
             deserialize::<Vec<_>>(
                 &self.raft.query(serialize(&Query::ScanTables { txn_id: self.id })?)?,

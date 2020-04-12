@@ -1,8 +1,8 @@
 use crate::raft::Raft;
 use crate::service;
-use crate::sql::engine::{Engine, Mode, Transaction};
+use crate::sql::engine::{Engine as _, Mode};
 use crate::sql::execution::ResultSet;
-use crate::sql::schema::Table;
+use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::{Relation, Row};
 use crate::utility::{deserialize, serialize};
 use crate::Error;

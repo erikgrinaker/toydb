@@ -1,5 +1,6 @@
 ///! Schema-related tests, using an in-memory database against golden files in tests/sql/chema/
-use toydb::sql::engine::{Engine, Transaction};
+use toydb::sql::engine::{Engine as _, Transaction as _};
+use toydb::sql::schema::Catalog as _;
 use toydb::Error;
 
 use goldenfile::Mint;
