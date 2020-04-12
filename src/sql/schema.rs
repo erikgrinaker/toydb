@@ -155,6 +155,7 @@ impl Table {
     }
 
     /// Creates an expression environment for a row in a table
+    #[allow(clippy::ptr_arg)]
     pub fn row_env<'a>(&'a self, row: &'a Row) -> Environment<'a> {
         let mut env = Environment::new();
         for (c, v) in self.columns.iter().zip(row.iter().chain(std::iter::repeat(&Value::Null))) {

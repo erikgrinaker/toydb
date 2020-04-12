@@ -414,14 +414,14 @@ impl<'a> Environment<'a> {
     pub fn lookup_field(&self, relation: Option<&'a str>, field: &'a str) -> Result<Value, Error> {
         if let Some(relation) = relation {
             match self.qualified.get(&(relation, field)) {
-                Some(r) => Ok(r.clone().clone()),
+                Some(r) => Ok((*r).clone()),
                 None => Err(Error::Value(format!("Unknown field {}.{}", relation, field))),
             }
         } else if self.ambiguous.contains(field) {
             Err(Error::Value(format!("Ambiguous field {}", field)))
         } else {
             match self.unqualified.get(field) {
-                Some(r) => Ok(r.clone().clone()),
+                Some(r) => Ok((*r).clone()),
                 None => Err(Error::Value(format!("Unknown field {}", field))),
             }
         }
@@ -430,7 +430,7 @@ impl<'a> Environment<'a> {
     /// Looks up a value by index
     pub fn lookup_index(&self, index: usize) -> Result<Value, Error> {
         match self.index.get(index) {
-            Some(r) => Ok(r.clone().clone()),
+            Some(r) => Ok((*r).clone()),
             None => Err(Error::Value(format!("Index {} out of bounds", index))),
         }
     }
