@@ -118,7 +118,6 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Leader, L, S> {
                     call.from.as_deref(),
                     match self.state.query(command) {
                         Ok(response) => Event::RespondState { call_id: call.id, response },
-                        Err(err @ Error::Internal(_)) => return Err(err),
                         Err(err) => Event::RespondError { call_id: call.id, error: err },
                     },
                 )?,
