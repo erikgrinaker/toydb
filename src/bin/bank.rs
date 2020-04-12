@@ -95,7 +95,7 @@ impl Bank {
     fn new(hosts: Vec<String>, customers: i64, accounts: i64) -> Result<Self, Error> {
         let mut h = Vec::new();
         for host in hosts {
-            let parts: Vec<&str> = host.split(":").collect();
+            let parts: Vec<&str> = host.split(':').collect();
             h.push((parts[0].to_string(), if parts.len() >= 2 { parts[1].parse()? } else { 9605 }));
         }
         Ok(Self { hosts: h, customers, customer_accounts: accounts, initial_balance: 100 })
