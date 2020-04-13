@@ -9,8 +9,15 @@ use crate::Error;
 
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{Seek as _, SeekFrom, Write};
+use std::io::{Seek as _, SeekFrom, Write as _};
 use std::sync::RwLock;
+
+/// A log entry
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct Entry {
+    key: Vec<u8>,
+    value: Option<Vec<u8>>,
+}
 
 /// A B-tree indexed log
 pub struct BLog {
@@ -19,7 +26,7 @@ pub struct BLog {
 }
 
 impl BLog {
-    /// Creates a new B-log.
+    /// Creates a new BLog.
     pub fn new(mut file: File) -> Result<Self, Error> {
         let index = Self::build_index(&mut file)?;
         Ok(Self { file: RwLock::new(file), index })
@@ -31,22 +38,21 @@ impl BLog {
         let mut pos = file.seek(SeekFrom::Start(0))?;
         let mut index = BTreeMap::new();
         while pos < size {
-            if let Some(Entry { key, .. }) = deserialize_read(&mut file)? {
-                index.insert(key.to_vec(), pos);
-            }
+            let entry: Entry = deserialize_read(&mut file)?;
+            index.insert(entry.key, pos);
             pos = file.seek(SeekFrom::Current(0))?;
         }
         Ok(index)
     }
 
-    /// Loads an entry from a position
+    /// Loads an entry from a position.
     fn load(&self, pos: u64) -> Result<Entry, Error> {
-        let mut file = self.file.write()?;
-        file.seek(SeekFrom::Start(pos))?;
-        Ok(deserialize_read(&*file)?)
+        let mut cursor = self.file.write()?;
+        cursor.seek(SeekFrom::Start(pos))?;
+        Ok(deserialize_read(&*cursor)?)
     }
 
-    /// Saves a value by appending to the log, returning its position
+    /// Saves an entry by appending it to the log, returning its position.
     fn save(&mut self, entry: &Entry) -> Result<u64, Error> {
         let mut cursor = self.file.write()?;
         let pos = cursor.seek(SeekFrom::End(0))?;
@@ -96,13 +102,6 @@ impl Storage for BLog {
         self.index.insert(key.to_vec(), pos);
         Ok(())
     }
-}
-
-/// A log entry
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Entry {
-    key: Vec<u8>,
-    value: Option<Vec<u8>>,
 }
 
 #[cfg(test)]
