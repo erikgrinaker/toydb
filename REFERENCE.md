@@ -2,44 +2,44 @@
 
 ## Data Types
 
-The following data types are supported, and can be used as column types:
+The following data types are supported:
 
 * `BOOLEAN` (`BOOL`): logical truth values, i.e. true and false.
-* `FLOAT` (`DOUBLE`): 64-bit signed floating point numbers, using [IEEE 754 `binary64`](https://en.wikipedia.org/wiki/binary64) encoding. Supports a magnitude of 10⁻³⁰⁷ to 10³⁰⁸, and 53-bit precision (exact up to 15 significant figures), as well as the special values infinity and NaN.
+* `FLOAT` (`DOUBLE`): 64-bit signed floating point numbers, using [IEEE 754 `binary64`](https://en.wikipedia.org/wiki/binary64) encoding. Supports magnitudes of 10⁻³⁰⁷ to 10³⁰⁸ with 53-bit precision (~15 significant figures), as well as the special values infinity and NaN.
 * `INTEGER` (`INT`): 64-bit signed integer numbers with a range of ±2⁶³-1.
 * `STRING` (`CHAR`, `TEXT`, `VARCHAR`): UTF-8 encoded strings up to 1024 bytes.
 
-In addition, the special `NULL` value is used for an unknown value of unknown data type, following the rules of [three-valued logic](https://en.wikipedia.org/wiki/Three-valued_logic).
+In addition, the special `NULL` value is used for an unknown value, following the rules of [three-valued logic](https://en.wikipedia.org/wiki/Three-valued_logic).
 
-Numeric types are not interchangable when stored; a float value cannot be stored in an integer column and vice-versa, even if the float value does not have a fractional part (e.g. `3.0`).
+Numeric types are not interchangable; a float value (even without a fractional part) cannot be stored in an integer column and vice-versa.
 
 ## SQL Syntax
 
 ### Keywords
 
-Keywords are reserved words that have special meaning in SQL statements, such as `SELECT`. These cannot be used as identifiers (e.g. table names) unless quoted with `"`. Keywords are case-insensitive. The complete list of keywords is:
+Keywords are reserved words with special meaning in SQL statements. They are case-insensitive, and must be quoted with `"` to be used as identifiers. The complete list is:
 
 `AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `EXPLAIN`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
-Identifiers are names for database objects, such as tables and columns. Unless quoted with `"`, identifiers may not be reserved keywords, must begin with any Unicode letter, and can contain any combination of Unicode letters, numbers, and underscores (`_`). Identifiers are automatically converted to lowercase, and have no length limit. In quoted identifiers, `""` can be used to escape a double quote character.
+Identifiers are names for database objects such as tables and columns. Unless quoted with `"`, they must begin with a Unicode letter followed by any combination of letters, numbers, and `_`, and cannot be reserved keywords. `""` can be used to escape a double quote character. They are always converted to lowercase.
 
 ### Constants
 
 #### Named constants
 
-The following case-insensitive keywords evaluate to constants:
+The following keywords evaluate to constants:
 
-* `FALSE`: the `BOOLEAN` false value.
-* `INFINITY`: the IEEE 754 `binary64` floating-point value for infinity.
-* `NAN`: the IEEE 754 `binary64` floating-point value for NaN (not a number).
-* `NULL`: the unknown value.
-* `TRUE`: the `BOOLEAN` true value.
+* `FALSE`: the boolean false value.
+* `INFINITY`: the floating-point value for infinity.
+* `NAN`: the floating-point value for NaN (not a number).
+* `NULL`: an unknown value.
+* `TRUE`: the boolean true value.
 
 #### String literals
 
-String literals are surrounded by single quotes `'`, and may contain any valid UTF-8 character. Single quotes must be escaped by an additional single quote, i.e. `''`, no other escape sequences are supported. For example:
+String literals are surrounded by single quotes `'`, and can contain any valid UTF-8 character. Single quotes must be escaped by an additional single quote, i.e. `''`, no other escape sequences are supported. For example:
 
 ```
 'A string with ''quotes'' and emojis 😀'
@@ -57,9 +57,9 @@ The `-` prefix operator can be used to take negative numbers.
 
 ### Expressions
 
-Expressions can be used wherever a value is expected, e.g. as `SELECT` fields and `INSERT` values, and can be either a constant, a column reference, an operator invocation, or a function call.
+Expressions can be used wherever a value is expected, e.g. as `SELECT` fields and `INSERT` values. They are made up of constants, a column references, an operator invocations, and a function calls.
 
-Column references can either be unqualified, e.g. `name`, or prefixed with the relation identifier separated by `.`, e.g. `person.name`. Unqualified identifiers must be unambiguous, otherwise an error is returned.
+Column references can either be unqualified, e.g. `name`, or prefixed with the relation identifier separated by `.`, e.g. `person.name`. Unqualified identifiers must be unambiguous.
 
 ## SQL Operators
 
@@ -93,7 +93,7 @@ The complete truth tables are:
 
 ### Comparison operators
 
-Comparison operators compare values of the same data type, and return `TRUE` if the comparison holds, otherwise `FALSE`. `INTEGER` and `FLOAT` values are interchangeable. `STRING` comparisons are byte-wise, i.e. case-sensitive with `B` considered lesser than `a` due to their UTF-8 code points. `FALSE` is considered lesser than `TRUE`. Comparison with `NULL` always yields `NULL` (even `NULL = NULL`).
+Comparison operators compare values of the same data type, and return `TRUE` if the comparison holds or `FALSE` otherwise. `INTEGER` and `FLOAT` values are interchangeable. `STRING` comparisons use the string's byte values, i.e. case-sensitive with `'B' < 'a'` due to their UTF-8 code points. `FALSE` is considered lesser than `TRUE`. Comparison with `NULL` always yields `NULL` (even `NULL = NULL`).
 
 Binary operators:
 
@@ -111,9 +111,9 @@ Unary operators:
 
 ### Mathematical operators
 
-Mathematical operators apply standard math operations on numeric (`INTEGER` or `FLOAT`) operands. If either operand is a `FLOAT`, both operands are converted to `FLOAT` and the result is a `FLOAT`. If either operand is `NULL`, the result is `NULL`. The special values `INFINITY` and `NAN` are handled according to the IEEE 754 `binary64` spec.
+Mathematical operators apply standard math operations on numeric (`INTEGER` or `FLOAT`) operands. If either operand is a `FLOAT`, both operands are converted to `FLOAT` and the result is a `FLOAT`. If either operand is `NULL`, the result is `NULL`. The special values `INFINITY` and `NAN` are handled according to the IEEE 754 spec.
 
-For `INTEGER` operands, failure conditions such as overflow and division by zero yield an error, while for `FLOAT` operands these return `INFINITY` or `NAN` as appropriate.
+For `INTEGER` operands, failure conditions such as overflow and division by zero yield an error. For `FLOAT` operands, these return `INFINITY` or `NAN` as appropriate.
 
 Binary operators:
 
@@ -162,10 +162,10 @@ Aggregate function aggregate an expression across all rows, optionally grouped i
 
 * `COUNT(expr)`: returns the number of rows for which ***`expr`*** evaluates to a non-`NULL` value. `COUNT(*)` can be used to count all rows.
 
+* `MAX(expr)`: returns the maximum value, according to the datatype's ordering.
+
 * `MIN(expr)`: returns the minimum value, according to the datatype's ordering.
 
-* `MIN(expr)`: returns the maximum value, according to the datatype's ordering.
-* 
 * `SUM(expr)`: returns the sum of numerical values.
 
 ## SQL Statements
@@ -404,19 +404,10 @@ WHERE release_year >= 2000 AND bluray = FALSE
 
 ## Transactions
 
-ToyDB supports ACID transactions using MVCC-based snapshot isolation. A new transaction is started with `BEGIN`, and ended with either `COMMIT` (atomically writing all changes) or `ROLLBACK` (discarding all changes). If any conflicts occur between concurrent transactions, the one with the lowest transaction ID wins and the others will receive a serialization error and must retry.
+ToyDB supports ACID transactions using MVCC-based snapshot isolation, protecting from the following anomalies: dirty writes, dirty reads, lost updates, fuzzy reads, read skew, and phantom reads. However, write skew anomalies are possible since serializable snapshot isolation is not implemented.
 
-Snapshot isolation protects against the following anomalies:
-
-* Dirty writes
-* Dirty reads
-* Lost updates
-* Fuzzy reads
-* Read skew
-* Phantom read
-
-However, since ToyDB doesn't use serializable snapshot isolation it exhibits write skew anomalies.
+A new transaction is started with `BEGIN`, and ended with either `COMMIT` (atomically writing all changes) or `ROLLBACK` (discarding all changes). If any conflicts occur between concurrent transactions, the lowest transaction ID wins and the others will fail with a serialization error and must retry.
 
 All past data is versioned and retained, and can be queried as of a given transaction ID via `BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME <txn_id>`.
 
-A transaction is still valid for use if a containing statement returns an error, it is up to the client to take appropriate action.
+A transaction is still valid for use if a contained statement returns an error. It is up to the client to take appropriate action.
