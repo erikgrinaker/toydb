@@ -8,7 +8,10 @@ CREATE TABLE other (
 
 CREATE TABLE test (
   id INTEGER PRIMARY KEY DEFAULT 0,
-  name STRING DEFAULT NULL,
+  name STRING DEFAULT NULL INDEX,
   value INTEGER DEFAULT NULL
 )
 [Integer(1), String("a"), Null]
+
+Index test.name
+String("a") => [Integer(1)]

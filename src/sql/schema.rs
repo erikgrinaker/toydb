@@ -238,6 +238,8 @@ pub struct Column {
     pub unique: bool,
     /// The table which is referenced by this foreign key
     pub references: Option<String>,
+    /// Whether the column should be indexed
+    pub index: bool,
 }
 
 impl Column {
@@ -259,6 +261,9 @@ impl Column {
         }
         if let Some(reference) = &self.references {
             sql += &format!(" REFERENCES {}", reference);
+        }
+        if self.index {
+            sql += " INDEX";
         }
         sql
     }

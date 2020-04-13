@@ -178,6 +178,7 @@ impl<'a> Parser<'a> {
             nullable: None,
             default: None,
             unique: false,
+            index: false,
             references: None,
         };
         while let Some(Token::Keyword(keyword)) = self.next_if_keyword() {
@@ -207,6 +208,7 @@ impl<'a> Parser<'a> {
                 }
                 Keyword::Default => column.default = Some(self.parse_expression(0)?),
                 Keyword::Unique => column.unique = true,
+                Keyword::Index => column.index = true,
                 Keyword::References => column.references = Some(self.next_ident()?),
                 keyword => return Err(Error::Parse(format!("Unexpected keyword {}", keyword))),
             }

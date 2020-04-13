@@ -4,6 +4,7 @@ mod delete;
 mod drop_table;
 mod explain;
 mod filter;
+mod index_lookup;
 mod insert;
 mod key_lookup;
 mod limit;
@@ -21,6 +22,7 @@ use delete::Delete;
 use drop_table::DropTable;
 use explain::Explain;
 use filter::Filter;
+use index_lookup::IndexLookup;
 use insert::Insert;
 use key_lookup::KeyLookup;
 use limit::Limit;
@@ -56,6 +58,9 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::DropTable { name } => DropTable::new(name),
             Node::Explain(plan) => Explain::new(*plan),
             Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
+            Node::IndexLookup { table, alias, column, keys } => {
+                IndexLookup::new(table, alias, column, keys)
+            }
             Node::Insert { table, columns, expressions } => {
                 Insert::new(table, columns, expressions)
             }

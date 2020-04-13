@@ -41,7 +41,7 @@ macro_rules! test_query {
                 "CREATE TABLE studios (
                     id INTEGER PRIMARY KEY,
                     name STRING NOT NULL,
-                    country_id STRING REFERENCES countries
+                    country_id STRING INDEX REFERENCES countries
                 )",
                 "INSERT INTO studios VALUES
                     (1, 'Mosfilm', 'ru'),
@@ -51,8 +51,8 @@ macro_rules! test_query {
                 "CREATE TABLE movies (
                     id INTEGER PRIMARY KEY,
                     title STRING NOT NULL,
-                    studio_id INTEGER NOT NULL REFERENCES studios,
-                    genre_id INTEGER NOT NULL REFERENCES genres,
+                    studio_id INTEGER NOT NULL INDEX REFERENCES studios,
+                    genre_id INTEGER NOT NULL INDEX REFERENCES genres,
                     released INTEGER NOT NULL,
                     rating FLOAT,
                     ultrahd BOOLEAN
@@ -195,6 +195,7 @@ test_query! {
     where_string: "SELECT * FROM movies WHERE 'abc'",
     where_multi: "SELECT * FROM movies WHERE TRUE, TRUE",
     where_primary_key: "SELECT * FROM movies WHERE id = 3",
+    where_index_lookup: "SELECT * FROM movies WHERE genre_id = 2",
     where_field_unknown: "SELECT * FROM movies WHERE unknown",
     where_field_qualified: "SELECT movies.id, genres.id FROM movies, genres WHERE movies.id >= 3 AND genres.id = 1",
     where_field_ambiguous: "SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3",

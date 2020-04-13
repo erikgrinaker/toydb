@@ -11,6 +11,8 @@ use super::schema::Catalog;
 use super::types::{Expression, Row, Value};
 use crate::Error;
 
+use std::collections::HashSet;
+
 /// The SQL engine interface
 pub trait Engine: Clone {
     /// The transaction type
@@ -62,8 +64,13 @@ pub trait Transaction: Catalog {
     fn delete(&mut self, table: &str, id: &Value) -> Result<(), Error>;
     /// Reads a table row, if it exists
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error>;
+    /// Reads an index entry, if it exists
+    fn read_index(&self, table: &str, column: &str, value: &Value)
+        -> Result<HashSet<Value>, Error>;
     /// Scans a table's rows
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan, Error>;
+    /// Scans a column's index entries
+    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan, Error>;
     /// Updates a table row
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error>;
 }
@@ -155,3 +162,7 @@ pub type Mode = crate::kv::Mode;
 
 /// A row scan iterator
 pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row, Error>> + Send>;
+
+/// An index scan iterator
+pub type IndexScan =
+    Box<dyn DoubleEndedIterator<Item = Result<(Value, HashSet<Value>), Error>> + Send>;

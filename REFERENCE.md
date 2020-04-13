@@ -19,7 +19,7 @@ Numeric types are not interchangable; a float value (even without a fractional p
 
 Keywords are reserved words with special meaning in SQL statements. They are case-insensitive, and must be quoted with `"` to be used as identifiers. The complete list is:
 
-`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `EXPLAIN`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
+`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `EXPLAIN`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `INDEX`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
@@ -190,7 +190,7 @@ Creates a new table.
 
 <pre>
 CREATE TABLE <b><i>table_name</i></b> (
-    [ <b><i>column_name</i></b> <b><i>data_type</i></b> [ <b><i>column_constraint</i></b> [ ... ] ] [, ... ] ]
+    [ <b><i>column_name</i></b> <b><i>data_type</i></b> [ <b><i>column_constraint</i></b> [ ... ] ]  [ INDEX ] [, ... ] ]
 )
 
 where <b><i>column_constraint</i></b> is:
@@ -216,14 +216,16 @@ where <b><i>column_constraint</i></b> is:
 
 * `UNIQUE`: The column may only contain unique (distinct) values. `NULL` values are not considered equal, thus a `UNIQUE` column which allows `NULL` may contain multiple `NULL` values. `PRIMARY KEY` columns are implicitly `UNIQUE`.
 
+* `INDEX`: Create an index for the column.
+
 #### Example
 
 ```sql
 CREATE TABLE movie (
     id INTEGER PRIMARY KEY,
     title STRING NOT NULL,
-    release_year INTEGER,
-    imdb_id STRING UNIQUE,
+    release_year INTEGER INDEX,
+    imdb_id STRING INDEX UNIQUE,
     bluray BOOLEAN NOT NULL DEFAULT TRUE
 )
 ```

@@ -34,6 +34,16 @@ macro_rules! test_schema {
                     for row in txn.scan(&table.name, None)? {
                         write!(f, "{:?}\n", row?)?;
                     }
+
+                    for column in table.columns.iter().filter(|c| c.index) {
+                        write!(f, "\nIndex {}.{}\n", table.name, column.name)?;
+                        let mut scan = txn.scan_index(&table.name, &column.name)?;
+                        while let Some((value, pks)) = scan.next().transpose()? {
+                            let mut pks = pks.into_iter().collect::<Vec<_>>();
+                            pks.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                            write!(f, "{:?} => {:?}\n", value, pks)?;
+                        }
+                    }
                 }
                 txn.rollback()?;
 
@@ -102,6 +112,9 @@ test_schema! {
     create_table_default_conflict: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT 7)",
     create_table_default_conflict_float_integer: "CREATE TABLE name (id INTEGER PRIMARY KEY, value FLOAT DEFAULT 7)",
     create_table_default_conflict_integer_float: "CREATE TABLE name (id INTEGER PRIMARY KEY, value INTEGER DEFAULT 3.14)",
+
+    create_table_index: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING INDEX)",
+    create_table_index_pk: "CREATE TABLE name (id INTEGER PRIMARY KEY INDEX, value STRING)",
 
     create_table_unique: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING UNIQUE)",
     create_table_unique_null: "CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NULL UNIQUE)",
@@ -408,4 +421,26 @@ test_schema! { with [
     update_ref_self_pk: "UPDATE self SET id = 9 WHERE id = 1",
     update_ref_self_pk_noref: "UPDATE self SET id = 9 WHERE id = 2",
     update_ref_self_self: "UPDATE self SET self_id = 2 WHERE id = 2",
+}
+
+test_schema! { with [
+        "CREATE TABLE test (id INTEGER PRIMARY KEY, name STRING INDEX, value INTEGER)",
+        "INSERT INTO test VALUES (1, 'a', 101), (2, 'b', 102), (3, 'b', 103)",
+    ];
+
+    delete_index_only: "DELETE FROM test WHERE id = 1",
+    delete_index_single: "DELETE FROM test WHERE id = 2",
+    delete_index_all: "DELETE FROM test",
+
+    insert_index_exists: "INSERT INTO test VALUES (4, 'b', 104)",
+    insert_index_new: "INSERT INTO test VALUES (4, 'c', 104)",
+    insert_index_null: "INSERT INTO test VALUES (4, NULL, 104)",
+
+    update_index_same: "UPDATE test SET value = 102 WHERE id = 3",
+    update_index_new: "UPDATE test SET name = 'c' WHERE id = 3",
+    update_index_existing: "UPDATE test SET name = 'a' WHERE id = 2",
+    update_index_last: "UPDATE test SET name = 'b' WHERE id = 1",
+    update_index_swap: "UPDATE test SET name = 'c' WHERE id = 1",
+    update_index_pk: "UPDATE test SET id = 4 WHERE id = 1",
+    update_index_null: "UPDATE test SET name = NULL WHERE id = 3",
 }

@@ -6,6 +6,8 @@ use crate::raft;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
+use std::collections::HashSet;
+
 /// A Raft state machine mutation
 #[derive(Clone, Serialize, Deserialize)]
 enum Mutation {
@@ -37,8 +39,12 @@ enum Query {
 
     /// Reads a row
     Read { txn_id: u64, table: String, id: Value },
+    /// Reads an index entry
+    ReadIndex { txn_id: u64, table: String, column: String, value: Value },
     /// Scans a table's rows
     Scan { txn_id: u64, table: String, filter: Option<Expression> },
+    /// Scans an index
+    ScanIndex { txn_id: u64, table: String, column: String },
 
     /// Scans the tables
     ScanTables { txn_id: u64 },
@@ -143,12 +149,38 @@ impl super::Transaction for Transaction {
         })?)?)
     }
 
+    fn read_index(
+        &self,
+        table: &str,
+        column: &str,
+        value: &Value,
+    ) -> Result<HashSet<Value>, Error> {
+        deserialize(&self.raft.query(serialize(&Query::ReadIndex {
+            txn_id: self.id,
+            table: table.to_string(),
+            column: column.to_string(),
+            value: value.clone(),
+        })?)?)
+    }
+
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan, Error> {
         Ok(Box::new(
             deserialize::<Vec<_>>(&self.raft.query(serialize(&Query::Scan {
                 txn_id: self.id,
                 table: table.to_string(),
                 filter,
+            })?)?)?
+            .into_iter()
+            .map(Ok),
+        ))
+    }
+
+    fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan, Error> {
+        Ok(Box::new(
+            deserialize::<Vec<_>>(&self.raft.query(serialize(&Query::ScanIndex {
+                txn_id: self.id,
+                table: table.to_string(),
+                column: column.to_string(),
             })?)?)?
             .into_iter()
             .map(Ok),
@@ -248,12 +280,22 @@ impl<S: kv::storage::Storage> raft::State for State<S> {
             Query::Read { txn_id, table, id } => {
                 serialize(&self.engine.resume(txn_id)?.read(&table, &id)?)
             }
-            // FIXME This needs to stream rows somehow
+            Query::ReadIndex { txn_id, table, column, value } => {
+                serialize(&self.engine.resume(txn_id)?.read_index(&table, &column, &value)?)
+            }
+            // FIXME These need to stream rows somehow
             Query::Scan { txn_id, table, filter } => serialize(
                 &self
                     .engine
                     .resume(txn_id)?
                     .scan(&table, filter)?
+                    .collect::<Result<Vec<_>, Error>>()?,
+            ),
+            Query::ScanIndex { txn_id, table, column } => serialize(
+                &self
+                    .engine
+                    .resume(txn_id)?
+                    .scan_index(&table, &column)?
                     .collect::<Result<Vec<_>, Error>>()?,
             ),
 

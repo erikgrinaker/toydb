@@ -1,0 +1,18 @@
+Query: INSERT INTO test VALUES (4, NULL, 104)
+Result: Create { count: 1 }
+
+Storage:
+CREATE TABLE test (
+  id INTEGER PRIMARY KEY,
+  name STRING DEFAULT NULL INDEX,
+  value INTEGER DEFAULT NULL
+)
+[Integer(1), String("a"), Integer(101)]
+[Integer(2), String("b"), Integer(102)]
+[Integer(3), String("b"), Integer(103)]
+[Integer(4), Null, Integer(104)]
+
+Index test.name
+Null => [Integer(4)]
+String("a") => [Integer(1)]
+String("b") => [Integer(2), Integer(3)]

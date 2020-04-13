@@ -49,6 +49,7 @@ pub struct ColumnSpec {
     pub nullable: Option<bool>,
     pub default: Option<Expression>,
     pub unique: bool,
+    pub index: bool,
     pub references: Option<String>,
 }
 

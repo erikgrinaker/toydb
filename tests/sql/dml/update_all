@@ -11,9 +11,12 @@ CREATE TABLE other (
 
 CREATE TABLE test (
   id INTEGER PRIMARY KEY DEFAULT 0,
-  name STRING DEFAULT NULL,
+  name STRING DEFAULT NULL INDEX,
   value INTEGER DEFAULT NULL
 )
 [Integer(1), String("x"), Integer(999)]
 [Integer(2), String("x"), Integer(999)]
 [Integer(3), String("x"), Integer(999)]
+
+Index test.name
+String("x") => [Integer(1), Integer(2), Integer(3)]

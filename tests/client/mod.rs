@@ -105,6 +105,7 @@ fn get_table() -> Result<(), Error> {
                     nullable: false,
                     default: None,
                     unique: true,
+                    index: false,
                     references: None,
                 },
                 schema::Column {
@@ -114,6 +115,7 @@ fn get_table() -> Result<(), Error> {
                     nullable: false,
                     default: None,
                     unique: false,
+                    index: false,
                     references: None,
                 },
                 schema::Column {
@@ -123,6 +125,7 @@ fn get_table() -> Result<(), Error> {
                     nullable: false,
                     default: None,
                     unique: false,
+                    index: false,
                     references: Some("studios".into()),
                 },
                 schema::Column {
@@ -132,6 +135,7 @@ fn get_table() -> Result<(), Error> {
                     nullable: false,
                     default: None,
                     unique: false,
+                    index: false,
                     references: Some("genres".into()),
                 },
                 schema::Column {
@@ -141,6 +145,7 @@ fn get_table() -> Result<(), Error> {
                     nullable: false,
                     default: None,
                     unique: false,
+                    index: false,
                     references: None,
                 },
                 schema::Column {
@@ -150,6 +155,7 @@ fn get_table() -> Result<(), Error> {
                     nullable: true,
                     default: Some(Value::Null),
                     unique: false,
+                    index: false,
                     references: None,
                 },
                 schema::Column {
@@ -159,6 +165,7 @@ fn get_table() -> Result<(), Error> {
                     nullable: true,
                     default: Some(Value::Null),
                     unique: false,
+                    index: false,
                     references: None,
                 },
             ]

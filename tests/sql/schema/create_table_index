@@ -1,0 +1,10 @@
+Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING INDEX)
+Result: CreateTable { name: "name" }
+
+Storage:
+CREATE TABLE name (
+  id INTEGER PRIMARY KEY,
+  value STRING DEFAULT NULL INDEX
+)
+
+Index name.value

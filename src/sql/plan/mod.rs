@@ -62,6 +62,12 @@ pub enum Node {
         source: Box<Node>,
         predicate: Expression,
     },
+    IndexLookup {
+        table: String,
+        alias: Option<String>,
+        column: String,
+        keys: Vec<Value>,
+    },
     Insert {
         table: String,
         columns: Vec<String>,
@@ -121,6 +127,7 @@ impl Node {
         self = match self {
             n @ Self::CreateTable { .. } => n,
             n @ Self::DropTable { .. } => n,
+            n @ Self::IndexLookup { .. } => n,
             n @ Self::Insert { .. } => n,
             n @ Self::KeyLookup { .. } => n,
             n @ Self::Nothing => n,
@@ -176,6 +183,7 @@ impl Node {
             n @ Self::Delete { .. } => n,
             n @ Self::DropTable { .. } => n,
             n @ Self::Explain { .. } => n,
+            n @ Self::IndexLookup { .. } => n,
             n @ Self::KeyLookup { .. } => n,
             n @ Self::Limit { .. } => n,
             n @ Self::NestedLoopJoin { .. } => n,

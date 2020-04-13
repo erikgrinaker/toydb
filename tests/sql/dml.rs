@@ -37,6 +37,16 @@ macro_rules! test_dml {
                     for row in txn.scan(&table.name, None)? {
                         write!(f, "{:?}\n", row?)?;
                     }
+
+                    for column in table.columns.iter().filter(|c| c.index) {
+                        write!(f, "\nIndex {}.{}\n", table.name, column.name)?;
+                        let mut scan = txn.scan_index(&table.name, &column.name)?;
+                        while let Some((value, pks)) = scan.next().transpose()? {
+                            let mut pks = pks.into_iter().collect::<Vec<_>>();
+                            pks.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                            write!(f, "{:?} => {:?}\n", value, pks)?;
+                        }
+                    }
                 }
                 txn.rollback()?;
 
@@ -49,7 +59,7 @@ macro_rules! test_dml {
 test_dml! { with [
         "CREATE TABLE test (
             id INTEGER PRIMARY KEY DEFAULT 0,
-            name STRING,
+            name STRING INDEX,
             value INTEGER
         )",
         "INSERT INTO test VALUES (1, 'a', 101), (2, 'b', 102), (3, 'c', 103)",
@@ -79,7 +89,7 @@ test_dml! { with [
 test_dml! { with [
         "CREATE TABLE test (
             id INTEGER PRIMARY KEY DEFAULT 0,
-            name STRING,
+            name STRING INDEX,
             value INTEGER
         )",
         "CREATE TABLE other (id INTEGER PRIMARY KEY)"
@@ -112,7 +122,7 @@ test_dml! { with [
 test_dml! { with [
         "CREATE TABLE test (
             id INTEGER PRIMARY KEY DEFAULT 0,
-            name STRING,
+            name STRING INDEX,
             value INTEGER
         )",
         "INSERT INTO test VALUES (1, 'a', 100), (2, 'b', 102), (3, 'c', 103)",

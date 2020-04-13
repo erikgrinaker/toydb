@@ -252,7 +252,7 @@ impl Bank {
         client.query(
             "CREATE TABLE account (
                 id INTEGER PRIMARY KEY,
-                customer_id INTEGER NOT NULL REFERENCES customer,
+                customer_id INTEGER NOT NULL INDEX REFERENCES customer,
                 balance INTEGER NOT NULL
            )",
         )?;

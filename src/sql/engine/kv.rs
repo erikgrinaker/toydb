@@ -5,6 +5,8 @@ use crate::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
+use std::collections::HashSet;
+
 /// A SQL engine based on an underlying MVCC key/value store
 pub struct KV<S: kv::storage::Storage> {
     /// The underlying key/value store
@@ -47,6 +49,40 @@ impl<S: kv::storage::Storage> Transaction<S> {
     fn new(txn: kv::Transaction<S>) -> Self {
         Self { txn }
     }
+
+    /// Loads an index entry
+    fn index_load(
+        &self,
+        table: &str,
+        column: &str,
+        value: &Value,
+    ) -> Result<HashSet<Value>, Error> {
+        let key = Key::Index(table, column, value).encode();
+        if let Some(value) = self.txn.get(&key)? {
+            let item: (Value, HashSet<Value>) = deserialize(&value)?;
+            Ok(item.1)
+        } else {
+            Ok(HashSet::new())
+        }
+    }
+
+    /// Saves an index entry.
+    /// FIXME We save the index key as part of the value, to avoid having to implement key decoders
+    /// right now.
+    fn index_save(
+        &mut self,
+        table: &str,
+        column: &str,
+        value: &Value,
+        index: HashSet<Value>,
+    ) -> Result<(), Error> {
+        let key = Key::Index(table, column, value).encode();
+        if index.is_empty() {
+            self.txn.delete(&key)
+        } else {
+            self.txn.set(&key, serialize(&(value, index))?)
+        }
+    }
 }
 
 impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
@@ -76,17 +112,48 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
                 id, table.name
             )));
         }
-        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
+        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)?;
+
+        // Update indexes
+        for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
+            let mut index = self.index_load(&table.name, &column.name, &row[i])?;
+            index.insert(id.clone());
+            self.index_save(&table.name, &column.name, &row[i], index)?;
+        }
+        Ok(())
     }
 
     fn delete(&mut self, table: &str, id: &Value) -> Result<(), Error> {
         let table = self.must_read_table(&table)?;
         table.assert_unreferenced_key(id, self)?;
+
+        let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
+        if !indexes.is_empty() {
+            if let Some(row) = self.read(&table.name, id)? {
+                for (i, column) in indexes {
+                    let mut index = self.index_load(&table.name, &column.name, &row[i])?;
+                    index.remove(id);
+                    self.index_save(&table.name, &column.name, &row[i], index)?;
+                }
+            }
+        }
         self.txn.delete(&Key::Row(&table.name, id).encode())
     }
 
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error> {
         self.txn.get(&Key::Row(table, id).encode())?.map(|v| deserialize(&v)).transpose()
+    }
+
+    fn read_index(
+        &self,
+        table: &str,
+        column: &str,
+        value: &Value,
+    ) -> Result<HashSet<Value>, Error> {
+        if !self.must_read_table(table)?.get_column(column)?.index {
+            return Err(Error::Value(format!("No index on {}.{}", table, column)));
+        }
+        self.index_load(table, column, value)
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan, Error> {
@@ -115,16 +182,54 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
         Ok(Box::new(scan.collect::<Vec<Result<Row, Error>>>().into_iter()))
     }
 
+    fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan, Error> {
+        let table = self.must_read_table(&table)?;
+        let column = table.get_column(column)?;
+        if !column.index {
+            return Err(Error::Value(format!("No index for {}.{}", table.name, column.name)));
+        }
+
+        let scan = self
+            .txn
+            .scan(
+                &Key::IndexStart(&table.name, &column.name).encode()
+                    ..&Key::IndexEnd(&table.name, &column.name).encode(),
+            )?
+            .map(|r| r.and_then(|(_, v)| deserialize(&v)));
+
+        // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
+        Ok(Box::new(scan.collect::<Vec<Result<(Value, HashSet<Value>), Error>>>().into_iter()))
+    }
+
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error> {
         let table = self.must_read_table(&table)?;
         // If the primary key changes we do a delete and create, otherwise we replace the row
         if id != &table.get_row_key(&row)? {
             self.delete(&table.name, id)?;
-            self.create(&table.name, row)
-        } else {
-            table.validate_row(&row, self)?;
-            self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
+            self.create(&table.name, row)?;
+            return Ok(());
         }
+
+        // Update indexes, knowing that the primary key has not changed
+        let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
+        if !indexes.is_empty() {
+            let old = self.read(&table.name, id)?.unwrap();
+            for (i, column) in indexes {
+                if old[i] == row[i] {
+                    continue;
+                }
+                let mut index = self.index_load(&table.name, &column.name, &old[i])?;
+                index.remove(id);
+                self.index_save(&table.name, &column.name, &old[i], index)?;
+
+                let mut index = self.index_load(&table.name, &column.name, &row[i])?;
+                index.insert(id.clone());
+                self.index_save(&table.name, &column.name, &row[i], index)?;
+            }
+        }
+
+        table.validate_row(&row, self)?;
+        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
     }
 }
 
@@ -170,6 +275,12 @@ enum Key<'a> {
     Table(&'a str),
     /// The end of the table schema keyspace
     TableEnd,
+    /// The start of the index keyspace for a table and column
+    IndexStart(&'a str, &'a str),
+    /// A key for an index entry
+    Index(&'a str, &'a str, &'a Value),
+    /// The end of the index keyspace for a table and column
+    IndexEnd(&'a str, &'a str),
     /// The start of the row keyspace of the given table name
     RowStart(&'a str),
     /// A key for a row identified by table name and row primary key
@@ -185,22 +296,48 @@ impl<'a> Key<'a> {
             Self::TableStart => vec![0x01],
             Self::Table(name) => [vec![0x01], name.as_bytes().to_vec()].concat(),
             Self::TableEnd => vec![0x02],
-            Self::RowStart(table) => [vec![0x03], table.as_bytes().to_vec(), vec![0x00]].concat(),
-            Self::Row(table, pk) => [
+            Self::IndexStart(table, column) => [
                 vec![0x03],
                 table.as_bytes().to_vec(),
                 vec![0x00],
-                match pk {
-                    Value::Boolean(b) if *b => vec![0x01],
-                    Value::Boolean(_) => vec![0x00],
-                    Value::Float(f) => f.to_be_bytes().to_vec(),
-                    Value::Integer(i) => i.to_be_bytes().to_vec(),
-                    Value::String(s) => s.as_bytes().to_vec(),
-                    Value::Null => panic!("Received NULL primary key"),
-                },
+                column.as_bytes().to_vec(),
+                vec![0x00],
             ]
             .concat(),
-            Self::RowEnd(table) => [vec![0x03], table.as_bytes().to_vec(), vec![0xff]].concat(),
+            Self::Index(table, column, value) => [
+                vec![0x03],
+                table.as_bytes().to_vec(),
+                vec![0x00],
+                column.as_bytes().to_vec(),
+                vec![0x00],
+                Self::encode_value(value),
+            ]
+            .concat(),
+            Self::IndexEnd(table, column) => [
+                vec![0x03],
+                table.as_bytes().to_vec(),
+                vec![0x00],
+                column.as_bytes().to_vec(),
+                vec![0xff],
+            ]
+            .concat(),
+            Self::RowStart(table) => [vec![0x05], table.as_bytes().to_vec(), vec![0x00]].concat(),
+            Self::Row(table, pk) => {
+                [vec![0x05], table.as_bytes().to_vec(), vec![0x00], Self::encode_value(pk)].concat()
+            }
+            Self::RowEnd(table) => [vec![0x05], table.as_bytes().to_vec(), vec![0xff]].concat(),
+        }
+    }
+
+    /// Encodes a value as a byte vector
+    fn encode_value(value: &Value) -> Vec<u8> {
+        match value {
+            Value::Boolean(b) if *b => vec![0x01],
+            Value::Boolean(_) => vec![0x00],
+            Value::Float(f) => f.to_be_bytes().to_vec(),
+            Value::Integer(i) => i.to_be_bytes().to_vec(),
+            Value::String(s) => s.as_bytes().to_vec(),
+            Value::Null => vec![],
         }
     }
 }

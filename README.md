@@ -8,7 +8,7 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 * ACID-compliant transaction engine with MVCC-based snapshot isolation.
 
-* Iterator-based query engine with heuristic optimization and time-travel support.
+* Iterator-based query engine with heuristic optimization, secondary indexes, and time-travel support.
 
 * SQL interface including projections, filters, joins, and aggregates.
 

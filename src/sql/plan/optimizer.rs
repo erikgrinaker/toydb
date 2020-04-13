@@ -1,5 +1,5 @@
 use super::super::schema::Catalog;
-use super::super::types::{Environment, Expression};
+use super::super::types::{Environment, Expression, Value};
 use super::Node;
 use crate::Error;
 
@@ -96,6 +96,25 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
     pub fn new(catalog: &'a mut C) -> Self {
         Self { catalog }
     }
+
+    pub fn is_lookup(column: &str, expr: &Expression) -> Option<Value> {
+        if let Expression::Equal(lhs, rhs) = expr {
+            match (*lhs.clone(), *rhs.clone()) {
+                (Expression::Field(None, name), Expression::Constant(v))
+                | (Expression::Constant(v), Expression::Field(None, name))
+                    if name == column =>
+                {
+                    // FIXME Handle IS NULL instead
+                    return match v {
+                        Value::Null => None,
+                        v => Some(v),
+                    };
+                }
+                _ => {}
+            }
+        }
+        None
+    }
 }
 
 impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
@@ -103,24 +122,28 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
         node.transform(
             &|n| match n {
                 // FIXME This needs to be smarter - at least handle ORs. Could be prettier too.
-                Node::Scan { table, alias, filter: Some(Expression::Equal(lhs, rhs)) } => {
+                Node::Scan { table, alias, filter: Some(expr @ Expression::Equal(_, _)) } => {
                     if let Some(table) = self.catalog.read_table(&table)? {
                         let pk = table.get_primary_key()?.name.clone();
-                        match (*lhs.clone(), *rhs.clone()) {
-                            (Expression::Field(None, name), Expression::Constant(v))
-                            | (Expression::Constant(v), Expression::Field(None, name))
-                                if name == pk =>
-                            {
-                                return Ok(Node::KeyLookup {
+                        if let Some(value) = Self::is_lookup(&pk, &expr) {
+                            return Ok(Node::KeyLookup {
+                                table: table.name,
+                                alias,
+                                keys: vec![value],
+                            });
+                        }
+                        for column in table.columns.into_iter().filter(|c| c.index) {
+                            if let Some(value) = Self::is_lookup(&column.name, &expr) {
+                                return Ok(Node::IndexLookup {
                                     table: table.name,
                                     alias,
-                                    keys: vec![v],
+                                    column: column.name,
+                                    keys: vec![value],
                                 });
                             }
-                            _ => {}
                         }
                     }
-                    Ok(Node::Scan { table, alias, filter: Some(Expression::Equal(lhs, rhs)) })
+                    Ok(Node::Scan { table, alias, filter: Some(expr) })
                 }
                 n => Ok(n),
             },
