@@ -1,4 +1,4 @@
-Query: SELECT * FROM movies WHERE genre_id = 2
+Query: SELECT * FROM movies WHERE genre_id = 2 ORDER BY id
 
 AST: Select {
     select: SelectClause {
@@ -34,47 +34,77 @@ AST: Select {
     ),
     group_by: None,
     having: None,
-    order: [],
+    order: [
+        (
+            Field(
+                None,
+                "id",
+            ),
+            Ascending,
+        ),
+    ],
     limit: None,
     offset: None,
 }
 
 Plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        predicate: Equal(
-            Field(
-                None,
-                "genre_id",
-            ),
-            Constant(
-                Integer(
-                    2,
+    Order {
+        source: Filter {
+            source: Scan {
+                table: "movies",
+                alias: None,
+                filter: None,
+            },
+            predicate: Equal(
+                Field(
+                    None,
+                    "genre_id",
+                ),
+                Constant(
+                    Integer(
+                        2,
+                    ),
                 ),
             ),
-        ),
-    },
-)
-
-Optimized plan: Plan(
-    IndexLookup {
-        table: "movies",
-        alias: None,
-        column: "genre_id",
-        keys: [
-            Integer(
-                2,
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "id",
+                ),
+                Ascending,
             ),
         ],
     },
 )
 
-Query: SELECT * FROM movies WHERE genre_id = 2
+Optimized plan: Plan(
+    Order {
+        source: IndexLookup {
+            table: "movies",
+            alias: None,
+            column: "genre_id",
+            keys: [
+                Integer(
+                    2,
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    None,
+                    "id",
+                ),
+                Ascending,
+            ),
+        ],
+    },
+)
+
+Query: SELECT * FROM movies WHERE genre_id = 2 ORDER BY id
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
-[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
 [Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
