@@ -1,9 +1,16 @@
 use crate::Error;
 
+use std::io::Read;
+
 /// Deserializes a value from a byte buffer, using MessagePack.
 /// Returns `Error::Internal` on error.
 pub fn deserialize<'de, V: serde::Deserialize<'de>>(bytes: &[u8]) -> Result<V, Error> {
     Ok(serde::Deserialize::deserialize(&mut rmps::Deserializer::new(bytes))?)
+}
+
+/// Deserializes the next value from a reader, using MessagePack.
+pub fn deserialize_read<R: Read, V: serde::de::DeserializeOwned>(reader: R) -> Result<V, Error> {
+    Ok(rmps::decode::from_read(reader)?)
 }
 
 /// Serializes a value into a byte buffer, using MessagePack.

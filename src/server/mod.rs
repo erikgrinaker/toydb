@@ -49,7 +49,7 @@ impl Server {
                     .create(true)
                     .open(data_path.join("state"))?,
             )?)),
-            kv::Simple::new(kv::storage::File::new(
+            kv::Simple::new(kv::storage::BLog::new(
                 std::fs::OpenOptions::new()
                     .read(true)
                     .write(true)

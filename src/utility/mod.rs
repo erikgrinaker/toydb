@@ -1,3 +1,3 @@
 mod serialize;
 
-pub use serialize::{deserialize, serialize};
+pub use serialize::{deserialize, deserialize_read, serialize};
