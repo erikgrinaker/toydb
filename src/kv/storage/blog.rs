@@ -34,11 +34,9 @@ impl BLog {
 
     /// Builds the index by scanning the file.
     fn build_index(mut file: &mut File) -> Result<BTreeMap<Vec<u8>, u64>, Error> {
-        let size = file.metadata()?.len();
-        let mut pos = file.seek(SeekFrom::Start(0))?;
         let mut index = BTreeMap::new();
-        while pos < size {
-            let entry: Entry = deserialize_read(&mut file)?;
+        let mut pos = file.seek(SeekFrom::Start(0))?;
+        while let Some(entry) = deserialize_read::<_, Entry>(&mut file)? {
             index.insert(entry.key, pos);
             pos = file.seek(SeekFrom::Current(0))?;
         }
@@ -49,7 +47,7 @@ impl BLog {
     fn load(&self, pos: u64) -> Result<Entry, Error> {
         let mut cursor = self.file.write()?;
         cursor.seek(SeekFrom::Start(pos))?;
-        Ok(deserialize_read(&*cursor)?)
+        deserialize_read(&*cursor)?.ok_or_else(|| Error::Value("No log entry found".into()))
     }
 
     /// Saves an entry by appending it to the log, returning its position.
