@@ -16,9 +16,6 @@ pub async fn server(
     addr_raft: &str,
     peers: HashMap<String, String>,
 ) -> Result<Box<dyn FnOnce()>, Error> {
-    let addr_sql = addr_sql.to_string();
-    let addr_raft = addr_raft.to_string();
-
     let data_dir = tempdir::TempDir::new("toydb").unwrap();
     let srv = Server::new(
         id,
@@ -26,12 +23,11 @@ pub async fn server(
         &data_dir.path().to_string_lossy(),
     )?;
 
-    let (f, abort) = srv.listen(addr_sql.to_string(), addr_raft.to_string()).remote_handle();
+    let (f, abort) = srv.listen(addr_sql.into(), addr_raft.into()).remote_handle();
 
     tokio::spawn(f);
 
     Ok(Box::new(move || {
-        std::mem::drop(addr_sql);
         std::mem::drop(abort);
     }))
 }
