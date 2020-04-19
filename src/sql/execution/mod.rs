@@ -114,6 +114,26 @@ pub enum ResultSet {
     Explain(Node),
 }
 
+impl ResultSet {
+    /// Converts the ResultSet into a Relation, or errors if not a query result.
+    pub fn into_relation(self) -> Result<Relation, Error> {
+        match self {
+            ResultSet::Query { relation } => Ok(relation),
+            r => Err(Error::Value(format!("Not a query result: {:?}", r))),
+        }
+    }
+
+    /// Converts the ResultSet into a Row, or errors if not a query result with rows.
+    pub fn into_row(self) -> Result<Row, Error> {
+        self.into_relation()?.into_row()?.ok_or_else(|| Error::Value("No rows returned".into()))
+    }
+
+    /// Converts the ResultSet into a Value, if possible.
+    pub fn into_value(self) -> Result<Value, Error> {
+        self.into_relation()?.into_value()?.ok_or_else(|| Error::Value("No value returned".into()))
+    }
+}
+
 /// Column metadata for a result.
 /// FIXME This is outdated and should be removed.
 #[derive(Clone, Serialize, Deserialize)]

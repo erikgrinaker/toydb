@@ -116,3 +116,9 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
         Error::Internal(err.to_string())
     }
 }
+
+impl From<tokio::task::JoinError> for Error {
+    fn from(err: tokio::task::JoinError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}

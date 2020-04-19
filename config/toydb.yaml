@@ -1,5 +1,6 @@
 id: toydb
-listen: 0.0.0.0:9605
+listen_sql: 0.0.0.0:9605
+listen_raft: 0.0.0.0:9705
 log_level: INFO
 data_dir: /var/lib/toydb
 peers: {}

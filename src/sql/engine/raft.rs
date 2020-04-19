@@ -74,8 +74,8 @@ impl Raft {
 impl super::Engine for Raft {
     type Transaction = Transaction;
 
-    fn begin_with_mode(&self, mode: super::Mode) -> Result<Self::Transaction, Error> {
-        Transaction::begin_with_mode(self.raft.clone(), mode)
+    fn begin(&self, mode: super::Mode) -> Result<Self::Transaction, Error> {
+        Transaction::begin(self.raft.clone(), mode)
     }
 
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
@@ -96,7 +96,7 @@ pub struct Transaction {
 
 impl Transaction {
     /// Starts a transaction in the given mode
-    fn begin_with_mode(raft: raft::Raft, mode: super::Mode) -> Result<Self, Error> {
+    fn begin(raft: raft::Raft, mode: super::Mode) -> Result<Self, Error> {
         let id = deserialize(&raft.mutate(serialize(&Mutation::Begin(mode.clone()))?)?)?;
         Ok(Self { raft, id, mode })
     }
@@ -247,7 +247,7 @@ impl<S: kv::storage::Storage> State<S> {
 impl<S: kv::storage::Storage> raft::State for State<S> {
     fn mutate(&mut self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
         match deserialize(&command)? {
-            Mutation::Begin(mode) => serialize(&self.engine.begin_with_mode(mode)?.id()),
+            Mutation::Begin(mode) => serialize(&self.engine.begin(mode)?.id()),
             Mutation::Commit(txn_id) => serialize(&self.engine.resume(txn_id)?.commit()?),
             Mutation::Rollback(txn_id) => serialize(&self.engine.resume(txn_id)?.rollback()?),
 

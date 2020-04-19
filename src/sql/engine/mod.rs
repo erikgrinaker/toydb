@@ -18,33 +18,16 @@ pub trait Engine: Clone {
     /// The transaction type
     type Transaction: Transaction;
 
-    /// Begins a typical read-write transaction
-    fn begin(&self) -> Result<Self::Transaction, Error> {
-        self.begin_with_mode(Mode::ReadWrite)
-    }
-
-    /// Begins a session, optionally resuming an active transaction with the given ID
-    fn session(&self, id: Option<u64>) -> Result<Session<Self>, Error> {
-        let txn = if let Some(id) = id { Some(self.resume(id)?) } else { None };
-        Ok(Session { engine: self.clone(), txn })
-    }
-
     /// Begins a transaction in the given mode
-    fn begin_with_mode(&self, mode: Mode) -> Result<Self::Transaction, Error>;
+    fn begin(&self, mode: Mode) -> Result<Self::Transaction, Error>;
+
+    /// Begins a session for executing individual statements
+    fn session(&self) -> Result<Session<Self>, Error> {
+        Ok(Session { engine: self.clone(), txn: None })
+    }
 
     /// Resumes an active transaction with the given ID
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error>;
-
-    /// Runs a closure in a transaction
-    fn with_txn<R, F>(&self, mode: Mode, f: F) -> Result<R, Error>
-    where
-        F: FnOnce(&mut Self::Transaction) -> Result<R, Error>,
-    {
-        let mut txn = self.begin_with_mode(mode)?;
-        let res = f(&mut txn);
-        txn.rollback()?;
-        res
-    }
 }
 
 /// An SQL transaction
@@ -94,13 +77,13 @@ impl<E: Engine + 'static> Session<E> {
                 Err(Error::Value("Already in a transaction".into()))
             }
             ast::Statement::Begin { readonly: true, version: None } => {
-                let txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
+                let txn = self.engine.begin(Mode::ReadOnly)?;
                 let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
                 self.txn = Some(txn);
                 Ok(result)
             }
             ast::Statement::Begin { readonly: true, version: Some(version) } => {
-                let txn = self.engine.begin_with_mode(Mode::Snapshot { version })?;
+                let txn = self.engine.begin(Mode::Snapshot { version })?;
                 let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
                 self.txn = Some(txn);
                 Ok(result)
@@ -109,7 +92,7 @@ impl<E: Engine + 'static> Session<E> {
                 Err(Error::Value("Can't start read-write transaction in a given version".into()))
             }
             ast::Statement::Begin { readonly: false, version: None } => {
-                let txn = self.engine.begin_with_mode(Mode::ReadWrite)?;
+                let txn = self.engine.begin(Mode::ReadWrite)?;
                 let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
                 self.txn = Some(txn);
                 Ok(result)
@@ -133,14 +116,14 @@ impl<E: Engine + 'static> Session<E> {
                 .optimize(self.txn.as_mut().unwrap())?
                 .execute(Context { txn: self.txn.as_mut().unwrap() }),
             statement @ ast::Statement::Select { .. } => {
-                let mut txn = self.engine.begin_with_mode(Mode::ReadOnly)?;
+                let mut txn = self.engine.begin(Mode::ReadOnly)?;
                 let result =
                     Plan::build(statement)?.optimize(&mut txn)?.execute(Context { txn: &mut txn });
                 txn.rollback()?;
                 result
             }
             statement => {
-                let mut txn = self.engine.begin_with_mode(Mode::ReadWrite)?;
+                let mut txn = self.engine.begin(Mode::ReadWrite)?;
                 match Plan::build(statement)?.optimize(&mut txn)?.execute(Context { txn: &mut txn })
                 {
                     Ok(result) => {
@@ -154,6 +137,25 @@ impl<E: Engine + 'static> Session<E> {
                 }
             }
         }
+    }
+
+    /// Runs a closure in the session's transaction, or a new transaction if none is active.
+    pub fn with_txn<R, F>(&mut self, mode: Mode, f: F) -> Result<R, Error>
+    where
+        F: FnOnce(&mut E::Transaction) -> Result<R, Error>,
+    {
+        if let Some(ref mut txn) = self.txn {
+            if !txn.mode().satisfies(&mode) {
+                return Err(Error::Value(
+                    "The operation cannot run in the current transaction".into(),
+                ));
+            }
+            return f(txn);
+        }
+        let mut txn = self.engine.begin(mode)?;
+        let result = f(&mut txn);
+        txn.rollback()?;
+        result
     }
 }
 

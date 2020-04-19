@@ -6,7 +6,7 @@ use toydb::Error;
 
 fn eval_expr(expr: &str) -> Result<Value, Error> {
     let engine = super::setup(Vec::new())?;
-    match engine.session(None)?.execute(&format!("SELECT {}", expr))? {
+    match engine.session()?.execute(&format!("SELECT {}", expr))? {
         ResultSet::Query { mut relation } => {
             Ok(relation.next().unwrap().unwrap().get(0).unwrap().clone())
         }

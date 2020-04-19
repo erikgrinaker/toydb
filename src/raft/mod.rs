@@ -98,7 +98,7 @@ impl Raft {
                     },
                 }
             })();
-            join_tx.send(result).unwrap()
+            join_tx.send(result).ok()
         });
 
         Ok(Raft { call_tx, join_rx, shutdown_tx })

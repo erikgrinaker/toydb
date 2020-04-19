@@ -11,7 +11,8 @@ extern crate toydb;
 
 use std::collections::HashMap;
 
-fn main() -> Result<(), toydb::Error> {
+#[tokio::main]
+async fn main() -> Result<(), toydb::Error> {
     let opts = app_from_crate!()
         .arg(
             clap::Arg::with_name("config")
@@ -31,15 +32,15 @@ fn main() -> Result<(), toydb::Error> {
     }
     simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
-    let mut server = toydb::Server::new(&cfg.id, cfg.parse_peers()?, &cfg.data_dir)?;
-    server.listen(&cfg.listen, 8)?;
-    server.join()
+    let server = toydb::Server::new(&cfg.id, cfg.parse_peers()?, &cfg.data_dir)?;
+    server.listen(cfg.listen_sql, cfg.listen_raft).await
 }
 
 #[derive(Debug, Deserialize)]
 struct Config {
     id: String,
-    listen: String,
+    listen_sql: String,
+    listen_raft: String,
     log_level: String,
     data_dir: String,
     peers: HashMap<String, String>,
@@ -49,7 +50,8 @@ impl Config {
     fn new(file: &str) -> Result<Self, config::ConfigError> {
         let mut c = config::Config::new();
         c.set_default("id", "toydb")?;
-        c.set_default("listen", "0.0.0.0:9605")?;
+        c.set_default("listen_sql", "0.0.0.0:9605")?;
+        c.set_default("listen_raft", "0.0.0.0:9705")?;
         c.set_default("log_level", "info")?;
         c.set_default("data_dir", "/var/lib/toydb")?;
 
@@ -67,7 +69,7 @@ impl Config {
                     sa
                 } else {
                     let ip = address.parse::<std::net::IpAddr>()?;
-                    std::net::SocketAddr::new(ip, 9605)
+                    std::net::SocketAddr::new(ip, 9705)
                 },
             );
         }

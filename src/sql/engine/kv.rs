@@ -30,7 +30,7 @@ impl<S: kv::storage::Storage> KV<S> {
 impl<S: kv::storage::Storage> super::Engine for KV<S> {
     type Transaction = Transaction<S>;
 
-    fn begin_with_mode(&self, mode: super::Mode) -> Result<Self::Transaction, Error> {
+    fn begin(&self, mode: super::Mode) -> Result<Self::Transaction, Error> {
         Ok(Self::Transaction::new(self.kv.begin_with_mode(mode)?))
     }
 

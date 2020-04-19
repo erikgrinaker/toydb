@@ -9,7 +9,7 @@ use toydb::Error;
 
 fn setup(queries: Vec<&str>) -> Result<KV<kv::storage::Memory>, Error> {
     let engine = KV::new(kv::MVCC::new(kv::storage::Memory::new()));
-    let mut session = engine.session(None)?;
+    let mut session = engine.session()?;
     session.execute("BEGIN")?;
     for query in queries {
         session.execute(query)?;

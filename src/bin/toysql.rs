@@ -5,17 +5,15 @@
 
 #![warn(clippy::all)]
 
-#[macro_use]
-extern crate clap;
-extern crate rustyline;
-extern crate toydb;
-
-use rustyline::error::ReadlineError;
+use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
+use rustyline::{error::ReadlineError, Editor};
 use toydb::sql::engine::Mode;
 use toydb::sql::execution::ResultSet;
+use toydb::Client;
 use toydb::Error;
 
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     let opts = app_from_crate!()
         .arg(clap::Arg::with_name("command"))
         .arg(clap::Arg::with_name("headers").short("H").long("headers").help("Show column headers"))
@@ -40,54 +38,56 @@ fn main() -> Result<(), Error> {
         .get_matches();
 
     let mut toysql =
-        ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)?;
+        ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)
+            .await?;
     if opts.is_present("headers") {
         toysql.show_headers = true
     }
 
     if let Some(command) = opts.value_of("command") {
-        toysql.execute(&command)
+        toysql.execute(&command).await
     } else {
-        toysql.run()
+        toysql.run().await
     }
 }
 
 /// The ToySQL REPL
 struct ToySQL {
-    client: toydb::Client,
-    editor: rustyline::Editor<()>,
+    client: Client,
+    editor: Editor<()>,
     history_path: Option<std::path::PathBuf>,
     show_headers: bool,
+    txn: Option<(u64, Mode)>,
 }
 
 impl ToySQL {
     /// Creates a new ToySQL REPL for the given server host and port
-    fn new(host: &str, port: u16) -> Result<Self, Error> {
+    async fn new(host: &str, port: u16) -> Result<Self, Error> {
         Ok(Self {
-            client: toydb::Client::new(host, port)?,
-            editor: rustyline::Editor::<()>::new(),
+            client: Client::new((host, port)).await?,
+            editor: Editor::<()>::new(),
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
             show_headers: false,
+            txn: None,
         })
     }
 
     /// Executes a line of input
-    fn execute(&mut self, input: &str) -> Result<(), Error> {
+    async fn execute(&mut self, input: &str) -> Result<(), Error> {
         if input.starts_with('!') {
-            self.execute_command(&input)
+            self.execute_command(&input).await
         } else if !input.is_empty() {
-            self.execute_query(&input)
+            self.execute_query(&input).await
         } else {
             Ok(())
         }
     }
 
     /// Handles a REPL command (prefixed by !, e.g. !help)
-    fn execute_command(&mut self, input: &str) -> Result<(), Error> {
+    async fn execute_command(&mut self, input: &str) -> Result<(), Error> {
         let mut input = input.split_ascii_whitespace();
-        let command =
-            input.next().ok_or_else(|| toydb::Error::Parse("Expected command.".to_string()))?;
+        let command = input.next().ok_or_else(|| Error::Parse("Expected command.".to_string()))?;
 
         let getargs = |n| {
             let args: Vec<&str> = input.collect();
@@ -112,22 +112,22 @@ impl ToySQL {
             },
             "!help" => println!(
                 r#"
-Enter an SQL statement on a single line to execute it and display the result.
-Semicolons are not supported. The following !-commands are also available:
+    Enter an SQL statement on a single line to execute it and display the result.
+    Semicolons are not supported. The following !-commands are also available:
 
-  !headers <on|off>  Toggles/enables/disables column headers display
-  !help              This help message
-  !table [table]     Display table schema, if it exists
-  !tables            List tables
-"#
+      !headers <on|off>  Toggles/enables/disables column headers display
+      !help              This help message
+      !table [table]     Display table schema, if it exists
+      !tables            List tables
+    "#
             ),
             "!table" => {
                 let args = getargs(1)?;
-                println!("{}", self.client.get_table(args[0])?.as_sql());
+                println!("{}", self.client.get_table(args[0]).await?.as_sql());
             }
             "!tables" => {
                 getargs(0)?;
-                for table in self.client.list_tables()? {
+                for table in self.client.list_tables().await? {
                     println!("{}", table)
                 }
             }
@@ -137,17 +137,27 @@ Semicolons are not supported. The following !-commands are also available:
     }
 
     /// Runs a query and displays the results
-    fn execute_query(&mut self, query: &str) -> Result<(), Error> {
-        match self.client.query(query)? {
-            ResultSet::Begin { id, mode: Mode::ReadWrite } => println!("Began transaction {}", id),
-            ResultSet::Begin { id, mode: Mode::ReadOnly } => {
-                println!("Began read-only transaction {}", id)
+    async fn execute_query(&mut self, query: &str) -> Result<(), Error> {
+        match self.client.execute(query).await? {
+            ResultSet::Begin { id, mode } => {
+                self.txn = Some((id, mode.clone()));
+                match mode {
+                    Mode::ReadWrite => println!("Began transaction {}", id),
+                    Mode::ReadOnly => println!("Began read-only transaction {}", id),
+                    Mode::Snapshot { version, .. } => println!(
+                        "Began read-only transaction {} in snapshot at version {}",
+                        id, version
+                    ),
+                };
             }
-            ResultSet::Begin { id, mode: Mode::Snapshot { version } } => {
-                println!("Began read-only transaction {} in version {} snapshot", id, version)
+            ResultSet::Commit { id } => {
+                self.txn = None;
+                println!("Committed transaction {}", id);
             }
-            ResultSet::Commit { id } => println!("Committed transaction {}", id),
-            ResultSet::Rollback { id } => println!("Rolled back transaction {}", id),
+            ResultSet::Rollback { id } => {
+                self.txn = None;
+                println!("Rolled back transaction {}", id);
+            }
             ResultSet::Create { count } => println!("Created {} rows", count),
             ResultSet::Delete { count } => println!("Deleted {} rows", count),
             ResultSet::Update { count } => println!("Updated {} rows", count),
@@ -161,15 +171,16 @@ Semicolons are not supported. The following !-commands are also available:
                         relation
                             .columns
                             .iter()
-                            .map(|c| c.name.clone().unwrap_or_else(|| "?".into()))
+                            .map(|c| c.name.as_deref().unwrap_or("?"))
                             .collect::<Vec<_>>()
                             .join("|")
                     );
                 }
                 while let Some(row) = relation.next().transpose()? {
-                    let formatted: Vec<String> =
-                        row.into_iter().map(|v| format!("{}", v)).collect();
-                    println!("{}", formatted.join("|"));
+                    println!(
+                        "{}",
+                        row.into_iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("|")
+                    );
                 }
             }
         }
@@ -178,7 +189,7 @@ Semicolons are not supported. The following !-commands are also available:
 
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>, Error> {
-        let prompt = match self.client.txn() {
+        let prompt = match self.txn {
             Some((id, Mode::ReadWrite)) => format!("toydb:{}> ", id),
             Some((id, Mode::ReadOnly)) => format!("toydb:{}> ", id),
             Some((_, Mode::Snapshot { version })) => format!("toydb@{}> ", version),
@@ -195,7 +206,7 @@ Semicolons are not supported. The following !-commands are also available:
     }
 
     /// Runs the ToySQL REPL
-    fn run(&mut self) -> Result<(), Error> {
+    async fn run(&mut self) -> Result<(), Error> {
         if let Some(path) = &self.history_path {
             match self.editor.load_history(path) {
                 Ok(_) => {}
@@ -204,14 +215,14 @@ Semicolons are not supported. The following !-commands are also available:
             };
         }
 
-        let status = self.client.status()?;
+        let status = self.client.status().await?;
         println!(
             "Connected to node \"{}\" (version {}). Enter !help for instructions.",
             status.id, status.version
         );
 
         while let Some(input) = self.prompt()? {
-            if let Err(err) = self.execute(&input) {
+            if let Err(err) = self.execute(&input).await {
                 println!("Error: {}", err.to_string())
             }
         }

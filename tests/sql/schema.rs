@@ -1,5 +1,5 @@
 ///! Schema-related tests, using an in-memory database against golden files in tests/sql/chema/
-use toydb::sql::engine::{Engine as _, Transaction as _};
+use toydb::sql::engine::{Engine as _, Mode, Transaction as _};
 use toydb::sql::schema::Catalog as _;
 use toydb::Error;
 
@@ -22,13 +22,13 @@ macro_rules! test_schema {
                 let mut f = mint.new_goldenfile(stringify!($name))?;
 
                 write!(f, "Query: {}\n", $query.trim())?;
-                match engine.session(None)?.execute($query) {
+                match engine.session()?.execute($query) {
                     Ok(result) => write!(f, "Result: {:?}\n\n", result)?,
                     Err(err) => write!(f, "Error: {:?}\n\n", err)?,
                 };
 
                 write!(f, "Storage:")?;
-                let txn = engine.begin()?;
+                let txn = engine.begin(Mode::ReadWrite)?;
                 for table in txn.scan_tables()? {
                     write!(f, "\n{}\n", table.as_sql())?;
                     for row in txn.scan(&table.name, None)? {

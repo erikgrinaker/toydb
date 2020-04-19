@@ -1,120 +1,148 @@
-use crate::raft::Raft;
-use crate::service;
-use crate::sql::engine::{Engine as _, Mode};
+use crate::sql::engine::{Engine as _, Mode, Raft, Session as SQLSession};
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
-use crate::sql::types::{Relation, Row};
-use crate::utility::{deserialize, serialize};
+use crate::sql::types::Row;
 use crate::Error;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+use futures_util::sink::{Sink, SinkExt as _};
+use futures_util::stream::Stream;
+use std::marker::Unpin;
+use tokio::net::TcpListener;
+use tokio::stream::StreamExt as _;
+use tokio_util::codec::{Framed, LengthDelimitedCodec};
+
+/// A client request.
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Request {
+    Execute(String),
     GetTable(String),
     ListTables,
     Status,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// A server response.
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
+    Error(Error),
+    Execute(ResultSet),
+    Row(Option<Row>),
     GetTable(Table),
     ListTables(Vec<String>),
     Status(Status),
 }
 
+/// Server status, returned to clients.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
     pub id: String,
     pub version: String,
 }
 
+/// The ToyDB SQL server.
+// FIXME This should be moved into main server struct
 pub struct ToyDB {
     pub id: String,
-    pub raft: Raft,
-    pub engine: crate::sql::engine::Raft,
-}
-
-impl service::ToyDB for ToyDB {
-    fn call(
-        &self,
-        _: grpc::RequestOptions,
-        req: service::Request,
-    ) -> grpc::SingleResponse<service::Result> {
-        let mut resp = service::Result::new();
-        match deserialize(&req.body) {
-            Ok(req) => match self.call(req) {
-                Ok(r) => resp.ok = serialize(&r).unwrap(),
-                Err(e) => resp.err = serialize(&e).unwrap(),
-            },
-            Err(e) => {
-                resp.err = serialize(&Error::Value(format!(
-                    "Failed to deserialize request request: {}",
-                    e
-                )))
-                .unwrap()
-            }
-        }
-        grpc::SingleResponse::completed(resp)
-    }
-
-    fn execute(
-        &self,
-        _: grpc::RequestOptions,
-        req: service::Query,
-    ) -> grpc::StreamingResponse<service::Result> {
-        let iter: Box<dyn Iterator<Item = service::Result> + Send> = match self
-            .execute(req.txn_id, &req.query)
-        {
-            Ok(result) => {
-                let mut iter: Box<dyn Iterator<Item = service::Result> + Send> = Box::new(
-                    vec![service::Result { ok: serialize(&result).unwrap(), ..Default::default() }]
-                        .into_iter(),
-                );
-                if let ResultSet::Query { relation: Relation { rows: Some(rows), .. } } = result {
-                    iter = Box::new(iter.chain(rows.map(Self::rows_to_stream)));
-                }
-                iter
-            }
-            Err(e) => Box::new(
-                vec![service::Result { err: serialize(&e).unwrap(), ..Default::default() }]
-                    .into_iter(),
-            ),
-        };
-        grpc::StreamingResponse::iter(iter)
-    }
+    pub engine: Raft,
 }
 
 impl ToyDB {
-    fn call(&self, req: Request) -> Result<Response, Error> {
+    /// Listens for connections from clients.
+    pub async fn listen(&self, addr: &str) -> Result<(), Error> {
+        let mut listener = TcpListener::bind(addr).await?;
+        while let Some(socket) = listener.try_next().await? {
+            let peer = socket.peer_addr()?;
+            let stream = tokio_serde::Framed::new(
+                Framed::new(socket, LengthDelimitedCodec::new()),
+                tokio_serde::formats::Cbor::default(),
+            );
+            let session = Session::new(&self.id, &self.engine)?;
+            tokio::spawn(async move {
+                info!("Client {} connected", peer);
+                match session.handle(stream).await {
+                    Ok(()) => info!("Client {} disconnected", peer),
+                    Err(err) => error!("Client {} error: {}", peer, err),
+                }
+            });
+        }
+        Ok(())
+    }
+}
+
+/// A client session coupled to a SQL session.
+pub struct Session {
+    server_id: String,
+    sql: SQLSession<Raft>,
+}
+
+impl Session {
+    /// Creates a new client session.
+    fn new(server_id: &str, engine: &Raft) -> Result<Self, Error> {
+        Ok(Self { server_id: server_id.into(), sql: engine.session()? })
+    }
+
+    /// Handles a client connection.
+    async fn handle<S>(mut self, mut stream: S) -> Result<(), Error>
+    where
+        S: Stream<Item = std::io::Result<Request>> + Sink<Response, Error = std::io::Error> + Unpin,
+    {
+        while let Some(request) = stream.try_next().await? {
+            // FIXME call() blocks here, the SQL engine should (possibly) be async
+            let mut response = match self.call(request) {
+                Ok(response) => response,
+                Err(err) => Response::Error(err),
+            };
+            let rows = match &mut response {
+                Response::Execute(ResultSet::Query { ref mut relation }) => relation.rows.take(),
+                _ => None,
+            };
+            stream.send(response).await?;
+            if let Some(rows) = rows {
+                let mut errored = false;
+                for r in rows {
+                    stream
+                        .send(match r {
+                            Ok(row) => Response::Row(Some(row)),
+                            Err(error) => {
+                                errored = true;
+                                Response::Error(error)
+                            }
+                        })
+                        .await?;
+                    if errored {
+                        break;
+                    }
+                }
+                if !errored {
+                    stream.send(Response::Row(None)).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Executes a simple request/response call.
+    fn call(&mut self, req: Request) -> Result<Response, Error> {
         Ok(match req {
+            Request::Execute(query) => Response::Execute(self.sql.execute(&query)?),
             Request::GetTable(table) => Response::GetTable(self.get_table(&table)?),
             Request::ListTables => Response::ListTables(self.list_tables()?),
             Request::Status => Response::Status(Status {
-                id: self.id.clone(),
+                id: self.server_id.clone(),
                 version: env!("CARGO_PKG_VERSION").into(),
             }),
         })
     }
 
-    fn execute(&self, txn_id: u64, query: &str) -> Result<ResultSet, Error> {
-        let txn_id = if txn_id > 0 { Some(txn_id) } else { None };
-        self.engine.session(txn_id)?.execute(query)
-    }
-
-    fn rows_to_stream(item: Result<Row, Error>) -> service::Result {
-        match item {
-            Ok(row) => service::Result { ok: serialize(&row).unwrap(), ..Default::default() },
-            Err(err) => service::Result { err: serialize(&err).unwrap(), ..Default::default() },
-        }
-    }
-
-    fn get_table(&self, name: &str) -> Result<Table, Error> {
-        self.engine.with_txn(Mode::ReadOnly, |txn| match txn.read_table(name)? {
+    /// Fetches a table.
+    fn get_table(&mut self, name: &str) -> Result<Table, Error> {
+        self.sql.with_txn(Mode::ReadOnly, |txn| match txn.read_table(name)? {
             Some(t) => Ok(t),
             None => Err(Error::Value(format!("Table {} does not exist", name))),
         })
     }
 
-    fn list_tables(&self) -> Result<Vec<String>, Error> {
-        self.engine.with_txn(Mode::ReadOnly, |txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
+    /// Fetches a list of tables.
+    fn list_tables(&mut self) -> Result<Vec<String>, Error> {
+        self.sql.with_txn(Mode::ReadOnly, |txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
     }
 }

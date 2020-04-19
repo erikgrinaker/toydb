@@ -1,151 +1,138 @@
 use crate::server::{Request, Response, Status};
-use crate::service;
-use crate::service::ToyDB;
-use crate::sql::engine::Mode;
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::Table;
-use crate::sql::types::Row;
-use crate::utility::{deserialize, serialize};
 use crate::Error;
 
-use grpc::ClientStubExt;
-use rand::Rng as _;
+use futures::future::FutureExt as _;
+use futures::sink::SinkExt as _;
+use futures::stream::TryStreamExt as _;
+use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::sync::{Mutex, MutexGuard};
+use tokio_util::codec::{Framed, LengthDelimitedCodec};
+
+type Connection = tokio_serde::Framed<
+    Framed<TcpStream, LengthDelimitedCodec>,
+    Response,
+    Request,
+    tokio_serde::formats::Cbor<Response, Request>,
+>;
 
 /// A ToyDB client
 pub struct Client {
-    client: service::ToyDBClient,
-    txn: Option<(u64, Mode)>,
-    pub txn_retries: u64,
+    conn: Mutex<Connection>,
 }
 
 impl Client {
     /// Creates a new client
-    pub fn new(host: &str, port: u16) -> Result<Self, Error> {
+    pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<Self, Error> {
         Ok(Self {
-            client: service::ToyDBClient::new_plain(host, port, grpc::ClientConf::new())?,
-            txn: None,
-            txn_retries: 8,
+            conn: Mutex::new(tokio_serde::Framed::new(
+                Framed::new(TcpStream::connect(addr).await?, LengthDelimitedCodec::new()),
+                tokio_serde::formats::Cbor::default(),
+            )),
         })
     }
 
     /// Call a server method
-    fn call(&self, req: Request) -> Result<Response, Error> {
-        let (_, resp, _) = self
-            .client
-            .call(
-                grpc::RequestOptions::new(),
-                service::Request { body: serialize(&req)?, ..Default::default() },
-            )
-            .wait()?;
-        if !resp.err.is_empty() {
-            Err(deserialize(&resp.err)?)
-        } else {
-            Ok(deserialize(&resp.ok)?)
+    async fn call(&self, request: Request) -> Result<Response, Error> {
+        let mut conn = self.conn.lock().await;
+        self.call_locked(&mut conn, request).await
+    }
+
+    /// Call a server method while holding the mutex lock
+    async fn call_locked(
+        &self,
+        conn: &mut MutexGuard<'_, Connection>,
+        request: Request,
+    ) -> Result<Response, Error> {
+        conn.send(request).await?;
+        match conn.try_next().await? {
+            Some(Response::Error(err)) => Err(err),
+            Some(response) => Ok(response),
+            None => Err(Error::Internal("Server disconnected".into())),
         }
     }
 
+    /// Executes a query
+    pub async fn execute(&self, query: &str) -> Result<ResultSet, Error> {
+        let mut conn = self.conn.lock().await;
+        let mut resultset =
+            match self.call_locked(&mut conn, Request::Execute(query.into())).await? {
+                Response::Execute(rs) => rs,
+                resp => return Err(Error::Internal(format!("Unexpected response {:?}", resp))),
+            };
+        if let ResultSet::Query { ref mut relation } = &mut resultset {
+            // FIXME We buffer rows for now to avoid lifetime hassles
+            let mut rows = Vec::new();
+            while let Some(response) = conn.try_next().await? {
+                match response {
+                    Response::Row(Some(row)) => rows.push(row),
+                    Response::Row(None) => break,
+                    Response::Error(error) => return Err(error),
+                    response => {
+                        return Err(Error::Internal(format!("Unexpected response {:?}", response)))
+                    }
+                }
+            }
+            relation.rows = Some(Box::new(rows.into_iter().map(Ok)));
+        };
+        Ok(resultset)
+    }
+
     /// Fetches the table schema as SQL
-    pub fn get_table(&self, table: &str) -> Result<Table, Error> {
-        match self.call(Request::GetTable(table.into()))? {
+    pub async fn get_table(&self, table: &str) -> Result<Table, Error> {
+        match self.call(Request::GetTable(table.into())).await? {
             Response::GetTable(t) => Ok(t),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
         }
     }
 
     /// Lists database tables
-    pub fn list_tables(&self) -> Result<Vec<String>, Error> {
-        match self.call(Request::ListTables)? {
+    pub async fn list_tables(&self) -> Result<Vec<String>, Error> {
+        match self.call(Request::ListTables).await? {
             Response::ListTables(t) => Ok(t),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
         }
     }
 
-    /// Returns the client transaction info, if any
-    pub fn txn(&self) -> Option<(u64, Mode)> {
-        self.txn.clone()
-    }
-
-    /// Runs a query
-    pub fn query(&mut self, query: &str) -> Result<ResultSet, Error> {
-        let (_, mut stream) = self
-            .client
-            .execute(
-                grpc::RequestOptions::new(),
-                service::Query {
-                    txn_id: match self.txn {
-                        Some((id, _)) => id,
-                        None => 0,
-                    },
-                    query: query.to_owned(),
-                    ..Default::default()
-                },
-            )
-            .wait()?;
-
-        let resp =
-            stream.next().ok_or_else(|| Error::Internal("Unexpected end of stream".into()))??;
-        if !resp.err.is_empty() {
-            return Err(deserialize(&resp.err)?);
-        }
-        let mut result = deserialize(&resp.ok)?;
-        match &mut result {
-            ResultSet::Query { relation } => {
-                relation.rows = Some(Box::new(stream.map(Self::stream_to_row)))
-            }
-            ResultSet::Begin { id, mode } => self.txn = Some((*id, mode.clone())),
-            ResultSet::Commit { .. } => self.txn = None,
-            ResultSet::Rollback { .. } => self.txn = None,
-            _ => {}
-        };
-        Ok(result)
-    }
-
-    /// Runs a transaction as a closure, automatically handling serialization failures by
-    /// retrying the closure with exponential backoff. The returned result is from the final commit.
-    pub fn with_txn<F>(&mut self, mut f: F) -> Result<ResultSet, Error>
-    where
-        F: FnMut(&mut Self) -> Result<(), Error>,
-    {
-        let mut rng = rand::thread_rng();
-        for i in 0..self.txn_retries {
-            if i > 0 {
-                std::thread::sleep(std::time::Duration::from_millis(
-                    2_u64.pow(i as u32 - 1) * rng.gen_range(75, 125),
-                ));
-            }
-            // Ugly workaround to use ?, while waiting for try_blocks:
-            // https://doc.rust-lang.org/unstable-book/language-features/try-blocks.html
-            let result = (|| {
-                self.query("BEGIN")?;
-                f(self)?;
-                self.query("COMMIT")
-            })();
-            if self.txn().is_some() {
-                self.query("ROLLBACK")?;
-            }
-            if let Err(Error::Serialization) = result {
-                continue;
-            }
-            return result;
-        }
-        Err(Error::Serialization)
-    }
-
-    /// Transform the gRPC result stream into a row iterator
-    fn stream_to_row(item: Result<service::Result, grpc::Error>) -> Result<Row, Error> {
-        let item = item?;
-        if !item.err.is_empty() {
-            return Err(deserialize(&item.err)?);
-        }
-        let row = deserialize(&item.ok)?;
-        Ok(row)
-    }
-
     /// Checks server status
-    pub fn status(&self) -> Result<Status, Error> {
-        match self.call(Request::Status)? {
+    pub async fn status(&self) -> Result<Status, Error> {
+        match self.call(Request::Status).await? {
             Response::Status(s) => Ok(s),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
         }
+    }
+}
+
+/// A ToyDB client pool
+pub struct Pool {
+    clients: Vec<Mutex<Client>>,
+}
+
+impl Pool {
+    /// Creates a new connection pool for the given servers, eagerly connecting clients.
+    pub async fn new<A: ToSocketAddrs + Clone>(addrs: Vec<A>, size: u64) -> Result<Self, Error> {
+        let mut addrs = addrs.into_iter().cycle();
+        let clients = futures::future::try_join_all(
+            std::iter::from_fn(|| {
+                Some(Client::new(addrs.next().unwrap()).map(|r| r.map(Mutex::new)))
+            })
+            .take(size as usize),
+        )
+        .await?;
+        Ok(Self { clients })
+    }
+
+    /// Fetches a client from the pool, returning it when it goes out of scope.
+    /// FIXME Should rollback txn (if any) when returning.
+    pub async fn get(&self) -> (usize, MutexGuard<'_, Client>) {
+        let (client, index, _) =
+            futures::future::select_all(self.clients.iter().map(|m| m.lock().boxed())).await;
+        (index, client)
+    }
+
+    /// Returns the size of the pool
+    pub fn size(&self) -> usize {
+        self.clients.len()
     }
 }

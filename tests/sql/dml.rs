@@ -1,6 +1,6 @@
 ///! DML-related tests, using an in-memory database against golden files in tests/sql/dml/
 ///! Note that schema-related tests are in schema.rs, this is just for the basic DML functionality
-use toydb::sql::engine::{Engine as _, Transaction as _};
+use toydb::sql::engine::{Engine as _, Mode, Transaction as _};
 use toydb::sql::schema::Catalog as _;
 use toydb::Error;
 
@@ -23,7 +23,7 @@ macro_rules! test_dml {
                 let mut f = mint.new_goldenfile(stringify!($name))?;
 
                 write!(f, "Query: {}\n", $query.trim())?;
-                match engine.session(None)?.execute($query) {
+                match engine.session()?.execute($query) {
                     Ok(resultset) => {
                         write!(f, "Result: {:?}\n\n", resultset)?;
                     },
@@ -31,7 +31,7 @@ macro_rules! test_dml {
                 };
 
                 write!(f, "Storage:")?;
-                let txn = engine.begin()?;
+                let txn = engine.begin(Mode::ReadWrite)?;
                 for table in txn.scan_tables()? {
                     write!(f, "\n{}\n", table.as_sql())?;
                     for row in txn.scan(&table.name, None)? {

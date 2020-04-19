@@ -16,8 +16,6 @@ pub struct Server {
     id: String,
     peers: HashMap<String, std::net::SocketAddr>,
     data_dir: String,
-    grpc: Option<grpc::Server>,
-    raft: Option<Raft>,
 }
 
 impl Server {
@@ -26,14 +24,14 @@ impl Server {
         peers: HashMap<String, std::net::SocketAddr>,
         data_dir: &str,
     ) -> Result<Self, Error> {
-        Ok(Server { id: id.into(), peers, data_dir: data_dir.into(), grpc: None, raft: None })
+        Ok(Server { id: id.into(), peers, data_dir: data_dir.into() })
     }
 
-    pub fn listen(&mut self, addr: &str, threads: usize) -> Result<(), Error> {
-        info!("Starting ToyDB node with ID {} on {}", self.id, addr);
+    pub async fn listen(self, sql_addr: String, raft_addr: String) -> Result<(), Error> {
+        info!("Starting ToyDB node {} on {} (SQL) and {} (Raft)", self.id, sql_addr, raft_addr);
         let mut server = grpc::ServerBuilder::new_plain();
-        server.http.set_addr(addr)?;
-        server.http.set_cpu_pool_threads(threads);
+        server.http.set_addr(raft_addr)?;
+        server.http.set_cpu_pool_threads(4);
         let data_path = std::path::Path::new(&self.data_dir);
         std::fs::create_dir_all(data_path)?;
 
@@ -59,22 +57,14 @@ impl Server {
             raft_transport,
         )?;
 
-        server.add_service(service::ToyDBServer::new_service_def(ToyDB {
-            id: self.id.clone(),
-            raft: raft.clone(),
-            engine: sql::engine::Raft::new(raft.clone()),
-        }));
+        let _s = server.build()?;
 
-        self.grpc = Some(server.build()?);
-        self.raft = Some(raft);
+        ToyDB { id: self.id.clone(), engine: sql::engine::Raft::new(raft.clone()) }
+            .listen(&sql_addr)
+            .await?;
+
+        raft.shutdown()?;
+
         Ok(())
-    }
-
-    pub fn join(self) -> Result<(), Error> {
-        self.raft.map(|r| r.join()).unwrap_or(Ok(()))
-    }
-
-    pub fn shutdown(self) -> Result<(), Error> {
-        self.raft.map(|r| r.shutdown()).unwrap_or(Ok(()))
     }
 }

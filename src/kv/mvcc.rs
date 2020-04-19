@@ -224,11 +224,21 @@ pub enum Mode {
 
 impl Mode {
     /// Checks whether the transaction mode can mutate data.
-    fn mutable(&self) -> bool {
+    pub fn mutable(&self) -> bool {
         match self {
             Self::ReadWrite => true,
             Self::ReadOnly => false,
             Self::Snapshot { .. } => false,
+        }
+    }
+
+    /// Checks whether a mode satisfies a mode (i.e. ReadWrite satisfies ReadOnly).
+    pub fn satisfies(&self, other: &Mode) -> bool {
+        match (self, other) {
+            (Mode::ReadWrite, Mode::ReadOnly) => true,
+            (Mode::Snapshot { .. }, Mode::ReadOnly) => true,
+            (_, _) if self == other => true,
+            (_, _) => false,
         }
     }
 }

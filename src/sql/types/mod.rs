@@ -63,6 +63,38 @@ impl Value {
             Self::String(_) => Some(DataType::String),
         }
     }
+
+    /// Returns the inner boolean, or an error if not a boolean
+    pub fn boolean(self) -> Result<bool, Error> {
+        match self {
+            Self::Boolean(b) => Ok(b),
+            v => Err(Error::Value(format!("Not a boolean: {:?}", v))),
+        }
+    }
+
+    /// Returns the inner float, or an error if not a float
+    pub fn float(self) -> Result<f64, Error> {
+        match self {
+            Self::Float(f) => Ok(f),
+            v => Err(Error::Value(format!("Not a float: {:?}", v))),
+        }
+    }
+
+    /// Returns the inner integer, or an error if not an integer
+    pub fn integer(self) -> Result<i64, Error> {
+        match self {
+            Self::Integer(i) => Ok(i),
+            v => Err(Error::Value(format!("Not an integer: {:?}", v))),
+        }
+    }
+
+    /// Returns the inner string, or an error if not a string
+    pub fn string(self) -> Result<String, Error> {
+        match self {
+            Self::String(s) => Ok(s),
+            v => Err(Error::Value(format!("Not a string: {:?}", v))),
+        }
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -154,6 +186,18 @@ pub struct Relation {
     #[derivative(PartialEq = "ignore")]
     #[serde(skip)]
     pub rows: Option<Rows>,
+}
+
+impl Relation {
+    /// Converts the relation into a single row, if any
+    pub fn into_row(mut self) -> Result<Option<Row>, Error> {
+        self.next().transpose()
+    }
+
+    /// Converts the relation into the first value of the first row, if any
+    pub fn into_value(self) -> Result<Option<Value>, Error> {
+        Ok(self.into_row()?.filter(|row| !row.is_empty()).map(|mut row| row.remove(0)))
+    }
 }
 
 impl Iterator for Relation {
