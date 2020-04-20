@@ -304,28 +304,29 @@ mod tests {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> (RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>) {
+    fn setup_rolenode(
+    ) -> Result<(RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>), Error> {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
     fn setup_rolenode_peers(
         peers: Vec<String>,
-    ) -> (RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>) {
+    ) -> Result<(RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>), Error> {
         let (sender, receiver) = crossbeam::channel::unbounded();
         let node = RoleNode {
             role: (),
             id: "a".into(),
             peers,
             term: 1,
-            log: Log::new(kv::Simple::new(kv::storage::Memory::new())).unwrap(),
+            log: Log::new(kv::Simple::new(kv::storage::Memory::new()))?,
             state: TestState::new(),
             sender,
         };
-        (node, receiver)
+        Ok((node, receiver))
     }
 
     #[test]
-    fn new() {
+    fn new() -> Result<(), Error> {
         let (sender, _) = crossbeam::channel::unbounded();
         let node = Node::new(
             "a",
@@ -333,8 +334,7 @@ mod tests {
             kv::Simple::new(kv::storage::Memory::new()),
             TestState::new(),
             sender,
-        )
-        .unwrap();
+        )?;
         match node {
             Node::Follower(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());
@@ -343,29 +343,30 @@ mod tests {
             }
             _ => panic!("Expected node to start as follower"),
         }
+        Ok(())
     }
 
     #[test]
-    fn new_loads_term() {
+    fn new_loads_term() -> Result<(), Error> {
         let (sender, _) = crossbeam::channel::unbounded();
         let storage = kv::storage::Test::new();
-        Log::new(kv::Simple::new(storage.clone())).unwrap().save_term(3, Some("c")).unwrap();
+        Log::new(kv::Simple::new(storage.clone()))?.save_term(3, Some("c"))?;
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
             kv::Simple::new(storage),
             TestState::new(),
             sender,
-        )
-        .unwrap();
+        )?;
         match node {
             Node::Follower(rolenode) => assert_eq!(rolenode.term, 3),
             _ => panic!("Expected node to start as follower"),
         }
+        Ok(())
     }
 
     #[test]
-    fn new_single() {
+    fn new_single() -> Result<(), Error> {
         let (sender, _) = crossbeam::channel::unbounded();
         let node = Node::new(
             "a",
@@ -373,8 +374,7 @@ mod tests {
             kv::Simple::new(kv::storage::Memory::new()),
             TestState::new(),
             sender,
-        )
-        .unwrap();
+        )?;
         match node {
             Node::Leader(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());
@@ -383,27 +383,29 @@ mod tests {
             }
             _ => panic!("Expected leader"),
         }
+        Ok(())
     }
 
     #[test]
-    fn become_role() {
-        let (node, _) = setup_rolenode();
-        let new = node.become_role("role").unwrap();
+    fn become_role() -> Result<(), Error> {
+        let (node, _) = setup_rolenode()?;
+        let new = node.become_role("role")?;
         assert_eq!(new.id, "a".to_owned());
         assert_eq!(new.term, 1);
         assert_eq!(new.peers, vec!["b".to_owned(), "c".to_owned()]);
         assert_eq!(new.role, "role");
+        Ok(())
     }
 
     #[test]
-    fn broadcast() {
-        let (node, rx) = setup_rolenode();
-        node.broadcast(Event::Heartbeat { commit_index: 1, commit_term: 1 }).unwrap();
+    fn broadcast() -> Result<(), Error> {
+        let (node, rx) = setup_rolenode()?;
+        node.broadcast(Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
 
         for to in ["b", "c"].iter().cloned() {
             assert!(!rx.is_empty());
             assert_eq!(
-                rx.recv().unwrap(),
+                rx.recv()?,
                 Message {
                     from: Some("a".into()),
                     to: Some(to.into()),
@@ -413,11 +415,12 @@ mod tests {
             )
         }
         assert!(rx.is_empty());
+        Ok(())
     }
 
     #[test]
-    fn normalize_message() {
-        let (node, _) = setup_rolenode();
+    fn normalize_message() -> Result<(), Error> {
+        let (node, _) = setup_rolenode()?;
         let mut msg = Message {
             from: None,
             to: None,
@@ -437,24 +440,26 @@ mod tests {
 
         msg.to = Some("c".into());
         assert!(!node.normalize_message(&mut msg));
+        Ok(())
     }
 
     #[test]
-    fn quorum() {
+    fn quorum() -> Result<(), Error> {
         let quorums = vec![(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)];
         for (size, quorum) in quorums.into_iter() {
             let peers: Vec<String> =
                 (0..(size as u8 - 1)).map(|i| (i as char).to_string()).collect();
             assert_eq!(peers.len(), size as usize - 1);
-            let (node, _) = setup_rolenode_peers(peers);
+            let (node, _) = setup_rolenode_peers(peers)?;
             assert_eq!(node.quorum(), quorum);
         }
+        Ok(())
     }
 
     #[test]
-    fn send() {
-        let (node, rx) = setup_rolenode();
-        node.send(Some("b"), Event::Heartbeat { commit_index: 1, commit_term: 1 }).unwrap();
+    fn send() -> Result<(), Error> {
+        let (node, rx) = setup_rolenode()?;
+        node.send(Some("b"), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
         assert_messages(
             &rx,
             vec![Message {
@@ -464,12 +469,14 @@ mod tests {
                 event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
             }],
         );
+        Ok(())
     }
 
     #[test]
-    fn save_term() {
-        let (mut node, _) = setup_rolenode();
-        node.save_term(4, Some("b")).unwrap();
-        assert_eq!(node.log.load_term().unwrap(), (4, Some("b".into())));
+    fn save_term() -> Result<(), Error> {
+        let (mut node, _) = setup_rolenode()?;
+        node.save_term(4, Some("b"))?;
+        assert_eq!(node.log.load_term()?, (4, Some("b".into())));
+        Ok(())
     }
 }

@@ -109,15 +109,17 @@ mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
 
-    fn setup() -> (RoleNode<Candidate, kv::storage::Memory, TestState>, Receiver<Message>) {
+    fn setup(
+    ) -> Result<(RoleNode<Candidate, kv::storage::Memory, TestState>, Receiver<Message>), Error>
+    {
         let (sender, receiver) = crossbeam::channel::unbounded();
         let mut state = TestState::new();
-        let mut log = Log::new(kv::Simple::new(kv::storage::Memory::new())).unwrap();
-        log.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        log.append(Entry { term: 1, command: Some(vec![0x02]) }).unwrap();
-        log.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
-        log.commit(2).unwrap();
-        log.apply(&mut state).unwrap();
+        let mut log = Log::new(kv::Simple::new(kv::storage::Memory::new()))?;
+        log.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        log.append(Entry { term: 1, command: Some(vec![0x02]) })?;
+        log.append(Entry { term: 2, command: Some(vec![0x03]) })?;
+        log.commit(2)?;
+        log.apply(&mut state)?;
 
         let mut node = RoleNode {
             id: "a".into(),
@@ -128,22 +130,20 @@ mod tests {
             sender,
             role: Candidate::new(),
         };
-        node.save_term(3, None).unwrap();
-        (node, receiver)
+        node.save_term(3, None)?;
+        Ok((node, receiver))
     }
 
     #[test]
     // Heartbeat for current term converts to follower and emits ConfirmLeader event
-    fn step_heartbeat_current_term() {
-        let (candidate, rx) = setup();
-        let node = candidate
-            .step(Message {
-                from: Some("b".into()),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-            })
-            .unwrap();
+    fn step_heartbeat_current_term() -> Result<(), Error> {
+        let (candidate, rx) = setup()?;
+        let node = candidate.step(Message {
+            from: Some("b".into()),
+            to: Some("a".into()),
+            term: 3,
+            event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
+        })?;
         assert_node(&node).is_follower().term(3);
         assert_messages(
             &rx,
@@ -154,20 +154,19 @@ mod tests {
                 event: Event::ConfirmLeader { commit_index: 1, has_committed: true },
             }],
         );
+        Ok(())
     }
 
     #[test]
     // Heartbeat for future term converts to follower and emits ConfirmLeader event
-    fn step_heartbeat_future_term() {
-        let (candidate, rx) = setup();
-        let node = candidate
-            .step(Message {
-                from: Some("b".into()),
-                to: Some("a".into()),
-                term: 4,
-                event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-            })
-            .unwrap();
+    fn step_heartbeat_future_term() -> Result<(), Error> {
+        let (candidate, rx) = setup()?;
+        let node = candidate.step(Message {
+            from: Some("b".into()),
+            to: Some("a".into()),
+            term: 4,
+            event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
+        })?;
         assert_node(&node).is_follower().term(4);
         assert_messages(
             &rx,
@@ -178,57 +177,53 @@ mod tests {
                 event: Event::ConfirmLeader { commit_index: 1, has_committed: true },
             }],
         );
+        Ok(())
     }
 
     #[test]
     // Heartbeat for past term is ignored
-    fn step_heartbeat_past_term() {
-        let (candidate, rx) = setup();
-        let node = candidate
-            .step(Message {
-                from: Some("b".into()),
-                to: Some("a".into()),
-                term: 2,
-                event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-            })
-            .unwrap();
+    fn step_heartbeat_past_term() -> Result<(), Error> {
+        let (candidate, rx) = setup()?;
+        let node = candidate.step(Message {
+            from: Some("b".into()),
+            to: Some("a".into()),
+            term: 2,
+            event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
+        })?;
         assert_node(&node).is_candidate().term(3);
         assert_messages(&rx, vec![]);
+        Ok(())
     }
 
     #[test]
-    fn step_grantvote() {
-        let (candidate, rx) = setup();
+    fn step_grantvote() -> Result<(), Error> {
+        let (candidate, rx) = setup()?;
         let peers = candidate.peers.clone();
         let mut node = Node::Candidate(candidate);
 
         // The first vote is not sufficient for a quorum (3 votes including self)
-        node = node
-            .step(Message {
-                from: Some("c".into()),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::GrantVote,
-            })
-            .unwrap();
+        node = node.step(Message {
+            from: Some("c".into()),
+            to: Some("a".into()),
+            term: 3,
+            event: Event::GrantVote,
+        })?;
         assert_node(&node).is_candidate().term(3);
         assert_messages(&rx, vec![]);
 
         // However, the second external vote makes us leader
-        node = node
-            .step(Message {
-                from: Some("e".into()),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::GrantVote,
-            })
-            .unwrap();
+        node = node.step(Message {
+            from: Some("e".into()),
+            to: Some("a".into()),
+            term: 3,
+            event: Event::GrantVote,
+        })?;
         assert_node(&node).is_leader().term(3);
 
         for to in peers.iter().cloned() {
             assert!(!rx.is_empty());
             assert_eq!(
-                rx.recv().unwrap(),
+                rx.recv()?,
                 Message {
                     from: Some("a".into()),
                     to: Some(to),
@@ -241,7 +236,7 @@ mod tests {
         for to in peers.iter().cloned() {
             assert!(!rx.is_empty());
             assert_eq!(
-                rx.recv().unwrap(),
+                rx.recv()?,
                 Message {
                     from: Some("a".into()),
                     to: Some(to),
@@ -256,11 +251,12 @@ mod tests {
         }
 
         assert_messages(&rx, vec![]);
+        Ok(())
     }
 
     #[test]
-    fn tick() {
-        let (candidate, rx) = setup();
+    fn tick() -> Result<(), Error> {
+        let (candidate, rx) = setup()?;
         let timeout = candidate.role.election_timeout;
         let peers = candidate.peers.clone();
         let mut node = Node::Candidate(candidate);
@@ -268,14 +264,14 @@ mod tests {
         assert!(timeout > 0);
         for i in 0..timeout {
             assert_node(&node).is_candidate().term(3).applied(if i > 0 { 2 } else { 1 });
-            node = node.tick().unwrap();
+            node = node.tick()?;
         }
         assert_node(&node).is_candidate().term(4);
 
         for to in peers.into_iter() {
             assert!(!rx.is_empty());
             assert_eq!(
-                rx.recv().unwrap(),
+                rx.recv()?,
                 Message {
                     from: Some("a".into()),
                     to: Some(to),
@@ -284,5 +280,6 @@ mod tests {
                 }
             )
         }
+        Ok(())
     }
 }

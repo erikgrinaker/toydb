@@ -258,109 +258,115 @@ mod tests {
     use super::super::tests::TestState;
     use super::*;
 
-    fn setup() -> (Log<kv::storage::Test>, kv::Simple<kv::storage::Test>) {
+    fn setup() -> Result<(Log<kv::storage::Test>, kv::Simple<kv::storage::Test>), Error> {
         let backend = kv::storage::Test::new();
-        let log = Log::new(kv::Simple::new(backend.clone())).unwrap();
+        let log = Log::new(kv::Simple::new(backend.clone()))?;
         let store = kv::Simple::new(backend);
-        (log, store)
+        Ok((log, store))
     }
 
     #[test]
-    fn new() {
-        let (l, _) = setup();
+    fn new() -> Result<(), Error> {
+        let (l, _) = setup()?;
         assert_eq!((0, 0), l.get_last());
         assert_eq!((0, 0), l.get_committed());
         assert_eq!((0, 0), l.get_applied());
-        assert_eq!(None, l.get(1).unwrap());
+        assert_eq!(None, l.get(1)?);
+        Ok(())
     }
 
     #[test]
-    fn append() {
-        let (mut l, _) = setup();
+    fn append() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
         assert_eq!(Ok(None), l.get(1));
 
-        assert_eq!(Ok(1), l.append(Entry { term: 3, command: Some(vec![0x01]) }));
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(None), l.get(2));
+        assert_eq!(1, l.append(Entry { term: 3, command: Some(vec![0x01]) })?);
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(None, l.get(2)?);
 
         assert_eq!((1, 3), l.get_last());
         assert_eq!((0, 0), l.get_committed());
         assert_eq!((0, 0), l.get_applied());
+        Ok(())
     }
 
     #[test]
-    fn append_none_command() {
-        let (mut l, _) = setup();
-        assert_eq!(Ok(1), l.append(Entry { term: 3, command: None }));
-        assert_eq!(Ok(Some(Entry { term: 3, command: None })), l.get(1));
+    fn append_none_command() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        assert_eq!(1, l.append(Entry { term: 3, command: None })?);
+        assert_eq!(Some(Entry { term: 3, command: None }), l.get(1)?);
+        Ok(())
     }
 
     #[test]
-    fn append_persistence() {
-        let (mut l, store) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: None }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
+    fn append_persistence() -> Result<(), Error> {
+        let (mut l, store) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: None })?;
+        l.append(Entry { term: 2, command: Some(vec![0x03]) })?;
 
-        let l = Log::new(store).unwrap();
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: None })), l.get(2));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x03]) })), l.get(3));
+        let l = Log::new(store)?;
+        assert_eq!(Some(Entry { term: 1, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 2, command: None }), l.get(2)?);
+        assert_eq!(Some(Entry { term: 2, command: Some(vec![0x03]) }), l.get(3)?);
+        Ok(())
     }
 
     #[test]
-    fn apply() {
-        let (mut l, store) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: None }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
+    fn apply() -> Result<(), Error> {
+        let (mut l, store) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: None })?;
+        l.append(Entry { term: 2, command: Some(vec![0x03]) })?;
         l.commit(3).unwrap();
 
         let mut state = TestState::new();
-        assert_eq!(Ok(Some((1, Ok(vec![0xff, 0x01])))), l.apply(&mut state));
+        assert_eq!(Some((1, Ok(vec![0xff, 0x01]))), l.apply(&mut state)?);
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(Some((2, Ok(vec![])))), l.apply(&mut state));
+        assert_eq!(Some((2, Ok(vec![]))), l.apply(&mut state)?);
         assert_eq!((2, 2), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(Some((3, Ok(vec![0xff, 0x03])))), l.apply(&mut state));
+        assert_eq!(Some((3, Ok(vec![0xff, 0x03]))), l.apply(&mut state)?);
         assert_eq!((3, 2), l.get_applied());
         assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
 
-        assert_eq!(Ok(None), l.apply(&mut state));
+        assert_eq!(None, l.apply(&mut state)?);
         assert_eq!((3, 2), l.get_applied());
         assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
 
         // The last applied entry should be persisted, and also used for last committed
-        let l = Log::new(store).unwrap();
+        let l = Log::new(store)?;
         assert_eq!((3, 2), l.get_last());
         assert_eq!((3, 2), l.get_committed());
         assert_eq!((3, 2), l.get_applied());
+        Ok(())
     }
 
     #[test]
-    fn apply_committed_only() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: None }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
+    fn apply_committed_only() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: None })?;
+        l.append(Entry { term: 2, command: Some(vec![0x03]) })?;
         l.commit(1).unwrap();
 
         let mut state = TestState::new();
-        assert_eq!(Ok(Some((1, Ok(vec![0xff, 0x01])))), l.apply(&mut state));
+        assert_eq!(Some((1, Ok(vec![0xff, 0x01]))), l.apply(&mut state)?);
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(None), l.apply(&mut state));
+        assert_eq!(None, l.apply(&mut state)?);
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
+        Ok(())
     }
 
     #[test]
     fn apply_errors() -> Result<(), Error> {
-        let (mut l, store) = setup();
+        let (mut l, store) = setup()?;
         l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
         l.append(Entry { term: 1, command: Some(vec![0xff]) })?; // Error::Value
         l.append(Entry { term: 1, command: Some(vec![0x03]) })?;
@@ -370,18 +376,18 @@ mod tests {
         assert_eq!((5, 1), l.get_committed(), "committed entry");
 
         let mut state = TestState::new();
-        assert_eq!(Ok(Some((1, Ok(vec![0xff, 0x01])))), l.apply(&mut state));
+        assert_eq!(Some((1, Ok(vec![0xff, 0x01]))), l.apply(&mut state)?);
         assert_eq!((1, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
         assert_eq!(
-            Ok(Some((2, Err(Error::Value("Command cannot be 0xff".into()))))),
-            l.apply(&mut state)
+            Some((2, Err(Error::Value("Command cannot be 0xff".into())))),
+            l.apply(&mut state)?
         );
         assert_eq!((2, 1), l.get_applied());
         assert_eq!(vec![vec![0x01],], state.list());
 
-        assert_eq!(Ok(Some((3, Ok(vec![0xff, 0x03])))), l.apply(&mut state));
+        assert_eq!(Some((3, Ok(vec![0xff, 0x03]))), l.apply(&mut state)?);
         assert_eq!((3, 1), l.get_applied());
         assert_eq!(vec![vec![0x01], vec![0x03]], state.list());
 
@@ -395,7 +401,7 @@ mod tests {
 
         // The last applied entry should be persisted, and also used for last committed,
         // and the erroring log entry should still be there.
-        let mut l = Log::new(store).unwrap();
+        let mut l = Log::new(store)?;
         assert_eq!((5, 1), l.get_last(), "last entry");
         assert_eq!((3, 1), l.get_committed(), "committed entry");
         assert_eq!((3, 1), l.get_applied(), "applied entry");
@@ -405,280 +411,297 @@ mod tests {
     }
 
     #[test]
-    fn commit() {
-        let (mut l, store) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: None }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
-        assert_eq!(Ok(3), l.commit(3));
+    fn commit() -> Result<(), Error> {
+        let (mut l, store) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: None })?;
+        l.append(Entry { term: 2, command: Some(vec![0x03]) })?;
+        assert_eq!(3, l.commit(3)?);
         assert_eq!((3, 2), l.get_committed());
 
         // The last committed entry should not be persisted
-        let l = Log::new(store).unwrap();
+        let l = Log::new(store)?;
         assert_eq!((0, 0), l.get_committed());
+        Ok(())
     }
 
     #[test]
-    fn commit_beyond() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: None }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
-        assert_eq!(Ok(3), l.commit(4));
+    fn commit_beyond() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: None })?;
+        l.append(Entry { term: 2, command: Some(vec![0x03]) })?;
+        assert_eq!(3, l.commit(4)?);
         assert_eq!((3, 2), l.get_committed());
+        Ok(())
     }
 
     #[test]
-    fn commit_partial() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: None }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
-        assert_eq!(Ok(2), l.commit(2));
+    fn commit_partial() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: None })?;
+        l.append(Entry { term: 2, command: Some(vec![0x03]) })?;
+        assert_eq!(2, l.commit(2)?);
         assert_eq!((2, 2), l.get_committed());
+        Ok(())
     }
 
     #[test]
-    fn commit_reduce() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: None }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x03]) }).unwrap();
-        assert_eq!(Ok(2), l.commit(2));
+    fn commit_reduce() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: None })?;
+        l.append(Entry { term: 2, command: Some(vec![0x03]) })?;
+        assert_eq!(2, l.commit(2)?);
         assert_eq!((2, 2), l.get_committed());
 
-        assert_eq!(Ok(2), l.commit(1));
+        assert_eq!(2, l.commit(1)?);
         assert_eq!((2, 2), l.get_committed());
+        Ok(())
     }
 
     #[test]
-    fn get() {
-        let (mut l, _) = setup();
-        assert_eq!(Ok(None), l.get(1));
+    fn get() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        assert_eq!(None, l.get(1)?);
 
-        l.append(Entry { term: 3, command: Some(vec![0x01]) }).unwrap();
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(None), l.get(2));
+        l.append(Entry { term: 3, command: Some(vec![0x01]) })?;
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(None, l.get(2)?);
+        Ok(())
     }
 
     #[test]
-    fn has() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 2, command: Some(vec![0x01]) }).unwrap();
+    fn has() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 2, command: Some(vec![0x01]) })?;
 
-        assert_eq!(true, l.has(1, 2).unwrap());
-        assert_eq!(true, l.has(0, 0).unwrap());
-        assert_eq!(false, l.has(0, 1).unwrap());
-        assert_eq!(false, l.has(1, 0).unwrap());
-        assert_eq!(false, l.has(1, 3).unwrap());
-        assert_eq!(false, l.has(2, 0).unwrap());
-        assert_eq!(false, l.has(2, 1).unwrap());
+        assert_eq!(true, l.has(1, 2)?);
+        assert_eq!(true, l.has(0, 0)?);
+        assert_eq!(false, l.has(0, 1)?);
+        assert_eq!(false, l.has(1, 0)?);
+        assert_eq!(false, l.has(1, 3)?);
+        assert_eq!(false, l.has(2, 0)?);
+        assert_eq!(false, l.has(2, 1)?);
+        Ok(())
     }
 
     #[test]
-    fn range() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 1, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 1, command: Some(vec![0x03]) }).unwrap();
+    fn range() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 1, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 1, command: Some(vec![0x03]) })?;
 
         assert_eq!(
-            Ok(vec![
+            vec![
                 Entry { term: 1, command: Some(vec![0x01]) },
                 Entry { term: 1, command: Some(vec![0x02]) },
                 Entry { term: 1, command: Some(vec![0x03]) },
-            ]),
-            l.range(0..)
+            ],
+            l.range(0..)?
         );
         assert_eq!(
-            Ok(vec![
+            vec![
                 Entry { term: 1, command: Some(vec![0x02]) },
                 Entry { term: 1, command: Some(vec![0x03]) },
-            ]),
-            l.range(2..)
+            ],
+            l.range(2..)?
         );
-        assert_eq!(Ok(vec![]), l.range(4..));
+        assert_eq!(Vec::<Entry>::new(), l.range(4..)?);
+        Ok(())
     }
 
     #[test]
-    fn load_save_term() {
+    fn load_save_term() -> Result<(), Error> {
         // Test loading empty term
-        let (l, _) = setup();
-        assert_eq!(Ok((0, None)), l.load_term());
+        let (l, _) = setup()?;
+        assert_eq!((0, None), l.load_term()?);
 
         // Test loading saved term
-        let (mut l, store) = setup();
-        assert_eq!(Ok(()), l.save_term(1, Some("a")));
-        let l = Log::new(store).unwrap();
-        assert_eq!(Ok((1, Some("a".into()))), l.load_term());
+        let (mut l, store) = setup()?;
+        assert_eq!((), l.save_term(1, Some("a"))?);
+        let l = Log::new(store)?;
+        assert_eq!((1, Some("a".into())), l.load_term()?);
 
         // Test replacing saved term with none
-        let (mut l, _) = setup();
-        assert_eq!(Ok(()), l.save_term(1, Some("a")));
-        assert_eq!(Ok((1, Some("a".into()))), l.load_term());
-        assert_eq!(Ok(()), l.save_term(0, None));
-        assert_eq!(Ok((0, None)), l.load_term());
+        let (mut l, _) = setup()?;
+        assert_eq!((), l.save_term(1, Some("a"))?);
+        assert_eq!((1, Some("a".into())), l.load_term()?);
+        assert_eq!((), l.save_term(0, None)?);
+        assert_eq!((0, None), l.load_term()?);
+        Ok(())
     }
 
     #[test]
-    fn splice() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
+    fn splice() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
 
         assert_eq!(
-            Ok(4),
+            4,
             l.splice(
                 2,
                 vec![
                     Entry { term: 3, command: Some(vec![0x03]) },
                     Entry { term: 4, command: Some(vec![0x04]) },
                 ]
-            )
+            )?
         );
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x03]) })), l.get(3));
-        assert_eq!(Ok(Some(Entry { term: 4, command: Some(vec![0x04]) })), l.get(4));
+        assert_eq!(Some(Entry { term: 1, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 2, command: Some(vec![0x02]) }), l.get(2)?);
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x03]) }), l.get(3)?);
+        assert_eq!(Some(Entry { term: 4, command: Some(vec![0x04]) }), l.get(4)?);
         assert_eq!((4, 4), l.get_last());
+        Ok(())
     }
 
     #[test]
-    fn splice_all() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
+    fn splice_all() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
 
         assert_eq!(
-            Ok(2),
+            2,
             l.splice(
                 0,
                 vec![
                     Entry { term: 4, command: Some(vec![0x0a]) },
                     Entry { term: 4, command: Some(vec![0x0b]) },
                 ]
-            )
+            )?
         );
-        assert_eq!(Ok(Some(Entry { term: 4, command: Some(vec![0x0a]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 4, command: Some(vec![0x0b]) })), l.get(2));
+        assert_eq!(Some(Entry { term: 4, command: Some(vec![0x0a]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 4, command: Some(vec![0x0b]) }), l.get(2)?);
         assert_eq!((2, 4), l.get_last());
+        Ok(())
     }
 
     #[test]
-    fn splice_append() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
+    fn splice_append() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
 
         assert_eq!(
-            Ok(4),
+            4,
             l.splice(
                 2,
                 vec![
                     Entry { term: 3, command: Some(vec![0x03]) },
                     Entry { term: 4, command: Some(vec![0x04]) },
                 ]
-            )
+            )?
         );
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x03]) })), l.get(3));
-        assert_eq!(Ok(Some(Entry { term: 4, command: Some(vec![0x04]) })), l.get(4));
+        assert_eq!(Some(Entry { term: 1, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 2, command: Some(vec![0x02]) }), l.get(2)?);
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x03]) }), l.get(3)?);
+        assert_eq!(Some(Entry { term: 4, command: Some(vec![0x04]) }), l.get(4)?);
         assert_eq!((4, 4), l.get_last());
+        Ok(())
     }
 
     #[test]
-    fn splice_conflict_term() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
-        l.append(Entry { term: 4, command: Some(vec![0x04]) }).unwrap();
+    fn splice_conflict_term() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
+        l.append(Entry { term: 4, command: Some(vec![0x04]) })?;
 
         assert_eq!(
-            Ok(3),
+            3,
             l.splice(
                 1,
                 vec![
                     Entry { term: 3, command: Some(vec![0x0b]) },
                     Entry { term: 3, command: Some(vec![0x0c]) }
                 ]
-            )
+            )?
         );
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x0b]) })), l.get(2));
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x0c]) })), l.get(3));
+        assert_eq!(Some(Entry { term: 1, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x0b]) }), l.get(2)?);
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x0c]) }), l.get(3)?);
         assert_eq!((3, 3), l.get_last());
+        Ok(())
     }
 
     #[test]
-    fn splice_overlap_inside() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
+    fn splice_overlap_inside() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
 
-        assert_eq!(Ok(3), l.splice(1, vec![Entry { term: 2, command: Some(vec![0x02]) },]));
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x03]) })), l.get(3));
+        assert_eq!(3, l.splice(1, vec![Entry { term: 2, command: Some(vec![0x02]) },])?);
+        assert_eq!(Some(Entry { term: 1, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 2, command: Some(vec![0x02]) }), l.get(2)?);
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x03]) }), l.get(3)?);
         assert_eq!((3, 3), l.get_last());
+        Ok(())
     }
 
     #[test]
-    fn truncate() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
+    fn truncate() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
 
-        assert_eq!(Ok(2), l.truncate(2));
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
-        assert_eq!(Ok(None), l.get(3));
+        assert_eq!(2, l.truncate(2)?);
+        assert_eq!(Some(Entry { term: 1, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 2, command: Some(vec![0x02]) }), l.get(2)?);
+        assert_eq!(None, l.get(3)?);
         assert_eq!((2, 2), l.get_last());
+        Ok(())
     }
 
     #[test]
-    fn truncate_beyond() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
+    fn truncate_beyond() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
 
-        assert_eq!(Ok(3), l.truncate(4));
-        assert_eq!(Ok(Some(Entry { term: 1, command: Some(vec![0x01]) })), l.get(1));
-        assert_eq!(Ok(Some(Entry { term: 2, command: Some(vec![0x02]) })), l.get(2));
-        assert_eq!(Ok(Some(Entry { term: 3, command: Some(vec![0x03]) })), l.get(3));
-        assert_eq!(Ok(None), l.get(4));
+        assert_eq!(3, l.truncate(4)?);
+        assert_eq!(Some(Entry { term: 1, command: Some(vec![0x01]) }), l.get(1)?);
+        assert_eq!(Some(Entry { term: 2, command: Some(vec![0x02]) }), l.get(2)?);
+        assert_eq!(Some(Entry { term: 3, command: Some(vec![0x03]) }), l.get(3)?);
+        assert_eq!(None, l.get(4)?);
         assert_eq!((3, 3), l.get_last());
+        Ok(())
     }
 
     #[test]
-    fn truncate_committed() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
-        l.commit(2).unwrap();
+    fn truncate_committed() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
+        l.commit(2)?;
 
         assert_matches!(l.truncate(1), Err(Error::Value(_)));
-        assert_eq!(l.truncate(2), Ok(2));
+        assert_eq!(l.truncate(2)?, 2);
+        Ok(())
     }
 
     #[test]
-    fn truncate_zero() {
-        let (mut l, _) = setup();
-        l.append(Entry { term: 1, command: Some(vec![0x01]) }).unwrap();
-        l.append(Entry { term: 2, command: Some(vec![0x02]) }).unwrap();
-        l.append(Entry { term: 3, command: Some(vec![0x03]) }).unwrap();
+    fn truncate_zero() -> Result<(), Error> {
+        let (mut l, _) = setup()?;
+        l.append(Entry { term: 1, command: Some(vec![0x01]) })?;
+        l.append(Entry { term: 2, command: Some(vec![0x02]) })?;
+        l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
 
-        assert_eq!(Ok(0), l.truncate(0));
-        assert_eq!(Ok(None), l.get(1));
-        assert_eq!(Ok(None), l.get(2));
-        assert_eq!(Ok(None), l.get(3));
+        assert_eq!(0, l.truncate(0)?);
+        assert_eq!(None, l.get(1)?);
+        assert_eq!(None, l.get(2)?);
+        assert_eq!(None, l.get(3)?);
         assert_eq!((0, 0), l.get_last());
+        Ok(())
     }
 }
