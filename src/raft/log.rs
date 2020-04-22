@@ -521,15 +521,15 @@ mod tests {
 
         // Test loading saved term
         let (mut l, store) = setup()?;
-        assert_eq!((), l.save_term(1, Some("a"))?);
+        l.save_term(1, Some("a"))?;
         let l = Log::new(store)?;
         assert_eq!((1, Some("a".into())), l.load_term()?);
 
         // Test replacing saved term with none
         let (mut l, _) = setup()?;
-        assert_eq!((), l.save_term(1, Some("a"))?);
+        l.save_term(1, Some("a"))?;
         assert_eq!((1, Some("a".into())), l.load_term()?);
-        assert_eq!((), l.save_term(0, None)?);
+        l.save_term(0, None)?;
         assert_eq!((0, None), l.load_term()?);
         Ok(())
     }

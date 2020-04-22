@@ -304,11 +304,13 @@ mod tests {
         NodeAsserter::new(node)
     }
 
+    #[allow(clippy::type_complexity)]
     fn setup_rolenode(
     ) -> Result<(RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>), Error> {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
+    #[allow(clippy::type_complexity)]
     fn setup_rolenode_peers(
         peers: Vec<String>,
     ) -> Result<(RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>), Error> {

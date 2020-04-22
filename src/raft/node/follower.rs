@@ -165,6 +165,7 @@ pub mod tests {
         node.role.voted_for.clone()
     }
 
+    #[allow(clippy::type_complexity)]
     fn setup(
     ) -> Result<(RoleNode<Follower, kv::storage::Memory, TestState>, Receiver<Message>), Error>
     {

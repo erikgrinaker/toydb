@@ -291,6 +291,7 @@ mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
 
+    #[allow(clippy::type_complexity)]
     fn setup(
     ) -> Result<(RoleNode<Leader, kv::storage::Memory, TestState>, Receiver<Message>), Error> {
         let (sender, receiver) = crossbeam::channel::unbounded();

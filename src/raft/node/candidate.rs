@@ -109,6 +109,7 @@ mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
 
+    #[allow(clippy::type_complexity)]
     fn setup(
     ) -> Result<(RoleNode<Candidate, kv::storage::Memory, TestState>, Receiver<Message>), Error>
     {
