@@ -3,6 +3,7 @@ use super::parser::format_ident;
 use super::types::{DataType, Environment, Row, Value};
 use crate::Error;
 
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The catalog stores schema information

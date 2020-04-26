@@ -60,7 +60,6 @@ impl Storage for File {
 #[cfg(test)]
 impl super::TestSuite<File> for File {
     fn setup() -> Result<Self, Error> {
-        extern crate tempfile;
         File::new(tempfile::tempfile()?)
     }
 }

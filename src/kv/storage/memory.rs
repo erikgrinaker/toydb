@@ -1,6 +1,7 @@
 use super::{Range, Storage};
 use crate::Error;
 
+use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::ops::RangeBounds;
 

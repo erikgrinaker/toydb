@@ -3,6 +3,8 @@ pub use expression::{Environment, Expression, Expressions};
 
 use crate::Error;
 
+use derivative::Derivative;
+use serde_derive::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 

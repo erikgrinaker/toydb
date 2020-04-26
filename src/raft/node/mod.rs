@@ -9,6 +9,8 @@ use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
 
+use log::{debug, info, warn};
+use serde_derive::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
 /// The interval between leader heartbeats, in ticks.

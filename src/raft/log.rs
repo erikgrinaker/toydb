@@ -3,6 +3,9 @@ use crate::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
+use log::debug;
+use serde_derive::{Deserialize, Serialize};
+
 /// A replicated log entry
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
@@ -685,7 +688,7 @@ mod tests {
         l.append(Entry { term: 3, command: Some(vec![0x03]) })?;
         l.commit(2)?;
 
-        assert_matches!(l.truncate(1), Err(Error::Value(_)));
+        assert_eq!(l.truncate(1), Err(Error::Value("Cannot remove committed log entry".into())));
         assert_eq!(l.truncate(2)?, 2);
         Ok(())
     }

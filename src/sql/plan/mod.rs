@@ -10,6 +10,7 @@ use super::schema::{Catalog, Table};
 use super::types::{Expression, Expressions, Value};
 use crate::Error;
 
+use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// A query plan

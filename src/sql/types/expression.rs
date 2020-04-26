@@ -2,6 +2,7 @@ use super::Value;
 use crate::Error;
 
 use regex::Regex;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 /// An expression, made up of constants and operations

@@ -3,6 +3,7 @@ use super::{Candidate, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MI
 use crate::kv::storage::Storage;
 use crate::Error;
 
+use log::{debug, info};
 use rand::Rng as _;
 use std::collections::HashMap;
 

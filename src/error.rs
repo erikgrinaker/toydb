@@ -1,3 +1,5 @@
+use serde_derive::{Deserialize, Serialize};
+
 /// Errors, all except Internal are considered user-facing
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Error {
@@ -45,14 +47,14 @@ impl From<regex::Error> for Error {
     }
 }
 
-impl From<rmps::decode::Error> for Error {
-    fn from(err: rmps::decode::Error) -> Self {
+impl From<rmp_serde::decode::Error> for Error {
+    fn from(err: rmp_serde::decode::Error) -> Self {
         Error::Internal(err.to_string())
     }
 }
 
-impl From<rmps::encode::Error> for Error {
-    fn from(err: rmps::encode::Error) -> Self {
+impl From<rmp_serde::encode::Error> for Error {
+    fn from(err: rmp_serde::encode::Error) -> Self {
         Error::Internal(err.to_string())
     }
 }

@@ -2,6 +2,7 @@ use super::storage::{Range, Storage};
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -589,9 +590,9 @@ pub mod tests {
         txn.commit()?;
 
         // Check that any future transaction IDs are invalid
-        assert_matches!(
+        assert_eq!(
             mvcc.begin_with_mode(Mode::Snapshot { version: 9 }).err(),
-            Some(Error::Value(_))
+            Some(Error::Value("Snapshot not found for version 9".into()))
         );
 
         // Check that concurrent transactions are hidden from snapshots of snapshot transactions.
@@ -681,7 +682,7 @@ pub mod tests {
         ts.commit()?;
 
         // Resuming an inactive transaction should error.
-        assert_matches!(mvcc.resume(7).err(), Some(Error::Value(_)));
+        assert_eq!(mvcc.resume(7).err(), Some(Error::Value("No active transaction 7".into())));
 
         Ok(())
     }

@@ -5,6 +5,7 @@ pub use lexer::{Keyword, Lexer, Token};
 use super::types::DataType;
 use crate::Error;
 
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::BTreeMap;
 

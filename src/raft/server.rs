@@ -3,6 +3,7 @@ use crate::kv::storage::Storage;
 use crate::Error;
 
 use futures::{sink::SinkExt as _, FutureExt as _};
+use log::{debug, error};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};

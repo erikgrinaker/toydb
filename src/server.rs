@@ -8,6 +8,8 @@ use crate::sql::types::Row;
 use crate::Error;
 
 use futures::sink::SinkExt as _;
+use log::{error, info};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;

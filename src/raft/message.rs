@@ -1,6 +1,8 @@
 use super::Entry;
 use crate::Error;
 
+use serde_derive::{Deserialize, Serialize};
+
 /// A message passed between Raft nodes.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {

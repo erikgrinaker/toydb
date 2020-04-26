@@ -40,6 +40,8 @@ use super::types::Environment;
 use super::types::{Columns, Relation, Row, Value};
 use crate::Error;
 
+use serde_derive::{Deserialize, Serialize};
+
 /// A plan executor
 pub trait Executor<T: Transaction> {
     /// Executes the executor, consuming it and returning a result set

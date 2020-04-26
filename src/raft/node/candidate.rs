@@ -3,6 +3,7 @@ use super::{Follower, Leader, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIM
 use crate::kv::storage::Storage;
 use crate::Error;
 
+use log::{debug, info};
 use rand::Rng as _;
 
 /// A candidate is campaigning to become a leader.

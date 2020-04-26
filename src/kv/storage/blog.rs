@@ -7,6 +7,7 @@ use super::{Range, Storage};
 use crate::utility::{deserialize_read, serialize};
 use crate::Error;
 
+use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{Seek as _, SeekFrom, Write as _};
@@ -105,7 +106,6 @@ impl Storage for BLog {
 #[cfg(test)]
 impl super::TestSuite<BLog> for BLog {
     fn setup() -> Result<Self, Error> {
-        extern crate tempfile;
         BLog::new(tempfile::tempfile()?)
     }
 }

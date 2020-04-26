@@ -3,6 +3,7 @@ use super::{Follower, Node, RoleNode, HEARTBEAT_INTERVAL};
 use crate::kv::storage::Storage;
 use crate::Error;
 
+use log::{debug, info};
 use std::collections::{HashMap, HashSet};
 
 // A leader serves requests and replicates the log to followers.
