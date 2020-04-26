@@ -1,5 +1,5 @@
 # Initial build
-FROM rust:1.42-slim AS build
+FROM rust:1.43-slim AS build
 
 ARG TARGET=x86_64-unknown-linux-musl
 ENV RUSTFLAGS=-Clinker=musl-gcc
