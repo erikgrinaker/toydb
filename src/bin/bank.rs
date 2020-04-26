@@ -160,7 +160,7 @@ impl Bank {
             .execute(&format!(
                 "INSERT INTO customer VALUES {}",
                 (1..=self.customers)
-                    .zip(names::Generator::default(names::Name::Plain))
+                    .zip(names::Generator::with_naming(names::Name::Plain))
                     .map(|(id, name)| format!("({}, '{}')", id, name))
                     .collect::<Vec<String>>()
                     .join(", ")
