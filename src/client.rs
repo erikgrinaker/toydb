@@ -1,4 +1,5 @@
-use crate::server::{Request, Response, Status};
+use crate::raft;
+use crate::server::{Request, Response};
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::Table;
 use crate::Error;
@@ -96,7 +97,7 @@ impl Client {
     }
 
     /// Checks server status
-    pub async fn status(&self) -> Result<Status, Error> {
+    pub async fn status(&self) -> Result<raft::Status, Error> {
         match self.call(Request::Status).await? {
             Response::Status(s) => Ok(s),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),

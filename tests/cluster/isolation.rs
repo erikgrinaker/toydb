@@ -1,18 +1,15 @@
+use super::super::{assert_row, assert_rows, setup};
+
 use toydb::sql::types::Value;
 use toydb::Error;
 
-use super::super::setup;
-use super::super::util::{assert_row, assert_rows};
-
-use pretty_assertions::assert_eq;
 use serial_test::serial;
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 // A dirty write is when b overwrites an uncommitted value written by a.
 async fn anomaly_dirty_write() -> Result<(), Error> {
-    let (a, b, _, teardown) = setup::cluster_simple().await?;
-    defer!(teardown());
+    let (a, b, _, _teardown) = setup::cluster_simple().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -28,12 +25,11 @@ async fn anomaly_dirty_write() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 // A dirty read is when b can read an uncommitted value set by a.
 async fn anomaly_dirty_read() -> Result<(), Error> {
-    let (a, b, _, teardown) = setup::cluster_simple().await?;
-    defer!(teardown());
+    let (a, b, _, _teardown) = setup::cluster_simple().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -43,12 +39,11 @@ async fn anomaly_dirty_read() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 // A lost update is when a and b both read a value and update it, where b's update replaces a.
 async fn anomaly_lost_update() -> Result<(), Error> {
-    let (a, b, c, teardown) = setup::cluster_simple().await?;
-    defer!(teardown());
+    let (a, b, c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c')").await?;
 
@@ -70,12 +65,11 @@ async fn anomaly_lost_update() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 // A fuzzy (or unrepeatable) read is when b sees a value change after a updates it.
 async fn anomaly_fuzzy_read() -> Result<(), Error> {
-    let (a, b, c, teardown) = setup::cluster_simple().await?;
-    defer!(teardown());
+    let (a, b, c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c')").await?;
 
@@ -96,12 +90,11 @@ async fn anomaly_fuzzy_read() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 // Read skew is when a reads 1 and 2, but b modifies 2 in between the reads.
 async fn anomaly_read_skew() -> Result<(), Error> {
-    let (a, b, c, teardown) = setup::cluster_simple().await?;
-    defer!(teardown());
+    let (a, b, c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c'), (2, 'c')").await?;
 
@@ -122,13 +115,12 @@ async fn anomaly_read_skew() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 // A phantom read is when a reads entries matching some predicate, but a modification by
 // b changes the entries that match the predicate such that a later read by a returns them.
 async fn anomaly_phantom_read() -> Result<(), Error> {
-    let (a, b, c, teardown) = setup::cluster_simple().await?;
-    defer!(teardown());
+    let (a, b, c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'true'), (2, 'false')").await?;
 

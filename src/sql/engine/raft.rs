@@ -1,6 +1,6 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
-use super::{Engine as _, Transaction as _};
+use super::{Engine as _, IndexScan, Mode, Scan, Transaction as _};
 use crate::kv;
 use crate::raft;
 use crate::utility::{deserialize, serialize};
@@ -12,7 +12,7 @@ use std::collections::HashSet;
 #[derive(Clone, Serialize, Deserialize)]
 enum Mutation {
     /// Begins a transaction in the given mode
-    Begin(super::Mode),
+    Begin(Mode),
     /// Commits the transaction with the given ID
     Commit(u64),
     /// Rolls back the transaction with the given ID
@@ -55,31 +55,35 @@ enum Query {
 /// An SQL engine that wraps a Raft cluster.
 #[derive(Clone)]
 pub struct Raft {
-    /// The underlying Raft cluster.
-    raft: raft::Raft,
+    client: raft::Client,
 }
 
 impl Raft {
     /// Creates a new Raft SQL engine.
-    pub fn new(raft: raft::Raft) -> Self {
-        Self { raft }
+    pub fn new(client: raft::Client) -> Self {
+        Self { client }
     }
 
     /// Creates an underlying state machine for a Raft engine.
     pub fn new_state<S: kv::storage::Storage>(kv: kv::MVCC<S>) -> State<S> {
         State::new(kv)
     }
+
+    /// Returns engine status, for now just the Raft status.
+    pub fn status(&self) -> Result<raft::Status, Error> {
+        self.client.status_sync()
+    }
 }
 
 impl super::Engine for Raft {
     type Transaction = Transaction;
 
-    fn begin(&self, mode: super::Mode) -> Result<Self::Transaction, Error> {
-        Transaction::begin(self.raft.clone(), mode)
+    fn begin(&self, mode: Mode) -> Result<Self::Transaction, Error> {
+        Transaction::begin(self.client.clone(), mode)
     }
 
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
-        Transaction::resume(self.raft.clone(), id)
+        Transaction::resume(self.client.clone(), id)
     }
 }
 
@@ -87,24 +91,24 @@ impl super::Engine for Raft {
 #[derive(Clone)]
 pub struct Transaction {
     /// The underlying Raft cluster
-    raft: raft::Raft,
+    client: raft::Client,
     /// The transaction ID
     id: u64,
     /// The transaction mode
-    mode: super::Mode,
+    mode: Mode,
 }
 
 impl Transaction {
     /// Starts a transaction in the given mode
-    fn begin(raft: raft::Raft, mode: super::Mode) -> Result<Self, Error> {
-        let id = deserialize(&raft.mutate(serialize(&Mutation::Begin(mode.clone()))?)?)?;
-        Ok(Self { raft, id, mode })
+    fn begin(client: raft::Client, mode: Mode) -> Result<Self, Error> {
+        let id = deserialize(&client.mutate_sync(serialize(&Mutation::Begin(mode.clone()))?)?)?;
+        Ok(Self { client, id, mode })
     }
 
     /// Resumes an active transaction
-    fn resume(raft: raft::Raft, id: u64) -> Result<Self, Error> {
-        let (id, mode) = deserialize(&raft.query(serialize(&Query::Resume(id))?)?)?;
-        Ok(Self { raft, id, mode })
+    fn resume(client: raft::Client, id: u64) -> Result<Self, Error> {
+        let (id, mode) = deserialize(&client.query_sync(serialize(&Query::Resume(id))?)?)?;
+        Ok(Self { client, id, mode })
     }
 }
 
@@ -113,20 +117,20 @@ impl super::Transaction for Transaction {
         self.id
     }
 
-    fn mode(&self) -> super::Mode {
+    fn mode(&self) -> Mode {
         self.mode.clone()
     }
 
     fn commit(self) -> Result<(), Error> {
-        deserialize(&self.raft.mutate(serialize(&Mutation::Commit(self.id))?)?)
+        deserialize(&self.client.mutate_sync(serialize(&Mutation::Commit(self.id))?)?)
     }
 
     fn rollback(self) -> Result<(), Error> {
-        deserialize(&self.raft.mutate(serialize(&Mutation::Rollback(self.id))?)?)
+        deserialize(&self.client.mutate_sync(serialize(&Mutation::Rollback(self.id))?)?)
     }
 
     fn create(&mut self, table: &str, row: Row) -> Result<(), Error> {
-        deserialize(&self.raft.mutate(serialize(&Mutation::Create {
+        deserialize(&self.client.mutate_sync(serialize(&Mutation::Create {
             txn_id: self.id,
             table: table.to_string(),
             row,
@@ -134,7 +138,7 @@ impl super::Transaction for Transaction {
     }
 
     fn delete(&mut self, table: &str, id: &Value) -> Result<(), Error> {
-        deserialize(&self.raft.mutate(serialize(&Mutation::Delete {
+        deserialize(&self.client.mutate_sync(serialize(&Mutation::Delete {
             txn_id: self.id,
             table: table.to_string(),
             id: id.clone(),
@@ -142,7 +146,7 @@ impl super::Transaction for Transaction {
     }
 
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error> {
-        deserialize(&self.raft.query(serialize(&Query::Read {
+        deserialize(&self.client.query_sync(serialize(&Query::Read {
             txn_id: self.id,
             table: table.to_string(),
             id: id.clone(),
@@ -155,7 +159,7 @@ impl super::Transaction for Transaction {
         column: &str,
         value: &Value,
     ) -> Result<HashSet<Value>, Error> {
-        deserialize(&self.raft.query(serialize(&Query::ReadIndex {
+        deserialize(&self.client.query_sync(serialize(&Query::ReadIndex {
             txn_id: self.id,
             table: table.to_string(),
             column: column.to_string(),
@@ -163,9 +167,9 @@ impl super::Transaction for Transaction {
         })?)?)
     }
 
-    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan, Error> {
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan, Error> {
         Ok(Box::new(
-            deserialize::<Vec<_>>(&self.raft.query(serialize(&Query::Scan {
+            deserialize::<Vec<_>>(&self.client.query_sync(serialize(&Query::Scan {
                 txn_id: self.id,
                 table: table.to_string(),
                 filter,
@@ -175,9 +179,9 @@ impl super::Transaction for Transaction {
         ))
     }
 
-    fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan, Error> {
+    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan, Error> {
         Ok(Box::new(
-            deserialize::<Vec<_>>(&self.raft.query(serialize(&Query::ScanIndex {
+            deserialize::<Vec<_>>(&self.client.query_sync(serialize(&Query::ScanIndex {
                 txn_id: self.id,
                 table: table.to_string(),
                 column: column.to_string(),
@@ -188,7 +192,7 @@ impl super::Transaction for Transaction {
     }
 
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error> {
-        deserialize(&self.raft.mutate(serialize(&Mutation::Update {
+        deserialize(&self.client.mutate_sync(serialize(&Mutation::Update {
             txn_id: self.id,
             table: table.to_string(),
             id: id.clone(),
@@ -199,32 +203,30 @@ impl super::Transaction for Transaction {
 
 impl Catalog for Transaction {
     fn create_table(&mut self, table: &Table) -> Result<(), Error> {
-        deserialize(&self.raft.mutate(serialize(&Mutation::CreateTable {
+        deserialize(&self.client.mutate_sync(serialize(&Mutation::CreateTable {
             txn_id: self.id,
             schema: table.clone(),
         })?)?)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<(), Error> {
-        deserialize(&self.raft.mutate(serialize(&Mutation::DeleteTable {
+        deserialize(&self.client.mutate_sync(serialize(&Mutation::DeleteTable {
             txn_id: self.id,
             table: table.to_string(),
         })?)?)
     }
 
     fn read_table(&self, table: &str) -> Result<Option<Table>, Error> {
-        deserialize(
-            &self.raft.query(serialize(&Query::ReadTable {
-                txn_id: self.id,
-                table: table.to_string(),
-            })?)?,
-        )
+        deserialize(&self.client.query_sync(serialize(&Query::ReadTable {
+            txn_id: self.id,
+            table: table.to_string(),
+        })?)?)
     }
 
     fn scan_tables(&self) -> Result<Tables, Error> {
         Ok(Box::new(
             deserialize::<Vec<_>>(
-                &self.raft.query(serialize(&Query::ScanTables { txn_id: self.id })?)?,
+                &self.client.query_sync(serialize(&Query::ScanTables { txn_id: self.id })?)?,
             )?
             .into_iter(),
         ))

@@ -1,15 +1,9 @@
 #![warn(clippy::all)]
 
-#[macro_use]
-extern crate clap;
-extern crate config;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate simplelog;
-extern crate toydb;
-
+use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
+use serde_derive::Deserialize;
 use std::collections::HashMap;
+use toydb::Server;
 
 #[tokio::main]
 async fn main() -> Result<(), toydb::Error> {
@@ -32,8 +26,11 @@ async fn main() -> Result<(), toydb::Error> {
     }
     simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
-    let server = toydb::Server::new(&cfg.id, cfg.parse_peers()?, &cfg.data_dir)?;
-    server.listen(cfg.listen_sql, cfg.listen_raft).await
+    Server::new(&cfg.id, cfg.peers, &cfg.data_dir)?
+        .listen(&cfg.listen_sql, &cfg.listen_raft)
+        .await?
+        .serve()
+        .await
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,21 +55,5 @@ impl Config {
         c.merge(config::File::with_name(file))?;
         c.merge(config::Environment::with_prefix("TOYDB"))?;
         c.try_into()
-    }
-
-    fn parse_peers(&self) -> Result<HashMap<String, std::net::SocketAddr>, toydb::Error> {
-        let mut peers = HashMap::new();
-        for (id, address) in self.peers.iter() {
-            peers.insert(
-                id.clone(),
-                if let Ok(sa) = address.parse::<std::net::SocketAddr>() {
-                    sa
-                } else {
-                    let ip = address.parse::<std::net::IpAddr>()?;
-                    std::net::SocketAddr::new(ip, 9705)
-                },
-            );
-        }
-        Ok(peers)
     }
 }

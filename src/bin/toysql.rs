@@ -117,10 +117,13 @@ impl ToySQL {
 
       !headers <on|off>  Toggles/enables/disables column headers display
       !help              This help message
+      !status            Display server status
       !table [table]     Display table schema, if it exists
       !tables            List tables
     "#
             ),
+            // FIXME This should have better formatting
+            "!status" => println!("{:?}", self.client.status().await?),
             "!table" => {
                 let args = getargs(1)?;
                 println!("{}", self.client.get_table(args[0]).await?.as_sql());
@@ -216,10 +219,7 @@ impl ToySQL {
         }
 
         let status = self.client.status().await?;
-        println!(
-            "Connected to node \"{}\" (version {}). Enter !help for instructions.",
-            status.id, status.version
-        );
+        println!("Connected to ToyDB node \"{}\". Enter !help for instructions.", status.id);
 
         while let Some(input) = self.prompt()? {
             if let Err(err) = self.execute(&input).await {

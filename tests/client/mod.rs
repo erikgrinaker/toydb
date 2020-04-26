@@ -1,75 +1,19 @@
-use super::setup;
-use super::util::{assert_row, assert_rows};
+use super::{assert_row, assert_rows, setup};
 
-use toydb::server::Status;
+use toydb::raft::Status;
 use toydb::sql::engine::Mode;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Relation, Value};
-use toydb::Client;
-use toydb::Error;
+use toydb::{Client, Error};
 
 use pretty_assertions::assert_eq;
 use serial_test::serial;
 
-#[allow(clippy::type_complexity)]
-async fn setup_movies() -> Result<(Client, Box<dyn FnOnce()>), Error> {
-    setup::server_with_queries(vec![
-        "CREATE TABLE countries (
-            id STRING PRIMARY KEY,
-            name STRING NOT NULL
-        )",
-        "INSERT INTO countries VALUES
-            ('fr', 'France'),
-            ('ru', 'Russia'),
-            ('us', 'United States of America')",
-        "CREATE TABLE genres (
-            id INTEGER PRIMARY KEY,
-            name STRING NOT NULL
-        )",
-        "INSERT INTO genres VALUES
-            (1, 'Science Fiction'),
-            (2, 'Action'),
-            (3, 'Comedy')",
-        "CREATE TABLE studios (
-            id INTEGER PRIMARY KEY,
-            name STRING NOT NULL,
-            country_id STRING REFERENCES countries
-        )",
-        "INSERT INTO studios VALUES
-            (1, 'Mosfilm', 'ru'),
-            (2, 'Lionsgate', 'us'),
-            (3, 'StudioCanal', 'fr'),
-            (4, 'Warner Bros', 'us')",
-        "CREATE TABLE movies (
-            id INTEGER PRIMARY KEY,
-            title STRING NOT NULL,
-            studio_id INTEGER NOT NULL REFERENCES studios,
-            genre_id INTEGER NOT NULL REFERENCES genres,
-            released INTEGER NOT NULL,
-            rating FLOAT,
-            ultrahd BOOLEAN
-        )",
-        "INSERT INTO movies VALUES
-            (1, 'Stalker', 1, 1, 1979, 8.2, NULL),
-            (2, 'Sicario', 2, 2, 2015, 7.6, TRUE),
-            (3, 'Primer', 3, 1, 2004, 6.9, NULL),
-            (4, 'Heat', 4, 2, 1995, 8.2, TRUE),
-            (5, 'The Fountain', 4, 1, 2006, 7.2, FALSE),
-            (6, 'Solaris', 1, 1, 1972, 8.1, NULL),
-            (7, 'Gravity', 4, 1, 2013, 7.7, TRUE),
-            (8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE),
-            (9, 'Birdman', 4, 3, 2014, 7.7, TRUE),
-            (10, 'Inception', 4, 1, 2010, 8.8, TRUE)",
-    ])
-    .await
-}
-
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 async fn get_table() -> Result<(), Error> {
-    let (c, teardown) = setup_movies().await?;
-    defer!(teardown());
+    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
 
     assert_eq!(
         c.get_table("unknown").await,
@@ -156,36 +100,40 @@ async fn get_table() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 async fn list_tables() -> Result<(), Error> {
-    let (c, teardown) = setup_movies().await?;
-    defer!(teardown());
+    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
 
     assert_eq!(c.list_tables().await?, vec!["countries", "genres", "movies", "studios"]);
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 async fn status() -> Result<(), Error> {
-    let (c, teardown) = setup_movies().await?;
-    defer!(teardown());
+    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
 
     assert_eq!(
         c.status().await?,
-        Status { id: "test".into(), version: env!("CARGO_PKG_VERSION").into() }
+        Status {
+            id: "test".into(),
+            role: "leader".into(),
+            leader: Some("test".into()),
+            nodes: 1,
+            term: 0,
+            entries: 26,
+            committed: 26,
+            applied: 26,
+        }
     );
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 async fn query() -> Result<(), Error> {
-    // The SQL engine is thoroughly tested in a separate suite, this just exercises the
-    // basic client/server integration.
-    let (c, teardown) = setup_movies().await?;
-    defer!(teardown());
+    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
 
     // SELECT
     let result = c.execute("SELECT * FROM genres").await?;
@@ -275,11 +223,10 @@ async fn query() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 async fn query_txn() -> Result<(), Error> {
-    let (c, teardown) = setup_movies().await?;
-    defer!(teardown());
+    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
 
     // Committing a change in a txn should work
     assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { id: 2, mode: Mode::ReadWrite });
@@ -357,12 +304,11 @@ async fn query_txn() -> Result<(), Error> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(core_threads = 2)]
 #[serial]
 async fn query_txn_concurrent() -> Result<(), Error> {
-    let (a, teardown) = setup_movies().await?;
+    let (a, _teardown) = setup::server_with_data(setup::movies()).await?;
     let b = Client::new("127.0.0.1:9605").await?;
-    defer!(teardown());
 
     // Concurrent updates should throw a serialization failure on conflict.
     assert_eq!(a.execute("BEGIN").await?, ResultSet::Begin { id: 2, mode: Mode::ReadWrite });

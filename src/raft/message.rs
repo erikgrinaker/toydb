@@ -1,15 +1,5 @@
-use super::log::Entry;
+use super::Entry;
 use crate::Error;
-use crossbeam::channel::Receiver;
-
-/// A transport for communication between a Raft node and its peers.
-pub trait Transport {
-    /// Returns a channel for receiving inbound messages.
-    fn receiver(&self) -> Receiver<Message>;
-
-    /// Sends a message to a peer.
-    fn send(&self, msg: Message) -> Result<(), Error>;
-}
 
 /// A message passed between Raft nodes.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

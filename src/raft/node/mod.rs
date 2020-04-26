@@ -2,15 +2,14 @@ mod candidate;
 mod follower;
 mod leader;
 
-use self::candidate::Candidate;
-use self::follower::Follower;
-use self::leader::Leader;
-use super::log::{Entry, Log};
-use super::transport::{Event, Message};
-use super::State;
-use crate::kv;
+use super::{Event, Log, Message, State};
+use crate::kv::storage::Storage;
 use crate::Error;
-use crossbeam::channel::Sender;
+use candidate::Candidate;
+use follower::Follower;
+use leader::Leader;
+
+use tokio::sync::mpsc::UnboundedSender;
 
 /// The interval between leader heartbeats, in ticks.
 const HEARTBEAT_INTERVAL: u64 = 1;
@@ -21,23 +20,35 @@ const ELECTION_TIMEOUT_MIN: u64 = 8 * HEARTBEAT_INTERVAL;
 /// The maximum election timeout, in ticks.
 const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
 
+/// Node status
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    pub id: String,
+    pub role: String,
+    pub leader: Option<String>,
+    pub nodes: u64,
+    pub term: u64,
+    pub entries: u64,
+    pub committed: u64,
+    pub applied: u64,
+}
+
 /// The local Raft node state machine.
-pub enum Node<L: kv::storage::Storage, S: State> {
+pub enum Node<L: Storage, S: State> {
     Candidate(RoleNode<Candidate, L, S>),
     Follower(RoleNode<Follower, L, S>),
     Leader(RoleNode<Leader, L, S>),
 }
 
-impl<L: kv::storage::Storage, S: State> Node<L, S> {
+impl<L: Storage, S: State> Node<L, S> {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
     pub fn new(
         id: &str,
         peers: Vec<String>,
-        logstore: kv::Simple<L>,
+        log: Log<L>,
         state: S,
-        sender: Sender<Message>,
+        sender: UnboundedSender<Message>,
     ) -> Result<Self, Error> {
-        let log = Log::new(logstore)?;
         let (term, voted_for) = log.load_term()?;
         let node = RoleNode {
             id: id.to_owned(),
@@ -55,6 +66,26 @@ impl<L: kv::storage::Storage, S: State> Node<L, S> {
         } else {
             Ok(node.into())
         }
+    }
+
+    /// Returns node status.
+    pub fn status(&self) -> Result<Status, Error> {
+        let mut status = match self {
+            Node::Candidate(n) => n.status(),
+            Node::Follower(n) => n.status(),
+            Node::Leader(n) => n.status(),
+        }?;
+        status.role = match self {
+            Node::Candidate(_) => "candidate".into(),
+            Node::Follower(_) => "follower".into(),
+            Node::Leader(_) => "leader".into(),
+        };
+        status.leader = match self {
+            Node::Candidate(_) => None,
+            Node::Follower(n) => n.role.leader.clone(),
+            Node::Leader(n) => Some(n.id.clone()),
+        };
+        Ok(status)
     }
 
     /// Processes a message.
@@ -77,36 +108,36 @@ impl<L: kv::storage::Storage, S: State> Node<L, S> {
     }
 }
 
-impl<L: kv::storage::Storage, S: State> From<RoleNode<Candidate, L, S>> for Node<L, S> {
+impl<L: Storage, S: State> From<RoleNode<Candidate, L, S>> for Node<L, S> {
     fn from(rn: RoleNode<Candidate, L, S>) -> Self {
         Node::Candidate(rn)
     }
 }
 
-impl<L: kv::storage::Storage, S: State> From<RoleNode<Follower, L, S>> for Node<L, S> {
+impl<L: Storage, S: State> From<RoleNode<Follower, L, S>> for Node<L, S> {
     fn from(rn: RoleNode<Follower, L, S>) -> Self {
         Node::Follower(rn)
     }
 }
 
-impl<L: kv::storage::Storage, S: State> From<RoleNode<Leader, L, S>> for Node<L, S> {
+impl<L: Storage, S: State> From<RoleNode<Leader, L, S>> for Node<L, S> {
     fn from(rn: RoleNode<Leader, L, S>) -> Self {
         Node::Leader(rn)
     }
 }
 
 // A Raft node with role R
-pub struct RoleNode<R, L: kv::storage::Storage, S: State> {
+pub struct RoleNode<R, L: Storage, S: State> {
     id: String,
     peers: Vec<String>,
     term: u64,
     log: Log<L>,
     state: S,
-    sender: Sender<Message>,
+    sender: UnboundedSender<Message>,
     role: R,
 }
 
-impl<R, L: kv::storage::Storage, S: State> RoleNode<R, L, S> {
+impl<R, L: Storage, S: State> RoleNode<R, L, S> {
     /// Transforms the node into another role.
     fn become_role<T>(self, role: T) -> Result<RoleNode<T, L, S>, Error> {
         Ok(RoleNode {
@@ -164,20 +195,48 @@ impl<R, L: kv::storage::Storage, S: State> RoleNode<R, L, S> {
         debug!("Sending {:?}", msg);
         Ok(self.sender.send(msg)?)
     }
+
+    /// Returns the node status.
+    fn status(&self) -> Result<Status, Error> {
+        let (entries, _) = self.log.get_last();
+        let (committed, _) = self.log.get_committed();
+        let (applied, _) = self.log.get_applied();
+
+        Ok(Status {
+            id: self.id.clone(),
+            role: "".into(),
+            leader: None,
+            nodes: self.peers.len() as u64 + 1,
+            term: self.term,
+            entries,
+            committed,
+            applied,
+        })
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    pub use super::super::tests::*;
+    pub use super::super::state::tests::TestState;
+    use super::super::Entry;
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
-    use crossbeam::channel::Receiver;
+    use crate::kv;
+    use tokio::sync::mpsc::UnboundedReceiver;
 
-    pub struct NodeAsserter<'a, L: kv::storage::Storage, S: State> {
+    pub fn assert_messages(rx: &mut UnboundedReceiver<Message>, msgs: Vec<Message>) {
+        let mut actual = Vec::new();
+        while let Ok(message) = rx.try_recv() {
+            actual.push(message)
+        }
+        assert_eq!(msgs, actual);
+    }
+
+    pub struct NodeAsserter<'a, L: Storage, S: State> {
         node: &'a Node<L, S>,
     }
 
-    impl<'a, L: kv::storage::Storage, S: State> NodeAsserter<'a, L, S> {
+    impl<'a, L: Storage, S: State> NodeAsserter<'a, L, S> {
         pub fn new(node: &'a Node<L, S>) -> Self {
             Self { node }
         }
@@ -300,27 +359,29 @@ mod tests {
         }
     }
 
-    pub fn assert_node<L: kv::storage::Storage, S: State>(node: &Node<L, S>) -> NodeAsserter<L, S> {
+    pub fn assert_node<L: Storage, S: State>(node: &Node<L, S>) -> NodeAsserter<L, S> {
         NodeAsserter::new(node)
     }
 
     #[allow(clippy::type_complexity)]
     fn setup_rolenode(
-    ) -> Result<(RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>), Error> {
+    ) -> Result<(RoleNode<(), kv::storage::Test, TestState>, UnboundedReceiver<Message>), Error>
+    {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
     #[allow(clippy::type_complexity)]
     fn setup_rolenode_peers(
         peers: Vec<String>,
-    ) -> Result<(RoleNode<(), kv::storage::Memory, TestState>, Receiver<Message>), Error> {
-        let (sender, receiver) = crossbeam::channel::unbounded();
+    ) -> Result<(RoleNode<(), kv::storage::Test, TestState>, UnboundedReceiver<Message>), Error>
+    {
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         let node = RoleNode {
             role: (),
             id: "a".into(),
             peers,
             term: 1,
-            log: Log::new(kv::Simple::new(kv::storage::Memory::new()))?,
+            log: Log::new(kv::Simple::new(kv::storage::Test::new()))?,
             state: TestState::new(),
             sender,
         };
@@ -329,11 +390,11 @@ mod tests {
 
     #[test]
     fn new() -> Result<(), Error> {
-        let (sender, _) = crossbeam::channel::unbounded();
+        let (sender, _) = tokio::sync::mpsc::unbounded_channel();
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            kv::Simple::new(kv::storage::Memory::new()),
+            Log::new(kv::Simple::new(kv::storage::Test::new()))?,
             TestState::new(),
             sender,
         )?;
@@ -350,13 +411,13 @@ mod tests {
 
     #[test]
     fn new_loads_term() -> Result<(), Error> {
-        let (sender, _) = crossbeam::channel::unbounded();
+        let (sender, _) = tokio::sync::mpsc::unbounded_channel();
         let storage = kv::storage::Test::new();
         Log::new(kv::Simple::new(storage.clone()))?.save_term(3, Some("c"))?;
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            kv::Simple::new(storage),
+            Log::new(kv::Simple::new(storage))?,
             TestState::new(),
             sender,
         )?;
@@ -369,11 +430,11 @@ mod tests {
 
     #[test]
     fn new_single() -> Result<(), Error> {
-        let (sender, _) = crossbeam::channel::unbounded();
+        let (sender, _) = tokio::sync::mpsc::unbounded_channel();
         let node = Node::new(
             "a",
             vec![],
-            kv::Simple::new(kv::storage::Memory::new()),
+            Log::new(kv::Simple::new(kv::storage::Test::new()))?,
             TestState::new(),
             sender,
         )?;
@@ -401,13 +462,12 @@ mod tests {
 
     #[test]
     fn broadcast() -> Result<(), Error> {
-        let (node, rx) = setup_rolenode()?;
+        let (node, mut rx) = setup_rolenode()?;
         node.broadcast(Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
 
         for to in ["b", "c"].iter().cloned() {
-            assert!(!rx.is_empty());
             assert_eq!(
-                rx.recv()?,
+                rx.try_recv()?,
                 Message {
                     from: Some("a".into()),
                     to: Some(to.into()),
@@ -416,7 +476,7 @@ mod tests {
                 },
             )
         }
-        assert!(rx.is_empty());
+        assert_messages(&mut rx, vec![]);
         Ok(())
     }
 
@@ -460,10 +520,10 @@ mod tests {
 
     #[test]
     fn send() -> Result<(), Error> {
-        let (node, rx) = setup_rolenode()?;
+        let (node, mut rx) = setup_rolenode()?;
         node.send(Some("b"), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),

@@ -255,7 +255,7 @@ impl<S: kv::storage::Storage> Log<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::TestState;
+    use super::super::state::tests::TestState;
     use super::*;
 
     fn setup() -> Result<(Log<kv::storage::Test>, kv::Simple<kv::storage::Test>), Error> {

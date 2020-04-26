@@ -27,30 +27,6 @@ impl From<config::ConfigError> for Error {
     }
 }
 
-impl From<crossbeam::channel::RecvError> for Error {
-    fn from(err: crossbeam::channel::RecvError) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl<T> From<crossbeam::channel::SendError<T>> for Error {
-    fn from(err: crossbeam::channel::SendError<T>) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl From<grpc::Error> for Error {
-    fn from(err: grpc::Error) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl From<httpbis::Error> for Error {
-    fn from(err: httpbis::Error) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
 impl From<log::ParseLevelError> for Error {
     fn from(err: log::ParseLevelError) -> Self {
         Error::Config(err.to_string())
@@ -119,6 +95,24 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
 
 impl From<tokio::task::JoinError> for Error {
     fn from(err: tokio::task::JoinError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl From<tokio::sync::mpsc::error::TryRecvError> for Error {
+    fn from(err: tokio::sync::mpsc::error::TryRecvError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for Error {
+    fn from(err: tokio::sync::oneshot::error::RecvError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
+    fn from(err: tokio::sync::mpsc::error::SendError<T>) -> Self {
         Error::Internal(err.to_string())
     }
 }

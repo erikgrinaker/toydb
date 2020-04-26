@@ -1,12 +1,16 @@
-use super::*;
-use rand::Rng;
+use super::super::{Event, Message, State};
+use super::{Candidate, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use crate::kv::storage::Storage;
+use crate::Error;
+
+use rand::Rng as _;
 use std::collections::HashMap;
 
 // A follower replicates state from a leader.
 #[derive(Debug)]
 pub struct Follower {
     /// The leader, or None if just initialized.
-    leader: Option<String>,
+    pub leader: Option<String>,
     /// The number of ticks since the last message from the leader.
     leader_seen_ticks: u64,
     /// The timeout before triggering an election.
@@ -31,7 +35,7 @@ impl Follower {
     }
 }
 
-impl<L: kv::storage::Storage, S: State> RoleNode<Follower, L, S> {
+impl<L: Storage, S: State> RoleNode<Follower, L, S> {
     /// Transforms the node into a candidate.
     fn become_candidate(self) -> Result<RoleNode<Candidate, L, S>, Error> {
         info!("Starting election for term {}", self.term + 1);
@@ -149,17 +153,20 @@ impl<L: kv::storage::Storage, S: State> RoleNode<Follower, L, S> {
 
 #[cfg(test)]
 pub mod tests {
+    use super::super::super::{Entry, Log};
     use super::super::tests::{assert_messages, assert_node, TestState};
     use super::*;
-    use crossbeam::channel::Receiver;
+    use crate::kv;
+    use tokio::stream::StreamExt as _;
+    use tokio::sync::mpsc::UnboundedReceiver;
 
-    pub fn follower_leader<L: kv::storage::Storage, S: State>(
+    pub fn follower_leader<L: Storage, S: State>(
         node: &RoleNode<Follower, L, S>,
     ) -> Option<String> {
         node.role.leader.clone()
     }
 
-    pub fn follower_voted_for<L: kv::storage::Storage, S: State>(
+    pub fn follower_voted_for<L: Storage, S: State>(
         node: &RoleNode<Follower, L, S>,
     ) -> Option<String> {
         node.role.voted_for.clone()
@@ -167,11 +174,11 @@ pub mod tests {
 
     #[allow(clippy::type_complexity)]
     fn setup(
-    ) -> Result<(RoleNode<Follower, kv::storage::Memory, TestState>, Receiver<Message>), Error>
+    ) -> Result<(RoleNode<Follower, kv::storage::Test, TestState>, UnboundedReceiver<Message>), Error>
     {
-        let (sender, receiver) = crossbeam::channel::unbounded();
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
         let mut state = TestState::new();
-        let mut log = Log::new(kv::Simple::new(kv::storage::Memory::new()))?;
+        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
         log.append(Entry { term: 1, command: Some(vec![0x01]) })?;
         log.append(Entry { term: 1, command: Some(vec![0x02]) })?;
         log.append(Entry { term: 2, command: Some(vec![0x03]) })?;
@@ -194,7 +201,7 @@ pub mod tests {
     #[test]
     // Heartbeat from current leader
     fn step_heartbeat() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -209,7 +216,7 @@ pub mod tests {
             .committed(3)
             .applied(1);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -223,7 +230,7 @@ pub mod tests {
     #[test]
     // Heartbeat from current leader with conflicting commit_term
     fn step_heartbeat_conflict_commit_term() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -238,7 +245,7 @@ pub mod tests {
             .committed(2)
             .applied(1);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -252,7 +259,7 @@ pub mod tests {
     #[test]
     // Heartbeat from current leader with a missing commit_index
     fn step_heartbeat_missing_commit_entry() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -267,7 +274,7 @@ pub mod tests {
             .committed(2)
             .applied(1);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -281,7 +288,7 @@ pub mod tests {
     #[test]
     // Heartbeat from fake leader
     fn step_heartbeat_fake_leader() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("c".into()),
             to: Some("a".into()),
@@ -295,14 +302,14 @@ pub mod tests {
             .voted_for(None)
             .committed(2)
             .applied(1);
-        assert_messages(&rx, vec![]);
+        assert_messages(&mut rx, vec![]);
         Ok(())
     }
 
     #[test]
     // Heartbeat when no current leader
     fn step_heartbeat_no_leader() -> Result<(), Error> {
-        let (mut follower, rx) = setup()?;
+        let (mut follower, mut rx) = setup()?;
         follower.role = Follower::new(None, None);
         let node = follower.step(Message {
             from: Some("c".into()),
@@ -318,7 +325,7 @@ pub mod tests {
             .committed(3)
             .applied(1);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("c".into()),
@@ -332,7 +339,7 @@ pub mod tests {
     #[test]
     // Heartbeat from current leader with old commit_index
     fn step_heartbeat_old_commit_index() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -347,7 +354,7 @@ pub mod tests {
             .committed(2)
             .applied(1);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -361,7 +368,7 @@ pub mod tests {
     #[test]
     // Heartbeat for future term with other leader changes leader
     fn step_heartbeat_future_term() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("c".into()),
             to: Some("a".into()),
@@ -370,7 +377,7 @@ pub mod tests {
         })?;
         assert_node(&node).is_follower().term(4).leader(Some("c")).voted_for(None);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("c".into()),
@@ -384,7 +391,7 @@ pub mod tests {
     #[test]
     // Heartbeat from past term
     fn step_heartbeat_past_term() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -398,14 +405,15 @@ pub mod tests {
             .voted_for(None)
             .committed(2)
             .applied(1);
-        assert_messages(&rx, vec![]);
+        std::mem::drop(node);
+        assert_messages(&mut rx, vec![]);
         Ok(())
     }
 
     #[test]
     // SolicitVote is granted for the first solicitor, otherwise ignored.
     fn step_solicitvote() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
 
         // The first vote request in this term yields a vote response.
         let mut node = follower.step(Message {
@@ -416,7 +424,7 @@ pub mod tests {
         })?;
         assert_node(&node).is_follower().term(3).leader(Some("b")).voted_for(Some("c"));
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("c".into()),
@@ -434,7 +442,7 @@ pub mod tests {
         })?;
         assert_node(&node).is_follower().term(3).leader(Some("b")).voted_for(Some("c"));
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("c".into()),
@@ -451,14 +459,14 @@ pub mod tests {
             event: Event::SolicitVote { last_index: 3, last_term: 2 },
         })?;
         assert_node(&node).is_follower().term(3).leader(Some("b")).voted_for(Some("c"));
-        assert_messages(&rx, vec![]);
+        assert_messages(&mut rx, vec![]);
         Ok(())
     }
 
     #[test]
     // GrantVote messages are ignored
     fn step_grantvote_noop() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -466,14 +474,14 @@ pub mod tests {
             event: Event::GrantVote,
         })?;
         assert_node(&node).is_follower().term(3).leader(Some("b"));
-        assert_messages(&rx, vec![]);
+        assert_messages(&mut rx, vec![]);
         Ok(())
     }
 
     #[test]
     // SolicitVote is rejected if last_term is outdated.
     fn step_solicitvote_last_index_outdated() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("c".into()),
             to: Some("a".into()),
@@ -481,14 +489,14 @@ pub mod tests {
             event: Event::SolicitVote { last_index: 2, last_term: 2 },
         })?;
         assert_node(&node).is_follower().term(3).leader(Some("b")).voted_for(None);
-        assert_messages(&rx, vec![]);
+        assert_messages(&mut rx, vec![]);
         Ok(())
     }
 
     #[test]
     // SolicitVote is rejected if last_term is outdated.
     fn step_solicitvote_last_term_outdated() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("c".into()),
             to: Some("a".into()),
@@ -496,14 +504,14 @@ pub mod tests {
             event: Event::SolicitVote { last_index: 3, last_term: 1 },
         })?;
         assert_node(&node).is_follower().term(3).leader(Some("b")).voted_for(None);
-        assert_messages(&rx, vec![]);
+        assert_messages(&mut rx, vec![]);
         Ok(())
     }
 
     #[test]
     // ReplicateEntries accepts some entries at base 0 without changes
     fn step_replicateentries_base0() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -523,7 +531,7 @@ pub mod tests {
             Entry { term: 2, command: Some(vec![0x03]) },
         ]);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -537,7 +545,7 @@ pub mod tests {
     #[test]
     // ReplicateEntries appends entries
     fn step_replicateentries_append() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -559,7 +567,7 @@ pub mod tests {
             Entry { term: 3, command: Some(vec![0x05]) },
         ]);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -573,7 +581,7 @@ pub mod tests {
     #[test]
     // ReplicateEntries accepts partially overlapping entries
     fn step_replicateentries_partial_overlap() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -595,7 +603,7 @@ pub mod tests {
             Entry { term: 3, command: Some(vec![0x04]) },
         ]);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -609,7 +617,7 @@ pub mod tests {
     #[test]
     // ReplicateEntries replaces conflicting entries
     fn step_replicateentries_replace() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -630,7 +638,7 @@ pub mod tests {
             Entry { term: 3, command: Some(vec![0x05]) },
         ]);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -644,7 +652,7 @@ pub mod tests {
     #[test]
     // ReplicateEntries replaces partially conflicting entries
     fn step_replicateentries_replace_partial() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -665,7 +673,7 @@ pub mod tests {
             Entry { term: 3, command: Some(vec![0x04]) },
         ]);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -679,7 +687,7 @@ pub mod tests {
     #[test]
     // ReplicateEntries rejects missing base index
     fn step_replicateentries_reject_missing_base_index() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -696,7 +704,7 @@ pub mod tests {
             Entry { term: 2, command: Some(vec![0x03]) },
         ]);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -710,7 +718,7 @@ pub mod tests {
     #[test]
     // ReplicateEntries rejects conflicting base term
     fn step_replicateentries_reject_missing_base_term() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let node = follower.step(Message {
             from: Some("b".into()),
             to: Some("a".into()),
@@ -727,7 +735,7 @@ pub mod tests {
             Entry { term: 2, command: Some(vec![0x03]) },
         ]);
         assert_messages(
-            &rx,
+            &mut rx,
             vec![Message {
                 from: Some("a".into()),
                 to: Some("b".into()),
@@ -749,14 +757,14 @@ pub mod tests {
             Event::RespondError { call_id: vec![], error: Error::Internal("b00m".into()) },
             Event::RespondState { call_id: vec![], response: vec![0xaf] },
         ];
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let mut node = Node::Follower(follower);
         for call in calls.into_iter() {
             for mut response in responses.clone().into_iter() {
                 node = node.step(Message { from: None, to: None, term: 0, event: call.clone() })?;
                 assert_node(&node).is_follower().term(3).leader(Some("b"));
                 assert_messages(
-                    &rx,
+                    &mut rx,
                     vec![Message {
                         from: Some("a".into()),
                         to: Some("b".into()),
@@ -781,7 +789,7 @@ pub mod tests {
                     })?;
                 }
                 assert_messages(
-                    &rx,
+                    &mut rx,
                     vec![Message { from: Some("a".into()), to: None, term: 3, event: response }],
                 );
             }
@@ -791,7 +799,7 @@ pub mod tests {
 
     #[test]
     fn tick() -> Result<(), Error> {
-        let (follower, rx) = setup()?;
+        let (follower, mut rx) = setup()?;
         let timeout = follower.role.leader_seen_timeout;
         let peers = follower.peers.clone();
         let mut node = Node::Follower(follower);
@@ -809,7 +817,7 @@ pub mod tests {
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
             })?;
             assert_messages(
-                &rx,
+                &mut rx,
                 vec![Message {
                     from: Some("a".into()),
                     to: Some("b".into()),
@@ -826,15 +834,14 @@ pub mod tests {
         assert_node(&node).is_candidate().term(4);
 
         for to in peers.into_iter() {
-            assert!(!rx.is_empty());
             assert_eq!(
-                rx.recv()?,
-                Message {
+                futures::executor::block_on(rx.next()),
+                Some(Message {
                     from: Some("a".into()),
                     to: Some(to),
                     term: 4,
                     event: Event::SolicitVote { last_index: 3, last_term: 2 },
-                }
+                })
             )
         }
         Ok(())

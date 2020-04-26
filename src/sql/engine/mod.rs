@@ -1,6 +1,6 @@
 //! The SQL engine provides fundamental CRUD storage operations.
 mod kv;
-mod raft;
+pub mod raft;
 pub use kv::KV;
 pub use raft::Raft;
 
