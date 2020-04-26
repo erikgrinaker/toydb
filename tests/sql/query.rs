@@ -141,9 +141,6 @@ macro_rules! test_query {
                         write!(f, " <none>\n")?;
                     }
                 }
-                ResultSet::Explain(plan) => {
-                    write!(f, " {:#?}", plan)?;
-                }
                 result => return Err(Error::Internal(format!("Unexpected result {:?}", result))),
             }
             Ok(())
@@ -157,7 +154,6 @@ test_query! {
     bare: "SELECT",
     trailing_comma: "SELECT 1,",
     lowercase: "select 1",
-    explain: "EXPLAIN SELECT m.id, m.title, g.name FROM movies m JOIN GENRES g ON m.genre_id = g.id WHERE m.released >= 2000",
 
     field_single: "SELECT id FROM movies",
     field_multi: "SELECT id, title FROM movies",

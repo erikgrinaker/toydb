@@ -27,6 +27,9 @@ impl Planner {
                     statement
                 )))
             }
+            ast::Statement::Explain(_) => {
+                return Err(Error::Internal(format!("Unexpected explain statement")))
+            }
             ast::Statement::CreateTable { name, columns } => {
                 Node::CreateTable { schema: self.build_schema_table(name, columns)? }
             }
@@ -42,7 +45,6 @@ impl Planner {
                 }),
             },
             ast::Statement::DropTable(name) => Node::DropTable { name },
-            ast::Statement::Explain(stmt) => Node::Explain(Box::new(self.build_statement(*stmt)?)),
             ast::Statement::Insert { table, columns, values } => Node::Insert {
                 table,
                 columns: columns.unwrap_or_else(Vec::new),

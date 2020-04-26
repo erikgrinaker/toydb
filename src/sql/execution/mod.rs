@@ -2,7 +2,6 @@ mod aggregation;
 mod create_table;
 mod delete;
 mod drop_table;
-mod explain;
 mod filter;
 mod index_lookup;
 mod insert;
@@ -20,7 +19,6 @@ use aggregation::Aggregation;
 use create_table::CreateTable;
 use delete::Delete;
 use drop_table::DropTable;
-use explain::Explain;
 use filter::Filter;
 use index_lookup::IndexLookup;
 use insert::Insert;
@@ -58,7 +56,6 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::CreateTable { schema } => CreateTable::new(schema),
             Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
             Node::DropTable { name } => DropTable::new(name),
-            Node::Explain(plan) => Explain::new(*plan),
             Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
             Node::IndexLookup { table, alias, column, keys } => {
                 IndexLookup::new(table, alias, column, keys)

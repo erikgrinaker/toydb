@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 /// A query plan
 #[derive(Debug)]
-pub struct Plan(Node);
+pub struct Plan(pub Node);
 
 impl Plan {
     /// Builds a plan from an AST statement
@@ -58,7 +58,6 @@ pub enum Node {
     DropTable {
         name: String,
     },
-    Explain(Box<Node>),
     Filter {
         source: Box<Node>,
         predicate: Expression,
@@ -139,7 +138,6 @@ impl Node {
             Self::Delete { table, source } => {
                 Self::Delete { table, source: source.transform(pre, post)?.into() }
             }
-            Self::Explain(node) => Self::Explain(node.transform(pre, post)?.into()),
             Self::Filter { source, predicate } => {
                 Self::Filter { source: source.transform(pre, post)?.into(), predicate }
             }
@@ -183,7 +181,6 @@ impl Node {
             n @ Self::CreateTable { .. } => n,
             n @ Self::Delete { .. } => n,
             n @ Self::DropTable { .. } => n,
-            n @ Self::Explain { .. } => n,
             n @ Self::IndexLookup { .. } => n,
             n @ Self::KeyLookup { .. } => n,
             n @ Self::Limit { .. } => n,

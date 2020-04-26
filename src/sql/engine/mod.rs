@@ -112,6 +112,9 @@ impl<E: Engine + 'static> Session<E> {
                 txn.rollback()?;
                 Ok(result)
             }
+            ast::Statement::Explain(statement) => self.with_txn(Mode::ReadOnly, |txn| {
+                Ok(ResultSet::Explain(Plan::build(*statement)?.optimize(txn)?.0))
+            }),
             statement if self.txn.is_some() => Plan::build(statement)?
                 .optimize(self.txn.as_mut().unwrap())?
                 .execute(Context { txn: self.txn.as_mut().unwrap() }),
