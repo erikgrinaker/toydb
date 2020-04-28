@@ -28,7 +28,7 @@ impl Planner {
                 )))
             }
             ast::Statement::Explain(_) => {
-                return Err(Error::Internal(format!("Unexpected explain statement")))
+                return Err(Error::Internal("Unexpected explain statement".into()))
             }
             ast::Statement::CreateTable { name, columns } => {
                 Node::CreateTable { schema: self.build_schema_table(name, columns)? }
