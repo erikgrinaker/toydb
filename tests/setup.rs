@@ -1,7 +1,7 @@
 #![allow(clippy::implicit_hasher)]
 #![allow(clippy::type_complexity)]
 
-use toydb::client::Client;
+use toydb::client::{Client, Pool};
 use toydb::server::Server;
 use toydb::Error;
 
@@ -62,6 +62,11 @@ pub fn movies() -> Vec<&'static str> {
     ]
 }
 
+/// Simple data
+pub fn simple() -> Vec<&'static str> {
+    vec!["CREATE TABLE test (id INTEGER PRIMARY KEY, value STRING)"]
+}
+
 /// Sets up a test server
 pub async fn server(
     id: &str,
@@ -83,20 +88,16 @@ pub async fn server(
 }
 
 /// Sets up a server with a client
-pub async fn server_with_client() -> Result<(Client, Teardown), Error> {
+pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown), Error> {
     let teardown = server("test", "127.0.0.1:9605", "127.0.0.1:9705", HashMap::new()).await?;
     let client = Client::new("127.0.0.1:9605").await?;
-    Ok((client, teardown))
-}
-
-/// Sets up a server with a client and a set of queries
-pub async fn server_with_data(queries: Vec<&str>) -> Result<(Client, Teardown), Error> {
-    let (client, teardown) = server_with_client().await?;
-    client.execute("BEGIN").await?;
-    for query in queries {
-        client.execute(query).await?;
+    if !queries.is_empty() {
+        client.execute("BEGIN").await?;
+        for query in queries {
+            client.execute(query).await?;
+        }
+        client.execute("COMMIT").await?;
     }
-    client.execute("COMMIT").await?;
     Ok((client, teardown))
 }
 
@@ -115,7 +116,10 @@ pub async fn cluster(nodes: HashMap<String, (String, String)>) -> Result<Teardow
 }
 
 /// Sets up a server cluster with clients
-pub async fn cluster_with_clients(size: u64) -> Result<(Vec<Client>, Teardown), Error> {
+pub async fn cluster_with_clients(
+    size: u64,
+    queries: Vec<&str>,
+) -> Result<(Vec<Client>, Teardown), Error> {
     let mut nodes = HashMap::new();
     for i in 0..size {
         nodes.insert(
@@ -131,34 +135,57 @@ pub async fn cluster_with_clients(size: u64) -> Result<(Vec<Client>, Teardown), 
         assert_eq!(id, client.status().await?.id);
         clients.push(client);
     }
-    Ok((clients, teardown))
-}
-
-/// Sets up a server cluster with clients and queries
-pub async fn cluster_with_data(
-    size: u64,
-    queries: Vec<&str>,
-) -> Result<(Vec<Client>, Teardown), Error> {
-    let (mut clients, teardown) = cluster_with_clients(size).await?;
 
     // FIXME Wait for cluster to stabilize, see: https://github.com/erikgrinaker/toydb/issues/19
     tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
 
-    let c = clients.get_mut(0).unwrap();
-    c.execute("BEGIN").await?;
-    for query in queries {
-        c.execute(query).await?;
+    if !queries.is_empty() {
+        let c = clients.get_mut(0).unwrap();
+        c.execute("BEGIN").await?;
+        for query in queries {
+            c.execute(query).await?;
+        }
+        c.execute("COMMIT").await?;
     }
-    c.execute("COMMIT").await?;
 
     Ok((clients, teardown))
 }
 
+/// Sets up a server cluster with a client pool
+pub async fn cluster_with_pool(
+    cluster_size: u64,
+    pool_size: u64,
+    queries: Vec<&str>,
+) -> Result<(Pool, Teardown), Error> {
+    let mut nodes = HashMap::new();
+    for i in 0..cluster_size {
+        nodes.insert(
+            format!("toydb{}", i),
+            (format!("127.0.0.1:{}", 9605 + i), format!("127.0.0.1:{}", 9705 + i)),
+        );
+    }
+    let teardown = cluster(nodes.clone()).await?;
+
+    let pool = Pool::new(nodes.into_iter().map(|(_, (addr, _))| addr).collect(), pool_size).await?;
+
+    // FIXME Wait for cluster to stabilize, see: https://github.com/erikgrinaker/toydb/issues/19
+    tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
+
+    if !queries.is_empty() {
+        let c = pool.get().await;
+        c.execute("BEGIN").await?;
+        for query in queries {
+            c.execute(query).await?;
+        }
+        c.execute("COMMIT").await?;
+    }
+
+    Ok((pool, teardown))
+}
+
 /// Sets up a simple cluster with 3 clients and a test table
 pub async fn cluster_simple() -> Result<(Client, Client, Client, Teardown), Error> {
-    let (mut clients, teardown) =
-        cluster_with_data(3, vec!["CREATE TABLE test (id INTEGER PRIMARY KEY, value STRING)"])
-            .await?;
+    let (mut clients, teardown) = cluster_with_clients(3, simple()).await?;
     let a = clients.remove(0);
     let b = clients.remove(0);
     let c = clients.remove(0);

@@ -136,7 +136,7 @@ impl Bank {
 
     // Sets up the database
     async fn setup(&self) -> Result<(), Error> {
-        let (_, client) = self.clients.get().await;
+        let client = self.clients.get().await;
         let start = std::time::Instant::now();
         client.execute("BEGIN").await?;
         client
@@ -190,7 +190,7 @@ impl Bank {
 
     /// Verifies that all invariants hold
     async fn verify(&self) -> Result<(), Error> {
-        let (_, client) = self.clients.get().await;
+        let client = self.clients.get().await;
         let expect = self.customers * self.customer_accounts * Self::INITIAL_BALANCE as i64;
         let balance =
             client.execute("SELECT SUM(balance) FROM account").await?.into_value()?.integer()?;
@@ -215,7 +215,7 @@ impl Bank {
     /// Transfers a random amount between two customers, retrying serialization failures
     /// FIXME The serialization rety with exponential backoff should be a helper on Client
     async fn transfer(&self, from: i64, to: i64) -> Result<(), Error> {
-        let (client_id, client) = self.clients.get().await;
+        let client = self.clients.get().await;
         let mut attempts = 0;
         let start = std::time::Instant::now();
 
@@ -243,7 +243,7 @@ impl Bank {
             let (from_account, to_account, amount) = result?;
             println!(
                 "Thread {} transferred {: >4} from {: >3} ({:0>4}) to {: >3} ({:0>4}) in {:.3}s ({} attempts)",
-                client_id,
+                client.id(),
                 amount,
                 from,
                 from_account,

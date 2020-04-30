@@ -1,3 +1,5 @@
+mod pool;
+
 use super::{assert_row, assert_rows, setup};
 
 use toydb::raft::Status;
@@ -13,7 +15,7 @@ use serial_test::serial;
 #[tokio::test(core_threads = 2)]
 #[serial]
 async fn get_table() -> Result<(), Error> {
-    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
+    let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     assert_eq!(
         c.get_table("unknown").await,
@@ -103,7 +105,7 @@ async fn get_table() -> Result<(), Error> {
 #[tokio::test(core_threads = 2)]
 #[serial]
 async fn list_tables() -> Result<(), Error> {
-    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
+    let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     assert_eq!(c.list_tables().await?, vec!["countries", "genres", "movies", "studios"]);
     Ok(())
@@ -112,7 +114,7 @@ async fn list_tables() -> Result<(), Error> {
 #[tokio::test(core_threads = 2)]
 #[serial]
 async fn status() -> Result<(), Error> {
-    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
+    let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     assert_eq!(
         c.status().await?,
@@ -132,8 +134,8 @@ async fn status() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn query() -> Result<(), Error> {
-    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
+async fn execute() -> Result<(), Error> {
+    let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     // SELECT
     let result = c.execute("SELECT * FROM genres").await?;
@@ -225,20 +227,25 @@ async fn query() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn query_txn() -> Result<(), Error> {
-    let (c, _teardown) = setup::server_with_data(setup::movies()).await?;
+async fn execute_txn() -> Result<(), Error> {
+    let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
+
+    assert_eq!(c.txn(), None);
 
     // Committing a change in a txn should work
     assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { id: 2, mode: Mode::ReadWrite });
+    assert_eq!(c.txn(), Some((2, Mode::ReadWrite)));
     c.execute("INSERT INTO genres VALUES (4, 'Drama')").await?;
     assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { id: 2 });
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 4").await?,
         vec![Value::Integer(4), Value::String("Drama".into())],
     );
+    assert_eq!(c.txn(), None);
 
     // Rolling back a change in a txn should also work
     assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { id: 4, mode: Mode::ReadWrite });
+    assert_eq!(c.txn(), Some((4, Mode::ReadWrite)));
     c.execute("INSERT INTO genres VALUES (5, 'Musical')").await?;
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 5").await?,
@@ -246,12 +253,14 @@ async fn query_txn() -> Result<(), Error> {
     );
     assert_eq!(c.execute("ROLLBACK").await?, ResultSet::Rollback { id: 4 });
     assert_rows(c.execute("SELECT * FROM genres WHERE id = 5").await?, Vec::new());
+    assert_eq!(c.txn(), None);
 
     // Starting a read-only txn should block writes
     assert_eq!(
         c.execute("BEGIN READ ONLY").await?,
         ResultSet::Begin { id: 6, mode: Mode::ReadOnly }
     );
+    assert_eq!(c.txn(), Some((6, Mode::ReadOnly)));
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 4").await?,
         vec![Value::Integer(4), Value::String("Drama".into())],
@@ -269,6 +278,7 @@ async fn query_txn() -> Result<(), Error> {
         c.execute("BEGIN READ ONLY AS OF SYSTEM TIME 1").await?,
         ResultSet::Begin { id: 7, mode: Mode::Snapshot { version: 1 } }
     );
+    assert_eq!(c.txn(), Some((7, Mode::Snapshot { version: 1 })));
     assert_rows(
         c.execute("SELECT * FROM genres").await?,
         vec![
@@ -287,6 +297,7 @@ async fn query_txn() -> Result<(), Error> {
         c.execute("INSERT INTO genres VALUES (5, 'Musical')").await,
         Err(Error::Value("Primary key 5 already exists for table genres".into()))
     );
+    assert_eq!(c.txn(), Some((8, Mode::ReadWrite)));
     c.execute("INSERT INTO genres VALUES (6, 'Western')").await?;
     assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { id: 8 });
     assert_rows(
@@ -306,8 +317,8 @@ async fn query_txn() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn query_txn_concurrent() -> Result<(), Error> {
-    let (a, _teardown) = setup::server_with_data(setup::movies()).await?;
+async fn execute_txn_concurrent() -> Result<(), Error> {
+    let (a, _teardown) = setup::server_with_client(setup::movies()).await?;
     let b = Client::new("127.0.0.1:9605").await?;
 
     // Concurrent updates should throw a serialization failure on conflict.

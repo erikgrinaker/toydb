@@ -102,7 +102,7 @@ impl<S: Storage> Transaction<S> {
 
     /// Returns the transaction mode.
     pub fn mode(&self) -> Mode {
-        self.mode.clone()
+        self.mode
     }
 
     /// Commits the transaction, by removing the txn from the active set.
@@ -209,7 +209,7 @@ impl<S: Storage> Transaction<S> {
 }
 
 /// An MVCC transaction mode.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Mode {
     /// A read-write transaction.
     ReadWrite,

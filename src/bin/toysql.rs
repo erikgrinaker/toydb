@@ -57,7 +57,6 @@ struct ToySQL {
     editor: Editor<()>,
     history_path: Option<std::path::PathBuf>,
     show_headers: bool,
-    txn: Option<(u64, Mode)>,
 }
 
 impl ToySQL {
@@ -69,7 +68,6 @@ impl ToySQL {
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
             show_headers: false,
-            txn: None,
         })
     }
 
@@ -142,25 +140,16 @@ impl ToySQL {
     /// Runs a query and displays the results
     async fn execute_query(&mut self, query: &str) -> Result<(), Error> {
         match self.client.execute(query).await? {
-            ResultSet::Begin { id, mode } => {
-                self.txn = Some((id, mode.clone()));
-                match mode {
-                    Mode::ReadWrite => println!("Began transaction {}", id),
-                    Mode::ReadOnly => println!("Began read-only transaction {}", id),
-                    Mode::Snapshot { version, .. } => println!(
-                        "Began read-only transaction {} in snapshot at version {}",
-                        id, version
-                    ),
-                };
-            }
-            ResultSet::Commit { id } => {
-                self.txn = None;
-                println!("Committed transaction {}", id);
-            }
-            ResultSet::Rollback { id } => {
-                self.txn = None;
-                println!("Rolled back transaction {}", id);
-            }
+            ResultSet::Begin { id, mode } => match mode {
+                Mode::ReadWrite => println!("Began transaction {}", id),
+                Mode::ReadOnly => println!("Began read-only transaction {}", id),
+                Mode::Snapshot { version, .. } => println!(
+                    "Began read-only transaction {} in snapshot at version {}",
+                    id, version
+                ),
+            },
+            ResultSet::Commit { id } => println!("Committed transaction {}", id),
+            ResultSet::Rollback { id } => println!("Rolled back transaction {}", id),
             ResultSet::Create { count } => println!("Created {} rows", count),
             ResultSet::Delete { count } => println!("Deleted {} rows", count),
             ResultSet::Update { count } => println!("Updated {} rows", count),
@@ -192,7 +181,7 @@ impl ToySQL {
 
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>, Error> {
-        let prompt = match self.txn {
+        let prompt = match self.client.txn() {
             Some((id, Mode::ReadWrite)) => format!("toydb:{}> ", id),
             Some((id, Mode::ReadOnly)) => format!("toydb:{}> ", id),
             Some((_, Mode::Snapshot { version })) => format!("toydb@{}> ", version),

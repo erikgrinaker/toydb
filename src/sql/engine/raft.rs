@@ -102,7 +102,7 @@ pub struct Transaction {
 impl Transaction {
     /// Starts a transaction in the given mode
     fn begin(client: raft::Client, mode: Mode) -> Result<Self, Error> {
-        let id = deserialize(&client.mutate_sync(serialize(&Mutation::Begin(mode.clone()))?)?)?;
+        let id = deserialize(&client.mutate_sync(serialize(&Mutation::Begin(mode))?)?)?;
         Ok(Self { client, id, mode })
     }
 
@@ -119,7 +119,7 @@ impl super::Transaction for Transaction {
     }
 
     fn mode(&self) -> Mode {
-        self.mode.clone()
+        self.mode
     }
 
     fn commit(self) -> Result<(), Error> {
