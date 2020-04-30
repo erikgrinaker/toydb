@@ -4,6 +4,11 @@ name: default
 clone:
   depth: 1
 
+trigger: 
+  branch:
+    exclude:
+    - github-pages
+
 env: &env
   CARGO_HOME: ./.cargo
 
