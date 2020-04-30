@@ -5,9 +5,9 @@ clone:
   depth: 1
 
 trigger: 
-  branch:
+  event:
     exclude:
-    - github-pages
+    - promote
 
 env: &env
   CARGO_HOME: ./.cargo
