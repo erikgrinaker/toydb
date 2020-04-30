@@ -1,4 +1,4 @@
-# ToyDB Documentation
+# SQL Reference
 
 ## Data Types
 
@@ -74,19 +74,19 @@ Logical operators apply standard logic operations on boolean operands.
 The complete truth tables are:
 
 | `AND`       | `TRUE`  | `FALSE` | `NULL`  |
-|-------------|---------|---------|---------|
+| ----------- | ------- | ------- | ------- |
 | **`TRUE`**  | `TRUE`  | `FALSE` | `NULL`  |
 | **`FALSE`** | `FALSE` | `FALSE` | `FALSE` |
 | **`NULL`**  | `NULL`  | `FALSE` | `NULL`  |
 
 | `OR`        | `TRUE` | `FALSE` | `NULL` |
-|-------------|--------|---------|--------|
+| ----------- | ------ | ------- | ------ |
 | **`TRUE`**  | `TRUE` | `TRUE`  | `TRUE` |
 | **`FALSE`** | `TRUE` | `FALSE` | `NULL` |
 | **`NULL`**  | `TRUE` | `NULL`  | `NULL` |
 
 | `NOT`       |         |
-|-------------|---------|
+| ----------- | ------- |
 | **`TRUE`**  | `FALSE` |
 | **`FALSE`** | `TRUE`  |
 | **`NULL`**  | `NULL`  |
@@ -141,7 +141,7 @@ String operators operate on string operands.
 The operator precedence (order of operations) is as follows:
 
 | Precedence | Operator                 | Associativity |
-|------------|--------------------------|---------------|
+| ---------- | ------------------------ | ------------- |
 | 9          | `+`, `-`, `NOT` (prefix) | Right         |
 | 8          | `!`, `IS` (postfix)      | Left          |
 | 7          | `^`                      | Right         |
