@@ -4,11 +4,6 @@ name: default
 clone:
   depth: 1
 
-trigger: 
-  event:
-    exclude:
-    - promote
-
 env: &env
   CARGO_HOME: ./.cargo
 

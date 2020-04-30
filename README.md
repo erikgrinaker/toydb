@@ -12,7 +12,7 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 * SQL interface including projections, filters, joins, and aggregates.
 
-For details, see the [documentation](https://erikgrinaker.github.io/toydb/).
+For details, see the [documentation](docs/).
 
 ## Usage
 
