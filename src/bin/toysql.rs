@@ -211,8 +211,10 @@ impl ToySQL {
         println!("Connected to ToyDB node \"{}\". Enter !help for instructions.", status.id);
 
         while let Some(input) = self.prompt()? {
-            if let Err(err) = self.execute(&input).await {
-                println!("Error: {}", err.to_string())
+            match self.execute(&input).await {
+                Ok(()) => {}
+                error @ Err(Error::Internal(_)) => return error,
+                Err(error) => println!("Error: {}", error.to_string()),
             }
         }
 
