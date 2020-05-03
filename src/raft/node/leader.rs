@@ -1,10 +1,10 @@
-use super::super::{Entry, Event, Message, State};
+use super::super::{Address, Event, Instruction, Message, Request, Response, Status};
 use super::{Follower, Node, RoleNode, HEARTBEAT_INTERVAL};
 use crate::kv::storage::Storage;
 use crate::Error;
 
-use log::{debug, info};
-use std::collections::{HashMap, HashSet};
+use log::{debug, info, warn};
+use std::collections::HashMap;
 
 // A leader serves requests and replicates the log to followers.
 #[derive(Debug)]
@@ -15,8 +15,6 @@ pub struct Leader {
     peer_next_index: HashMap<String, u64>,
     /// The last index known to be replicated on a peer.
     peer_last_index: HashMap<String, u64>,
-    /// Any client calls being processed.
-    calls: Calls,
 }
 
 impl Leader {
@@ -26,7 +24,6 @@ impl Leader {
             heartbeat_ticks: 0,
             peer_next_index: HashMap::new(),
             peer_last_index: HashMap::new(),
-            calls: Calls::new(),
         };
         for peer in peers {
             leader.peer_next_index.insert(peer.clone(), last_index + 1);
@@ -36,43 +33,22 @@ impl Leader {
     }
 }
 
-impl<L: Storage, S: State> RoleNode<Leader, L, S> {
+impl<L: Storage> RoleNode<Leader, L> {
     /// Transforms the leader into a follower
-    fn become_follower(
-        mut self,
-        term: u64,
-        leader: &str,
-    ) -> Result<RoleNode<Follower, L, S>, Error> {
+    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>, Error> {
         info!("Discovered new leader {} for term {}, following", leader, term);
         self.save_term(term, None)?;
+        self.state_tx.send(Instruction::Abort)?;
         self.become_role(Follower::new(Some(leader), None))
     }
 
     /// Appends an entry to the log and replicates it to peers.
     pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<u64, Error> {
-        let index = self.log.append(Entry { term: self.term, command })?;
+        let entry = self.log.append(self.term, command)?;
         for peer in self.peers.iter() {
             self.replicate(peer)?;
         }
-        Ok(index)
-    }
-
-    /// Applies any pending log entries.
-    fn apply(&mut self) -> Result<u64, Error> {
-        let (mut index, _) = self.log.get_applied();
-        while let Some((i, output)) = self.log.apply(&mut self.state)? {
-            index = i;
-            if let Some(call) = self.role.calls.log_applied(index) {
-                self.send(
-                    call.from.as_deref(),
-                    match output {
-                        Ok(resp) => Event::RespondState { call_id: call.id, response: resp },
-                        Err(err) => Event::RespondError { call_id: call.id, error: err },
-                    },
-                )?
-            }
-        }
-        Ok(index)
+        Ok(entry.index)
     }
 
     /// Commits any pending log entries.
@@ -89,10 +65,17 @@ impl<L: Storage, S: State> RoleNode<Leader, L, S> {
         }
         // We can only safely commit up to an entry from our own term, see
         // figure 8 in Raft paper for background.
-        match self.log.get(quorum_index)? {
-            Some(ref entry) if entry.term == self.term => self.log.commit(quorum_index),
-            _ => Ok(commit_index),
+        let committed_index = match self.log.get(quorum_index)? {
+            Some(entry) if entry.term == self.term => self.log.commit(quorum_index)?,
+            _ => commit_index,
+        };
+        // FIXME Log should handle range scans
+        for index in (commit_index + 1)..=committed_index {
+            if let Some(entry) = self.log.get(index)? {
+                self.state_tx.send(Instruction::Apply { entry })?
+            }
         }
+        Ok(committed_index)
     }
 
     /// Replicates the log to a peer.
@@ -111,57 +94,46 @@ impl<L: Storage, S: State> RoleNode<Leader, L, S> {
         };
         let entries = self.log.range(peer_next..)?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
-        self.send(Some(peer), Event::ReplicateEntries { base_index, base_term, entries })?;
-        Ok(())
-    }
-
-    /// Registers a vote for quorum-based client calls.
-    fn vote_call(&mut self, from: &str, commit_index: u64) -> Result<(), Error> {
-        for call in self.role.calls.quorum_vote(from, commit_index) {
-            match call.operation {
-                Operation::ReadState { command, .. } => self.send(
-                    call.from.as_deref(),
-                    match self.state.query(command) {
-                        Ok(response) => Event::RespondState { call_id: call.id, response },
-                        Err(err) => Event::RespondError { call_id: call.id, error: err },
-                    },
-                )?,
-                _ => return Err(Error::Internal(format!("Unsupported call {:?}", call))),
-            }
-        }
+        self.send(
+            Address::Peer(peer.to_string()),
+            Event::ReplicateEntries { base_index, base_term, entries },
+        )?;
         Ok(())
     }
 
     /// Processes a message.
-    pub fn step(mut self, mut msg: Message) -> Result<Node<L, S>, Error> {
-        if !self.normalize_message(&mut msg) {
+    pub fn step(mut self, msg: Message) -> Result<Node<L>, Error> {
+        if let Err(err) = self.validate(&msg) {
+            warn!("Ignoring invalid message: {}", err);
             return Ok(self.into());
         }
         if msg.term > self.term {
-            if let Some(from) = &msg.from {
+            if let Address::Peer(from) = &msg.from {
                 return self.become_follower(msg.term, from)?.step(msg);
             }
         }
 
         match msg.event {
             Event::ConfirmLeader { commit_index, has_committed } => {
-                if let Some(from) = &msg.from {
-                    self.vote_call(from, commit_index)?;
+                if let Address::Peer(from) = msg.from.clone() {
+                    self.state_tx
+                        .send(Instruction::Vote { index: commit_index, address: msg.from })?;
                     if !has_committed {
-                        self.replicate(from)?;
+                        self.replicate(&from)?;
                     }
                 }
             }
+
             Event::AcceptEntries { last_index } => {
-                if let Some(from) = msg.from {
+                if let Address::Peer(from) = msg.from {
                     self.role.peer_last_index.insert(from.clone(), last_index);
                     self.role.peer_next_index.insert(from, last_index + 1);
                 }
                 self.commit()?;
-                self.apply()?;
             }
+
             Event::RejectEntries => {
-                if let Some(from) = msg.from {
+                if let Address::Peer(from) = msg.from {
                     self.role.peer_next_index.entry(from.clone()).and_modify(|i| {
                         if *i > 1 {
                             *i -= 1
@@ -170,149 +142,111 @@ impl<L: Storage, S: State> RoleNode<Leader, L, S> {
                     self.replicate(&from)?;
                 }
             }
-            Event::QueryState { call_id, command } => {
+
+            Event::ClientRequest { id, request: Request::Query(command) } => {
+                // FIXME This needs to wait until the first entry from out term has been
+                // committed, see: https://stackoverflow.com/questions/37207682/raft-some-questions-about-read-only-queries
                 let (commit_index, commit_term) = self.log.get_committed();
-                self.role.calls.register(Call {
-                    id: call_id,
-                    from: msg.from,
-                    operation: Operation::ReadState {
-                        command,
-                        commit_index,
-                        quorum: self.quorum(),
-                        votes: HashSet::new(),
-                    },
-                });
-                self.vote_call(self.id.clone().as_ref(), commit_index)?;
-                // Send heartbeats immediately, so we don't have to wait for the next tick
-                self.broadcast(Event::Heartbeat { commit_index, commit_term })?;
-            }
-            Event::MutateState { call_id, command } => {
-                let index = self.append(Some(command))?;
-                self.role.calls.register(Call {
-                    id: call_id,
-                    from: msg.from,
-                    operation: Operation::MutateState { log_index: index },
-                });
-                if self.peers.is_empty() {
-                    self.commit()?;
-                    self.apply()?;
+                self.state_tx.send(Instruction::Query {
+                    id,
+                    address: msg.from,
+                    command,
+                    index: commit_index,
+                    quorum: self.quorum(),
+                })?;
+                self.state_tx
+                    .send(Instruction::Vote { index: commit_index, address: Address::Local })?;
+                if !self.peers.is_empty() {
+                    self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
                 }
             }
-            Event::Heartbeat { .. } => {}
-            Event::SolicitVote { .. } => {}
-            Event::GrantVote => {}
-            Event::ReplicateEntries { .. } => {}
-            // FIXME We may want to handle these
-            Event::RespondState { .. } => {}
-            Event::RespondError { .. } => {}
+
+            Event::ClientRequest { id, request: Request::Mutate(command) } => {
+                let index = self.append(Some(command))?;
+                self.state_tx.send(Instruction::Notify { id, address: msg.from, index })?;
+                if self.peers.is_empty() {
+                    self.commit()?;
+                }
+            }
+
+            Event::ClientRequest { id, request: Request::Status } => {
+                self.state_tx.send(Instruction::Status {
+                    id,
+                    address: msg.from,
+                    status: Status {
+                        id: self.id.clone(),
+                        role: "leader".into(),
+                        leader: self.id.clone(),
+                        nodes: self.peers.len() as u64 + 1,
+                        term: self.term,
+                        entries: self.log.get_last().0,
+                        committed: self.log.get_committed().0,
+                        applied: 0,
+                    },
+                })?
+            }
+
+            Event::ClientResponse { id, mut response } => {
+                if let Ok(Response::Status(ref mut status)) = response {
+                    status.id = self.id.clone();
+                    status.role = "leader".into();
+                }
+                self.send(Address::Client, Event::ClientResponse { id, response })?;
+            }
+
+            // We ignore these messages, since they are typically additional votes from the previous
+            // election that we won after a quorum.
+            Event::SolicitVote { .. } | Event::GrantVote => {}
+
+            Event::Heartbeat { .. } | Event::ReplicateEntries { .. } => {
+                warn!("Received unexpected message {:?}", msg)
+            }
         }
 
         Ok(self.into())
     }
 
     /// Processes a logical clock tick.
-    pub fn tick(mut self) -> Result<Node<L, S>, Error> {
-        self.apply()?;
-        self.role.heartbeat_ticks += 1;
-        if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
-            self.role.heartbeat_ticks = 0;
-            let (commit_index, commit_term) = self.log.get_committed();
-            self.broadcast(Event::Heartbeat { commit_index, commit_term })?;
-        }
-        Ok(self.into())
-    }
-}
-
-/// A client call processed by the leader.
-#[derive(Clone, Debug, PartialEq)]
-struct Call {
-    id: Vec<u8>,
-    from: Option<String>,
-    operation: Operation,
-}
-
-/// An operation performed by a call.
-#[derive(Clone, Debug, PartialEq)]
-enum Operation {
-    /// A mutation submitted to the Raft log.
-    MutateState { log_index: u64 },
-    /// A state machine read requiring a quorum.
-    ReadState { command: Vec<u8>, commit_index: u64, quorum: u64, votes: HashSet<String> },
-}
-
-/// A set of calls
-#[derive(Clone, Debug)]
-struct Calls {
-    calls: Vec<Call>,
-}
-
-impl Calls {
-    /// Creates a new Calls
-    fn new() -> Self {
-        Self { calls: Vec::new() }
-    }
-
-    /// Registers a call
-    fn register(&mut self, call: Call) {
-        self.calls.push(call);
-    }
-
-    /// Signals application of the log entry with the given index, removes and
-    /// returns the call tracking the entry (if any).
-    fn log_applied(&mut self, index: u64) -> Option<Call> {
-        self.calls
-            .iter()
-            .position(|call| match call.operation {
-                Operation::MutateState { log_index } => log_index == index,
-                Operation::ReadState { .. } => false,
-            })
-            .map(|i| self.calls.remove(i))
-    }
-
-    /// Signals a leadership vote by a peer for a given commit index, removes and
-    /// returns any calls which have received votes from a quorum.
-    fn quorum_vote(&mut self, voter: &str, index: u64) -> Vec<Call> {
-        let mut indexes = Vec::new();
-        for (i, call) in self.calls.iter_mut().enumerate() {
-            match call.operation {
-                Operation::MutateState { .. } => {}
-                Operation::ReadState { commit_index, ref mut votes, quorum, .. } => {
-                    if index >= commit_index {
-                        votes.insert(voter.to_owned());
-                        if votes.len() as u64 >= quorum {
-                            indexes.push(i)
-                        }
-                    }
-                }
+    pub fn tick(mut self) -> Result<Node<L>, Error> {
+        if !self.peers.is_empty() {
+            self.role.heartbeat_ticks += 1;
+            if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
+                self.role.heartbeat_ticks = 0;
+                let (commit_index, commit_term) = self.log.get_committed();
+                self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
             }
         }
-        indexes.into_iter().enumerate().map(|(j, i)| self.calls.remove(i - j)).collect()
+        Ok(self.into())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::super::{Entry, Log};
-    use super::super::tests::{assert_messages, assert_node, TestState};
+    use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::kv;
+    use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<
-        (RoleNode<Leader, kv::storage::Test, TestState>, mpsc::UnboundedReceiver<Message>),
+        (
+            RoleNode<Leader, kv::storage::Test>,
+            mpsc::UnboundedReceiver<Message>,
+            mpsc::UnboundedReceiver<Instruction>,
+        ),
         Error,
     > {
-        let (sender, receiver) = mpsc::unbounded_channel();
-        let mut state = TestState::new();
+        let (node_tx, node_rx) = mpsc::unbounded_channel();
+        let (state_tx, state_rx) = mpsc::unbounded_channel();
         let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
-        log.append(Entry { term: 1, command: Some(vec![0x01]) })?;
-        log.append(Entry { term: 1, command: Some(vec![0x02]) })?;
-        log.append(Entry { term: 2, command: Some(vec![0x03]) })?;
-        log.append(Entry { term: 3, command: Some(vec![0x04]) })?;
-        log.append(Entry { term: 3, command: Some(vec![0x05]) })?;
+        log.append(1, Some(vec![0x01]))?;
+        log.append(1, Some(vec![0x02]))?;
+        log.append(2, Some(vec![0x03]))?;
+        log.append(3, Some(vec![0x04]))?;
+        log.append(3, Some(vec![0x05]))?;
         log.commit(2)?;
-        log.apply(&mut state)?;
 
         let peers = vec!["b".into(), "c".into(), "d".into(), "e".into()];
         let (last_index, _) = log.get_last();
@@ -322,52 +256,62 @@ mod tests {
             peers: peers.clone(),
             term: 3,
             log,
-            state,
-            sender,
+            node_tx,
+            state_tx,
+            proxied_reqs: HashMap::new(),
+            queued_reqs: Vec::new(),
             role: Leader::new(peers, last_index),
         };
         node.save_term(3, None)?;
-        Ok((node, receiver))
+        Ok((node, node_rx, state_rx))
     }
 
     #[test]
-    // ConfirmLeader with has_committed has no effect without any calls
-    fn step_confirmleader() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let mut node: Node<_, _> = leader.into();
+    // ConfirmLeader triggers vote
+    fn step_confirmleader_vote() -> Result<(), Error> {
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
 
         node = node.step(Message {
-            from: Some("b".into()),
-            to: Some("a".into()),
+            from: Address::Peer("b".into()),
+            to: Address::Peer("a".into()),
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2).applied(1);
-        assert_messages(&mut rx, vec![]);
+        assert_node(&node).is_leader().term(3).committed(2);
+        assert_messages(&mut node_rx, vec![]);
+        assert_messages(
+            &mut state_rx,
+            vec![Instruction::Vote { index: 2, address: Address::Peer("b".into()) }],
+        );
         Ok(())
     }
 
     #[test]
     // ConfirmLeader without has_committed triggers replication
-    fn step_confirmleader_without_has_committed() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let mut node: Node<_, _> = leader.into();
+    fn step_confirmleader_replicate() -> Result<(), Error> {
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
 
         node = node.step(Message {
-            from: Some("b".into()),
-            to: Some("a".into()),
+            from: Address::Peer("b".into()),
+            to: Address::Peer("a".into()),
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: false },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2).applied(1);
+        assert_node(&node).is_leader().term(3).committed(2);
         assert_messages(
-            &mut rx,
+            &mut node_rx,
             vec![Message {
-                from: Some("a".into()),
-                to: Some("b".into()),
+                from: Address::Local,
+                to: Address::Peer("b".into()),
                 term: 3,
                 event: Event::ReplicateEntries { base_index: 5, base_term: 3, entries: vec![] },
             }],
+        );
+        assert_messages(
+            &mut state_rx,
+            vec![Instruction::Vote { index: 2, address: Address::Peer("b".into()) }],
         );
         Ok(())
     }
@@ -375,93 +319,114 @@ mod tests {
     #[test]
     // Heartbeats from other leaders in current term are ignored.
     fn step_heartbeat_current_term() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let mut node: Node<_, _> = leader.into();
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
 
         node = node.step(Message {
-            from: Some("b".into()),
-            to: Some("a".into()),
+            from: Address::Peer("b".into()),
+            to: Address::Peer("a".into()),
             term: 3,
             event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2).applied(1);
-        assert_messages(&mut rx, vec![]);
+        assert_node(&node).is_leader().term(3).committed(2);
+        assert_messages(&mut node_rx, vec![]);
+        assert_messages(&mut state_rx, vec![]);
         Ok(())
     }
 
     #[test]
     // Heartbeats from other leaders in future term converts to follower and steps.
     fn step_heartbeat_future_term() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let mut node: Node<_, _> = leader.into();
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
 
         node = node.step(Message {
-            from: Some("b".into()),
-            to: Some("a".into()),
+            from: Address::Peer("b".into()),
+            to: Address::Peer("a".into()),
             term: 4,
             event: Event::Heartbeat { commit_index: 7, commit_term: 4 },
         })?;
-        assert_node(&node).is_follower().term(4).leader(Some("b")).committed(2).applied(1);
+        assert_node(&node).is_follower().term(4).leader(Some("b")).committed(2);
         assert_messages(
-            &mut rx,
+            &mut node_rx,
             vec![Message {
-                from: Some("a".into()),
-                to: Some("b".into()),
+                from: Address::Local,
+                to: Address::Peer("b".into()),
                 term: 4,
                 event: Event::ConfirmLeader { commit_index: 7, has_committed: false },
             }],
         );
+        assert_messages(&mut state_rx, vec![Instruction::Abort]);
         Ok(())
     }
 
     #[test]
     // Heartbeats from other leaders in past terms are ignored.
     fn step_heartbeat_past_term() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let mut node: Node<_, _> = leader.into();
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
 
         node = node.step(Message {
-            from: Some("b".into()),
-            to: Some("a".into()),
+            from: Address::Peer("b".into()),
+            to: Address::Peer("a".into()),
             term: 2,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2).applied(1);
-        assert_messages(&mut rx, vec![]);
+        assert_node(&node).is_leader().term(3).committed(2);
+        assert_messages(&mut node_rx, vec![]);
+        assert_messages(&mut state_rx, vec![]);
         Ok(())
     }
 
     #[test]
     fn step_acceptentries() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let mut node: Node<_, _> = leader.into();
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
 
         node = node.step(Message {
-            from: Some("b".into()),
-            to: Some("a".into()),
+            from: Address::Peer("b".into()),
+            to: Address::Peer("a".into()),
             term: 3,
             event: Event::AcceptEntries { last_index: 4 },
         })?;
-        assert_node(&node).committed(2).applied(2);
-        assert_messages(&mut rx, vec![]);
+        assert_node(&node).committed(2);
+        assert_messages(&mut node_rx, vec![]);
+        assert_messages(&mut state_rx, vec![]);
 
         node = node.step(Message {
-            from: Some("c".into()),
-            to: Some("a".into()),
+            from: Address::Peer("c".into()),
+            to: Address::Peer("a".into()),
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
-        assert_node(&node).committed(4).applied(4);
-        assert_messages(&mut rx, vec![]);
+        assert_node(&node).committed(4);
+        assert_messages(&mut node_rx, vec![]);
+        assert_messages(
+            &mut state_rx,
+            vec![
+                Instruction::Apply {
+                    entry: Entry { index: 3, term: 2, command: Some(vec![0x03]) },
+                },
+                Instruction::Apply {
+                    entry: Entry { index: 4, term: 3, command: Some(vec![0x04]) },
+                },
+            ],
+        );
 
         node = node.step(Message {
-            from: Some("d".into()),
-            to: Some("a".into()),
+            from: Address::Peer("d".into()),
+            to: Address::Peer("a".into()),
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
-        assert_node(&node).committed(5).applied(5);
-        assert_messages(&mut rx, vec![]);
+        assert_node(&node).committed(5);
+        assert_messages(&mut node_rx, vec![]);
+        assert_messages(
+            &mut state_rx,
+            vec![Instruction::Apply {
+                entry: Entry { index: 5, term: 3, command: Some(vec![0x05]) },
+            }],
+        );
 
         assert_node(&node).is_leader().term(3);
         Ok(())
@@ -470,18 +435,19 @@ mod tests {
     #[test]
     // Duplicate AcceptEntries from single node should not trigger commit.
     fn step_acceptentries_duplicate() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let mut node: Node<_, _> = leader.into();
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
 
         for _ in 0..5 {
             node = node.step(Message {
-                from: Some("b".into()),
-                to: Some("a".into()),
+                from: Address::Peer("b".into()),
+                to: Address::Peer("a".into()),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
             })?;
-            assert_node(&node).is_leader().term(3).committed(2).applied(2);
-            assert_messages(&mut rx, vec![]);
+            assert_node(&node).is_leader().term(3).committed(2);
+            assert_messages(&mut node_rx, vec![]);
+            assert_messages(&mut state_rx, vec![]);
         }
         Ok(())
     }
@@ -489,19 +455,20 @@ mod tests {
     #[test]
     // AcceptEntries quorum for entry in past term should not trigger commit
     fn step_acceptentries_past_term() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
+        let (leader, mut node_rx, mut state_rx) = setup()?;
         let peers = leader.peers.clone();
-        let mut node: Node<_, _> = leader.into();
+        let mut node: Node<_> = leader.into();
 
         for peer in peers.into_iter() {
             node = node.step(Message {
-                from: Some(peer),
-                to: Some("a".into()),
+                from: Address::Peer(peer),
+                to: Address::Peer("a".into()),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 3 },
             })?;
-            assert_node(&node).is_leader().term(3).committed(2).applied(2);
-            assert_messages(&mut rx, vec![]);
+            assert_node(&node).is_leader().term(3).committed(2);
+            assert_messages(&mut node_rx, vec![]);
+            assert_messages(&mut state_rx, vec![]);
         }
         Ok(())
     }
@@ -509,48 +476,65 @@ mod tests {
     #[test]
     // AcceptEntries quorum for missing future entry
     fn step_acceptentries_future_index() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
+        let (leader, mut node_rx, mut state_rx) = setup()?;
         let peers = leader.peers.clone();
-        let mut node: Node<_, _> = leader.into();
+        let mut node: Node<_> = leader.into();
 
         for (i, peer) in peers.into_iter().enumerate() {
             node = node.step(Message {
-                from: Some(peer),
-                to: Some("a".into()),
+                from: Address::Peer(peer),
+                to: Address::Peer("a".into()),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 7 },
             })?;
-            // The local leader will cast a vote to commit 5, thus
-            // when we have votes 2x7, 1x5, 2x0 we will commit index 5.
-            // However, we will correctly ignore the following votes for 7.
+            // The local leader will cast a vote to commit 5, thus when we have votes 2x7, 1x5, 2x0
+            // we will commit index 5. However, we will correctly ignore the following votes for7.
             let c = if i == 0 { 2 } else { 5 };
-            assert_node(&node).is_leader().term(3).committed(c).applied(c).last(5);
-            assert_messages(&mut rx, vec![]);
+            assert_node(&node).is_leader().term(3).committed(c).last(5);
+            assert_messages(&mut node_rx, vec![]);
+            if i == 1 {
+                assert_messages(
+                    &mut state_rx,
+                    vec![
+                        Instruction::Apply {
+                            entry: Entry { index: 3, term: 2, command: Some(vec![0x03]) },
+                        },
+                        Instruction::Apply {
+                            entry: Entry { index: 4, term: 3, command: Some(vec![0x04]) },
+                        },
+                        Instruction::Apply {
+                            entry: Entry { index: 5, term: 3, command: Some(vec![0x05]) },
+                        },
+                    ],
+                );
+            } else {
+                assert_messages(&mut state_rx, vec![]);
+            }
         }
         Ok(())
     }
 
     #[test]
     fn step_rejectentries() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
+        let (leader, mut node_rx, mut state_rx) = setup()?;
         let entries = leader.log.range(0..)?;
-        let mut node: Node<_, _> = leader.into();
+        let mut node: Node<_> = leader.into();
 
         for i in 0..(entries.len() + 3) {
             node = node.step(Message {
-                from: Some("b".into()),
-                to: Some("a".into()),
+                from: Address::Peer("b".into()),
+                to: Address::Peer("a".into()),
                 term: 3,
                 event: Event::RejectEntries,
             })?;
-            assert_node(&node).is_leader().term(3).committed(2).applied(1);
+            assert_node(&node).is_leader().term(3).committed(2);
             let index = if i >= entries.len() { 0 } else { entries.len() - i - 1 };
             let replicate = entries.get(index..).unwrap().to_vec();
             assert_messages(
-                &mut rx,
+                &mut node_rx,
                 vec![Message {
-                    from: Some("a".into()),
-                    to: Some("b".into()),
+                    from: Address::Local,
+                    to: Address::Peer("b".into()),
                     term: 3,
                     event: Event::ReplicateEntries {
                         base_index: index as u64,
@@ -563,306 +547,147 @@ mod tests {
                     },
                 }],
             );
+            assert_messages(&mut state_rx, vec![]);
         }
         Ok(())
     }
 
     #[test]
-    fn step_mutatestate_readstate() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let peers = leader.peers.clone();
+    // Sending a client query request will pass it to the state machine and trigger heartbeats.
+    fn step_clientrequest_query() -> Result<(), Error> {
+        let (leader, mut node_rx, mut state_rx) = setup()?;
         let quorum = leader.quorum();
-        let mut node: Node<_, _> = leader.into();
-
-        // Submit the mutate call from local sender, and observe it being
-        // appended to log and replicated to peers. The mutate command will be
-        // appended to the internal commands list of TestState and returned with
-        // a 0xff prefix, and a subsequent read command can read back the
-        // command at the index given by the command with the result prefixed
-        // with 0xbb.
+        let mut node: Node<_> = leader.into();
         node = node.step(Message {
-            from: None,
-            to: None,
+            from: Address::Client,
+            to: Address::Local,
             term: 0,
-            event: Event::MutateState { call_id: vec![0x01], command: vec![0xaf] },
+            event: Event::ClientRequest { id: vec![0x01], request: Request::Query(vec![0xaf]) },
         })?;
-        assert_node(&node)
-            .is_leader()
-            .term(3)
-            .committed(2)
-            .applied(1)
-            .last(6)
-            .entry(6, Entry { term: 3, command: Some(vec![0xaf]) });
+        assert_node(&node).is_leader().term(3).committed(2).last(5);
+        assert_messages(
+            &mut node_rx,
+            vec![Message {
+                from: Address::Local,
+                to: Address::Peers,
+                term: 3,
+                event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
+            }],
+        );
+        assert_messages(
+            &mut state_rx,
+            vec![
+                Instruction::Query {
+                    id: vec![0x01],
+                    address: Address::Client,
+                    command: vec![0xaf],
+                    index: 2,
+                    quorum,
+                },
+                Instruction::Vote { index: 2, address: Address::Local },
+            ],
+        );
+        Ok(())
+    }
+
+    #[test]
+    // Sending a mutate request should append it to log, replicate it to peers, and register notification.
+    fn step_clientrequest_mutate() -> Result<(), Error> {
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let peers = leader.peers.clone();
+        let mut node: Node<_> = leader.into();
+
+        node = node.step(Message {
+            from: Address::Client,
+            to: Address::Local,
+            term: 0,
+            event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
+        })?;
+        assert_node(&node).is_leader().term(3).committed(2).last(6).entry(Entry {
+            index: 6,
+            term: 3,
+            command: Some(vec![0xaf]),
+        });
         for peer in peers.iter().cloned() {
             assert_eq!(
-                rx.try_recv()?,
+                node_rx.try_recv()?,
                 Message {
-                    from: Some("a".into()),
-                    to: Some(peer),
+                    from: Address::Local,
+                    to: Address::Peer(peer),
                     term: 3,
                     event: Event::ReplicateEntries {
                         base_index: 5,
                         base_term: 3,
-                        entries: vec![Entry { term: 3, command: Some(vec![0xaf]) },]
+                        entries: vec![Entry { index: 6, term: 3, command: Some(vec![0xaf]) },]
                     },
                 }
             )
         }
-
-        // Receive some ConfirmLeader messages from peers, to make sure
-        // they do not affect mutation calls at all.
-        for peer in peers.iter().cloned() {
-            node = node.step(Message {
-                from: Some(peer),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::ConfirmLeader { commit_index: 6, has_committed: true },
-            })?;
-            assert_node(&node).committed(2).applied(1).last(6);
-        }
-        assert_messages(&mut rx, vec![]);
-
-        // Receive AcceptEntries calls from peers, which after a quorum
-        // will commit and apply the entries and return a call response.
-        for (i, peer) in peers.iter().cloned().enumerate() {
-            node = node.step(Message {
-                from: Some(peer),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::AcceptEntries { last_index: 6 },
-            })?;
-            if (i as u64 + 2) < quorum {
-                assert_node(&node).committed(2).applied(2).last(6);
-                assert_messages(&mut rx, vec![]);
-            } else {
-                assert_node(&node).committed(6).applied(6).last(6);
-            }
-        }
+        assert_messages(&mut node_rx, vec![]);
         assert_messages(
-            &mut rx,
-            vec![Message {
-                from: Some("a".into()),
-                to: None,
-                term: 3,
-                event: Event::RespondState { call_id: vec![0x01], response: vec![0xff, 0xaf] },
-            }],
+            &mut state_rx,
+            vec![Instruction::Notify { id: vec![0x01], address: Address::Client, index: 6 }],
         );
 
-        // Submit a read call to read back our entry, which will immediately
-        // send heartbeats to all peers to confirm that we're still the leader.
+        Ok(())
+    }
+
+    #[test]
+    // Sending a status request should pass it on to state machine, to add status.
+    fn step_clientrequest_status() -> Result<(), Error> {
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
+
         node = node.step(Message {
-            from: None,
-            to: None,
+            from: Address::Client,
+            to: Address::Local,
             term: 0,
-            event: Event::QueryState { call_id: vec![0x02], command: vec![0x06] },
+            event: Event::ClientRequest { id: vec![0x01], request: Request::Status },
         })?;
-        assert_node(&node).is_leader().term(3);
-        for peer in peers.iter().cloned() {
-            assert_eq!(
-                rx.try_recv()?,
-                Message {
-                    from: Some("a".into()),
-                    to: Some(peer),
-                    term: 3,
-                    event: Event::Heartbeat { commit_index: 6, commit_term: 3 },
-                }
-            )
-        }
-        assert_messages(&mut rx, vec![]);
-
-        // Check that ConfirmLeader calls for an old commit_index as well as
-        // AcceptEntries calls for the current last_index do not trigger a
-        // read response.
-        for peer in peers.iter().cloned() {
-            node = node.step(Message {
-                from: Some(peer.clone()),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::ConfirmLeader { commit_index: 5, has_committed: true },
-            })?;
-            node = node.step(Message {
-                from: Some(peer),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::AcceptEntries { last_index: 6 },
-            })?;
-            assert_messages(&mut rx, vec![]);
-        }
-
-        // After we receive leadership confirmation from a quorum of
-        // votes, the read response is returned.
-        for (i, peer) in peers.iter().cloned().enumerate() {
-            node = node.step(Message {
-                from: Some(peer.clone()),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::ConfirmLeader { commit_index: 6, has_committed: true },
-            })?;
-            assert_node(&node).is_leader().term(3).committed(6).applied(6).last(6);
-            if (i as u64 + 2) < quorum {
-                assert_messages(&mut rx, vec![]);
-            }
-        }
+        assert_node(&node).is_leader().term(3).committed(2).last(5);
+        assert_messages(&mut node_rx, vec![]);
         assert_messages(
-            &mut rx,
-            vec![Message {
-                from: Some("a".into()),
-                to: None,
-                term: 3,
-                event: Event::RespondState { call_id: vec![0x02], response: vec![0xbb, 0xaf] },
+            &mut state_rx,
+            vec![Instruction::Status {
+                id: vec![0x01],
+                address: Address::Client,
+                status: Status {
+                    id: "a".into(),
+                    role: "leader".into(),
+                    leader: "a".into(),
+                    nodes: 5,
+                    term: 3,
+                    entries: 5,
+                    committed: 2,
+                    applied: 0,
+                },
             }],
         );
 
-        // Further leadership confirmation messages should not trigger messages.
-        for peer in peers.iter().cloned() {
-            node = node.step(Message {
-                from: Some(peer.clone()),
-                to: Some("a".into()),
-                term: 3,
-                event: Event::ConfirmLeader { commit_index: 6, has_committed: true },
-            })?;
-            assert_messages(&mut rx, vec![]);
-        }
-        assert_node(&node).is_leader().term(3).committed(6).applied(6).last(6);
         Ok(())
     }
 
     #[test]
     fn tick() -> Result<(), Error> {
-        let (leader, mut rx) = setup()?;
-        let peers = leader.peers.clone();
-        let mut node: Node<_, _> = leader.into();
+        let (leader, mut node_rx, mut state_rx) = setup()?;
+        let mut node: Node<_> = leader.into();
         for _ in 0..5 {
             for _ in 0..HEARTBEAT_INTERVAL {
-                assert_messages(&mut rx, vec![]);
+                assert_messages(&mut node_rx, vec![]);
+                assert_messages(&mut state_rx, vec![]);
                 node = node.tick()?;
-                assert_node(&node).is_leader().term(3).committed(2).applied(2);
+                assert_node(&node).is_leader().term(3).committed(2);
             }
-            for peer in peers.iter() {
-                assert_eq!(
-                    rx.try_recv()?,
-                    Message {
-                        from: Some("a".into()),
-                        to: Some(peer.into()),
-                        term: 3,
-                        event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
-                    }
-                );
-            }
+            assert_eq!(
+                node_rx.try_recv()?,
+                Message {
+                    from: Address::Local,
+                    to: Address::Peers,
+                    term: 3,
+                    event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
+                }
+            );
         }
-        Ok(())
-    }
-
-    fn setup_calls() -> Calls {
-        let mut calls = Calls::new();
-        calls.register(Call {
-            id: vec![0xa0],
-            from: None,
-            operation: Operation::MutateState { log_index: 1 },
-        });
-        calls.register(Call {
-            id: vec![0xa2],
-            from: None,
-            operation: Operation::MutateState { log_index: 2 },
-        });
-        calls.register(Call {
-            id: vec![0xa3],
-            from: None,
-            operation: Operation::MutateState { log_index: 3 },
-        });
-
-        calls.register(Call {
-            id: vec![0xb0],
-            from: None,
-            operation: Operation::ReadState {
-                command: vec![0x01],
-                commit_index: 1,
-                quorum: 3,
-                votes: HashSet::new(),
-            },
-        });
-        calls.register(Call {
-            id: vec![0xb1],
-            from: None,
-            operation: Operation::ReadState {
-                command: vec![0x02],
-                commit_index: 2,
-                quorum: 3,
-                votes: HashSet::new(),
-            },
-        });
-        calls.register(Call {
-            id: vec![0xb2],
-            from: None,
-            operation: Operation::ReadState {
-                command: vec![0x02],
-                commit_index: 3,
-                quorum: 3,
-                votes: HashSet::new(),
-            },
-        });
-        calls
-    }
-
-    #[test]
-    fn calls_log_applied() -> Result<(), Error> {
-        let mut calls = setup_calls();
-        assert_eq!(calls.log_applied(2).unwrap().id, vec![0xa2]);
-        assert_eq!(calls.log_applied(2), None);
-        assert_eq!(calls.log_applied(9), None);
-        Ok(())
-    }
-
-    #[test]
-    fn calls_quorum_vote() -> Result<(), Error> {
-        let mut calls = setup_calls();
-        // 0xb0=1 0xb1=1 0xb2=1
-        assert_eq!(calls.quorum_vote("a", 3), vec![]);
-        // 0xb0=2 0xb1=1 0xb2=1
-        assert_eq!(calls.quorum_vote("b", 1), vec![]);
-        // 0xb0=3 0xb1=2 0xb2=1
-        assert_eq!(
-            calls.quorum_vote("c", 2).into_iter().map(|c| c.id).collect::<Vec<Vec<u8>>>(),
-            vec![vec![0xb0_u8]]
-        );
-        // 0xb1=3 0xb2=2
-        assert_eq!(
-            calls.quorum_vote("d", 4).into_iter().map(|c| c.id).collect::<Vec<Vec<u8>>>(),
-            vec![vec![0xb1_u8]]
-        );
-        // 0xb2=3
-        assert_eq!(
-            calls.quorum_vote("e", 3).into_iter().map(|c| c.id).collect::<Vec<Vec<u8>>>(),
-            vec![vec![0xb2_u8]]
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn calls_quorum_vote_multiple() -> Result<(), Error> {
-        let mut calls = setup_calls();
-        assert_eq!(calls.quorum_vote("a", 3), vec![]);
-        assert_eq!(calls.quorum_vote("b", 3), vec![]);
-        assert_eq!(
-            calls.quorum_vote("c", 3).into_iter().map(|c| c.id).collect::<Vec<Vec<u8>>>(),
-            vec![vec![0xb0_u8], vec![0xb1_u8], vec![0xb2_u8]]
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn calls_quorum_vote_same_voter_ignored() -> Result<(), Error> {
-        let mut calls = setup_calls();
-        assert_eq!(calls.quorum_vote("a", 1), vec![]);
-        assert_eq!(calls.quorum_vote("a", 1), vec![]);
-        assert_eq!(calls.quorum_vote("a", 1), vec![]);
-        assert_eq!(calls.quorum_vote("b", 1), vec![]);
-        assert_eq!(calls.quorum_vote("b", 1), vec![]);
-        assert_eq!(calls.quorum_vote("b", 1), vec![]);
-        assert_eq!(
-            calls.quorum_vote("c", 1).into_iter().map(|c| c.id).collect::<Vec<Vec<u8>>>(),
-            vec![vec![0xb0_u8]]
-        );
         Ok(())
     }
 }

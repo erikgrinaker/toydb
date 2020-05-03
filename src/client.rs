@@ -16,9 +16,9 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 type Connection = tokio_serde::Framed<
     Framed<TcpStream, LengthDelimitedCodec>,
-    Response,
+    Result<Response, Error>,
     Request,
-    tokio_serde::formats::Cbor<Response, Request>,
+    tokio_serde::formats::Cbor<Result<Response, Error>, Request>,
 >;
 
 /// A ToyDB client
@@ -53,8 +53,7 @@ impl Client {
     ) -> Result<Response, Error> {
         conn.send(request).await?;
         match conn.try_next().await? {
-            Some(Response::Error(err)) => Err(err),
-            Some(response) => Ok(response),
+            Some(result) => result,
             None => Err(Error::Internal("Server disconnected".into())),
         }
     }
@@ -70,11 +69,10 @@ impl Client {
         if let ResultSet::Query { ref mut relation } = &mut resultset {
             // FIXME We buffer rows for now to avoid lifetime hassles
             let mut rows = Vec::new();
-            while let Some(response) = conn.try_next().await? {
-                match response {
+            while let Some(result) = conn.try_next().await? {
+                match result? {
                     Response::Row(Some(row)) => rows.push(row),
                     Response::Row(None) => break,
-                    Response::Error(error) => return Err(error),
                     response => {
                         return Err(Error::Internal(format!("Unexpected response {:?}", response)))
                     }

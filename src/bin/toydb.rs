@@ -26,7 +26,8 @@ async fn main() -> Result<(), toydb::Error> {
     }
     simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
-    Server::new(&cfg.id, cfg.peers, &cfg.data_dir)?
+    Server::new(&cfg.id, cfg.peers, &cfg.data_dir)
+        .await?
         .listen(&cfg.listen_sql, &cfg.listen_raft)
         .await?
         .serve()

@@ -42,6 +42,18 @@ impl<S: Storage> MVCC<S> {
     pub fn resume(&self, id: u64) -> Result<Transaction<S>, Error> {
         Transaction::resume(self.storage.clone(), id)
     }
+
+    /// Fetches an unversioned metadata value
+    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        let session = self.storage.read()?;
+        session.read(key)
+    }
+
+    /// Sets an unversioned metadata value
+    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        let mut session = self.storage.write()?;
+        session.write(key, value)
+    }
 }
 
 /// An MVCC transaction.
@@ -303,6 +315,8 @@ enum Key {
     TxnUpdate(u64, Vec<u8>),
     /// A record for a key/version pair.
     Record(Vec<u8>, u64),
+    /// Arbitrary unversioned metadata.
+    Metadata(Vec<u8>),
 }
 
 impl Key {
@@ -314,6 +328,7 @@ impl Key {
             Some(0x02) => Ok(Key::TxnActive(Self::decode_u64(&mut iter)?)),
             Some(0x03) => Ok(Key::TxnSnapshot(Self::decode_u64(&mut iter)?)),
             Some(0x04) => Ok(Key::TxnUpdate(Self::decode_u64(&mut iter)?, iter.cloned().collect())),
+            Some(0x05) => Ok(Key::Metadata(Self::decode_bytes(&mut iter)?)),
             Some(0xff) => {
                 Ok(Self::Record(Self::decode_bytes(&mut iter)?, Self::decode_u64(&mut iter)?))
             }
@@ -356,6 +371,7 @@ impl Key {
             Self::TxnActive(id) => [vec![0x02], Self::encode_u64(id)].concat(),
             Self::TxnSnapshot(version) => [vec![0x03], Self::encode_u64(version)].concat(),
             Self::TxnUpdate(id, key) => [vec![0x04], Self::encode_u64(id), key].concat(),
+            Self::Metadata(key) => [vec![0x05], Self::encode_bytes(key)].concat(),
             Self::Record(key, version) => {
                 [vec![0xff], Self::encode_bytes(key), Self::encode_u64(version)].concat()
             }
@@ -1109,4 +1125,18 @@ pub mod tests {
 
         Ok(())
     }*/
+
+    #[test]
+    fn test_metadata() -> Result<(), Error> {
+        let mvcc = setup();
+
+        mvcc.set_metadata(b"foo", b"bar".to_vec())?;
+        assert_eq!(Some(b"bar".to_vec()), mvcc.get_metadata(b"foo")?);
+
+        assert_eq!(None, mvcc.get_metadata(b"x")?);
+
+        mvcc.set_metadata(b"foo", b"baz".to_vec())?;
+        assert_eq!(Some(b"baz".to_vec()), mvcc.get_metadata(b"foo")?);
+        Ok(())
+    }
 }

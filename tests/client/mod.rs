@@ -121,7 +121,7 @@ async fn status() -> Result<(), Error> {
         Status {
             id: "test".into(),
             role: "leader".into(),
-            leader: Some("test".into()),
+            leader: "test".into(),
             nodes: 1,
             term: 0,
             entries: 26,

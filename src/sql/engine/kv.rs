@@ -2,32 +2,43 @@ use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
 use crate::kv;
+use crate::kv::storage::Storage;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
 use std::collections::HashSet;
 
 /// A SQL engine based on an underlying MVCC key/value store
-pub struct KV<S: kv::storage::Storage> {
+pub struct KV<S: Storage> {
     /// The underlying key/value store
     kv: kv::MVCC<S>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl<S: kv::storage::Storage> std::clone::Clone for KV<S> {
+impl<S: Storage> std::clone::Clone for KV<S> {
     fn clone(&self) -> Self {
         KV::new(self.kv.clone())
     }
 }
 
-impl<S: kv::storage::Storage> KV<S> {
+impl<S: Storage> KV<S> {
     /// Creates a new key/value-based SQL engine
     pub fn new(kv: kv::MVCC<S>) -> Self {
         Self { kv }
     }
+
+    /// Fetches an unversioned metadata value
+    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        self.kv.get_metadata(key)
+    }
+
+    /// Sets an unversioned metadata value
+    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        self.kv.set_metadata(key, value)
+    }
 }
 
-impl<S: kv::storage::Storage> super::Engine for KV<S> {
+impl<S: Storage> super::Engine for KV<S> {
     type Transaction = Transaction<S>;
 
     fn begin(&self, mode: super::Mode) -> Result<Self::Transaction, Error> {
@@ -40,11 +51,11 @@ impl<S: kv::storage::Storage> super::Engine for KV<S> {
 }
 
 /// An SQL transaction based on an MVCC key/value transaction
-pub struct Transaction<S: kv::storage::Storage> {
+pub struct Transaction<S: Storage> {
     txn: kv::Transaction<S>,
 }
 
-impl<S: kv::storage::Storage> Transaction<S> {
+impl<S: Storage> Transaction<S> {
     /// Creates a new SQL transaction from an MVCC transaction
     fn new(txn: kv::Transaction<S>) -> Self {
         Self { txn }
@@ -85,7 +96,7 @@ impl<S: kv::storage::Storage> Transaction<S> {
     }
 }
 
-impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
+impl<S: Storage> super::Transaction for Transaction<S> {
     fn id(&self) -> u64 {
         self.txn.id()
     }
@@ -233,7 +244,7 @@ impl<S: kv::storage::Storage> super::Transaction for Transaction<S> {
     }
 }
 
-impl<S: kv::storage::Storage> Catalog for Transaction<S> {
+impl<S: Storage> Catalog for Transaction<S> {
     fn create_table(&mut self, table: &Table) -> Result<(), Error> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));

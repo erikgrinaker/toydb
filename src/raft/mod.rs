@@ -6,8 +6,8 @@ mod server;
 mod state;
 
 pub use self::log::{Entry, Log};
-pub use client::{Client, Request, Response};
-pub use message::{Event, Message};
+pub use client::Client;
+pub use message::{Address, Event, Message, Request, Response};
 pub use node::{Node, Status};
 pub use server::Server;
-pub use state::State;
+pub use state::{Driver, Instruction, State};

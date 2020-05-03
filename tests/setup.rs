@@ -75,7 +75,7 @@ pub async fn server(
     peers: HashMap<String, String>,
 ) -> Result<Teardown, Error> {
     let dir = TempDir::new("toydb")?;
-    let mut srv = Server::new(id, peers, &dir.path().to_string_lossy())?;
+    let mut srv = Server::new(id, peers, &dir.path().to_string_lossy()).await?;
 
     srv = srv.listen(addr_sql, addr_raft).await?;
     let (task, abort) = srv.serve().remote_handle();
@@ -136,9 +136,6 @@ pub async fn cluster_with_clients(
         clients.push(client);
     }
 
-    // FIXME Wait for cluster to stabilize, see: https://github.com/erikgrinaker/toydb/issues/19
-    tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
-
     if !queries.is_empty() {
         let c = clients.get_mut(0).unwrap();
         c.execute("BEGIN").await?;
@@ -167,9 +164,7 @@ pub async fn cluster_with_pool(
     let teardown = cluster(nodes.clone()).await?;
 
     let pool = Pool::new(nodes.into_iter().map(|(_, (addr, _))| addr).collect(), pool_size).await?;
-
-    // FIXME Wait for cluster to stabilize, see: https://github.com/erikgrinaker/toydb/issues/19
-    tokio::time::delay_for(std::time::Duration::from_millis(2000)).await;
+    pool.get().await.status().await?;
 
     if !queries.is_empty() {
         let c = pool.get().await;

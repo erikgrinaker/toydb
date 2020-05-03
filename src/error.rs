@@ -3,6 +3,7 @@ use serde_derive::{Deserialize, Serialize};
 /// Errors, all except Internal are considered user-facing
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Error {
+    Abort,
     Config(String),
     Internal(String),
     Parse(String),
@@ -17,6 +18,7 @@ impl std::fmt::Display for Error {
             Error::Config(s) | Error::Internal(s) | Error::Parse(s) | Error::Value(s) => {
                 write!(f, "{}", s)
             }
+            Error::Abort => write!(f, "Operation aborted"),
             Error::Serialization => write!(f, "Serialization failure, retry transaction"),
             Error::ReadOnly => write!(f, "Read-only transaction"),
         }
@@ -115,6 +117,12 @@ impl From<tokio::sync::oneshot::error::RecvError> for Error {
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
     fn from(err: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl<T> From<tokio::sync::mpsc::error::TrySendError<T>> for Error {
+    fn from(err: tokio::sync::mpsc::error::TrySendError<T>) -> Self {
         Error::Internal(err.to_string())
     }
 }

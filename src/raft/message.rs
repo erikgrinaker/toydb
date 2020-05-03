@@ -1,57 +1,32 @@
-use super::Entry;
+use super::{Entry, Status};
 use crate::Error;
 
 use serde_derive::{Deserialize, Serialize};
 
+/// A message address.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub enum Address {
+    /// Broadcast to all peers.
+    Peers,
+    /// A remote peer.
+    Peer(String),
+    /// The local node.
+    Local,
+    /// A local client.
+    Client,
+}
+
 /// A message passed between Raft nodes.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     /// The current term of the sender.
     pub term: u64,
-    /// The ID of the sending node, or None if local sender.
-    pub from: Option<String>,
-    /// The ID of the receiving node, or None if local receiver.
-    pub to: Option<String>,
+    /// The sender address.
+    pub from: Address,
+    /// The recipient address.
+    pub to: Address,
     /// The message event.
     pub event: Event,
-}
-
-impl Message {
-    /// Normalizes a message by setting to and term for local messages.
-    pub fn normalize(&mut self, node_id: &str, term: u64) {
-        if self.from.is_none() && self.to.is_none() {
-            self.to = Some(node_id.to_owned());
-            if self.term == 0 {
-                self.term = term;
-            }
-        }
-    }
-
-    /// Validates a message against the receiving node.
-    pub fn validate(&self, node_id: &str, term: u64) -> Result<(), Error> {
-        // Don't allow local messages without call ID
-        if self.from.is_none() && self.event.call_id().is_none() {
-            return Err(Error::Internal(format!(
-                "Received local non-call event: {:?}",
-                self.event
-            )));
-        }
-
-        // Ignore messages from past term
-        if self.term < term {
-            return Err(Error::Internal(format!("Ignoring message from stale term {}", self.term)));
-        }
-
-        // Ignore messages addressed to peers or local client
-        if let Some(to) = &self.to {
-            if to != node_id {
-                return Err(Error::Internal(format!("Ignoring message for other node {}", to)));
-            }
-        } else {
-            return Err(Error::Internal("Ignoring message for local client".into()));
-        }
-        Ok(())
-    }
 }
 
 /// An event contained within messages.
@@ -98,115 +73,33 @@ pub enum Event {
     },
     /// Followers may also reject a set of log entries from a leader.
     RejectEntries,
-    /// Queries the state machine.
-    QueryState {
-        /// The call ID.
-        call_id: Vec<u8>,
-        /// The state machine command.
-        command: Vec<u8>,
+    /// A client request.
+    ClientRequest {
+        /// The request ID.
+        id: Vec<u8>,
+        /// The request.
+        request: Request,
     },
-    /// Mutates the state machine.
-    MutateState {
-        /// The call ID.
-        call_id: Vec<u8>,
-        /// The state machine command.
-        command: Vec<u8>,
-    },
-    /// The response of a state machine command.
-    RespondState {
-        /// The call ID.
-        call_id: Vec<u8>,
-        /// The command output.
-        response: Vec<u8>,
-    },
-    /// An error response
-    RespondError {
-        /// The call ID.
-        call_id: Vec<u8>,
-        /// The error.
-        error: Error,
+    /// A client response.
+    ClientResponse {
+        /// The response ID.
+        id: Vec<u8>,
+        /// The response.
+        response: Result<Response, Error>,
     },
 }
 
-impl Event {
-    /// Returns the call ID for the event, if any
-    pub fn call_id(&self) -> Option<Vec<u8>> {
-        match self {
-            Event::QueryState { call_id, .. }
-            | Event::MutateState { call_id, .. }
-            | Event::RespondState { call_id, .. }
-            | Event::RespondError { call_id, .. } => Some(call_id.clone()),
-            _ => None,
-        }
-    }
+/// A client request.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Request {
+    Query(Vec<u8>),
+    Mutate(Vec<u8>),
+    Status,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn normalize() {
-        let mut msg = Message {
-            from: None,
-            to: None,
-            term: 0,
-            event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-        };
-        msg.normalize("to", 3);
-        assert_eq!(
-            msg,
-            Message {
-                from: None,
-                to: Some("to".into()),
-                term: 3,
-                event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-            }
-        )
-    }
-
-    #[test]
-    fn normalize_peer() {
-        let mut msg = Message {
-            from: Some("from".into()),
-            to: Some("to".into()),
-            term: 3,
-            event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-        };
-        msg.normalize("other", 7);
-        assert_eq!(
-            msg,
-            Message {
-                from: Some("from".into()),
-                to: Some("to".into()),
-                term: 3,
-                event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-            }
-        )
-    }
-
-    #[test]
-    fn validate() {
-        let event = Event::Heartbeat { commit_index: 1, commit_term: 1 };
-
-        // Errors on stale term
-        assert!(Message {
-            from: Some("b".into()),
-            to: Some("a".into()),
-            term: 2,
-            event: event.clone(),
-        }
-        .validate("a", 3)
-        .is_err());
-
-        // Errors on no receiver
-        assert!(Message { from: Some("b".into()), to: None, term: 3, event: event.clone() }
-            .validate("a", 3)
-            .is_err());
-
-        // Errors on other receiver
-        assert!(Message { from: Some("b".into()), to: Some("c".into()), term: 3, event: event }
-            .validate("a", 3)
-            .is_err());
-    }
+/// A client response.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Response {
+    State(Vec<u8>),
+    Status(Status),
 }

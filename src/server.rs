@@ -15,18 +15,19 @@ use std::fs;
 use std::path::Path;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::stream::StreamExt as _;
+use tokio::sync::mpsc;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 /// A ToyDB server.
 pub struct Server {
-    raft: raft::Server<kv::storage::BLog, sql::engine::raft::State<kv::storage::File>>,
+    raft: raft::Server<kv::storage::BLog>,
     raft_listener: Option<TcpListener>,
     sql_listener: Option<TcpListener>,
 }
 
 impl Server {
     /// Creates a new ToyDB server.
-    pub fn new(id: &str, peers: HashMap<String, String>, dir: &str) -> Result<Self, Error> {
+    pub async fn new(id: &str, peers: HashMap<String, String>, dir: &str) -> Result<Self, Error> {
         let path = Path::new(dir);
         fs::create_dir_all(path)?;
         Ok(Server {
@@ -46,8 +47,9 @@ impl Server {
                         .write(true)
                         .create(true)
                         .open(path.join("state"))?,
-                )?)),
-            )?,
+                )?))?,
+            )
+            .await?,
             raft_listener: None,
             sql_listener: None,
         })
@@ -71,10 +73,11 @@ impl Server {
         let raft_listener = self
             .raft_listener
             .ok_or_else(|| Error::Internal("Must listen before serving".into()))?;
-        let sql_engine = sql::engine::Raft::new(self.raft.client().await);
+        let (raft_tx, raft_rx) = mpsc::unbounded_channel();
+        let sql_engine = sql::engine::Raft::new(raft::Client::new(raft_tx));
 
         tokio::try_join!(
-            self.raft.serve(raft_listener),
+            self.raft.serve(raft_listener, raft_rx),
             Self::serve_sql(sql_listener, sql_engine),
         )?;
         Ok(())
@@ -109,7 +112,6 @@ pub enum Request {
 /// A server response.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
-    Error(Error),
     Execute(ResultSet),
     Row(Option<Row>),
     GetTable(Table),
@@ -136,24 +138,22 @@ impl Session {
             tokio_serde::formats::Cbor::default(),
         );
         while let Some(request) = stream.try_next().await? {
-            let mut response = self.request(request).await;
-            let mut rows: Box<dyn Iterator<Item = Response> + Send> = Box::new(std::iter::empty());
-            if let Response::Execute(ResultSet::Query { ref mut relation }) = &mut response {
+            let mut response = tokio::task::block_in_place(|| self.request(request));
+            let mut rows: Box<dyn Iterator<Item = Result<Response, Error>> + Send> =
+                Box::new(std::iter::empty());
+            if let Ok(Response::Execute(ResultSet::Query { ref mut relation })) = &mut response {
                 rows = Box::new(
                     relation
                         .rows
                         .take()
                         .unwrap_or_else(|| Box::new(std::iter::empty()))
-                        .map(|result| match result {
-                            Ok(row) => Response::Row(Some(row)),
-                            Err(error) => Response::Error(error),
-                        })
-                        .chain(std::iter::once(Response::Row(None)))
+                        .map(|result| result.map(|row| Response::Row(Some(row))))
+                        .chain(std::iter::once(Ok(Response::Row(None))))
                         .scan(false, |err_sent, response| match (&err_sent, &response) {
                             (true, _) => None,
-                            (_, Response::Error(_)) => {
+                            (_, Err(error)) => {
                                 *err_sent = true;
-                                Some(response)
+                                Some(Err(error.clone()))
                             }
                             _ => Some(response),
                         })
@@ -166,17 +166,8 @@ impl Session {
         Ok(())
     }
 
-    /// Runs a request, returning errors as Response::Error.
-    /// FIXME Blocks the thread, since the SQL engine is not async.
-    async fn request(&mut self, request: Request) -> Response {
-        match tokio::task::block_in_place(|| self.call(request)) {
-            Ok(response) => response,
-            Err(error) => Response::Error(error),
-        }
-    }
-
-    /// Executes a simple request/response call, without error handling.
-    fn call(&mut self, request: Request) -> Result<Response, Error> {
+    /// Executes a request.
+    pub fn request(&mut self, request: Request) -> Result<Response, Error> {
         Ok(match request {
             Request::Execute(query) => Response::Execute(self.sql.execute(&query)?),
             Request::GetTable(table) => Response::GetTable(

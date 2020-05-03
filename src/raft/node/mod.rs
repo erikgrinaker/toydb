@@ -2,16 +2,17 @@ mod candidate;
 mod follower;
 mod leader;
 
-use super::{Event, Log, Message, State};
+use super::{Address, Driver, Event, Instruction, Log, Message, State};
 use crate::kv::storage::Storage;
 use crate::Error;
 use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
 
-use log::{debug, info, warn};
+use log::{debug, info};
 use serde_derive::{Deserialize, Serialize};
-use tokio::sync::mpsc::UnboundedSender;
+use std::collections::HashMap;
+use tokio::sync::mpsc;
 
 /// The interval between leader heartbeats, in ticks.
 const HEARTBEAT_INTERVAL: u64 = 1;
@@ -23,11 +24,11 @@ const ELECTION_TIMEOUT_MIN: u64 = 8 * HEARTBEAT_INTERVAL;
 const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
 
 /// Node status
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
     pub id: String,
     pub role: String,
-    pub leader: Option<String>,
+    pub leader: String,
     pub nodes: u64,
     pub term: u64,
     pub entries: u64,
@@ -36,29 +37,47 @@ pub struct Status {
 }
 
 /// The local Raft node state machine.
-pub enum Node<L: Storage, S: State> {
-    Candidate(RoleNode<Candidate, L, S>),
-    Follower(RoleNode<Follower, L, S>),
-    Leader(RoleNode<Leader, L, S>),
+pub enum Node<L: Storage> {
+    Candidate(RoleNode<Candidate, L>),
+    Follower(RoleNode<Follower, L>),
+    Leader(RoleNode<Leader, L>),
 }
 
-impl<L: Storage, S: State> Node<L, S> {
+impl<L: Storage> Node<L> {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
-    pub fn new(
+    pub async fn new<S: State + Send + 'static>(
         id: &str,
         peers: Vec<String>,
         log: Log<L>,
         state: S,
-        sender: UnboundedSender<Message>,
+        node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self, Error> {
+        let (state_tx, state_rx) = mpsc::unbounded_channel();
+        let (committed_index, _) = log.get_committed();
+        let applied_index = state.applied_index();
+        if applied_index > committed_index {
+            return Err(Error::Internal(format!(
+                "State machine applied index {} greater than log committed index {}",
+                applied_index, committed_index
+            )));
+        }
+        tokio::spawn(Driver::new(state_rx, node_tx.clone()).drive(state));
+        for index in applied_index..=committed_index {
+            if let Some(entry) = log.get(index)? {
+                state_tx.send(Instruction::Apply { entry })?;
+            }
+        }
+
         let (term, voted_for) = log.load_term()?;
         let node = RoleNode {
             id: id.to_owned(),
             peers,
             term,
             log,
-            state,
-            sender,
+            node_tx,
+            state_tx,
+            queued_reqs: Vec::new(),
+            proxied_reqs: HashMap::new(),
             role: Follower::new(None, voted_for.as_deref()),
         };
         if node.peers.is_empty() {
@@ -70,24 +89,13 @@ impl<L: Storage, S: State> Node<L, S> {
         }
     }
 
-    /// Returns node status.
-    pub fn status(&self) -> Result<Status, Error> {
-        let mut status = match self {
-            Node::Candidate(n) => n.status(),
-            Node::Follower(n) => n.status(),
-            Node::Leader(n) => n.status(),
-        }?;
-        status.role = match self {
-            Node::Candidate(_) => "candidate".into(),
-            Node::Follower(_) => "follower".into(),
-            Node::Leader(_) => "leader".into(),
-        };
-        status.leader = match self {
-            Node::Candidate(_) => None,
-            Node::Follower(n) => n.role.leader.clone(),
-            Node::Leader(n) => Some(n.id.clone()),
-        };
-        Ok(status)
+    /// Returns the node ID.
+    pub fn id(&self) -> String {
+        match self {
+            Node::Candidate(n) => n.id.clone(),
+            Node::Follower(n) => n.id.clone(),
+            Node::Leader(n) => n.id.clone(),
+        }
     }
 
     /// Processes a message.
@@ -110,68 +118,80 @@ impl<L: Storage, S: State> Node<L, S> {
     }
 }
 
-impl<L: Storage, S: State> From<RoleNode<Candidate, L, S>> for Node<L, S> {
-    fn from(rn: RoleNode<Candidate, L, S>) -> Self {
+impl<L: Storage> From<RoleNode<Candidate, L>> for Node<L> {
+    fn from(rn: RoleNode<Candidate, L>) -> Self {
         Node::Candidate(rn)
     }
 }
 
-impl<L: Storage, S: State> From<RoleNode<Follower, L, S>> for Node<L, S> {
-    fn from(rn: RoleNode<Follower, L, S>) -> Self {
+impl<L: Storage> From<RoleNode<Follower, L>> for Node<L> {
+    fn from(rn: RoleNode<Follower, L>) -> Self {
         Node::Follower(rn)
     }
 }
 
-impl<L: Storage, S: State> From<RoleNode<Leader, L, S>> for Node<L, S> {
-    fn from(rn: RoleNode<Leader, L, S>) -> Self {
+impl<L: Storage> From<RoleNode<Leader, L>> for Node<L> {
+    fn from(rn: RoleNode<Leader, L>) -> Self {
         Node::Leader(rn)
     }
 }
 
 // A Raft node with role R
-pub struct RoleNode<R, L: Storage, S: State> {
+pub struct RoleNode<R, L: Storage> {
     id: String,
     peers: Vec<String>,
     term: u64,
     log: Log<L>,
-    state: S,
-    sender: UnboundedSender<Message>,
+    node_tx: mpsc::UnboundedSender<Message>,
+    state_tx: mpsc::UnboundedSender<Instruction>,
+    /// Keeps track of queued client requests received e.g. during elections.
+    queued_reqs: Vec<(Address, Event)>,
+    /// Keeps track of proxied client requests, to abort on new leader election.
+    proxied_reqs: HashMap<Vec<u8>, Address>,
     role: R,
 }
 
-impl<R, L: Storage, S: State> RoleNode<R, L, S> {
+impl<R, L: Storage> RoleNode<R, L> {
     /// Transforms the node into another role.
-    fn become_role<T>(self, role: T) -> Result<RoleNode<T, L, S>, Error> {
+    fn become_role<T>(self, role: T) -> Result<RoleNode<T, L>, Error> {
         Ok(RoleNode {
             id: self.id,
             peers: self.peers,
             term: self.term,
             log: self.log,
-            state: self.state,
-            sender: self.sender,
+            node_tx: self.node_tx,
+            state_tx: self.state_tx,
+            queued_reqs: self.queued_reqs,
+            proxied_reqs: self.proxied_reqs,
             role,
         })
     }
 
-    /// Broadcasts an event to all peers.
-    fn broadcast(&self, event: Event) -> Result<(), Error> {
-        for peer in self.peers.iter() {
-            self.send(Some(peer), event.clone())?
+    /// Aborts any proxied requests.
+    fn abort_proxied(&mut self) -> Result<(), Error> {
+        for (id, address) in std::mem::replace(&mut self.proxied_reqs, HashMap::new()) {
+            self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
         }
         Ok(())
     }
 
-    /// Normalizes and validates a message, ensuring it is addressed
-    /// to the local node and term. On any errors it emits a warning and
-    /// returns false.
-    fn normalize_message(&self, msg: &mut Message) -> bool {
-        msg.normalize(&self.id, self.term);
-        if let Err(err) = msg.validate(&self.id, self.term) {
-            warn!("{}", err);
-            false
-        } else {
-            true
+    /// Sends any queued requests to the given leader.
+    fn forward_queued(&mut self, leader: Address) -> Result<(), Error> {
+        for (from, event) in std::mem::replace(&mut self.queued_reqs, Vec::new()) {
+            if let Event::ClientRequest { id, .. } = &event {
+                self.proxied_reqs.insert(id.clone(), from.clone());
+                self.node_tx.send(Message {
+                    from: match from {
+                        Address::Client => Address::Local,
+                        address => address,
+                    },
+                    to: leader.clone(),
+                    term: 0,
+                    event,
+                })?;
+            }
         }
+        Ok(())
     }
 
     /// Returns the quorum size of the cluster.
@@ -186,34 +206,40 @@ impl<R, L: Storage, S: State> RoleNode<R, L, S> {
         Ok(())
     }
 
-    /// Sends an event to a peer, or local caller if None
-    fn send(&self, to: Option<&str>, event: Event) -> Result<(), Error> {
-        let msg = Message {
-            term: self.term,
-            from: Some(self.id.clone()),
-            to: to.map(str::to_owned),
-            event,
-        };
+    /// Sends an event
+    fn send(&self, to: Address, event: Event) -> Result<(), Error> {
+        let msg = Message { term: self.term, from: Address::Local, to, event };
         debug!("Sending {:?}", msg);
-        Ok(self.sender.send(msg)?)
+        Ok(self.node_tx.send(msg)?)
     }
 
-    /// Returns the node status.
-    fn status(&self) -> Result<Status, Error> {
-        let (entries, _) = self.log.get_last();
-        let (committed, _) = self.log.get_committed();
-        let (applied, _) = self.log.get_applied();
+    /// Validates a message
+    fn validate(&self, msg: &Message) -> Result<(), Error> {
+        match msg.from {
+            Address::Peers => return Err(Error::Internal("Message from broadcast address".into())),
+            Address::Local => return Err(Error::Internal("Message from local node".into())),
+            Address::Client if !matches!(msg.event, Event::ClientRequest{..}) => {
+                return Err(Error::Internal("Non-request message from client".into()));
+            }
+            _ => {}
+        }
 
-        Ok(Status {
-            id: self.id.clone(),
-            role: "".into(),
-            leader: None,
-            nodes: self.peers.len() as u64 + 1,
-            term: self.term,
-            entries,
-            committed,
-            applied,
-        })
+        // Allowing requests and responses form past terms is fine, since they don't rely on it
+        if msg.term < self.term
+            && !matches!(msg.event, Event::ClientRequest{..} | Event::ClientResponse{..})
+        {
+            return Err(Error::Internal(format!("Message from past term {}", self.term)));
+        }
+
+        match &msg.to {
+            Address::Peer(id) if id == &self.id => Ok(()),
+            Address::Local => Ok(()),
+            Address::Peers => Ok(()),
+            Address::Peer(id) => {
+                Err(Error::Internal(format!("Received message for other node {}", id)))
+            }
+            Address::Client => Err(Error::Internal("Received message for client".into())),
+        }
     }
 }
 
@@ -224,9 +250,13 @@ mod tests {
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
     use crate::kv;
-    use tokio::sync::mpsc::UnboundedReceiver;
+    use pretty_assertions::assert_eq;
+    use tokio::sync::mpsc;
 
-    pub fn assert_messages(rx: &mut UnboundedReceiver<Message>, msgs: Vec<Message>) {
+    pub fn assert_messages<T: std::fmt::Debug + PartialEq>(
+        rx: &mut mpsc::UnboundedReceiver<T>,
+        msgs: Vec<T>,
+    ) {
         let mut actual = Vec::new();
         while let Ok(message) = rx.try_recv() {
             actual.push(message)
@@ -234,12 +264,12 @@ mod tests {
         assert_eq!(msgs, actual);
     }
 
-    pub struct NodeAsserter<'a, L: Storage, S: State> {
-        node: &'a Node<L, S>,
+    pub struct NodeAsserter<'a, L: Storage> {
+        node: &'a Node<L>,
     }
 
-    impl<'a, L: Storage, S: State> NodeAsserter<'a, L, S> {
-        pub fn new(node: &'a Node<L, S>) -> Self {
+    impl<'a, L: Storage> NodeAsserter<'a, L> {
+        pub fn new(node: &'a Node<L>) -> Self {
             Self { node }
         }
 
@@ -249,12 +279,6 @@ mod tests {
                 Node::Follower(n) => &n.log,
                 Node::Leader(n) => &n.log,
             }
-        }
-
-        pub fn applied(self, index: u64) -> Self {
-            let (apply_index, _) = self.log().get_applied();
-            assert_eq!(index, apply_index, "Unexpected applied index");
-            self
         }
 
         pub fn committed(self, index: u64) -> Self {
@@ -269,10 +293,10 @@ mod tests {
             self
         }
 
-        pub fn entry(self, index: u64, entry: Entry) -> Self {
+        pub fn entry(self, entry: Entry) -> Self {
             let (last_index, _) = self.log().get_last();
-            assert!(index <= last_index, "Index beyond last entry");
-            assert_eq!(entry, self.log().get(index).unwrap().unwrap());
+            assert!(entry.index <= last_index, "Index beyond last entry");
+            assert_eq!(entry, self.log().get(entry.index).unwrap().unwrap());
             self
         }
 
@@ -321,6 +345,30 @@ mod tests {
             self
         }
 
+        pub fn proxied(self, proxied: Vec<(Vec<u8>, Address)>) -> Self {
+            assert_eq!(
+                &proxied.into_iter().collect::<HashMap<Vec<u8>, Address>>(),
+                match self.node {
+                    Node::Candidate(n) => &n.proxied_reqs,
+                    Node::Follower(n) => &n.proxied_reqs,
+                    Node::Leader(n) => &n.proxied_reqs,
+                }
+            );
+            self
+        }
+
+        pub fn queued(self, queued: Vec<(Address, Event)>) -> Self {
+            assert_eq!(
+                &queued,
+                match self.node {
+                    Node::Candidate(n) => &n.queued_reqs,
+                    Node::Follower(n) => &n.queued_reqs,
+                    Node::Leader(n) => &n.queued_reqs,
+                }
+            );
+            self
+        }
+
         pub fn term(self, term: u64) -> Self {
             assert_eq!(
                 term,
@@ -361,45 +409,47 @@ mod tests {
         }
     }
 
-    pub fn assert_node<L: Storage, S: State>(node: &Node<L, S>) -> NodeAsserter<L, S> {
+    pub fn assert_node<L: Storage>(node: &Node<L>) -> NodeAsserter<L> {
         NodeAsserter::new(node)
     }
 
     #[allow(clippy::type_complexity)]
     fn setup_rolenode(
-    ) -> Result<(RoleNode<(), kv::storage::Test, TestState>, UnboundedReceiver<Message>), Error>
-    {
+    ) -> Result<(RoleNode<(), kv::storage::Test>, mpsc::UnboundedReceiver<Message>), Error> {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
     #[allow(clippy::type_complexity)]
     fn setup_rolenode_peers(
         peers: Vec<String>,
-    ) -> Result<(RoleNode<(), kv::storage::Test, TestState>, UnboundedReceiver<Message>), Error>
-    {
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+    ) -> Result<(RoleNode<(), kv::storage::Test>, mpsc::UnboundedReceiver<Message>), Error> {
+        let (node_tx, node_rx) = mpsc::unbounded_channel();
+        let (state_tx, _) = mpsc::unbounded_channel();
         let node = RoleNode {
             role: (),
             id: "a".into(),
             peers,
             term: 1,
             log: Log::new(kv::Simple::new(kv::storage::Test::new()))?,
-            state: TestState::new(),
-            sender,
+            node_tx,
+            state_tx,
+            proxied_reqs: HashMap::new(),
+            queued_reqs: Vec::new(),
         };
-        Ok((node, receiver))
+        Ok((node, node_rx))
     }
 
-    #[test]
-    fn new() -> Result<(), Error> {
-        let (sender, _) = tokio::sync::mpsc::unbounded_channel();
+    #[tokio::test]
+    async fn new() -> Result<(), Error> {
+        let (node_tx, _) = mpsc::unbounded_channel();
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
             Log::new(kv::Simple::new(kv::storage::Test::new()))?,
-            TestState::new(),
-            sender,
-        )?;
+            TestState::new(0),
+            node_tx,
+        )
+        .await?;
         match node {
             Node::Follower(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());
@@ -411,18 +461,19 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn new_loads_term() -> Result<(), Error> {
-        let (sender, _) = tokio::sync::mpsc::unbounded_channel();
+    #[tokio::test]
+    async fn new_loads_term() -> Result<(), Error> {
+        let (node_tx, _) = mpsc::unbounded_channel();
         let storage = kv::storage::Test::new();
         Log::new(kv::Simple::new(storage.clone()))?.save_term(3, Some("c"))?;
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
             Log::new(kv::Simple::new(storage))?,
-            TestState::new(),
-            sender,
-        )?;
+            TestState::new(0),
+            node_tx,
+        )
+        .await?;
         match node {
             Node::Follower(rolenode) => assert_eq!(rolenode.term, 3),
             _ => panic!("Expected node to start as follower"),
@@ -430,16 +481,73 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn new_single() -> Result<(), Error> {
-        let (sender, _) = tokio::sync::mpsc::unbounded_channel();
+    #[tokio::test(core_threads = 2)]
+    async fn new_state_apply_all() -> Result<(), Error> {
+        let (node_tx, _) = mpsc::unbounded_channel();
+        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        log.append(1, Some(vec![0x01]))?;
+        log.append(2, None)?;
+        log.append(2, Some(vec![0x02]))?;
+        log.commit(3)?;
+        log.append(2, Some(vec![0x03]))?;
+        let state = TestState::new(0);
+
+        Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
+        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+        assert_eq!(state.list(), vec![vec![0x01], vec![0x02]]);
+        assert_eq!(state.applied_index(), 3);
+        Ok(())
+    }
+
+    #[tokio::test(core_threads = 2)]
+    async fn new_state_apply_partial() -> Result<(), Error> {
+        let (node_tx, _) = mpsc::unbounded_channel();
+        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        log.append(1, Some(vec![0x01]))?;
+        log.append(2, None)?;
+        log.append(2, Some(vec![0x02]))?;
+        log.commit(3)?;
+        log.append(2, Some(vec![0x03]))?;
+        let state = TestState::new(2);
+
+        Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
+        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+        assert_eq!(state.list(), vec![vec![0x02]]);
+        assert_eq!(state.applied_index(), 3);
+        Ok(())
+    }
+
+    #[tokio::test(core_threads = 2)]
+    async fn new_state_apply_missing() -> Result<(), Error> {
+        let (node_tx, _) = mpsc::unbounded_channel();
+        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        log.append(1, Some(vec![0x01]))?;
+        log.append(2, None)?;
+        log.append(2, Some(vec![0x02]))?;
+        log.commit(3)?;
+        log.append(2, Some(vec![0x03]))?;
+        let state = TestState::new(4);
+
+        assert_eq!(
+            Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await.err(),
+            Some(Error::Internal(
+                "State machine applied index 4 greater than log committed index 3".into()
+            ))
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn new_single() -> Result<(), Error> {
+        let (node_tx, _) = mpsc::unbounded_channel();
         let node = Node::new(
             "a",
             vec![],
             Log::new(kv::Simple::new(kv::storage::Test::new()))?,
-            TestState::new(),
-            sender,
-        )?;
+            TestState::new(0),
+            node_tx,
+        )
+        .await?;
         match node {
             Node::Leader(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());
@@ -463,51 +571,6 @@ mod tests {
     }
 
     #[test]
-    fn broadcast() -> Result<(), Error> {
-        let (node, mut rx) = setup_rolenode()?;
-        node.broadcast(Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
-
-        for to in ["b", "c"].iter().cloned() {
-            assert_eq!(
-                rx.try_recv()?,
-                Message {
-                    from: Some("a".into()),
-                    to: Some(to.into()),
-                    term: 1,
-                    event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
-                },
-            )
-        }
-        assert_messages(&mut rx, vec![]);
-        Ok(())
-    }
-
-    #[test]
-    fn normalize_message() -> Result<(), Error> {
-        let (node, _) = setup_rolenode()?;
-        let mut msg = Message {
-            from: None,
-            to: None,
-            term: 0,
-            event: Event::QueryState { call_id: vec![], command: vec![] },
-        };
-        assert!(node.normalize_message(&mut msg));
-        assert_eq!(
-            msg,
-            Message {
-                from: None,
-                to: Some("a".into()),
-                term: 1,
-                event: Event::QueryState { call_id: vec![], command: vec![] },
-            }
-        );
-
-        msg.to = Some("c".into());
-        assert!(!node.normalize_message(&mut msg));
-        Ok(())
-    }
-
-    #[test]
     fn quorum() -> Result<(), Error> {
         let quorums = vec![(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)];
         for (size, quorum) in quorums.into_iter() {
@@ -523,12 +586,12 @@ mod tests {
     #[test]
     fn send() -> Result<(), Error> {
         let (node, mut rx) = setup_rolenode()?;
-        node.send(Some("b"), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
+        node.send(Address::Peer("b".into()), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
         assert_messages(
             &mut rx,
             vec![Message {
-                from: Some("a".into()),
-                to: Some("b".into()),
+                from: Address::Local,
+                to: Address::Peer("b".into()),
                 term: 1,
                 event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
             }],

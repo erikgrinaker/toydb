@@ -8,7 +8,7 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 * ACID-compliant transaction engine with MVCC-based snapshot isolation.
 
-* Iterator-based query engine with heuristic optimization, secondary indexes, and time-travel support.
+* Iterator-based query engine with heuristic optimization and time-travel support.
 
 * SQL interface including projections, filters, joins, and aggregates.
 
@@ -86,17 +86,15 @@ The primary goal is to build a minimally functional yet correct distributed data
 
 ### Networking
 
-* **No security:** all network traffic is unauthenticated and in plaintext; any request from any source is accepted.
+* **No security:** all network traffic is unauthenticated and in plaintext.
 
 ### Raft
 
 * **Cluster reconfiguration:** the Raft cluster must consist of a static set of nodes available via static IP addresses. It is not possible to resize the cluster without a full cluster restart.
 
-* **Single node processing:** all operations (both reads and writes) are processed by a single Raft thread on a single node (the master), and the system consists of a single Raft cluster, preventing horizontal scalability and efficient resource utilization.
+* **Single-threaded state:** all state machine operations are processed by a single thread on a single node, preventing horizontal scalability.
 
-* **Client call retries:** there is currently no retries of client-submitted operations, and if a node processing or proxying an operation changes role then the call is dropped.
-
-* **Log replication optimization:** currently only the simplest version of the Raft log replication protocol is implemented, without snapshots or rapid log replay (i.e. replication of old log entries is retried one by one until a common base entry is found).
+* **Log replication:** only the simplest form of Raft log replication is implemented, without snapshots or rapid log replay.
 
 ### Storage
 
@@ -118,7 +116,7 @@ The primary goal is to build a minimally functional yet correct distributed data
 
 * **Single database:** only a single, unnamed database is supported per ToyDB cluster.
 
-* **Schema changes:** schema changes other than creating or dropping tables and indexes is not supported, i.e. there is no `ALTER TABLE`.
+* **Schema changes:** schema changes other than creating or dropping tables is not supported.
 
 ### Query Engine
 
