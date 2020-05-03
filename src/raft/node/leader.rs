@@ -651,7 +651,15 @@ mod tests {
                     server: "a".into(),
                     leader: "a".into(),
                     term: 3,
-                    node_last_index: HashMap::new(),
+                    node_last_index: vec![
+                        ("a".into(), 5),
+                        ("b".into(), 0),
+                        ("c".into(), 0),
+                        ("d".into(), 0),
+                        ("e".into(), 0),
+                    ]
+                    .into_iter()
+                    .collect(),
                     commit_index: 2,
                     apply_index: 0,
                 },
