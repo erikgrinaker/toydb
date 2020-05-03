@@ -60,7 +60,7 @@ impl<L: Storage> Node<L> {
             )));
         }
         tokio::spawn(Driver::new(state_rx, node_tx.clone()).drive(state));
-        for index in applied_index..=committed_index {
+        for index in (applied_index+1)..=committed_index {
             if let Some(entry) = log.get(index)? {
                 state_tx.send(Instruction::Apply { entry })?;
             }
