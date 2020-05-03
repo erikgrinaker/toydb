@@ -115,7 +115,7 @@ impl Driver {
             }
 
             Instruction::Status { id, address, mut status } => {
-                status.applied = state.applied_index();
+                status.apply_index = state.applied_index();
                 self.send(
                     address,
                     Event::ClientResponse { id, response: Ok(Response::Status(status)) },

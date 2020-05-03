@@ -26,14 +26,12 @@ const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
 /// Node status
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
-    pub id: String,
-    pub role: String,
+    pub server: String,
     pub leader: String,
-    pub nodes: u64,
     pub term: u64,
-    pub entries: u64,
-    pub committed: u64,
-    pub applied: u64,
+    pub node_last_index: HashMap<String, u64>,
+    pub commit_index: u64,
+    pub apply_index: u64,
 }
 
 /// The local Raft node state machine.

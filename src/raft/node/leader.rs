@@ -170,26 +170,22 @@ impl<L: Storage> RoleNode<Leader, L> {
             }
 
             Event::ClientRequest { id, request: Request::Status } => {
-                self.state_tx.send(Instruction::Status {
-                    id,
-                    address: msg.from,
-                    status: Status {
-                        id: self.id.clone(),
-                        role: "leader".into(),
-                        leader: self.id.clone(),
-                        nodes: self.peers.len() as u64 + 1,
-                        term: self.term,
-                        entries: self.log.get_last().0,
-                        committed: self.log.get_committed().0,
-                        applied: 0,
-                    },
-                })?
+                let mut status = Status {
+                    server: self.id.clone(),
+                    leader: self.id.clone(),
+                    term: self.term,
+                    node_last_index: self.role.peer_last_index.clone(),
+                    commit_index: self.log.get_committed().0,
+                    apply_index: 0,
+                };
+                let (last_index, _) = self.log.get_last();
+                status.node_last_index.insert(self.id.clone(), last_index);
+                self.state_tx.send(Instruction::Status { id, address: msg.from, status })?
             }
 
             Event::ClientResponse { id, mut response } => {
                 if let Ok(Response::Status(ref mut status)) = response {
-                    status.id = self.id.clone();
-                    status.role = "leader".into();
+                    status.server = self.id.clone();
                 }
                 self.send(Address::Client, Event::ClientResponse { id, response })?;
             }
@@ -652,14 +648,12 @@ mod tests {
                 id: vec![0x01],
                 address: Address::Client,
                 status: Status {
-                    id: "a".into(),
-                    role: "leader".into(),
+                    server: "a".into(),
                     leader: "a".into(),
-                    nodes: 5,
                     term: 3,
-                    entries: 5,
-                    committed: 2,
-                    applied: 0,
+                    node_last_index: HashMap::new(),
+                    commit_index: 2,
+                    apply_index: 0,
                 },
             }],
         );

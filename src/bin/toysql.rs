@@ -208,7 +208,7 @@ impl ToySQL {
         }
 
         let status = self.client.status().await?;
-        println!("Connected to ToyDB node \"{}\". Enter !help for instructions.", status.id);
+        println!("Connected to ToyDB node \"{}\". Enter !help for instructions.", status.server);
 
         while let Some(input) = self.prompt()? {
             match self.execute(&input).await {

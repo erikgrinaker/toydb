@@ -119,14 +119,12 @@ async fn status() -> Result<(), Error> {
     assert_eq!(
         c.status().await?,
         Status {
-            id: "test".into(),
-            role: "leader".into(),
+            server: "test".into(),
             leader: "test".into(),
-            nodes: 1,
             term: 0,
-            entries: 26,
-            committed: 26,
-            applied: 26,
+            node_last_index: vec![("test".to_string(), 26)].into_iter().collect(),
+            commit_index: 26,
+            apply_index: 26,
         }
     );
     Ok(())

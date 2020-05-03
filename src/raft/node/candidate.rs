@@ -89,8 +89,7 @@ impl<L: Storage> RoleNode<Candidate, L> {
 
             Event::ClientResponse { id, mut response } => {
                 if let Ok(Response::Status(ref mut status)) = response {
-                    status.id = self.id.clone();
-                    status.role = "candidate".into();
+                    status.server = self.id.clone();
                 }
                 self.proxied_reqs.remove(&id);
                 self.send(Address::Client, Event::ClientResponse { id, response })?;

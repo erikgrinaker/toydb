@@ -25,7 +25,7 @@ async fn get() -> Result<(), Error> {
     let mut servers = HashSet::new();
     let mut ids = HashSet::new();
     for client in vec![a, b, c, d, e] {
-        servers.insert(client.status().await?.id);
+        servers.insert(client.status().await?.server);
         ids.insert(client.id());
     }
     assert_eq!(

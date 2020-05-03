@@ -132,7 +132,7 @@ pub async fn cluster_with_clients(
     let mut clients = Vec::<Client>::new();
     for (id, (addr_sql, _)) in nodes {
         let client = Client::new(addr_sql).await?;
-        assert_eq!(id, client.status().await?.id);
+        assert_eq!(id, client.status().await?.server);
         clients.push(client);
     }
 
