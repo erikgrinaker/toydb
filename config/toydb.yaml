@@ -1,11 +1,11 @@
-# The cluster node ID (must be unique), data directory, and log level
+# The cluster node ID and peer ID/address map (empty for single node)
 id: toydb
-data_dir: /var/lib/toydb
-log_level: INFO
+peers: {}
 
 # Network addresses to bind the SQL and Raft servers to
 listen_sql: 0.0.0.0:9605
 listen_raft: 0.0.0.0:9705
 
-# ID/address map of other cluster peers (empty for single node)
-peers: {}
+# The node data directory and log level
+data_dir: /var/lib/toydb
+log_level: INFO
