@@ -226,7 +226,7 @@ impl<R, L: Storage> RoleNode<R, L> {
         if msg.term < self.term
             && !matches!(msg.event, Event::ClientRequest{..} | Event::ClientResponse{..})
         {
-            return Err(Error::Internal(format!("Message from past term {}", self.term)));
+            return Err(Error::Internal(format!("Message from past term {}", msg.term)));
         }
 
         match &msg.to {
