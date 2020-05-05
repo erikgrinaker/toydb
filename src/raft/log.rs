@@ -86,10 +86,10 @@ impl<S: Storage> Log<S> {
         if index != self.commit_index {
             if let Some(entry) = self.get(index)? {
                 debug!("Committing log entry {}", index);
+                self.kv.set(b"commit_index", serialize(&index)?)?;
                 self.kv.flush()?;
                 self.commit_index = index;
                 self.commit_term = entry.term;
-                self.kv.set(b"commit_index", serialize(&index)?)?;
             } else {
                 return Err(Error::Internal(format!(
                     "Entry at commit index {} does not exist",
