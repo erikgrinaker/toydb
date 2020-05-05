@@ -63,6 +63,10 @@ impl<S: Storage> MVCC<S> {
     }
 
     /// Returns engine status
+    //
+    // Bizarrely, the return statement is in fact necessary - see:
+    // https://github.com/rust-lang/reference/issues/452
+    #[allow(clippy::needless_return)]
     pub fn status(&self) -> Result<Status, Error> {
         let session = self.storage.read()?;
         return Ok(Status {
