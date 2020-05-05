@@ -1,13 +1,11 @@
 //! Key-value storage backends, with primitive IO operations.
 
 mod blog;
-mod file;
 mod memory;
 #[cfg(test)]
 mod test;
 
 pub use blog::BLog;
-pub use file::File;
 pub use memory::Memory;
 #[cfg(test)]
 pub use test::Test;

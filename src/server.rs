@@ -41,13 +41,8 @@ impl Server {
                         .create(true)
                         .open(path.join("raft"))?,
                 )?))?,
-                sql::engine::Raft::new_state(kv::MVCC::new(kv::storage::File::new(
-                    fs::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .create(true)
-                        .open(path.join("state"))?,
-                )?))?,
+                // Use an in-memory database since the Raft log is durable
+                sql::engine::Raft::new_state(kv::MVCC::new(kv::storage::Memory::new()))?,
             )
             .await?,
             raft_listener: None,

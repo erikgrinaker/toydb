@@ -9,13 +9,13 @@ use std::sync::{Arc, RwLock};
 #[derive(Clone)]
 pub struct Test {
     /// The underlying key-value store.
-    data: Arc<RwLock<Memory>>,
+    kv: Arc<RwLock<Memory>>,
 }
 
 impl Test {
     /// Creates a new Test key-value storage engine.
     pub fn new() -> Self {
-        Self { data: Arc::new(RwLock::new(Memory::new())) }
+        Self { kv: Arc::new(RwLock::new(Memory::new())) }
     }
 }
 
@@ -25,23 +25,21 @@ impl Storage for Test {
     }
 
     fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        self.data.read()?.read(key)
+        self.kv.read()?.read(key)
     }
 
     fn remove(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.data.write()?.remove(key)
+        self.kv.write()?.remove(key)
     }
 
     fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Range {
         // Since the mutex guard is scoped to this method, we have to
         // buffer the result and return an owned iterator.
-        Box::new(
-            self.data.read().unwrap().scan(range).collect::<Vec<Result<_, Error>>>().into_iter(),
-        )
+        Box::new(self.kv.read().unwrap().scan(range).collect::<Vec<Result<_, Error>>>().into_iter())
     }
 
     fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.data.write()?.write(key, value)
+        self.kv.write()?.write(key, value)
     }
 }
 

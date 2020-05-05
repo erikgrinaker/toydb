@@ -1,16 +1,11 @@
 use super::{Range, Storage};
 use crate::Error;
 
-use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::ops::RangeBounds;
 
-/// In-memory key-value storage backend.
-///
-/// Derives serialize/deserialize because the File backend uses this for storage.
-#[derive(Serialize, Deserialize)]
+/// In-memory key-value storage backend using a B-Tree.
 pub struct Memory {
-    /// The underlying key-value storage.
     data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
