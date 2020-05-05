@@ -110,18 +110,43 @@ impl ToySQL {
             },
             "!help" => println!(
                 r#"
-    Enter an SQL statement on a single line to execute it and display the result.
-    Semicolons are not supported. The following !-commands are also available:
+Enter a SQL statement on a single line to execute it and display the result.
+Semicolons are not supported. The following commands are also available:
 
-      !headers <on|off>  Toggles/enables/disables column headers display
-      !help              This help message
-      !status            Display server status
-      !table [table]     Display table schema, if it exists
-      !tables            List tables
-    "#
+    !headers <on|off>  Enable or disable column headers
+    !help              This help message
+    !status            Display server status
+    !table [table]     Display table schema, if it exists
+    !tables            List tables
+"#
             ),
-            // FIXME This should have better formatting
-            "!status" => println!("{:?}", self.client.status().await?),
+            "!status" => {
+                let status = self.client.status().await?;
+                let mut node_logs = status
+                    .raft
+                    .node_last_index
+                    .iter()
+                    .map(|(id, index)| format!("{}:{}", id, index))
+                    .collect::<Vec<_>>();
+                node_logs.sort();
+                println!(
+                    r#"
+Server:    {server} (leader {leader} in term {term} with {nodes} nodes)
+Raft log:  {committed} committed, {applied} applied entries
+Node logs: {logs}
+Txns:      {txns_active} active, {txns} total
+"#,
+                    server = status.raft.server,
+                    leader = status.raft.leader,
+                    term = status.raft.term,
+                    nodes = status.raft.node_last_index.len(),
+                    committed = status.raft.commit_index,
+                    applied = status.raft.apply_index,
+                    logs = node_logs.join(" "),
+                    txns = status.mvcc.txns,
+                    txns_active = status.mvcc.txns_active
+                )
+            }
             "!table" => {
                 let args = getargs(1)?;
                 println!("{}", self.client.get_table(args[0]).await?.as_sql());
@@ -208,7 +233,10 @@ impl ToySQL {
         }
 
         let status = self.client.status().await?;
-        println!("Connected to ToyDB node \"{}\". Enter !help for instructions.", status.server);
+        println!(
+            "Connected to ToyDB node \"{}\". Enter !help for instructions.",
+            status.raft.server
+        );
 
         while let Some(input) = self.prompt()? {
             match self.execute(&input).await {

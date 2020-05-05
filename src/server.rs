@@ -116,7 +116,7 @@ pub enum Response {
     Row(Option<Row>),
     GetTable(Table),
     ListTables(Vec<String>),
-    Status(raft::Status),
+    Status(sql::engine::Status),
 }
 
 /// A client session coupled to a SQL session.

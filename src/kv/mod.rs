@@ -1,5 +1,5 @@
-mod mvcc;
-mod simple;
+pub mod mvcc;
+pub mod simple;
 pub mod storage;
 
 pub use mvcc::{Mode, Transaction, MVCC};

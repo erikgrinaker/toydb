@@ -7,6 +7,13 @@ use std::collections::HashSet;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+/// MVCC status
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    pub txns: u64,
+    pub txns_active: u64,
+}
+
 /// An MVCC-based transactional key-value store.
 pub struct MVCC<S: Storage> {
     /// The storage backend. It is protected by a mutex so it can be shared
@@ -53,6 +60,20 @@ impl<S: Storage> MVCC<S> {
     pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
         let mut session = self.storage.write()?;
         session.write(key, value)
+    }
+
+    /// Returns engine status
+    pub fn status(&self) -> Result<Status, Error> {
+        let session = self.storage.read()?;
+        return Ok(Status {
+            txns: match session.read(&Key::TxnNext.encode())? {
+                Some(ref v) => deserialize(v)?,
+                None => 1,
+            } - 1,
+            txns_active: session
+                .scan(&Key::TxnActive(0).encode()..&Key::TxnActive(std::u64::MAX).encode())
+                .try_fold(0, |count, r| r.map(|_| count + 1))?,
+        });
     }
 }
 

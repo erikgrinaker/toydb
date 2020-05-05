@@ -2,7 +2,7 @@
 mod kv;
 pub mod raft;
 pub use kv::KV;
-pub use raft::Raft;
+pub use raft::{Raft, Status};
 
 use super::execution::{Context, ResultSet};
 use super::parser::{ast, Parser};

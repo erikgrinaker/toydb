@@ -36,6 +36,8 @@ enum Mutation {
 /// A Raft state machine query
 #[derive(Clone, Serialize, Deserialize)]
 enum Query {
+    /// Fetches engine status
+    Status,
     /// Resumes the active transaction with the given ID
     Resume(u64),
 
@@ -52,6 +54,13 @@ enum Query {
     ScanTables { txn_id: u64 },
     /// Reads a table
     ReadTable { txn_id: u64, table: String },
+}
+
+/// Status for the Raft SQL engine.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    pub raft: raft::Status,
+    pub mvcc: kv::mvcc::Status,
 }
 
 /// An SQL engine that wraps a Raft cluster.
@@ -71,9 +80,14 @@ impl Raft {
         State::new(kv)
     }
 
-    /// Returns engine status, for now just the Raft status.
-    pub fn status(&self) -> Result<raft::Status, Error> {
-        futures::executor::block_on(self.client.status())
+    /// Returns Raft SQL engine status.
+    pub fn status(&self) -> Result<Status, Error> {
+        Ok(Status {
+            raft: futures::executor::block_on(self.client.status())?,
+            mvcc: deserialize(&futures::executor::block_on(
+                self.client.query(serialize(&Query::Status)?),
+            )?)?,
+        })
     }
 }
 
@@ -329,6 +343,7 @@ impl<S: Storage> raft::State for State<S> {
                     .scan_index(&table, &column)?
                     .collect::<Result<Vec<_>, Error>>()?,
             ),
+            Query::Status => serialize(&self.engine.kv.status()?),
 
             Query::ReadTable { txn_id, table } => {
                 serialize(&self.engine.resume(txn_id)?.read_table(&table)?)

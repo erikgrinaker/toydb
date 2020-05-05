@@ -2,8 +2,9 @@ mod pool;
 
 use super::{assert_row, assert_rows, setup};
 
-use toydb::raft::Status;
-use toydb::sql::engine::Mode;
+use toydb::kv;
+use toydb::raft;
+use toydb::sql::engine::{Mode, Status};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Relation, Value};
@@ -119,12 +120,15 @@ async fn status() -> Result<(), Error> {
     assert_eq!(
         c.status().await?,
         Status {
-            server: "test".into(),
-            leader: "test".into(),
-            term: 0,
-            node_last_index: vec![("test".to_string(), 26)].into_iter().collect(),
-            commit_index: 26,
-            apply_index: 26,
+            raft: raft::Status {
+                server: "test".into(),
+                leader: "test".into(),
+                term: 0,
+                node_last_index: vec![("test".to_string(), 26)].into_iter().collect(),
+                commit_index: 26,
+                apply_index: 26,
+            },
+            mvcc: kv::mvcc::Status { txns: 1, txns_active: 0 },
         }
     );
     Ok(())

@@ -11,7 +11,7 @@ use std::collections::HashSet;
 /// A SQL engine based on an underlying MVCC key/value store
 pub struct KV<S: Storage> {
     /// The underlying key/value store
-    kv: kv::MVCC<S>,
+    pub(super) kv: kv::MVCC<S>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
