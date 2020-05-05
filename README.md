@@ -114,7 +114,7 @@ The primary goal is to build a minimally functional yet correct distributed data
 
 ### Schema
 
-* **Single database:** only a single, unnamed database is supported per ToyDB cluster.
+* **Single database:** only a single, unnamed database is supported per toyDB cluster.
 
 * **Schema changes:** schema changes other than creating or dropping tables is not supported.
 

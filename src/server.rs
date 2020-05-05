@@ -18,7 +18,7 @@ use tokio::stream::StreamExt as _;
 use tokio::sync::mpsc;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
-/// A ToyDB server.
+/// A toyDB server.
 pub struct Server {
     raft: raft::Server<kv::storage::BLog>,
     raft_listener: Option<TcpListener>,
@@ -26,7 +26,7 @@ pub struct Server {
 }
 
 impl Server {
-    /// Creates a new ToyDB server.
+    /// Creates a new toyDB server.
     pub async fn new(id: &str, peers: HashMap<String, String>, dir: &str) -> Result<Self, Error> {
         let path = Path::new(dir);
         fs::create_dir_all(path)?;

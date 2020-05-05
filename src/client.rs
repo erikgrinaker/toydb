@@ -20,7 +20,7 @@ type Connection = tokio_serde::Framed<
     tokio_serde::formats::Cbor<Result<Response, Error>, Request>,
 >;
 
-/// A ToyDB client
+/// A toyDB client
 pub struct Client {
     conn: Mutex<Connection>,
     txn: Cell<Option<(u64, Mode)>>,
@@ -118,7 +118,7 @@ impl Client {
     }
 }
 
-/// A ToyDB client pool
+/// A toyDB client pool
 pub struct Pool {
     clients: Vec<Mutex<Client>>,
 }

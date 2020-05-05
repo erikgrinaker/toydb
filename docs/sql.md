@@ -406,7 +406,7 @@ WHERE release_year >= 2000 AND bluray = FALSE
 
 ## Transactions
 
-ToyDB supports ACID transactions using MVCC-based snapshot isolation, protecting from the following anomalies: dirty writes, dirty reads, lost updates, fuzzy reads, read skew, and phantom reads. However, write skew anomalies are possible since serializable snapshot isolation is not implemented.
+toyDB supports ACID transactions using MVCC-based snapshot isolation, protecting from the following anomalies: dirty writes, dirty reads, lost updates, fuzzy reads, read skew, and phantom reads. However, write skew anomalies are possible since serializable snapshot isolation is not implemented.
 
 A new transaction is started with `BEGIN`, and ended with either `COMMIT` (atomically writing all changes) or `ROLLBACK` (discarding all changes). If any conflicts occur between concurrent transactions, the lowest transaction ID wins and the others will fail with a serialization error and must retry.
 

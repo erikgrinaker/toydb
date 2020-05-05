@@ -1,5 +1,5 @@
 /*
- * ToySQL is a command-line client for ToyDB. It can connect to any ToyDB node
+ * ToySQL is a command-line client for toyDB. It can connect to any toyDB node
  * via gRPC and run SQL queries through a REPL interface.
  */
 
@@ -234,7 +234,7 @@ Txns:      {txns_active} active, {txns} total
 
         let status = self.client.status().await?;
         println!(
-            "Connected to ToyDB node \"{}\". Enter !help for instructions.",
+            "Connected to toyDB node \"{}\". Enter !help for instructions.",
             status.raft.server
         );
 

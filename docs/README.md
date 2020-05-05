@@ -1,3 +1,3 @@
-# ToyDB Documentation
+# toyDB Documentation
 
 * [SQL reference](sql.md)
