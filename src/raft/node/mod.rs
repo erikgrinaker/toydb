@@ -47,7 +47,7 @@ impl<L: Storage> Node<L> {
         id: &str,
         peers: Vec<String>,
         log: Log<L>,
-        state: S,
+        mut state: S,
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self, Error> {
         let (state_tx, state_rx) = mpsc::unbounded_channel();
@@ -59,12 +59,19 @@ impl<L: Storage> Node<L> {
                 applied_index, committed_index
             )));
         }
-        tokio::spawn(Driver::new(state_rx, node_tx.clone()).drive(state));
-        for index in (applied_index+1)..=committed_index {
-            if let Some(entry) = log.get(index)? {
-                state_tx.send(Instruction::Apply { entry })?;
+        let mut driver = Driver::new(state_rx, node_tx.clone());
+        if committed_index > applied_index {
+            // FIXME Fix Log.range() and pass an iterator instead.
+            let mut entries = Vec::new();
+            for index in (applied_index + 1)..=committed_index {
+                if let Some(entry) = log.get(index)? {
+                    entries.push(entry);
+                }
             }
-        }
+            info!("Replaying log entries {} to {}", applied_index, committed_index);
+            driver.replay(&mut state, entries).await?;
+        };
+        tokio::spawn(driver.drive(state));
 
         let (term, voted_for) = log.load_term()?;
         let node = RoleNode {

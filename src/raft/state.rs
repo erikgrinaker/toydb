@@ -84,6 +84,24 @@ impl Driver {
         Ok(())
     }
 
+    /// Replays a set of log entries, for initial sync.
+    /// FIXME Should take a log iterator when implemented.
+    pub async fn replay<S: State>(
+        &mut self,
+        state: &mut S,
+        entries: Vec<Entry>,
+    ) -> Result<(), Error> {
+        for entry in entries.into_iter() {
+            if let Some(command) = entry.command {
+                match state.mutate(entry.index, command) {
+                    Err(error @ Error::Internal(_)) => return Err(error),
+                    _ => self.applied_index = entry.index,
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Executes a state machine instruction.
     pub async fn execute<S: State>(&mut self, i: Instruction, state: &mut S) -> Result<(), Error> {
         debug!("Executing {:?}", i);
