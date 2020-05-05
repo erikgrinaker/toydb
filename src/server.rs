@@ -20,7 +20,7 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 /// A toyDB server.
 pub struct Server {
-    raft: raft::Server<kv::storage::BLog>,
+    raft: raft::Server<kv::storage::ILog>,
     raft_listener: Option<TcpListener>,
     sql_listener: Option<TcpListener>,
 }
@@ -34,7 +34,7 @@ impl Server {
             raft: raft::Server::new(
                 id,
                 peers,
-                raft::Log::new(kv::Simple::new(kv::storage::BLog::new(
+                raft::Log::new(kv::Simple::new(kv::storage::ILog::new(
                     fs::OpenOptions::new()
                         .read(true)
                         .write(true)

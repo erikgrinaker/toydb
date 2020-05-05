@@ -1,7 +1,6 @@
-//! BLog is a B-tree indexed log. Since all historical data is retained, changed key/value pairs
-//! are written sequentially (MessagePack-encoded) to a file, and a (currently in-memory) B-tree
-//! is used to index keys to locations in the log. This also allows the log to act as a
-//! write-ahead log, since the B-tree is reconstructed by replaying the log.
+//! iLog is an indexed log. Changed key/value pairs are written sequentially to a file
+//! (MessagePack-encoded), and an in-memory B-tree is used to index keys to locations in the
+//! log. It is an initial prototype until a better storage backend is written.
 
 use super::{Range, Storage};
 use crate::utility::{deserialize_read, serialize};
@@ -21,13 +20,13 @@ struct Entry {
 }
 
 /// A B-tree indexed log
-pub struct BLog {
+pub struct ILog {
     file: RwLock<File>,
     index: BTreeMap<Vec<u8>, u64>,
 }
 
-impl BLog {
-    /// Creates a new BLog.
+impl ILog {
+    /// Creates a new ILog.
     pub fn new(mut file: File) -> Result<Self, Error> {
         let index = Self::build_index(&mut file)?;
         Ok(Self { file: RwLock::new(file), index })
@@ -60,7 +59,7 @@ impl BLog {
     }
 }
 
-impl Storage for BLog {
+impl Storage for ILog {
     fn flush(&mut self) -> Result<(), Error> {
         Ok(self.file.read()?.sync_all()?)
     }
@@ -104,14 +103,14 @@ impl Storage for BLog {
 }
 
 #[cfg(test)]
-impl super::TestSuite<BLog> for BLog {
+impl super::TestSuite<ILog> for ILog {
     fn setup() -> Result<Self, Error> {
-        BLog::new(tempfile::tempfile()?)
+        ILog::new(tempfile::tempfile()?)
     }
 }
 
 #[test]
 fn tests() -> Result<(), Error> {
     use super::TestSuite;
-    BLog::test()
+    ILog::test()
 }

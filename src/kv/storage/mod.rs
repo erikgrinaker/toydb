@@ -1,11 +1,11 @@
-//! Key-value storage backends, with primitive IO operations.
+//! Key-value storage backends, with fundamental IO operations.
 
-mod blog;
+mod ilog;
 mod memory;
 #[cfg(test)]
 mod test;
 
-pub use blog::BLog;
+pub use ilog::ILog;
 pub use memory::Memory;
 #[cfg(test)]
 pub use test::Test;
