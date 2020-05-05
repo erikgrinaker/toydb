@@ -49,6 +49,7 @@ struct Query {
 pub struct Driver {
     state_rx: mpsc::UnboundedReceiver<Instruction>,
     node_tx: mpsc::UnboundedSender<Message>,
+    applied_index: u64,
     /// Notify clients when their mutation is applied. <index, (client, id)>
     notify: HashMap<u64, (Address, Vec<u8>)>,
     /// Execute client queries when they receive a quorum. <index, <id, query>>
@@ -61,7 +62,13 @@ impl Driver {
         state_rx: mpsc::UnboundedReceiver<Instruction>,
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Self {
-        Self { state_rx, node_tx, notify: HashMap::new(), queries: BTreeMap::new() }
+        Self {
+            state_rx,
+            node_tx,
+            applied_index: 0,
+            notify: HashMap::new(),
+            queries: BTreeMap::new(),
+        }
     }
 
     /// Drives a state machine.
@@ -86,18 +93,21 @@ impl Driver {
                 self.query_abort()?;
             }
 
-            Instruction::Apply { entry: Entry { index, command: Some(command), .. } } => {
-                debug!("Applying state machine command {}: {:?}", index, command);
-                match tokio::task::block_in_place(|| state.mutate(index, command)) {
-                    Err(error @ Error::Internal(_)) => return Err(error),
-                    result => self.notify_applied(index, result)?,
-                };
-                // Try to execute any pending queries, since they may have been submitted for
-                // a commit_index which hadn't been applied yet.
+            Instruction::Apply { entry: Entry { index, command, .. } } => {
+                if let Some(command) = command {
+                    debug!("Applying state machine command {}: {:?}", index, command);
+                    match tokio::task::block_in_place(|| state.mutate(index, command)) {
+                        Err(error @ Error::Internal(_)) => return Err(error),
+                        result => self.notify_applied(index, result)?,
+                    };
+                }
+                // We have to track applied_index here, separately from the state machine, because
+                // no-op log entries are significant for whether a query should be executed.
+                self.applied_index = index;
+                // Try to execute any pending queries, since they may have been submitted for a
+                // commit_index which hadn't been applied yet.
                 self.query_execute(state)?;
             }
-
-            Instruction::Apply { entry: Entry { command: None, .. }, .. } => {}
 
             Instruction::Notify { id, address, index } => {
                 if index > state.applied_index() {
@@ -161,7 +171,8 @@ impl Driver {
 
     /// Executes any queries that are ready.
     fn query_execute<S: State>(&mut self, state: &mut S) -> Result<(), Error> {
-        for query in self.query_ready(state.applied_index()) {
+        for query in self.query_ready(self.applied_index) {
+            debug!("Executing query {:?}", query.command);
             let result = state.query(query.command);
             if let Err(error @ Error::Internal(_)) = result {
                 return Err(error);
