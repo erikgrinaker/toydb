@@ -1,4 +1,4 @@
-use super::storage::{Range, Storage};
+use super::Store;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
@@ -15,51 +15,51 @@ pub struct Status {
 }
 
 /// An MVCC-based transactional key-value store.
-pub struct MVCC<S: Storage> {
-    /// The storage backend. It is protected by a mutex so it can be shared
-    /// between multiple transactions. FIXME Can we avoid the mutex?
-    storage: Arc<RwLock<S>>,
+pub struct MVCC<S: Store> {
+    /// The underlying KV store. It is protected by a mutex so it can be shared between multiple
+    /// transactions.
+    store: Arc<RwLock<S>>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl<S: Storage> Clone for MVCC<S> {
+impl<S: Store> Clone for MVCC<S> {
     fn clone(&self) -> Self {
-        MVCC { storage: self.storage.clone() }
+        MVCC { store: self.store.clone() }
     }
 }
 
-impl<S: Storage> MVCC<S> {
-    /// Creates a new MVCC key-value store with the given storage backend.
-    pub fn new(storage: S) -> Self {
-        Self { storage: Arc::new(RwLock::new(storage)) }
+impl<S: Store> MVCC<S> {
+    /// Creates a new MVCC key-value store with the given key-value store for storage.
+    pub fn new(store: S) -> Self {
+        Self { store: Arc::new(RwLock::new(store)) }
     }
 
     /// Begins a new transaction in read-write mode.
     #[allow(dead_code)]
     pub fn begin(&self) -> Result<Transaction<S>, Error> {
-        Transaction::begin(self.storage.clone(), Mode::ReadWrite)
+        Transaction::begin(self.store.clone(), Mode::ReadWrite)
     }
 
     /// Begins a new transaction in the given mode.
     pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<S>, Error> {
-        Transaction::begin(self.storage.clone(), mode)
+        Transaction::begin(self.store.clone(), mode)
     }
 
     /// Resumes a transaction with the given ID.
     pub fn resume(&self, id: u64) -> Result<Transaction<S>, Error> {
-        Transaction::resume(self.storage.clone(), id)
+        Transaction::resume(self.store.clone(), id)
     }
 
     /// Fetches an unversioned metadata value
     pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        let session = self.storage.read()?;
-        session.read(key)
+        let session = self.store.read()?;
+        session.get(key)
     }
 
     /// Sets an unversioned metadata value
     pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        let mut session = self.storage.write()?;
-        session.write(key, value)
+        let mut session = self.store.write()?;
+        session.set(key, value)
     }
 
     /// Returns engine status
@@ -68,9 +68,9 @@ impl<S: Storage> MVCC<S> {
     // https://github.com/rust-lang/reference/issues/452
     #[allow(clippy::needless_return)]
     pub fn status(&self) -> Result<Status, Error> {
-        let session = self.storage.read()?;
+        let session = self.store.read()?;
         return Ok(Status {
-            txns: match session.read(&Key::TxnNext.encode())? {
+            txns: match session.get(&Key::TxnNext.encode())? {
                 Some(ref v) => deserialize(v)?,
                 None => 1,
             } - 1,
@@ -82,9 +82,9 @@ impl<S: Storage> MVCC<S> {
 }
 
 /// An MVCC transaction.
-pub struct Transaction<S: Storage> {
-    /// The underlying storage for the transaction. Shared between transactions using a mutex.
-    storage: Arc<RwLock<S>>,
+pub struct Transaction<S: Store> {
+    /// The underlying store for the transaction. Shared between transactions using a mutex.
+    store: Arc<RwLock<S>>,
     /// The unique transaction ID.
     id: u64,
     /// The transaction mode.
@@ -93,17 +93,17 @@ pub struct Transaction<S: Storage> {
     snapshot: Snapshot,
 }
 
-impl<S: Storage> Transaction<S> {
+impl<S: Store> Transaction<S> {
     /// Begins a new transaction in the given mode.
-    fn begin(storage: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
-        let mut session = storage.write()?;
+    fn begin(store: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
+        let mut session = store.write()?;
 
-        let id = match session.read(&Key::TxnNext.encode())? {
+        let id = match session.get(&Key::TxnNext.encode())? {
             Some(ref v) => deserialize(v)?,
             None => 1,
         };
-        session.write(&Key::TxnNext.encode(), serialize(&(id + 1))?)?;
-        session.write(&Key::TxnActive(id).encode(), serialize(&mode)?)?;
+        session.set(&Key::TxnNext.encode(), serialize(&(id + 1))?)?;
+        session.set(&Key::TxnActive(id).encode(), serialize(&mode)?)?;
 
         // We always take a new snapshot, even for snapshot transactions, because all transactions
         // increment the transaction ID and we need to properly record currently active transactions
@@ -111,16 +111,16 @@ impl<S: Storage> Transaction<S> {
         let mut snapshot = Snapshot::take(&mut session, id)?;
         std::mem::drop(session);
         if let Mode::Snapshot { version } = &mode {
-            snapshot = Snapshot::restore(&storage.read()?, *version)?
+            snapshot = Snapshot::restore(&store.read()?, *version)?
         }
 
-        Ok(Self { storage, id, mode, snapshot })
+        Ok(Self { store, id, mode, snapshot })
     }
 
     /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
-    fn resume(storage: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
-        let session = storage.read()?;
-        let mode = match session.read(&Key::TxnActive(id).encode())? {
+    fn resume(store: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
+        let session = store.read()?;
+        let mode = match session.get(&Key::TxnActive(id).encode())? {
             Some(v) => deserialize(&v)?,
             None => return Err(Error::Value(format!("No active transaction {}", id))),
         };
@@ -129,7 +129,7 @@ impl<S: Storage> Transaction<S> {
             _ => Snapshot::restore(&session, id)?,
         };
         std::mem::drop(session);
-        Ok(Self { storage, id, mode, snapshot })
+        Ok(Self { store, id, mode, snapshot })
     }
 
     /// Returns the transaction ID.
@@ -144,14 +144,14 @@ impl<S: Storage> Transaction<S> {
 
     /// Commits the transaction, by removing the txn from the active set.
     pub fn commit(self) -> Result<(), Error> {
-        let mut session = self.storage.write()?;
-        session.remove(&Key::TxnActive(self.id).encode())?;
+        let mut session = self.store.write()?;
+        session.delete(&Key::TxnActive(self.id).encode())?;
         session.flush()
     }
 
     /// Rolls back the transaction, by removing all updated entries.
     pub fn rollback(self) -> Result<(), Error> {
-        let mut session = self.storage.write()?;
+        let mut session = self.store.write()?;
         if self.mode.mutable() {
             let mut rollback = Vec::new();
             let mut scan = session.scan(
@@ -167,10 +167,10 @@ impl<S: Storage> Transaction<S> {
             }
             std::mem::drop(scan);
             for key in rollback.into_iter() {
-                session.remove(&key)?;
+                session.delete(&key)?;
             }
         }
-        session.remove(&Key::TxnActive(self.id).encode())
+        session.delete(&Key::TxnActive(self.id).encode())
     }
 
     /// Deletes a key.
@@ -180,7 +180,7 @@ impl<S: Storage> Transaction<S> {
 
     /// Fetches a key.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        let session = self.storage.read()?;
+        let session = self.store.read()?;
         let mut scan = session
             .scan(
                 Key::Record(key.to_vec(), 0).encode()..=Key::Record(key.to_vec(), self.id).encode(),
@@ -200,8 +200,8 @@ impl<S: Storage> Transaction<S> {
     }
 
     /// Scans a key range.
-    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<Range, Error> {
-        Ok(Box::new(Scan::new(self.storage.clone(), self.snapshot.clone(), range)?))
+    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<super::Scan, Error> {
+        Ok(Box::new(Scan::new(self.store.clone(), self.snapshot.clone(), range)?))
     }
 
     /// Sets a key.
@@ -214,7 +214,7 @@ impl<S: Storage> Transaction<S> {
         if !self.mode.mutable() {
             return Err(Error::ReadOnly);
         }
-        let mut session = self.storage.write()?;
+        let mut session = self.store.write()?;
 
         // Check if the key is dirty, i.e. if it has any uncommitted changes, by scanning for any
         // versions that aren't visible to us.
@@ -240,8 +240,8 @@ impl<S: Storage> Transaction<S> {
         // Write the key and its update record.
         let key = Key::Record(key.to_vec(), self.id).encode();
         let update = Key::TxnUpdate(self.id, key.clone()).encode();
-        session.write(&update, vec![])?;
-        session.write(&key, serialize(&value)?)
+        session.set(&update, vec![])?;
+        session.set(&key, serialize(&value)?)
     }
 }
 
@@ -293,7 +293,7 @@ struct Snapshot {
 
 impl Snapshot {
     /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
-    fn take(session: &mut RwLockWriteGuard<impl Storage>, version: u64) -> Result<Self, Error> {
+    fn take(session: &mut RwLockWriteGuard<impl Store>, version: u64) -> Result<Self, Error> {
         let mut snapshot = Self { version, invisible: HashSet::new() };
         let mut scan = session.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode());
         while let Some((key, _)) = scan.next().transpose()? {
@@ -303,13 +303,13 @@ impl Snapshot {
             };
         }
         std::mem::drop(scan);
-        session.write(&Key::TxnSnapshot(version).encode(), serialize(&snapshot.invisible)?)?;
+        session.set(&Key::TxnSnapshot(version).encode(), serialize(&snapshot.invisible)?)?;
         Ok(snapshot)
     }
 
     /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn restore(session: &RwLockReadGuard<impl Storage>, version: u64) -> Result<Self, Error> {
-        match session.read(&Key::TxnSnapshot(version).encode())? {
+    fn restore(session: &RwLockReadGuard<impl Store>, version: u64) -> Result<Self, Error> {
+        match session.get(&Key::TxnSnapshot(version).encode())? {
             Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
             None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
         }
@@ -424,12 +424,12 @@ impl Key {
 }
 
 /// A key range scan.
-/// FIXME This should really just wrap the underlying iterator via a RwLock guard for the storage,
+/// FIXME This should really just wrap the underlying iterator via a RwLock guard for the store,
 /// but making the lifetimes work out is non-trivial. See also:
 /// https://users.rust-lang.org/t/creating-an-iterator-over-mutex-contents-cannot-infer-an-appropriate-lifetime/24458
-pub struct Scan<S: Storage> {
-    /// The KV storage used for the scan.
-    storage: Arc<RwLock<S>>,
+pub struct Scan<S: Store> {
+    /// The KV store used for the scan.
+    store: Arc<RwLock<S>>,
     /// The snapshot the scan is running in.
     snapshot: Snapshot,
     /// Keeps track of the remaining range bounds we're iterating over.
@@ -440,10 +440,10 @@ pub struct Scan<S: Storage> {
     next_back_returned: Option<Vec<u8>>,
 }
 
-impl<S: Storage> Scan<S> {
+impl<S: Store> Scan<S> {
     /// Creates a new scan.
     fn new(
-        storage: Arc<RwLock<S>>,
+        store: Arc<RwLock<S>>,
         snapshot: Snapshot,
         range: impl RangeBounds<Vec<u8>>,
     ) -> Result<Self, Error> {
@@ -459,7 +459,7 @@ impl<S: Storage> Scan<S> {
         };
 
         Ok(Self {
-            storage,
+            store,
             snapshot,
             bounds: (start, end),
             next_candidate: None,
@@ -470,7 +470,7 @@ impl<S: Storage> Scan<S> {
     // next() with error handling.
     #[allow(clippy::type_complexity)]
     fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>, Error> {
-        let session = self.storage.read()?;
+        let session = self.store.read()?;
         let mut range = session.scan(self.bounds.clone());
         while let Some((k, v)) = range.next().transpose()? {
             // Keep track of iterator progress
@@ -507,7 +507,7 @@ impl<S: Storage> Scan<S> {
     /// next_back() with error handling.
     #[allow(clippy::type_complexity)]
     fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>, Error> {
-        let session = self.storage.read()?;
+        let session = self.store.read()?;
         let mut range = session.scan(self.bounds.clone());
         while let Some((k, v)) = range.next_back().transpose()? {
             // Keep track of iterator progress
@@ -535,7 +535,7 @@ impl<S: Storage> Scan<S> {
     }
 }
 
-impl<S: Storage> Iterator for Scan<S> {
+impl<S: Store> Iterator for Scan<S> {
     type Item = Result<(Vec<u8>, Vec<u8>), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -543,7 +543,7 @@ impl<S: Storage> Iterator for Scan<S> {
     }
 }
 
-impl<S: Storage> DoubleEndedIterator for Scan<S> {
+impl<S: Store> DoubleEndedIterator for Scan<S> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.try_next_back().transpose()
     }
@@ -551,7 +551,7 @@ impl<S: Storage> DoubleEndedIterator for Scan<S> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::storage::Test;
+    use super::super::Test;
     use super::*;
 
     fn setup() -> MVCC<Test> {

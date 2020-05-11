@@ -1,9 +1,8 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, IndexScan, Mode, Scan, Transaction as _};
-use crate::kv;
-use crate::kv::storage::Storage;
 use crate::raft;
+use crate::storage::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
@@ -76,7 +75,7 @@ impl Raft {
     }
 
     /// Creates an underlying state machine for a Raft engine.
-    pub fn new_state<S: Storage>(kv: kv::MVCC<S>) -> Result<State<S>, Error> {
+    pub fn new_state<S: kv::Store>(kv: kv::MVCC<S>) -> Result<State<S>, Error> {
         State::new(kv)
     }
 
@@ -254,14 +253,14 @@ impl Catalog for Transaction {
 }
 
 /// The Raft state machine for the Raft-based SQL engine, using a KV SQL engine
-pub struct State<S: Storage> {
+pub struct State<S: kv::Store> {
     /// The underlying KV SQL engine
     engine: super::KV<S>,
     /// The last applied index
     applied_index: u64,
 }
 
-impl<S: Storage> State<S> {
+impl<S: kv::Store> State<S> {
     /// Creates a new Raft state maching using the given MVCC key/value store
     pub fn new(store: kv::MVCC<S>) -> Result<Self, Error> {
         let engine = super::KV::new(store);
@@ -297,7 +296,7 @@ impl<S: Storage> State<S> {
     }
 }
 
-impl<S: Storage> raft::State for State<S> {
+impl<S: kv::Store> raft::State for State<S> {
     fn applied_index(&self) -> u64 {
         self.applied_index
     }

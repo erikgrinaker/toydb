@@ -163,7 +163,7 @@ impl<E: Engine + 'static> Session<E> {
 }
 
 /// The transaction mode
-pub type Mode = crate::kv::Mode;
+pub type Mode = crate::storage::kv::mvcc::Mode;
 
 /// A row scan iterator
 pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row, Error>> + Send>;

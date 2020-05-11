@@ -2,12 +2,12 @@ mod pool;
 
 use super::{assert_row, assert_rows, setup};
 
-use toydb::kv;
 use toydb::raft;
 use toydb::sql::engine::{Mode, Status};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Relation, Value};
+use toydb::storage::kv;
 use toydb::{Client, Error};
 
 use pretty_assertions::assert_eq;

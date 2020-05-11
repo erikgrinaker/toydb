@@ -1,5 +1,5 @@
 use super::{Address, Event, Log, Message, Node, Request, Response, State};
-use crate::kv::storage::Storage;
+use crate::storage::kv;
 use crate::Error;
 
 use futures::{sink::SinkExt as _, FutureExt as _};
@@ -16,13 +16,13 @@ use uuid::Uuid;
 const TICK: Duration = Duration::from_millis(100);
 
 /// A Raft server.
-pub struct Server<L: Storage> {
+pub struct Server<L: kv::Store> {
     node: Node<L>,
     peers: HashMap<String, String>,
     node_rx: mpsc::UnboundedReceiver<Message>,
 }
 
-impl<L: Storage + Send + 'static> Server<L> {
+impl<L: kv::Store + Send + 'static> Server<L> {
     /// Creates a new Raft cluster
     pub async fn new<S: State + Send + 'static>(
         id: &str,

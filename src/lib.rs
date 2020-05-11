@@ -3,10 +3,10 @@
 
 pub mod client;
 mod error;
-pub mod kv;
 pub mod raft;
 pub mod server;
 pub mod sql;
+pub mod storage;
 mod utility;
 
 pub use client::Client;

@@ -3,7 +3,7 @@ mod follower;
 mod leader;
 
 use super::{Address, Driver, Event, Instruction, Log, Message, State};
-use crate::kv::storage::Storage;
+use crate::storage::kv;
 use crate::Error;
 use candidate::Candidate;
 use follower::Follower;
@@ -35,13 +35,13 @@ pub struct Status {
 }
 
 /// The local Raft node state machine.
-pub enum Node<L: Storage> {
+pub enum Node<L: kv::Store> {
     Candidate(RoleNode<Candidate, L>),
     Follower(RoleNode<Follower, L>),
     Leader(RoleNode<Leader, L>),
 }
 
-impl<L: Storage> Node<L> {
+impl<L: kv::Store> Node<L> {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
     pub async fn new<S: State + Send + 'static>(
         id: &str,
@@ -123,26 +123,26 @@ impl<L: Storage> Node<L> {
     }
 }
 
-impl<L: Storage> From<RoleNode<Candidate, L>> for Node<L> {
+impl<L: kv::Store> From<RoleNode<Candidate, L>> for Node<L> {
     fn from(rn: RoleNode<Candidate, L>) -> Self {
         Node::Candidate(rn)
     }
 }
 
-impl<L: Storage> From<RoleNode<Follower, L>> for Node<L> {
+impl<L: kv::Store> From<RoleNode<Follower, L>> for Node<L> {
     fn from(rn: RoleNode<Follower, L>) -> Self {
         Node::Follower(rn)
     }
 }
 
-impl<L: Storage> From<RoleNode<Leader, L>> for Node<L> {
+impl<L: kv::Store> From<RoleNode<Leader, L>> for Node<L> {
     fn from(rn: RoleNode<Leader, L>) -> Self {
         Node::Leader(rn)
     }
 }
 
 // A Raft node with role R
-pub struct RoleNode<R, L: Storage> {
+pub struct RoleNode<R, L: kv::Store> {
     id: String,
     peers: Vec<String>,
     term: u64,
@@ -156,7 +156,7 @@ pub struct RoleNode<R, L: Storage> {
     role: R,
 }
 
-impl<R, L: Storage> RoleNode<R, L> {
+impl<R, L: kv::Store> RoleNode<R, L> {
     /// Transforms the node into another role.
     fn become_role<T>(self, role: T) -> Result<RoleNode<T, L>, Error> {
         Ok(RoleNode {
@@ -254,7 +254,6 @@ mod tests {
     use super::super::Entry;
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
-    use crate::kv;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
@@ -269,11 +268,11 @@ mod tests {
         assert_eq!(msgs, actual);
     }
 
-    pub struct NodeAsserter<'a, L: Storage> {
+    pub struct NodeAsserter<'a, L: kv::Store> {
         node: &'a Node<L>,
     }
 
-    impl<'a, L: Storage> NodeAsserter<'a, L> {
+    impl<'a, L: kv::Store> NodeAsserter<'a, L> {
         pub fn new(node: &'a Node<L>) -> Self {
             Self { node }
         }
@@ -414,20 +413,19 @@ mod tests {
         }
     }
 
-    pub fn assert_node<L: Storage>(node: &Node<L>) -> NodeAsserter<L> {
+    pub fn assert_node<L: kv::Store>(node: &Node<L>) -> NodeAsserter<L> {
         NodeAsserter::new(node)
     }
 
-    #[allow(clippy::type_complexity)]
-    fn setup_rolenode(
-    ) -> Result<(RoleNode<(), kv::storage::Test>, mpsc::UnboundedReceiver<Message>), Error> {
+    fn setup_rolenode() -> Result<(RoleNode<(), kv::Test>, mpsc::UnboundedReceiver<Message>), Error>
+    {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
     #[allow(clippy::type_complexity)]
     fn setup_rolenode_peers(
         peers: Vec<String>,
-    ) -> Result<(RoleNode<(), kv::storage::Test>, mpsc::UnboundedReceiver<Message>), Error> {
+    ) -> Result<(RoleNode<(), kv::Test>, mpsc::UnboundedReceiver<Message>), Error> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, _) = mpsc::unbounded_channel();
         let node = RoleNode {
@@ -435,7 +433,7 @@ mod tests {
             id: "a".into(),
             peers,
             term: 1,
-            log: Log::new(kv::Simple::new(kv::storage::Test::new()))?,
+            log: Log::new(kv::Test::new())?,
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
@@ -450,7 +448,7 @@ mod tests {
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            Log::new(kv::Simple::new(kv::storage::Test::new()))?,
+            Log::new(kv::Test::new())?,
             TestState::new(0),
             node_tx,
         )
@@ -469,12 +467,12 @@ mod tests {
     #[tokio::test]
     async fn new_loads_term() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let storage = kv::storage::Test::new();
-        Log::new(kv::Simple::new(storage.clone()))?.save_term(3, Some("c"))?;
+        let store = kv::Test::new();
+        Log::new(store.clone())?.save_term(3, Some("c"))?;
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            Log::new(kv::Simple::new(storage))?,
+            Log::new(store)?,
             TestState::new(0),
             node_tx,
         )
@@ -489,7 +487,7 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_all() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        let mut log = Log::new(kv::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -507,7 +505,7 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_partial() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        let mut log = Log::new(kv::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -525,7 +523,7 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_missing() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        let mut log = Log::new(kv::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -545,14 +543,8 @@ mod tests {
     #[tokio::test]
     async fn new_single() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let node = Node::new(
-            "a",
-            vec![],
-            Log::new(kv::Simple::new(kv::storage::Test::new()))?,
-            TestState::new(0),
-            node_tx,
-        )
-        .await?;
+        let node =
+            Node::new("a", vec![], Log::new(kv::Test::new())?, TestState::new(0), node_tx).await?;
         match node {
             Node::Leader(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());

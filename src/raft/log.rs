@@ -1,5 +1,4 @@
-use crate::kv;
-use crate::kv::storage::Storage;
+use crate::storage::kv;
 use crate::utility::{deserialize, serialize};
 use crate::Error;
 
@@ -18,9 +17,9 @@ pub struct Entry {
 }
 
 /// The replicated Raft log
-pub struct Log<S: Storage> {
+pub struct Log<S: kv::Store> {
     /// The underlying key-value store
-    kv: kv::Simple<S>,
+    kv: S,
     /// The index of the last stored entry.
     last_index: u64,
     /// The term of the last stored entry.
@@ -31,9 +30,9 @@ pub struct Log<S: Storage> {
     commit_term: u64,
 }
 
-impl<S: Storage> Log<S> {
+impl<S: kv::Store> Log<S> {
     /// Creates a new log, using a kv::Store for storage.
-    pub fn new(store: kv::Simple<S>) -> Result<Self, Error> {
+    pub fn new(store: S) -> Result<Self, Error> {
         let (mut commit_index, mut commit_term) = (0, 0);
         if let Some(index) =
             store.get(b"commit_index")?.map(|v| deserialize::<u64>(&v)).transpose()?
@@ -218,12 +217,12 @@ impl<S: Storage> Log<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::kv;
     use pretty_assertions::assert_eq;
 
-    fn setup() -> Result<(Log<kv::storage::Test>, kv::Simple<kv::storage::Test>), Error> {
-        let backend = kv::storage::Test::new();
-        let log = Log::new(kv::Simple::new(backend.clone()))?;
-        let store = kv::Simple::new(backend);
+    fn setup() -> Result<(Log<kv::Test>, kv::Test), Error> {
+        let store = kv::Test::new();
+        let log = Log::new(store.clone())?;
         Ok((log, store))
     }
 

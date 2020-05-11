@@ -1,6 +1,6 @@
 use super::super::{Address, Event, Instruction, Message, Response};
 use super::{Candidate, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
-use crate::kv::storage::Storage;
+use crate::storage::kv;
 use crate::Error;
 
 use log::{debug, info, warn};
@@ -32,7 +32,7 @@ impl Follower {
     }
 }
 
-impl<L: Storage> RoleNode<Follower, L> {
+impl<L: kv::Store> RoleNode<Follower, L> {
     /// Transforms the node into a candidate.
     fn become_candidate(self) -> Result<RoleNode<Candidate, L>, Error> {
         info!("Starting election for term {}", self.term + 1);
@@ -176,22 +176,21 @@ pub mod tests {
     use super::super::super::{Entry, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
-    use crate::kv;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
-    pub fn follower_leader<L: Storage>(node: &RoleNode<Follower, L>) -> Option<String> {
+    pub fn follower_leader<L: kv::Store>(node: &RoleNode<Follower, L>) -> Option<String> {
         node.role.leader.clone()
     }
 
-    pub fn follower_voted_for<L: Storage>(node: &RoleNode<Follower, L>) -> Option<String> {
+    pub fn follower_voted_for<L: kv::Store>(node: &RoleNode<Follower, L>) -> Option<String> {
         node.role.voted_for.clone()
     }
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<
         (
-            RoleNode<Follower, kv::storage::Test>,
+            RoleNode<Follower, kv::Test>,
             mpsc::UnboundedReceiver<Message>,
             mpsc::UnboundedReceiver<Instruction>,
         ),
@@ -199,7 +198,7 @@ pub mod tests {
     > {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        let mut log = Log::new(kv::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;

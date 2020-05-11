@@ -1,6 +1,6 @@
 use super::super::{Address, Event, Message, Response};
 use super::{Follower, Leader, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
-use crate::kv::storage::Storage;
+use crate::storage::kv;
 use crate::Error;
 
 use log::{debug, info, warn};
@@ -29,7 +29,7 @@ impl Candidate {
     }
 }
 
-impl<L: Storage> RoleNode<Candidate, L> {
+impl<L: kv::Store> RoleNode<Candidate, L> {
     /// Transition to follower role.
     fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>, Error> {
         info!("Discovered leader {} for term {}, following", leader, term);
@@ -126,14 +126,14 @@ mod tests {
     use super::super::super::{Entry, Instruction, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
-    use crate::kv;
+    use crate::storage::kv;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<
         (
-            RoleNode<Candidate, kv::storage::Test>,
+            RoleNode<Candidate, kv::Test>,
             mpsc::UnboundedReceiver<Message>,
             mpsc::UnboundedReceiver<Instruction>,
         ),
@@ -141,7 +141,7 @@ mod tests {
     > {
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Simple::new(kv::storage::Test::new()))?;
+        let mut log = Log::new(kv::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;

@@ -1,76 +1,76 @@
-//! Key-value storage backends, with fundamental IO operations.
-
 mod ilog;
 mod memory;
+pub mod mvcc;
 #[cfg(test)]
 mod test;
 
 pub use ilog::ILog;
 pub use memory::Memory;
+pub use mvcc::MVCC;
 #[cfg(test)]
 pub use test::Test;
 
 use crate::Error;
 use std::ops::RangeBounds;
 
-/// Key/value storage backend.
-pub trait Storage {
-    /// Flushes data to disk.
+/// Key/value store.
+pub trait Store {
+    /// Deletes a key, if it exists.
+    fn delete(&mut self, key: &[u8]) -> Result<(), Error>;
+
+    /// Flushes data to storage.
     fn flush(&mut self) -> Result<(), Error>;
 
-    /// Reads a value for a key, or `None` if it does not exist.
-    fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error>;
-
-    /// Removes a key, if it exists.
-    fn remove(&mut self, key: &[u8]) -> Result<(), Error>;
+    /// Gets a value for a key, or `None` if it does not exist.
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error>;
 
     /// Returns an iterator over a range of key/value pairs.
-    fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Range;
+    fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Scan;
 
     /// Writes a value for a key, replacing the existing value if any.
-    fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error>;
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error>;
 }
 
 /// Iterator over a key/value range.
-pub type Range<'a> = Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>), Error>> + 'a>;
+pub type Scan<'a> = Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>), Error>> + 'a>;
 
 #[cfg(test)]
-trait TestSuite<S: Storage> {
+trait TestSuite<S: Store> {
     fn setup() -> Result<S, Error>;
 
     fn test() -> Result<(), Error> {
-        Self::test_read()?;
-        Self::test_remove()?;
+        Self::test_delete()?;
+        Self::test_get()?;
         Self::test_scan()?;
-        Self::test_write()?;
+        Self::test_set()?;
         Ok(())
     }
 
-    fn test_read() -> Result<(), Error> {
+    fn test_get() -> Result<(), Error> {
         let mut s = Self::setup()?;
-        s.write(b"a", vec![0x01])?;
-        assert_eq!(Some(vec![0x01]), s.read(b"a")?);
-        assert_eq!(None, s.read(b"b")?);
+        s.set(b"a", vec![0x01])?;
+        assert_eq!(Some(vec![0x01]), s.get(b"a")?);
+        assert_eq!(None, s.get(b"b")?);
         Ok(())
     }
 
-    fn test_remove() -> Result<(), Error> {
+    fn test_delete() -> Result<(), Error> {
         let mut s = Self::setup()?;
-        s.write(b"a", vec![0x01])?;
-        assert_eq!(Some(vec![0x01]), s.read(b"a")?);
-        s.remove(b"a")?;
-        assert_eq!(None, s.read(b"a")?);
-        s.remove(b"b")?;
+        s.set(b"a", vec![0x01])?;
+        assert_eq!(Some(vec![0x01]), s.get(b"a")?);
+        s.delete(b"a")?;
+        assert_eq!(None, s.get(b"a")?);
+        s.delete(b"b")?;
         Ok(())
     }
 
     fn test_scan() -> Result<(), Error> {
         let mut s = Self::setup()?;
-        s.write(b"a", vec![0x01])?;
-        s.write(b"b", vec![0x02])?;
-        s.write(b"ba", vec![0x02, 0x01])?;
-        s.write(b"bb", vec![0x02, 0x02])?;
-        s.write(b"c", vec![0x03])?;
+        s.set(b"a", vec![0x01])?;
+        s.set(b"b", vec![0x02])?;
+        s.set(b"ba", vec![0x02, 0x01])?;
+        s.set(b"bb", vec![0x02, 0x02])?;
+        s.set(b"c", vec![0x03])?;
 
         // Forward/backward ranges
         assert_eq!(
@@ -128,12 +128,12 @@ trait TestSuite<S: Storage> {
         Ok(())
     }
 
-    fn test_write() -> Result<(), Error> {
+    fn test_set() -> Result<(), Error> {
         let mut s = Self::setup()?;
-        s.write(b"a", vec![0x01])?;
-        assert_eq!(Some(vec![0x01]), s.read(b"a")?);
-        s.write(b"a", vec![0x02])?;
-        assert_eq!(Some(vec![0x02]), s.read(b"a")?);
+        s.set(b"a", vec![0x01])?;
+        assert_eq!(Some(vec![0x01]), s.get(b"a")?);
+        s.set(b"a", vec![0x02])?;
+        assert_eq!(Some(vec![0x02]), s.get(b"a")?);
         Ok(())
     }
 }

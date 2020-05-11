@@ -2,7 +2,7 @@
 //! (MessagePack-encoded), and an in-memory B-tree is used to index keys to locations in the
 //! log. It is an initial prototype until a better storage backend is written.
 
-use super::{Range, Storage};
+use super::{Scan, Store};
 use crate::utility::{deserialize_read, serialize};
 use crate::Error;
 
@@ -59,19 +59,8 @@ impl ILog {
     }
 }
 
-impl Storage for ILog {
-    fn flush(&mut self) -> Result<(), Error> {
-        Ok(self.file.read()?.sync_all()?)
-    }
-
-    fn read(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        if let Some(pos) = self.index.get(key) {
-            return Ok(self.load(*pos)?.value);
-        }
-        Ok(None)
-    }
-
-    fn remove(&mut self, key: &[u8]) -> Result<(), Error> {
+impl Store for ILog {
+    fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
         if self.index.contains_key(key) {
             self.save(&Entry { key: key.to_vec(), value: None })?;
             self.index.remove(key);
@@ -79,7 +68,18 @@ impl Storage for ILog {
         Ok(())
     }
 
-    fn scan(&self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Range {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        if let Some(pos) = self.index.get(key) {
+            return Ok(self.load(*pos)?.value);
+        }
+        Ok(None)
+    }
+
+    fn flush(&mut self) -> Result<(), Error> {
+        Ok(self.file.read()?.sync_all()?)
+    }
+
+    fn scan(&self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Scan {
         // FIXME Needs to temporarily buffer results in a Vec to avoid dealing with
         // trait lifetimes right now.
         Box::new(
@@ -95,7 +95,7 @@ impl Storage for ILog {
         )
     }
 
-    fn write(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
         let pos = self.save(&Entry { key: key.to_vec(), value: Some(value) })?;
         self.index.insert(key.to_vec(), pos);
         Ok(())
