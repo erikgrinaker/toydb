@@ -7,7 +7,6 @@ pub mod raft;
 pub mod server;
 pub mod sql;
 pub mod storage;
-mod utility;
 
 pub use client::Client;
 pub use error::Error;

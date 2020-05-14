@@ -1,7 +1,7 @@
 use super::Store;
-use crate::utility::{deserialize, serialize};
 use crate::Error;
 
+use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::ops::{Bound, RangeBounds};
@@ -79,6 +79,16 @@ impl<S: Store> MVCC<S> {
                 .try_fold(0, |count, r| r.map(|_| count + 1))?,
         });
     }
+}
+
+/// Serializes MVCC metadata.
+fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
+    Ok(serde_cbor::ser::to_vec_packed(value)?)
+}
+
+/// Deserializes MVCC metadata.
+fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
+    Ok(serde_cbor::from_slice(bytes)?)
 }
 
 /// An MVCC transaction.

@@ -49,18 +49,6 @@ impl From<regex::Error> for Error {
     }
 }
 
-impl From<rmp_serde::decode::Error> for Error {
-    fn from(err: rmp_serde::decode::Error) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl From<rmp_serde::encode::Error> for Error {
-    fn from(err: rmp_serde::encode::Error) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
 impl From<rustyline::error::ReadlineError> for Error {
     fn from(err: rustyline::error::ReadlineError) -> Self {
         Error::Internal(err.to_string())

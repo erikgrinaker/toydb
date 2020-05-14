@@ -2,9 +2,9 @@ use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
 use crate::storage::kv;
-use crate::utility::{deserialize, serialize};
 use crate::Error;
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// A SQL engine based on an underlying MVCC key/value store
@@ -47,6 +47,16 @@ impl<S: kv::Store> super::Engine for KV<S> {
     fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
         Ok(Self::Transaction::new(self.kv.resume(id)?))
     }
+}
+
+/// Serializes SQL metadata.
+fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
+    Ok(serde_cbor::ser::to_vec_packed(value)?)
+}
+
+/// Deserializes SQL metadata.
+fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
+    Ok(serde_cbor::from_slice(bytes)?)
 }
 
 /// An SQL transaction based on an MVCC key/value transaction
