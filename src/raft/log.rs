@@ -20,15 +20,13 @@ pub struct Entry {
 /// A metadata key
 #[derive(Clone, Debug, PartialEq)]
 pub enum Key {
-    Term,
-    VotedFor,
+    TermVote,
 }
 
 impl Key {
     fn encode(&self) -> Vec<u8> {
         match self {
-            Self::Term => vec![0],
-            Self::VotedFor => vec![1],
+            Self::TermVote => vec![0],
         }
     }
 }
@@ -160,27 +158,20 @@ impl<S: log::Store> Log<S> {
     /// Loads information about the most recent term known by the log, containing the term number (0
     /// if none) and candidate voted for in current term (if any).
     pub fn load_term(&self) -> Result<(u64, Option<String>), Error> {
-        let term = self
+        let (term, voted_for) = self
             .store
-            .get_metadata(&Key::Term.encode())?
+            .get_metadata(&Key::TermVote.encode())?
             .map(|v| Self::deserialize(&v))
             .transpose()?
-            .unwrap_or(0);
-        let voted_for = self
-            .store
-            .get_metadata(&Key::VotedFor.encode())?
-            .map(|v| Self::deserialize(&v))
-            .transpose()?
-            .unwrap_or(None);
+            .unwrap_or((0, None));
         debug!("Loaded term {} and voted_for {:?} from log", term, voted_for);
         Ok((term, voted_for))
     }
 
     /// Saves information about the most recent term.
     pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
-        self.store.set_metadata(&Key::Term.encode(), Self::serialize(&term)?)?;
-        self.store.set_metadata(&Key::VotedFor.encode(), Self::serialize(&voted_for.clone())?)?;
-        Ok(())
+        self.store
+            .set_metadata(&Key::TermVote.encode(), Self::serialize(&(term, voted_for.clone()))?)
     }
 
     /// Serializes a value for the log store.
