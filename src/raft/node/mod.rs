@@ -3,13 +3,13 @@ mod follower;
 mod leader;
 
 use super::{Address, Driver, Event, Instruction, Log, Message, State};
-use crate::storage::kv;
+use crate::storage::log;
 use crate::Error;
 use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
 
-use log::{debug, info};
+use ::log::{debug, info};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -35,13 +35,13 @@ pub struct Status {
 }
 
 /// The local Raft node state machine.
-pub enum Node<L: kv::Store> {
+pub enum Node<L: log::Store> {
     Candidate(RoleNode<Candidate, L>),
     Follower(RoleNode<Follower, L>),
     Leader(RoleNode<Leader, L>),
 }
 
-impl<L: kv::Store> Node<L> {
+impl<L: log::Store> Node<L> {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
     pub async fn new<S: State + Send + 'static>(
         id: &str,
@@ -50,26 +50,19 @@ impl<L: kv::Store> Node<L> {
         mut state: S,
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self, Error> {
-        let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let (committed_index, _) = log.get_committed();
         let applied_index = state.applied_index();
-        if applied_index > committed_index {
+        if applied_index > log.commit_index {
             return Err(Error::Internal(format!(
                 "State machine applied index {} greater than log committed index {}",
-                applied_index, committed_index
+                applied_index, log.commit_index
             )));
         }
+
+        let (state_tx, state_rx) = mpsc::unbounded_channel();
         let mut driver = Driver::new(state_rx, node_tx.clone());
-        if committed_index > applied_index {
-            // FIXME Fix Log.range() and pass an iterator instead.
-            let mut entries = Vec::new();
-            for index in (applied_index + 1)..=committed_index {
-                if let Some(entry) = log.get(index)? {
-                    entries.push(entry);
-                }
-            }
-            info!("Replaying log entries {} to {}", applied_index, committed_index);
-            driver.replay(&mut state, entries).await?;
+        if log.commit_index > applied_index {
+            info!("Replaying log entries {} to {}", applied_index + 1, log.commit_index);
+            driver.replay(&mut state, log.scan((applied_index + 1)..=log.commit_index))?;
         };
         tokio::spawn(driver.drive(state));
 
@@ -87,7 +80,7 @@ impl<L: kv::Store> Node<L> {
         };
         if node.peers.is_empty() {
             info!("No peers specified, starting as leader");
-            let (last_index, _) = node.log.get_last();
+            let last_index = node.log.last_index;
             Ok(node.become_role(Leader::new(vec![], last_index))?.into())
         } else {
             Ok(node.into())
@@ -123,26 +116,26 @@ impl<L: kv::Store> Node<L> {
     }
 }
 
-impl<L: kv::Store> From<RoleNode<Candidate, L>> for Node<L> {
+impl<L: log::Store> From<RoleNode<Candidate, L>> for Node<L> {
     fn from(rn: RoleNode<Candidate, L>) -> Self {
         Node::Candidate(rn)
     }
 }
 
-impl<L: kv::Store> From<RoleNode<Follower, L>> for Node<L> {
+impl<L: log::Store> From<RoleNode<Follower, L>> for Node<L> {
     fn from(rn: RoleNode<Follower, L>) -> Self {
         Node::Follower(rn)
     }
 }
 
-impl<L: kv::Store> From<RoleNode<Leader, L>> for Node<L> {
+impl<L: log::Store> From<RoleNode<Leader, L>> for Node<L> {
     fn from(rn: RoleNode<Leader, L>) -> Self {
         Node::Leader(rn)
     }
 }
 
 // A Raft node with role R
-pub struct RoleNode<R, L: kv::Store> {
+pub struct RoleNode<R, L: log::Store> {
     id: String,
     peers: Vec<String>,
     term: u64,
@@ -156,7 +149,7 @@ pub struct RoleNode<R, L: kv::Store> {
     role: R,
 }
 
-impl<R, L: kv::Store> RoleNode<R, L> {
+impl<R, L: log::Store> RoleNode<R, L> {
     /// Transforms the node into another role.
     fn become_role<T>(self, role: T) -> Result<RoleNode<T, L>, Error> {
         Ok(RoleNode {
@@ -202,13 +195,6 @@ impl<R, L: kv::Store> RoleNode<R, L> {
     /// Returns the quorum size of the cluster.
     fn quorum(&self) -> u64 {
         (self.peers.len() as u64 + 1) / 2 + 1
-    }
-
-    /// Updates the current term and stores it in the log
-    fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
-        self.log.save_term(term, voted_for)?;
-        self.term = term;
-        Ok(())
     }
 
     /// Sends an event
@@ -268,11 +254,11 @@ mod tests {
         assert_eq!(msgs, actual);
     }
 
-    pub struct NodeAsserter<'a, L: kv::Store> {
+    pub struct NodeAsserter<'a, L: log::Store> {
         node: &'a Node<L>,
     }
 
-    impl<'a, L: kv::Store> NodeAsserter<'a, L> {
+    impl<'a, L: log::Store> NodeAsserter<'a, L> {
         pub fn new(node: &'a Node<L>) -> Self {
             Self { node }
         }
@@ -286,26 +272,23 @@ mod tests {
         }
 
         pub fn committed(self, index: u64) -> Self {
-            let (commit_index, _) = self.log().get_committed();
-            assert_eq!(index, commit_index, "Unexpected committed index");
+            assert_eq!(index, self.log().commit_index, "Unexpected committed index");
             self
         }
 
         pub fn last(self, index: u64) -> Self {
-            let (last_index, _) = self.log().get_last();
-            assert_eq!(index, last_index, "Unexpected last index");
+            assert_eq!(index, self.log().last_index, "Unexpected last index");
             self
         }
 
         pub fn entry(self, entry: Entry) -> Self {
-            let (last_index, _) = self.log().get_last();
-            assert!(entry.index <= last_index, "Index beyond last entry");
+            assert!(entry.index <= self.log().last_index, "Index beyond last entry");
             assert_eq!(entry, self.log().get(entry.index).unwrap().unwrap());
             self
         }
 
         pub fn entries(self, entries: Vec<Entry>) -> Self {
-            assert_eq!(entries, self.log().range(0..).unwrap());
+            assert_eq!(entries, self.log().scan(0..).collect::<Result<Vec<_>, Error>>().unwrap());
             self
         }
 
@@ -413,11 +396,11 @@ mod tests {
         }
     }
 
-    pub fn assert_node<L: kv::Store>(node: &Node<L>) -> NodeAsserter<L> {
+    pub fn assert_node<L: log::Store>(node: &Node<L>) -> NodeAsserter<L> {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> Result<(RoleNode<(), kv::Test>, mpsc::UnboundedReceiver<Message>), Error>
+    fn setup_rolenode() -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>), Error>
     {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
@@ -425,7 +408,7 @@ mod tests {
     #[allow(clippy::type_complexity)]
     fn setup_rolenode_peers(
         peers: Vec<String>,
-    ) -> Result<(RoleNode<(), kv::Test>, mpsc::UnboundedReceiver<Message>), Error> {
+    ) -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>), Error> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, _) = mpsc::unbounded_channel();
         let node = RoleNode {
@@ -433,7 +416,7 @@ mod tests {
             id: "a".into(),
             peers,
             term: 1,
-            log: Log::new(kv::Test::new())?,
+            log: Log::new(log::Test::new())?,
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
@@ -448,7 +431,7 @@ mod tests {
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            Log::new(kv::Test::new())?,
+            Log::new(log::Test::new())?,
             TestState::new(0),
             node_tx,
         )
@@ -467,7 +450,7 @@ mod tests {
     #[tokio::test]
     async fn new_loads_term() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let store = kv::Test::new();
+        let store = log::Test::new();
         Log::new(store.clone())?.save_term(3, Some("c"))?;
         let node = Node::new(
             "a",
@@ -487,7 +470,7 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_all() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Test::new())?;
+        let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -505,7 +488,7 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_partial() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Test::new())?;
+        let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -523,7 +506,7 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_missing() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Test::new())?;
+        let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -544,7 +527,7 @@ mod tests {
     async fn new_single() -> Result<(), Error> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let node =
-            Node::new("a", vec![], Log::new(kv::Test::new())?, TestState::new(0), node_tx).await?;
+            Node::new("a", vec![], Log::new(log::Test::new())?, TestState::new(0), node_tx).await?;
         match node {
             Node::Leader(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());
@@ -593,14 +576,6 @@ mod tests {
                 event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
             }],
         );
-        Ok(())
-    }
-
-    #[test]
-    fn save_term() -> Result<(), Error> {
-        let (mut node, _) = setup_rolenode()?;
-        node.save_term(4, Some("b"))?;
-        assert_eq!(node.log.load_term()?, (4, Some("b".into())));
         Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use super::{Address, Entry, Event, Message, Response, Status};
+use super::{Address, Entry, Event, Message, Response, Scan, Status};
 use crate::Error;
 
 use log::{debug, error};
@@ -84,14 +84,10 @@ impl Driver {
         Ok(())
     }
 
-    /// Replays a set of log entries, for initial sync.
-    /// FIXME Should take a log iterator when implemented.
-    pub async fn replay<S: State>(
-        &mut self,
-        state: &mut S,
-        entries: Vec<Entry>,
-    ) -> Result<(), Error> {
-        for entry in entries.into_iter() {
+    /// Synchronously (re)plays a set of log entries, for initial sync.
+    pub fn replay<'a, S: State>(&mut self, state: &mut S, mut scan: Scan<'a>) -> Result<(), Error> {
+        while let Some(entry) = scan.next().transpose()? {
+            debug!("Replaying {:?}", entry);
             if let Some(command) = entry.command {
                 match state.mutate(entry.index, command) {
                     Err(error @ Error::Internal(_)) => return Err(error),

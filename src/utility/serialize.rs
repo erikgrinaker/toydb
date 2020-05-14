@@ -10,6 +10,7 @@ pub fn deserialize<'de, V: Deserialize<'de>>(bytes: &[u8]) -> Result<V, Error> {
 }
 
 /// Deserializes the next value from a reader, using MessagePack.
+#[allow(dead_code)]
 pub fn deserialize_read<R: Read, V: DeserializeOwned>(reader: R) -> Result<Option<V>, Error> {
     match rmp_serde::decode::from_read(reader) {
         Ok(value) => Ok(Some(value)),

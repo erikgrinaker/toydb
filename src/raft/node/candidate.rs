@@ -1,9 +1,9 @@
 use super::super::{Address, Event, Message, Response};
 use super::{Follower, Leader, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
-use crate::storage::kv;
+use crate::storage::log;
 use crate::Error;
 
-use log::{debug, info, warn};
+use ::log::{debug, info, warn};
 use rand::Rng as _;
 
 /// A candidate is campaigning to become a leader.
@@ -29,11 +29,12 @@ impl Candidate {
     }
 }
 
-impl<L: kv::Store> RoleNode<Candidate, L> {
+impl<L: log::Store> RoleNode<Candidate, L> {
     /// Transition to follower role.
     fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>, Error> {
         info!("Discovered leader {} for term {}, following", leader, term);
-        self.save_term(term, None)?;
+        self.term = term;
+        self.log.save_term(term, None)?;
         let mut node = self.become_role(Follower::new(Some(leader), None))?;
         node.abort_proxied()?;
         node.forward_queued(Address::Peer(leader.to_string()))?;
@@ -44,10 +45,15 @@ impl<L: kv::Store> RoleNode<Candidate, L> {
     fn become_leader(self) -> Result<RoleNode<Leader, L>, Error> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
-        let (last_index, _) = self.log.get_last();
-        let (commit_index, commit_term) = self.log.get_committed();
+        let last_index = self.log.last_index;
         let mut node = self.become_role(Leader::new(peers, last_index))?;
-        node.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
+        node.send(
+            Address::Peers,
+            Event::Heartbeat {
+                commit_index: node.log.commit_index,
+                commit_term: node.log.commit_term,
+            },
+        )?;
         node.append(None)?;
         node.abort_proxied()?;
         Ok(node)
@@ -112,10 +118,16 @@ impl<L: kv::Store> RoleNode<Candidate, L> {
         self.role.election_ticks += 1;
         if self.role.election_ticks >= self.role.election_timeout {
             info!("Election timed out, starting new election for term {}", self.term + 1);
-            self.save_term(self.term + 1, None)?;
+            self.term += 1;
+            self.log.save_term(self.term, None)?;
             self.role = Candidate::new();
-            let (last_index, last_term) = self.log.get_last();
-            self.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
+            self.send(
+                Address::Peers,
+                Event::SolicitVote {
+                    last_index: self.log.last_index,
+                    last_term: self.log.last_term,
+                },
+            )?;
         }
         Ok(self.into())
     }
@@ -126,14 +138,13 @@ mod tests {
     use super::super::super::{Entry, Instruction, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
-    use crate::storage::kv;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<
         (
-            RoleNode<Candidate, kv::Test>,
+            RoleNode<Candidate, log::Test>,
             mpsc::UnboundedReceiver<Message>,
             mpsc::UnboundedReceiver<Instruction>,
         ),
@@ -141,11 +152,12 @@ mod tests {
     > {
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Test::new())?;
+        let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
         log.commit(2)?;
+        log.save_term(3, None)?;
 
         let mut node = RoleNode {
             id: "a".into(),
@@ -158,7 +170,6 @@ mod tests {
             proxied_reqs: HashMap::new(),
             role: Candidate::new(),
         };
-        node.save_term(3, None)?;
         node = match node.step(Message {
             from: Address::Client,
             to: Address::Local,
@@ -181,7 +192,7 @@ mod tests {
             from: Address::Peer("b".into()),
             to: Address::Peer("a".into()),
             term: 3,
-            event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
+            event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
         })?;
         assert_node(&node).is_follower().term(3);
         assert_messages(
@@ -200,7 +211,7 @@ mod tests {
                     from: Address::Local,
                     to: Address::Peer("b".into()),
                     term: 3,
-                    event: Event::ConfirmLeader { commit_index: 1, has_committed: true },
+                    event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
                 },
             ],
         );
@@ -217,7 +228,7 @@ mod tests {
             from: Address::Peer("b".into()),
             to: Address::Peer("a".into()),
             term: 4,
-            event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
+            event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
         })?;
         assert_node(&node).is_follower().term(4);
         assert_messages(
@@ -236,7 +247,7 @@ mod tests {
                     from: Address::Local,
                     to: Address::Peer("b".into()),
                     term: 4,
-                    event: Event::ConfirmLeader { commit_index: 1, has_committed: true },
+                    event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
                 },
             ],
         );

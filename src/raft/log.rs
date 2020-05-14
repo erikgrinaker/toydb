@@ -1,9 +1,10 @@
-use crate::storage::kv;
-use crate::utility::{deserialize, serialize};
+use crate::storage::log;
 use crate::Error;
 
-use log::debug;
+use ::log::debug;
+use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
+use std::ops::RangeBounds;
 
 /// A replicated log entry
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -16,130 +17,101 @@ pub struct Entry {
     pub command: Option<Vec<u8>>,
 }
 
-/// The replicated Raft log
-pub struct Log<S: kv::Store> {
-    /// The underlying key-value store
-    kv: S,
-    /// The index of the last stored entry.
-    last_index: u64,
-    /// The term of the last stored entry.
-    last_term: u64,
-    /// The last entry known to be committed.
-    commit_index: u64,
-    /// The term of the last committed entry.
-    commit_term: u64,
+/// A metadata key
+#[derive(Clone, Debug, PartialEq)]
+pub enum Key {
+    Term,
+    VotedFor,
 }
 
-impl<S: kv::Store> Log<S> {
-    /// Creates a new log, using a kv::Store for storage.
+impl Key {
+    fn encode(&self) -> Vec<u8> {
+        match self {
+            Self::Term => vec![0],
+            Self::VotedFor => vec![1],
+        }
+    }
+}
+
+/// A log scan
+pub type Scan<'a> = Box<dyn Iterator<Item = Result<Entry, Error>> + 'a>;
+
+/// The replicated Raft log
+pub struct Log<S: log::Store> {
+    /// The underlying log store.
+    store: S,
+    /// The index of the last stored entry.
+    pub(super) last_index: u64,
+    /// The term of the last stored entry.
+    pub(super) last_term: u64,
+    /// The last entry known to be committed.
+    pub(super) commit_index: u64,
+    /// The term of the last committed entry.
+    pub(super) commit_term: u64,
+}
+
+impl<S: log::Store> Log<S> {
+    /// Creates a new log, using a log::Store for storage.
     pub fn new(store: S) -> Result<Self, Error> {
-        let (mut commit_index, mut commit_term) = (0, 0);
-        if let Some(index) =
-            store.get(b"commit_index")?.map(|v| deserialize::<u64>(&v)).transpose()?
-        {
-            match store
-                .get(&index.to_string().as_bytes())?
-                .map(|v| deserialize::<Entry>(&v))
+        let (commit_index, commit_term) = match store.committed() {
+            0 => (0, 0),
+            index => store
+                .get(index)?
+                .map(|v| Self::deserialize::<Entry>(&v))
                 .transpose()?
-            {
-                Some(Entry { term, .. }) => {
-                    commit_index = index;
-                    commit_term = term;
-                }
-                e => {
-                    return Err(Error::Internal(format!(
-                        "Failed to load committed entry {}, got {:?}",
-                        index, e
-                    )))
-                }
-            }
-        }
-        // FIXME This really needs to be done in a better way.
-        let (mut last_index, mut last_term) = (0, 0);
-        for i in 1..std::u64::MAX {
-            if let Some(e) = store.get(&i.to_string().as_bytes())? {
-                let entry: Entry = deserialize(&e)?;
-                last_index = i;
-                last_term = entry.term;
-            } else {
-                break;
-            }
-        }
-        Ok(Self { kv: store, last_index, last_term, commit_index, commit_term })
+                .map(|e| (e.index, e.term))
+                .ok_or_else(|| Error::Internal("Committed entry not found".into()))?,
+        };
+        let (last_index, last_term) = match store.len() {
+            0 => (0, 0),
+            index => store
+                .get(index)?
+                .map(|v| Self::deserialize::<Entry>(&v))
+                .transpose()?
+                .map(|e| (e.index, e.term))
+                .ok_or_else(|| Error::Internal("Last entry not found".into()))?,
+        };
+        Ok(Self { store, last_index, last_term, commit_index, commit_term })
     }
 
     /// Appends a command to the log, returning the entry.
     pub fn append(&mut self, term: u64, command: Option<Vec<u8>>) -> Result<Entry, Error> {
         let entry = Entry { index: self.last_index + 1, term, command };
         debug!("Appending log entry {}: {:?}", entry.index, entry);
-        self.kv.set(&entry.index.to_string().as_bytes(), serialize(&entry)?)?;
+        self.store.append(Self::serialize(&entry)?)?;
         self.last_index = entry.index;
         self.last_term = entry.term;
         Ok(entry)
     }
 
-    /// Commits entries up to and including an index
-    pub fn commit(&mut self, mut index: u64) -> Result<u64, Error> {
-        index = std::cmp::min(index, self.last_index);
-        index = std::cmp::max(index, self.commit_index);
-        if index != self.commit_index {
-            if let Some(entry) = self.get(index)? {
-                debug!("Committing log entry {}", index);
-                self.kv.set(b"commit_index", serialize(&index)?)?;
-                self.kv.flush()?;
-                self.commit_index = index;
-                self.commit_term = entry.term;
-            } else {
-                return Err(Error::Internal(format!(
-                    "Entry at commit index {} does not exist",
-                    index
-                )));
-            }
-        }
+    /// Commits entries up to and including an index.
+    pub fn commit(&mut self, index: u64) -> Result<u64, Error> {
+        let entry = self
+            .get(index)?
+            .ok_or_else(|| Error::Internal(format!("Entry {} not found", index)))?;
+        self.store.commit(index)?;
+        self.commit_index = entry.index;
+        self.commit_term = entry.term;
         Ok(index)
     }
 
     /// Fetches an entry at an index
     pub fn get(&self, index: u64) -> Result<Option<Entry>, Error> {
-        if let Some(value) = self.kv.get(&index.to_string().as_bytes())? {
-            Ok(Some(deserialize(&value)?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Fetches the last committed index and term
-    pub fn get_committed(&self) -> (u64, u64) {
-        (self.commit_index, self.commit_term)
-    }
-
-    /// Fetches the last stored index and term
-    pub fn get_last(&self) -> (u64, u64) {
-        (self.last_index, self.last_term)
+        self.store.get(index)?.map(|v| Self::deserialize(&v)).transpose()
     }
 
     /// Checks if the log contains an entry
     pub fn has(&self, index: u64, term: u64) -> Result<bool, Error> {
-        if index == 0 && term == 0 {
-            return Ok(true);
-        }
         match self.get(index)? {
-            Some(ref entry) => Ok(entry.term == term),
+            Some(entry) => Ok(entry.term == term),
+            None if index == 0 && term == 0 => Ok(true),
             None => Ok(false),
         }
     }
 
-    /// Fetches a range of entries
-    // FIXME Should take all kinds of ranges (generic over std::ops::RangeBounds),
-    // and use kv::Store.range() once implemented.
-    pub fn range(&self, range: std::ops::RangeFrom<u64>) -> Result<Vec<Entry>, Error> {
-        let mut entries = Vec::new();
-        for i in range.start..=self.last_index {
-            if let Some(entry) = self.get(i)? {
-                entries.push(entry)
-            }
-        }
-        Ok(entries)
+    /// Iterates over log entries
+    pub fn scan(&self, range: impl RangeBounds<u64>) -> Scan {
+        Box::new(self.store.scan(range).map(|r| r.and_then(|v| Self::deserialize(&v))))
     }
 
     /// Splices a set of entries onto an offset. The entries must be contiguous, and the first entry
@@ -170,58 +142,65 @@ impl<S: kv::Store> Log<S> {
     /// Refuses to remove entries that have been applied or committed.
     pub fn truncate(&mut self, index: u64) -> Result<u64, Error> {
         debug!("Truncating log from entry {}", index);
-        if index < self.commit_index {
-            return Err(Error::Value("Cannot remove committed log entry".into()));
-        }
-
-        // FIXME This shouldn't rely on last_index
-        for i in (index + 1)..=self.last_index {
-            self.kv.delete(&i.to_string().as_bytes())?
-        }
-        self.last_index = std::cmp::min(index, self.last_index);
-        self.last_term = self.get(self.last_index)?.map(|e| e.term).unwrap_or(0);
-        Ok(self.last_index)
+        let (index, term) = match self.store.truncate(index)? {
+            0 => (0, 0),
+            i => self
+                .store
+                .get(i)?
+                .map(|v| Self::deserialize::<Entry>(&v))
+                .transpose()?
+                .map(|e| (e.index, e.term))
+                .ok_or_else(|| Error::Internal(format!("Entry {} not found", index)))?,
+        };
+        self.last_index = index;
+        self.last_term = term;
+        Ok(index)
     }
 
     /// Loads information about the most recent term known by the log, containing the term number (0
     /// if none) and candidate voted for in current term (if any).
     pub fn load_term(&self) -> Result<(u64, Option<String>), Error> {
-        let term = if let Some(value) = self.kv.get(b"term")? { deserialize(&value)? } else { 0 };
-        let voted_for = if let Some(value) = self.kv.get(b"voted_for")? {
-            Some(deserialize(&value)?)
-        } else {
-            None
-        };
+        let term = self
+            .store
+            .get_metadata(&Key::Term.encode())?
+            .map(|v| Self::deserialize(&v))
+            .transpose()?
+            .unwrap_or(0);
+        let voted_for = self
+            .store
+            .get_metadata(&Key::VotedFor.encode())?
+            .map(|v| Self::deserialize(&v))
+            .transpose()?
+            .unwrap_or(None);
         debug!("Loaded term {} and voted_for {:?} from log", term, voted_for);
         Ok((term, voted_for))
     }
 
     /// Saves information about the most recent term.
     pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
-        if term > 0 {
-            self.kv.set(b"term", serialize(&term)?)?
-        } else {
-            self.kv.delete(b"term")?
-        }
-        if let Some(v) = voted_for {
-            self.kv.set(b"voted_for", serialize(&v)?)?
-        } else {
-            self.kv.delete(b"voted_for")?
-        }
-        self.kv.flush()?;
-        debug!("Saved term={} and voted_for={:?}", term, voted_for);
+        self.store.set_metadata(&Key::Term.encode(), Self::serialize(&term)?)?;
+        self.store.set_metadata(&Key::VotedFor.encode(), Self::serialize(&voted_for.clone())?)?;
         Ok(())
+    }
+
+    /// Serializes a value for the log store.
+    fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
+        Ok(serde_cbor::ser::to_vec_packed(value)?)
+    }
+
+    /// Deserializes a value from the log store.
+    fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
+        Ok(serde_cbor::from_slice(bytes)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::kv;
     use pretty_assertions::assert_eq;
 
-    fn setup() -> Result<(Log<kv::Test>, kv::Test), Error> {
-        let store = kv::Test::new();
+    fn setup() -> Result<(Log<log::Test>, log::Test), Error> {
+        let store = log::Test::new();
         let log = Log::new(store.clone())?;
         Ok((log, store))
     }
@@ -229,8 +208,10 @@ mod tests {
     #[test]
     fn new() -> Result<(), Error> {
         let (l, _) = setup()?;
-        assert_eq!((0, 0), l.get_last());
-        assert_eq!((0, 0), l.get_committed());
+        assert_eq!(0, l.last_index);
+        assert_eq!(0, l.last_term);
+        assert_eq!(0, l.commit_index);
+        assert_eq!(0, l.commit_term);
         assert_eq!(None, l.get(1)?);
         Ok(())
     }
@@ -247,8 +228,10 @@ mod tests {
         assert_eq!(Some(Entry { index: 1, term: 3, command: Some(vec![0x01]) }), l.get(1)?);
         assert_eq!(None, l.get(2)?);
 
-        assert_eq!((1, 3), l.get_last());
-        assert_eq!((0, 0), l.get_committed());
+        assert_eq!(1, l.last_index);
+        assert_eq!(3, l.last_term);
+        assert_eq!(0, l.commit_index);
+        assert_eq!(0, l.commit_term);
         Ok(())
     }
 
@@ -281,26 +264,24 @@ mod tests {
         l.append(2, None)?;
         l.append(2, Some(vec![0x03]))?;
         assert_eq!(3, l.commit(3)?);
-        assert_eq!((3, 2), l.get_committed());
+        assert_eq!(3, l.commit_index);
+        assert_eq!(2, l.commit_term);
 
         // The last committed entry must be persisted, to sync with state machine
         let l = Log::new(store)?;
-        assert_eq!((3, 2), l.get_committed());
+        assert_eq!(3, l.commit_index);
+        assert_eq!(2, l.commit_term);
         Ok(())
     }
 
     #[test]
     fn commit_beyond() -> Result<(), Error> {
-        let (mut l, store) = setup()?;
+        let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, None)?;
         l.append(2, Some(vec![0x03]))?;
-        assert_eq!(3, l.commit(4)?);
-        assert_eq!((3, 2), l.get_committed());
+        assert_eq!(Err(Error::Internal("Entry 4 not found".into())), l.commit(4));
 
-        // The last committed entry must be persisted, to sync with state machine
-        let l = Log::new(store)?;
-        assert_eq!((3, 2), l.get_committed());
         Ok(())
     }
 
@@ -311,21 +292,8 @@ mod tests {
         l.append(2, None)?;
         l.append(2, Some(vec![0x03]))?;
         assert_eq!(2, l.commit(2)?);
-        assert_eq!((2, 2), l.get_committed());
-        Ok(())
-    }
-
-    #[test]
-    fn commit_reduce() -> Result<(), Error> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, None)?;
-        l.append(2, Some(vec![0x03]))?;
-        assert_eq!(2, l.commit(2)?);
-        assert_eq!((2, 2), l.get_committed());
-
-        assert_eq!(2, l.commit(1)?);
-        assert_eq!((2, 2), l.get_committed());
+        assert_eq!(2, l.commit_index);
+        assert_eq!(2, l.commit_term);
         Ok(())
     }
 
@@ -356,7 +324,7 @@ mod tests {
     }
 
     #[test]
-    fn range() -> Result<(), Error> {
+    fn scan() -> Result<(), Error> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(1, Some(vec![0x02]))?;
@@ -368,16 +336,16 @@ mod tests {
                 Entry { index: 2, term: 1, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 1, command: Some(vec![0x03]) },
             ],
-            l.range(0..)?
+            l.scan(0..).collect::<Result<Vec<_>, Error>>()?
         );
         assert_eq!(
             vec![
                 Entry { index: 2, term: 1, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 1, command: Some(vec![0x03]) },
             ],
-            l.range(2..)?
+            l.scan(2..).collect::<Result<Vec<_>, Error>>()?
         );
-        assert_eq!(Vec::<Entry>::new(), l.range(4..)?);
+        assert!(l.scan(4..).collect::<Result<Vec<_>, Error>>()?.is_empty());
         Ok(())
     }
 
@@ -416,11 +384,17 @@ mod tests {
                 Entry { index: 4, term: 4, command: Some(vec![0x04]) },
             ])?
         );
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: Some(vec![0x02]) }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 3, command: Some(vec![0x03]) }), l.get(3)?);
-        assert_eq!(Some(Entry { index: 4, term: 4, command: Some(vec![0x04]) }), l.get(4)?);
-        assert_eq!((4, 4), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 4, command: Some(vec![0x04]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
+        assert_eq!(4, l.last_index);
+        assert_eq!(4, l.last_term);
         Ok(())
     }
 
@@ -438,9 +412,15 @@ mod tests {
                 Entry { index: 2, term: 4, command: Some(vec![0x0b]) },
             ])?
         );
-        assert_eq!(Some(Entry { index: 1, term: 4, command: Some(vec![0x0a]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 4, command: Some(vec![0x0b]) }), l.get(2)?);
-        assert_eq!((2, 4), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 4, command: Some(vec![0x0a]) },
+                Entry { index: 2, term: 4, command: Some(vec![0x0b]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
+        assert_eq!(2, l.last_index);
+        assert_eq!(4, l.last_term);
         Ok(())
     }
 
@@ -457,11 +437,17 @@ mod tests {
                 Entry { index: 4, term: 4, command: Some(vec![0x04]) },
             ])?
         );
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: Some(vec![0x02]) }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 3, command: Some(vec![0x03]) }), l.get(3)?);
-        assert_eq!(Some(Entry { index: 4, term: 4, command: Some(vec![0x04]) }), l.get(4)?);
-        assert_eq!((4, 4), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 4, command: Some(vec![0x04]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
+        assert_eq!(4, l.last_index);
+        assert_eq!(4, l.last_term);
         Ok(())
     }
 
@@ -480,10 +466,16 @@ mod tests {
                 Entry { index: 3, term: 3, command: Some(vec![0x0c]) }
             ])?
         );
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 3, command: Some(vec![0x0b]) }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 3, command: Some(vec![0x0c]) }), l.get(3)?);
-        assert_eq!((3, 3), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 3, command: Some(vec![0x0b]) },
+                Entry { index: 3, term: 3, command: Some(vec![0x0c]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
+        assert_eq!(3, l.last_index);
+        assert_eq!(3, l.last_term);
         Ok(())
     }
 
@@ -501,11 +493,14 @@ mod tests {
                 Entry { index: 3, term: 3, command: Some(vec![0x03]) },
             ])
         );
-        // FIXME Use range for these assertions
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: Some(vec![0x02]) }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 3, command: Some(vec![0x03]) }), l.get(3)?);
-        assert_eq!((3, 3), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
         Ok(())
     }
 
@@ -523,11 +518,14 @@ mod tests {
                 Entry { index: 6, term: 3, command: Some(vec![0x06]) },
             ])
         );
-        // FIXME Use range for these assertions
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: Some(vec![0x02]) }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 3, command: Some(vec![0x03]) }), l.get(3)?);
-        assert_eq!((3, 3), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
         Ok(())
     }
 
@@ -539,10 +537,14 @@ mod tests {
         l.append(3, Some(vec![0x03]))?;
 
         assert_eq!(3, l.splice(vec![Entry { index: 2, term: 2, command: Some(vec![0x02]) },])?);
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: Some(vec![0x02]) }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 3, command: Some(vec![0x03]) }), l.get(3)?);
-        assert_eq!((3, 3), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
         Ok(())
     }
 
@@ -554,10 +556,13 @@ mod tests {
         l.append(3, Some(vec![0x03]))?;
 
         assert_eq!(2, l.truncate(2)?);
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: Some(vec![0x02]) }), l.get(2)?);
-        assert_eq!(None, l.get(3)?);
-        assert_eq!((2, 2), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
         Ok(())
     }
 
@@ -569,11 +574,14 @@ mod tests {
         l.append(3, Some(vec![0x03]))?;
 
         assert_eq!(3, l.truncate(4)?);
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: Some(vec![0x02]) }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 3, command: Some(vec![0x03]) }), l.get(3)?);
-        assert_eq!(None, l.get(4)?);
-        assert_eq!((3, 3), l.get_last());
+        assert_eq!(
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
+            ],
+            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+        );
         Ok(())
     }
 
@@ -585,7 +593,10 @@ mod tests {
         l.append(3, Some(vec![0x03]))?;
         l.commit(2)?;
 
-        assert_eq!(l.truncate(1), Err(Error::Value("Cannot remove committed log entry".into())));
+        assert_eq!(
+            l.truncate(1),
+            Err(Error::Internal("Cannot truncate below committed index 2".into()))
+        );
         assert_eq!(l.truncate(2)?, 2);
         Ok(())
     }
@@ -598,10 +609,7 @@ mod tests {
         l.append(3, Some(vec![0x03]))?;
 
         assert_eq!(0, l.truncate(0)?);
-        assert_eq!(None, l.get(1)?);
-        assert_eq!(None, l.get(2)?);
-        assert_eq!(None, l.get(3)?);
-        assert_eq!((0, 0), l.get_last());
+        assert!(l.scan(..).collect::<Result<Vec<_>, Error>>()?.is_empty());
         Ok(())
     }
 }

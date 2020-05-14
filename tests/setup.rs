@@ -75,7 +75,7 @@ pub async fn server(
     peers: HashMap<String, String>,
 ) -> Result<Teardown, Error> {
     let dir = TempDir::new("toydb")?;
-    let mut srv = Server::new(id, peers, &dir.path().to_string_lossy()).await?;
+    let mut srv = Server::new(id, peers, &dir.path().to_string_lossy(), false).await?;
 
     srv = srv.listen(addr_sql, addr_raft).await?;
     let (task, abort) = srv.serve().remote_handle();

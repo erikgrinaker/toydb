@@ -1,10 +1,8 @@
-mod ilog;
 mod memory;
 pub mod mvcc;
 #[cfg(test)]
 mod test;
 
-pub use ilog::ILog;
 pub use memory::Memory;
 pub use mvcc::MVCC;
 #[cfg(test)]

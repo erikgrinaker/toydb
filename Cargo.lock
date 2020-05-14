@@ -1100,6 +1100,7 @@ dependencies = [
  "rmp-serde 0.14.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustyline 6.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.106 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_cbor 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.106 (registry+https://github.com/rust-lang/crates.io-index)",
  "serial_test 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "simplelog 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)",

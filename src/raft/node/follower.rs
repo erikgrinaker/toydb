@@ -1,9 +1,9 @@
 use super::super::{Address, Event, Instruction, Message, Response};
 use super::{Candidate, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
-use crate::storage::kv;
+use crate::storage::log;
 use crate::Error;
 
-use log::{debug, info, warn};
+use ::log::{debug, info, warn};
 use rand::Rng as _;
 
 // A follower replicates state from a leader.
@@ -32,14 +32,17 @@ impl Follower {
     }
 }
 
-impl<L: kv::Store> RoleNode<Follower, L> {
+impl<L: log::Store> RoleNode<Follower, L> {
     /// Transforms the node into a candidate.
     fn become_candidate(self) -> Result<RoleNode<Candidate, L>, Error> {
         info!("Starting election for term {}", self.term + 1);
         let mut node = self.become_role(Candidate::new())?;
-        node.save_term(node.term + 1, None)?;
-        let (last_index, last_term) = node.log.get_last();
-        node.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
+        node.term += 1;
+        node.log.save_term(node.term, None)?;
+        node.send(
+            Address::Peers,
+            Event::SolicitVote { last_index: node.log.last_index, last_term: node.log.last_term },
+        )?;
         Ok(node)
     }
 
@@ -48,7 +51,8 @@ impl<L: kv::Store> RoleNode<Follower, L> {
         let mut voted_for = None;
         if term > self.term {
             info!("Discovered new term {}, following leader {}", term, leader);
-            self.save_term(term, None)?;
+            self.term = term;
+            self.log.save_term(term, None)?;
         } else {
             info!("Discovered leader {}, following", leader);
             voted_for = self.role.voted_for;
@@ -85,15 +89,13 @@ impl<L: kv::Store> RoleNode<Follower, L> {
         match msg.event {
             Event::Heartbeat { commit_index, commit_term } => {
                 if self.is_leader(&msg.from) {
-                    let (prev_commit_index, _) = self.log.get_committed();
                     let has_committed = self.log.has(commit_index, commit_term)?;
-                    if has_committed {
+                    if has_committed && commit_index > self.log.commit_index {
+                        let old_commit_index = self.log.commit_index;
                         self.log.commit(commit_index)?;
-                        // FIXME This should use a range scan
-                        for index in (prev_commit_index + 1)..=commit_index {
-                            if let Some(entry) = self.log.get(index)? {
-                                self.state_tx.send(Instruction::Apply { entry })?
-                            }
+                        let mut scan = self.log.scan((old_commit_index + 1)..=commit_index);
+                        while let Some(entry) = scan.next().transpose()? {
+                            self.state_tx.send(Instruction::Apply { entry })?;
                         }
                     }
                     self.send(msg.from, Event::ConfirmLeader { commit_index, has_committed })?;
@@ -106,17 +108,16 @@ impl<L: kv::Store> RoleNode<Follower, L> {
                         return Ok(self.into());
                     }
                 }
-                let (local_last_index, local_last_term) = self.log.get_last();
-                if last_term < local_last_term {
+                if last_term < self.log.last_term {
                     return Ok(self.into());
                 }
-                if last_term == local_last_term && last_index < local_last_index {
+                if last_term == self.log.last_term && last_index < self.log.last_index {
                     return Ok(self.into());
                 }
                 if let Address::Peer(from) = msg.from {
                     info!("Voting for {} in term {} election", from, self.term);
                     self.send(Address::Peer(from.clone()), Event::GrantVote)?;
-                    self.save_term(self.term, Some(&from))?;
+                    self.log.save_term(self.term, Some(&from))?;
                     self.role.voted_for = Some(from);
                 }
             }
@@ -179,18 +180,18 @@ pub mod tests {
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
-    pub fn follower_leader<L: kv::Store>(node: &RoleNode<Follower, L>) -> Option<String> {
+    pub fn follower_leader<L: log::Store>(node: &RoleNode<Follower, L>) -> Option<String> {
         node.role.leader.clone()
     }
 
-    pub fn follower_voted_for<L: kv::Store>(node: &RoleNode<Follower, L>) -> Option<String> {
+    pub fn follower_voted_for<L: log::Store>(node: &RoleNode<Follower, L>) -> Option<String> {
         node.role.voted_for.clone()
     }
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<
         (
-            RoleNode<Follower, kv::Test>,
+            RoleNode<Follower, log::Test>,
             mpsc::UnboundedReceiver<Message>,
             mpsc::UnboundedReceiver<Instruction>,
         ),
@@ -198,13 +199,14 @@ pub mod tests {
     > {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Test::new())?;
+        let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
         log.commit(2)?;
+        log.save_term(3, None)?;
 
-        let mut node = RoleNode {
+        let node = RoleNode {
             id: "a".into(),
             peers: vec!["b".into(), "c".into(), "d".into(), "e".into()],
             term: 3,
@@ -215,7 +217,6 @@ pub mod tests {
             queued_reqs: Vec::new(),
             role: Follower::new(Some("b"), None),
         };
-        node.save_term(3, None)?;
         Ok((node, node_rx, state_rx))
     }
 

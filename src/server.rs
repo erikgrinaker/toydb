@@ -4,11 +4,11 @@ use crate::sql::engine::{Engine as _, Mode};
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
-use crate::storage::kv;
+use crate::storage::{kv, log};
 use crate::Error;
 
+use ::log::{error, info};
 use futures::sink::SinkExt as _;
-use log::{error, info};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -20,27 +20,26 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 /// A toyDB server.
 pub struct Server {
-    raft: raft::Server<kv::ILog>,
+    raft: raft::Server<log::Hybrid>,
     raft_listener: Option<TcpListener>,
     sql_listener: Option<TcpListener>,
 }
 
 impl Server {
     /// Creates a new toyDB server.
-    pub async fn new(id: &str, peers: HashMap<String, String>, dir: &str) -> Result<Self, Error> {
+    pub async fn new(
+        id: &str,
+        peers: HashMap<String, String>,
+        dir: &str,
+        sync: bool,
+    ) -> Result<Self, Error> {
         let path = Path::new(dir);
         fs::create_dir_all(path)?;
         Ok(Server {
             raft: raft::Server::new(
                 id,
                 peers,
-                raft::Log::new(kv::ILog::new(
-                    fs::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .create(true)
-                        .open(path.join("raft"))?,
-                )?)?,
+                raft::Log::new(log::Hybrid::new(&path, sync)?)?,
                 // Use an in-memory database since the Raft log is durable
                 sql::engine::Raft::new_state(kv::MVCC::new(kv::Memory::new()))?,
             )

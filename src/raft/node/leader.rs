@@ -1,9 +1,9 @@
 use super::super::{Address, Event, Instruction, Message, Request, Response, Status};
 use super::{Follower, Node, RoleNode, HEARTBEAT_INTERVAL};
-use crate::storage::kv;
+use crate::storage::log;
 use crate::Error;
 
-use log::{debug, info, warn};
+use ::log::{debug, info, warn};
 use std::collections::HashMap;
 
 // A leader serves requests and replicates the log to followers.
@@ -33,11 +33,12 @@ impl Leader {
     }
 }
 
-impl<L: kv::Store> RoleNode<Leader, L> {
+impl<L: log::Store> RoleNode<Leader, L> {
     /// Transforms the leader into a follower
     fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>, Error> {
         info!("Discovered new leader {} for term {}, following", leader, term);
-        self.save_term(term, None)?;
+        self.term = term;
+        self.log.save_term(term, None)?;
         self.state_tx.send(Instruction::Abort)?;
         self.become_role(Follower::new(Some(leader), None))
     }
@@ -53,29 +54,26 @@ impl<L: kv::Store> RoleNode<Leader, L> {
 
     /// Commits any pending log entries.
     fn commit(&mut self) -> Result<u64, Error> {
-        let (last_index, _) = self.log.get_last();
-        let (commit_index, _) = self.log.get_committed();
-        let mut last_indexes = vec![last_index];
+        let mut last_indexes = vec![self.log.last_index];
         last_indexes.extend(self.role.peer_last_index.values());
         last_indexes.sort();
         last_indexes.reverse();
         let quorum_index = last_indexes[self.quorum() as usize - 1];
-        if quorum_index < commit_index {
-            return Ok(commit_index);
-        }
-        // We can only safely commit up to an entry from our own term, see
-        // figure 8 in Raft paper for background.
-        let committed_index = match self.log.get(quorum_index)? {
-            Some(entry) if entry.term == self.term => self.log.commit(quorum_index)?,
-            _ => commit_index,
-        };
-        // FIXME Log should handle range scans
-        for index in (commit_index + 1)..=committed_index {
-            if let Some(entry) = self.log.get(index)? {
-                self.state_tx.send(Instruction::Apply { entry })?
+
+        // We can only safely commit up to an entry from our own term, see figure 8 in Raft paper.
+        if quorum_index > self.log.commit_index {
+            if let Some(entry) = self.log.get(quorum_index)? {
+                if entry.term == self.term {
+                    let old_commit_index = self.log.commit_index;
+                    self.log.commit(quorum_index)?;
+                    let mut scan = self.log.scan((old_commit_index + 1)..=self.log.commit_index);
+                    while let Some(entry) = scan.next().transpose()? {
+                        self.state_tx.send(Instruction::Apply { entry })?;
+                    }
+                }
             }
         }
-        Ok(committed_index)
+        Ok(self.log.commit_index)
     }
 
     /// Replicates the log to a peer.
@@ -92,7 +90,7 @@ impl<L: kv::Store> RoleNode<Leader, L> {
             None if base_index == 0 => 0,
             None => return Err(Error::Internal(format!("Missing base entry {}", base_index))),
         };
-        let entries = self.log.range(peer_next..)?;
+        let entries = self.log.scan(peer_next..).collect::<Result<Vec<_>, Error>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
         self.send(
             Address::Peer(peer.to_string()),
@@ -144,20 +142,27 @@ impl<L: kv::Store> RoleNode<Leader, L> {
             }
 
             Event::ClientRequest { id, request: Request::Query(command) } => {
-                // FIXME This needs to wait until the first entry from out term has been
+                // FIXME This needs to wait until the first entry from our term has been
                 // committed, see: https://stackoverflow.com/questions/37207682/raft-some-questions-about-read-only-queries
-                let (commit_index, commit_term) = self.log.get_committed();
                 self.state_tx.send(Instruction::Query {
                     id,
                     address: msg.from,
                     command,
-                    index: commit_index,
+                    index: self.log.commit_index,
                     quorum: self.quorum(),
                 })?;
-                self.state_tx
-                    .send(Instruction::Vote { index: commit_index, address: Address::Local })?;
+                self.state_tx.send(Instruction::Vote {
+                    index: self.log.commit_index,
+                    address: Address::Local,
+                })?;
                 if !self.peers.is_empty() {
-                    self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
+                    self.send(
+                        Address::Peers,
+                        Event::Heartbeat {
+                            commit_index: self.log.commit_index,
+                            commit_term: self.log.commit_term,
+                        },
+                    )?;
                 }
             }
 
@@ -175,11 +180,10 @@ impl<L: kv::Store> RoleNode<Leader, L> {
                     leader: self.id.clone(),
                     term: self.term,
                     node_last_index: self.role.peer_last_index.clone(),
-                    commit_index: self.log.get_committed().0,
+                    commit_index: self.log.commit_index,
                     apply_index: 0,
                 };
-                let (last_index, _) = self.log.get_last();
-                status.node_last_index.insert(self.id.clone(), last_index);
+                status.node_last_index.insert(self.id.clone(), self.log.last_index);
                 self.state_tx.send(Instruction::Status { id, address: msg.from, status })?
             }
 
@@ -208,8 +212,13 @@ impl<L: kv::Store> RoleNode<Leader, L> {
             self.role.heartbeat_ticks += 1;
             if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
                 self.role.heartbeat_ticks = 0;
-                let (commit_index, commit_term) = self.log.get_committed();
-                self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
+                self.send(
+                    Address::Peers,
+                    Event::Heartbeat {
+                        commit_index: self.log.commit_index,
+                        commit_term: self.log.commit_term,
+                    },
+                )?;
             }
         }
         Ok(self.into())
@@ -221,14 +230,13 @@ mod tests {
     use super::super::super::{Entry, Log};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
-    use crate::storage::kv;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<
         (
-            RoleNode<Leader, kv::Test>,
+            RoleNode<Leader, log::Test>,
             mpsc::UnboundedReceiver<Message>,
             mpsc::UnboundedReceiver<Instruction>,
         ),
@@ -236,29 +244,27 @@ mod tests {
     > {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(kv::Test::new())?;
+        let peers = vec!["b".into(), "c".into(), "d".into(), "e".into()];
+        let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
         log.append(3, Some(vec![0x04]))?;
         log.append(3, Some(vec![0x05]))?;
         log.commit(2)?;
+        log.save_term(3, None)?;
 
-        let peers = vec!["b".into(), "c".into(), "d".into(), "e".into()];
-        let (last_index, _) = log.get_last();
-
-        let mut node = RoleNode {
+        let node = RoleNode {
             id: "a".into(),
             peers: peers.clone(),
             term: 3,
+            role: Leader::new(peers, log.last_index),
             log,
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
             queued_reqs: Vec::new(),
-            role: Leader::new(peers, last_index),
         };
-        node.save_term(3, None)?;
         Ok((node, node_rx, state_rx))
     }
 
@@ -513,7 +519,7 @@ mod tests {
     #[test]
     fn step_rejectentries() -> Result<(), Error> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
-        let entries = leader.log.range(0..)?;
+        let entries = leader.log.scan(0..).collect::<Result<Vec<_>, Error>>()?;
         let mut node: Node<_> = leader.into();
 
         for i in 0..(entries.len() + 3) {

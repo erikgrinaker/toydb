@@ -67,6 +67,12 @@ impl From<rustyline::error::ReadlineError> for Error {
     }
 }
 
+impl From<serde_cbor::error::Error> for Error {
+    fn from(err: serde_cbor::error::Error) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::Internal(err.to_string())

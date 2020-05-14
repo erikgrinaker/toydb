@@ -1,9 +1,9 @@
 use super::{Address, Event, Log, Message, Node, Request, Response, State};
-use crate::storage::kv;
+use crate::storage::log;
 use crate::Error;
 
+use ::log::{debug, error};
 use futures::{sink::SinkExt as _, FutureExt as _};
-use log::{debug, error};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
@@ -16,13 +16,13 @@ use uuid::Uuid;
 const TICK: Duration = Duration::from_millis(100);
 
 /// A Raft server.
-pub struct Server<L: kv::Store> {
+pub struct Server<L: log::Store> {
     node: Node<L>,
     peers: HashMap<String, String>,
     node_rx: mpsc::UnboundedReceiver<Message>,
 }
 
-impl<L: kv::Store + Send + 'static> Server<L> {
+impl<L: log::Store + Send + 'static> Server<L> {
     /// Creates a new Raft cluster
     pub async fn new<S: State + Send + 'static>(
         id: &str,

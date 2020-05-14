@@ -26,7 +26,7 @@ async fn main() -> Result<(), toydb::Error> {
     }
     simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
-    Server::new(&cfg.id, cfg.peers, &cfg.data_dir)
+    Server::new(&cfg.id, cfg.peers, &cfg.data_dir, cfg.sync)
         .await?
         .listen(&cfg.listen_sql, &cfg.listen_raft)
         .await?
@@ -41,6 +41,7 @@ struct Config {
     listen_raft: String,
     log_level: String,
     data_dir: String,
+    sync: bool,
     peers: HashMap<String, String>,
 }
 
@@ -52,6 +53,7 @@ impl Config {
         c.set_default("listen_raft", "0.0.0.0:9705")?;
         c.set_default("log_level", "info")?;
         c.set_default("data_dir", "/var/lib/toydb")?;
+        c.set_default("sync", true)?;
 
         c.merge(config::File::with_name(file))?;
         c.merge(config::Environment::with_prefix("TOYDB"))?;
