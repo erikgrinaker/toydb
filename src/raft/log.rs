@@ -170,8 +170,7 @@ impl<S: log::Store> Log<S> {
 
     /// Saves information about the most recent term.
     pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
-        self.store
-            .set_metadata(&Key::TermVote.encode(), Self::serialize(&(term, voted_for.clone()))?)
+        self.store.set_metadata(&Key::TermVote.encode(), Self::serialize(&(term, voted_for))?)
     }
 
     /// Serializes a value for the log store.
