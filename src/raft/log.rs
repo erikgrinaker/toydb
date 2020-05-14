@@ -176,12 +176,12 @@ impl<S: log::Store> Log<S> {
 
     /// Serializes a value for the log store.
     fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
-        Ok(serde_cbor::ser::to_vec_packed(value)?)
+        Ok(bincode::serialize(value)?)
     }
 
     /// Deserializes a value from the log store.
     fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
-        Ok(serde_cbor::from_slice(bytes)?)
+        Ok(bincode::deserialize(bytes)?)
     }
 }
 

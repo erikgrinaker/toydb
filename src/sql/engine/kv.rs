@@ -51,12 +51,12 @@ impl<S: kv::Store> super::Engine for KV<S> {
 
 /// Serializes SQL metadata.
 fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
-    Ok(serde_cbor::ser::to_vec_packed(value)?)
+    Ok(bincode::serialize(value)?)
 }
 
 /// Deserializes SQL metadata.
 fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
-    Ok(serde_cbor::from_slice(bytes)?)
+    Ok(bincode::deserialize(bytes)?)
 }
 
 /// An SQL transaction based on an MVCC key/value transaction

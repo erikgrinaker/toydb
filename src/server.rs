@@ -129,7 +129,7 @@ impl Session {
     async fn handle(mut self, socket: TcpStream) -> Result<(), Error> {
         let mut stream = tokio_serde::Framed::new(
             Framed::new(socket, LengthDelimitedCodec::new()),
-            tokio_serde::formats::Cbor::default(),
+            tokio_serde::formats::Bincode::default(),
         );
         while let Some(request) = stream.try_next().await? {
             let mut response = tokio::task::block_in_place(|| self.request(request));

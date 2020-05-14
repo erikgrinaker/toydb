@@ -83,12 +83,12 @@ impl<S: Store> MVCC<S> {
 
 /// Serializes MVCC metadata.
 fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
-    Ok(serde_cbor::ser::to_vec_packed(value)?)
+    Ok(bincode::serialize(value)?)
 }
 
 /// Deserializes MVCC metadata.
 fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
-    Ok(serde_cbor::from_slice(bytes)?)
+    Ok(bincode::deserialize(bytes)?)
 }
 
 /// An MVCC transaction.

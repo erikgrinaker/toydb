@@ -91,12 +91,12 @@ impl Raft {
 
     /// Serializes a command for the Raft SQL state machine.
     fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
-        Ok(serde_cbor::ser::to_vec_packed(value)?)
+        Ok(bincode::serialize(value)?)
     }
 
     /// Deserializes a command for the Raft SQL state machine.
     fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
-        Ok(serde_cbor::from_slice(bytes)?)
+        Ok(bincode::deserialize(bytes)?)
     }
 }
 

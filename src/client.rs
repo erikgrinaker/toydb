@@ -17,7 +17,7 @@ type Connection = tokio_serde::Framed<
     Framed<TcpStream, LengthDelimitedCodec>,
     Result<Response, Error>,
     Request,
-    tokio_serde::formats::Cbor<Result<Response, Error>, Request>,
+    tokio_serde::formats::Bincode<Result<Response, Error>, Request>,
 >;
 
 /// A toyDB client
@@ -32,7 +32,7 @@ impl Client {
         Ok(Self {
             conn: Mutex::new(tokio_serde::Framed::new(
                 Framed::new(TcpStream::connect(addr).await?, LengthDelimitedCodec::new()),
-                tokio_serde::formats::Cbor::default(),
+                tokio_serde::formats::Bincode::default(),
             )),
             txn: Cell::new(None),
         })

@@ -138,7 +138,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
     ) -> Result<(), Error> {
         let mut stream = tokio_serde::SymmetricallyFramed::<_, Message, _>::new(
             Framed::new(socket, LengthDelimitedCodec::new()),
-            tokio_serde::formats::SymmetricalCbor::<Message>::default(),
+            tokio_serde::formats::SymmetricalBincode::<Message>::default(),
         );
         while let Some(message) = stream.try_next().await? {
             in_tx.send(message)?;
@@ -213,7 +213,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
     ) -> Result<(), Error> {
         let mut stream = tokio_serde::SymmetricallyFramed::<_, Message, _>::new(
             Framed::new(socket, LengthDelimitedCodec::new()),
-            tokio_serde::formats::SymmetricalCbor::<Message>::default(),
+            tokio_serde::formats::SymmetricalBincode::<Message>::default(),
         );
         while let Some(message) = out_rx.next().await {
             stream.send(message).await?;

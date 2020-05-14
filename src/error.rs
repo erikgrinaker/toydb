@@ -25,6 +25,12 @@ impl std::fmt::Display for Error {
     }
 }
 
+impl From<std::boxed::Box<bincode::ErrorKind>> for Error {
+    fn from(err: std::boxed::Box<bincode::ErrorKind>) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
 impl From<config::ConfigError> for Error {
     fn from(err: config::ConfigError) -> Self {
         Error::Config(err.to_string())
