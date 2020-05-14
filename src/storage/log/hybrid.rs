@@ -3,11 +3,11 @@ use crate::Error;
 
 use std::cmp::{max, min};
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::fs;
-use std::io::{BufReader, BufWriter, Read as _, Seek as _, SeekFrom, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, BufWriter, Read, Seek as _, SeekFrom, Write};
 use std::ops::{Bound, RangeBounds};
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 /// A hybrid log store, storing committed entries in an append-only file, uncommitted entries
 /// in memory, and metadata in a separate file (should be an on-disk key-value store).
@@ -22,7 +22,7 @@ use std::sync::Mutex;
 /// reasonably cheap.
 pub struct Hybrid {
     /// The append-only log file. Protected by a mutex for interior mutability (i.e. read seeks).
-    file: Mutex<fs::File>,
+    file: Mutex<File>,
     /// Index of entry locations and sizes in the log file.
     index: BTreeMap<u64, (u64, u64)>,
     /// Uncommitted log entries.
@@ -31,7 +31,7 @@ pub struct Hybrid {
     metadata: HashMap<Vec<u8>, Vec<u8>>,
     /// The file used to store metadata.
     /// FIXME Should be an on-disk B-tree key-value store.
-    metadata_file: fs::File,
+    metadata_file: File,
     /// If true, fsync writes.
     sync: bool,
 }
@@ -39,13 +39,10 @@ pub struct Hybrid {
 impl Hybrid {
     /// Creates or opens a new hybrid log, with files in the given directory.
     pub fn new(dir: &Path, sync: bool) -> Result<Self, Error> {
-        let file = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(dir.join("raft-log"))?;
+        let file =
+            OpenOptions::new().read(true).write(true).create(true).open(dir.join("raft-log"))?;
 
-        let metadata_file = fs::OpenOptions::new()
+        let metadata_file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -62,7 +59,7 @@ impl Hybrid {
     }
 
     /// Builds the index by scanning the log file.
-    fn build_index(file: &fs::File) -> Result<BTreeMap<u64, (u64, u64)>, Error> {
+    fn build_index(file: &File) -> Result<BTreeMap<u64, (u64, u64)>, Error> {
         let filesize = file.metadata()?.len();
         let mut bufreader = BufReader::new(file);
         let mut index = BTreeMap::new();
@@ -83,7 +80,7 @@ impl Hybrid {
     }
 
     /// Loads metadata from a file.
-    fn load_metadata(file: &fs::File) -> Result<HashMap<Vec<u8>, Vec<u8>>, Error> {
+    fn load_metadata(file: &File) -> Result<HashMap<Vec<u8>, Vec<u8>>, Error> {
         match serde_cbor::from_reader(file) {
             Ok(metadata) => Ok(metadata),
             Err(err) if err.is_eof() => Ok(HashMap::new()),
@@ -245,9 +242,9 @@ impl Drop for Hybrid {
     }
 }
 
-struct MutexReader<'a>(std::sync::MutexGuard<'a, fs::File>);
+struct MutexReader<'a>(MutexGuard<'a, File>);
 
-impl<'a> std::io::Read for MutexReader<'a> {
+impl<'a> Read for MutexReader<'a> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.0.read(buf)
     }
