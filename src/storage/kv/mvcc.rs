@@ -214,6 +214,30 @@ impl<S: Store> Transaction<S> {
         Ok(Box::new(Scan::new(self.store.clone(), self.snapshot.clone(), range)?))
     }
 
+    /// Scans keys under a given prefix.
+    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<super::Scan, Error> {
+        if prefix.is_empty() {
+            return Err(Error::Internal("Scan prefix cannot be empty".into()));
+        }
+        let start = prefix.to_vec();
+        let mut end = start.clone();
+        for i in (0..end.len()).rev() {
+            match end[i] {
+                // If all 0xff we could in principle use Range::Unbounded, but it's won't happen
+                0xff if i == 0 => return Err(Error::Internal("Invalid prefix scan range".into())),
+                0xff => {
+                    end[i] = 0x00;
+                    continue;
+                }
+                v => {
+                    end[i] = v + 1;
+                    break;
+                }
+            }
+        }
+        Ok(Box::new(Scan::new(self.store.clone(), self.snapshot.clone(), start..end)?))
+    }
+
     /// Sets a key.
     pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
         self.write(key, Some(value))
@@ -960,6 +984,56 @@ pub mod tests {
             vec![(vec![0].to_vec(), vec![3]), (vec![0, 0, 0, 0, 0, 0, 0, 0, 2].to_vec(), vec![2]),],
             txn.scan(..)?.collect::<Result<Vec<_>, _>>()?
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_txn_scan_prefix() -> Result<(), Error> {
+        let mvcc = setup();
+        let mut txn = mvcc.begin()?;
+
+        txn.set(b"a", vec![0x01])?;
+        txn.set(b"az", vec![0x01, 0x1a])?;
+        txn.set(b"b", vec![0x02])?;
+        txn.set(b"ba", vec![0x02, 0x01])?;
+        txn.set(b"bb", vec![0x02, 0x02])?;
+        txn.set(b"bc", vec![0x02, 0x03])?;
+        txn.set(b"c", vec![0x03])?;
+        txn.commit()?;
+
+        // Forward scan
+        let txn = mvcc.begin()?;
+        assert_eq!(
+            vec![
+                (b"b".to_vec(), vec![0x02]),
+                (b"ba".to_vec(), vec![0x02, 0x01]),
+                (b"bb".to_vec(), vec![0x02, 0x02]),
+                (b"bc".to_vec(), vec![0x02, 0x03]),
+            ],
+            txn.scan_prefix(b"b")?.collect::<Result<Vec<_>, _>>()?
+        );
+
+        // Reverse scan
+        assert_eq!(
+            vec![
+                (b"bc".to_vec(), vec![0x02, 0x03]),
+                (b"bb".to_vec(), vec![0x02, 0x02]),
+                (b"ba".to_vec(), vec![0x02, 0x01]),
+                (b"b".to_vec(), vec![0x02]),
+            ],
+            txn.scan_prefix(b"b")?.rev().collect::<Result<Vec<_>, _>>()?
+        );
+
+        // Alternate forward/backward scan
+        let mut scan = txn.scan_prefix(b"b")?;
+        assert_eq!(Some((b"b".to_vec(), vec![0x02])), scan.next().transpose()?);
+        assert_eq!(Some((b"bc".to_vec(), vec![0x02, 0x03])), scan.next_back().transpose()?);
+        assert_eq!(Some((b"bb".to_vec(), vec![0x02, 0x02])), scan.next_back().transpose()?);
+        assert_eq!(Some((b"ba".to_vec(), vec![0x02, 0x01])), scan.next().transpose()?);
+        assert_eq!(None, scan.next_back().transpose()?);
+        std::mem::drop(scan);
+
+        txn.commit()?;
         Ok(())
     }
 

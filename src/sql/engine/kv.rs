@@ -180,7 +180,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
         let table = self.must_read_table(&table)?;
         let scan = self
             .txn
-            .scan(&Key::RowStart(&table.name).encode()..&Key::RowEnd(&table.name).encode())?
+            .scan_prefix(&KeyPrefix::Row(&table.name).encode())?
             .map(|r| r.and_then(|(_, v)| deserialize(&v)))
             .filter_map(|r| match r {
                 Ok(row) => match &filter {
@@ -211,10 +211,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
 
         let scan = self
             .txn
-            .scan(
-                &Key::IndexStart(&table.name, &column.name).encode()
-                    ..&Key::IndexEnd(&table.name, &column.name).encode(),
-            )?
+            .scan_prefix(&KeyPrefix::Index(&table.name, &column.name).encode())?
             .map(|r| r.and_then(|(_, v)| deserialize(&v)));
 
         // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
@@ -279,7 +276,7 @@ impl<S: kv::Store> Catalog for Transaction<S> {
     fn scan_tables(&self) -> Result<Tables, Error> {
         Ok(Box::new(
             self.txn
-                .scan(&Key::TableStart.encode()..&Key::TableEnd.encode())?
+                .scan_prefix(&KeyPrefix::Table.encode())?
                 .map(|r| r.and_then(|(_, v)| deserialize(&v)))
                 .collect::<Result<Vec<_>, Error>>()?
                 .into_iter(),
@@ -287,65 +284,54 @@ impl<S: kv::Store> Catalog for Transaction<S> {
     }
 }
 
+/// Encodes MVCC keyspace prefixes
+enum KeyPrefix<'a> {
+    /// Tables
+    Table,
+    /// Index entries for a table and column
+    Index(&'a str, &'a str),
+    /// Rows for a table
+    Row(&'a str),
+}
+
+impl<'a> KeyPrefix<'a> {
+    fn encode(&self) -> Vec<u8> {
+        match self {
+            KeyPrefix::Table => vec![0x01],
+            KeyPrefix::Index(table, column) => [
+                vec![0x03],
+                table.as_bytes().to_vec(),
+                vec![0x00],
+                column.as_bytes().to_vec(),
+                vec![0x00],
+            ]
+            .concat(),
+            KeyPrefix::Row(table) => [vec![0x05], table.as_bytes().to_vec(), vec![0x00]].concat(),
+        }
+    }
+}
+
 /// Encodes tables and rows as MVCC key/value keys
 enum Key<'a> {
-    /// The start of the table schema keyspace
-    TableStart,
     /// A table schema key for the given table name
     Table(&'a str),
-    /// The end of the table schema keyspace
-    TableEnd,
-    /// The start of the index keyspace for a table and column
-    IndexStart(&'a str, &'a str),
     /// A key for an index entry
     Index(&'a str, &'a str, &'a Value),
-    /// The end of the index keyspace for a table and column
-    IndexEnd(&'a str, &'a str),
-    /// The start of the row keyspace of the given table name
-    RowStart(&'a str),
     /// A key for a row identified by table name and row primary key
     Row(&'a str, &'a Value),
-    /// The end of the row keyspace of the given table name
-    RowEnd(&'a str),
 }
 
 impl<'a> Key<'a> {
     /// Encodes the key as a byte vector
     fn encode(self) -> Vec<u8> {
         match self {
-            Self::TableStart => vec![0x01],
-            Self::Table(name) => [vec![0x01], name.as_bytes().to_vec()].concat(),
-            Self::TableEnd => vec![0x02],
-            Self::IndexStart(table, column) => [
-                vec![0x03],
-                table.as_bytes().to_vec(),
-                vec![0x00],
-                column.as_bytes().to_vec(),
-                vec![0x00],
-            ]
-            .concat(),
-            Self::Index(table, column, value) => [
-                vec![0x03],
-                table.as_bytes().to_vec(),
-                vec![0x00],
-                column.as_bytes().to_vec(),
-                vec![0x00],
-                Self::encode_value(value),
-            ]
-            .concat(),
-            Self::IndexEnd(table, column) => [
-                vec![0x03],
-                table.as_bytes().to_vec(),
-                vec![0x00],
-                column.as_bytes().to_vec(),
-                vec![0xff],
-            ]
-            .concat(),
-            Self::RowStart(table) => [vec![0x05], table.as_bytes().to_vec(), vec![0x00]].concat(),
-            Self::Row(table, pk) => {
-                [vec![0x05], table.as_bytes().to_vec(), vec![0x00], Self::encode_value(pk)].concat()
+            Self::Table(name) => [KeyPrefix::Table.encode(), name.as_bytes().to_vec()].concat(),
+            Self::Index(table, column, value) => {
+                [KeyPrefix::Index(table, column).encode(), Self::encode_value(value)].concat()
             }
-            Self::RowEnd(table) => [vec![0x05], table.as_bytes().to_vec(), vec![0xff]].concat(),
+            Self::Row(table, pk) => {
+                [KeyPrefix::Row(table).encode(), Self::encode_value(pk)].concat()
+            }
         }
     }
 
