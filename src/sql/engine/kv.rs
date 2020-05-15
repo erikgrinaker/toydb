@@ -77,7 +77,7 @@ impl<S: kv::Store> Transaction<S> {
         column: &str,
         value: &Value,
     ) -> Result<HashSet<Value>, Error> {
-        let key = Key::Index(table, column, value).encode();
+        let key = Key::Index(table, column, Some(value)).encode();
         if let Some(value) = self.txn.get(&key)? {
             let item: (Value, HashSet<Value>) = deserialize(&value)?;
             Ok(item.1)
@@ -96,7 +96,7 @@ impl<S: kv::Store> Transaction<S> {
         value: &Value,
         index: HashSet<Value>,
     ) -> Result<(), Error> {
-        let key = Key::Index(table, column, value).encode();
+        let key = Key::Index(table, column, Some(value)).encode();
         if index.is_empty() {
             self.txn.delete(&key)
         } else {
@@ -132,7 +132,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
                 id, table.name
             )));
         }
-        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)?;
+        self.txn.set(&Key::Row(&table.name, Some(&id)).encode(), serialize(&row)?)?;
 
         // Update indexes
         for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
@@ -157,11 +157,11 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
                 }
             }
         }
-        self.txn.delete(&Key::Row(&table.name, id).encode())
+        self.txn.delete(&Key::Row(&table.name, Some(id)).encode())
     }
 
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error> {
-        self.txn.get(&Key::Row(table, id).encode())?.map(|v| deserialize(&v)).transpose()
+        self.txn.get(&Key::Row(table, Some(id)).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
     fn read_index(
@@ -180,7 +180,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
         let table = self.must_read_table(&table)?;
         let scan = self
             .txn
-            .scan_prefix(&KeyPrefix::Row(&table.name).encode())?
+            .scan_prefix(&Key::Row(&table.name, None).encode())?
             .map(|r| r.and_then(|(_, v)| deserialize(&v)))
             .filter_map(|r| match r {
                 Ok(row) => match &filter {
@@ -211,7 +211,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
 
         let scan = self
             .txn
-            .scan_prefix(&KeyPrefix::Index(&table.name, &column.name).encode())?
+            .scan_prefix(&Key::Index(&table.name, &column.name, None).encode())?
             .map(|r| r.and_then(|(_, v)| deserialize(&v)));
 
         // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
@@ -246,7 +246,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
         }
 
         table.validate_row(&row, self)?;
-        self.txn.set(&Key::Row(&table.name, &id).encode(), serialize(&row)?)
+        self.txn.set(&Key::Row(&table.name, Some(&id)).encode(), serialize(&row)?)
     }
 }
 
@@ -256,7 +256,7 @@ impl<S: kv::Store> Catalog for Transaction<S> {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
         }
         table.validate(self)?;
-        self.txn.set(&Key::Table(&table.name).encode(), serialize(table)?)
+        self.txn.set(&Key::Table(Some(&table.name)).encode(), serialize(table)?)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<(), Error> {
@@ -266,17 +266,17 @@ impl<S: kv::Store> Catalog for Transaction<S> {
         while let Some(row) = scan.next().transpose()? {
             self.delete(&table.name, &table.get_row_key(&row)?)?
         }
-        self.txn.delete(&Key::Table(&table.name).encode())
+        self.txn.delete(&Key::Table(Some(&table.name)).encode())
     }
 
     fn read_table(&self, table: &str) -> Result<Option<Table>, Error> {
-        self.txn.get(&Key::Table(table).encode())?.map(|v| deserialize(&v)).transpose()
+        self.txn.get(&Key::Table(Some(table)).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
     fn scan_tables(&self) -> Result<Tables, Error> {
         Ok(Box::new(
             self.txn
-                .scan_prefix(&KeyPrefix::Table.encode())?
+                .scan_prefix(&Key::Table(None).encode())?
                 .map(|r| r.and_then(|(_, v)| deserialize(&v)))
                 .collect::<Result<Vec<_>, Error>>()?
                 .into_iter(),
@@ -284,54 +284,37 @@ impl<S: kv::Store> Catalog for Transaction<S> {
     }
 }
 
-/// Encodes MVCC keyspace prefixes
-enum KeyPrefix<'a> {
-    /// Tables
-    Table,
-    /// Index entries for a table and column
-    Index(&'a str, &'a str),
-    /// Rows for a table
-    Row(&'a str),
-}
-
-impl<'a> KeyPrefix<'a> {
-    fn encode(&self) -> Vec<u8> {
-        match self {
-            KeyPrefix::Table => vec![0x01],
-            KeyPrefix::Index(table, column) => [
-                vec![0x03],
-                table.as_bytes().to_vec(),
-                vec![0x00],
-                column.as_bytes().to_vec(),
-                vec![0x00],
-            ]
-            .concat(),
-            KeyPrefix::Row(table) => [vec![0x05], table.as_bytes().to_vec(), vec![0x00]].concat(),
-        }
-    }
-}
-
-/// Encodes tables and rows as MVCC key/value keys
+/// Encodes MVCC keys. Options can be None to get a keyspace prefix.
 enum Key<'a> {
     /// A table schema key for the given table name
-    Table(&'a str),
+    Table(Option<&'a str>),
     /// A key for an index entry
-    Index(&'a str, &'a str, &'a Value),
+    Index(&'a str, &'a str, Option<&'a Value>),
     /// A key for a row identified by table name and row primary key
-    Row(&'a str, &'a Value),
+    Row(&'a str, Option<&'a Value>),
 }
 
 impl<'a> Key<'a> {
     /// Encodes the key as a byte vector
     fn encode(self) -> Vec<u8> {
         match self {
-            Self::Table(name) => [KeyPrefix::Table.encode(), name.as_bytes().to_vec()].concat(),
-            Self::Index(table, column, value) => {
-                [KeyPrefix::Index(table, column).encode(), Self::encode_value(value)].concat()
-            }
-            Self::Row(table, pk) => {
-                [KeyPrefix::Row(table).encode(), Self::encode_value(pk)].concat()
-            }
+            Self::Table(name) => [vec![0x01], name.unwrap_or("").as_bytes().to_vec()].concat(),
+            Self::Index(table, column, value) => [
+                vec![0x02],
+                table.as_bytes().to_vec(),
+                vec![0x00],
+                column.as_bytes().to_vec(),
+                vec![0x00],
+                value.map_or_else(Vec::new, Self::encode_value),
+            ]
+            .concat(),
+            Self::Row(table, pk) => [
+                vec![0x03],
+                table.as_bytes().to_vec(),
+                vec![0x00],
+                pk.map_or_else(Vec::new, Self::encode_value),
+            ]
+            .concat(),
         }
     }
 
