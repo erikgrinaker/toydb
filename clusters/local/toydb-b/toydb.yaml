@@ -1,5 +1,6 @@
 id: toydb-b
 data_dir: toydb-b/data
+sync: false
 listen_sql: 0.0.0.0:9602
 listen_raft: 0.0.0.0:9702
 peers:
