@@ -24,7 +24,7 @@ pub struct Hybrid {
     /// The append-only log file. Protected by a mutex for interior mutability (i.e. read seeks).
     file: Mutex<File>,
     /// Index of entry locations and sizes in the log file.
-    index: BTreeMap<u64, (u64, u64)>,
+    index: BTreeMap<u64, (u64, u32)>,
     /// Uncommitted log entries.
     uncommitted: VecDeque<Vec<u8>>,
     /// Metadata cache. Flushed to disk on changes.
@@ -59,21 +59,21 @@ impl Hybrid {
     }
 
     /// Builds the index by scanning the log file.
-    fn build_index(file: &File) -> Result<BTreeMap<u64, (u64, u64)>, Error> {
+    fn build_index(file: &File) -> Result<BTreeMap<u64, (u64, u32)>, Error> {
         let filesize = file.metadata()?.len();
         let mut bufreader = BufReader::new(file);
         let mut index = BTreeMap::new();
-        let mut sizebuf = [0; 8];
+        let mut sizebuf = [0; 4];
         let mut pos = 0;
         let mut i = 1;
         while pos < filesize {
             bufreader.read_exact(&mut sizebuf)?;
-            pos += 8;
-            let size = u64::from_be_bytes(sizebuf);
+            pos += 4;
+            let size = u32::from_be_bytes(sizebuf);
             index.insert(i, (pos, size));
             let mut buf = vec![0; size as usize];
             bufreader.read_exact(&mut buf)?;
-            pos += size;
+            pos += size as u64;
             i += 1;
         }
         Ok(index)
@@ -117,9 +117,9 @@ impl Store for Hybrid {
                 .uncommitted
                 .pop_front()
                 .ok_or_else(|| Error::Internal("Unexpected end of uncommitted entries".into()))?;
-            bufwriter.write_all(&entry.len().to_be_bytes())?;
-            pos += 8;
-            self.index.insert(i, (pos, entry.len() as u64));
+            bufwriter.write_all(&(entry.len() as u32).to_be_bytes())?;
+            pos += 4;
+            self.index.insert(i, (pos, entry.len() as u32));
             bufwriter.write_all(&entry)?;
             pos += entry.len() as u64;
         }
@@ -178,11 +178,11 @@ impl Store for Hybrid {
         // Scan committed entries in file
         if let Some((offset, _)) = self.index.get(&start) {
             let mut file = self.file.lock().unwrap();
-            file.seek(SeekFrom::Start(*offset - 8)).unwrap(); // seek to length prefix
+            file.seek(SeekFrom::Start(*offset - 4)).unwrap(); // seek to length prefix
             let mut bufreader = BufReader::new(MutexReader(file)); // FIXME Avoid MutexReader
             scan =
                 Box::new(scan.chain(self.index.range(start..=end).map(move |(_, (_, size))| {
-                    let mut sizebuf = vec![0; 8];
+                    let mut sizebuf = vec![0; 4];
                     bufreader.read_exact(&mut sizebuf)?;
                     let mut entry = vec![0; *size as usize];
                     bufreader.read_exact(&mut entry)?;
