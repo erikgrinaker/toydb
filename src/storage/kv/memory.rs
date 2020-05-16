@@ -1,5 +1,5 @@
 use super::{Scan, Store};
-use crate::Error;
+use crate::error::Result;
 
 use std::collections::BTreeMap;
 use std::ops::RangeBounds;
@@ -17,16 +17,16 @@ impl Memory {
 }
 
 impl Store for Memory {
-    fn flush(&mut self) -> Result<(), Error> {
+    fn flush(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
+    fn delete(&mut self, key: &[u8]) -> Result<()> {
         self.data.remove(key);
         Ok(())
     }
 
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.data.get(key).cloned())
     }
 
@@ -34,7 +34,7 @@ impl Store for Memory {
         Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
     }
 
-    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.data.insert(key.to_vec(), value);
         Ok(())
     }
@@ -42,13 +42,13 @@ impl Store for Memory {
 
 #[cfg(test)]
 impl super::TestSuite<Memory> for Memory {
-    fn setup() -> Result<Self, Error> {
+    fn setup() -> Result<Self> {
         Ok(Memory::new())
     }
 }
 
 #[test]
-fn tests() -> Result<(), Error> {
+fn tests() -> Result<()> {
     use super::TestSuite;
     Memory::test()
 }

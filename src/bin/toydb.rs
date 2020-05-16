@@ -3,10 +3,11 @@
 use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
 use serde_derive::Deserialize;
 use std::collections::HashMap;
+use toydb::error::Result;
 use toydb::Server;
 
 #[tokio::main]
-async fn main() -> Result<(), toydb::Error> {
+async fn main() -> Result<()> {
     let opts = app_from_crate!()
         .arg(
             clap::Arg::with_name("config")
@@ -46,7 +47,7 @@ struct Config {
 }
 
 impl Config {
-    fn new(file: &str) -> Result<Self, config::ConfigError> {
+    fn new(file: &str) -> Result<Self> {
         let mut c = config::Config::new();
         c.set_default("id", "toydb")?;
         c.set_default("listen_sql", "0.0.0.0:9605")?;
@@ -57,6 +58,6 @@ impl Config {
 
         c.merge(config::File::with_name(file))?;
         c.merge(config::Environment::with_prefix("TOYDB"))?;
-        c.try_into()
+        Ok(c.try_into()?)
     }
 }

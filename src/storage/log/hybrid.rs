@@ -1,5 +1,5 @@
 use super::{Scan, Store};
-use crate::Error;
+use crate::error::{Error, Result};
 
 use std::cmp::{max, min};
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -38,7 +38,7 @@ pub struct Hybrid {
 
 impl Hybrid {
     /// Creates or opens a new hybrid log, with files in the given directory.
-    pub fn new(dir: &Path, sync: bool) -> Result<Self, Error> {
+    pub fn new(dir: &Path, sync: bool) -> Result<Self> {
         let file =
             OpenOptions::new().read(true).write(true).create(true).open(dir.join("raft-log"))?;
 
@@ -59,7 +59,7 @@ impl Hybrid {
     }
 
     /// Builds the index by scanning the log file.
-    fn build_index(file: &File) -> Result<BTreeMap<u64, (u64, u32)>, Error> {
+    fn build_index(file: &File) -> Result<BTreeMap<u64, (u64, u32)>> {
         let filesize = file.metadata()?.len();
         let mut bufreader = BufReader::new(file);
         let mut index = BTreeMap::new();
@@ -80,7 +80,7 @@ impl Hybrid {
     }
 
     /// Loads metadata from a file.
-    fn load_metadata(file: &File) -> Result<HashMap<Vec<u8>, Vec<u8>>, Error> {
+    fn load_metadata(file: &File) -> Result<HashMap<Vec<u8>, Vec<u8>>> {
         match serde_cbor::from_reader(file) {
             Ok(metadata) => Ok(metadata),
             Err(err) if err.is_eof() => Ok(HashMap::new()),
@@ -90,12 +90,12 @@ impl Hybrid {
 }
 
 impl Store for Hybrid {
-    fn append(&mut self, entry: Vec<u8>) -> Result<u64, Error> {
+    fn append(&mut self, entry: Vec<u8>) -> Result<u64> {
         self.uncommitted.push_back(entry);
         Ok(self.len())
     }
 
-    fn commit(&mut self, index: u64) -> Result<(), Error> {
+    fn commit(&mut self, index: u64) -> Result<()> {
         if index > self.len() {
             return Err(Error::Internal(format!("Cannot commit non-existant index {}", index)));
         }
@@ -135,7 +135,7 @@ impl Store for Hybrid {
         self.index.len() as u64
     }
 
-    fn get(&self, index: u64) -> Result<Option<Vec<u8>>, Error> {
+    fn get(&self, index: u64) -> Result<Option<Vec<u8>>> {
         match index {
             0 => Ok(None),
             i if i <= self.index.len() as u64 => {
@@ -207,7 +207,7 @@ impl Store for Hybrid {
         scan
     }
 
-    fn truncate(&mut self, index: u64) -> Result<u64, Error> {
+    fn truncate(&mut self, index: u64) -> Result<u64> {
         if index < self.index.len() as u64 {
             return Err(Error::Internal(format!(
                 "Cannot truncate below committed index {}",
@@ -218,11 +218,11 @@ impl Store for Hybrid {
         Ok(self.len())
     }
 
-    fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.metadata.get(key).cloned())
     }
 
-    fn set_metadata(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    fn set_metadata(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.metadata.insert(key.to_vec(), value);
         self.metadata_file.set_len(0)?;
         self.metadata_file.seek(SeekFrom::Start(0))?;
@@ -252,20 +252,20 @@ impl<'a> Read for MutexReader<'a> {
 
 #[cfg(test)]
 impl super::TestSuite<Hybrid> for Hybrid {
-    fn setup() -> Result<Self, Error> {
+    fn setup() -> Result<Self> {
         let dir = tempdir::TempDir::new("toydb")?;
         Hybrid::new(dir.as_ref(), false)
     }
 }
 
 #[test]
-fn tests() -> Result<(), Error> {
+fn tests() -> Result<()> {
     use super::TestSuite;
     Hybrid::test()
 }
 
 #[test]
-fn test_persistent() -> Result<(), Error> {
+fn test_persistent() -> Result<()> {
     let dir = tempdir::TempDir::new("toydb")?;
     let mut l = Hybrid::new(dir.as_ref(), true)?;
 
@@ -278,7 +278,7 @@ fn test_persistent() -> Result<(), Error> {
 
     let l = Hybrid::new(dir.as_ref(), true)?;
 
-    assert_eq!(vec![vec![1], vec![2], vec![3]], l.scan(..).collect::<Result<Vec<_>, Error>>()?);
+    assert_eq!(vec![vec![1], vec![2], vec![3]], l.scan(..).collect::<Result<Vec<_>>>()?);
 
     Ok(())
 }

@@ -1,5 +1,5 @@
 use super::{Entry, Status};
-use crate::Error;
+use crate::error::Result;
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -85,7 +85,7 @@ pub enum Event {
         /// The response ID.
         id: Vec<u8>,
         /// The response.
-        response: Result<Response, Error>,
+        response: Result<Response>,
     },
 }
 

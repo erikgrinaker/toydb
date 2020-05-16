@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::{Column, Expression, Expressions, Relation};
 use super::{Context, Executor, ResultColumns, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// A filter executor
 pub struct Projection<T: Transaction> {
@@ -24,7 +24,7 @@ impl<T: Transaction> Projection<T> {
 }
 
 impl<T: Transaction> Executor<T> for Projection<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         match self.source.execute(ctx)? {
             ResultSet::Query { relation } => {
                 let labels = self.labels;
@@ -47,7 +47,7 @@ impl<T: Transaction> Executor<T> for Projection<T> {
                                 Column { relation: None, name: None }
                             })
                         })
-                        .collect::<Result<Vec<_>, Error>>()?,
+                        .collect::<Result<Vec<_>>>()?,
                     rows: None,
                 };
                 if let Some(rows) = relation.rows {
@@ -58,7 +58,7 @@ impl<T: Transaction> Executor<T> for Projection<T> {
                             Ok(expressions
                                 .iter()
                                 .map(|e| e.evaluate(&env))
-                                .collect::<Result<_, Error>>()?)
+                                .collect::<Result<_>>()?)
                         })
                     })));
                 }

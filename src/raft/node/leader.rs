@@ -1,7 +1,7 @@
 use super::super::{Address, Event, Instruction, Message, Request, Response, Status};
 use super::{Follower, Node, RoleNode, HEARTBEAT_INTERVAL};
+use crate::error::{Error, Result};
 use crate::storage::log;
-use crate::Error;
 
 use ::log::{debug, info, warn};
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ impl Leader {
 
 impl<L: log::Store> RoleNode<Leader, L> {
     /// Transforms the leader into a follower
-    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>, Error> {
+    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>> {
         info!("Discovered new leader {} for term {}, following", leader, term);
         self.term = term;
         self.log.save_term(term, None)?;
@@ -44,7 +44,7 @@ impl<L: log::Store> RoleNode<Leader, L> {
     }
 
     /// Appends an entry to the log and replicates it to peers.
-    pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<u64, Error> {
+    pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<u64> {
         let entry = self.log.append(self.term, command)?;
         for peer in self.peers.iter() {
             self.replicate(peer)?;
@@ -53,7 +53,7 @@ impl<L: log::Store> RoleNode<Leader, L> {
     }
 
     /// Commits any pending log entries.
-    fn commit(&mut self) -> Result<u64, Error> {
+    fn commit(&mut self) -> Result<u64> {
         let mut last_indexes = vec![self.log.last_index];
         last_indexes.extend(self.role.peer_last_index.values());
         last_indexes.sort();
@@ -77,7 +77,7 @@ impl<L: log::Store> RoleNode<Leader, L> {
     }
 
     /// Replicates the log to a peer.
-    fn replicate(&self, peer: &str) -> Result<(), Error> {
+    fn replicate(&self, peer: &str) -> Result<()> {
         let peer_next = self
             .role
             .peer_next_index
@@ -90,7 +90,7 @@ impl<L: log::Store> RoleNode<Leader, L> {
             None if base_index == 0 => 0,
             None => return Err(Error::Internal(format!("Missing base entry {}", base_index))),
         };
-        let entries = self.log.scan(peer_next..).collect::<Result<Vec<_>, Error>>()?;
+        let entries = self.log.scan(peer_next..).collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
         self.send(
             Address::Peer(peer.to_string()),
@@ -100,7 +100,7 @@ impl<L: log::Store> RoleNode<Leader, L> {
     }
 
     /// Processes a message.
-    pub fn step(mut self, msg: Message) -> Result<Node<L>, Error> {
+    pub fn step(mut self, msg: Message) -> Result<Node<L>> {
         if let Err(err) = self.validate(&msg) {
             warn!("Ignoring invalid message: {}", err);
             return Ok(self.into());
@@ -207,7 +207,7 @@ impl<L: log::Store> RoleNode<Leader, L> {
     }
 
     /// Processes a logical clock tick.
-    pub fn tick(mut self) -> Result<Node<L>, Error> {
+    pub fn tick(mut self) -> Result<Node<L>> {
         if !self.peers.is_empty() {
             self.role.heartbeat_ticks += 1;
             if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
@@ -234,14 +234,11 @@ mod tests {
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
-    fn setup() -> Result<
-        (
-            RoleNode<Leader, log::Test>,
-            mpsc::UnboundedReceiver<Message>,
-            mpsc::UnboundedReceiver<Instruction>,
-        ),
-        Error,
-    > {
+    fn setup() -> Result<(
+        RoleNode<Leader, log::Test>,
+        mpsc::UnboundedReceiver<Message>,
+        mpsc::UnboundedReceiver<Instruction>,
+    )> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let peers = vec!["b".into(), "c".into(), "d".into(), "e".into()];
@@ -270,7 +267,7 @@ mod tests {
 
     #[test]
     // ConfirmLeader triggers vote
-    fn step_confirmleader_vote() -> Result<(), Error> {
+    fn step_confirmleader_vote() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -291,7 +288,7 @@ mod tests {
 
     #[test]
     // ConfirmLeader without has_committed triggers replication
-    fn step_confirmleader_replicate() -> Result<(), Error> {
+    fn step_confirmleader_replicate() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -320,7 +317,7 @@ mod tests {
 
     #[test]
     // Heartbeats from other leaders in current term are ignored.
-    fn step_heartbeat_current_term() -> Result<(), Error> {
+    fn step_heartbeat_current_term() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -338,7 +335,7 @@ mod tests {
 
     #[test]
     // Heartbeats from other leaders in future term converts to follower and steps.
-    fn step_heartbeat_future_term() -> Result<(), Error> {
+    fn step_heartbeat_future_term() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -364,7 +361,7 @@ mod tests {
 
     #[test]
     // Heartbeats from other leaders in past terms are ignored.
-    fn step_heartbeat_past_term() -> Result<(), Error> {
+    fn step_heartbeat_past_term() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -381,7 +378,7 @@ mod tests {
     }
 
     #[test]
-    fn step_acceptentries() -> Result<(), Error> {
+    fn step_acceptentries() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -436,7 +433,7 @@ mod tests {
 
     #[test]
     // Duplicate AcceptEntries from single node should not trigger commit.
-    fn step_acceptentries_duplicate() -> Result<(), Error> {
+    fn step_acceptentries_duplicate() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -456,7 +453,7 @@ mod tests {
 
     #[test]
     // AcceptEntries quorum for entry in past term should not trigger commit
-    fn step_acceptentries_past_term() -> Result<(), Error> {
+    fn step_acceptentries_past_term() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let peers = leader.peers.clone();
         let mut node: Node<_> = leader.into();
@@ -477,7 +474,7 @@ mod tests {
 
     #[test]
     // AcceptEntries quorum for missing future entry
-    fn step_acceptentries_future_index() -> Result<(), Error> {
+    fn step_acceptentries_future_index() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let peers = leader.peers.clone();
         let mut node: Node<_> = leader.into();
@@ -517,9 +514,9 @@ mod tests {
     }
 
     #[test]
-    fn step_rejectentries() -> Result<(), Error> {
+    fn step_rejectentries() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
-        let entries = leader.log.scan(0..).collect::<Result<Vec<_>, Error>>()?;
+        let entries = leader.log.scan(0..).collect::<Result<Vec<_>>>()?;
         let mut node: Node<_> = leader.into();
 
         for i in 0..(entries.len() + 3) {
@@ -556,7 +553,7 @@ mod tests {
 
     #[test]
     // Sending a client query request will pass it to the state machine and trigger heartbeats.
-    fn step_clientrequest_query() -> Result<(), Error> {
+    fn step_clientrequest_query() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let quorum = leader.quorum();
         let mut node: Node<_> = leader.into();
@@ -594,7 +591,7 @@ mod tests {
 
     #[test]
     // Sending a mutate request should append it to log, replicate it to peers, and register notification.
-    fn step_clientrequest_mutate() -> Result<(), Error> {
+    fn step_clientrequest_mutate() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let peers = leader.peers.clone();
         let mut node: Node<_> = leader.into();
@@ -636,7 +633,7 @@ mod tests {
 
     #[test]
     // Sending a status request should pass it on to state machine, to add status.
-    fn step_clientrequest_status() -> Result<(), Error> {
+    fn step_clientrequest_status() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
 
@@ -676,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn tick() -> Result<(), Error> {
+    fn tick() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
         let mut node: Node<_> = leader.into();
         for _ in 0..5 {

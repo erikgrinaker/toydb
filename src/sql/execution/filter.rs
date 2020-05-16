@@ -2,7 +2,7 @@ use super::super::engine::Transaction;
 use super::super::types::Expression;
 use super::super::types::Value;
 use super::{Context, Executor, ResultColumns, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// A filter executor
 pub struct Filter<T: Transaction> {
@@ -19,7 +19,7 @@ impl<T: Transaction> Filter<T> {
 }
 
 impl<T: Transaction> Executor<T> for Filter<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let result = self.source.execute(ctx)?;
         if let ResultSet::Query { mut relation } = result {
             if let Some(rows) = relation.rows {

@@ -2,7 +2,7 @@ use super::super::engine::Transaction;
 use super::super::plan::Aggregate;
 use super::super::types::{Column, Relation, Value};
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -25,7 +25,7 @@ impl<T: Transaction> Aggregation<T> {
 
 impl<T: Transaction> Executor<T> for Aggregation<T> {
     #[allow(clippy::or_fun_call)]
-    fn execute(mut self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(mut self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let agg_count = self.aggregates.len();
         match self.source.execute(ctx)? {
             ResultSet::Query { mut relation } => {
@@ -81,7 +81,7 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
 // An accumulator
 pub trait Accumulator: std::fmt::Debug + Send {
     // Accumulates a value
-    fn accumulate(&mut self, value: &Value) -> Result<(), Error>;
+    fn accumulate(&mut self, value: &Value) -> Result<()>;
 
     // Calculates a final aggregate
     fn aggregate(&self) -> Value;
@@ -112,7 +112,7 @@ impl Count {
 }
 
 impl Accumulator for Count {
-    fn accumulate(&mut self, value: &Value) -> Result<(), Error> {
+    fn accumulate(&mut self, value: &Value) -> Result<()> {
         match value {
             Value::Null => {}
             _ => self.count += 1,
@@ -139,7 +139,7 @@ impl Average {
 }
 
 impl Accumulator for Average {
-    fn accumulate(&mut self, value: &Value) -> Result<(), Error> {
+    fn accumulate(&mut self, value: &Value) -> Result<()> {
         self.count.accumulate(value)?;
         self.sum.accumulate(value)?;
         Ok(())
@@ -167,7 +167,7 @@ impl Max {
 }
 
 impl Accumulator for Max {
-    fn accumulate(&mut self, value: &Value) -> Result<(), Error> {
+    fn accumulate(&mut self, value: &Value) -> Result<()> {
         if let Some(max) = &mut self.max {
             match value.partial_cmp(max) {
                 _ if max.datatype() != value.datatype() => *max = Value::Null,
@@ -202,7 +202,7 @@ impl Min {
 }
 
 impl Accumulator for Min {
-    fn accumulate(&mut self, value: &Value) -> Result<(), Error> {
+    fn accumulate(&mut self, value: &Value) -> Result<()> {
         if let Some(min) = &mut self.min {
             match value.partial_cmp(min) {
                 _ if min.datatype() != value.datatype() => *min = Value::Null,
@@ -237,7 +237,7 @@ impl Sum {
 }
 
 impl Accumulator for Sum {
-    fn accumulate(&mut self, value: &Value) -> Result<(), Error> {
+    fn accumulate(&mut self, value: &Value) -> Result<()> {
         self.sum = match (&self.sum, value) {
             (Some(Value::Integer(s)), Value::Integer(i)) => Some(Value::Integer(s + i)),
             (Some(Value::Float(s)), Value::Float(f)) => Some(Value::Float(s + f)),

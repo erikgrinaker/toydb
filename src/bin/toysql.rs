@@ -7,13 +7,13 @@
 
 use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
 use rustyline::{error::ReadlineError, Editor};
+use toydb::error::{Error, Result};
 use toydb::sql::engine::Mode;
 use toydb::sql::execution::ResultSet;
 use toydb::Client;
-use toydb::Error;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     let opts = app_from_crate!()
         .arg(clap::Arg::with_name("command"))
         .arg(clap::Arg::with_name("headers").short("H").long("headers").help("Show column headers"))
@@ -61,7 +61,7 @@ struct ToySQL {
 
 impl ToySQL {
     /// Creates a new ToySQL REPL for the given server host and port
-    async fn new(host: &str, port: u16) -> Result<Self, Error> {
+    async fn new(host: &str, port: u16) -> Result<Self> {
         Ok(Self {
             client: Client::new((host, port)).await?,
             editor: Editor::<()>::new(),
@@ -72,7 +72,7 @@ impl ToySQL {
     }
 
     /// Executes a line of input
-    async fn execute(&mut self, input: &str) -> Result<(), Error> {
+    async fn execute(&mut self, input: &str) -> Result<()> {
         if input.starts_with('!') {
             self.execute_command(&input).await
         } else if !input.is_empty() {
@@ -83,7 +83,7 @@ impl ToySQL {
     }
 
     /// Handles a REPL command (prefixed by !, e.g. !help)
-    async fn execute_command(&mut self, input: &str) -> Result<(), Error> {
+    async fn execute_command(&mut self, input: &str) -> Result<()> {
         let mut input = input.split_ascii_whitespace();
         let command = input.next().ok_or_else(|| Error::Parse("Expected command.".to_string()))?;
 
@@ -163,7 +163,7 @@ Txns:      {txns_active} active, {txns} total
     }
 
     /// Runs a query and displays the results
-    async fn execute_query(&mut self, query: &str) -> Result<(), Error> {
+    async fn execute_query(&mut self, query: &str) -> Result<()> {
         match self.client.execute(query).await? {
             ResultSet::Begin { id, mode } => match mode {
                 Mode::ReadWrite => println!("Began transaction {}", id),
@@ -205,7 +205,7 @@ Txns:      {txns_active} active, {txns} total
     }
 
     /// Prompts the user for input
-    fn prompt(&mut self) -> Result<Option<String>, Error> {
+    fn prompt(&mut self) -> Result<Option<String>> {
         let prompt = match self.client.txn() {
             Some((id, Mode::ReadWrite)) => format!("toydb:{}> ", id),
             Some((id, Mode::ReadOnly)) => format!("toydb:{}> ", id),
@@ -223,7 +223,7 @@ Txns:      {txns_active} active, {txns} total
     }
 
     /// Runs the ToySQL REPL
-    async fn run(&mut self) -> Result<(), Error> {
+    async fn run(&mut self) -> Result<()> {
         if let Some(path) = &self.history_path {
             match self.editor.load_history(path) {
                 Ok(_) => {}

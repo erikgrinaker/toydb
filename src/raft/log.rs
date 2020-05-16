@@ -1,5 +1,5 @@
+use crate::error::{Error, Result};
 use crate::storage::log;
-use crate::Error;
 
 use ::log::debug;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ impl Key {
 }
 
 /// A log scan
-pub type Scan<'a> = Box<dyn Iterator<Item = Result<Entry, Error>> + 'a>;
+pub type Scan<'a> = Box<dyn Iterator<Item = Result<Entry>> + 'a>;
 
 /// The replicated Raft log
 pub struct Log<S: log::Store> {
@@ -50,7 +50,7 @@ pub struct Log<S: log::Store> {
 
 impl<S: log::Store> Log<S> {
     /// Creates a new log, using a log::Store for storage.
-    pub fn new(store: S) -> Result<Self, Error> {
+    pub fn new(store: S) -> Result<Self> {
         let (commit_index, commit_term) = match store.committed() {
             0 => (0, 0),
             index => store
@@ -73,7 +73,7 @@ impl<S: log::Store> Log<S> {
     }
 
     /// Appends a command to the log, returning the entry.
-    pub fn append(&mut self, term: u64, command: Option<Vec<u8>>) -> Result<Entry, Error> {
+    pub fn append(&mut self, term: u64, command: Option<Vec<u8>>) -> Result<Entry> {
         let entry = Entry { index: self.last_index + 1, term, command };
         debug!("Appending log entry {}: {:?}", entry.index, entry);
         self.store.append(Self::serialize(&entry)?)?;
@@ -83,7 +83,7 @@ impl<S: log::Store> Log<S> {
     }
 
     /// Commits entries up to and including an index.
-    pub fn commit(&mut self, index: u64) -> Result<u64, Error> {
+    pub fn commit(&mut self, index: u64) -> Result<u64> {
         let entry = self
             .get(index)?
             .ok_or_else(|| Error::Internal(format!("Entry {} not found", index)))?;
@@ -94,12 +94,12 @@ impl<S: log::Store> Log<S> {
     }
 
     /// Fetches an entry at an index
-    pub fn get(&self, index: u64) -> Result<Option<Entry>, Error> {
+    pub fn get(&self, index: u64) -> Result<Option<Entry>> {
         self.store.get(index)?.map(|v| Self::deserialize(&v)).transpose()
     }
 
     /// Checks if the log contains an entry
-    pub fn has(&self, index: u64, term: u64) -> Result<bool, Error> {
+    pub fn has(&self, index: u64, term: u64) -> Result<bool> {
         match self.get(index)? {
             Some(entry) => Ok(entry.term == term),
             None if index == 0 && term == 0 => Ok(true),
@@ -115,7 +115,7 @@ impl<S: log::Store> Log<S> {
     /// Splices a set of entries onto an offset. The entries must be contiguous, and the first entry
     /// must be at most last_index+1. If an entry does not exist, append it. If an existing entry
     /// has a term mismatch, replace it and all following entries.
-    pub fn splice(&mut self, entries: Vec<Entry>) -> Result<u64, Error> {
+    pub fn splice(&mut self, entries: Vec<Entry>) -> Result<u64> {
         for i in 0..entries.len() {
             if i == 0 && entries.get(i).unwrap().index > self.last_index + 1 {
                 return Err(Error::Internal("Spliced entries cannot begin past last index".into()));
@@ -138,7 +138,7 @@ impl<S: log::Store> Log<S> {
 
     /// Truncates the log such that its last item is at most index.
     /// Refuses to remove entries that have been applied or committed.
-    pub fn truncate(&mut self, index: u64) -> Result<u64, Error> {
+    pub fn truncate(&mut self, index: u64) -> Result<u64> {
         debug!("Truncating log from entry {}", index);
         let (index, term) = match self.store.truncate(index)? {
             0 => (0, 0),
@@ -157,7 +157,7 @@ impl<S: log::Store> Log<S> {
 
     /// Loads information about the most recent term known by the log, containing the term number (0
     /// if none) and candidate voted for in current term (if any).
-    pub fn load_term(&self) -> Result<(u64, Option<String>), Error> {
+    pub fn load_term(&self) -> Result<(u64, Option<String>)> {
         let (term, voted_for) = self
             .store
             .get_metadata(&Key::TermVote.encode())?
@@ -169,17 +169,17 @@ impl<S: log::Store> Log<S> {
     }
 
     /// Saves information about the most recent term.
-    pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<(), Error> {
+    pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<()> {
         self.store.set_metadata(&Key::TermVote.encode(), Self::serialize(&(term, voted_for))?)
     }
 
     /// Serializes a value for the log store.
-    fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
+    fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
         Ok(bincode::serialize(value)?)
     }
 
     /// Deserializes a value from the log store.
-    fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
+    fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
         Ok(bincode::deserialize(bytes)?)
     }
 }
@@ -189,14 +189,14 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    fn setup() -> Result<(Log<log::Test>, log::Test), Error> {
+    fn setup() -> Result<(Log<log::Test>, log::Test)> {
         let store = log::Test::new();
         let log = Log::new(store.clone())?;
         Ok((log, store))
     }
 
     #[test]
-    fn new() -> Result<(), Error> {
+    fn new() -> Result<()> {
         let (l, _) = setup()?;
         assert_eq!(0, l.last_index);
         assert_eq!(0, l.last_term);
@@ -207,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn append() -> Result<(), Error> {
+    fn append() -> Result<()> {
         let (mut l, _) = setup()?;
         assert_eq!(Ok(None), l.get(1));
 
@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn append_none() -> Result<(), Error> {
+    fn append_none() -> Result<()> {
         let (mut l, _) = setup()?;
         assert_eq!(Entry { index: 1, term: 3, command: None }, l.append(3, None)?);
         assert_eq!(Some(Entry { index: 1, term: 3, command: None }), l.get(1)?);
@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn append_persistence() -> Result<(), Error> {
+    fn append_persistence() -> Result<()> {
         let (mut l, store) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, None)?;
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn commit() -> Result<(), Error> {
+    fn commit() -> Result<()> {
         let (mut l, store) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, None)?;
@@ -265,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_beyond() -> Result<(), Error> {
+    fn commit_beyond() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, None)?;
@@ -276,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn commit_partial() -> Result<(), Error> {
+    fn commit_partial() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, None)?;
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn get() -> Result<(), Error> {
+    fn get() -> Result<()> {
         let (mut l, _) = setup()?;
         assert_eq!(None, l.get(1)?);
 
@@ -299,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn has() -> Result<(), Error> {
+    fn has() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(2, Some(vec![0x01]))?;
 
@@ -314,7 +314,7 @@ mod tests {
     }
 
     #[test]
-    fn scan() -> Result<(), Error> {
+    fn scan() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(1, Some(vec![0x02]))?;
@@ -326,21 +326,21 @@ mod tests {
                 Entry { index: 2, term: 1, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 1, command: Some(vec![0x03]) },
             ],
-            l.scan(0..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(0..).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(
             vec![
                 Entry { index: 2, term: 1, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 1, command: Some(vec![0x03]) },
             ],
-            l.scan(2..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(2..).collect::<Result<Vec<_>>>()?
         );
-        assert!(l.scan(4..).collect::<Result<Vec<_>, Error>>()?.is_empty());
+        assert!(l.scan(4..).collect::<Result<Vec<_>>>()?.is_empty());
         Ok(())
     }
 
     #[test]
-    fn load_save_term() -> Result<(), Error> {
+    fn load_save_term() -> Result<()> {
         // Test loading empty term
         let (l, _) = setup()?;
         assert_eq!((0, None), l.load_term()?);
@@ -361,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn splice() -> Result<(), Error> {
+    fn splice() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -381,7 +381,7 @@ mod tests {
                 Entry { index: 3, term: 3, command: Some(vec![0x03]) },
                 Entry { index: 4, term: 4, command: Some(vec![0x04]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(4, l.last_index);
         assert_eq!(4, l.last_term);
@@ -389,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    fn splice_all() -> Result<(), Error> {
+    fn splice_all() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -407,7 +407,7 @@ mod tests {
                 Entry { index: 1, term: 4, command: Some(vec![0x0a]) },
                 Entry { index: 2, term: 4, command: Some(vec![0x0b]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(2, l.last_index);
         assert_eq!(4, l.last_term);
@@ -415,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    fn splice_append() -> Result<(), Error> {
+    fn splice_append() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -434,7 +434,7 @@ mod tests {
                 Entry { index: 3, term: 3, command: Some(vec![0x03]) },
                 Entry { index: 4, term: 4, command: Some(vec![0x04]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(4, l.last_index);
         assert_eq!(4, l.last_term);
@@ -442,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn splice_conflict_term() -> Result<(), Error> {
+    fn splice_conflict_term() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -462,7 +462,7 @@ mod tests {
                 Entry { index: 2, term: 3, command: Some(vec![0x0b]) },
                 Entry { index: 3, term: 3, command: Some(vec![0x0c]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(3, l.last_index);
         assert_eq!(3, l.last_term);
@@ -470,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn splice_error_noncontiguous() -> Result<(), Error> {
+    fn splice_error_noncontiguous() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -489,13 +489,13 @@ mod tests {
                 Entry { index: 2, term: 2, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 3, command: Some(vec![0x03]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         Ok(())
     }
 
     #[test]
-    fn splice_error_beyond_last() -> Result<(), Error> {
+    fn splice_error_beyond_last() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -514,13 +514,13 @@ mod tests {
                 Entry { index: 2, term: 2, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 3, command: Some(vec![0x03]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         Ok(())
     }
 
     #[test]
-    fn splice_overlap_inside() -> Result<(), Error> {
+    fn splice_overlap_inside() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -533,13 +533,13 @@ mod tests {
                 Entry { index: 2, term: 2, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 3, command: Some(vec![0x03]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         Ok(())
     }
 
     #[test]
-    fn truncate() -> Result<(), Error> {
+    fn truncate() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -551,13 +551,13 @@ mod tests {
                 Entry { index: 1, term: 1, command: Some(vec![0x01]) },
                 Entry { index: 2, term: 2, command: Some(vec![0x02]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         Ok(())
     }
 
     #[test]
-    fn truncate_beyond() -> Result<(), Error> {
+    fn truncate_beyond() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -570,13 +570,13 @@ mod tests {
                 Entry { index: 2, term: 2, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 3, command: Some(vec![0x03]) },
             ],
-            l.scan(..).collect::<Result<Vec<_>, Error>>()?
+            l.scan(..).collect::<Result<Vec<_>>>()?
         );
         Ok(())
     }
 
     #[test]
-    fn truncate_committed() -> Result<(), Error> {
+    fn truncate_committed() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
@@ -592,14 +592,14 @@ mod tests {
     }
 
     #[test]
-    fn truncate_zero() -> Result<(), Error> {
+    fn truncate_zero() -> Result<()> {
         let (mut l, _) = setup()?;
         l.append(1, Some(vec![0x01]))?;
         l.append(2, Some(vec![0x02]))?;
         l.append(3, Some(vec![0x03]))?;
 
         assert_eq!(0, l.truncate(0)?);
-        assert!(l.scan(..).collect::<Result<Vec<_>, Error>>()?.is_empty());
+        assert!(l.scan(..).collect::<Result<Vec<_>>>()?.is_empty());
         Ok(())
     }
 }

@@ -1,7 +1,7 @@
 use super::engine::Transaction;
 use super::parser::format_ident;
 use super::types::{DataType, Environment, Row, Value};
-use crate::Error;
+use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -9,16 +9,16 @@ use std::collections::HashMap;
 /// The catalog stores schema information
 pub trait Catalog {
     /// Creates a new table
-    fn create_table(&mut self, table: &Table) -> Result<(), Error>;
+    fn create_table(&mut self, table: &Table) -> Result<()>;
     /// Deletes an existing table, or errors if it does not exist
-    fn delete_table(&mut self, table: &str) -> Result<(), Error>;
+    fn delete_table(&mut self, table: &str) -> Result<()>;
     /// Reads a table, if it exists
-    fn read_table(&self, table: &str) -> Result<Option<Table>, Error>;
+    fn read_table(&self, table: &str) -> Result<Option<Table>>;
     /// Iterates over all tables
-    fn scan_tables(&self) -> Result<Tables, Error>;
+    fn scan_tables(&self) -> Result<Tables>;
 
     /// Reads a table, and errors if it does not exist
-    fn must_read_table(&self, table: &str) -> Result<Table, Error> {
+    fn must_read_table(&self, table: &str) -> Result<Table> {
         self.read_table(table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
     }
@@ -38,7 +38,7 @@ pub struct Table {
 
 impl Table {
     /// Creates a new table schema
-    pub fn new(name: String, columns: Vec<Column>) -> Result<Self, Error> {
+    pub fn new(name: String, columns: Vec<Column>) -> Result<Self> {
         let table = Self { name, columns };
         Ok(table)
     }
@@ -57,7 +57,7 @@ impl Table {
     }
 
     /// Asserts that the table is not referenced by other tables, otherwise returns an error
-    pub fn assert_unreferenced(&self, txn: &mut dyn Transaction) -> Result<(), Error> {
+    pub fn assert_unreferenced(&self, txn: &mut dyn Transaction) -> Result<()> {
         for source in txn.scan_tables()?.filter(|t| t.name != self.name) {
             if let Some(column) =
                 source.columns.iter().find(|c| c.references.as_ref() == Some(&self.name))
@@ -72,11 +72,7 @@ impl Table {
     }
 
     /// Asserts that this primary key is not referenced from any other rows, otherwise errors
-    pub fn assert_unreferenced_key(
-        &self,
-        pk: &Value,
-        txn: &mut dyn Transaction,
-    ) -> Result<(), Error> {
+    pub fn assert_unreferenced_key(&self, pk: &Value, txn: &mut dyn Transaction) -> Result<()> {
         for source in txn.scan_tables()? {
             let refs = source
                 .columns
@@ -105,21 +101,21 @@ impl Table {
     }
 
     /// Fetches a column by name
-    pub fn get_column(&self, name: &str) -> Result<&Column, Error> {
+    pub fn get_column(&self, name: &str) -> Result<&Column> {
         self.columns.iter().find(|c| c.name == name).ok_or_else(|| {
             Error::Value(format!("Column {} not found in table {}", name, self.name))
         })
     }
 
     /// Fetches a column index by name
-    pub fn get_column_index(&self, name: &str) -> Result<usize, Error> {
+    pub fn get_column_index(&self, name: &str) -> Result<usize> {
         self.columns.iter().position(|c| c.name == name).ok_or_else(|| {
             Error::Value(format!("Column {} not found in table {}", name, self.name))
         })
     }
 
     /// Returns the primary key column of the table
-    pub fn get_primary_key(&self) -> Result<&Column, Error> {
+    pub fn get_primary_key(&self) -> Result<&Column> {
         self.columns
             .iter()
             .find(|c| c.primary_key)
@@ -127,7 +123,7 @@ impl Table {
     }
 
     /// Returns the primary key value of a row
-    pub fn get_row_key(&self, row: &[Value]) -> Result<Value, Error> {
+    pub fn get_row_key(&self, row: &[Value]) -> Result<Value> {
         row.get(
             self.columns
                 .iter()
@@ -140,7 +136,7 @@ impl Table {
 
     // Builds a row from a set of values, optionally with a set of column names, padding
     // it with default values as necessary.
-    pub fn make_row(&self, columns: &[String], values: Vec<Value>) -> Result<Row, Error> {
+    pub fn make_row(&self, columns: &[String], values: Vec<Value>) -> Result<Row> {
         if columns.len() != values.len() {
             return Err(Error::Value("Column and value counts do not match".into()));
         }
@@ -165,7 +161,7 @@ impl Table {
     }
 
     /// Pads a row with default values where possible
-    pub fn pad_row(&self, mut row: Row) -> Result<Row, Error> {
+    pub fn pad_row(&self, mut row: Row) -> Result<Row> {
         for column in self.columns.iter().skip(row.len()) {
             if let Some(default) = &column.default {
                 row.push(default.clone())
@@ -187,14 +183,14 @@ impl Table {
     }
 
     /// Sets a named row field to a value
-    pub fn set_row_field(&self, row: &mut Row, field: &str, value: Value) -> Result<(), Error> {
+    pub fn set_row_field(&self, row: &mut Row, field: &str, value: Value) -> Result<()> {
         *row.get_mut(self.get_column_index(field)?)
             .ok_or_else(|| Error::Value(format!("Field {} not found in row", field)))? = value;
         Ok(())
     }
 
     /// Validates the table schema
-    pub fn validate(&self, txn: &mut dyn Transaction) -> Result<(), Error> {
+    pub fn validate(&self, txn: &mut dyn Transaction) -> Result<()> {
         if self.columns.is_empty() {
             return Err(Error::Value(format!("Table {} has no columns", self.name)));
         }
@@ -210,7 +206,7 @@ impl Table {
     }
 
     /// Validates a row
-    pub fn validate_row(&self, row: &[Value], txn: &mut dyn Transaction) -> Result<(), Error> {
+    pub fn validate_row(&self, row: &[Value], txn: &mut dyn Transaction) -> Result<()> {
         if row.len() != self.columns.len() {
             return Err(Error::Value(format!("Invalid row size for table {}", self.name)));
         }
@@ -270,7 +266,7 @@ impl Column {
     }
 
     /// Validates the column schema
-    pub fn validate(&self, table: &Table, txn: &mut dyn Transaction) -> Result<(), Error> {
+    pub fn validate(&self, table: &Table, txn: &mut dyn Transaction) -> Result<()> {
         // Validate primary key
         if self.primary_key && self.nullable {
             return Err(Error::Value(format!("Primary key {} cannot be nullable", self.name)));
@@ -334,7 +330,7 @@ impl Column {
         pk: &Value,
         value: &Value,
         txn: &mut dyn Transaction,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         // Validate datatype
         match value.datatype() {
             None if self.nullable => Ok(()),

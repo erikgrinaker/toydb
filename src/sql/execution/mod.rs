@@ -36,14 +36,14 @@ use super::engine::{Mode, Transaction};
 use super::plan::Node;
 use super::types::Environment;
 use super::types::{Columns, Relation, Row, Value};
-use crate::Error;
+use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
 
 /// A plan executor
 pub trait Executor<T: Transaction> {
     /// Executes the executor, consuming it and returning a result set
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error>;
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet>;
 }
 
 impl<T: Transaction + 'static> dyn Executor<T> {
@@ -115,7 +115,7 @@ pub enum ResultSet {
 
 impl ResultSet {
     /// Converts the ResultSet into a Relation, or errors if not a query result.
-    pub fn into_relation(self) -> Result<Relation, Error> {
+    pub fn into_relation(self) -> Result<Relation> {
         match self {
             ResultSet::Query { relation } => Ok(relation),
             r => Err(Error::Value(format!("Not a query result: {:?}", r))),
@@ -123,12 +123,12 @@ impl ResultSet {
     }
 
     /// Converts the ResultSet into a Row, or errors if not a query result with rows.
-    pub fn into_row(self) -> Result<Row, Error> {
+    pub fn into_row(self) -> Result<Row> {
         self.into_relation()?.into_row()?.ok_or_else(|| Error::Value("No rows returned".into()))
     }
 
     /// Converts the ResultSet into a Value, if possible.
-    pub fn into_value(self) -> Result<Value, Error> {
+    pub fn into_value(self) -> Result<Value> {
         self.into_relation()?.into_value()?.ok_or_else(|| Error::Value("No value returned".into()))
     }
 }
@@ -169,7 +169,7 @@ impl ResultColumns {
         s
     }
 
-    fn get(&self, relation: Option<&str>, field: &str) -> Result<(Option<String>, String), Error> {
+    fn get(&self, relation: Option<&str>, field: &str) -> Result<(Option<String>, String)> {
         let matches: Vec<_> = self
             .columns
             .iter()
@@ -192,7 +192,7 @@ impl ResultColumns {
         }
     }
 
-    pub fn index(&self, relation: Option<&str>, field: &str) -> Result<usize, Error> {
+    pub fn index(&self, relation: Option<&str>, field: &str) -> Result<usize> {
         let matches: Vec<_> = self
             .columns
             .iter()

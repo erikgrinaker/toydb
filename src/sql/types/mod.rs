@@ -1,7 +1,7 @@
 mod expression;
 pub use expression::{Environment, Expression, Expressions};
 
-use crate::Error;
+use crate::error::{Error, Result};
 
 use derivative::Derivative;
 use serde_derive::{Deserialize, Serialize};
@@ -67,7 +67,7 @@ impl Value {
     }
 
     /// Returns the inner boolean, or an error if not a boolean
-    pub fn boolean(self) -> Result<bool, Error> {
+    pub fn boolean(self) -> Result<bool> {
         match self {
             Self::Boolean(b) => Ok(b),
             v => Err(Error::Value(format!("Not a boolean: {:?}", v))),
@@ -75,7 +75,7 @@ impl Value {
     }
 
     /// Returns the inner float, or an error if not a float
-    pub fn float(self) -> Result<f64, Error> {
+    pub fn float(self) -> Result<f64> {
         match self {
             Self::Float(f) => Ok(f),
             v => Err(Error::Value(format!("Not a float: {:?}", v))),
@@ -83,7 +83,7 @@ impl Value {
     }
 
     /// Returns the inner integer, or an error if not an integer
-    pub fn integer(self) -> Result<i64, Error> {
+    pub fn integer(self) -> Result<i64> {
         match self {
             Self::Integer(i) => Ok(i),
             v => Err(Error::Value(format!("Not an integer: {:?}", v))),
@@ -91,7 +91,7 @@ impl Value {
     }
 
     /// Returns the inner string, or an error if not a string
-    pub fn string(self) -> Result<String, Error> {
+    pub fn string(self) -> Result<String> {
         match self {
             Self::String(s) => Ok(s),
             v => Err(Error::Value(format!("Not a string: {:?}", v))),
@@ -166,7 +166,7 @@ impl From<&str> for Value {
 pub type Row = Vec<Value>;
 
 /// A row iterator
-pub type Rows = Box<dyn Iterator<Item = Result<Row, Error>> + Send>;
+pub type Rows = Box<dyn Iterator<Item = Result<Row>> + Send>;
 
 /// A column (in a result set, see schema::Column for table columns)
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -192,18 +192,18 @@ pub struct Relation {
 
 impl Relation {
     /// Converts the relation into a single row, if any
-    pub fn into_row(mut self) -> Result<Option<Row>, Error> {
+    pub fn into_row(mut self) -> Result<Option<Row>> {
         self.next().transpose()
     }
 
     /// Converts the relation into the first value of the first row, if any
-    pub fn into_value(self) -> Result<Option<Value>, Error> {
+    pub fn into_value(self) -> Result<Option<Value>> {
         Ok(self.into_row()?.filter(|row| !row.is_empty()).map(|mut row| row.remove(0)))
     }
 }
 
 impl Iterator for Relation {
-    type Item = Result<Row, Error>;
+    type Item = Result<Row>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Make sure iteration is aborted on the first error, otherwise callers

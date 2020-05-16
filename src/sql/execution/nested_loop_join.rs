@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::{Columns, Expression, Relation, Rows};
 use super::{Context, Executor, ResultColumns, ResultSet, Row, Value};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// A nested loop join executor
 /// FIXME This code is horrible, clean it up at some point
@@ -31,7 +31,7 @@ impl<T: Transaction> NestedLoopJoin<T> {
 }
 
 impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let (result, inner) = if self.flip {
             (self.inner.execute(ctx)?, self.outer.execute(ctx)?)
         } else {
@@ -78,7 +78,7 @@ struct NestedLoopRows {
     columns: ResultColumns,
     predicate: Option<Expression>,
     outer: Rows,
-    outer_cur: Option<Result<Row, Error>>,
+    outer_cur: Option<Result<Row>>,
     // FIXME inner should be Rows too, but requires impl Clone
     inner: Box<dyn Iterator<Item = Row> + Send>,
     inner_orig: Vec<Row>,
@@ -109,7 +109,7 @@ impl NestedLoopRows {
         }
     }
 
-    fn next_inner(&mut self) -> Result<Option<Row>, Error> {
+    fn next_inner(&mut self) -> Result<Option<Row>> {
         let o = match self.outer_cur.clone() {
             Some(Ok(o)) => o,
             Some(Err(e)) => return Err(e),
@@ -140,7 +140,7 @@ impl NestedLoopRows {
 }
 
 impl Iterator for NestedLoopRows {
-    type Item = Result<Row, Error>;
+    type Item = Result<Row>;
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.outer_cur.is_some() {

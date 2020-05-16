@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::Expression;
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 use std::collections::BTreeMap;
 
@@ -27,7 +27,7 @@ impl<T: Transaction> Update<T> {
 }
 
 impl<T: Transaction> Executor<T> for Update<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         match self.source.execute(ctx)? {
             ResultSet::Query { mut relation } => {
                 let table = ctx.txn.must_read_table(&self.table)?;

@@ -2,7 +2,7 @@ use super::super::parser::ast;
 use super::super::schema;
 use super::super::types::{Environment, Expression, Expressions, Value};
 use super::{Aggregate, Aggregates, Node, Plan};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// The plan builder
 pub struct Planner {}
@@ -14,12 +14,12 @@ impl Planner {
     }
 
     /// Builds a plan tree for an AST statement
-    pub fn build(&self, statement: ast::Statement) -> Result<Plan, Error> {
+    pub fn build(&self, statement: ast::Statement) -> Result<Plan> {
         Ok(Plan(self.build_statement(statement)?))
     }
 
     /// Builds a plan node for a statement
-    fn build_statement(&self, statement: ast::Statement) -> Result<Node, Error> {
+    fn build_statement(&self, statement: ast::Statement) -> Result<Node> {
         Ok(match statement {
             ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
                 return Err(Error::Internal(format!(
@@ -51,7 +51,7 @@ impl Planner {
                 expressions: values
                     .into_iter()
                     .map(|exprs| self.build_expressions(exprs))
-                    .collect::<Result<_, Error>>()?,
+                    .collect::<Result<_>>()?,
             },
             ast::Statement::Select {
                 select,
@@ -175,7 +175,7 @@ impl Planner {
                         orders: order
                             .into_iter()
                             .map(|(e, o)| self.build_expression(e).map(|e| (e, o.into())))
-                            .collect::<Result<_, _>>()?,
+                            .collect::<Result<_>>()?,
                     };
                 }
                 if let Some(expr) = offset {
@@ -223,13 +223,13 @@ impl Planner {
                 expressions: set
                     .into_iter()
                     .map(|(c, e)| self.build_expression(e).map(|e| (c, e)))
-                    .collect::<Result<_, _>>()?,
+                    .collect::<Result<_>>()?,
             },
         })
     }
 
     /// Builds FROM items
-    fn build_from_item(&self, item: ast::FromItem) -> Result<Node, Error> {
+    fn build_from_item(&self, item: ast::FromItem) -> Result<Node> {
         Ok(match item {
             ast::FromItem::Table { name, alias } => Node::Scan { table: name, alias, filter: None },
             ast::FromItem::Join { left, right, r#type, predicate } => match r#type {
@@ -259,12 +259,12 @@ impl Planner {
     }
 
     /// Builds an expression from an AST expression
-    fn build_expression(&self, expr: ast::Expression) -> Result<Expression, Error> {
+    fn build_expression(&self, expr: ast::Expression) -> Result<Expression> {
         ExpressionBuilder::build(expr)
     }
 
     /// Builds expressions from AST expressions
-    fn build_expressions(&self, exprs: ast::Expressions) -> Result<Expressions, Error> {
+    fn build_expressions(&self, exprs: ast::Expressions) -> Result<Expressions> {
         ExpressionBuilder::build_many(exprs)
     }
 
@@ -272,7 +272,7 @@ impl Planner {
     fn build_aggregate_expressions(
         &self,
         exprs: ast::Expressions,
-    ) -> Result<(Expressions, Vec<Aggregate>, Expressions), Error> {
+    ) -> Result<(Expressions, Vec<Aggregate>, Expressions)> {
         ExpressionBuilder::build_aggregates(exprs)
     }
 
@@ -281,7 +281,7 @@ impl Planner {
         &self,
         name: String,
         columns: Vec<ast::ColumnSpec>,
-    ) -> Result<schema::Table, Error> {
+    ) -> Result<schema::Table> {
         schema::Table::new(
             name,
             columns
@@ -314,7 +314,7 @@ impl Planner {
                         references: c.references,
                     })
                 })
-                .collect::<Result<_, Error>>()?,
+                .collect::<Result<_>>()?,
         )
     }
 }
@@ -328,13 +328,13 @@ struct ExpressionBuilder {
 
 impl ExpressionBuilder {
     /// Builds a single expression.
-    fn build(expr: ast::Expression) -> Result<Expression, Error> {
+    fn build(expr: ast::Expression) -> Result<Expression> {
         Ok(*ExpressionBuilder { agg_allow: false, aggs: Vec::new(), agg_args: Vec::new() }
             .make(Box::new(expr))?)
     }
 
     /// Builds multiple expressions.
-    fn build_many(exprs: ast::Expressions) -> Result<Expressions, Error> {
+    fn build_many(exprs: ast::Expressions) -> Result<Expressions> {
         exprs.into_iter().map(Self::build).collect()
     }
 
@@ -342,9 +342,7 @@ impl ExpressionBuilder {
     /// non-constant, non-aggregate expressions are pushed to the pre-projection as grouping
     /// expressions (caller should validate against GROUP BY), following expressions referenced by
     /// the aggregates.
-    fn build_aggregates(
-        exprs: ast::Expressions,
-    ) -> Result<(Expressions, Aggregates, Expressions), Error> {
+    fn build_aggregates(exprs: ast::Expressions) -> Result<(Expressions, Aggregates, Expressions)> {
         let mut builder =
             ExpressionBuilder { agg_allow: true, aggs: Vec::new(), agg_args: Vec::new() };
 
@@ -360,7 +358,7 @@ impl ExpressionBuilder {
 
     /// Used internally, with more convenient signature.
     #[allow(clippy::boxed_local)]
-    fn make(&mut self, expr: Box<ast::Expression>) -> Result<Box<Expression>, Error> {
+    fn make(&mut self, expr: Box<ast::Expression>) -> Result<Box<Expression>> {
         use Expression::*;
         Ok(Box::new(match *expr {
             ast::Expression::Literal(l) => Constant(match l {
@@ -429,7 +427,7 @@ impl ExpressionBuilder {
         &mut self,
         name: &str,
         expr: Box<ast::Expression>,
-    ) -> Result<Box<Expression>, Error> {
+    ) -> Result<Box<Expression>> {
         if !self.agg_allow {
             return Err(Error::Value(format!(
                 "Aggregate function {}() not allowed here",

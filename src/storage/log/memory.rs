@@ -1,5 +1,5 @@
 use super::Store;
-use crate::Error;
+use crate::error::{Error, Result};
 
 use std::collections::HashMap;
 use std::ops::{Bound, RangeBounds};
@@ -19,12 +19,12 @@ impl Memory {
 }
 
 impl Store for Memory {
-    fn append(&mut self, entry: Vec<u8>) -> Result<u64, Error> {
+    fn append(&mut self, entry: Vec<u8>) -> Result<u64> {
         self.log.push(entry);
         Ok(self.log.len() as u64)
     }
 
-    fn commit(&mut self, index: u64) -> Result<(), Error> {
+    fn commit(&mut self, index: u64) -> Result<()> {
         if index > self.len() {
             return Err(Error::Internal(format!("Cannot commit non-existant index {}", index)));
         }
@@ -42,7 +42,7 @@ impl Store for Memory {
         self.committed
     }
 
-    fn get(&self, index: u64) -> Result<Option<Vec<u8>>, Error> {
+    fn get(&self, index: u64) -> Result<Option<Vec<u8>>> {
         match index {
             0 => Ok(None),
             i => Ok(self.log.get(i as usize - 1).cloned()),
@@ -74,7 +74,7 @@ impl Store for Memory {
         )
     }
 
-    fn truncate(&mut self, index: u64) -> Result<u64, Error> {
+    fn truncate(&mut self, index: u64) -> Result<u64> {
         if index < self.committed {
             return Err(Error::Internal(format!(
                 "Cannot truncate below committed index {}",
@@ -85,11 +85,11 @@ impl Store for Memory {
         Ok(self.log.len() as u64)
     }
 
-    fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.metadata.get(key).cloned())
     }
 
-    fn set_metadata(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    fn set_metadata(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.metadata.insert(key.to_vec(), value);
         Ok(())
     }
@@ -97,13 +97,13 @@ impl Store for Memory {
 
 #[cfg(test)]
 impl super::TestSuite<Memory> for Memory {
-    fn setup() -> Result<Self, Error> {
+    fn setup() -> Result<Self> {
         Ok(Memory::new())
     }
 }
 
 #[test]
-fn tests() -> Result<(), Error> {
+fn tests() -> Result<()> {
     use super::TestSuite;
     Memory::test()
 }

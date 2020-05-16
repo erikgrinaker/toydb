@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::schema::Table;
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::Result;
 
 /// A CREATE TABLE executor
 pub struct CreateTable {
@@ -16,7 +16,7 @@ impl CreateTable {
 }
 
 impl<T: Transaction> Executor<T> for CreateTable {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         ctx.txn.create_table(&self.table)?;
         Ok(ResultSet::CreateTable { name: self.table.name })
     }

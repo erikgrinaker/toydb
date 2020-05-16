@@ -8,7 +8,7 @@ use super::execution::{Context, Executor, ResultSet};
 use super::parser::ast;
 use super::schema::{Catalog, Table};
 use super::types::{Expression, Expressions, Value};
-use crate::Error;
+use crate::error::Result;
 
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -19,20 +19,17 @@ pub struct Plan(pub Node);
 
 impl Plan {
     /// Builds a plan from an AST statement
-    pub fn build(statement: ast::Statement) -> Result<Self, Error> {
+    pub fn build(statement: ast::Statement) -> Result<Self> {
         Planner::new().build(statement)
     }
 
     /// Executes the plan, consuming it
-    pub fn execute<T: Transaction + 'static>(
-        self,
-        mut ctx: Context<T>,
-    ) -> Result<ResultSet, Error> {
+    pub fn execute<T: Transaction + 'static>(self, mut ctx: Context<T>) -> Result<ResultSet> {
         Executor::build(self.0).execute(&mut ctx)
     }
 
     /// Optimizes the plan, consuming it
-    pub fn optimize<C: Catalog + 'static>(self, catalog: &mut C) -> Result<Self, Error> {
+    pub fn optimize<C: Catalog + 'static>(self, catalog: &mut C) -> Result<Self> {
         let mut root = self.0;
         root = optimizer::ConstantFolder.optimize(root)?;
         root = optimizer::FilterPushdown.optimize(root)?;
@@ -118,10 +115,10 @@ pub enum Node {
 
 impl Node {
     /// Recursively transforms nodes by applying functions before and after descending.
-    pub fn transform<B, A>(mut self, pre: &B, post: &A) -> Result<Self, Error>
+    pub fn transform<B, A>(mut self, pre: &B, post: &A) -> Result<Self>
     where
-        B: Fn(Self) -> Result<Self, Error>,
-        A: Fn(Self) -> Result<Self, Error>,
+        B: Fn(Self) -> Result<Self>,
+        A: Fn(Self) -> Result<Self>,
     {
         self = pre(self)?;
         self = match self {
@@ -171,10 +168,10 @@ impl Node {
 
     /// Transforms all expressions in a node by calling .transform() on them
     /// with the given functions.
-    pub fn transform_expressions<B, A>(self, pre: &B, post: &A) -> Result<Self, Error>
+    pub fn transform_expressions<B, A>(self, pre: &B, post: &A) -> Result<Self>
     where
-        B: Fn(Expression) -> Result<Expression, Error>,
-        A: Fn(Expression) -> Result<Expression, Error>,
+        B: Fn(Expression) -> Result<Expression>,
+        A: Fn(Expression) -> Result<Expression>,
     {
         Ok(match self {
             n @ Self::Aggregation { .. } => n,
@@ -197,14 +194,14 @@ impl Node {
                 expressions: expressions
                     .into_iter()
                     .map(|exprs| exprs.into_iter().map(|e| e.transform(pre, post)).collect())
-                    .collect::<Result<_, Error>>()?,
+                    .collect::<Result<_>>()?,
             },
             Self::Order { source, orders } => Self::Order {
                 source,
                 orders: orders
                     .into_iter()
                     .map(|(e, o)| e.transform(pre, post).map(|e| (e, o)))
-                    .collect::<Result<_, Error>>()?,
+                    .collect::<Result<_>>()?,
             },
             Self::Projection { source, labels, expressions } => Self::Projection {
                 source,
@@ -212,7 +209,7 @@ impl Node {
                 expressions: expressions
                     .into_iter()
                     .map(|e| e.transform(pre, post))
-                    .collect::<Result<_, Error>>()?,
+                    .collect::<Result<_>>()?,
             },
             Self::Scan { table, alias, filter: Some(filter) } => {
                 Self::Scan { table, alias, filter: Some(filter.transform(pre, post)?) }
@@ -223,7 +220,7 @@ impl Node {
                 expressions: expressions
                     .into_iter()
                     .map(|(k, e)| e.transform(pre, post).map(|e| (k, e)))
-                    .collect::<Result<_, Error>>()?,
+                    .collect::<Result<_>>()?,
             },
         })
     }

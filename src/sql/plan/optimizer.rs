@@ -1,13 +1,13 @@
 use super::super::schema::Catalog;
 use super::super::types::{Environment, Expression, Value};
 use super::Node;
-use crate::Error;
+use crate::error::Result;
 
 use std::collections::HashMap;
 
 /// A plan optimizer
 pub trait Optimizer {
-    fn optimize(&mut self, node: Node) -> Result<Node, Error>;
+    fn optimize(&mut self, node: Node) -> Result<Node>;
 }
 
 /// A constant folding optimizer, which replaces constant expressions
@@ -16,7 +16,7 @@ pub trait Optimizer {
 pub struct ConstantFolder;
 
 impl Optimizer for ConstantFolder {
-    fn optimize(&mut self, node: Node) -> Result<Node, Error> {
+    fn optimize(&mut self, node: Node) -> Result<Node> {
         let env = Environment::new();
         node.transform(&|n| Ok(n), &|n| {
             n.transform_expressions(&|e| Ok(e), &|e| {
@@ -31,7 +31,7 @@ impl Optimizer for ConstantFolder {
 pub struct FilterPushdown;
 
 impl Optimizer for FilterPushdown {
-    fn optimize(&mut self, node: Node) -> Result<Node, Error> {
+    fn optimize(&mut self, node: Node) -> Result<Node> {
         node.transform(
             &|n| match n {
                 Node::Filter { source, predicate } => Self::pushdown(predicate, *source),
@@ -44,7 +44,7 @@ impl Optimizer for FilterPushdown {
 
 impl FilterPushdown {
     /// Attempts to push a predicate down into a target node, or returns a regular filter node.
-    fn pushdown(mut predicate: Expression, target: Node) -> Result<Node, Error> {
+    fn pushdown(mut predicate: Expression, target: Node) -> Result<Node> {
         Ok(match target {
             // Filter nodes immediately before a scan node can be trivially pushed down, as long as
             // we remove any field qualifyers (e.g. movies table aliased as m).
@@ -76,7 +76,7 @@ impl FilterPushdown {
     fn requalify(
         expr: Expression,
         map: &HashMap<Option<String>, Option<String>>,
-    ) -> Result<Expression, Error> {
+    ) -> Result<Expression> {
         Ok(match expr {
             Expression::Field(relation, name) => match map.get(&relation) {
                 Some(mapped) => Expression::Field(mapped.clone(), name),
@@ -118,7 +118,7 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
 }
 
 impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
-    fn optimize(&mut self, node: Node) -> Result<Node, Error> {
+    fn optimize(&mut self, node: Node) -> Result<Node> {
         node.transform(
             &|n| match n {
                 // FIXME This needs to be smarter - at least handle ORs. Could be prettier too.

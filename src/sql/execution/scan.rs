@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::{Column, Expression, Relation};
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::Result;
 
 /// A table scan executor
 pub struct Scan {
@@ -20,7 +20,7 @@ impl Scan {
 }
 
 impl<T: Transaction> Executor<T> for Scan {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let table = ctx.txn.must_read_table(&self.table)?;
         let name = if let Some(alias) = &self.alias { alias } else { &table.name };
         Ok(ResultSet::Query {

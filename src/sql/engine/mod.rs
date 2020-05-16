@@ -9,7 +9,7 @@ use super::parser::{ast, Parser};
 use super::plan::Plan;
 use super::schema::Catalog;
 use super::types::{Expression, Row, Value};
-use crate::Error;
+use crate::error::{Error, Result};
 
 use std::collections::HashSet;
 
@@ -19,15 +19,15 @@ pub trait Engine: Clone {
     type Transaction: Transaction;
 
     /// Begins a transaction in the given mode
-    fn begin(&self, mode: Mode) -> Result<Self::Transaction, Error>;
+    fn begin(&self, mode: Mode) -> Result<Self::Transaction>;
 
     /// Begins a session for executing individual statements
-    fn session(&self) -> Result<Session<Self>, Error> {
+    fn session(&self) -> Result<Session<Self>> {
         Ok(Session { engine: self.clone(), txn: None })
     }
 
     /// Resumes an active transaction with the given ID
-    fn resume(&self, id: u64) -> Result<Self::Transaction, Error>;
+    fn resume(&self, id: u64) -> Result<Self::Transaction>;
 }
 
 /// An SQL transaction
@@ -37,25 +37,24 @@ pub trait Transaction: Catalog {
     /// The transaction mode
     fn mode(&self) -> Mode;
     /// Commits the transaction
-    fn commit(self) -> Result<(), Error>;
+    fn commit(self) -> Result<()>;
     /// Rolls back the transaction
-    fn rollback(self) -> Result<(), Error>;
+    fn rollback(self) -> Result<()>;
 
     /// Creates a new table row
-    fn create(&mut self, table: &str, row: Row) -> Result<(), Error>;
+    fn create(&mut self, table: &str, row: Row) -> Result<()>;
     /// Deletes a table row
-    fn delete(&mut self, table: &str, id: &Value) -> Result<(), Error>;
+    fn delete(&mut self, table: &str, id: &Value) -> Result<()>;
     /// Reads a table row, if it exists
-    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error>;
+    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>>;
     /// Reads an index entry, if it exists
-    fn read_index(&self, table: &str, column: &str, value: &Value)
-        -> Result<HashSet<Value>, Error>;
+    fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>>;
     /// Scans a table's rows
-    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan, Error>;
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan>;
     /// Scans a column's index entries
-    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan, Error>;
+    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
     /// Updates a table row
-    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error>;
+    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()>;
 }
 
 /// An SQL session, which handles transaction control and simplified query execution
@@ -68,7 +67,7 @@ pub struct Session<E: Engine> {
 
 impl<E: Engine + 'static> Session<E> {
     /// Executes a query, managing transaction status for the session
-    pub fn execute(&mut self, query: &str) -> Result<ResultSet, Error> {
+    pub fn execute(&mut self, query: &str) -> Result<ResultSet> {
         // FIXME We should match on self.txn as well, but get this error:
         // error[E0009]: cannot bind by-move and by-ref in the same pattern
         // ...which seems like an arbitrary compiler limitation
@@ -143,9 +142,9 @@ impl<E: Engine + 'static> Session<E> {
     }
 
     /// Runs a closure in the session's transaction, or a new transaction if none is active.
-    pub fn with_txn<R, F>(&mut self, mode: Mode, f: F) -> Result<R, Error>
+    pub fn with_txn<R, F>(&mut self, mode: Mode, f: F) -> Result<R>
     where
-        F: FnOnce(&mut E::Transaction) -> Result<R, Error>,
+        F: FnOnce(&mut E::Transaction) -> Result<R>,
     {
         if let Some(ref mut txn) = self.txn {
             if !txn.mode().satisfies(&mode) {
@@ -166,8 +165,7 @@ impl<E: Engine + 'static> Session<E> {
 pub type Mode = crate::storage::kv::mvcc::Mode;
 
 /// A row scan iterator
-pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row, Error>> + Send>;
+pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row>> + Send>;
 
 /// An index scan iterator
-pub type IndexScan =
-    Box<dyn DoubleEndedIterator<Item = Result<(Value, HashSet<Value>), Error>> + Send>;
+pub type IndexScan = Box<dyn DoubleEndedIterator<Item = Result<(Value, HashSet<Value>)>> + Send>;

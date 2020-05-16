@@ -1,5 +1,5 @@
 use super::{Memory, Scan, Store};
-use crate::Error;
+use crate::error::Result;
 
 use std::ops::RangeBounds;
 use std::sync::{Arc, RwLock};
@@ -19,11 +19,11 @@ impl Test {
 }
 
 impl Store for Test {
-    fn append(&mut self, entry: Vec<u8>) -> Result<u64, Error> {
+    fn append(&mut self, entry: Vec<u8>) -> Result<u64> {
         self.store.write()?.append(entry)
     }
 
-    fn commit(&mut self, index: u64) -> Result<(), Error> {
+    fn commit(&mut self, index: u64) -> Result<()> {
         self.store.write()?.commit(index)
     }
 
@@ -31,7 +31,7 @@ impl Store for Test {
         self.store.read().unwrap().committed()
     }
 
-    fn get(&self, index: u64) -> Result<Option<Vec<u8>>, Error> {
+    fn get(&self, index: u64) -> Result<Option<Vec<u8>>> {
         self.store.read()?.get(index)
     }
 
@@ -41,33 +41,31 @@ impl Store for Test {
 
     fn scan(&self, range: impl RangeBounds<u64>) -> Scan {
         // Since the mutex guard is scoped to this method, we simply buffer the result.
-        Box::new(
-            self.store.read().unwrap().scan(range).collect::<Vec<Result<_, Error>>>().into_iter(),
-        )
+        Box::new(self.store.read().unwrap().scan(range).collect::<Vec<Result<_>>>().into_iter())
     }
 
-    fn truncate(&mut self, index: u64) -> Result<u64, Error> {
+    fn truncate(&mut self, index: u64) -> Result<u64> {
         self.store.write()?.truncate(index)
     }
 
-    fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.store.read()?.get_metadata(key)
     }
 
-    fn set_metadata(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    fn set_metadata(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.store.write()?.set_metadata(key, value)
     }
 }
 
 #[cfg(test)]
 impl super::TestSuite<Test> for Test {
-    fn setup() -> Result<Self, Error> {
+    fn setup() -> Result<Self> {
         Ok(Test::new())
     }
 }
 
 #[test]
-fn tests() -> Result<(), Error> {
+fn tests() -> Result<()> {
     use super::TestSuite;
     Test::test()
 }

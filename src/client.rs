@@ -1,8 +1,8 @@
+use crate::error::{Error, Result};
 use crate::server::{Request, Response};
 use crate::sql::engine::{Mode, Status};
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::Table;
-use crate::Error;
 
 use futures::future::FutureExt as _;
 use futures::sink::SinkExt as _;
@@ -15,9 +15,9 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 type Connection = tokio_serde::Framed<
     Framed<TcpStream, LengthDelimitedCodec>,
-    Result<Response, Error>,
+    Result<Response>,
     Request,
-    tokio_serde::formats::Bincode<Result<Response, Error>, Request>,
+    tokio_serde::formats::Bincode<Result<Response>, Request>,
 >;
 
 /// A toyDB client
@@ -28,7 +28,7 @@ pub struct Client {
 
 impl Client {
     /// Creates a new client
-    pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<Self, Error> {
+    pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<Self> {
         Ok(Self {
             conn: Mutex::new(tokio_serde::Framed::new(
                 Framed::new(TcpStream::connect(addr).await?, LengthDelimitedCodec::new()),
@@ -39,7 +39,7 @@ impl Client {
     }
 
     /// Call a server method
-    async fn call(&self, request: Request) -> Result<Response, Error> {
+    async fn call(&self, request: Request) -> Result<Response> {
         let mut conn = self.conn.lock().await;
         self.call_locked(&mut conn, request).await
     }
@@ -49,7 +49,7 @@ impl Client {
         &self,
         conn: &mut MutexGuard<'_, Connection>,
         request: Request,
-    ) -> Result<Response, Error> {
+    ) -> Result<Response> {
         conn.send(request).await?;
         match conn.try_next().await? {
             Some(result) => result,
@@ -58,7 +58,7 @@ impl Client {
     }
 
     /// Executes a query
-    pub async fn execute(&self, query: &str) -> Result<ResultSet, Error> {
+    pub async fn execute(&self, query: &str) -> Result<ResultSet> {
         let mut conn = self.conn.lock().await;
         let mut resultset =
             match self.call_locked(&mut conn, Request::Execute(query.into())).await? {
@@ -89,7 +89,7 @@ impl Client {
     }
 
     /// Fetches the table schema as SQL
-    pub async fn get_table(&self, table: &str) -> Result<Table, Error> {
+    pub async fn get_table(&self, table: &str) -> Result<Table> {
         match self.call(Request::GetTable(table.into())).await? {
             Response::GetTable(t) => Ok(t),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
@@ -97,7 +97,7 @@ impl Client {
     }
 
     /// Lists database tables
-    pub async fn list_tables(&self) -> Result<Vec<String>, Error> {
+    pub async fn list_tables(&self) -> Result<Vec<String>> {
         match self.call(Request::ListTables).await? {
             Response::ListTables(t) => Ok(t),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
@@ -105,7 +105,7 @@ impl Client {
     }
 
     /// Checks server status
-    pub async fn status(&self) -> Result<Status, Error> {
+    pub async fn status(&self) -> Result<Status> {
         match self.call(Request::Status).await? {
             Response::Status(s) => Ok(s),
             resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
@@ -125,7 +125,7 @@ pub struct Pool {
 
 impl Pool {
     /// Creates a new connection pool for the given servers, eagerly connecting clients.
-    pub async fn new<A: ToSocketAddrs + Clone>(addrs: Vec<A>, size: u64) -> Result<Self, Error> {
+    pub async fn new<A: ToSocketAddrs + Clone>(addrs: Vec<A>, size: u64) -> Result<Self> {
         let mut addrs = addrs.into_iter().cycle();
         let clients = futures::future::try_join_all(
             std::iter::from_fn(|| {

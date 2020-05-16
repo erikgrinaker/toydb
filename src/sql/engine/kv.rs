@@ -1,8 +1,8 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
+use crate::error::{Error, Result};
 use crate::storage::kv;
-use crate::Error;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -27,12 +27,12 @@ impl<S: kv::Store> KV<S> {
     }
 
     /// Fetches an unversioned metadata value
-    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.kv.get_metadata(key)
     }
 
     /// Sets an unversioned metadata value
-    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.kv.set_metadata(key, value)
     }
 }
@@ -40,22 +40,22 @@ impl<S: kv::Store> KV<S> {
 impl<S: kv::Store> super::Engine for KV<S> {
     type Transaction = Transaction<S>;
 
-    fn begin(&self, mode: super::Mode) -> Result<Self::Transaction, Error> {
+    fn begin(&self, mode: super::Mode) -> Result<Self::Transaction> {
         Ok(Self::Transaction::new(self.kv.begin_with_mode(mode)?))
     }
 
-    fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
+    fn resume(&self, id: u64) -> Result<Self::Transaction> {
         Ok(Self::Transaction::new(self.kv.resume(id)?))
     }
 }
 
 /// Serializes SQL metadata.
-fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
+fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
     Ok(bincode::serialize(value)?)
 }
 
 /// Deserializes SQL metadata.
-fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
+fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
     Ok(bincode::deserialize(bytes)?)
 }
 
@@ -71,12 +71,7 @@ impl<S: kv::Store> Transaction<S> {
     }
 
     /// Loads an index entry
-    fn index_load(
-        &self,
-        table: &str,
-        column: &str,
-        value: &Value,
-    ) -> Result<HashSet<Value>, Error> {
+    fn index_load(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
         let key = Key::Index(table, column, Some(value)).encode();
         if let Some(value) = self.txn.get(&key)? {
             let item: (Value, HashSet<Value>) = deserialize(&value)?;
@@ -95,7 +90,7 @@ impl<S: kv::Store> Transaction<S> {
         column: &str,
         value: &Value,
         index: HashSet<Value>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let key = Key::Index(table, column, Some(value)).encode();
         if index.is_empty() {
             self.txn.delete(&key)
@@ -114,15 +109,15 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
         self.txn.mode()
     }
 
-    fn commit(self) -> Result<(), Error> {
+    fn commit(self) -> Result<()> {
         self.txn.commit()
     }
 
-    fn rollback(self) -> Result<(), Error> {
+    fn rollback(self) -> Result<()> {
         self.txn.rollback()
     }
 
-    fn create(&mut self, table: &str, row: Row) -> Result<(), Error> {
+    fn create(&mut self, table: &str, row: Row) -> Result<()> {
         let table = self.must_read_table(&table)?;
         table.validate_row(&row, self)?;
         let id = table.get_row_key(&row)?;
@@ -143,7 +138,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
         Ok(())
     }
 
-    fn delete(&mut self, table: &str, id: &Value) -> Result<(), Error> {
+    fn delete(&mut self, table: &str, id: &Value) -> Result<()> {
         let table = self.must_read_table(&table)?;
         table.assert_unreferenced_key(id, self)?;
 
@@ -160,23 +155,18 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
         self.txn.delete(&Key::Row(&table.name, Some(id)).encode())
     }
 
-    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error> {
+    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>> {
         self.txn.get(&Key::Row(table, Some(id)).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
-    fn read_index(
-        &self,
-        table: &str,
-        column: &str,
-        value: &Value,
-    ) -> Result<HashSet<Value>, Error> {
+    fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
         if !self.must_read_table(table)?.get_column(column)?.index {
             return Err(Error::Value(format!("No index on {}.{}", table, column)));
         }
         self.index_load(table, column, value)
     }
 
-    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan, Error> {
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan> {
         let table = self.must_read_table(&table)?;
         let scan = self
             .txn
@@ -199,10 +189,10 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
             });
 
         // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
-        Ok(Box::new(scan.collect::<Vec<Result<Row, Error>>>().into_iter()))
+        Ok(Box::new(scan.collect::<Vec<Result<Row>>>().into_iter()))
     }
 
-    fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan, Error> {
+    fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan> {
         let table = self.must_read_table(&table)?;
         let column = table.get_column(column)?;
         if !column.index {
@@ -215,10 +205,10 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
             .map(|r| r.and_then(|(_, v)| deserialize(&v)));
 
         // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
-        Ok(Box::new(scan.collect::<Vec<Result<(Value, HashSet<Value>), Error>>>().into_iter()))
+        Ok(Box::new(scan.collect::<Vec<Result<(Value, HashSet<Value>)>>>().into_iter()))
     }
 
-    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error> {
+    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()> {
         let table = self.must_read_table(&table)?;
         // If the primary key changes we do a delete and create, otherwise we replace the row
         if id != &table.get_row_key(&row)? {
@@ -251,7 +241,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
 }
 
 impl<S: kv::Store> Catalog for Transaction<S> {
-    fn create_table(&mut self, table: &Table) -> Result<(), Error> {
+    fn create_table(&mut self, table: &Table) -> Result<()> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
         }
@@ -259,7 +249,7 @@ impl<S: kv::Store> Catalog for Transaction<S> {
         self.txn.set(&Key::Table(Some(&table.name)).encode(), serialize(table)?)
     }
 
-    fn delete_table(&mut self, table: &str) -> Result<(), Error> {
+    fn delete_table(&mut self, table: &str) -> Result<()> {
         let table = self.must_read_table(&table)?;
         table.assert_unreferenced(self)?;
         let mut scan = self.scan(&table.name, None)?;
@@ -269,16 +259,16 @@ impl<S: kv::Store> Catalog for Transaction<S> {
         self.txn.delete(&Key::Table(Some(&table.name)).encode())
     }
 
-    fn read_table(&self, table: &str) -> Result<Option<Table>, Error> {
+    fn read_table(&self, table: &str) -> Result<Option<Table>> {
         self.txn.get(&Key::Table(Some(table)).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
-    fn scan_tables(&self) -> Result<Tables, Error> {
+    fn scan_tables(&self) -> Result<Tables> {
         Ok(Box::new(
             self.txn
                 .scan_prefix(&Key::Table(None).encode())?
                 .map(|r| r.and_then(|(_, v)| deserialize(&v)))
-                .collect::<Result<Vec<_>, Error>>()?
+                .collect::<Result<Vec<_>>>()?
                 .into_iter(),
         ))
     }

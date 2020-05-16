@@ -2,20 +2,21 @@ mod pool;
 
 use super::{assert_row, assert_rows, setup};
 
+use toydb::error::{Error, Result};
 use toydb::raft;
 use toydb::sql::engine::{Mode, Status};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Relation, Value};
 use toydb::storage::kv;
-use toydb::{Client, Error};
+use toydb::Client;
 
 use pretty_assertions::assert_eq;
 use serial_test::serial;
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn get_table() -> Result<(), Error> {
+async fn get_table() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     assert_eq!(
@@ -105,7 +106,7 @@ async fn get_table() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn list_tables() -> Result<(), Error> {
+async fn list_tables() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     assert_eq!(c.list_tables().await?, vec!["countries", "genres", "movies", "studios"]);
@@ -114,7 +115,7 @@ async fn list_tables() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn status() -> Result<(), Error> {
+async fn status() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     assert_eq!(
@@ -136,7 +137,7 @@ async fn status() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn execute() -> Result<(), Error> {
+async fn execute() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     // SELECT
@@ -229,7 +230,7 @@ async fn execute() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn execute_txn() -> Result<(), Error> {
+async fn execute_txn() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
 
     assert_eq!(c.txn(), None);
@@ -319,7 +320,7 @@ async fn execute_txn() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 2)]
 #[serial]
-async fn execute_txn_concurrent() -> Result<(), Error> {
+async fn execute_txn_concurrent() -> Result<()> {
     let (a, _teardown) = setup::server_with_client(setup::movies()).await?;
     let b = Client::new("127.0.0.1:9605").await?;
 

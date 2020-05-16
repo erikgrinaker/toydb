@@ -1,6 +1,10 @@
 use serde_derive::{Deserialize, Serialize};
+use std::fmt::{self, Display};
 
-/// Errors, all except Internal are considered user-facing
+/// Result returning Error
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// toyDB errors. All except Internal are considered user-facing.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Error {
     Abort,
@@ -12,8 +16,10 @@ pub enum Error {
     Value(String),
 }
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl std::error::Error for Error {}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
         match self {
             Error::Config(s) | Error::Internal(s) | Error::Parse(s) | Error::Value(s) => {
                 write!(f, "{}", s)
@@ -25,8 +31,8 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl From<std::boxed::Box<bincode::ErrorKind>> for Error {
-    fn from(err: std::boxed::Box<bincode::ErrorKind>) -> Self {
+impl From<Box<bincode::ErrorKind>> for Error {
+    fn from(err: Box<bincode::ErrorKind>) -> Self {
         Error::Internal(err.to_string())
     }
 }
@@ -109,12 +115,6 @@ impl From<tokio::sync::mpsc::error::TryRecvError> for Error {
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for Error {
-    fn from(err: tokio::sync::oneshot::error::RecvError) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
     fn from(err: tokio::sync::mpsc::error::SendError<T>) -> Self {
         Error::Internal(err.to_string())
@@ -123,6 +123,12 @@ impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
 
 impl<T> From<tokio::sync::mpsc::error::TrySendError<T>> for Error {
     fn from(err: tokio::sync::mpsc::error::TrySendError<T>) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for Error {
+    fn from(err: tokio::sync::oneshot::error::RecvError) -> Self {
         Error::Internal(err.to_string())
     }
 }

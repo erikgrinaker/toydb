@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// A DELETE executor
 pub struct Delete<T: Transaction> {
@@ -17,7 +17,7 @@ impl<T: Transaction> Delete<T> {
 }
 
 impl<T: Transaction> Executor<T> for Delete<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let table = ctx.txn.must_read_table(&self.table)?;
         let mut count = 0;
         match self.source.execute(ctx)? {

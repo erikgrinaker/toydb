@@ -1,3 +1,4 @@
+use crate::error::{Error, Result};
 use crate::raft;
 use crate::sql;
 use crate::sql::engine::{Engine as _, Mode};
@@ -5,7 +6,6 @@ use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
 use crate::storage::{kv, log};
-use crate::Error;
 
 use ::log::{error, info};
 use futures::sink::SinkExt as _;
@@ -32,7 +32,7 @@ impl Server {
         peers: HashMap<String, String>,
         dir: &str,
         sync: bool,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let path = Path::new(dir);
         fs::create_dir_all(path)?;
         Ok(Server {
@@ -50,7 +50,7 @@ impl Server {
     }
 
     /// Starts listening on the given ports. Must be called before serve.
-    pub async fn listen(mut self, sql_addr: &str, raft_addr: &str) -> Result<Self, Error> {
+    pub async fn listen(mut self, sql_addr: &str, raft_addr: &str) -> Result<Self> {
         let (sql, raft) =
             tokio::try_join!(TcpListener::bind(sql_addr), TcpListener::bind(raft_addr),)?;
         info!("Listening on {} (SQL) and {} (Raft)", sql.local_addr()?, raft.local_addr()?);
@@ -60,7 +60,7 @@ impl Server {
     }
 
     /// Serves Raft and SQL requests until the returned future is dropped. Consumes the server.
-    pub async fn serve(self) -> Result<(), Error> {
+    pub async fn serve(self) -> Result<()> {
         let sql_listener = self
             .sql_listener
             .ok_or_else(|| Error::Internal("Must listen before serving".into()))?;
@@ -78,7 +78,7 @@ impl Server {
     }
 
     /// Serves SQL clients.
-    async fn serve_sql(mut listener: TcpListener, engine: sql::engine::Raft) -> Result<(), Error> {
+    async fn serve_sql(mut listener: TcpListener, engine: sql::engine::Raft) -> Result<()> {
         while let Some(socket) = listener.try_next().await? {
             let peer = socket.peer_addr()?;
             let session = Session::new(engine.clone())?;
@@ -121,19 +121,19 @@ pub struct Session {
 
 impl Session {
     /// Creates a new client session.
-    fn new(engine: sql::engine::Raft) -> Result<Self, Error> {
+    fn new(engine: sql::engine::Raft) -> Result<Self> {
         Ok(Self { sql: engine.session()?, engine })
     }
 
     /// Handles a client connection.
-    async fn handle(mut self, socket: TcpStream) -> Result<(), Error> {
+    async fn handle(mut self, socket: TcpStream) -> Result<()> {
         let mut stream = tokio_serde::Framed::new(
             Framed::new(socket, LengthDelimitedCodec::new()),
             tokio_serde::formats::Bincode::default(),
         );
         while let Some(request) = stream.try_next().await? {
             let mut response = tokio::task::block_in_place(|| self.request(request));
-            let mut rows: Box<dyn Iterator<Item = Result<Response, Error>> + Send> =
+            let mut rows: Box<dyn Iterator<Item = Result<Response>> + Send> =
                 Box::new(std::iter::empty());
             if let Ok(Response::Execute(ResultSet::Query { ref mut relation })) = &mut response {
                 rows = Box::new(
@@ -161,7 +161,7 @@ impl Session {
     }
 
     /// Executes a request.
-    pub fn request(&mut self, request: Request) -> Result<Response, Error> {
+    pub fn request(&mut self, request: Request) -> Result<Response> {
         Ok(match request {
             Request::Execute(query) => Response::Execute(self.sql.execute(&query)?),
             Request::GetTable(table) => Response::GetTable(

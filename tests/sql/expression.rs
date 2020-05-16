@@ -1,10 +1,10 @@
 ///! Evaluates SQL expressions and compares with expectations.
+use toydb::error::{Error, Result};
 use toydb::sql::engine::Engine;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::types::Value;
-use toydb::Error;
 
-fn eval_expr(expr: &str) -> Result<Value, Error> {
+fn eval_expr(expr: &str) -> Result<Value> {
     let engine = super::setup(Vec::new())?;
     match engine.session()?.execute(&format!("SELECT {}", expr))? {
         ResultSet::Query { mut relation } => {
@@ -18,8 +18,8 @@ macro_rules! test_expr {
     ( $( $name:ident: $expr:expr => $expect:expr, )* ) => {
     $(
         #[test]
-        fn $name() -> Result<(), Error> {
-            let expect: Result<Value, Error> = $expect;
+        fn $name() -> Result<()> {
+            let expect: Result<Value> = $expect;
             let actual = eval_expr($expr);
             match expect {
                 Ok(Float(e)) if e.is_nan() => match actual {

@@ -1,6 +1,6 @@
 use super::{Address, Event, Log, Message, Node, Request, Response, State};
+use crate::error::{Error, Result};
 use crate::storage::log;
-use crate::Error;
 
 use ::log::{debug, error};
 use futures::{sink::SinkExt as _, FutureExt as _};
@@ -29,7 +29,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
         peers: HashMap<String, String>,
         log: Log<L>,
         state: S,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         Ok(Self {
             node: Node::new(
@@ -49,8 +49,8 @@ impl<L: log::Store + Send + 'static> Server<L> {
     pub async fn serve(
         self,
         listener: TcpListener,
-        client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response, Error>>)>,
-    ) -> Result<(), Error> {
+        client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>,
+    ) -> Result<()> {
         let (tcp_in_tx, tcp_in_rx) = mpsc::unbounded_channel::<Message>();
         let (tcp_out_tx, tcp_out_rx) = mpsc::unbounded_channel::<Message>();
         let (task, tcp_receiver) = Self::tcp_receive(listener, tcp_in_tx).remote_handle();
@@ -71,12 +71,12 @@ impl<L: log::Store + Send + 'static> Server<L> {
     async fn eventloop(
         mut node: Node<L>,
         mut node_rx: mpsc::UnboundedReceiver<Message>,
-        mut client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response, Error>>)>,
+        mut client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>,
         mut tcp_rx: mpsc::UnboundedReceiver<Message>,
         tcp_tx: mpsc::UnboundedSender<Message>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut ticker = tokio::time::interval(TICK);
-        let mut requests = HashMap::<Vec<u8>, oneshot::Sender<Result<Response, Error>>>::new();
+        let mut requests = HashMap::<Vec<u8>, oneshot::Sender<Result<Response>>>::new();
         loop {
             tokio::select! {
                 _ = ticker.tick() => node = node.tick()?,
@@ -116,7 +116,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
     async fn tcp_receive(
         mut listener: TcpListener,
         in_tx: mpsc::UnboundedSender<Message>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         while let Some(socket) = listener.try_next().await? {
             let peer = socket.peer_addr()?;
             let peer_in_tx = in_tx.clone();
@@ -135,7 +135,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
     async fn tcp_receive_peer(
         socket: TcpStream,
         in_tx: mpsc::UnboundedSender<Message>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut stream = tokio_serde::SymmetricallyFramed::<_, Message, _>::new(
             Framed::new(socket, LengthDelimitedCodec::new()),
             tokio_serde::formats::SymmetricalBincode::<Message>::default(),
@@ -151,7 +151,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
         node_id: String,
         peers: HashMap<String, String>,
         mut out_rx: mpsc::UnboundedReceiver<Message>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut peer_txs: HashMap<String, mpsc::Sender<Message>> = HashMap::new();
 
         for (id, addr) in peers.into_iter() {
@@ -210,7 +210,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
     async fn tcp_send_peer_session(
         socket: TcpStream,
         out_rx: &mut mpsc::Receiver<Message>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut stream = tokio_serde::SymmetricallyFramed::<_, Message, _>::new(
             Framed::new(socket, LengthDelimitedCodec::new()),
             tokio_serde::formats::SymmetricalBincode::<Message>::default(),

@@ -3,7 +3,7 @@ mod lexer;
 pub use lexer::{Keyword, Lexer, Token};
 
 use super::types::DataType;
-use crate::Error;
+use crate::error::{Error, Result};
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -21,20 +21,20 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses the input string into an AST statement
-    pub fn parse(&mut self) -> Result<ast::Statement, Error> {
+    pub fn parse(&mut self) -> Result<ast::Statement> {
         let statement = self.parse_statement()?;
         self.next_expect(None)?;
         Ok(statement)
     }
 
     /// Grabs the next lexer token, or throws an error if none is found.
-    fn next(&mut self) -> Result<Token, Error> {
+    fn next(&mut self) -> Result<Token> {
         self.lexer.next().unwrap_or_else(|| Err(Error::Parse("Unexpected end of input".into())))
     }
 
     /// Grabs the next lexer token, and returns it if it was expected or
     /// otherwise throws an error.
-    fn next_expect(&mut self, expect: Option<Token>) -> Result<Option<Token>, Error> {
+    fn next_expect(&mut self, expect: Option<Token>) -> Result<Option<Token>> {
         if let Some(t) = expect {
             let token = self.next()?;
             if token == t {
@@ -50,7 +50,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Grabs the next identifier, or errors if not found
-    fn next_ident(&mut self) -> Result<String, Error> {
+    fn next_ident(&mut self) -> Result<String> {
         match self.next()? {
             Token::Ident(ident) => Ok(ident),
             token => Err(Error::Parse(format!("Expected identifier, got {}", token))),
@@ -64,7 +64,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Grabs the next operator if it satisfies the type and precedence
-    fn next_if_operator<O: Operator>(&mut self, min_prec: u8) -> Result<Option<O>, Error> {
+    fn next_if_operator<O: Operator>(&mut self, min_prec: u8) -> Result<Option<O>> {
         if let Some(operator) = self
             .peek()
             .unwrap_or(None)
@@ -92,14 +92,14 @@ impl<'a> Parser<'a> {
     }
 
     /// Peeks the next lexer token if any, but converts it from
-    /// Option<Result<Token, Error>> to Result<Option<Token>, Error> which is
+    /// Option<Result<Token>> to Result<Option<Token>> which is
     /// more convenient to work with (the Iterator trait requires Option<T>).
-    fn peek(&mut self) -> Result<Option<Token>, Error> {
+    fn peek(&mut self) -> Result<Option<Token>> {
         self.lexer.peek().cloned().transpose()
     }
 
     /// Parses an SQL statement
-    fn parse_statement(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_statement(&mut self) -> Result<ast::Statement> {
         match self.peek()? {
             Some(Token::Keyword(Keyword::Begin)) => self.parse_transaction(),
             Some(Token::Keyword(Keyword::Commit)) => self.parse_transaction(),
@@ -121,7 +121,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a DDL statement
-    fn parse_ddl(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_ddl(&mut self) -> Result<ast::Statement> {
         match self.next()? {
             Token::Keyword(Keyword::Create) => match self.next()? {
                 Token::Keyword(Keyword::Table) => self.parse_ddl_create_table(),
@@ -137,7 +137,7 @@ impl<'a> Parser<'a> {
 
     /// Parses a CREATE TABLE DDL statement. The CREATE TABLE prefix has
     /// already been consumed.
-    fn parse_ddl_create_table(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_ddl_create_table(&mut self) -> Result<ast::Statement> {
         let name = self.next_ident()?;
         self.next_expect(Some(Token::OpenParen))?;
 
@@ -154,12 +154,12 @@ impl<'a> Parser<'a> {
 
     /// Parses a DROP TABLE DDL statement. The DROP TABLE prefix has
     /// already been consumed.
-    fn parse_ddl_drop_table(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_ddl_drop_table(&mut self) -> Result<ast::Statement> {
         Ok(ast::Statement::DropTable(self.next_ident()?))
     }
 
     /// Parses a column specification
-    fn parse_ddl_columnspec(&mut self) -> Result<ast::ColumnSpec, Error> {
+    fn parse_ddl_columnspec(&mut self) -> Result<ast::ColumnSpec> {
         let mut column = ast::ColumnSpec {
             name: self.next_ident()?,
             datatype: match self.next()? {
@@ -218,7 +218,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a delete statement
-    fn parse_statement_delete(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_statement_delete(&mut self) -> Result<ast::Statement> {
         self.next_expect(Some(Keyword::Delete.into()))?;
         self.next_expect(Some(Keyword::From.into()))?;
         let table = self.next_ident()?;
@@ -226,7 +226,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a delete statement
-    fn parse_statement_explain(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_statement_explain(&mut self) -> Result<ast::Statement> {
         self.next_expect(Some(Keyword::Explain.into()))?;
         if let Some(Token::Keyword(Keyword::Explain)) = self.peek()? {
             return Err(Error::Parse("Cannot nest EXPLAIN statements".into()));
@@ -235,7 +235,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses an insert statement
-    fn parse_statement_insert(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_statement_insert(&mut self) -> Result<ast::Statement> {
         self.next_expect(Some(Keyword::Insert.into()))?;
         self.next_expect(Some(Keyword::Into.into()))?;
         let table = self.next_ident()?;
@@ -278,7 +278,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a select statement
-    fn parse_statement_select(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_statement_select(&mut self) -> Result<ast::Statement> {
         Ok(ast::Statement::Select {
             select: self.parse_clause_select()?.unwrap(),
             from: self.parse_clause_from()?,
@@ -300,7 +300,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses an update statement
-    fn parse_statement_update(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_statement_update(&mut self) -> Result<ast::Statement> {
         self.next_expect(Some(Keyword::Update.into()))?;
         let table = self.next_ident()?;
         self.next_expect(Some(Keyword::Set.into()))?;
@@ -323,7 +323,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a transaction statement
-    fn parse_transaction(&mut self) -> Result<ast::Statement, Error> {
+    fn parse_transaction(&mut self) -> Result<ast::Statement> {
         match self.next()? {
             Token::Keyword(Keyword::Begin) => {
                 let mut readonly = false;
@@ -359,7 +359,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a from clause
-    fn parse_clause_from(&mut self) -> Result<Option<ast::FromClause>, Error> {
+    fn parse_clause_from(&mut self) -> Result<Option<ast::FromClause>> {
         if self.next_if_token(Keyword::From.into()).is_none() {
             return Ok(None);
         }
@@ -388,12 +388,12 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a from clause item
-    fn parse_clause_from_item(&mut self) -> Result<ast::FromItem, Error> {
+    fn parse_clause_from_item(&mut self) -> Result<ast::FromItem> {
         self.parse_clause_from_table()
     }
 
     // Parses a from clause table
-    fn parse_clause_from_table(&mut self) -> Result<ast::FromItem, Error> {
+    fn parse_clause_from_table(&mut self) -> Result<ast::FromItem> {
         let name = self.next_ident()?;
         let alias = if self.next_if_token(Keyword::As.into()).is_some() {
             Some(self.next_ident()?)
@@ -406,7 +406,7 @@ impl<'a> Parser<'a> {
     }
 
     // Parses a from clause join type
-    fn parse_clause_from_jointype(&mut self) -> Result<Option<ast::JoinType>, Error> {
+    fn parse_clause_from_jointype(&mut self) -> Result<Option<ast::JoinType>> {
         if self.next_if_token(Keyword::Cross.into()).is_some() {
             self.next_expect(Some(Keyword::Join.into()))?;
             Ok(Some(ast::JoinType::Cross))
@@ -429,7 +429,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a group by clause
-    fn parse_clause_group_by(&mut self) -> Result<Option<ast::GroupByClause>, Error> {
+    fn parse_clause_group_by(&mut self) -> Result<Option<ast::GroupByClause>> {
         if self.next_if_token(Keyword::Group.into()).is_none() {
             return Ok(None);
         }
@@ -445,7 +445,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a HAVING clause
-    fn parse_clause_having(&mut self) -> Result<Option<ast::HavingClause>, Error> {
+    fn parse_clause_having(&mut self) -> Result<Option<ast::HavingClause>> {
         if self.next_if_token(Keyword::Having.into()).is_none() {
             return Ok(None);
         }
@@ -453,7 +453,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses an order clause
-    fn parse_clause_order(&mut self) -> Result<Vec<(ast::Expression, ast::Order)>, Error> {
+    fn parse_clause_order(&mut self) -> Result<Vec<(ast::Expression, ast::Order)>> {
         if self.next_if_token(Keyword::Order.into()).is_none() {
             return Ok(Vec::new());
         }
@@ -478,7 +478,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a select clause
-    fn parse_clause_select(&mut self) -> Result<Option<ast::SelectClause>, Error> {
+    fn parse_clause_select(&mut self) -> Result<Option<ast::SelectClause>> {
         if self.next_if_token(Keyword::Select.into()).is_none() {
             return Ok(None);
         }
@@ -504,7 +504,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a WHERE clause
-    fn parse_clause_where(&mut self) -> Result<Option<ast::WhereClause>, Error> {
+    fn parse_clause_where(&mut self) -> Result<Option<ast::WhereClause>> {
         if self.next_if_token(Keyword::Where.into()).is_none() {
             return Ok(None);
         }
@@ -513,7 +513,7 @@ impl<'a> Parser<'a> {
 
     /// Parses an expression consisting of at least one atom operated on by any
     /// number of operators, using the precedence climbing algorithm.
-    fn parse_expression(&mut self, min_prec: u8) -> Result<ast::Expression, Error> {
+    fn parse_expression(&mut self, min_prec: u8) -> Result<ast::Expression> {
         let mut lhs = if let Some(prefix) = self.next_if_operator::<PrefixOperator>(min_prec)? {
             prefix.build(self.parse_expression(prefix.prec() + prefix.assoc())?)
         } else {
@@ -529,7 +529,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses an expression atom
-    fn parse_expression_atom(&mut self) -> Result<ast::Expression, Error> {
+    fn parse_expression_atom(&mut self) -> Result<ast::Expression> {
         Ok(match self.next()? {
             Token::Ident(i) => {
                 if self.next_if_token(Token::OpenParen).is_some() {
@@ -584,7 +584,7 @@ trait Operator: Sized {
     /// Looks up the corresponding operator for a token, if one exists
     fn from(token: &Token) -> Option<Self>;
     /// Augments an operator by allowing it to parse any modifiers.
-    fn augment(self, parser: &mut Parser) -> Result<Self, Error>;
+    fn augment(self, parser: &mut Parser) -> Result<Self>;
     /// Returns the operator's associativity
     fn assoc(&self) -> u8;
     /// Returns the operator's precedence
@@ -621,7 +621,7 @@ impl Operator for PrefixOperator {
         }
     }
 
-    fn augment(self, _parser: &mut Parser) -> Result<Self, Error> {
+    fn augment(self, _parser: &mut Parser) -> Result<Self> {
         Ok(self)
     }
 
@@ -699,7 +699,7 @@ impl Operator for InfixOperator {
         })
     }
 
-    fn augment(self, _parser: &mut Parser) -> Result<Self, Error> {
+    fn augment(self, _parser: &mut Parser) -> Result<Self> {
         Ok(self)
     }
 
@@ -758,7 +758,7 @@ impl Operator for PostfixOperator {
         }
     }
 
-    fn augment(mut self, parser: &mut Parser) -> Result<Self, Error> {
+    fn augment(mut self, parser: &mut Parser) -> Result<Self> {
         #[allow(clippy::single_match)]
         match &mut self {
             Self::IsNull { ref mut not } => {

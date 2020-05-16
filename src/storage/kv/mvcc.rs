@@ -1,5 +1,5 @@
 use super::Store;
-use crate::Error;
+use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
@@ -36,28 +36,28 @@ impl<S: Store> MVCC<S> {
 
     /// Begins a new transaction in read-write mode.
     #[allow(dead_code)]
-    pub fn begin(&self) -> Result<Transaction<S>, Error> {
+    pub fn begin(&self) -> Result<Transaction<S>> {
         Transaction::begin(self.store.clone(), Mode::ReadWrite)
     }
 
     /// Begins a new transaction in the given mode.
-    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<S>, Error> {
+    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<S>> {
         Transaction::begin(self.store.clone(), mode)
     }
 
     /// Resumes a transaction with the given ID.
-    pub fn resume(&self, id: u64) -> Result<Transaction<S>, Error> {
+    pub fn resume(&self, id: u64) -> Result<Transaction<S>> {
         Transaction::resume(self.store.clone(), id)
     }
 
     /// Fetches an unversioned metadata value
-    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         let session = self.store.read()?;
         session.get(key)
     }
 
     /// Sets an unversioned metadata value
-    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
         let mut session = self.store.write()?;
         session.set(key, value)
     }
@@ -67,7 +67,7 @@ impl<S: Store> MVCC<S> {
     // Bizarrely, the return statement is in fact necessary - see:
     // https://github.com/rust-lang/reference/issues/452
     #[allow(clippy::needless_return)]
-    pub fn status(&self) -> Result<Status, Error> {
+    pub fn status(&self) -> Result<Status> {
         let session = self.store.read()?;
         return Ok(Status {
             txns: match session.get(&Key::TxnNext.encode())? {
@@ -82,12 +82,12 @@ impl<S: Store> MVCC<S> {
 }
 
 /// Serializes MVCC metadata.
-fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
+fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
     Ok(bincode::serialize(value)?)
 }
 
 /// Deserializes MVCC metadata.
-fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
+fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
     Ok(bincode::deserialize(bytes)?)
 }
 
@@ -105,7 +105,7 @@ pub struct Transaction<S: Store> {
 
 impl<S: Store> Transaction<S> {
     /// Begins a new transaction in the given mode.
-    fn begin(store: Arc<RwLock<S>>, mode: Mode) -> Result<Self, Error> {
+    fn begin(store: Arc<RwLock<S>>, mode: Mode) -> Result<Self> {
         let mut session = store.write()?;
 
         let id = match session.get(&Key::TxnNext.encode())? {
@@ -128,7 +128,7 @@ impl<S: Store> Transaction<S> {
     }
 
     /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
-    fn resume(store: Arc<RwLock<S>>, id: u64) -> Result<Self, Error> {
+    fn resume(store: Arc<RwLock<S>>, id: u64) -> Result<Self> {
         let session = store.read()?;
         let mode = match session.get(&Key::TxnActive(id).encode())? {
             Some(v) => deserialize(&v)?,
@@ -153,14 +153,14 @@ impl<S: Store> Transaction<S> {
     }
 
     /// Commits the transaction, by removing the txn from the active set.
-    pub fn commit(self) -> Result<(), Error> {
+    pub fn commit(self) -> Result<()> {
         let mut session = self.store.write()?;
         session.delete(&Key::TxnActive(self.id).encode())?;
         session.flush()
     }
 
     /// Rolls back the transaction, by removing all updated entries.
-    pub fn rollback(self) -> Result<(), Error> {
+    pub fn rollback(self) -> Result<()> {
         let mut session = self.store.write()?;
         if self.mode.mutable() {
             let mut rollback = Vec::new();
@@ -184,12 +184,12 @@ impl<S: Store> Transaction<S> {
     }
 
     /// Deletes a key.
-    pub fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
+    pub fn delete(&mut self, key: &[u8]) -> Result<()> {
         self.write(key, None)
     }
 
     /// Fetches a key.
-    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         let session = self.store.read()?;
         let mut scan = session
             .scan(
@@ -210,12 +210,12 @@ impl<S: Store> Transaction<S> {
     }
 
     /// Scans a key range.
-    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<super::Scan, Error> {
+    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<super::Scan> {
         Ok(Box::new(Scan::new(self.store.clone(), self.snapshot.clone(), range)?))
     }
 
     /// Scans keys under a given prefix.
-    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<super::Scan, Error> {
+    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<super::Scan> {
         if prefix.is_empty() {
             return Err(Error::Internal("Scan prefix cannot be empty".into()));
         }
@@ -239,12 +239,12 @@ impl<S: Store> Transaction<S> {
     }
 
     /// Sets a key.
-    pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.write(key, Some(value))
     }
 
     /// Writes a value for a key. None is used for deletion.
-    fn write(&self, key: &[u8], value: Option<Vec<u8>>) -> Result<(), Error> {
+    fn write(&self, key: &[u8], value: Option<Vec<u8>>) -> Result<()> {
         if !self.mode.mutable() {
             return Err(Error::ReadOnly);
         }
@@ -327,7 +327,7 @@ struct Snapshot {
 
 impl Snapshot {
     /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
-    fn take(session: &mut RwLockWriteGuard<impl Store>, version: u64) -> Result<Self, Error> {
+    fn take(session: &mut RwLockWriteGuard<impl Store>, version: u64) -> Result<Self> {
         let mut snapshot = Self { version, invisible: HashSet::new() };
         let mut scan = session.scan(&Key::TxnActive(0).encode()..&Key::TxnActive(version).encode());
         while let Some((key, _)) = scan.next().transpose()? {
@@ -342,7 +342,7 @@ impl Snapshot {
     }
 
     /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn restore(session: &RwLockReadGuard<impl Store>, version: u64) -> Result<Self, Error> {
+    fn restore(session: &RwLockReadGuard<impl Store>, version: u64) -> Result<Self> {
         match session.get(&Key::TxnSnapshot(version).encode())? {
             Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
             None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
@@ -380,7 +380,7 @@ enum Key {
 
 impl Key {
     /// Decodes a key from a byte representation.
-    fn decode(key: &[u8]) -> Result<Self, Error> {
+    fn decode(key: &[u8]) -> Result<Self> {
         let mut iter = key.iter();
         match iter.next() {
             Some(0x01) => Ok(Key::TxnNext),
@@ -396,7 +396,7 @@ impl Key {
     }
 
     /// Decodes a byte vector from a byte representation. See encode_bytes() for format.
-    fn decode_bytes<'a, I: Iterator<Item = &'a u8>>(iter: &mut I) -> Result<Vec<u8>, Error> {
+    fn decode_bytes<'a, I: Iterator<Item = &'a u8>>(iter: &mut I) -> Result<Vec<u8>> {
         let mut bytes = Vec::new();
         loop {
             match iter.next() {
@@ -413,7 +413,7 @@ impl Key {
     }
 
     /// Decodes a u64 from a byte representation.
-    fn decode_u64<'a, I: Iterator<Item = &'a u8>>(iter: &mut I) -> Result<u64, Error> {
+    fn decode_u64<'a, I: Iterator<Item = &'a u8>>(iter: &mut I) -> Result<u64> {
         let bytes = iter.take(8).cloned().collect::<Vec<u8>>();
         if bytes.len() < 8 {
             return Err(Error::Value(format!("Unable to decode u64, got {} bytes", bytes.len())));
@@ -480,7 +480,7 @@ impl<S: Store> Scan<S> {
         store: Arc<RwLock<S>>,
         snapshot: Snapshot,
         range: impl RangeBounds<Vec<u8>>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let start = match range.start_bound() {
             Bound::Excluded(k) => Bound::Excluded(Key::Record(k.clone(), std::u64::MAX).encode()),
             Bound::Included(k) => Bound::Included(Key::Record(k.clone(), 0).encode()),
@@ -502,8 +502,7 @@ impl<S: Store> Scan<S> {
     }
 
     // next() with error handling.
-    #[allow(clippy::type_complexity)]
-    fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>, Error> {
+    fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
         let session = self.store.read()?;
         let mut range = session.scan(self.bounds.clone());
         while let Some((k, v)) = range.next().transpose()? {
@@ -539,8 +538,7 @@ impl<S: Store> Scan<S> {
     }
 
     /// next_back() with error handling.
-    #[allow(clippy::type_complexity)]
-    fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>, Error> {
+    fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
         let session = self.store.read()?;
         let mut range = session.scan(self.bounds.clone());
         while let Some((k, v)) = range.next_back().transpose()? {
@@ -570,7 +568,7 @@ impl<S: Store> Scan<S> {
 }
 
 impl<S: Store> Iterator for Scan<S> {
-    type Item = Result<(Vec<u8>, Vec<u8>), Error>;
+    type Item = Result<(Vec<u8>, Vec<u8>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
@@ -593,7 +591,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_begin() -> Result<(), Error> {
+    fn test_begin() -> Result<()> {
         let mvcc = setup();
 
         let txn = mvcc.begin()?;
@@ -613,7 +611,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_begin_with_mode_readonly() -> Result<(), Error> {
+    fn test_begin_with_mode_readonly() -> Result<()> {
         let mvcc = setup();
         let txn = mvcc.begin_with_mode(Mode::ReadOnly)?;
         assert_eq!(1, txn.id());
@@ -623,7 +621,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_begin_with_mode_readwrite() -> Result<(), Error> {
+    fn test_begin_with_mode_readwrite() -> Result<()> {
         let mvcc = setup();
         let txn = mvcc.begin_with_mode(Mode::ReadWrite)?;
         assert_eq!(1, txn.id());
@@ -633,7 +631,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_begin_with_mode_snapshot() -> Result<(), Error> {
+    fn test_begin_with_mode_snapshot() -> Result<()> {
         let mvcc = setup();
 
         // Write a couple of versions for a key
@@ -692,7 +690,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_resume() -> Result<(), Error> {
+    fn test_resume() -> Result<()> {
         let mvcc = setup();
 
         // We first write a set of values that should be visible
@@ -763,7 +761,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_delete_conflict() -> Result<(), Error> {
+    fn test_txn_delete_conflict() -> Result<()> {
         let mvcc = setup();
 
         let mut txn = mvcc.begin()?;
@@ -783,7 +781,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_delete_idempotent() -> Result<(), Error> {
+    fn test_txn_delete_idempotent() -> Result<()> {
         let mvcc = setup();
 
         let mut txn = mvcc.begin()?;
@@ -794,7 +792,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_get() -> Result<(), Error> {
+    fn test_txn_get() -> Result<()> {
         let mvcc = setup();
 
         let mut txn = mvcc.begin()?;
@@ -809,7 +807,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_get_deleted() -> Result<(), Error> {
+    fn test_txn_get_deleted() -> Result<()> {
         let mvcc = setup();
         let mut txn = mvcc.begin()?;
         txn.set(b"a", vec![0x01])?;
@@ -827,7 +825,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_get_hides_newer() -> Result<(), Error> {
+    fn test_txn_get_hides_newer() -> Result<()> {
         let mvcc = setup();
 
         let mut t1 = mvcc.begin()?;
@@ -846,7 +844,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_get_hides_uncommitted() -> Result<(), Error> {
+    fn test_txn_get_hides_uncommitted() -> Result<()> {
         let mvcc = setup();
 
         let mut t1 = mvcc.begin()?;
@@ -862,7 +860,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_get_readonly_historical() -> Result<(), Error> {
+    fn test_txn_get_readonly_historical() -> Result<()> {
         let mvcc = setup();
 
         let mut txn = mvcc.begin()?;
@@ -886,7 +884,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_get_serial() -> Result<(), Error> {
+    fn test_txn_get_serial() -> Result<()> {
         let mvcc = setup();
 
         let mut txn = mvcc.begin()?;
@@ -900,7 +898,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_scan() -> Result<(), Error> {
+    fn test_txn_scan() -> Result<()> {
         let mvcc = setup();
         let mut txn = mvcc.begin()?;
 
@@ -935,7 +933,7 @@ pub mod tests {
                 (b"c".to_vec(), vec![0x03]),
                 (b"e".to_vec(), vec![0x05]),
             ],
-            txn.scan(..)?.collect::<Result<Vec<_>, _>>()?
+            txn.scan(..)?.collect::<Result<Vec<_>>>()?
         );
 
         // Reverse scan
@@ -945,7 +943,7 @@ pub mod tests {
                 (b"c".to_vec(), vec![0x03]),
                 (b"a".to_vec(), vec![0x01]),
             ],
-            txn.scan(..)?.rev().collect::<Result<Vec<_>, _>>()?
+            txn.scan(..)?.rev().collect::<Result<Vec<_>>>()?
         );
 
         // Alternate forward/backward scan
@@ -961,7 +959,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_scan_key_version_overlap() -> Result<(), Error> {
+    fn test_txn_scan_key_version_overlap() -> Result<()> {
         // The idea here is that with a naive key/version concatenation
         // we get overlapping entries that mess up scans. For example:
         //
@@ -982,13 +980,13 @@ pub mod tests {
         let txn = mvcc.begin()?;
         assert_eq!(
             vec![(vec![0].to_vec(), vec![3]), (vec![0, 0, 0, 0, 0, 0, 0, 0, 2].to_vec(), vec![2]),],
-            txn.scan(..)?.collect::<Result<Vec<_>, _>>()?
+            txn.scan(..)?.collect::<Result<Vec<_>>>()?
         );
         Ok(())
     }
 
     #[test]
-    fn test_txn_scan_prefix() -> Result<(), Error> {
+    fn test_txn_scan_prefix() -> Result<()> {
         let mvcc = setup();
         let mut txn = mvcc.begin()?;
 
@@ -1010,7 +1008,7 @@ pub mod tests {
                 (b"bb".to_vec(), vec![0x02, 0x02]),
                 (b"bc".to_vec(), vec![0x02, 0x03]),
             ],
-            txn.scan_prefix(b"b")?.collect::<Result<Vec<_>, _>>()?
+            txn.scan_prefix(b"b")?.collect::<Result<Vec<_>>>()?
         );
 
         // Reverse scan
@@ -1021,7 +1019,7 @@ pub mod tests {
                 (b"ba".to_vec(), vec![0x02, 0x01]),
                 (b"b".to_vec(), vec![0x02]),
             ],
-            txn.scan_prefix(b"b")?.rev().collect::<Result<Vec<_>, _>>()?
+            txn.scan_prefix(b"b")?.rev().collect::<Result<Vec<_>>>()?
         );
 
         // Alternate forward/backward scan
@@ -1038,7 +1036,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_set_conflict() -> Result<(), Error> {
+    fn test_txn_set_conflict() -> Result<()> {
         let mvcc = setup();
 
         let mut t1 = mvcc.begin()?;
@@ -1054,7 +1052,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_set_conflict_committed() -> Result<(), Error> {
+    fn test_txn_set_conflict_committed() -> Result<()> {
         let mvcc = setup();
 
         let mut t1 = mvcc.begin()?;
@@ -1070,7 +1068,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_txn_set_rollback() -> Result<(), Error> {
+    fn test_txn_set_rollback() -> Result<()> {
         let mvcc = setup();
 
         let mut txn = mvcc.begin()?;
@@ -1093,7 +1091,7 @@ pub mod tests {
 
     #[test]
     // A dirty write is when t2 overwrites an uncommitted value written by t1.
-    fn test_txn_anomaly_dirty_write() -> Result<(), Error> {
+    fn test_txn_anomaly_dirty_write() -> Result<()> {
         let mvcc = setup();
 
         let mut t1 = mvcc.begin()?;
@@ -1107,7 +1105,7 @@ pub mod tests {
 
     #[test]
     // A dirty read is when t2 can read an uncommitted value set by t1.
-    fn test_txn_anomaly_dirty_read() -> Result<(), Error> {
+    fn test_txn_anomaly_dirty_read() -> Result<()> {
         let mvcc = setup();
 
         let mut t1 = mvcc.begin()?;
@@ -1121,7 +1119,7 @@ pub mod tests {
 
     #[test]
     // A lost update is when t1 and t2 both read a value and update it, where t2's update replaces t1.
-    fn test_txn_anomaly_lost_update() -> Result<(), Error> {
+    fn test_txn_anomaly_lost_update() -> Result<()> {
         let mvcc = setup();
 
         let mut t0 = mvcc.begin()?;
@@ -1142,7 +1140,7 @@ pub mod tests {
 
     #[test]
     // A fuzzy (or unrepeatable) read is when t2 sees a value change after t1 updates it.
-    fn test_txn_anomaly_fuzzy_read() -> Result<(), Error> {
+    fn test_txn_anomaly_fuzzy_read() -> Result<()> {
         let mvcc = setup();
 
         let mut t0 = mvcc.begin()?;
@@ -1162,7 +1160,7 @@ pub mod tests {
 
     #[test]
     // Read skew is when t1 reads a and b, but t2 modifies b in between the reads.
-    fn test_txn_anomaly_read_skew() -> Result<(), Error> {
+    fn test_txn_anomaly_read_skew() -> Result<()> {
         let mvcc = setup();
 
         let mut t0 = mvcc.begin()?;
@@ -1185,7 +1183,7 @@ pub mod tests {
     #[test]
     // A phantom read is when t1 reads entries matching some predicate, but a modification by
     // t2 changes the entries that match the predicate such that a later read by t1 returns them.
-    fn test_txn_anomaly_phantom_read() -> Result<(), Error> {
+    fn test_txn_anomaly_phantom_read() -> Result<()> {
         let mvcc = setup();
 
         let mut t0 = mvcc.begin()?;
@@ -1211,7 +1209,7 @@ pub mod tests {
     /* FIXME To avoid write skew we need to implement serializable snapshot isolation.
     #[test]
     // Write skew is when t1 reads b and writes it to a while t2 reads a and writes it to b.¨
-    fn test_txn_anomaly_write_skew() -> Result<(), Error> {
+    fn test_txn_anomaly_write_skew() -> Result<()> {
         let mvcc = setup();
 
         let mut t0 = mvcc.begin()?;
@@ -1236,7 +1234,7 @@ pub mod tests {
     }*/
 
     #[test]
-    fn test_metadata() -> Result<(), Error> {
+    fn test_metadata() -> Result<()> {
         let mvcc = setup();
 
         mvcc.set_metadata(b"foo", b"bar".to_vec())?;

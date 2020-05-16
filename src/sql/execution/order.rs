@@ -2,7 +2,7 @@ use super::super::engine::Transaction;
 use super::super::plan::Direction;
 use super::super::types::{Expression, Row, Value};
 use super::{Context, Executor, ResultColumns, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// An order executor
 pub struct Order<T: Transaction> {
@@ -19,7 +19,7 @@ impl<T: Transaction> Order<T> {
 }
 
 impl<T: Transaction> Executor<T> for Order<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         match self.source.execute(ctx)? {
             ResultSet::Query { mut relation } => {
                 if let Some(mut rows) = relation.rows {

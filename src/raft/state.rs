@@ -1,5 +1,5 @@
 use super::{Address, Entry, Event, Message, Response, Scan, Status};
-use crate::Error;
+use crate::error::{Error, Result};
 
 use log::{debug, error};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -13,10 +13,10 @@ pub trait State {
 
     /// Mutates the state machine. If the state machine returns Error::Internal, the Raft node
     /// halts. For any other error, the state is applied and the error propagated to the caller.
-    fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>, Error>;
+    fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>>;
 
     /// Queries the state machine. All errors are propagated to the caller.
-    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error>;
+    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>>;
 }
 
 #[derive(Debug, PartialEq)]
@@ -72,7 +72,7 @@ impl Driver {
     }
 
     /// Drives a state machine.
-    pub async fn drive<S: State>(mut self, mut state: S) -> Result<(), Error> {
+    pub async fn drive<S: State>(mut self, mut state: S) -> Result<()> {
         debug!("Starting state machine driver");
         while let Some(instruction) = self.state_rx.next().await {
             if let Err(error) = self.execute(instruction, &mut state).await {
@@ -85,7 +85,7 @@ impl Driver {
     }
 
     /// Synchronously (re)plays a set of log entries, for initial sync.
-    pub fn replay<'a, S: State>(&mut self, state: &mut S, mut scan: Scan<'a>) -> Result<(), Error> {
+    pub fn replay<'a, S: State>(&mut self, state: &mut S, mut scan: Scan<'a>) -> Result<()> {
         while let Some(entry) = scan.next().transpose()? {
             debug!("Replaying {:?}", entry);
             if let Some(command) = entry.command {
@@ -99,7 +99,7 @@ impl Driver {
     }
 
     /// Executes a state machine instruction.
-    pub async fn execute<S: State>(&mut self, i: Instruction, state: &mut S) -> Result<(), Error> {
+    pub async fn execute<S: State>(&mut self, i: Instruction, state: &mut S) -> Result<()> {
         debug!("Executing {:?}", i);
         match i {
             Instruction::Abort => {
@@ -155,7 +155,7 @@ impl Driver {
     }
 
     /// Aborts all pending notifications.
-    fn notify_abort(&mut self) -> Result<(), Error> {
+    fn notify_abort(&mut self) -> Result<()> {
         for (_, (address, id)) in std::mem::replace(&mut self.notify, HashMap::new()) {
             self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
         }
@@ -163,7 +163,7 @@ impl Driver {
     }
 
     /// Notifies a client about an applied log entry, if any.
-    fn notify_applied(&mut self, index: u64, result: Result<Vec<u8>, Error>) -> Result<(), Error> {
+    fn notify_applied(&mut self, index: u64, result: Result<Vec<u8>>) -> Result<()> {
         if let Some((to, id)) = self.notify.remove(&index) {
             self.send(to, Event::ClientResponse { id, response: result.map(Response::State) })?;
         }
@@ -171,7 +171,7 @@ impl Driver {
     }
 
     /// Aborts all pending queries.
-    fn query_abort(&mut self) -> Result<(), Error> {
+    fn query_abort(&mut self) -> Result<()> {
         for (_, queries) in std::mem::replace(&mut self.queries, BTreeMap::new()) {
             for (id, query) in queries {
                 self.send(
@@ -184,7 +184,7 @@ impl Driver {
     }
 
     /// Executes any queries that are ready.
-    fn query_execute<S: State>(&mut self, state: &mut S) -> Result<(), Error> {
+    fn query_execute<S: State>(&mut self, state: &mut S) -> Result<()> {
         for query in self.query_ready(self.applied_index) {
             debug!("Executing query {:?}", query.command);
             let result = state.query(query.command);
@@ -235,7 +235,7 @@ impl Driver {
     }
 
     /// Sends a message.
-    fn send(&self, to: Address, event: Event) -> Result<(), Error> {
+    fn send(&self, to: Address, event: Event) -> Result<()> {
         let msg = Message { from: Address::Local, to, term: 0, event };
         debug!("Sending {:?}", msg);
         Ok(self.node_tx.send(msg)?)
@@ -273,23 +273,22 @@ pub mod tests {
         }
 
         // Appends the command to the internal commands list.
-        fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>, Error> {
+        fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>> {
             self.commands.lock()?.push(command.clone());
             *self.applied_index.lock()? = index;
             Ok(command)
         }
 
         // Appends the command to the internal commands list.
-        fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
+        fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
             self.commands.lock()?.push(command.clone());
             Ok(command)
         }
     }
 
-    async fn setup() -> Result<
-        (TestState, mpsc::UnboundedSender<Instruction>, mpsc::UnboundedReceiver<Message>),
-        Error,
-    > {
+    async fn setup(
+    ) -> Result<(TestState, mpsc::UnboundedSender<Instruction>, mpsc::UnboundedReceiver<Message>)>
+    {
         let state = TestState::new(0);
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let (node_tx, node_rx) = mpsc::unbounded_channel();
@@ -298,7 +297,7 @@ pub mod tests {
     }
 
     #[tokio::test(core_threads = 2)]
-    async fn driver_abort() -> Result<(), Error> {
+    async fn driver_abort() -> Result<()> {
         let (state, state_tx, node_rx) = setup().await?;
 
         state_tx.send(Instruction::Notify {
@@ -341,7 +340,7 @@ pub mod tests {
     }
 
     #[tokio::test(core_threads = 2)]
-    async fn driver_apply() -> Result<(), Error> {
+    async fn driver_apply() -> Result<()> {
         let (state, state_tx, node_rx) = setup().await?;
 
         state_tx.send(Instruction::Notify {
@@ -373,7 +372,7 @@ pub mod tests {
     }
 
     #[tokio::test(core_threads = 2)]
-    async fn driver_query() -> Result<(), Error> {
+    async fn driver_query() -> Result<()> {
         let (_, state_tx, node_rx) = setup().await?;
 
         state_tx.send(Instruction::Query {
@@ -407,7 +406,7 @@ pub mod tests {
     }
 
     #[tokio::test(core_threads = 2)]
-    async fn driver_query_noquorum() -> Result<(), Error> {
+    async fn driver_query_noquorum() -> Result<()> {
         let (_, state_tx, node_rx) = setup().await?;
 
         state_tx.send(Instruction::Query {

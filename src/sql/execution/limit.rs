@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// A LIMIT executor
 pub struct Limit<T: Transaction> {
@@ -17,13 +17,13 @@ impl<T: Transaction> Limit<T> {
 }
 
 impl<T: Transaction> Executor<T> for Limit<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let result = self.source.execute(ctx)?;
         if let ResultSet::Query { mut relation } = result {
             if let Some(rows) = relation.rows {
                 relation.rows = Some(Box::new(rows.take(self.limit as usize)))
             }
-            return Ok(ResultSet::Query { relation })
+            return Ok(ResultSet::Query { relation });
         }
         Err(Error::Internal("Unexpected result".into()))
     }

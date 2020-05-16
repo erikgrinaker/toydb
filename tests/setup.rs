@@ -1,9 +1,8 @@
 #![allow(clippy::implicit_hasher)]
-#![allow(clippy::type_complexity)]
 
 use toydb::client::{Client, Pool};
+use toydb::error::Result;
 use toydb::server::Server;
-use toydb::Error;
 
 use futures_util::future::FutureExt as _;
 use pretty_assertions::assert_eq;
@@ -73,7 +72,7 @@ pub async fn server(
     addr_sql: &str,
     addr_raft: &str,
     peers: HashMap<String, String>,
-) -> Result<Teardown, Error> {
+) -> Result<Teardown> {
     let dir = TempDir::new("toydb")?;
     let mut srv = Server::new(id, peers, &dir.path().to_string_lossy(), false).await?;
 
@@ -88,7 +87,7 @@ pub async fn server(
 }
 
 /// Sets up a server with a client
-pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown), Error> {
+pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown)> {
     let teardown = server("test", "127.0.0.1:9605", "127.0.0.1:9705", HashMap::new()).await?;
     let client = Client::new("127.0.0.1:9605").await?;
     if !queries.is_empty() {
@@ -102,7 +101,7 @@ pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown)
 }
 
 /// Sets up a server cluster
-pub async fn cluster(nodes: HashMap<String, (String, String)>) -> Result<Teardown, Error> {
+pub async fn cluster(nodes: HashMap<String, (String, String)>) -> Result<Teardown> {
     let mut teardown = Teardown::empty();
     for (id, (addr_sql, addr_raft)) in nodes.iter() {
         let peers = nodes
@@ -119,7 +118,7 @@ pub async fn cluster(nodes: HashMap<String, (String, String)>) -> Result<Teardow
 pub async fn cluster_with_clients(
     size: u64,
     queries: Vec<&str>,
-) -> Result<(Vec<Client>, Teardown), Error> {
+) -> Result<(Vec<Client>, Teardown)> {
     let mut nodes = HashMap::new();
     for i in 0..size {
         nodes.insert(
@@ -153,7 +152,7 @@ pub async fn cluster_with_pool(
     cluster_size: u64,
     pool_size: u64,
     queries: Vec<&str>,
-) -> Result<(Pool, Teardown), Error> {
+) -> Result<(Pool, Teardown)> {
     let mut nodes = HashMap::new();
     for i in 0..cluster_size {
         nodes.insert(
@@ -179,7 +178,7 @@ pub async fn cluster_with_pool(
 }
 
 /// Sets up a simple cluster with 3 clients and a test table
-pub async fn cluster_simple() -> Result<(Client, Client, Client, Teardown), Error> {
+pub async fn cluster_simple() -> Result<(Client, Client, Client, Teardown)> {
     let (mut clients, teardown) = cluster_with_clients(3, simple()).await?;
     let a = clients.remove(0);
     let b = clients.remove(0);

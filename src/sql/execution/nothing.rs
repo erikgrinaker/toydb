@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::Row;
 use super::{Context, Executor, Relation, ResultSet};
-use crate::Error;
+use crate::error::Result;
 
 /// An executor that produces a single empty row
 pub struct Nothing;
@@ -13,7 +13,7 @@ impl Nothing {
 }
 
 impl<T: Transaction> Executor<T> for Nothing {
-    fn execute(self: Box<Self>, _ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, _ctx: &mut Context<T>) -> Result<ResultSet> {
         Ok(ResultSet::Query {
             relation: Relation {
                 columns: Vec::new(),

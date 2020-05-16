@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::error::{Error, Result};
 
 use std::iter::Peekable;
 use std::str::Chars;
@@ -293,9 +293,9 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token, Error>;
+    type Item = Result<Token>;
 
-    fn next(&mut self) -> Option<Result<Token, Error>> {
+    fn next(&mut self) -> Option<Result<Token>> {
         match self.scan() {
             Ok(Some(token)) => Some(Ok(token)),
             Ok(None) => match self.iter.peek() {
@@ -342,7 +342,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scans the input for the next token if any, ignoring leading whitespace
-    fn scan(&mut self) -> Result<Option<Token>, Error> {
+    fn scan(&mut self) -> Result<Option<Token>> {
         self.consume_whitespace();
         match self.iter.peek() {
             Some('\'') => self.scan_string(),
@@ -366,7 +366,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scans the input for the next quoted ident, if any
-    fn scan_ident_quoted(&mut self) -> Result<Option<Token>, Error> {
+    fn scan_ident_quoted(&mut self) -> Result<Option<Token>> {
         if self.next_if(|c| c == '"').is_none() {
             return Ok(None);
         }
@@ -404,7 +404,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Scans the input for the next string literal, if any
-    fn scan_string(&mut self) -> Result<Option<Token>, Error> {
+    fn scan_string(&mut self) -> Result<Option<Token>> {
         if self.next_if(|c| c == '\'').is_none() {
             return Ok(None);
         }

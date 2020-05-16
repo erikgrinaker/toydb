@@ -1,8 +1,8 @@
 ///! DML-related tests, using an in-memory database against golden files in tests/sql/dml/
 ///! Note that schema-related tests are in schema.rs, this is just for the basic DML functionality
+use toydb::error::Result;
 use toydb::sql::engine::{Engine as _, Mode, Transaction as _};
 use toydb::sql::schema::Catalog as _;
-use toydb::Error;
 
 use goldenfile::Mint;
 use std::io::Write;
@@ -16,7 +16,7 @@ macro_rules! test_dml {
     ( with $setup:expr; $( $name:ident: $query:expr, )* ) => {
         $(
             #[test]
-            fn $name() -> Result<(), Error> {
+            fn $name() -> Result<()> {
                 let setup: &[&str] = &$setup;
                 let engine = super::setup(setup.into())?;
                 let mut mint = Mint::new("tests/sql/dml");

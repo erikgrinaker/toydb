@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::{Error, Result};
 
 /// An OFFSET executor
 pub struct Offset<T: Transaction> {
@@ -17,7 +17,7 @@ impl<T: Transaction> Offset<T> {
 }
 
 impl<T: Transaction> Executor<T> for Offset<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let result = self.source.execute(ctx)?;
         if let ResultSet::Query { mut relation } = result {
             if let Some(rows) = relation.rows {

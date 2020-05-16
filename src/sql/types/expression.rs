@@ -1,5 +1,5 @@
 use super::Value;
-use crate::Error;
+use crate::error::{Error, Result};
 
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
@@ -44,7 +44,7 @@ pub type Expressions = Vec<Expression>;
 
 impl Expression {
     /// Evaluates an expression to a value, given an environment
-    pub fn evaluate(&self, env: &Environment) -> Result<Value, Error> {
+    pub fn evaluate(&self, env: &Environment) -> Result<Value> {
         use Value::*;
         Ok(match self {
             // Constant values
@@ -274,10 +274,10 @@ impl Expression {
 
     /// Transforms the expression tree, by applying a callback function to it
     /// before and/or after descending into it.
-    pub fn transform<B, A>(mut self, pre: &B, post: &A) -> Result<Self, Error>
+    pub fn transform<B, A>(mut self, pre: &B, post: &A) -> Result<Self>
     where
-        B: Fn(Self) -> Result<Self, Error>,
-        A: Fn(Self) -> Result<Self, Error>,
+        B: Fn(Self) -> Result<Self>,
+        A: Fn(Self) -> Result<Self>,
     {
         self = pre(self)?;
         // FIXME Ugly having to explicitly reconstruct each variant, but unable to
@@ -412,7 +412,7 @@ impl<'a> Environment<'a> {
     }
 
     /// Looks up a value by field
-    pub fn lookup_field(&self, relation: Option<&'a str>, field: &'a str) -> Result<Value, Error> {
+    pub fn lookup_field(&self, relation: Option<&'a str>, field: &'a str) -> Result<Value> {
         if let Some(relation) = relation {
             match self.qualified.get(&(relation, field)) {
                 Some(r) => Ok((*r).clone()),
@@ -429,7 +429,7 @@ impl<'a> Environment<'a> {
     }
 
     /// Looks up a value by index
-    pub fn lookup_index(&self, index: usize) -> Result<Value, Error> {
+    pub fn lookup_index(&self, index: usize) -> Result<Value> {
         match self.index.get(index) {
             Some(r) => Ok((*r).clone()),
             None => Err(Error::Value(format!("Index {} out of bounds", index))),

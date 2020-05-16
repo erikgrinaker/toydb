@@ -1,7 +1,7 @@
 use super::super::{Address, Event, Instruction, Message, Response};
 use super::{Candidate, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use crate::error::Result;
 use crate::storage::log;
-use crate::Error;
 
 use ::log::{debug, info, warn};
 use rand::Rng as _;
@@ -34,7 +34,7 @@ impl Follower {
 
 impl<L: log::Store> RoleNode<Follower, L> {
     /// Transforms the node into a candidate.
-    fn become_candidate(self) -> Result<RoleNode<Candidate, L>, Error> {
+    fn become_candidate(self) -> Result<RoleNode<Candidate, L>> {
         info!("Starting election for term {}", self.term + 1);
         let mut node = self.become_role(Candidate::new())?;
         node.term += 1;
@@ -47,7 +47,7 @@ impl<L: log::Store> RoleNode<Follower, L> {
     }
 
     /// Transforms the node into a follower for a new leader.
-    fn become_follower(mut self, leader: &str, term: u64) -> Result<RoleNode<Follower, L>, Error> {
+    fn become_follower(mut self, leader: &str, term: u64) -> Result<RoleNode<Follower, L>> {
         let mut voted_for = None;
         if term > self.term {
             info!("Discovered new term {}, following leader {}", term, leader);
@@ -72,7 +72,7 @@ impl<L: log::Store> RoleNode<Follower, L> {
     }
 
     /// Processes a message.
-    pub fn step(mut self, msg: Message) -> Result<Node<L>, Error> {
+    pub fn step(mut self, msg: Message) -> Result<Node<L>> {
         if let Err(err) = self.validate(&msg) {
             warn!("Ignoring invalid message: {}", err);
             return Ok(self.into());
@@ -162,7 +162,7 @@ impl<L: log::Store> RoleNode<Follower, L> {
     }
 
     /// Processes a logical clock tick.
-    pub fn tick(mut self) -> Result<Node<L>, Error> {
+    pub fn tick(mut self) -> Result<Node<L>> {
         self.role.leader_seen_ticks += 1;
         if self.role.leader_seen_ticks >= self.role.leader_seen_timeout {
             Ok(self.become_candidate()?.into())
@@ -177,6 +177,7 @@ pub mod tests {
     use super::super::super::{Entry, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
+    use crate::error::Error;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
@@ -189,14 +190,11 @@ pub mod tests {
     }
 
     #[allow(clippy::type_complexity)]
-    fn setup() -> Result<
-        (
-            RoleNode<Follower, log::Test>,
-            mpsc::UnboundedReceiver<Message>,
-            mpsc::UnboundedReceiver<Instruction>,
-        ),
-        Error,
-    > {
+    fn setup() -> Result<(
+        RoleNode<Follower, log::Test>,
+        mpsc::UnboundedReceiver<Message>,
+        mpsc::UnboundedReceiver<Instruction>,
+    )> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let mut log = Log::new(log::Test::new())?;
@@ -222,7 +220,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat from current leader should commit and apply
-    fn step_heartbeat() -> Result<(), Error> {
+    fn step_heartbeat() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -251,7 +249,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat from current leader with conflicting commit_term
-    fn step_heartbeat_conflict_commit_term() -> Result<(), Error> {
+    fn step_heartbeat_conflict_commit_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -275,7 +273,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat from current leader with a missing commit_index
-    fn step_heartbeat_missing_commit_entry() -> Result<(), Error> {
+    fn step_heartbeat_missing_commit_entry() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -299,7 +297,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat from fake leader
-    fn step_heartbeat_fake_leader() -> Result<(), Error> {
+    fn step_heartbeat_fake_leader() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("c".into()),
@@ -315,7 +313,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat when no current leader makes us follow the leader
-    fn step_heartbeat_no_leader() -> Result<(), Error> {
+    fn step_heartbeat_no_leader() -> Result<()> {
         let (mut follower, mut node_rx, mut state_rx) = setup()?;
         follower.role = Follower::new(None, None);
         let node = follower.step(Message {
@@ -345,7 +343,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat from current leader with old commit_index
-    fn step_heartbeat_old_commit_index() -> Result<(), Error> {
+    fn step_heartbeat_old_commit_index() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -369,7 +367,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat for future term with other leader changes leader
-    fn step_heartbeat_future_term() -> Result<(), Error> {
+    fn step_heartbeat_future_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("c".into()),
@@ -398,7 +396,7 @@ pub mod tests {
 
     #[test]
     // Heartbeat from past term
-    fn step_heartbeat_past_term() -> Result<(), Error> {
+    fn step_heartbeat_past_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -414,7 +412,7 @@ pub mod tests {
 
     #[test]
     // SolicitVote is granted for the first solicitor, otherwise ignored.
-    fn step_solicitvote() -> Result<(), Error> {
+    fn step_solicitvote() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
 
         // The first vote request in this term yields a vote response.
@@ -470,7 +468,7 @@ pub mod tests {
 
     #[test]
     // GrantVote messages are ignored
-    fn step_grantvote_noop() -> Result<(), Error> {
+    fn step_grantvote_noop() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -486,7 +484,7 @@ pub mod tests {
 
     #[test]
     // SolicitVote is rejected if last_term is outdated.
-    fn step_solicitvote_last_index_outdated() -> Result<(), Error> {
+    fn step_solicitvote_last_index_outdated() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("c".into()),
@@ -502,7 +500,7 @@ pub mod tests {
 
     #[test]
     // SolicitVote is rejected if last_term is outdated.
-    fn step_solicitvote_last_term_outdated() -> Result<(), Error> {
+    fn step_solicitvote_last_term_outdated() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("c".into()),
@@ -518,7 +516,7 @@ pub mod tests {
 
     #[test]
     // ReplicateEntries accepts some entries at base 0 without changes
-    fn step_replicateentries_base0() -> Result<(), Error> {
+    fn step_replicateentries_base0() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -553,7 +551,7 @@ pub mod tests {
 
     #[test]
     // ReplicateEntries appends entries but does not commit them
-    fn step_replicateentries_append() -> Result<(), Error> {
+    fn step_replicateentries_append() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -590,7 +588,7 @@ pub mod tests {
 
     #[test]
     // ReplicateEntries accepts partially overlapping entries
-    fn step_replicateentries_partial_overlap() -> Result<(), Error> {
+    fn step_replicateentries_partial_overlap() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -627,7 +625,7 @@ pub mod tests {
 
     #[test]
     // ReplicateEntries replaces conflicting entries
-    fn step_replicateentries_replace() -> Result<(), Error> {
+    fn step_replicateentries_replace() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -663,7 +661,7 @@ pub mod tests {
 
     #[test]
     // ReplicateEntries replaces partially conflicting entries
-    fn step_replicateentries_replace_partial() -> Result<(), Error> {
+    fn step_replicateentries_replace_partial() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -699,7 +697,7 @@ pub mod tests {
 
     #[test]
     // ReplicateEntries rejects missing base index
-    fn step_replicateentries_reject_missing_base_index() -> Result<(), Error> {
+    fn step_replicateentries_reject_missing_base_index() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -731,7 +729,7 @@ pub mod tests {
 
     #[test]
     // ReplicateEntries rejects conflicting base term
-    fn step_replicateentries_reject_missing_base_term() -> Result<(), Error> {
+    fn step_replicateentries_reject_missing_base_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let node = follower.step(Message {
             from: Address::Peer("b".into()),
@@ -763,7 +761,7 @@ pub mod tests {
 
     #[test]
     // ClientRequest is proxied, as is the response.
-    fn step_clientrequest_clientresponse() -> Result<(), Error> {
+    fn step_clientrequest_clientresponse() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = Node::Follower(follower);
 
@@ -821,7 +819,7 @@ pub mod tests {
 
     #[test]
     // ClientRequest is queued when there is no leader, and forwarded when a leader appears.
-    fn step_clientrequest_queued() -> Result<(), Error> {
+    fn step_clientrequest_queued() -> Result<()> {
         let (mut follower, mut node_rx, mut state_rx) = setup()?;
         follower.role = Follower::new(None, None);
         let mut node = Node::Follower(follower);
@@ -883,7 +881,7 @@ pub mod tests {
 
     // ClientRequest is proxied, but aborted when a new leader appears.
     #[test]
-    fn step_clientrequest_aborted() -> Result<(), Error> {
+    fn step_clientrequest_aborted() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = Node::Follower(follower);
 
@@ -948,7 +946,7 @@ pub mod tests {
     }
 
     #[test]
-    fn tick() -> Result<(), Error> {
+    fn tick() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let timeout = follower.role.leader_seen_timeout;
         let mut node = Node::Follower(follower);

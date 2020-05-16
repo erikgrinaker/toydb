@@ -3,8 +3,8 @@ mod follower;
 mod leader;
 
 use super::{Address, Driver, Event, Instruction, Log, Message, State};
+use crate::error::{Error, Result};
 use crate::storage::log;
-use crate::Error;
 use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
@@ -49,7 +49,7 @@ impl<L: log::Store> Node<L> {
         log: Log<L>,
         mut state: S,
         node_tx: mpsc::UnboundedSender<Message>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let applied_index = state.applied_index();
         if applied_index > log.commit_index {
             return Err(Error::Internal(format!(
@@ -97,7 +97,7 @@ impl<L: log::Store> Node<L> {
     }
 
     /// Processes a message.
-    pub fn step(self, msg: Message) -> Result<Self, Error> {
+    pub fn step(self, msg: Message) -> Result<Self> {
         debug!("Stepping {:?}", msg);
         match self {
             Node::Candidate(n) => n.step(msg),
@@ -107,7 +107,7 @@ impl<L: log::Store> Node<L> {
     }
 
     /// Moves time forward by a tick.
-    pub fn tick(self) -> Result<Self, Error> {
+    pub fn tick(self) -> Result<Self> {
         match self {
             Node::Candidate(n) => n.tick(),
             Node::Follower(n) => n.tick(),
@@ -151,7 +151,7 @@ pub struct RoleNode<R, L: log::Store> {
 
 impl<R, L: log::Store> RoleNode<R, L> {
     /// Transforms the node into another role.
-    fn become_role<T>(self, role: T) -> Result<RoleNode<T, L>, Error> {
+    fn become_role<T>(self, role: T) -> Result<RoleNode<T, L>> {
         Ok(RoleNode {
             id: self.id,
             peers: self.peers,
@@ -166,7 +166,7 @@ impl<R, L: log::Store> RoleNode<R, L> {
     }
 
     /// Aborts any proxied requests.
-    fn abort_proxied(&mut self) -> Result<(), Error> {
+    fn abort_proxied(&mut self) -> Result<()> {
         for (id, address) in std::mem::replace(&mut self.proxied_reqs, HashMap::new()) {
             self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
         }
@@ -174,7 +174,7 @@ impl<R, L: log::Store> RoleNode<R, L> {
     }
 
     /// Sends any queued requests to the given leader.
-    fn forward_queued(&mut self, leader: Address) -> Result<(), Error> {
+    fn forward_queued(&mut self, leader: Address) -> Result<()> {
         for (from, event) in std::mem::replace(&mut self.queued_reqs, Vec::new()) {
             if let Event::ClientRequest { id, .. } = &event {
                 self.proxied_reqs.insert(id.clone(), from.clone());
@@ -198,14 +198,14 @@ impl<R, L: log::Store> RoleNode<R, L> {
     }
 
     /// Sends an event
-    fn send(&self, to: Address, event: Event) -> Result<(), Error> {
+    fn send(&self, to: Address, event: Event) -> Result<()> {
         let msg = Message { term: self.term, from: Address::Local, to, event };
         debug!("Sending {:?}", msg);
         Ok(self.node_tx.send(msg)?)
     }
 
     /// Validates a message
-    fn validate(&self, msg: &Message) -> Result<(), Error> {
+    fn validate(&self, msg: &Message) -> Result<()> {
         match msg.from {
             Address::Peers => return Err(Error::Internal("Message from broadcast address".into())),
             Address::Local => return Err(Error::Internal("Message from local node".into())),
@@ -288,7 +288,7 @@ mod tests {
         }
 
         pub fn entries(self, entries: Vec<Entry>) -> Self {
-            assert_eq!(entries, self.log().scan(0..).collect::<Result<Vec<_>, Error>>().unwrap());
+            assert_eq!(entries, self.log().scan(0..).collect::<Result<Vec<_>>>().unwrap());
             self
         }
 
@@ -400,15 +400,13 @@ mod tests {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>), Error>
-    {
+    fn setup_rolenode() -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>)> {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
-    #[allow(clippy::type_complexity)]
     fn setup_rolenode_peers(
         peers: Vec<String>,
-    ) -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>), Error> {
+    ) -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>)> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, _) = mpsc::unbounded_channel();
         let node = RoleNode {
@@ -426,7 +424,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn new() -> Result<(), Error> {
+    async fn new() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let node = Node::new(
             "a",
@@ -448,7 +446,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn new_loads_term() -> Result<(), Error> {
+    async fn new_loads_term() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let store = log::Test::new();
         Log::new(store.clone())?.save_term(3, Some("c"))?;
@@ -468,7 +466,7 @@ mod tests {
     }
 
     #[tokio::test(core_threads = 2)]
-    async fn new_state_apply_all() -> Result<(), Error> {
+    async fn new_state_apply_all() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
@@ -486,7 +484,7 @@ mod tests {
     }
 
     #[tokio::test(core_threads = 2)]
-    async fn new_state_apply_partial() -> Result<(), Error> {
+    async fn new_state_apply_partial() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
@@ -504,7 +502,7 @@ mod tests {
     }
 
     #[tokio::test(core_threads = 2)]
-    async fn new_state_apply_missing() -> Result<(), Error> {
+    async fn new_state_apply_missing() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let mut log = Log::new(log::Test::new())?;
         log.append(1, Some(vec![0x01]))?;
@@ -524,7 +522,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn new_single() -> Result<(), Error> {
+    async fn new_single() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let node =
             Node::new("a", vec![], Log::new(log::Test::new())?, TestState::new(0), node_tx).await?;
@@ -540,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn become_role() -> Result<(), Error> {
+    fn become_role() -> Result<()> {
         let (node, _) = setup_rolenode()?;
         let new = node.become_role("role")?;
         assert_eq!(new.id, "a".to_owned());
@@ -551,7 +549,7 @@ mod tests {
     }
 
     #[test]
-    fn quorum() -> Result<(), Error> {
+    fn quorum() -> Result<()> {
         let quorums = vec![(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)];
         for (size, quorum) in quorums.into_iter() {
             let peers: Vec<String> =
@@ -564,7 +562,7 @@ mod tests {
     }
 
     #[test]
-    fn send() -> Result<(), Error> {
+    fn send() -> Result<()> {
         let (node, mut rx) = setup_rolenode()?;
         node.send(Address::Peer("b".into()), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
         assert_messages(

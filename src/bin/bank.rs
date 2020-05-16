@@ -12,10 +12,10 @@ use rand::Rng as _;
 use tokio::net::ToSocketAddrs;
 use tokio::sync::MutexGuard;
 use toydb::client::{Client, Pool};
-use toydb::Error;
+use toydb::error::{Error, Result};
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     let opts = app_from_crate!()
         .arg(
             clap::Arg::with_name("host")
@@ -93,7 +93,7 @@ impl Bank {
         concurrency: u64,
         customers: i64,
         accounts: i64,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         Ok(Self {
             clients: Pool::new(addrs, concurrency).await?,
             customers,
@@ -102,7 +102,7 @@ impl Bank {
     }
 
     // Runs the bank simulation
-    async fn run(&self, transactions: u64) -> Result<(), Error> {
+    async fn run(&self, transactions: u64) -> Result<()> {
         self.setup().await?;
         self.verify().await?;
         println!();
@@ -135,7 +135,7 @@ impl Bank {
     }
 
     // Sets up the database
-    async fn setup(&self) -> Result<(), Error> {
+    async fn setup(&self) -> Result<()> {
         let client = self.clients.get().await;
         let start = std::time::Instant::now();
         client.execute("BEGIN").await?;
@@ -189,7 +189,7 @@ impl Bank {
     }
 
     /// Verifies that all invariants hold
-    async fn verify(&self) -> Result<(), Error> {
+    async fn verify(&self) -> Result<()> {
         let client = self.clients.get().await;
         let expect = self.customers * self.customer_accounts * Self::INITIAL_BALANCE as i64;
         let balance =
@@ -214,7 +214,7 @@ impl Bank {
 
     /// Transfers a random amount between two customers, retrying serialization failures
     /// FIXME The serialization rety with exponential backoff should be a helper on Client
-    async fn transfer(&self, from: i64, to: i64) -> Result<(), Error> {
+    async fn transfer(&self, from: i64, to: i64) -> Result<()> {
         let client = self.clients.get().await;
         let mut attempts = 0;
         let start = std::time::Instant::now();
@@ -263,7 +263,7 @@ impl Bank {
         client: &MutexGuard<'_, Client>,
         from: i64,
         to: i64,
-    ) -> Result<(i64, i64, i64), Error> {
+    ) -> Result<(i64, i64, i64)> {
         let mut row = client
             .execute(&format!(
                 "SELECT a.id, a.balance

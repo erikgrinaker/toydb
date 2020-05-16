@@ -1,7 +1,7 @@
 use super::super::{Address, Event, Message, Response};
 use super::{Follower, Leader, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use crate::error::Result;
 use crate::storage::log;
-use crate::Error;
 
 use ::log::{debug, info, warn};
 use rand::Rng as _;
@@ -31,7 +31,7 @@ impl Candidate {
 
 impl<L: log::Store> RoleNode<Candidate, L> {
     /// Transition to follower role.
-    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>, Error> {
+    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>> {
         info!("Discovered leader {} for term {}, following", leader, term);
         self.term = term;
         self.log.save_term(term, None)?;
@@ -42,7 +42,7 @@ impl<L: log::Store> RoleNode<Candidate, L> {
     }
 
     /// Transition to leader role.
-    fn become_leader(self) -> Result<RoleNode<Leader, L>, Error> {
+    fn become_leader(self) -> Result<RoleNode<Leader, L>> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
         let last_index = self.log.last_index;
@@ -60,7 +60,7 @@ impl<L: log::Store> RoleNode<Candidate, L> {
     }
 
     /// Processes a message.
-    pub fn step(mut self, msg: Message) -> Result<Node<L>, Error> {
+    pub fn step(mut self, msg: Message) -> Result<Node<L>> {
         if let Err(err) = self.validate(&msg) {
             warn!("Ignoring invalid message: {}", err);
             return Ok(self.into());
@@ -113,7 +113,7 @@ impl<L: log::Store> RoleNode<Candidate, L> {
     }
 
     /// Processes a logical clock tick.
-    pub fn tick(mut self) -> Result<Node<L>, Error> {
+    pub fn tick(mut self) -> Result<Node<L>> {
         // If the election times out, start a new one for the next term.
         self.role.election_ticks += 1;
         if self.role.election_ticks >= self.role.election_timeout {
@@ -142,14 +142,11 @@ mod tests {
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
-    fn setup() -> Result<
-        (
-            RoleNode<Candidate, log::Test>,
-            mpsc::UnboundedReceiver<Message>,
-            mpsc::UnboundedReceiver<Instruction>,
-        ),
-        Error,
-    > {
+    fn setup() -> Result<(
+        RoleNode<Candidate, log::Test>,
+        mpsc::UnboundedReceiver<Message>,
+        mpsc::UnboundedReceiver<Instruction>,
+    )> {
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let mut log = Log::new(log::Test::new())?;
@@ -186,7 +183,7 @@ mod tests {
     #[test]
     // Heartbeat for current term converts to follower, forwards the queued request from setup(),
     // and emits ConfirmLeader.
-    fn step_heartbeat_current_term() -> Result<(), Error> {
+    fn step_heartbeat_current_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let node = candidate.step(Message {
             from: Address::Peer("b".into()),
@@ -222,7 +219,7 @@ mod tests {
     #[test]
     // Heartbeat for future term converts to follower, forwards queued request, and emits
     // ConfirmLeader event
-    fn step_heartbeat_future_term() -> Result<(), Error> {
+    fn step_heartbeat_future_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let node = candidate.step(Message {
             from: Address::Peer("b".into()),
@@ -257,7 +254,7 @@ mod tests {
 
     #[test]
     // Heartbeat for past term is ignored
-    fn step_heartbeat_past_term() -> Result<(), Error> {
+    fn step_heartbeat_past_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let node = candidate.step(Message {
             from: Address::Peer("b".into()),
@@ -272,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn step_grantvote() -> Result<(), Error> {
+    fn step_grantvote() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let peers = candidate.peers.clone();
         let mut node = Node::Candidate(candidate);
@@ -350,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn tick() -> Result<(), Error> {
+    fn tick() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let timeout = candidate.role.election_timeout;
         let mut node = Node::Candidate(candidate);

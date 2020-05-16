@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::{Column, Relation, Row, Value};
 use super::{Context, Executor, ResultSet};
-use crate::Error;
+use crate::error::Result;
 
 use std::collections::HashSet;
 
@@ -30,7 +30,7 @@ impl IndexLookup {
 }
 
 impl<T: Transaction> Executor<T> for IndexLookup {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet, Error> {
+    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let table = ctx.txn.must_read_table(&self.table)?;
         let name = if let Some(alias) = &self.alias { alias } else { &table.name };
 
@@ -43,7 +43,7 @@ impl<T: Transaction> Executor<T> for IndexLookup {
         let rows = pks
             .into_iter()
             .filter_map(|pk| ctx.txn.read(&table.name, &pk).transpose())
-            .collect::<Result<Vec<Row>, Error>>()?;
+            .collect::<Result<Vec<Row>>>()?;
 
         Ok(ResultSet::Query {
             relation: Relation {

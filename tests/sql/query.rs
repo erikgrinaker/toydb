@@ -1,11 +1,11 @@
 ///! Tests for the SQL query engine. Runs SQL queries against an in-memory database,
 ///! and compares the results with golden files stored under tests/sql/query/
+use toydb::error::{Error, Result};
 use toydb::sql::engine::{Engine, Mode, Transaction};
 use toydb::sql::execution::{Context, ResultSet};
 use toydb::sql::parser::Parser;
 use toydb::sql::plan::Plan;
 use toydb::sql::types::Row;
-use toydb::Error;
 
 use goldenfile::Mint;
 use std::io::Write;
@@ -19,7 +19,7 @@ macro_rules! test_query {
     ( with $setup:expr; $( $name:ident: $query:expr, )* ) => {
     $(
         #[test]
-        fn $name() -> Result<(), Error> {
+        fn $name() -> Result<()> {
             let mut setup = $setup.to_vec();
             setup.extend(vec![
                 "CREATE TABLE countries (

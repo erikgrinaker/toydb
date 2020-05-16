@@ -1,7 +1,7 @@
 use super::super::{assert_rows, setup};
 
+use toydb::error::Result;
 use toydb::sql::types::Value;
-use toydb::Error;
 
 use futures::future::FutureExt as _;
 use pretty_assertions::assert_eq;
@@ -12,7 +12,7 @@ use std::iter::FromIterator as _;
 #[tokio::test(core_threads = 4)]
 #[serial]
 #[allow(clippy::many_single_char_names)]
-async fn get() -> Result<(), Error> {
+async fn get() -> Result<()> {
     let (pool, _teardown) = setup::cluster_with_pool(3, 5, setup::simple()).await?;
 
     // The clients are allocated to all servers
@@ -42,7 +42,7 @@ async fn get() -> Result<(), Error> {
 
 #[tokio::test(core_threads = 4)]
 #[serial]
-async fn drop_rollback() -> Result<(), Error> {
+async fn drop_rollback() -> Result<()> {
     let (pool, _teardown) = setup::cluster_with_pool(3, 1, setup::simple()).await?;
 
     // Starting a client and dropping it mid-transaction should work.

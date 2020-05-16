@@ -1,9 +1,9 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, IndexScan, Mode, Scan, Transaction as _};
+use crate::error::{Error, Result};
 use crate::raft;
 use crate::storage::kv;
-use crate::Error;
 
 use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
@@ -75,12 +75,12 @@ impl Raft {
     }
 
     /// Creates an underlying state machine for a Raft engine.
-    pub fn new_state<S: kv::Store>(kv: kv::MVCC<S>) -> Result<State<S>, Error> {
+    pub fn new_state<S: kv::Store>(kv: kv::MVCC<S>) -> Result<State<S>> {
         State::new(kv)
     }
 
     /// Returns Raft SQL engine status.
-    pub fn status(&self) -> Result<Status, Error> {
+    pub fn status(&self) -> Result<Status> {
         Ok(Status {
             raft: futures::executor::block_on(self.client.status())?,
             mvcc: Raft::deserialize(&futures::executor::block_on(
@@ -90,12 +90,12 @@ impl Raft {
     }
 
     /// Serializes a command for the Raft SQL state machine.
-    fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>, Error> {
+    fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
         Ok(bincode::serialize(value)?)
     }
 
     /// Deserializes a command for the Raft SQL state machine.
-    fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V, Error> {
+    fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
         Ok(bincode::deserialize(bytes)?)
     }
 }
@@ -103,11 +103,11 @@ impl Raft {
 impl super::Engine for Raft {
     type Transaction = Transaction;
 
-    fn begin(&self, mode: Mode) -> Result<Self::Transaction, Error> {
+    fn begin(&self, mode: Mode) -> Result<Self::Transaction> {
         Transaction::begin(self.client.clone(), mode)
     }
 
-    fn resume(&self, id: u64) -> Result<Self::Transaction, Error> {
+    fn resume(&self, id: u64) -> Result<Self::Transaction> {
         Transaction::resume(self.client.clone(), id)
     }
 }
@@ -125,7 +125,7 @@ pub struct Transaction {
 
 impl Transaction {
     /// Starts a transaction in the given mode
-    fn begin(client: raft::Client, mode: Mode) -> Result<Self, Error> {
+    fn begin(client: raft::Client, mode: Mode) -> Result<Self> {
         let id = Raft::deserialize(&futures::executor::block_on(
             client.mutate(Raft::serialize(&Mutation::Begin(mode))?),
         )?)?;
@@ -133,7 +133,7 @@ impl Transaction {
     }
 
     /// Resumes an active transaction
-    fn resume(client: raft::Client, id: u64) -> Result<Self, Error> {
+    fn resume(client: raft::Client, id: u64) -> Result<Self> {
         let (id, mode) = Raft::deserialize(&futures::executor::block_on(
             client.query(Raft::serialize(&Query::Resume(id))?),
         )?)?;
@@ -141,12 +141,12 @@ impl Transaction {
     }
 
     /// Executes a mutation
-    fn mutate(&self, mutation: Mutation) -> Result<Vec<u8>, Error> {
+    fn mutate(&self, mutation: Mutation) -> Result<Vec<u8>> {
         futures::executor::block_on(self.client.mutate(Raft::serialize(&mutation)?))
     }
 
     /// Executes a query
-    fn query(&self, query: Query) -> Result<Vec<u8>, Error> {
+    fn query(&self, query: Query) -> Result<Vec<u8>> {
         futures::executor::block_on(self.client.query(Raft::serialize(&query)?))
     }
 }
@@ -160,15 +160,15 @@ impl super::Transaction for Transaction {
         self.mode
     }
 
-    fn commit(self) -> Result<(), Error> {
+    fn commit(self) -> Result<()> {
         Raft::deserialize(&self.mutate(Mutation::Commit(self.id))?)
     }
 
-    fn rollback(self) -> Result<(), Error> {
+    fn rollback(self) -> Result<()> {
         Raft::deserialize(&self.mutate(Mutation::Rollback(self.id))?)
     }
 
-    fn create(&mut self, table: &str, row: Row) -> Result<(), Error> {
+    fn create(&mut self, table: &str, row: Row) -> Result<()> {
         Raft::deserialize(&self.mutate(Mutation::Create {
             txn_id: self.id,
             table: table.to_string(),
@@ -176,7 +176,7 @@ impl super::Transaction for Transaction {
         })?)
     }
 
-    fn delete(&mut self, table: &str, id: &Value) -> Result<(), Error> {
+    fn delete(&mut self, table: &str, id: &Value) -> Result<()> {
         Raft::deserialize(&self.mutate(Mutation::Delete {
             txn_id: self.id,
             table: table.to_string(),
@@ -184,7 +184,7 @@ impl super::Transaction for Transaction {
         })?)
     }
 
-    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>, Error> {
+    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>> {
         Raft::deserialize(&self.query(Query::Read {
             txn_id: self.id,
             table: table.to_string(),
@@ -192,12 +192,7 @@ impl super::Transaction for Transaction {
         })?)
     }
 
-    fn read_index(
-        &self,
-        table: &str,
-        column: &str,
-        value: &Value,
-    ) -> Result<HashSet<Value>, Error> {
+    fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
         Raft::deserialize(&self.query(Query::ReadIndex {
             txn_id: self.id,
             table: table.to_string(),
@@ -206,7 +201,7 @@ impl super::Transaction for Transaction {
         })?)
     }
 
-    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan, Error> {
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan> {
         Ok(Box::new(
             Raft::deserialize::<Vec<_>>(&self.query(Query::Scan {
                 txn_id: self.id,
@@ -218,7 +213,7 @@ impl super::Transaction for Transaction {
         ))
     }
 
-    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan, Error> {
+    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan> {
         Ok(Box::new(
             Raft::deserialize::<Vec<_>>(&self.query(Query::ScanIndex {
                 txn_id: self.id,
@@ -230,7 +225,7 @@ impl super::Transaction for Transaction {
         ))
     }
 
-    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<(), Error> {
+    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()> {
         Raft::deserialize(&self.mutate(Mutation::Update {
             txn_id: self.id,
             table: table.to_string(),
@@ -241,25 +236,25 @@ impl super::Transaction for Transaction {
 }
 
 impl Catalog for Transaction {
-    fn create_table(&mut self, table: &Table) -> Result<(), Error> {
+    fn create_table(&mut self, table: &Table) -> Result<()> {
         Raft::deserialize(
             &self.mutate(Mutation::CreateTable { txn_id: self.id, schema: table.clone() })?,
         )
     }
 
-    fn delete_table(&mut self, table: &str) -> Result<(), Error> {
+    fn delete_table(&mut self, table: &str) -> Result<()> {
         Raft::deserialize(
             &self.mutate(Mutation::DeleteTable { txn_id: self.id, table: table.to_string() })?,
         )
     }
 
-    fn read_table(&self, table: &str) -> Result<Option<Table>, Error> {
+    fn read_table(&self, table: &str) -> Result<Option<Table>> {
         Raft::deserialize(
             &self.query(Query::ReadTable { txn_id: self.id, table: table.to_string() })?,
         )
     }
 
-    fn scan_tables(&self) -> Result<Tables, Error> {
+    fn scan_tables(&self) -> Result<Tables> {
         Ok(Box::new(
             Raft::deserialize::<Vec<_>>(&self.query(Query::ScanTables { txn_id: self.id })?)?
                 .into_iter(),
@@ -277,7 +272,7 @@ pub struct State<S: kv::Store> {
 
 impl<S: kv::Store> State<S> {
     /// Creates a new Raft state maching using the given MVCC key/value store
-    pub fn new(store: kv::MVCC<S>) -> Result<Self, Error> {
+    pub fn new(store: kv::MVCC<S>) -> Result<Self> {
         let engine = super::KV::new(store);
         let applied_index = engine
             .get_metadata(b"applied_index")?
@@ -287,7 +282,7 @@ impl<S: kv::Store> State<S> {
     }
 
     /// Applies a state machine mutation
-    fn apply(&mut self, mutation: Mutation) -> Result<Vec<u8>, Error> {
+    fn apply(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
         match mutation {
             Mutation::Begin(mode) => Raft::serialize(&self.engine.begin(mode)?.id()),
             Mutation::Commit(txn_id) => Raft::serialize(&self.engine.resume(txn_id)?.commit()?),
@@ -318,7 +313,7 @@ impl<S: kv::Store> raft::State for State<S> {
         self.applied_index
     }
 
-    fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>, Error> {
+    fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>> {
         // We don't check that index == applied_index + 1, since the Raft log commits no-op
         // entries during leader election which we need to ignore.
         match self.apply(Raft::deserialize(&command)?) {
@@ -331,7 +326,7 @@ impl<S: kv::Store> raft::State for State<S> {
         }
     }
 
-    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>, Error> {
+    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
         match Raft::deserialize(&command)? {
             Query::Resume(id) => {
                 let txn = self.engine.resume(id)?;
@@ -346,18 +341,14 @@ impl<S: kv::Store> raft::State for State<S> {
             }
             // FIXME These need to stream rows somehow
             Query::Scan { txn_id, table, filter } => Raft::serialize(
-                &self
-                    .engine
-                    .resume(txn_id)?
-                    .scan(&table, filter)?
-                    .collect::<Result<Vec<_>, Error>>()?,
+                &self.engine.resume(txn_id)?.scan(&table, filter)?.collect::<Result<Vec<_>>>()?,
             ),
             Query::ScanIndex { txn_id, table, column } => Raft::serialize(
                 &self
                     .engine
                     .resume(txn_id)?
                     .scan_index(&table, &column)?
-                    .collect::<Result<Vec<_>, Error>>()?,
+                    .collect::<Result<Vec<_>>>()?,
             ),
             Query::Status => Raft::serialize(&self.engine.kv.status()?),
 
