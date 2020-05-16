@@ -13,21 +13,26 @@ steps:
   pull: true
   environment: *env
   commands:
-  - apt-get update && apt-get install -y protobuf-compiler
-  - cargo build
+  - cargo build --tests
 
 - name: test
   image: rust:1.43
   environment: *env
   commands:
   - cargo test
+  depends_on:
+  - build
 
 - name: lint
   image: rust:1.43
   environment: *env
   commands:
   - rustup component add clippy
+  # wait for test step to finish building
+  - sleep 2
   - cargo clippy --tests -- -D warnings
+  depends_on:
+  - build
 
 - name: notify
   image: drillster/drone-email
@@ -40,3 +45,6 @@ steps:
     status:
     - changed
     - failure
+  depends_on:
+  - test
+  - lint

@@ -3,10 +3,7 @@ FROM rust:1.43-slim AS build
 
 ARG TARGET=x86_64-unknown-linux-musl
 ENV RUSTFLAGS=-Clinker=musl-gcc
-
-RUN apt-get -q update \
-    && apt-get -yq install musl-tools protobuf-compiler \
-    && rustup target add $TARGET
+RUN rustup target add $TARGET
 
 # FIXME: cargo does not have an option to only build dependencies, so we build
 # a dummy main.rs. See: https://github.com/rust-lang/cargo/issues/2644
