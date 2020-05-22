@@ -1,3 +1,4 @@
 /clusters/*/toydb-?/data
 /target
+.vscode/
 **/*.rs.bk

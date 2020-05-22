@@ -1,10 +1,12 @@
 mod memory;
 pub mod mvcc;
+mod std_memory;
 #[cfg(test)]
 mod test;
 
 pub use memory::Memory;
 pub use mvcc::MVCC;
+pub use std_memory::StdMemory;
 #[cfg(test)]
 pub use test::Test;
 
@@ -41,6 +43,7 @@ trait TestSuite<S: Store> {
         Self::test_get()?;
         Self::test_scan()?;
         Self::test_set()?;
+        Self::test_random()?;
         Ok(())
     }
 
@@ -59,6 +62,40 @@ trait TestSuite<S: Store> {
         s.delete(b"a")?;
         assert_eq!(None, s.get(b"a")?);
         s.delete(b"b")?;
+        Ok(())
+    }
+
+    fn test_random() -> Result<()> {
+        use rand::Rng;
+        let mut s = Self::setup()?;
+        let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(397_427_893);
+
+        // Create a bunch of random items and insert them
+        let mut items: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
+        for i in 0..1000_u64 {
+            items.push((rng.gen::<[u8; 32]>().to_vec(), i.to_be_bytes().to_vec()))
+        }
+        for (key, value) in items.iter() {
+            s.set(key, value.clone())?;
+        }
+
+        // Fetch the random items, both via get() and scan()
+        for (key, value) in items.iter() {
+            assert_eq!(s.get(key)?, Some(value.clone()))
+        }
+        let mut expect = items.clone();
+        expect.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?);
+        expect.reverse();
+        assert_eq!(expect, s.scan(..).rev().collect::<Result<Vec<_>>>()?);
+
+        // Remove the items
+        for (key, _) in items {
+            s.delete(&key)?;
+            assert_eq!(None, s.get(&key)?);
+        }
+        assert!(s.scan(..).collect::<Result<Vec<_>>>()?.is_empty());
+
         Ok(())
     }
 
