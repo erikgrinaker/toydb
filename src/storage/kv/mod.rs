@@ -91,7 +91,7 @@ impl RangeBounds<Vec<u8>> for Range {
 }
 
 /// Iterator over a key/value range.
-pub type Scan<'a> = Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a>;
+pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>>>;
 
 #[cfg(test)]
 trait TestSuite<S: Store> {

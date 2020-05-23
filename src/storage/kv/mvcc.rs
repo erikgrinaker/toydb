@@ -198,8 +198,7 @@ impl Transaction {
         let session = self.store.read()?;
         let mut scan = session
             .scan(Range::from(
-                Key::Record(Cow::Borrowed(key), 0).encode()
-                    ..=Key::Record(Cow::Borrowed(key), self.id).encode(),
+                Key::Record(key.into(), 0).encode()..=Key::Record(key.into(), self.id).encode(),
             ))
             .rev();
         while let Some((k, v)) = scan.next().transpose()? {
@@ -217,7 +216,18 @@ impl Transaction {
 
     /// Scans a key range.
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<super::Scan> {
-        Ok(Box::new(Scan::new(self.store.clone(), self.snapshot.clone(), range)?))
+        let start = match range.start_bound() {
+            Bound::Excluded(k) => Bound::Excluded(Key::Record(k.into(), std::u64::MAX).encode()),
+            Bound::Included(k) => Bound::Included(Key::Record(k.into(), 0).encode()),
+            Bound::Unbounded => Bound::Included(Key::Record(vec![].into(), 0).encode()),
+        };
+        let end = match range.end_bound() {
+            Bound::Excluded(k) => Bound::Excluded(Key::Record(k.into(), 0).encode()),
+            Bound::Included(k) => Bound::Included(Key::Record(k.into(), std::u64::MAX).encode()),
+            Bound::Unbounded => Bound::Unbounded,
+        };
+        let scan = self.store.read()?.scan(Range::from((start, end)));
+        Ok(Box::new(Scan::new(scan, self.snapshot.clone())))
     }
 
     /// Scans keys under a given prefix.
@@ -229,7 +239,7 @@ impl Transaction {
         let mut end = start.clone();
         for i in (0..end.len()).rev() {
             match end[i] {
-                // If all 0xff we could in principle use Range::Unbounded, but it's won't happen
+                // If all 0xff we could in principle use Range::Unbounded, but it won't happen
                 0xff if i == 0 => return Err(Error::Internal("Invalid prefix scan range".into())),
                 0xff => {
                     end[i] = 0x00;
@@ -241,7 +251,7 @@ impl Transaction {
                 }
             }
         }
-        Ok(Box::new(Scan::new(self.store.clone(), self.snapshot.clone(), start..end)?))
+        self.scan(start..end)
     }
 
     /// Sets a key.
@@ -261,8 +271,8 @@ impl Transaction {
         let min = self.snapshot.invisible.iter().min().cloned().unwrap_or(self.id + 1);
         let mut scan = session
             .scan(Range::from(
-                Key::Record(Cow::Borrowed(key), min).encode()
-                    ..=Key::Record(Cow::Borrowed(key), std::u64::MAX).encode(),
+                Key::Record(key.into(), min).encode()
+                    ..=Key::Record(key.into(), std::u64::MAX).encode(),
             ))
             .rev();
         while let Some((k, _)) = scan.next().transpose()? {
@@ -278,8 +288,8 @@ impl Transaction {
         std::mem::drop(scan);
 
         // Write the key and its update record.
-        let key = Key::Record(Cow::Borrowed(key), self.id).encode();
-        let update = Key::TxnUpdate(self.id, Cow::Borrowed(&key)).encode();
+        let key = Key::Record(key.into(), self.id).encode();
+        let update = Key::TxnUpdate(self.id, (&key).into()).encode();
         session.set(&update, vec![])?;
         session.set(&key, serialize(&value)?)
     }
@@ -423,57 +433,25 @@ impl<'a> Key<'a> {
 /// but making the lifetimes work out is non-trivial. See also:
 /// https://users.rust-lang.org/t/creating-an-iterator-over-mutex-contents-cannot-infer-an-appropriate-lifetime/24458
 pub struct Scan {
-    /// The KV store used for the scan.
-    store: Arc<RwLock<Box<dyn Store>>>,
+    /// The underlying KV store iterator.
+    scan: super::Scan,
     /// The snapshot the scan is running in.
     snapshot: Snapshot,
-    /// Keeps track of the remaining range bounds we're iterating over.
-    bounds: (Bound<Vec<u8>>, Bound<Vec<u8>>),
     /// Keeps track of next() candidate pair to be returned if no newer versions are found.
-    next_candidate: Option<(Vec<u8>, Option<Vec<u8>>)>,
+    next_candidate: Option<(Vec<u8>, Vec<u8>)>,
     /// Keeps track of next_back() returned key, whose older versions should be ignored.
     next_back_returned: Option<Vec<u8>>,
 }
 
 impl Scan {
     /// Creates a new scan.
-    fn new(
-        store: Arc<RwLock<Box<dyn Store>>>,
-        snapshot: Snapshot,
-        range: impl RangeBounds<Vec<u8>>,
-    ) -> Result<Self> {
-        let start = match range.start_bound() {
-            Bound::Excluded(k) => {
-                Bound::Excluded(Key::Record(Cow::Borrowed(k), std::u64::MAX).encode())
-            }
-            Bound::Included(k) => Bound::Included(Key::Record(Cow::Borrowed(k), 0).encode()),
-            Bound::Unbounded => Bound::Included(Key::Record(Cow::Owned(vec![]), 0).encode()),
-        };
-        let end = match range.end_bound() {
-            Bound::Excluded(k) => Bound::Excluded(Key::Record(Cow::Borrowed(k), 0).encode()),
-            Bound::Included(k) => {
-                Bound::Included(Key::Record(Cow::Borrowed(k), std::u64::MAX).encode())
-            }
-            Bound::Unbounded => Bound::Unbounded,
-        };
-
-        Ok(Self {
-            store,
-            snapshot,
-            bounds: (start, end),
-            next_candidate: None,
-            next_back_returned: None,
-        })
+    fn new(scan: super::Scan, snapshot: Snapshot) -> Self {
+        Self { scan, snapshot, next_candidate: None, next_back_returned: None }
     }
 
     // next() with error handling.
     fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        let session = self.store.read()?;
-        let mut range = session.scan(Range::from(self.bounds.clone()));
-        while let Some((k, v)) = range.next().transpose()? {
-            // Keep track of iterator progress
-            self.bounds.0 = Bound::Excluded(k.clone());
-
+        while let Some((k, v)) = self.scan.next().transpose()? {
             let (key, version) = match Key::decode(&k)? {
                 Key::Record(key, version) => (key, version),
                 k => return Err(Error::Internal(format!("Expected Record, got {:?}", k))),
@@ -483,33 +461,31 @@ impl Scan {
             }
 
             // Keep track of return candidate, and return current candidate if key changes.
-            let ret = match &self.next_candidate {
-                Some((k, Some(v))) if k != &&*key => Some((k.clone(), v.clone())),
-                _ => None,
-            };
-            self.next_candidate = Some((key.into_owned(), deserialize(&v)?));
-            if ret.is_some() {
-                return Ok(ret);
+            let hit = self
+                .next_candidate
+                .take()
+                .filter(|(k, _)| k != &&*key)
+                .map(|(k, v)| deserialize::<Option<Vec<u8>>>(&v).map(|v| (k, v)))
+                .transpose()?
+                .and_then(|(k, v)| v.map(|v| (k, v)));
+            self.next_candidate = Some((key.into_owned(), v));
+            if hit.is_some() {
+                return Ok(hit);
             }
         }
 
         // When iteration ends, return the last candidate if any
-        if let Some((k, Some(v))) = self.next_candidate.clone() {
-            self.next_candidate = None;
-            Ok(Some((k, v)))
-        } else {
-            Ok(None)
-        }
+        Ok(self
+            .next_candidate
+            .take()
+            .map(|(k, v)| deserialize::<Option<Vec<u8>>>(&v).map(|v| (k, v)))
+            .transpose()?
+            .and_then(|(k, v)| v.map(|v| (k, v))))
     }
 
     /// next_back() with error handling.
     fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        let session = self.store.read()?;
-        let mut range = session.scan(Range::from(self.bounds.clone()));
-        while let Some((k, v)) = range.next_back().transpose()? {
-            // Keep track of iterator progress
-            self.bounds.1 = Bound::Excluded(k.clone());
-
+        while let Some((k, v)) = self.scan.next_back().transpose()? {
             let (key, version) = match Key::decode(&k)? {
                 Key::Record(key, version) => (key, version),
                 k => return Err(Error::Internal(format!("Expected Record, got {:?}", k))),
@@ -519,8 +495,10 @@ impl Scan {
             }
 
             // Keep track of keys already been seen and returned (i.e. skip older versions)
-            if Some(key.clone().into_owned()) == self.next_back_returned {
-                continue;
+            if let Some(ref returned) = self.next_back_returned {
+                if returned == &&*key {
+                    continue;
+                }
             }
             self.next_back_returned = Some(key.clone().into_owned());
 

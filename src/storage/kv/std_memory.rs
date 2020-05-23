@@ -37,7 +37,17 @@ impl Store for StdMemory {
     }
 
     fn scan(&self, range: Range) -> Scan {
-        Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
+        // FIXME Since the range iterator returns borrowed items it would require a read-lock for
+        // the duration of the iteration. This is too coarse, so we buffer the entire iteration
+        // here. An iterator with an arc-mutex should be used instead, which is able to resume
+        // iteration by grabbing the lock again.
+        Box::new(
+            self.data
+                .range(range)
+                .map(|(k, v)| Ok((k.clone(), v.clone())))
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
