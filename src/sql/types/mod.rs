@@ -5,6 +5,7 @@ use crate::error::{Error, Result};
 
 use derivative::Derivative;
 use serde_derive::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
@@ -51,6 +52,18 @@ impl Hash for Value {
             Value::Float(v) => v.to_be_bytes().hash(state), // FIXME Is this sane?
             Value::String(v) => v.hash(state),
         }
+    }
+}
+
+impl<'a> Into<Cow<'a, Value>> for Value {
+    fn into(self) -> Cow<'a, Value> {
+        Cow::Owned(self)
+    }
+}
+
+impl<'a> Into<Cow<'a, Value>> for &'a Value {
+    fn into(self) -> Cow<'a, Value> {
+        Cow::Borrowed(self)
     }
 }
 

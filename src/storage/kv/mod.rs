@@ -1,3 +1,4 @@
+pub mod encoding;
 mod memory;
 pub mod mvcc;
 mod std_memory;

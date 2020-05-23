@@ -5,6 +5,6 @@ Storage:
 CREATE TABLE "integer" (
   pk INTEGER PRIMARY KEY
 )
+[Integer(-1)]
 [Integer(1)]
 [Integer(2)]
-[Integer(-1)]

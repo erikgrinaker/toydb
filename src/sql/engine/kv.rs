@@ -5,6 +5,7 @@ use crate::error::{Error, Result};
 use crate::storage::kv;
 
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::clone::Clone;
 use std::collections::HashSet;
 
@@ -73,13 +74,12 @@ impl Transaction {
 
     /// Loads an index entry
     fn index_load(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
-        let key = Key::Index(table, column, Some(value)).encode();
-        if let Some(value) = self.txn.get(&key)? {
-            let item: (Value, HashSet<Value>) = deserialize(&value)?;
-            Ok(item.1)
-        } else {
-            Ok(HashSet::new())
-        }
+        Ok(self
+            .txn
+            .get(&Key::Index(table.into(), column.into(), Some(value.into())).encode())?
+            .map(|v| deserialize(&v))
+            .transpose()?
+            .unwrap_or_else(HashSet::new))
     }
 
     /// Saves an index entry.
@@ -92,11 +92,11 @@ impl Transaction {
         value: &Value,
         index: HashSet<Value>,
     ) -> Result<()> {
-        let key = Key::Index(table, column, Some(value)).encode();
+        let key = Key::Index(table.into(), column.into(), Some(value.into())).encode();
         if index.is_empty() {
             self.txn.delete(&key)
         } else {
-            self.txn.set(&key, serialize(&(value, index))?)
+            self.txn.set(&key, serialize(&index)?)
         }
     }
 }
@@ -128,7 +128,10 @@ impl super::Transaction for Transaction {
                 id, table.name
             )));
         }
-        self.txn.set(&Key::Row(&table.name, Some(&id)).encode(), serialize(&row)?)?;
+        self.txn.set(
+            &Key::Row(Cow::Borrowed(&table.name), Some(Cow::Borrowed(&id))).encode(),
+            serialize(&row)?,
+        )?;
 
         // Update indexes
         for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
@@ -153,11 +156,14 @@ impl super::Transaction for Transaction {
                 }
             }
         }
-        self.txn.delete(&Key::Row(&table.name, Some(id)).encode())
+        self.txn.delete(&Key::Row(table.name.into(), Some(id.into())).encode())
     }
 
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>> {
-        self.txn.get(&Key::Row(table, Some(id)).encode())?.map(|v| deserialize(&v)).transpose()
+        self.txn
+            .get(&Key::Row(table.into(), Some(id.into())).encode())?
+            .map(|v| deserialize(&v))
+            .transpose()
     }
 
     fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
@@ -171,7 +177,7 @@ impl super::Transaction for Transaction {
         let table = self.must_read_table(&table)?;
         let scan = self
             .txn
-            .scan_prefix(&Key::Row(&table.name, None).encode())?
+            .scan_prefix(&Key::Row(table.name.clone().into(), None).encode())?
             .map(|r| r.and_then(|(_, v)| deserialize(&v)))
             .filter_map(|r| match r {
                 Ok(row) => match &filter {
@@ -202,8 +208,15 @@ impl super::Transaction for Transaction {
 
         let scan = self
             .txn
-            .scan_prefix(&Key::Index(&table.name, &column.name, None).encode())?
-            .map(|r| r.and_then(|(_, v)| deserialize(&v)));
+            .scan_prefix(&Key::Index((&table.name).into(), (&column.name).into(), None).encode())?
+            .map(|r| -> Result<(Value, HashSet<Value>)> {
+                let (k, v) = r?;
+                let value = match Key::decode(&k)? {
+                    Key::Index(_, _, Some(pk)) => pk.into_owned(),
+                    _ => return Err(Error::Internal("Invalid index key".into())),
+                };
+                Ok((value, deserialize(&v)?))
+            });
 
         // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
         Ok(Box::new(scan.collect::<Vec<Result<(Value, HashSet<Value>)>>>().into_iter()))
@@ -237,7 +250,7 @@ impl super::Transaction for Transaction {
         }
 
         table.validate_row(&row, self)?;
-        self.txn.set(&Key::Row(&table.name, Some(&id)).encode(), serialize(&row)?)
+        self.txn.set(&Key::Row(table.name.into(), Some(id.into())).encode(), serialize(&row)?)
     }
 }
 
@@ -247,7 +260,7 @@ impl Catalog for Transaction {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
         }
         table.validate(self)?;
-        self.txn.set(&Key::Table(Some(&table.name)).encode(), serialize(table)?)
+        self.txn.set(&Key::Table(Some((&table.name).into())).encode(), serialize(table)?)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
@@ -257,11 +270,11 @@ impl Catalog for Transaction {
         while let Some(row) = scan.next().transpose()? {
             self.delete(&table.name, &table.get_row_key(&row)?)?
         }
-        self.txn.delete(&Key::Table(Some(&table.name)).encode())
+        self.txn.delete(&Key::Table(Some(table.name.into())).encode())
     }
 
     fn read_table(&self, table: &str) -> Result<Option<Table>> {
-        self.txn.get(&Key::Table(Some(table)).encode())?.map(|v| deserialize(&v)).transpose()
+        self.txn.get(&Key::Table(Some(table.into())).encode())?.map(|v| deserialize(&v)).transpose()
     }
 
     fn scan_tables(&self) -> Result<Tables> {
@@ -275,49 +288,60 @@ impl Catalog for Transaction {
     }
 }
 
-/// Encodes MVCC keys. Options can be None to get a keyspace prefix.
+/// Encodes SQL keys, using an order-preserving encoding - see kv::encoding for details. Options can
+/// be None to get a keyspace prefix. We use table and column names directly as identifiers, to
+/// avoid additional indirection and associated overhead. It is not possible to change names, so
+/// this is ok. Uses Cows since we want to borrow when encoding but return owned when decoding.
 enum Key<'a> {
     /// A table schema key for the given table name
-    Table(Option<&'a str>),
+    Table(Option<Cow<'a, str>>),
     /// A key for an index entry
-    Index(&'a str, &'a str, Option<&'a Value>),
+    Index(Cow<'a, str>, Cow<'a, str>, Option<Cow<'a, Value>>),
     /// A key for a row identified by table name and row primary key
-    Row(&'a str, Option<&'a Value>),
+    Row(Cow<'a, str>, Option<Cow<'a, Value>>),
 }
 
 impl<'a> Key<'a> {
     /// Encodes the key as a byte vector
     fn encode(self) -> Vec<u8> {
+        use kv::encoding::*;
         match self {
-            Self::Table(name) => [vec![0x01], name.unwrap_or("").as_bytes().to_vec()].concat(),
-            Self::Index(table, column, value) => [
-                vec![0x02],
-                table.as_bytes().to_vec(),
-                vec![0x00],
-                column.as_bytes().to_vec(),
-                vec![0x00],
-                value.map_or_else(Vec::new, Self::encode_value),
+            Self::Table(None) => vec![0x01],
+            Self::Table(Some(name)) => [&[0x01][..], &encode_string(&name)].concat(),
+            Self::Index(table, column, None) => {
+                [&[0x02][..], &encode_string(&table), &encode_string(&column)].concat()
+            }
+            Self::Index(table, column, Some(value)) => [
+                &[0x02][..],
+                &encode_string(&table),
+                &encode_string(&column),
+                &encode_value(&value),
             ]
             .concat(),
-            Self::Row(table, pk) => [
-                vec![0x03],
-                table.as_bytes().to_vec(),
-                vec![0x00],
-                pk.map_or_else(Vec::new, Self::encode_value),
-            ]
-            .concat(),
+            Self::Row(table, None) => [&[0x03][..], &encode_string(&table)].concat(),
+            Self::Row(table, Some(pk)) => {
+                [&[0x03][..], &encode_string(&table), &encode_value(&pk)].concat()
+            }
         }
     }
 
-    /// Encodes a value as a byte vector
-    fn encode_value(value: &Value) -> Vec<u8> {
-        match value {
-            Value::Boolean(b) if *b => vec![0x01],
-            Value::Boolean(_) => vec![0x00],
-            Value::Float(f) => f.to_be_bytes().to_vec(),
-            Value::Integer(i) => i.to_be_bytes().to_vec(),
-            Value::String(s) => s.as_bytes().to_vec(),
-            Value::Null => vec![],
+    /// Decodes a key from a byte vector
+    fn decode(mut bytes: &[u8]) -> Result<Self> {
+        use kv::encoding::*;
+        let bytes = &mut bytes;
+        let key = match take_byte(bytes)? {
+            0x01 => Self::Table(Some(take_string(bytes)?.into())),
+            0x02 => Self::Index(
+                take_string(bytes)?.into(),
+                take_string(bytes)?.into(),
+                Some(take_value(bytes)?.into()),
+            ),
+            0x03 => Self::Row(take_string(bytes)?.into(), Some(take_value(bytes)?.into())),
+            b => return Err(Error::Internal(format!("Unknown SQL key prefix {:x?}", b))),
+        };
+        if !bytes.is_empty() {
+            return Err(Error::Internal("Unexpected data remaining at end of key".into()));
         }
+        Ok(key)
     }
 }

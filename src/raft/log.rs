@@ -27,7 +27,7 @@ pub enum Key {
 impl Key {
     fn encode(&self) -> Vec<u8> {
         match self {
-            Self::TermVote => vec![0],
+            Self::TermVote => vec![0x00],
         }
     }
 }
