@@ -3,6 +3,7 @@
 use toydb::client::{Client, Pool};
 use toydb::error::Result;
 use toydb::server::Server;
+use toydb::storage;
 
 use futures_util::future::FutureExt as _;
 use pretty_assertions::assert_eq;
@@ -74,7 +75,13 @@ pub async fn server(
     peers: HashMap<String, String>,
 ) -> Result<Teardown> {
     let dir = TempDir::new("toydb")?;
-    let mut srv = Server::new(id, peers, &dir.path().to_string_lossy(), false).await?;
+    let mut srv = Server::new(
+        id,
+        peers,
+        Box::new(storage::log::Hybrid::new(&dir.path(), false)?),
+        Box::new(storage::kv::Memory::new()),
+    )
+    .await?;
 
     srv = srv.listen(addr_sql, addr_raft).await?;
     let (task, abort) = srv.serve().remote_handle();

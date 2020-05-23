@@ -1,7 +1,7 @@
-use super::{Memory, Scan, Store};
+use super::{Memory, Range, Scan, Store};
 use crate::error::Result;
 
-use std::ops::RangeBounds;
+use std::fmt::Display;
 use std::sync::{Arc, RwLock};
 
 /// Log storage backend for testing. Protects an inner Memory backend using a mutex, so it can
@@ -15,6 +15,12 @@ impl Test {
     /// Creates a new Test key-value storage engine.
     pub fn new() -> Self {
         Self { store: Arc::new(RwLock::new(Memory::new())) }
+    }
+}
+
+impl Display for Test {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "test")
     }
 }
 
@@ -39,9 +45,13 @@ impl Store for Test {
         self.store.read().unwrap().len()
     }
 
-    fn scan(&self, range: impl RangeBounds<u64>) -> Scan {
+    fn scan(&self, range: Range) -> Scan {
         // Since the mutex guard is scoped to this method, we simply buffer the result.
         Box::new(self.store.read().unwrap().scan(range).collect::<Vec<Result<_>>>().into_iter())
+    }
+
+    fn size(&self) -> u64 {
+        self.store.read().unwrap().size()
     }
 
     fn truncate(&mut self, index: u64) -> Result<u64> {

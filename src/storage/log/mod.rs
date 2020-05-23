@@ -10,10 +10,11 @@ pub use test::Test;
 
 use crate::error::Result;
 
-use std::ops::RangeBounds;
+use std::fmt::Display;
+use std::ops::{Bound, RangeBounds};
 
 /// A log store. Entry indexes are 1-based, to match Raft semantics.
-pub trait Store {
+pub trait Store: Display + Sync + Send {
     /// Appends a log entry, returning its index.
     fn append(&mut self, entry: Vec<u8>) -> Result<u64>;
 
@@ -30,7 +31,10 @@ pub trait Store {
     fn len(&self) -> u64;
 
     /// Scans the log between the given indexes.
-    fn scan(&self, range: impl RangeBounds<u64>) -> Scan;
+    fn scan(&self, range: Range) -> Scan;
+
+    /// Returns the size of the log, in bytes.
+    fn size(&self) -> u64;
 
     /// Truncates the log be removing any entries above the given index, and returns the
     /// highest index. Errors if asked to truncate any committed entries.
@@ -45,6 +49,31 @@ pub trait Store {
     /// Returns true if the log has no entries.
     fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+/// A scan range.
+pub struct Range {
+    start: Bound<u64>,
+    end: Bound<u64>,
+}
+
+impl Range {
+    /// Creates a new range from the given Rust range. We can't use the RangeBounds directly in
+    /// scan() since that prevents us from Store into a trait object.
+    pub fn from(range: impl RangeBounds<u64>) -> Self {
+        Self {
+            start: match range.start_bound() {
+                Bound::Included(v) => Bound::Included(*v),
+                Bound::Excluded(v) => Bound::Excluded(*v),
+                Bound::Unbounded => Bound::Unbounded,
+            },
+            end: match range.end_bound() {
+                Bound::Included(v) => Bound::Included(*v),
+                Bound::Excluded(v) => Bound::Excluded(*v),
+                Bound::Unbounded => Bound::Unbounded,
+            },
+        }
     }
 }
 
@@ -74,7 +103,10 @@ trait TestSuite<S: Store> {
         assert_eq!(2, s.append(vec![0x02])?);
         assert_eq!(3, s.append(vec![0x03])?);
         assert_eq!(3, s.len());
-        assert_eq!(vec![vec![1], vec![2], vec![3]], s.scan(..).collect::<Result<Vec<_>>>()?);
+        assert_eq!(
+            vec![vec![1], vec![2], vec![3]],
+            s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?
+        );
         Ok(())
     }
 
@@ -94,7 +126,10 @@ trait TestSuite<S: Store> {
 
         // Truncating beyond the end should be fine.
         assert_eq!(3, s.truncate(4)?);
-        assert_eq!(vec![vec![1], vec![2], vec![3]], s.scan(..).collect::<Result<Vec<_>>>()?);
+        assert_eq!(
+            vec![vec![1], vec![2], vec![3]],
+            s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?
+        );
 
         // Truncating a committed entry should error.
         assert_eq!(
@@ -104,7 +139,7 @@ trait TestSuite<S: Store> {
 
         // Truncating above should work.
         assert_eq!(1, s.truncate(1)?);
-        assert_eq!(vec![vec![1]], s.scan(..).collect::<Result<Vec<_>>>()?);
+        assert_eq!(vec![vec![1]], s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?);
 
         Ok(())
     }
@@ -135,23 +170,29 @@ trait TestSuite<S: Store> {
         s.append(vec![0x03])?;
         s.commit(2)?;
 
-        assert_eq!(vec![vec![1], vec![2], vec![3]], s.scan(..).collect::<Result<Vec<_>>>()?);
+        assert_eq!(
+            vec![vec![1], vec![2], vec![3]],
+            s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?
+        );
 
-        assert_eq!(vec![vec![1]], s.scan(0..2).collect::<Result<Vec<_>>>()?);
-        assert_eq!(vec![vec![1], vec![2]], s.scan(1..3).collect::<Result<Vec<_>>>()?);
-        assert_eq!(vec![vec![1], vec![2], vec![3]], s.scan(1..=3).collect::<Result<Vec<_>>>()?);
-        assert!(s.scan(3..1).collect::<Result<Vec<_>>>()?.is_empty());
-        assert!(s.scan(1..1).collect::<Result<Vec<_>>>()?.is_empty());
-        assert_eq!(vec![vec![2]], s.scan(2..=2).collect::<Result<Vec<_>>>()?);
-        assert_eq!(vec![vec![2], vec![3]], s.scan(2..5).collect::<Result<Vec<_>>>()?);
+        assert_eq!(vec![vec![1]], s.scan(Range::from(0..2)).collect::<Result<Vec<_>>>()?);
+        assert_eq!(vec![vec![1], vec![2]], s.scan(Range::from(1..3)).collect::<Result<Vec<_>>>()?);
+        assert_eq!(
+            vec![vec![1], vec![2], vec![3]],
+            s.scan(Range::from(1..=3)).collect::<Result<Vec<_>>>()?
+        );
+        assert!(s.scan(Range::from(3..1)).collect::<Result<Vec<_>>>()?.is_empty());
+        assert!(s.scan(Range::from(1..1)).collect::<Result<Vec<_>>>()?.is_empty());
+        assert_eq!(vec![vec![2]], s.scan(Range::from(2..=2)).collect::<Result<Vec<_>>>()?);
+        assert_eq!(vec![vec![2], vec![3]], s.scan(Range::from(2..5)).collect::<Result<Vec<_>>>()?);
 
-        assert!(s.scan(..0).collect::<Result<Vec<_>>>()?.is_empty());
-        assert_eq!(vec![vec![1]], s.scan(..=1).collect::<Result<Vec<_>>>()?);
-        assert_eq!(vec![vec![1], vec![2]], s.scan(..3).collect::<Result<Vec<_>>>()?);
+        assert!(s.scan(Range::from(..0)).collect::<Result<Vec<_>>>()?.is_empty());
+        assert_eq!(vec![vec![1]], s.scan(Range::from(..=1)).collect::<Result<Vec<_>>>()?);
+        assert_eq!(vec![vec![1], vec![2]], s.scan(Range::from(..3)).collect::<Result<Vec<_>>>()?);
 
-        assert!(s.scan(4..).collect::<Result<Vec<_>>>()?.is_empty());
-        assert_eq!(vec![vec![3]], s.scan(3..).collect::<Result<Vec<_>>>()?);
-        assert_eq!(vec![vec![2], vec![3]], s.scan(2..).collect::<Result<Vec<_>>>()?);
+        assert!(s.scan(Range::from(4..)).collect::<Result<Vec<_>>>()?.is_empty());
+        assert_eq!(vec![vec![3]], s.scan(Range::from(3..)).collect::<Result<Vec<_>>>()?);
+        assert_eq!(vec![vec![2], vec![3]], s.scan(Range::from(2..)).collect::<Result<Vec<_>>>()?);
 
         Ok(())
     }

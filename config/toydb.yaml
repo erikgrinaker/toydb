@@ -1,12 +1,25 @@
-# The cluster node ID and peer ID/address map (empty for single node)
+# The node ID, peer ID/address map (empty for single node), and log level.
 id: toydb
 peers: {}
+log_level: INFO
 
-# Network addresses to bind the SQL and Raft servers to
+# Network addresses to bind the SQL and Raft servers to.
 listen_sql: 0.0.0.0:9605
 listen_raft: 0.0.0.0:9705
 
-# The node log level, data directory, and whether to fsync writes
-log_level: INFO
+# Node data directory, and whether to fsync writes. Fsyncing guarantees that committed data is
+# persisted to disk, but has a high performance penalty. Disabling fsync and relying on cluster
+# redundancy for data durability may be a reasonable trade-off, although this can compromise Raft
+# linearizability guarantees in rare edge cases where committed entries lose majority.
 data_dir: /var/lib/toydb
 sync: true
+
+# Raft log storage engine
+# - hybrid: (default) stores committed entries in an indexed append-only file, the rest in memory.
+# - memory: stores all entries in memory.
+storage_raft: hybrid
+
+# SQL key-value storage engine
+# - memory: (default) uses an in-memory B+tree. Durability is provided by the Raft log.
+# - stdmemory: uses the Rust standard library BTreeMap.
+storage_sql: memory

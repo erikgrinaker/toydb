@@ -1,9 +1,10 @@
-use super::{Scan, Store};
+use super::{Range, Scan, Store};
 use crate::error::{Error, Result};
 
 use std::cmp::Ordering;
+use std::fmt::Display;
 use std::mem::replace;
-use std::ops::{Bound, Deref, DerefMut, RangeBounds};
+use std::ops::{Bound, Deref, DerefMut};
 use std::sync::{Arc, RwLock};
 
 /// The default B+tree order, i.e. maximum number of children per node.
@@ -22,6 +23,12 @@ const DEFAULT_ORDER: usize = 8;
 pub struct Memory {
     /// The tree root, guarded by an RwLock to support multiple iterators across it.
     root: Arc<RwLock<Node>>,
+}
+
+impl Display for Memory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "memory")
+    }
 }
 
 impl Memory {
@@ -53,7 +60,7 @@ impl Store for Memory {
         Ok(self.root.read()?.get(key))
     }
 
-    fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Scan {
+    fn scan(&self, range: Range) -> Scan {
         Box::new(Iter::new(self.root.clone(), range))
     }
 
@@ -606,7 +613,7 @@ struct Iter {
     /// The root node of the tree we're iterating across.
     root: Arc<RwLock<Node>>,
     /// The range we're iterating over.
-    range: (Bound<Vec<u8>>, Bound<Vec<u8>>),
+    range: Range,
     /// The front cursor keeps track of the last returned value from the front.
     front_cursor: Option<Vec<u8>>,
     /// The back cursor keeps track of the last returned value from the back.
@@ -615,26 +622,15 @@ struct Iter {
 
 impl Iter {
     /// Creates a new iterator.
-    fn new(root: Arc<RwLock<Node>>, range: impl RangeBounds<Vec<u8>>) -> Self {
-        // FIXME https://github.com/rust-lang/rust/issues/61356
-        let start = match range.start_bound() {
-            Bound::Excluded(k) => Bound::Excluded(k.clone()),
-            Bound::Included(k) => Bound::Included(k.clone()),
-            Bound::Unbounded => Bound::Unbounded,
-        };
-        let end = match range.end_bound() {
-            Bound::Excluded(k) => Bound::Excluded(k.clone()),
-            Bound::Included(k) => Bound::Included(k.clone()),
-            Bound::Unbounded => Bound::Unbounded,
-        };
-        Self { root, range: (start, end), front_cursor: None, back_cursor: None }
+    fn new(root: Arc<RwLock<Node>>, range: Range) -> Self {
+        Self { root, range, front_cursor: None, back_cursor: None }
     }
 
     // next() with error handling.
     fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
         let root = self.root.read()?;
         let next = match &self.front_cursor {
-            None => match &self.range.0 {
+            None => match &self.range.start {
                 Bound::Included(k) => {
                     root.get(k).map(|v| (k.clone(), v)).or_else(|| root.get_next(k))
                 }
@@ -661,7 +657,7 @@ impl Iter {
     fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
         let root = self.root.read()?;
         let prev = match &self.back_cursor {
-            None => match &self.range.1 {
+            None => match &self.range.end {
                 Bound::Included(k) => {
                     root.get(k).map(|v| (k.clone(), v)).or_else(|| root.get_prev(k))
                 }

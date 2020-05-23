@@ -7,7 +7,7 @@ use tokio::stream::StreamExt as _;
 use tokio::sync::mpsc;
 
 /// A Raft-managed state machine.
-pub trait State {
+pub trait State: Send {
     /// Returns the last applied index from the state machine, used when initializing the driver.
     fn applied_index(&self) -> u64;
 
@@ -31,7 +31,7 @@ pub enum Instruction {
     /// Query the state machine when the given index has been confirmed by vote.
     Query { id: Vec<u8>, address: Address, command: Vec<u8>, index: u64, quorum: u64 },
     /// Extend the given server status and return it to the given address.
-    Status { id: Vec<u8>, address: Address, status: Status },
+    Status { id: Vec<u8>, address: Address, status: Box<Status> },
     /// Votes for queries at the given commit index.
     Vote { index: u64, address: Address },
 }
@@ -72,10 +72,10 @@ impl Driver {
     }
 
     /// Drives a state machine.
-    pub async fn drive<S: State>(mut self, mut state: S) -> Result<()> {
+    pub async fn drive(mut self, mut state: Box<dyn State>) -> Result<()> {
         debug!("Starting state machine driver");
         while let Some(instruction) = self.state_rx.next().await {
-            if let Err(error) = self.execute(instruction, &mut state).await {
+            if let Err(error) = self.execute(instruction, &mut *state).await {
                 error!("Halting state machine due to error: {}", error);
                 return Err(error);
             }
@@ -85,7 +85,7 @@ impl Driver {
     }
 
     /// Synchronously (re)plays a set of log entries, for initial sync.
-    pub fn replay<'a, S: State>(&mut self, state: &mut S, mut scan: Scan<'a>) -> Result<()> {
+    pub fn replay<'a>(&mut self, state: &mut dyn State, mut scan: Scan<'a>) -> Result<()> {
         while let Some(entry) = scan.next().transpose()? {
             debug!("Replaying {:?}", entry);
             if let Some(command) = entry.command {
@@ -99,7 +99,7 @@ impl Driver {
     }
 
     /// Executes a state machine instruction.
-    pub async fn execute<S: State>(&mut self, i: Instruction, state: &mut S) -> Result<()> {
+    pub async fn execute(&mut self, i: Instruction, state: &mut dyn State) -> Result<()> {
         debug!("Executing {:?}", i);
         match i {
             Instruction::Abort => {
@@ -142,7 +142,7 @@ impl Driver {
                 status.apply_index = state.applied_index();
                 self.send(
                     address,
-                    Event::ClientResponse { id, response: Ok(Response::Status(status)) },
+                    Event::ClientResponse { id, response: Ok(Response::Status(*status)) },
                 )?;
             }
 
@@ -184,7 +184,7 @@ impl Driver {
     }
 
     /// Executes any queries that are ready.
-    fn query_execute<S: State>(&mut self, state: &mut S) -> Result<()> {
+    fn query_execute(&mut self, state: &mut dyn State) -> Result<()> {
         for query in self.query_ready(self.applied_index) {
             debug!("Executing query {:?}", query.command);
             let result = state.query(query.command);
@@ -286,10 +286,12 @@ pub mod tests {
         }
     }
 
-    async fn setup(
-    ) -> Result<(TestState, mpsc::UnboundedSender<Instruction>, mpsc::UnboundedReceiver<Message>)>
-    {
-        let state = TestState::new(0);
+    async fn setup() -> Result<(
+        Box<TestState>,
+        mpsc::UnboundedSender<Instruction>,
+        mpsc::UnboundedReceiver<Message>,
+    )> {
+        let state = Box::new(TestState::new(0));
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         tokio::spawn(Driver::new(state_rx, node_tx).drive(state.clone()));

@@ -1,8 +1,8 @@
-use super::{Scan, Store};
+use super::{Range, Scan, Store};
 use crate::error::Result;
 
 use std::collections::BTreeMap;
-use std::ops::RangeBounds;
+use std::fmt::Display;
 
 /// In-memory key-value store using the Rust standard library B-tree implementation.
 pub struct StdMemory {
@@ -13,6 +13,12 @@ impl StdMemory {
     /// Creates a new Memory key-value storage engine.
     pub fn new() -> Self {
         Self { data: BTreeMap::new() }
+    }
+}
+
+impl Display for StdMemory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "stdmemory")
     }
 }
 
@@ -30,7 +36,7 @@ impl Store for StdMemory {
         Ok(self.data.get(key).cloned())
     }
 
-    fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Scan {
+    fn scan(&self, range: Range) -> Scan {
         Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
     }
 

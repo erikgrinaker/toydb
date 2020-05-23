@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 use crate::storage::log;
+use crate::storage::log::Range;
 
 use ::log::debug;
 use serde::{Deserialize, Serialize};
@@ -35,9 +36,9 @@ impl Key {
 pub type Scan<'a> = Box<dyn Iterator<Item = Result<Entry>> + 'a>;
 
 /// The replicated Raft log
-pub struct Log<S: log::Store> {
+pub struct Log {
     /// The underlying log store.
-    store: S,
+    pub(super) store: Box<dyn log::Store>,
     /// The index of the last stored entry.
     pub(super) last_index: u64,
     /// The term of the last stored entry.
@@ -48,9 +49,9 @@ pub struct Log<S: log::Store> {
     pub(super) commit_term: u64,
 }
 
-impl<S: log::Store> Log<S> {
+impl Log {
     /// Creates a new log, using a log::Store for storage.
-    pub fn new(store: S) -> Result<Self> {
+    pub fn new(store: Box<dyn log::Store>) -> Result<Self> {
         let (commit_index, commit_term) = match store.committed() {
             0 => (0, 0),
             index => store
@@ -109,7 +110,7 @@ impl<S: log::Store> Log<S> {
 
     /// Iterates over log entries
     pub fn scan(&self, range: impl RangeBounds<u64>) -> Scan {
-        Box::new(self.store.scan(range).map(|r| r.and_then(|v| Self::deserialize(&v))))
+        Box::new(self.store.scan(Range::from(range)).map(|r| r.and_then(|v| Self::deserialize(&v))))
     }
 
     /// Splices a set of entries onto an offset. The entries must be contiguous, and the first entry
@@ -189,8 +190,8 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    fn setup() -> Result<(Log<log::Test>, log::Test)> {
-        let store = log::Test::new();
+    fn setup() -> Result<(Log, Box<log::Test>)> {
+        let store = Box::new(log::Test::new());
         let log = Log::new(store.clone())?;
         Ok((log, store))
     }

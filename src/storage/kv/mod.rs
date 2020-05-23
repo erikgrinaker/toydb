@@ -11,10 +11,11 @@ pub use std_memory::StdMemory;
 pub use test::Test;
 
 use crate::error::Result;
-use std::ops::RangeBounds;
+use std::fmt::Display;
+use std::ops::{Bound, RangeBounds};
 
 /// Key/value store.
-pub trait Store {
+pub trait Store: Display + Send + Sync {
     /// Deletes a key, if it exists.
     fn delete(&mut self, key: &[u8]) -> Result<()>;
 
@@ -25,10 +26,67 @@ pub trait Store {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Returns an iterator over a range of key/value pairs.
-    fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Scan;
+    fn scan(&self, range: Range) -> Scan;
 
     /// Writes a value for a key, replacing the existing value if any.
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
+}
+
+/// A scan range.
+pub struct Range {
+    start: Bound<Vec<u8>>,
+    end: Bound<Vec<u8>>,
+}
+
+impl Range {
+    /// Creates a new range from the given Rust range. We can't use the RangeBounds directly in
+    /// scan() since that prevents us from using Store as a trait object. Also, we can't take
+    /// AsRef<[u8]> or other convenient types, since that won't work with e.g. .. ranges.
+    pub fn from<R: RangeBounds<Vec<u8>>>(range: R) -> Self {
+        Self {
+            start: match range.start_bound() {
+                Bound::Included(v) => Bound::Included(v.to_vec()),
+                Bound::Excluded(v) => Bound::Excluded(v.to_vec()),
+                Bound::Unbounded => Bound::Unbounded,
+            },
+            end: match range.end_bound() {
+                Bound::Included(v) => Bound::Included(v.to_vec()),
+                Bound::Excluded(v) => Bound::Excluded(v.to_vec()),
+                Bound::Unbounded => Bound::Unbounded,
+            },
+        }
+    }
+
+    /// Checks if the given value is contained in the range.
+    fn contains(&self, v: &[u8]) -> bool {
+        (match &self.start {
+            Bound::Included(start) => &**start <= v,
+            Bound::Excluded(start) => &**start < v,
+            Bound::Unbounded => true,
+        }) && (match &self.end {
+            Bound::Included(end) => v <= &**end,
+            Bound::Excluded(end) => v < &**end,
+            Bound::Unbounded => true,
+        })
+    }
+}
+
+impl RangeBounds<Vec<u8>> for Range {
+    fn start_bound(&self) -> Bound<&Vec<u8>> {
+        match &self.start {
+            Bound::Included(v) => Bound::Included(v),
+            Bound::Excluded(v) => Bound::Excluded(v),
+            Bound::Unbounded => Bound::Unbounded,
+        }
+    }
+
+    fn end_bound(&self) -> Bound<&Vec<u8>> {
+        match &self.end {
+            Bound::Included(v) => Bound::Included(v),
+            Bound::Excluded(v) => Bound::Excluded(v),
+            Bound::Unbounded => Bound::Unbounded,
+        }
+    }
 }
 
 /// Iterator over a key/value range.
@@ -85,16 +143,16 @@ trait TestSuite<S: Store> {
         }
         let mut expect = items.clone();
         expect.sort_by(|a, b| a.0.cmp(&b.0));
-        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?);
+        assert_eq!(expect, s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?);
         expect.reverse();
-        assert_eq!(expect, s.scan(..).rev().collect::<Result<Vec<_>>>()?);
+        assert_eq!(expect, s.scan(Range::from(..)).rev().collect::<Result<Vec<_>>>()?);
 
         // Remove the items
         for (key, _) in items {
             s.delete(&key)?;
             assert_eq!(None, s.get(&key)?);
         }
-        assert!(s.scan(..).collect::<Result<Vec<_>>>()?.is_empty());
+        assert!(s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?.is_empty());
 
         Ok(())
     }
@@ -114,7 +172,7 @@ trait TestSuite<S: Store> {
                 (b"ba".to_vec(), vec![0x02, 0x01]),
                 (b"bb".to_vec(), vec![0x02, 0x02]),
             ],
-            s.scan(b"b".to_vec()..b"bz".to_vec()).collect::<Result<Vec<_>>>()?
+            s.scan(Range::from(b"b".to_vec()..b"bz".to_vec())).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(
             vec![
@@ -122,13 +180,13 @@ trait TestSuite<S: Store> {
                 (b"ba".to_vec(), vec![0x02, 0x01]),
                 (b"b".to_vec(), vec![0x02]),
             ],
-            s.scan(b"b".to_vec()..b"bz".to_vec()).rev().collect::<Result<Vec<_>>>()?
+            s.scan(Range::from(b"b".to_vec()..b"bz".to_vec())).rev().collect::<Result<Vec<_>>>()?
         );
 
         // Inclusive/exclusive ranges
         assert_eq!(
             vec![(b"b".to_vec(), vec![0x02]), (b"ba".to_vec(), vec![0x02, 0x01]),],
-            s.scan(b"b".to_vec()..b"bb".to_vec()).collect::<Result<Vec<_>>>()?
+            s.scan(Range::from(b"b".to_vec()..b"bb".to_vec())).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(
             vec![
@@ -136,17 +194,17 @@ trait TestSuite<S: Store> {
                 (b"ba".to_vec(), vec![0x02, 0x01]),
                 (b"bb".to_vec(), vec![0x02, 0x02]),
             ],
-            s.scan(b"b".to_vec()..=b"bb".to_vec()).collect::<Result<Vec<_>>>()?
+            s.scan(Range::from(b"b".to_vec()..=b"bb".to_vec())).collect::<Result<Vec<_>>>()?
         );
 
         // Open ranges
         assert_eq!(
             vec![(b"bb".to_vec(), vec![0x02, 0x02]), (b"c".to_vec(), vec![0x03]),],
-            s.scan(b"bb".to_vec()..).collect::<Result<Vec<_>>>()?
+            s.scan(Range::from(b"bb".to_vec()..)).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(
             vec![(b"a".to_vec(), vec![0x01]), (b"b".to_vec(), vec![0x02]),],
-            s.scan(..=b"b".to_vec()).collect::<Result<Vec<_>>>()?
+            s.scan(Range::from(..=b"b".to_vec())).collect::<Result<Vec<_>>>()?
         );
 
         // Full range
@@ -158,7 +216,7 @@ trait TestSuite<S: Store> {
                 (b"bb".to_vec(), vec![0x02, 0x02]),
                 (b"c".to_vec(), vec![0x03]),
             ],
-            s.scan(..).collect::<Result<Vec<_>>>()?
+            s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?
         );
         Ok(())
     }

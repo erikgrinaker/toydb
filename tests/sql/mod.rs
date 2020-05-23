@@ -7,8 +7,8 @@ use toydb::error::Result;
 use toydb::sql::engine::{Engine, KV};
 use toydb::storage::kv;
 
-fn setup(queries: Vec<&str>) -> Result<KV<kv::StdMemory>> {
-    let engine = KV::new(kv::MVCC::new(kv::StdMemory::new()));
+fn setup(queries: Vec<&str>) -> Result<KV> {
+    let engine = KV::new(kv::MVCC::new(Box::new(kv::Memory::new())));
     let mut session = engine.session()?;
     session.execute("BEGIN")?;
     for query in queries {

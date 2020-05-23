@@ -1,11 +1,12 @@
-use super::{Scan, Store};
+use super::{Range, Scan, Store};
 use crate::error::{Error, Result};
 
 use std::cmp::{max, min};
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::fs::{File, OpenOptions};
+use std::fmt::Display;
+use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek as _, SeekFrom, Write};
-use std::ops::{Bound, RangeBounds};
+use std::ops::Bound;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
@@ -36,9 +37,17 @@ pub struct Hybrid {
     sync: bool,
 }
 
+impl Display for Hybrid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "hybrid")
+    }
+}
+
 impl Hybrid {
     /// Creates or opens a new hybrid log, with files in the given directory.
     pub fn new(dir: &Path, sync: bool) -> Result<Self> {
+        create_dir_all(dir)?;
+
         let file =
             OpenOptions::new().read(true).write(true).create(true).open(dir.join("raft-log"))?;
 
@@ -156,17 +165,17 @@ impl Store for Hybrid {
         self.index.len() as u64 + self.uncommitted.len() as u64
     }
 
-    fn scan(&self, range: impl RangeBounds<u64>) -> Scan {
-        let start = match range.start_bound() {
+    fn scan(&self, range: Range) -> Scan {
+        let start = match range.start {
             Bound::Included(0) => 1,
-            Bound::Included(n) => *n,
-            Bound::Excluded(n) => *n + 1,
+            Bound::Included(n) => n,
+            Bound::Excluded(n) => n + 1,
             Bound::Unbounded => 1,
         };
-        let end = match range.end_bound() {
-            Bound::Included(n) => *n,
+        let end = match range.end {
+            Bound::Included(n) => n,
             Bound::Excluded(0) => 0,
-            Bound::Excluded(n) => *n - 1,
+            Bound::Excluded(n) => n - 1,
             Bound::Unbounded => self.len(),
         };
 
@@ -205,6 +214,10 @@ impl Store for Hybrid {
         }
 
         scan
+    }
+
+    fn size(&self) -> u64 {
+        self.index.iter().next_back().map(|(_, (pos, size))| *pos + *size as u64).unwrap_or(0)
     }
 
     fn truncate(&mut self, index: u64) -> Result<u64> {
@@ -278,7 +291,10 @@ fn test_persistent() -> Result<()> {
 
     let l = Hybrid::new(dir.as_ref(), true)?;
 
-    assert_eq!(vec![vec![1], vec![2], vec![3]], l.scan(..).collect::<Result<Vec<_>>>()?);
+    assert_eq!(
+        vec![vec![1], vec![2], vec![3]],
+        l.scan(Range::from(..)).collect::<Result<Vec<_>>>()?
+    );
 
     Ok(())
 }

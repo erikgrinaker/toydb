@@ -11,8 +11,6 @@ use ::log::{error, info};
 use futures::sink::SinkExt as _;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::stream::StreamExt as _;
 use tokio::sync::mpsc;
@@ -20,7 +18,7 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 /// A toyDB server.
 pub struct Server {
-    raft: raft::Server<log::Hybrid>,
+    raft: raft::Server,
     raft_listener: Option<TcpListener>,
     sql_listener: Option<TcpListener>,
 }
@@ -30,18 +28,15 @@ impl Server {
     pub async fn new(
         id: &str,
         peers: HashMap<String, String>,
-        dir: &str,
-        sync: bool,
+        raft_store: Box<dyn log::Store>,
+        sql_store: Box<dyn kv::Store>,
     ) -> Result<Self> {
-        let path = Path::new(dir);
-        fs::create_dir_all(path)?;
         Ok(Server {
             raft: raft::Server::new(
                 id,
                 peers,
-                raft::Log::new(log::Hybrid::new(&path, sync)?)?,
-                // Use an in-memory database since the Raft log is durable
-                sql::engine::Raft::new_state(kv::MVCC::new(kv::Memory::new()))?,
+                raft::Log::new(raft_store)?,
+                Box::new(sql::engine::Raft::new_state(kv::MVCC::new(sql_store))?),
             )
             .await?,
             raft_listener: None,

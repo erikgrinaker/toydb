@@ -4,13 +4,15 @@
 
 Distributed SQL database in Rust, written as a learning project. Most components have been built from scratch, including:
 
+* Pluggable storage engine with B+tree and log-structured backends.
+
 * Raft-based distributed consensus engine for linearizable state machine replication.
 
 * ACID-compliant transaction engine with MVCC-based snapshot isolation.
 
 * Iterator-based query engine with heuristic optimization and time-travel support.
 
-* SQL interface including projections, filters, joins, and aggregates.
+* SQL interface including projections, filters, joins, aggregates, and transactions.
 
 For details, see the [documentation](docs/).
 

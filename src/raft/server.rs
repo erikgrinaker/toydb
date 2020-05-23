@@ -1,6 +1,5 @@
 use super::{Address, Event, Log, Message, Node, Request, Response, State};
 use crate::error::{Error, Result};
-use crate::storage::log;
 
 use ::log::{debug, error};
 use futures::{sink::SinkExt as _, FutureExt as _};
@@ -16,19 +15,19 @@ use uuid::Uuid;
 const TICK: Duration = Duration::from_millis(100);
 
 /// A Raft server.
-pub struct Server<L: log::Store> {
-    node: Node<L>,
+pub struct Server {
+    node: Node,
     peers: HashMap<String, String>,
     node_rx: mpsc::UnboundedReceiver<Message>,
 }
 
-impl<L: log::Store + Send + 'static> Server<L> {
+impl Server {
     /// Creates a new Raft cluster
-    pub async fn new<S: State + Send + 'static>(
+    pub async fn new(
         id: &str,
         peers: HashMap<String, String>,
-        log: Log<L>,
-        state: S,
+        log: Log,
+        state: Box<dyn State>,
     ) -> Result<Self> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         Ok(Self {
@@ -69,7 +68,7 @@ impl<L: log::Store + Send + 'static> Server<L> {
 
     /// Runs the event loop.
     async fn eventloop(
-        mut node: Node<L>,
+        mut node: Node,
         mut node_rx: mpsc::UnboundedReceiver<Message>,
         mut client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>,
         mut tcp_rx: mpsc::UnboundedReceiver<Message>,

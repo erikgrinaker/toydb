@@ -132,9 +132,9 @@ Semicolons are not supported. The following commands are also available:
                 println!(
                     r#"
 Server:    {server} (leader {leader} in term {term} with {nodes} nodes)
-Raft log:  {committed} committed, {applied} applied entries
+Raft log:  {committed} committed, {applied} applied, {raft_size} MB ({raft_storage} storage)
 Node logs: {logs}
-Txns:      {txns_active} active, {txns} total
+SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
 "#,
                     server = status.raft.server,
                     leader = status.raft.leader,
@@ -142,9 +142,12 @@ Txns:      {txns_active} active, {txns} total
                     nodes = status.raft.node_last_index.len(),
                     committed = status.raft.commit_index,
                     applied = status.raft.apply_index,
+                    raft_storage = status.raft.storage,
+                    raft_size = format!("{:.3}", status.raft.storage_size as f64 / 1000.0 / 1000.0),
                     logs = node_logs.join(" "),
                     txns = status.mvcc.txns,
-                    txns_active = status.mvcc.txns_active
+                    txns_active = status.mvcc.txns_active,
+                    sql_storage = status.mvcc.storage
                 )
             }
             "!table" => {

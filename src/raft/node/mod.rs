@@ -4,7 +4,6 @@ mod leader;
 
 use super::{Address, Driver, Event, Instruction, Log, Message, State};
 use crate::error::{Error, Result};
-use crate::storage::log;
 use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
@@ -32,22 +31,24 @@ pub struct Status {
     pub node_last_index: HashMap<String, u64>,
     pub commit_index: u64,
     pub apply_index: u64,
+    pub storage: String,
+    pub storage_size: u64,
 }
 
 /// The local Raft node state machine.
-pub enum Node<L: log::Store> {
-    Candidate(RoleNode<Candidate, L>),
-    Follower(RoleNode<Follower, L>),
-    Leader(RoleNode<Leader, L>),
+pub enum Node {
+    Candidate(RoleNode<Candidate>),
+    Follower(RoleNode<Follower>),
+    Leader(RoleNode<Leader>),
 }
 
-impl<L: log::Store> Node<L> {
+impl Node {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
-    pub async fn new<S: State + Send + 'static>(
+    pub async fn new(
         id: &str,
         peers: Vec<String>,
-        log: Log<L>,
-        mut state: S,
+        log: Log,
+        mut state: Box<dyn State>,
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self> {
         let applied_index = state.applied_index();
@@ -62,7 +63,7 @@ impl<L: log::Store> Node<L> {
         let mut driver = Driver::new(state_rx, node_tx.clone());
         if log.commit_index > applied_index {
             info!("Replaying log entries {} to {}", applied_index + 1, log.commit_index);
-            driver.replay(&mut state, log.scan((applied_index + 1)..=log.commit_index))?;
+            driver.replay(&mut *state, log.scan((applied_index + 1)..=log.commit_index))?;
         };
         tokio::spawn(driver.drive(state));
 
@@ -116,30 +117,30 @@ impl<L: log::Store> Node<L> {
     }
 }
 
-impl<L: log::Store> From<RoleNode<Candidate, L>> for Node<L> {
-    fn from(rn: RoleNode<Candidate, L>) -> Self {
+impl From<RoleNode<Candidate>> for Node {
+    fn from(rn: RoleNode<Candidate>) -> Self {
         Node::Candidate(rn)
     }
 }
 
-impl<L: log::Store> From<RoleNode<Follower, L>> for Node<L> {
-    fn from(rn: RoleNode<Follower, L>) -> Self {
+impl From<RoleNode<Follower>> for Node {
+    fn from(rn: RoleNode<Follower>) -> Self {
         Node::Follower(rn)
     }
 }
 
-impl<L: log::Store> From<RoleNode<Leader, L>> for Node<L> {
-    fn from(rn: RoleNode<Leader, L>) -> Self {
+impl From<RoleNode<Leader>> for Node {
+    fn from(rn: RoleNode<Leader>) -> Self {
         Node::Leader(rn)
     }
 }
 
 // A Raft node with role R
-pub struct RoleNode<R, L: log::Store> {
+pub struct RoleNode<R> {
     id: String,
     peers: Vec<String>,
     term: u64,
-    log: Log<L>,
+    log: Log,
     node_tx: mpsc::UnboundedSender<Message>,
     state_tx: mpsc::UnboundedSender<Instruction>,
     /// Keeps track of queued client requests received e.g. during elections.
@@ -149,9 +150,9 @@ pub struct RoleNode<R, L: log::Store> {
     role: R,
 }
 
-impl<R, L: log::Store> RoleNode<R, L> {
+impl<R> RoleNode<R> {
     /// Transforms the node into another role.
-    fn become_role<T>(self, role: T) -> Result<RoleNode<T, L>> {
+    fn become_role<T>(self, role: T) -> Result<RoleNode<T>> {
         Ok(RoleNode {
             id: self.id,
             peers: self.peers,
@@ -240,6 +241,7 @@ mod tests {
     use super::super::Entry;
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
+    use crate::storage::log;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
@@ -254,16 +256,16 @@ mod tests {
         assert_eq!(msgs, actual);
     }
 
-    pub struct NodeAsserter<'a, L: log::Store> {
-        node: &'a Node<L>,
+    pub struct NodeAsserter<'a> {
+        node: &'a Node,
     }
 
-    impl<'a, L: log::Store> NodeAsserter<'a, L> {
-        pub fn new(node: &'a Node<L>) -> Self {
+    impl<'a> NodeAsserter<'a> {
+        pub fn new(node: &'a Node) -> Self {
             Self { node }
         }
 
-        fn log(&self) -> &'a Log<L> {
+        fn log(&self) -> &'a Log {
             match self.node {
                 Node::Candidate(n) => &n.log,
                 Node::Follower(n) => &n.log,
@@ -396,17 +398,17 @@ mod tests {
         }
     }
 
-    pub fn assert_node<L: log::Store>(node: &Node<L>) -> NodeAsserter<L> {
+    pub fn assert_node(node: &Node) -> NodeAsserter {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>)> {
+    fn setup_rolenode() -> Result<(RoleNode<()>, mpsc::UnboundedReceiver<Message>)> {
         setup_rolenode_peers(vec!["b".into(), "c".into()])
     }
 
     fn setup_rolenode_peers(
         peers: Vec<String>,
-    ) -> Result<(RoleNode<(), log::Test>, mpsc::UnboundedReceiver<Message>)> {
+    ) -> Result<(RoleNode<()>, mpsc::UnboundedReceiver<Message>)> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, _) = mpsc::unbounded_channel();
         let node = RoleNode {
@@ -414,7 +416,7 @@ mod tests {
             id: "a".into(),
             peers,
             term: 1,
-            log: Log::new(log::Test::new())?,
+            log: Log::new(Box::new(log::Test::new()))?,
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
@@ -429,8 +431,8 @@ mod tests {
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            Log::new(log::Test::new())?,
-            TestState::new(0),
+            Log::new(Box::new(log::Test::new()))?,
+            Box::new(TestState::new(0)),
             node_tx,
         )
         .await?;
@@ -448,13 +450,13 @@ mod tests {
     #[tokio::test]
     async fn new_loads_term() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let store = log::Test::new();
+        let store = Box::new(log::Test::new());
         Log::new(store.clone())?.save_term(3, Some("c"))?;
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
             Log::new(store)?,
-            TestState::new(0),
+            Box::new(TestState::new(0)),
             node_tx,
         )
         .await?;
@@ -468,13 +470,13 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_all() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(log::Test::new())?;
+        let mut log = Log::new(Box::new(log::Test::new()))?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
         log.commit(3)?;
         log.append(2, Some(vec![0x03]))?;
-        let state = TestState::new(0);
+        let state = Box::new(TestState::new(0));
 
         Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
         tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
@@ -486,13 +488,13 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_partial() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(log::Test::new())?;
+        let mut log = Log::new(Box::new(log::Test::new()))?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
         log.commit(3)?;
         log.append(2, Some(vec![0x03]))?;
-        let state = TestState::new(2);
+        let state = Box::new(TestState::new(2));
 
         Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
         tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
@@ -504,13 +506,13 @@ mod tests {
     #[tokio::test(core_threads = 2)]
     async fn new_state_apply_missing() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(log::Test::new())?;
+        let mut log = Log::new(Box::new(log::Test::new()))?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
         log.commit(3)?;
         log.append(2, Some(vec![0x03]))?;
-        let state = TestState::new(4);
+        let state = Box::new(TestState::new(4));
 
         assert_eq!(
             Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await.err(),
@@ -524,8 +526,14 @@ mod tests {
     #[tokio::test]
     async fn new_single() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let node =
-            Node::new("a", vec![], Log::new(log::Test::new())?, TestState::new(0), node_tx).await?;
+        let node = Node::new(
+            "a",
+            vec![],
+            Log::new(Box::new(log::Test::new()))?,
+            Box::new(TestState::new(0)),
+            node_tx,
+        )
+        .await?;
         match node {
             Node::Leader(rolenode) => {
                 assert_eq!(rolenode.id, "a".to_owned());

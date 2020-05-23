@@ -128,8 +128,10 @@ async fn status() -> Result<()> {
                 node_last_index: vec![("test".to_string(), 26)].into_iter().collect(),
                 commit_index: 26,
                 apply_index: 26,
+                storage: "hybrid".into(),
+                storage_size: 3239,
             },
-            mvcc: kv::mvcc::Status { txns: 1, txns_active: 0 },
+            mvcc: kv::mvcc::Status { txns: 1, txns_active: 0, storage: "memory".into() },
         }
     );
     Ok(())

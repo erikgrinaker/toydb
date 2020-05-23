@@ -1,7 +1,6 @@
 use super::super::{Address, Event, Message, Response};
 use super::{Follower, Leader, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
 use crate::error::Result;
-use crate::storage::log;
 
 use ::log::{debug, info, warn};
 use rand::Rng as _;
@@ -29,9 +28,9 @@ impl Candidate {
     }
 }
 
-impl<L: log::Store> RoleNode<Candidate, L> {
+impl RoleNode<Candidate> {
     /// Transition to follower role.
-    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower, L>> {
+    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower>> {
         info!("Discovered leader {} for term {}, following", leader, term);
         self.term = term;
         self.log.save_term(term, None)?;
@@ -42,7 +41,7 @@ impl<L: log::Store> RoleNode<Candidate, L> {
     }
 
     /// Transition to leader role.
-    fn become_leader(self) -> Result<RoleNode<Leader, L>> {
+    fn become_leader(self) -> Result<RoleNode<Leader>> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
         let last_index = self.log.last_index;
@@ -60,7 +59,7 @@ impl<L: log::Store> RoleNode<Candidate, L> {
     }
 
     /// Processes a message.
-    pub fn step(mut self, msg: Message) -> Result<Node<L>> {
+    pub fn step(mut self, msg: Message) -> Result<Node> {
         if let Err(err) = self.validate(&msg) {
             warn!("Ignoring invalid message: {}", err);
             return Ok(self.into());
@@ -83,7 +82,7 @@ impl<L: log::Store> RoleNode<Candidate, L> {
                 self.role.votes += 1;
                 if self.role.votes >= self.quorum() {
                     let queued = std::mem::replace(&mut self.queued_reqs, Vec::new());
-                    let mut node: Node<_> = self.become_leader()?.into();
+                    let mut node: Node = self.become_leader()?.into();
                     for (from, event) in queued {
                         node = node.step(Message { from, to: Address::Local, term: 0, event })?;
                     }
@@ -113,7 +112,7 @@ impl<L: log::Store> RoleNode<Candidate, L> {
     }
 
     /// Processes a logical clock tick.
-    pub fn tick(mut self) -> Result<Node<L>> {
+    pub fn tick(mut self) -> Result<Node> {
         // If the election times out, start a new one for the next term.
         self.role.election_ticks += 1;
         if self.role.election_ticks >= self.role.election_timeout {
@@ -138,18 +137,19 @@ mod tests {
     use super::super::super::{Entry, Instruction, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
+    use crate::storage::log;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(
-        RoleNode<Candidate, log::Test>,
+        RoleNode<Candidate>,
         mpsc::UnboundedReceiver<Message>,
         mpsc::UnboundedReceiver<Instruction>,
     )> {
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(log::Test::new())?;
+        let mut log = Log::new(Box::new(log::Test::new()))?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;

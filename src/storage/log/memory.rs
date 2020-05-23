@@ -1,8 +1,9 @@
-use super::Store;
+use super::{Range, Store};
 use crate::error::{Error, Result};
 
 use std::collections::HashMap;
-use std::ops::{Bound, RangeBounds};
+use std::fmt::Display;
+use std::ops::Bound;
 
 // An in-memory log store.
 pub struct Memory {
@@ -15,6 +16,12 @@ impl Memory {
     /// Creates a new in-memory log.
     pub fn new() -> Self {
         Self { log: Vec::new(), committed: 0, metadata: HashMap::new() }
+    }
+}
+
+impl Display for Memory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "memory")
     }
 }
 
@@ -53,25 +60,29 @@ impl Store for Memory {
         self.log.len() as u64
     }
 
-    fn scan(&self, range: impl RangeBounds<u64>) -> super::Scan {
+    fn scan(&self, range: Range) -> super::Scan {
         Box::new(
             self.log
                 .iter()
-                .take(match range.end_bound() {
-                    Bound::Included(n) => *n as usize,
+                .take(match range.end {
+                    Bound::Included(n) => n as usize,
                     Bound::Excluded(0) => 0,
-                    Bound::Excluded(n) => *n as usize - 1,
+                    Bound::Excluded(n) => n as usize - 1,
                     Bound::Unbounded => std::usize::MAX,
                 })
-                .skip(match range.start_bound() {
+                .skip(match range.start {
                     Bound::Included(0) => 0,
-                    Bound::Included(n) => *n as usize - 1,
-                    Bound::Excluded(n) => *n as usize,
+                    Bound::Included(n) => n as usize - 1,
+                    Bound::Excluded(n) => n as usize,
                     Bound::Unbounded => 0,
                 })
                 .cloned()
                 .map(Ok),
         )
+    }
+
+    fn size(&self) -> u64 {
+        self.log.iter().map(|v| v.len() as u64).sum()
     }
 
     fn truncate(&mut self, index: u64) -> Result<u64> {

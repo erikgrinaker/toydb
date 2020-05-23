@@ -1,7 +1,7 @@
-use super::{Memory, Scan, Store};
+use super::{Memory, Range, Scan, Store};
 use crate::error::Result;
 
-use std::ops::RangeBounds;
+use std::fmt::Display;
 use std::sync::{Arc, RwLock};
 
 /// Key-value storage backend for testing. Protects an inner Memory backend using a mutex, so it can
@@ -18,6 +18,12 @@ impl Test {
     }
 }
 
+impl Display for Test {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "test")
+    }
+}
+
 impl Store for Test {
     fn delete(&mut self, key: &[u8]) -> Result<()> {
         self.kv.write()?.delete(key)
@@ -31,7 +37,7 @@ impl Store for Test {
         self.kv.read()?.get(key)
     }
 
-    fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Scan {
+    fn scan(&self, range: Range) -> Scan {
         // Since the mutex guard is scoped to this method, we simply buffer the result.
         Box::new(self.kv.read().unwrap().scan(range).collect::<Vec<Result<_>>>().into_iter())
     }
