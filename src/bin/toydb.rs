@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     };
     let sql_store: Box<dyn storage::kv::Store> = match cfg.storage_sql.as_str() {
         "memory" | "" => Box::new(storage::kv::Memory::new()),
-        //"stdmemory" => Box::new(storage::kv::StdMemory::new()),
+        "stdmemory" => Box::new(storage::kv::StdMemory::new()),
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
 
