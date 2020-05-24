@@ -3,7 +3,7 @@ use super::super::types::Expression;
 use super::{Context, Executor, ResultSet};
 use crate::error::{Error, Result};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 /// An UPDATE executor
 pub struct Update<T: Transaction> {
@@ -31,18 +31,29 @@ impl<T: Transaction> Executor<T> for Update<T> {
         match self.source.execute(ctx)? {
             ResultSet::Query { mut relation } => {
                 let table = ctx.txn.must_read_table(&self.table)?;
-                let mut count = 0;
+
+                // The iterator will see our changes, such that the same item may be iterated over
+                // multiple times. We keep track of the primary keys here to avoid that, althought
+                // it may cause ballooning memory usage for large updates.
+                //
+                // FIXME This is not safe for primary key updates, which may still be processed
+                // multiple times - it should be possible to come up with a pathological case that
+                // loops forever (e.g. UPDATE test SET id = id + 1).
+                let mut updated = HashSet::new();
                 while let Some(row) = relation.next().transpose()? {
                     let id = table.get_row_key(&row)?;
+                    if updated.contains(&id) {
+                        continue;
+                    }
                     let env = table.row_env(&row);
                     let mut new = row.clone();
                     for (field, expr) in &self.expressions {
                         table.set_row_field(&mut new, field, expr.evaluate(&env)?)?;
                     }
                     ctx.txn.update(&table.name, &id, new)?;
-                    count += 1
+                    updated.insert(id);
                 }
-                Ok(ResultSet::Update { count })
+                Ok(ResultSet::Update { count: updated.len() as u64 })
             }
             r => Err(Error::Internal(format!("Unexpected response {:?}", r))),
         }

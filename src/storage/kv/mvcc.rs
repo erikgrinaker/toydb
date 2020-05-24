@@ -429,9 +429,6 @@ impl<'a> Key<'a> {
 }
 
 /// A key range scan.
-/// FIXME This should really just wrap the underlying iterator via a RwLock guard for the store,
-/// but making the lifetimes work out is non-trivial. See also:
-/// https://users.rust-lang.org/t/creating-an-iterator-over-mutex-contents-cannot-infer-an-appropriate-lifetime/24458
 pub struct Scan {
     /// The underlying KV store iterator.
     scan: super::Scan,
@@ -461,6 +458,8 @@ impl Scan {
             }
 
             // Keep track of return candidate, and return current candidate if key changes.
+            // We don't use a peekable iterator here, because we need to apply the above
+            // logic for the peeked item as well.
             let hit = self
                 .next_candidate
                 .take()
@@ -512,7 +511,6 @@ impl Scan {
 
 impl Iterator for Scan {
     type Item = Result<(Vec<u8>, Vec<u8>)>;
-
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
     }
