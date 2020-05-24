@@ -7,8 +7,11 @@ use crate::sql::schema::Table;
 use futures::future::FutureExt as _;
 use futures::sink::SinkExt as _;
 use futures::stream::TryStreamExt as _;
+use rand::Rng as _;
 use std::cell::Cell;
+use std::future::Future;
 use std::ops::{Deref, Drop};
+use std::sync::Arc;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio::sync::{Mutex, MutexGuard};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
@@ -20,9 +23,13 @@ type Connection = tokio_serde::Framed<
     tokio_serde::formats::Bincode<Result<Response>, Request>,
 >;
 
+/// Number of serialization retries in with_txn()
+const WITH_TXN_RETRIES: u8 = 8;
+
 /// A toyDB client
+#[derive(Clone)]
 pub struct Client {
-    conn: Mutex<Connection>,
+    conn: Arc<Mutex<Connection>>,
     txn: Cell<Option<(u64, Mode)>>,
 }
 
@@ -30,10 +37,10 @@ impl Client {
     /// Creates a new client
     pub async fn new<A: ToSocketAddrs>(addr: A) -> Result<Self> {
         Ok(Self {
-            conn: Mutex::new(tokio_serde::Framed::new(
+            conn: Arc::new(Mutex::new(tokio_serde::Framed::new(
                 Framed::new(TcpStream::connect(addr).await?, LengthDelimitedCodec::new()),
                 tokio_serde::formats::Bincode::default(),
-            )),
+            ))),
             txn: Cell::new(None),
         })
     }
@@ -115,6 +122,38 @@ impl Client {
     /// Returns the transaction status of the client
     pub fn txn(&self) -> Option<(u64, Mode)> {
         self.txn.get()
+    }
+
+    /// Runs a query in a transaction, automatically retrying serialization failures with
+    /// exponential backoff.
+    pub async fn with_txn<W, F, R>(&self, mut with: W) -> Result<R>
+    where
+        W: FnMut(Client) -> F,
+        F: Future<Output = Result<R>>,
+    {
+        for i in 0..WITH_TXN_RETRIES {
+            if i > 0 {
+                tokio::time::delay_for(std::time::Duration::from_millis(
+                    2_u64.pow(i as u32 - 1) * rand::thread_rng().gen_range(25, 75),
+                ))
+                .await;
+            }
+            let result = async {
+                self.execute("BEGIN").await?;
+                let result = with(self.clone()).await?;
+                self.execute("COMMIT").await?;
+                Ok(result)
+            }
+            .await;
+            if result.is_err() {
+                self.execute("ROLLBACK").await?;
+                if let Err(Error::Serialization) = result {
+                    continue;
+                }
+            }
+            return result;
+        }
+        Err(Error::Serialization)
     }
 }
 

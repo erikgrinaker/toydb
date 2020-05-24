@@ -9,9 +9,10 @@ use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_v
 use futures::stream::TryStreamExt as _;
 use rand::distributions::Distribution;
 use rand::Rng as _;
+use std::cell::Cell;
+use std::rc::Rc;
 use tokio::net::ToSocketAddrs;
-use tokio::sync::MutexGuard;
-use toydb::client::{Client, Pool};
+use toydb::client::Pool;
 use toydb::error::{Error, Result};
 
 #[tokio::main]
@@ -85,7 +86,6 @@ struct Bank {
 
 impl Bank {
     const INITIAL_BALANCE: u64 = 100;
-    const TXN_RETRIES: u64 = 8;
 
     // Creates a new bank simulation
     async fn new<A: ToSocketAddrs + Clone>(
@@ -212,98 +212,70 @@ impl Bank {
         Ok(())
     }
 
-    /// Transfers a random amount between two customers, retrying serialization failures
-    /// FIXME The serialization rety with exponential backoff should be a helper on Client
+    /// Transfers a random amount between two customers.
     async fn transfer(&self, from: i64, to: i64) -> Result<()> {
         let client = self.clients.get().await;
-        let mut attempts = 0;
+        let attempts = Rc::new(Cell::new(0_u8));
         let start = std::time::Instant::now();
 
-        for i in 0..Self::TXN_RETRIES {
-            attempts += 1;
-            if i > 0 {
-                tokio::time::delay_for(std::time::Duration::from_millis(
-                    2_u64.pow(i as u32 - 1) * rand::thread_rng().gen_range(75, 125),
-                ))
-                .await;
-            }
-            let result = async {
-                client.execute("BEGIN").await?;
-                let result = self.try_transfer(&client, from, to).await?;
-                client.execute("COMMIT").await?;
-                Ok(result)
-            }
-            .await;
-            if result.is_err() {
-                client.execute("ROLLBACK").await?;
-                if let Err(Error::Serialization) = result {
-                    continue;
+        let (from_account, to_account, amount) = client
+            .with_txn(|txn| {
+                let attempts = attempts.clone();
+                async move {
+                    attempts.set(attempts.get() + 1);
+                    let mut row = txn
+                        .execute(&format!(
+                            "SELECT a.id, a.balance
+                            FROM account a JOIN customer c ON a.customer_id = c.id
+                            WHERE c.id = {}
+                            ORDER BY a.balance DESC
+                            LIMIT 1",
+                            from
+                        ))
+                        .await?
+                        .into_row()?;
+                    let from_account = row.remove(0).integer()?;
+                    let from_balance = row.remove(0).integer()?;
+
+                    let to_account = txn
+                        .execute(&format!(
+                            "SELECT a.id, a.balance
+                            FROM account a JOIN customer c ON a.customer_id = c.id
+                            WHERE c.id = {}
+                            ORDER BY a.balance ASC
+                            LIMIT 1",
+                            to
+                        ))
+                        .await?
+                        .into_value()?
+                        .integer()?;
+
+                    let amount = rand::thread_rng().gen_range(0, from_balance);
+                    txn.execute(&format!(
+                        "UPDATE account SET balance = balance - {} WHERE id = {}",
+                        amount, from_account,
+                    ))
+                    .await?;
+                    txn.execute(&format!(
+                        "UPDATE account SET balance = balance + {} WHERE id = {}",
+                        amount, to_account,
+                    ))
+                    .await?;
+                    Ok((from_account, to_account, amount))
                 }
-            }
-            let (from_account, to_account, amount) = result?;
-            println!(
-                "Thread {} transferred {: >4} from {: >3} ({:0>4}) to {: >3} ({:0>4}) in {:.3}s ({} attempts)",
-                client.id(),
-                amount,
-                from,
-                from_account,
-                to,
-                to_account,
-                start.elapsed().as_secs_f64(),
-                attempts
-            );
-            return Ok(());
-        }
-        Err(Error::Serialization)
-    }
-
-    /// Attempts to transfer a random amount
-    async fn try_transfer(
-        &self,
-        client: &MutexGuard<'_, Client>,
-        from: i64,
-        to: i64,
-    ) -> Result<(i64, i64, i64)> {
-        let mut row = client
-            .execute(&format!(
-                "SELECT a.id, a.balance
-                 FROM account a JOIN customer c ON a.customer_id = c.id
-                 WHERE c.id = {}
-                 ORDER BY a.balance DESC
-                 LIMIT 1",
-                from
-            ))
-            .await?
-            .into_row()?;
-        let from_account = row.remove(0).integer()?;
-        let from_balance = row.remove(0).integer()?;
-
-        let to_account = client
-            .execute(&format!(
-                "SELECT a.id, a.balance
-                 FROM account a JOIN customer c ON a.customer_id = c.id
-                 WHERE c.id = {}
-                 ORDER BY a.balance ASC
-                 LIMIT 1",
-                to
-            ))
-            .await?
-            .into_value()?
-            .integer()?;
-
-        let amount = rand::thread_rng().gen_range(0, from_balance);
-        client
-            .execute(&format!(
-                "UPDATE account SET balance = balance - {} WHERE id = {}",
-                amount, from_account,
-            ))
+            })
             .await?;
-        client
-            .execute(&format!(
-                "UPDATE account SET balance = balance + {} WHERE id = {}",
-                amount, to_account,
-            ))
-            .await?;
-        Ok((from_account, to_account, amount))
+
+        println!(
+            "Thread {} transferred {: >4} from {: >3} ({:0>4}) to {: >3} ({:0>4}) in {:.3}s ({} attempts)",
+            client.id(),
+            amount,
+            from,
+            from_account,
+            to,
+            to_account,
+            start.elapsed().as_secs_f64(),
+            attempts.get());
+        Ok(())
     }
 }
