@@ -175,28 +175,26 @@ impl super::Transaction for Transaction {
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan> {
         let table = self.must_read_table(&table)?;
-        let scan = self
-            .txn
-            .scan_prefix(&Key::Row(table.name.clone().into(), None).encode())?
-            .map(|r| r.and_then(|(_, v)| deserialize(&v)))
-            .filter_map(|r| match r {
-                Ok(row) => match &filter {
-                    Some(filter) => match filter.evaluate(&table.row_env(&row)) {
-                        Ok(Value::Boolean(b)) if b => Some(Ok(row)),
-                        Ok(Value::Boolean(_)) | Ok(Value::Null) => None,
-                        Ok(v) => Some(Err(Error::Value(format!(
-                            "Filter returned {}, expected boolean",
-                            v
-                        )))),
-                        Err(err) => Some(Err(err)),
+        Ok(Box::new(
+            self.txn
+                .scan_prefix(&Key::Row((&table.name).into(), None).encode())?
+                .map(|r| r.and_then(|(_, v)| deserialize(&v)))
+                .filter_map(move |r| match r {
+                    Ok(row) => match &filter {
+                        Some(filter) => match filter.evaluate(&table.row_env(&row)) {
+                            Ok(Value::Boolean(b)) if b => Some(Ok(row)),
+                            Ok(Value::Boolean(_)) | Ok(Value::Null) => None,
+                            Ok(v) => Some(Err(Error::Value(format!(
+                                "Filter returned {}, expected boolean",
+                                v
+                            )))),
+                            Err(err) => Some(Err(err)),
+                        },
+                        None => Some(Ok(row)),
                     },
-                    None => Some(Ok(row)),
-                },
-                err => Some(err),
-            });
-
-        // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
-        Ok(Box::new(scan.collect::<Vec<Result<Row>>>().into_iter()))
+                    err => Some(err),
+                }),
+        ))
     }
 
     fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan> {
@@ -205,21 +203,20 @@ impl super::Transaction for Transaction {
         if !column.index {
             return Err(Error::Value(format!("No index for {}.{}", table.name, column.name)));
         }
-
-        let scan = self
-            .txn
-            .scan_prefix(&Key::Index((&table.name).into(), (&column.name).into(), None).encode())?
-            .map(|r| -> Result<(Value, HashSet<Value>)> {
-                let (k, v) = r?;
-                let value = match Key::decode(&k)? {
-                    Key::Index(_, _, Some(pk)) => pk.into_owned(),
-                    _ => return Err(Error::Internal("Invalid index key".into())),
-                };
-                Ok((value, deserialize(&v)?))
-            });
-
-        // FIXME We buffer results here, to avoid dealing with trait lifetimes right now
-        Ok(Box::new(scan.collect::<Vec<Result<(Value, HashSet<Value>)>>>().into_iter()))
+        Ok(Box::new(
+            self.txn
+                .scan_prefix(
+                    &Key::Index((&table.name).into(), (&column.name).into(), None).encode(),
+                )?
+                .map(|r| -> Result<(Value, HashSet<Value>)> {
+                    let (k, v) = r?;
+                    let value = match Key::decode(&k)? {
+                        Key::Index(_, _, Some(pk)) => pk.into_owned(),
+                        _ => return Err(Error::Internal("Invalid index key".into())),
+                    };
+                    Ok((value, deserialize(&v)?))
+                }),
+        ))
     }
 
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()> {
