@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashSet;
+use std::iter::Peekable;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -430,79 +431,65 @@ impl<'a> Key<'a> {
 
 /// A key range scan.
 pub struct Scan {
-    /// The underlying KV store iterator.
-    scan: super::Scan,
-    /// The snapshot the scan is running in.
-    snapshot: Snapshot,
-    /// Keeps track of next() candidate pair to be returned if no newer versions are found.
-    next_candidate: Option<(Vec<u8>, Vec<u8>)>,
-    /// Keeps track of next_back() returned key, whose older versions should be ignored.
-    next_back_returned: Option<Vec<u8>>,
+    /// The augmented KV store iterator, with key (decoded) and value. Note that we don't retain
+    /// the decoded version, so there will be multiple keys (for each version). We want the last.
+    scan: Peekable<super::Scan>,
+    /// Keeps track of next_back() seen key, whose previous versions should be ignored.
+    next_back_seen: Option<Vec<u8>>,
 }
 
 impl Scan {
     /// Creates a new scan.
-    fn new(scan: super::Scan, snapshot: Snapshot) -> Self {
-        Self { scan, snapshot, next_candidate: None, next_back_returned: None }
+    fn new(mut scan: super::Scan, snapshot: Snapshot) -> Self {
+        // Augment the underlying scan to decode the key and filter invisible versions. We don't
+        // return the version, since we don't need it, but beware that all versions of the key
+        // will still be returned - we usually only need the last, which is what the next() and
+        // next_back() methods need to handle. We also don't decode the value, since we only need
+        // to decode the last version.
+        scan = Box::new(scan.filter_map(move |r| {
+            r.and_then(|(k, v)| match Key::decode(&k)? {
+                Key::Record(_, version) if !snapshot.is_visible(version) => Ok(None),
+                Key::Record(key, _) => Ok(Some((key.into_owned(), v))),
+                k => Err(Error::Internal(format!("Expected Record, got {:?}", k))),
+            })
+            .transpose()
+        }));
+        Self { scan: scan.peekable(), next_back_seen: None }
     }
 
     // next() with error handling.
     fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        while let Some((k, v)) = self.scan.next().transpose()? {
-            let (key, version) = match Key::decode(&k)? {
-                Key::Record(key, version) => (key, version),
-                k => return Err(Error::Internal(format!("Expected Record, got {:?}", k))),
-            };
-            if !self.snapshot.is_visible(version) {
-                continue;
-            }
-
-            // Keep track of return candidate, and return current candidate if key changes.
-            // We don't use a peekable iterator here, because we need to apply the above
-            // logic for the peeked item as well.
-            let hit = self
-                .next_candidate
-                .take()
-                .filter(|(k, _)| k != &&*key)
-                .map(|(k, v)| deserialize::<Option<Vec<u8>>>(&v).map(|v| (k, v)))
-                .transpose()?
-                .and_then(|(k, v)| v.map(|v| (k, v)));
-            self.next_candidate = Some((key.into_owned(), v));
-            if hit.is_some() {
-                return Ok(hit);
+        while let Some((key, value)) = self.scan.next().transpose()? {
+            // Only return the item if it is the last version of the key.
+            if match self.scan.peek() {
+                Some(Ok((peek_key, _))) if peek_key != &&*key => true,
+                Some(Ok(_)) => false,
+                Some(Err(err)) => return Err(err.clone()),
+                None => true,
+            } {
+                // Only return non-deleted items.
+                if let Some(value) = deserialize(&value)? {
+                    return Ok(Some((key, value)));
+                }
             }
         }
-
-        // When iteration ends, return the last candidate if any
-        Ok(self
-            .next_candidate
-            .take()
-            .map(|(k, v)| deserialize::<Option<Vec<u8>>>(&v).map(|v| (k, v)))
-            .transpose()?
-            .and_then(|(k, v)| v.map(|v| (k, v))))
+        Ok(None)
     }
 
     /// next_back() with error handling.
     fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        while let Some((k, v)) = self.scan.next_back().transpose()? {
-            let (key, version) = match Key::decode(&k)? {
-                Key::Record(key, version) => (key, version),
-                k => return Err(Error::Internal(format!("Expected Record, got {:?}", k))),
-            };
-            if !self.snapshot.is_visible(version) {
-                continue;
-            }
-
-            // Keep track of keys already been seen and returned (i.e. skip older versions)
-            if let Some(ref returned) = self.next_back_returned {
-                if returned == &&*key {
-                    continue;
+        while let Some((key, value)) = self.scan.next_back().transpose()? {
+            // Only return the last version of the key (so skip if seen).
+            if match &self.next_back_seen {
+                Some(seen_key) if seen_key != &&*key => true,
+                Some(_) => false,
+                None => true,
+            } {
+                self.next_back_seen = Some(key.clone());
+                // Only return non-deleted items.
+                if let Some(value) = deserialize(&value)? {
+                    return Ok(Some((key, value)));
                 }
-            }
-            self.next_back_returned = Some(key.clone().into_owned());
-
-            if let Some(value) = deserialize(&v)? {
-                return Ok(Some((key.into_owned(), value)));
             }
         }
         Ok(None)
