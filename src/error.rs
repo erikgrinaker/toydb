@@ -67,12 +67,6 @@ impl From<rustyline::error::ReadlineError> for Error {
     }
 }
 
-impl From<serde_cbor::error::Error> for Error {
-    fn from(err: serde_cbor::error::Error) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
 impl From<std::array::TryFromSliceError> for Error {
     fn from(err: std::array::TryFromSliceError) -> Self {
         Error::Internal(err.to_string())

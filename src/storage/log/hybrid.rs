@@ -90,10 +90,16 @@ impl Hybrid {
 
     /// Loads metadata from a file.
     fn load_metadata(file: &File) -> Result<HashMap<Vec<u8>, Vec<u8>>> {
-        match serde_cbor::from_reader(file) {
+        match bincode::deserialize_from(file) {
             Ok(metadata) => Ok(metadata),
-            Err(err) if err.is_eof() => Ok(HashMap::new()),
-            Err(err) => Err(err.into()),
+            Err(err) => {
+                if let bincode::ErrorKind::Io(err) = &*err {
+                    if err.kind() == std::io::ErrorKind::UnexpectedEof {
+                        return Ok(HashMap::new());
+                    }
+                }
+                Err(err.into())
+            }
         }
     }
 }
@@ -239,7 +245,7 @@ impl Store for Hybrid {
         self.metadata.insert(key.to_vec(), value);
         self.metadata_file.set_len(0)?;
         self.metadata_file.seek(SeekFrom::Start(0))?;
-        serde_cbor::to_writer(&mut self.metadata_file, &self.metadata)?;
+        bincode::serialize_into(&mut self.metadata_file, &self.metadata)?;
         if self.sync {
             self.metadata_file.sync_data()?;
         }
