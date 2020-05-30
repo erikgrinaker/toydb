@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::Expression;
 use super::super::types::Value;
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
 /// A filter executor
@@ -19,8 +19,8 @@ impl<T: Transaction> Filter<T> {
 }
 
 impl<T: Transaction> Executor<T> for Filter<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        let result = self.source.execute(ctx)?;
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        let result = self.source.execute(txn)?;
         if let ResultSet::Query { columns, rows } = result {
             let predicate = self.predicate;
             Ok(ResultSet::Query {

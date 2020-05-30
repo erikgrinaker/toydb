@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::{Columns, Expression, Rows};
-use super::{Context, Executor, ResultSet, Row, Value};
+use super::{Executor, ResultSet, Row, Value};
 use crate::error::{Error, Result};
 
 /// A nested loop join executor
@@ -31,11 +31,11 @@ impl<T: Transaction> NestedLoopJoin<T> {
 }
 
 impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
         let (result, inner) = if self.flip {
-            (self.inner.execute(ctx)?, self.outer.execute(ctx)?)
+            (self.inner.execute(txn)?, self.outer.execute(txn)?)
         } else {
-            (self.outer.execute(ctx)?, self.inner.execute(ctx)?)
+            (self.outer.execute(txn)?, self.inner.execute(txn)?)
         };
         if let ResultSet::Query { columns, rows } = result {
             if let ResultSet::Query { columns: inner_columns, rows: inner_rows } = inner {

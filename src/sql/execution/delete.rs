@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
 /// A DELETE executor
@@ -17,13 +17,13 @@ impl<T: Transaction> Delete<T> {
 }
 
 impl<T: Transaction> Executor<T> for Delete<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        let table = ctx.txn.must_read_table(&self.table)?;
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        let table = txn.must_read_table(&self.table)?;
         let mut count = 0;
-        match self.source.execute(ctx)? {
+        match self.source.execute(txn)? {
             ResultSet::Query { mut rows, .. } => {
                 while let Some(row) = rows.next().transpose()? {
-                    ctx.txn.delete(&table.name, &table.get_row_key(&row)?)?;
+                    txn.delete(&table.name, &table.get_row_key(&row)?)?;
                     count += 1
                 }
                 Ok(ResultSet::Delete { count })

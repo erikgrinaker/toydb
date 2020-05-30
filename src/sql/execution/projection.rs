@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::{Column, Expression, Expressions};
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
 /// A filter executor
@@ -24,8 +24,8 @@ impl<T: Transaction> Projection<T> {
 }
 
 impl<T: Transaction> Executor<T> for Projection<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        match self.source.execute(ctx)? {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        match self.source.execute(txn)? {
             ResultSet::Query { columns, rows } => {
                 let labels = self.labels;
                 let columns = self

@@ -2,7 +2,7 @@
 ///! and compares the results with golden files stored under tests/sql/query/
 use toydb::error::{Error, Result};
 use toydb::sql::engine::{Engine, Mode, Transaction};
-use toydb::sql::execution::{Context, ResultSet};
+use toydb::sql::execution::ResultSet;
 use toydb::sql::parser::Parser;
 use toydb::sql::plan::Plan;
 use toydb::sql::types::Row;
@@ -111,8 +111,7 @@ macro_rules! test_query {
             write!(f, "Query: {}\n\n", $query)?;
 
             write!(f, "Result:")?;
-            let ctx = Context{txn: &mut txn};
-            let result = match plan.execute(ctx) {
+            let result = match plan.execute(&mut txn) {
                 Ok(result) => result,
                 Err(err) => {
                     write!(f, " {:?}", err)?;

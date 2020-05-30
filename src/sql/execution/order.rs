@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::plan::Direction;
 use super::super::types::{Expression, Row, Value};
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
 /// An order executor
@@ -19,8 +19,8 @@ impl<T: Transaction> Order<T> {
 }
 
 impl<T: Transaction> Executor<T> for Order<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        match self.source.execute(ctx)? {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        match self.source.execute(txn)? {
             ResultSet::Query { columns, mut rows } => {
                 // FIXME Since we can't return errors from the sort_by closure, we have to
                 // pre-evaluate all values. This means that we can't short-circuit evaluation,

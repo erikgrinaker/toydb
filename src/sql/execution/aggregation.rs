@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::plan::Aggregate;
 use super::super::types::{Column, Value};
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
 use std::cmp::Ordering;
@@ -25,9 +25,9 @@ impl<T: Transaction> Aggregation<T> {
 
 impl<T: Transaction> Executor<T> for Aggregation<T> {
     #[allow(clippy::or_fun_call)]
-    fn execute(mut self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
+    fn execute(mut self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
         let agg_count = self.aggregates.len();
-        match self.source.execute(ctx)? {
+        match self.source.execute(txn)? {
             ResultSet::Query { columns, mut rows } => {
                 while let Some(mut row) = rows.next().transpose()? {
                     self.accumulators

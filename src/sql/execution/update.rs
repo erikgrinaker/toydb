@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::Expression;
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
 use std::collections::{BTreeMap, HashSet};
@@ -27,10 +27,10 @@ impl<T: Transaction> Update<T> {
 }
 
 impl<T: Transaction> Executor<T> for Update<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        match self.source.execute(ctx)? {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        match self.source.execute(txn)? {
             ResultSet::Query { mut rows, .. } => {
-                let table = ctx.txn.must_read_table(&self.table)?;
+                let table = txn.must_read_table(&self.table)?;
 
                 // The iterator will see our changes, such that the same item may be iterated over
                 // multiple times. We keep track of the primary keys here to avoid that, althought
@@ -49,7 +49,7 @@ impl<T: Transaction> Executor<T> for Update<T> {
                     for (field, expr) in &self.expressions {
                         table.set_row_field(&mut new, field, expr.evaluate(Some(&row))?)?;
                     }
-                    ctx.txn.update(&table.name, &id, new)?;
+                    txn.update(&table.name, &id, new)?;
                     updated.insert(id);
                 }
                 Ok(ResultSet::Update { count: updated.len() as u64 })

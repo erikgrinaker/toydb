@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
 /// A LIMIT executor
@@ -17,8 +17,8 @@ impl<T: Transaction> Limit<T> {
 }
 
 impl<T: Transaction> Executor<T> for Limit<T> {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        if let ResultSet::Query { columns, rows } = self.source.execute(ctx)? {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        if let ResultSet::Query { columns, rows } = self.source.execute(txn)? {
             Ok(ResultSet::Query { columns, rows: Box::new(rows.take(self.limit as usize)) })
         } else {
             Err(Error::Internal("Unexpected result".into()))

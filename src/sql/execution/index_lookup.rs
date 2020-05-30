@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::{Column, Row, Value};
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::Result;
 
 use std::collections::HashSet;
@@ -30,19 +30,19 @@ impl IndexLookup {
 }
 
 impl<T: Transaction> Executor<T> for IndexLookup {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        let table = ctx.txn.must_read_table(&self.table)?;
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        let table = txn.must_read_table(&self.table)?;
         let name = if let Some(alias) = &self.alias { alias } else { &table.name };
 
         let mut pks: HashSet<Value> = HashSet::new();
         for key in self.keys {
-            pks.extend(ctx.txn.read_index(&self.table, &self.column, &key)?);
+            pks.extend(txn.read_index(&self.table, &self.column, &key)?);
         }
 
         // FIXME Is there a way to pass the txn into an iterator closure instead?
         let rows = pks
             .into_iter()
-            .filter_map(|pk| ctx.txn.read(&table.name, &pk).transpose())
+            .filter_map(|pk| txn.read(&table.name, &pk).transpose())
             .collect::<Result<Vec<Row>>>()?;
 
         Ok(ResultSet::Query {

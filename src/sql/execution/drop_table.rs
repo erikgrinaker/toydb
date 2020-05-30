@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::Result;
 
 /// A DROP TABLE executor
@@ -15,8 +15,8 @@ impl DropTable {
 }
 
 impl<T: Transaction> Executor<T> for DropTable {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        ctx.txn.delete_table(&self.table)?;
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        txn.delete_table(&self.table)?;
         Ok(ResultSet::DropTable { name: self.table })
     }
 }

@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::{Column, Expression};
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::Result;
 
 /// A table scan executor
@@ -18,15 +18,15 @@ impl Scan {
 }
 
 impl<T: Transaction> Executor<T> for Scan {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        let table = ctx.txn.must_read_table(&self.table)?;
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        let table = txn.must_read_table(&self.table)?;
         Ok(ResultSet::Query {
             columns: table
                 .columns
                 .iter()
                 .map(|c| Column { table: Some(self.label.clone()), name: Some(c.name.clone()) })
                 .collect(),
-            rows: Box::new(ctx.txn.scan(&table.name, self.filter)?),
+            rows: Box::new(txn.scan(&table.name, self.filter)?),
         })
     }
 }

@@ -43,7 +43,7 @@ use serde_derive::{Deserialize, Serialize};
 /// A plan executor
 pub trait Executor<T: Transaction> {
     /// Executes the executor, consuming it and returning a result set
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet>;
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet>;
 }
 
 impl<T: Transaction + 'static> dyn Executor<T> {
@@ -80,12 +80,6 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             }
         }
     }
-}
-
-/// An execution context
-pub struct Context<'a, T: Transaction> {
-    /// The transaction to execute in
-    pub txn: &'a mut T,
 }
 
 /// An executor result set

@@ -4,7 +4,7 @@ pub mod raft;
 pub use kv::KV;
 pub use raft::{Raft, Status};
 
-use super::execution::{Context, ResultSet};
+use super::execution::ResultSet;
 use super::parser::{ast, Parser};
 use super::plan::Plan;
 use super::schema::Catalog;
@@ -116,21 +116,17 @@ impl<E: Engine + 'static> Session<E> {
             }),
             statement if self.txn.is_some() => Plan::build(statement, self.txn.as_mut().unwrap())?
                 .optimize(self.txn.as_mut().unwrap())?
-                .execute(Context { txn: self.txn.as_mut().unwrap() }),
+                .execute(self.txn.as_mut().unwrap()),
             statement @ ast::Statement::Select { .. } => {
                 let mut txn = self.engine.begin(Mode::ReadOnly)?;
-                let result = Plan::build(statement, &mut txn)?
-                    .optimize(&mut txn)?
-                    .execute(Context { txn: &mut txn });
+                let result =
+                    Plan::build(statement, &mut txn)?.optimize(&mut txn)?.execute(&mut txn);
                 txn.rollback()?;
                 result
             }
             statement => {
                 let mut txn = self.engine.begin(Mode::ReadWrite)?;
-                match Plan::build(statement, &mut txn)?
-                    .optimize(&mut txn)?
-                    .execute(Context { txn: &mut txn })
-                {
+                match Plan::build(statement, &mut txn)?.optimize(&mut txn)?.execute(&mut txn) {
                     Ok(result) => {
                         txn.commit()?;
                         Ok(result)

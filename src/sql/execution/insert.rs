@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::Expressions;
-use super::{Context, Executor, ResultSet};
+use super::{Executor, ResultSet};
 use crate::error::Result;
 
 /// An INSERT executor
@@ -20,8 +20,8 @@ impl Insert {
 }
 
 impl<T: Transaction> Executor<T> for Insert {
-    fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        let table = ctx.txn.must_read_table(&self.table)?;
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        let table = txn.must_read_table(&self.table)?;
         let mut count = 0;
         for expressions in self.rows {
             let mut row =
@@ -31,7 +31,7 @@ impl<T: Transaction> Executor<T> for Insert {
             } else {
                 row = table.make_row(&self.columns, row)?;
             }
-            ctx.txn.create(&table.name, row)?;
+            txn.create(&table.name, row)?;
             count += 1;
         }
         Ok(ResultSet::Create { count })

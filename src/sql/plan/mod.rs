@@ -4,7 +4,7 @@ use optimizer::Optimizer as _;
 use planner::Planner;
 
 use super::engine::Transaction;
-use super::execution::{Context, Executor, ResultSet};
+use super::execution::{Executor, ResultSet};
 use super::parser::ast;
 use super::schema::{Catalog, Table};
 use super::types::{Expression, Expressions, Value};
@@ -19,13 +19,14 @@ pub struct Plan(pub Node);
 
 impl Plan {
     /// Builds a plan from an AST statement
+    /// FIXME Catalog should be generic, not trait object
     pub fn build(statement: ast::Statement, catalog: &mut dyn Catalog) -> Result<Self> {
         Planner::new(catalog).build(statement)
     }
 
     /// Executes the plan, consuming it
-    pub fn execute<T: Transaction + 'static>(self, mut ctx: Context<T>) -> Result<ResultSet> {
-        Executor::build(self.0).execute(&mut ctx)
+    pub fn execute<T: Transaction + 'static>(self, txn: &mut T) -> Result<ResultSet> {
+        Executor::build(self.0).execute(txn)
     }
 
     /// Optimizes the plan, consuming it
