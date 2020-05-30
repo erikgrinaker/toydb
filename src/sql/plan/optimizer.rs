@@ -44,11 +44,11 @@ impl FilterPushdown {
         Ok(match target {
             // Filter nodes immediately before a scan node can be trivially pushed down, as long as
             // we remove any field qualifyers (e.g. movies table aliased as m).
-            Node::Scan { table, label, filter } => {
+            Node::Scan { table, alias, filter } => {
                 if let Some(filter) = filter {
                     predicate = Expression::And(Box::new(predicate), Box::new(filter))
                 }
-                Node::Scan { table, label, filter: Some(predicate) }
+                Node::Scan { table, alias, filter: Some(predicate) }
             }
             // Filter nodes immediately before a nested loop join can be trivially pushed down.
             Node::NestedLoopJoin { outer, inner, predicate: join_predicate, pad, flip } => {
@@ -97,10 +97,9 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
         node.transform(
             &|n| match n {
                 // FIXME This needs to be smarter - at least handle ORs. Could be prettier too.
-                Node::Scan { table, label, filter: Some(expr @ Expression::Equal(_, _)) } => {
+                Node::Scan { table, alias, filter: Some(expr @ Expression::Equal(_, _)) } => {
                     if let Some(table) = self.catalog.read_table(&table)? {
                         let pk = table.get_column_index(&table.get_primary_key()?.name)?;
-                        let alias = if label != table.name { Some(label.clone()) } else { None }; // FIXME
                         if let Some(value) = Self::is_lookup(pk, &expr) {
                             return Ok(Node::KeyLookup {
                                 table: table.name,
@@ -121,7 +120,7 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
                             }
                         }
                     }
-                    Ok(Node::Scan { table, label, filter: Some(expr) })
+                    Ok(Node::Scan { table, alias, filter: Some(expr) })
                 }
                 n => Ok(n),
             },

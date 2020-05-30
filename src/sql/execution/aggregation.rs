@@ -51,15 +51,7 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                     columns: columns
                         .into_iter()
                         .enumerate()
-                        .map(
-                            |(i, c)| {
-                                if i < agg_count {
-                                    Column { table: None, name: None }
-                                } else {
-                                    c
-                                }
-                            },
-                        )
+                        .map(|(i, c)| if i < agg_count { Column { name: None } } else { c })
                         .collect(),
                     rows: Box::new(self.accumulators.into_iter().map(|(bucket, accs)| {
                         Ok(accs

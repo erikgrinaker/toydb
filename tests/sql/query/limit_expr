@@ -42,7 +42,7 @@ Plan: Plan(
     Limit {
         source: Scan {
             table: "movies",
-            label: "movies",
+            alias: None,
             filter: None,
         },
         limit: 3,
@@ -53,7 +53,7 @@ Optimized plan: Plan(
     Limit {
         source: Scan {
             table: "movies",
-            label: "movies",
+            alias: None,
             filter: None,
         },
         limit: 3,

@@ -74,8 +74,8 @@ impl<'a> Planner<'a> {
                 Node::Delete {
                     table: table.clone(),
                     source: Box::new(Node::Scan {
-                        label: table.clone(),
                         table,
+                        alias: None,
                         filter: match r#where {
                             Some(ast::WhereClause(expr)) => {
                                 Some(self.build_expression(scope, expr)?)
@@ -100,8 +100,8 @@ impl<'a> Planner<'a> {
                 Node::Update {
                     table: table.clone(),
                     source: Box::new(Node::Scan {
-                        label: table.clone(),
                         table,
+                        alias: None,
                         filter: match r#where {
                             Some(ast::WhereClause(expr)) => {
                                 Some(self.build_expression(scope, expr)?)
@@ -265,9 +265,11 @@ impl<'a> Planner<'a> {
     fn build_from_item(&mut self, scope: &mut Scope, item: ast::FromItem) -> Result<Node> {
         Ok(match item {
             ast::FromItem::Table { name, alias } => {
-                let label = alias.unwrap_or_else(|| name.clone());
-                scope.add_table(label.clone(), self.catalog.must_read_table(&name)?)?;
-                Node::Scan { table: name, label, filter: None }
+                scope.add_table(
+                    alias.clone().unwrap_or_else(|| name.clone()),
+                    self.catalog.must_read_table(&name)?,
+                )?;
+                Node::Scan { table: name, alias, filter: None }
             }
 
             ast::FromItem::Join { left, right, r#type, predicate } => match r#type {

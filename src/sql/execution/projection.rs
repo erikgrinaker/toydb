@@ -34,11 +34,11 @@ impl<T: Transaction> Executor<T> for Projection<T> {
                     .enumerate()
                     .map(|(i, e)| {
                         Ok(if let Some(Some(label)) = labels.get(i) {
-                            Column { table: None, name: Some(label.clone()) }
+                            Column { name: Some(label.clone()) }
                         } else if let Expression::Field(i, _) = e {
                             columns[*i].clone()
                         } else {
-                            Column { table: None, name: None }
+                            Column { name: None }
                         })
                     })
                     .collect::<Result<Vec<_>>>()?;

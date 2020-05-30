@@ -77,12 +77,16 @@ Plan: Plan(
         source: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
-                label: "g",
+                alias: Some(
+                    "g",
+                ),
                 filter: None,
             },
             inner: Scan {
                 table: "movies",
-                label: "m",
+                alias: Some(
+                    "m",
+                ),
                 filter: None,
             },
             predicate: Some(
@@ -154,12 +158,16 @@ Optimized plan: Plan(
         source: NestedLoopJoin {
             outer: Scan {
                 table: "genres",
-                label: "g",
+                alias: Some(
+                    "g",
+                ),
                 filter: None,
             },
             inner: Scan {
                 table: "movies",
-                label: "m",
+                alias: Some(
+                    "m",
+                ),
                 filter: None,
             },
             predicate: Some(

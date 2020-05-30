@@ -9,9 +9,6 @@ use std::collections::HashSet;
 pub struct IndexLookup {
     /// The table to look up
     table: String,
-    /// The table alias to use
-    /// FIXME Shouldn't be here, see: https://github.com/erikgrinaker/toydb/issues/21
-    alias: Option<String>,
     /// The column index to use
     column: String,
     /// The index values to look up
@@ -19,20 +16,14 @@ pub struct IndexLookup {
 }
 
 impl IndexLookup {
-    pub fn new(
-        table: String,
-        alias: Option<String>,
-        column: String,
-        keys: Vec<Value>,
-    ) -> Box<Self> {
-        Box::new(Self { table, alias, column, keys })
+    pub fn new(table: String, column: String, keys: Vec<Value>) -> Box<Self> {
+        Box::new(Self { table, column, keys })
     }
 }
 
 impl<T: Transaction> Executor<T> for IndexLookup {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
         let table = txn.must_read_table(&self.table)?;
-        let name = if let Some(alias) = &self.alias { alias } else { &table.name };
 
         let mut pks: HashSet<Value> = HashSet::new();
         for key in self.keys {
@@ -46,11 +37,7 @@ impl<T: Transaction> Executor<T> for IndexLookup {
             .collect::<Result<Vec<Row>>>()?;
 
         Ok(ResultSet::Query {
-            columns: table
-                .columns
-                .iter()
-                .map(|c| Column { table: Some(name.clone()), name: Some(c.name.clone()) })
-                .collect(),
+            columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
             rows: Box::new(rows.into_iter().map(Ok)),
         })
     }

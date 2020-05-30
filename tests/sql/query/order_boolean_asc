@@ -35,7 +35,7 @@ Plan: Plan(
     Order {
         source: Scan {
             table: "booleans",
-            label: "booleans",
+            alias: None,
             filter: None,
         },
         orders: [
@@ -59,7 +59,7 @@ Optimized plan: Plan(
     Order {
         source: Scan {
             table: "booleans",
-            label: "booleans",
+            alias: None,
             filter: None,
         },
         orders: [

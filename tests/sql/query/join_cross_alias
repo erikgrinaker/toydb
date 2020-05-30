@@ -156,12 +156,16 @@ Plan: Plan(
                 outer: NestedLoopJoin {
                     outer: Scan {
                         table: "movies",
-                        label: "m",
+                        alias: Some(
+                            "m",
+                        ),
                         filter: None,
                     },
                     inner: Scan {
                         table: "genres",
-                        label: "g",
+                        alias: Some(
+                            "g",
+                        ),
                         filter: None,
                     },
                     predicate: None,
@@ -170,7 +174,9 @@ Plan: Plan(
                 },
                 inner: Scan {
                     table: "countries",
-                    label: "c",
+                    alias: Some(
+                        "c",
+                    ),
                     filter: None,
                 },
                 predicate: None,
@@ -343,12 +349,16 @@ Optimized plan: Plan(
             outer: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    label: "m",
+                    alias: Some(
+                        "m",
+                    ),
                     filter: None,
                 },
                 inner: Scan {
                     table: "genres",
-                    label: "g",
+                    alias: Some(
+                        "g",
+                    ),
                     filter: None,
                 },
                 predicate: None,
@@ -357,7 +367,9 @@ Optimized plan: Plan(
             },
             inner: Scan {
                 table: "countries",
-                label: "c",
+                alias: Some(
+                    "c",
+                ),
                 filter: None,
             },
             predicate: Some(

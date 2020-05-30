@@ -57,13 +57,13 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
             Node::DropTable { table } => DropTable::new(table),
             Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
-            Node::IndexLookup { table, alias, column, keys } => {
-                IndexLookup::new(table, alias, column, keys)
+            Node::IndexLookup { table, alias: _, column, keys } => {
+                IndexLookup::new(table, column, keys)
             }
             Node::Insert { table, columns, expressions } => {
                 Insert::new(table, columns, expressions)
             }
-            Node::KeyLookup { table, alias, keys } => KeyLookup::new(table, alias, keys),
+            Node::KeyLookup { table, alias: _, keys } => KeyLookup::new(table, keys),
             Node::Limit { source, limit } => Limit::new(Self::build(*source), limit),
             Node::NestedLoopJoin { outer, inner, predicate, pad, flip } => {
                 NestedLoopJoin::new(Self::build(*outer), Self::build(*inner), predicate, pad, flip)
@@ -74,7 +74,7 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Projection { source, labels, expressions } => {
                 Projection::new(Self::build(*source), labels, expressions)
             }
-            Node::Scan { table, label, filter } => Scan::new(table, label, filter),
+            Node::Scan { table, filter, alias: _ } => Scan::new(table, filter),
             Node::Update { table, source, expressions } => {
                 Update::new(table, Self::build(*source), expressions)
             }

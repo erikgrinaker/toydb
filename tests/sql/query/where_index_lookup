@@ -52,7 +52,7 @@ Plan: Plan(
         source: Filter {
             source: Scan {
                 table: "movies",
-                label: "movies",
+                alias: None,
                 filter: None,
             },
             predicate: Equal(

@@ -97,7 +97,7 @@ Plan: Plan(
                 source: Filter {
                     source: Scan {
                         table: "strings",
-                        label: "strings",
+                        alias: None,
                         filter: None,
                     },
                     predicate: Not(
@@ -215,7 +215,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "strings",
-                    label: "strings",
+                    alias: None,
                     filter: Some(
                         Not(
                             IsNull(

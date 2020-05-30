@@ -90,7 +90,7 @@ Plan: Plan(
                 source: Filter {
                     source: Scan {
                         table: "movies",
-                        label: "movies",
+                        alias: None,
                         filter: None,
                     },
                     predicate: Constant(
@@ -200,7 +200,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "movies",
-                    label: "movies",
+                    alias: None,
                     filter: Some(
                         Constant(
                             Boolean(

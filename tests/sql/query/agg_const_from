@@ -86,7 +86,7 @@ Plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "genres",
-                    label: "genres",
+                    alias: None,
                     filter: None,
                 },
                 labels: [
@@ -170,7 +170,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "genres",
-                    label: "genres",
+                    alias: None,
                     filter: None,
                 },
                 labels: [

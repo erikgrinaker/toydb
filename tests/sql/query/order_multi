@@ -42,7 +42,7 @@ Plan: Plan(
     Order {
         source: Scan {
             table: "movies",
-            label: "movies",
+            alias: None,
             filter: None,
         },
         orders: [
@@ -78,7 +78,7 @@ Optimized plan: Plan(
     Order {
         source: Scan {
             table: "movies",
-            label: "movies",
+            alias: None,
             filter: None,
         },
         orders: [

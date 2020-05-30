@@ -103,7 +103,7 @@ pub enum Node {
     },
     Scan {
         table: String,
-        label: String,
+        alias: Option<String>,
         filter: Option<Expression>,
     },
     // Uses BTreeMap for test stability
@@ -212,8 +212,8 @@ impl Node {
                     .map(|e| e.transform(pre, post))
                     .collect::<Result<_>>()?,
             },
-            Self::Scan { table, label, filter: Some(filter) } => {
-                Self::Scan { table, label, filter: Some(filter.transform(pre, post)?) }
+            Self::Scan { table, alias, filter: Some(filter) } => {
+                Self::Scan { table, alias, filter: Some(filter.transform(pre, post)?) }
             }
             Self::Update { table, source, expressions } => Self::Update {
                 table,

@@ -81,7 +81,7 @@ Plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "integers",
-                    label: "integers",
+                    alias: None,
                     filter: None,
                 },
                 labels: [
@@ -185,7 +185,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "integers",
-                    label: "integers",
+                    alias: None,
                     filter: None,
                 },
                 labels: [

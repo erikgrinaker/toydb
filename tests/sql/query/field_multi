@@ -39,7 +39,7 @@ Plan: Plan(
     Projection {
         source: Scan {
             table: "movies",
-            label: "movies",
+            alias: None,
             filter: None,
         },
         labels: [
@@ -73,7 +73,7 @@ Optimized plan: Plan(
     Projection {
         source: Scan {
             table: "movies",
-            label: "movies",
+            alias: None,
             filter: None,
         },
         labels: [

@@ -147,10 +147,7 @@ async fn execute() -> Result<()> {
     assert_eq!(
         result,
         ResultSet::Query {
-            columns: vec![
-                Column { table: Some("genres".into()), name: Some("id".into()) },
-                Column { table: Some("genres".into()), name: Some("name".into()) }
-            ],
+            columns: vec![Column { name: Some("id".into()) }, Column { name: Some("name".into()) }],
             rows: Box::new(std::iter::empty()),
         }
     );
@@ -167,10 +164,7 @@ async fn execute() -> Result<()> {
     assert_eq!(
         result,
         ResultSet::Query {
-            columns: vec![
-                Column { table: Some("genres".into()), name: Some("id".into()) },
-                Column { table: Some("genres".into()), name: Some("name".into()) }
-            ],
+            columns: vec![Column { name: Some("id".into()) }, Column { name: Some("name".into()) }],
             rows: Box::new(std::iter::empty()),
         }
     );

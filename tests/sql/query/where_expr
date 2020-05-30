@@ -51,7 +51,7 @@ Plan: Plan(
     Filter {
         source: Scan {
             table: "movies",
-            label: "movies",
+            alias: None,
             filter: None,
         },
         predicate: And(
@@ -105,7 +105,7 @@ Plan: Plan(
 Optimized plan: Plan(
     Scan {
         table: "movies",
-        label: "movies",
+        alias: None,
         filter: Some(
             And(
                 Or(
