@@ -33,4 +33,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Value("Invalid value -1 for limit")
+Plan: Value("Invalid limit -1")

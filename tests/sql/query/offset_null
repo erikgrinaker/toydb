@@ -27,4 +27,4 @@ AST: Select {
     ),
 }
 
-Plan: Value("Invalid value NULL for offset")
+Plan: Value("Invalid offset NULL")

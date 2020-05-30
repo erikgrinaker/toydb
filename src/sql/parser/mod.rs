@@ -159,8 +159,8 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a column specification
-    fn parse_ddl_columnspec(&mut self) -> Result<ast::ColumnSpec> {
-        let mut column = ast::ColumnSpec {
+    fn parse_ddl_columnspec(&mut self) -> Result<ast::Column> {
+        let mut column = ast::Column {
             name: self.next_ident()?,
             datatype: match self.next()? {
                 Token::Keyword(Keyword::Bool) => DataType::Boolean,

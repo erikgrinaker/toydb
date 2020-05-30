@@ -29,4 +29,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Value("Invalid value TRUE for limit")
+Plan: Value("Invalid limit TRUE")

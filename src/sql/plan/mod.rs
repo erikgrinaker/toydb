@@ -53,7 +53,7 @@ pub enum Node {
         source: Box<Node>,
     },
     DropTable {
-        name: String,
+        table: String,
     },
     Filter {
         source: Box<Node>,

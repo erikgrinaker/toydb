@@ -7,26 +7,26 @@ use crate::error::{Error, Result};
 use std::collections::{HashMap, HashSet};
 use std::mem::replace;
 
-/// The plan builder
+/// A query plan builder.
 pub struct Planner<'a> {
     catalog: &'a mut dyn Catalog,
 }
 
 impl<'a> Planner<'a> {
-    /// Creates a new planner
+    /// Creates a new planner.
     pub fn new(catalog: &'a mut dyn Catalog) -> Self {
         Self { catalog }
     }
 
-    /// Builds a plan tree for an AST statement
+    /// Builds a plan for an AST statement.
     pub fn build(&mut self, statement: ast::Statement) -> Result<Plan> {
         Ok(Plan(self.build_statement(statement)?))
     }
 
-    /// Builds a plan node for a statement
+    /// Builds a plan node for a statement.
     fn build_statement(&mut self, statement: ast::Statement) -> Result<Node> {
         Ok(match statement {
-            // Transaction control and explain statements should be handled by session.
+            // Transaction control and explain statements should have been handled by session.
             ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
                 return Err(Error::Internal(format!(
                     "Unexpected transaction statement {:?}",
@@ -38,7 +38,7 @@ impl<'a> Planner<'a> {
                 return Err(Error::Internal("Unexpected explain statement".into()))
             }
 
-            // Data definition language.
+            // DDL statements (schema changes).
             ast::Statement::CreateTable { name, columns } => Node::CreateTable {
                 schema: Table::new(
                     name,
@@ -47,9 +47,7 @@ impl<'a> Planner<'a> {
                         .map(|c| {
                             let nullable = c.nullable.unwrap_or(!c.primary_key);
                             let default = match c.default {
-                                Some(expr) => {
-                                    Some(self.build_expression_constant(expr)?.evaluate(None)?)
-                                }
+                                Some(expr) => Some(self.evaluate_constant(expr)?),
                                 None if nullable => Some(Value::Null),
                                 None => None,
                             };
@@ -68,10 +66,9 @@ impl<'a> Planner<'a> {
                 )?,
             },
 
-            ast::Statement::DropTable(name) => Node::DropTable { name },
+            ast::Statement::DropTable(table) => Node::DropTable { table },
 
             // Data modification language.
-            // FIXME Delete and update should handle aliases in the same way as select
             ast::Statement::Delete { table, r#where } => {
                 let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
                 Node::Delete {
@@ -218,12 +215,10 @@ impl<'a> Planner<'a> {
                 if let Some(expr) = offset {
                     node = Node::Offset {
                         source: Box::new(node),
-                        offset: match self.build_expression_constant(expr)?.evaluate(None)? {
-                            Value::Integer(i) if i >= 0 => i as u64,
-                            v => {
-                                return Err(Error::Value(format!("Invalid value {} for offset", v)))
-                            }
-                        },
+                        offset: match self.evaluate_constant(expr)? {
+                            Value::Integer(i) if i >= 0 => Ok(i as u64),
+                            v => Err(Error::Value(format!("Invalid offset {}", v))),
+                        }?,
                     }
                 }
 
@@ -231,12 +226,10 @@ impl<'a> Planner<'a> {
                 if let Some(expr) = limit {
                     node = Node::Limit {
                         source: Box::new(node),
-                        limit: match self.build_expression_constant(expr)?.evaluate(None)? {
-                            Value::Integer(i) if i >= 0 => i as u64,
-                            v => {
-                                return Err(Error::Value(format!("Invalid value {} for limit", v)))
-                            }
-                        },
+                        limit: match self.evaluate_constant(expr)? {
+                            Value::Integer(i) if i >= 0 => Ok(i as u64),
+                            v => Err(Error::Value(format!("Invalid limit {}", v))),
+                        }?,
                     }
                 }
                 node
@@ -331,21 +324,6 @@ impl<'a> Planner<'a> {
             aggregates,
         };
         Ok(node)
-    }
-
-    /// Builds an expression from an AST expression
-    fn build_expression(&self, scope: &mut Scope, expr: ast::Expression) -> Result<Expression> {
-        ExpressionBuilder::build(scope, expr)
-    }
-
-    /// Build a constant expression from an AST expression
-    fn build_expression_constant(&self, expr: ast::Expression) -> Result<Expression> {
-        ExpressionBuilder::build_constant(expr)
-    }
-
-    /// Builds expressions from AST expressions
-    fn build_expressions(&self, scope: &mut Scope, exprs: ast::Expressions) -> Result<Expressions> {
-        ExpressionBuilder::build_many(scope, exprs)
     }
 
     /// Extracts aggregate functions from an AST expression tree. This finds the aggregate
@@ -451,35 +429,11 @@ impl<'a> Planner<'a> {
             _ => false,
         })
     }
-}
 
-/// Builds expressions.
-struct ExpressionBuilder<'a> {
-    // Variable scope
-    scope: &'a Scope,
-}
-
-impl<'a> ExpressionBuilder<'a> {
-    /// Builds a single expression.
-    fn build(scope: &'a Scope, expr: ast::Expression) -> Result<Expression> {
-        Ok(*ExpressionBuilder { scope }.make(Box::new(expr))?)
-    }
-
-    /// Builds a single expression, errors if it's not constant (i.e. has field reference).
-    fn build_constant(expr: ast::Expression) -> Result<Expression> {
-        Ok(*ExpressionBuilder { scope: &mut Scope::constant() }.make(Box::new(expr))?)
-    }
-
-    /// Builds multiple expressions.
-    fn build_many(scope: &'a Scope, exprs: ast::Expressions) -> Result<Expressions> {
-        exprs.into_iter().map(|e| Self::build(scope, e)).collect()
-    }
-
-    /// Used internally, with more convenient signature.
-    #[allow(clippy::boxed_local)]
-    fn make(&mut self, expr: Box<ast::Expression>) -> Result<Box<Expression>> {
+    /// Builds an expression from an AST expression
+    fn build_expression(&self, scope: &mut Scope, expr: ast::Expression) -> Result<Expression> {
         use Expression::*;
-        Ok(Box::new(match *expr {
+        Ok(match expr {
             ast::Expression::Literal(l) => Constant(match l {
                 ast::Literal::Null => Value::Null,
                 ast::Literal::Boolean(b) => Value::Boolean(b),
@@ -487,57 +441,115 @@ impl<'a> ExpressionBuilder<'a> {
                 ast::Literal::Float(f) => Value::Float(f),
                 ast::Literal::String(s) => Value::String(s),
             }),
-            ast::Expression::Column(i) => Field(self.scope.assert(i)?, None),
+            ast::Expression::Column(i) => Field(scope.assert(i)?, None),
             ast::Expression::Field(table, name) => {
-                Field(self.scope.resolve(table.as_deref(), &name)?, Some((table, name)))
+                Field(scope.resolve(table.as_deref(), &name)?, Some((table, name)))
             }
-            ast::Expression::Function(name, args) => {
-                return Err(Error::Value(format!(
-                    "Unknown function {} with {} arguments",
-                    name,
-                    args.len()
-                )))
+            ast::Expression::Function(name, _) => {
+                return Err(Error::Value(format!("Unknown function {}", name,)))
             }
             ast::Expression::Operation(op) => match op {
                 // Logical operators
-                ast::Operation::And(lhs, rhs) => And(self.make(lhs)?, self.make(rhs)?),
-                ast::Operation::Not(expr) => Not(self.make(expr)?),
-                ast::Operation::Or(lhs, rhs) => Or(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::And(lhs, rhs) => And(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::Not(expr) => Not(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::Or(lhs, rhs) => Or(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
 
                 // Comparison operators
-                ast::Operation::Equal(lhs, rhs) => Equal(self.make(lhs)?, self.make(rhs)?),
-                ast::Operation::GreaterThan(lhs, rhs) => {
-                    GreaterThan(self.make(lhs)?, self.make(rhs)?)
-                }
+                ast::Operation::Equal(lhs, rhs) => Equal(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::GreaterThan(lhs, rhs) => GreaterThan(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
                 ast::Operation::GreaterThanOrEqual(lhs, rhs) => Or(
-                    GreaterThan(self.make(lhs.clone())?, self.make(rhs.clone())?).into(),
-                    Equal(self.make(lhs)?, self.make(rhs)?).into(),
+                    GreaterThan(
+                        self.build_expression(scope, *lhs.clone())?.into(),
+                        self.build_expression(scope, *rhs.clone())?.into(),
+                    )
+                    .into(),
+                    Equal(
+                        self.build_expression(scope, *lhs)?.into(),
+                        self.build_expression(scope, *rhs)?.into(),
+                    )
+                    .into(),
                 ),
-                ast::Operation::IsNull(expr) => IsNull(self.make(expr)?),
-                ast::Operation::LessThan(lhs, rhs) => LessThan(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::IsNull(expr) => IsNull(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::LessThan(lhs, rhs) => LessThan(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
                 ast::Operation::LessThanOrEqual(lhs, rhs) => Or(
-                    LessThan(self.make(lhs.clone())?, self.make(rhs.clone())?).into(),
-                    Equal(self.make(lhs)?, self.make(rhs)?).into(),
+                    LessThan(
+                        self.build_expression(scope, *lhs.clone())?.into(),
+                        self.build_expression(scope, *rhs.clone())?.into(),
+                    )
+                    .into(),
+                    Equal(
+                        self.build_expression(scope, *lhs)?.into(),
+                        self.build_expression(scope, *rhs)?.into(),
+                    )
+                    .into(),
                 ),
-                ast::Operation::Like(lhs, rhs) => Like(self.make(lhs)?, self.make(rhs)?),
-                ast::Operation::NotEqual(lhs, rhs) => {
-                    Not(Equal(self.make(lhs)?, self.make(rhs)?).into())
-                }
+                ast::Operation::Like(lhs, rhs) => Like(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::NotEqual(lhs, rhs) => Not(Equal(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                )
+                .into()),
 
                 // Mathematical operators
-                ast::Operation::Assert(expr) => Assert(self.make(expr)?),
-                ast::Operation::Add(lhs, rhs) => Add(self.make(lhs)?, self.make(rhs)?),
-                ast::Operation::Divide(lhs, rhs) => Divide(self.make(lhs)?, self.make(rhs)?),
-                ast::Operation::Exponentiate(lhs, rhs) => {
-                    Exponentiate(self.make(lhs)?, self.make(rhs)?)
+                ast::Operation::Assert(expr) => Assert(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::Add(lhs, rhs) => Add(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::Divide(lhs, rhs) => Divide(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::Exponentiate(lhs, rhs) => Exponentiate(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::Factorial(expr) => {
+                    Factorial(self.build_expression(scope, *expr)?.into())
                 }
-                ast::Operation::Factorial(expr) => Factorial(self.make(expr)?),
-                ast::Operation::Modulo(lhs, rhs) => Modulo(self.make(lhs)?, self.make(rhs)?),
-                ast::Operation::Multiply(lhs, rhs) => Multiply(self.make(lhs)?, self.make(rhs)?),
-                ast::Operation::Negate(expr) => Negate(self.make(expr)?),
-                ast::Operation::Subtract(lhs, rhs) => Subtract(self.make(lhs)?, self.make(rhs)?),
+                ast::Operation::Modulo(lhs, rhs) => Modulo(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::Multiply(lhs, rhs) => Multiply(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
+                ast::Operation::Negate(expr) => Negate(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::Subtract(lhs, rhs) => Subtract(
+                    self.build_expression(scope, *lhs)?.into(),
+                    self.build_expression(scope, *rhs)?.into(),
+                ),
             },
-        }))
+        })
+    }
+
+    /// Builds expressions from AST expressions
+    fn build_expressions(&self, scope: &mut Scope, exprs: ast::Expressions) -> Result<Expressions> {
+        exprs.into_iter().map(|e| self.build_expression(scope, e)).collect()
+    }
+
+    /// Builds and evaluates a constant AST expression.
+    fn evaluate_constant(&self, expr: ast::Expression) -> Result<Value> {
+        self.build_expression(&mut Scope::constant(), expr)?.evaluate(None)
     }
 }
 

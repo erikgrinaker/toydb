@@ -55,7 +55,7 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             }
             Node::CreateTable { schema } => CreateTable::new(schema),
             Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
-            Node::DropTable { name } => DropTable::new(name),
+            Node::DropTable { table } => DropTable::new(table),
             Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
             Node::IndexLookup { table, alias, column, keys } => {
                 IndexLookup::new(table, alias, column, keys)

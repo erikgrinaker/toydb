@@ -8,23 +8,35 @@ use std::mem::replace;
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Statement {
-    /// A BEGIN statement
-    Begin { readonly: bool, version: Option<u64> },
-    /// A COMMIT statement
+    Begin {
+        readonly: bool,
+        version: Option<u64>,
+    },
     Commit,
-    /// A ROLLBACK statement
     Rollback,
+    Explain(Box<Statement>),
 
-    /// A CREATE TABLE statement
-    CreateTable { name: String, columns: Vec<ColumnSpec> },
-    /// A DROP TABLE statement
+    CreateTable {
+        name: String,
+        columns: Vec<Column>,
+    },
     DropTable(String),
 
-    /// A DELETE statement
-    Delete { table: String, r#where: Option<WhereClause> },
-    /// An INSERT statement
-    Insert { table: String, columns: Option<Vec<String>>, values: Vec<Expressions> },
-    /// A SELECT statement
+    Delete {
+        table: String,
+        r#where: Option<WhereClause>,
+    },
+    Insert {
+        table: String,
+        columns: Option<Vec<String>>,
+        values: Vec<Expressions>,
+    },
+    Update {
+        table: String,
+        set: BTreeMap<String, Expression>,
+        r#where: Option<WhereClause>,
+    },
+
     Select {
         select: SelectClause,
         from: Option<FromClause>,
@@ -35,16 +47,11 @@ pub enum Statement {
         limit: Option<Expression>,
         offset: Option<Expression>,
     },
-    /// An UPDATE statement
-    Update { table: String, set: BTreeMap<String, Expression>, r#where: Option<WhereClause> },
-
-    /// An EXPLAIN statement
-    Explain(Box<Statement>),
 }
 
-/// A column specification
+/// A column
 #[derive(Clone, Debug, PartialEq)]
-pub struct ColumnSpec {
+pub struct Column {
     pub name: String,
     pub datatype: DataType,
     pub primary_key: bool,

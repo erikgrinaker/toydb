@@ -27,4 +27,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Value("Invalid value NULL for limit")
+Plan: Value("Invalid limit NULL")

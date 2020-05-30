@@ -75,10 +75,10 @@ test_expr! {
     lit_string_long: &format!("'{}'", "a".repeat(4096)) => Ok("a".repeat(4096).into()),
 
     // Functions
-    func_unknown: "unknown()" => Err(Error::Value("Unknown function unknown with 0 arguments".into())),
-    func_unknown_case: "UnKnown ( )" => Err(Error::Value("Unknown function unknown with 0 arguments".into())),
-    func_unknown_space: "unknown ( )" => Err(Error::Value("Unknown function unknown with 0 arguments".into())),
-    func_unknown_args: "unknown(a, b, c)" => Err(Error::Value("Unknown function unknown with 3 arguments".into())),
+    func_unknown: "unknown()" => Err(Error::Value("Unknown function unknown".into())),
+    func_unknown_case: "UnKnown ( )" => Err(Error::Value("Unknown function unknown".into())),
+    func_unknown_space: "unknown ( )" => Err(Error::Value("Unknown function unknown".into())),
+    func_unknown_args: "unknown(a, b, c)" => Err(Error::Value("Unknown function unknown".into())),
     func_unknown_open: "unknown(a, b, c" => Err(Error::Parse("Unexpected end of input".into())),
     func_unknown_trailing_comma: "unknown(a, b, c,)" => Err(Error::Parse("Expected expression atom, found )".into())),
 
