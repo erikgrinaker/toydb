@@ -1,5 +1,5 @@
 mod expression;
-pub use expression::{Expression, Expressions};
+pub use expression::Expression;
 
 use crate::error::{Error, Result};
 

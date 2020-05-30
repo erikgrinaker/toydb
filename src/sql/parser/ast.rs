@@ -29,7 +29,7 @@ pub enum Statement {
     Insert {
         table: String,
         columns: Option<Vec<String>>,
-        values: Vec<Expressions>,
+        values: Vec<Vec<Expression>>,
     },
     Update {
         table: String,
@@ -122,7 +122,7 @@ pub enum Expression {
     Field(Option<String>, String),
     Column(usize), // only used during plan building to break off expression subtrees
     Literal(Literal),
-    Function(String, Expressions),
+    Function(String, Vec<Expression>),
     Operation(Operation),
 }
 
@@ -137,8 +137,6 @@ impl From<Operation> for Expression {
         Self::Operation(op)
     }
 }
-
-pub type Expressions = Vec<Expression>;
 
 /// Literals
 #[derive(Clone, Debug, PartialEq)]

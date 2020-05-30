@@ -259,7 +259,7 @@ impl<'a> Parser<'a> {
         let mut values = Vec::new();
         loop {
             self.next_expect(Some(Token::OpenParen))?;
-            let mut exprs = ast::Expressions::new();
+            let mut exprs = Vec::new();
             loop {
                 exprs.push(self.parse_expression(0)?);
                 match self.next()? {

@@ -7,7 +7,7 @@ use super::engine::Transaction;
 use super::execution::{Executor, ResultSet};
 use super::parser::ast;
 use super::schema::{Catalog, Table};
-use super::types::{Expression, Expressions, Value};
+use super::types::{Expression, Value};
 use crate::error::Result;
 
 use serde_derive::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ pub enum Node {
     Insert {
         table: String,
         columns: Vec<String>,
-        expressions: Vec<Expressions>,
+        expressions: Vec<Vec<Expression>>,
     },
     KeyLookup {
         table: String,

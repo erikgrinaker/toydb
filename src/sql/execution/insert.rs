@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::types::Expressions;
+use super::super::types::Expression;
 use super::{Executor, ResultSet};
 use crate::error::Result;
 
@@ -10,11 +10,11 @@ pub struct Insert {
     /// The columns to insert into
     columns: Vec<String>,
     /// The row expressions to insert
-    rows: Vec<Expressions>,
+    rows: Vec<Vec<Expression>>,
 }
 
 impl Insert {
-    pub fn new(table: String, columns: Vec<String>, rows: Vec<Expressions>) -> Box<Self> {
+    pub fn new(table: String, columns: Vec<String>, rows: Vec<Vec<Expression>>) -> Box<Self> {
         Box::new(Self { table, columns, rows })
     }
 }

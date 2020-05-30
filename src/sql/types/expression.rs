@@ -38,9 +38,6 @@ pub enum Expression {
     Like(Box<Expression>, Box<Expression>),
 }
 
-/// A list of expressions
-pub type Expressions = Vec<Expression>;
-
 impl Expression {
     /// Evaluates an expression to a value, given an environment
     pub fn evaluate(&self, row: Option<&Row>) -> Result<Value> {
