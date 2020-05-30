@@ -20,7 +20,7 @@ pub struct Plan(pub Node);
 impl Plan {
     /// Builds a plan from an AST statement
     /// FIXME Catalog should be generic, not trait object
-    pub fn build(statement: ast::Statement, catalog: &mut dyn Catalog) -> Result<Self> {
+    pub fn build<C: Catalog>(statement: ast::Statement, catalog: &mut C) -> Result<Self> {
         Planner::new(catalog).build(statement)
     }
 
@@ -30,7 +30,7 @@ impl Plan {
     }
 
     /// Optimizes the plan, consuming it
-    pub fn optimize<C: Catalog + 'static>(self, catalog: &mut C) -> Result<Self> {
+    pub fn optimize<C: Catalog>(self, catalog: &mut C) -> Result<Self> {
         let mut root = self.0;
         root = optimizer::ConstantFolder.optimize(root)?;
         root = optimizer::FilterPushdown.optimize(root)?;
