@@ -8,13 +8,13 @@ use std::collections::{HashMap, HashSet};
 use std::mem::replace;
 
 /// A query plan builder.
-pub struct Planner<'a> {
-    catalog: &'a mut dyn Catalog,
+pub struct Planner<'a, C: Catalog> {
+    catalog: &'a mut C,
 }
 
-impl<'a> Planner<'a> {
+impl<'a, C: Catalog> Planner<'a, C> {
     /// Creates a new planner.
-    pub fn new(catalog: &'a mut dyn Catalog) -> Self {
+    pub fn new(catalog: &'a mut C) -> Self {
         Self { catalog }
     }
 
@@ -196,7 +196,7 @@ impl<'a> Planner<'a> {
                         orders: order
                             .into_iter()
                             .map(|(e, o)| {
-                                if Self::is_aggregate(&e) {
+                                if self.is_aggregate(&e) {
                                     return Err(Error::Value(
                                         "Aggregate function not allowed here".into(),
                                     ));
@@ -340,7 +340,7 @@ impl<'a> Planner<'a> {
                 e.transform(
                     &mut |mut e| match &mut e {
                         ast::Expression::Function(f, args) if args.len() == 1 => {
-                            if let Some(aggregate) = Self::aggregate_from_name(f) {
+                            if let Some(aggregate) = self.aggregate_from_name(f) {
                                 aggregates.push((aggregate, args.remove(0)));
                                 Ok(ast::Expression::Column(aggregates.len() - 1))
                             } else {
@@ -354,7 +354,7 @@ impl<'a> Planner<'a> {
             })?;
         }
         for (_, expr) in &aggregates {
-            if Self::is_aggregate(expr) {
+            if self.is_aggregate(expr) {
                 return Err(Error::Value("Aggregate functions can't be nested".into()));
             }
         }
@@ -400,7 +400,7 @@ impl<'a> Planner<'a> {
         // Make sure no group expressions contain Column references, which would be placed here
         // during extract_aggregates().
         for (expr, _) in &groups {
-            if Self::is_aggregate(expr) {
+            if self.is_aggregate(expr) {
                 return Err(Error::Value("Group expression cannot contain aggregates".into()));
             }
         }
@@ -408,7 +408,7 @@ impl<'a> Planner<'a> {
     }
 
     /// Returns the aggregate corresponding to the given aggregate function name.
-    fn aggregate_from_name(name: &str) -> Option<Aggregate> {
+    fn aggregate_from_name(&self, name: &str) -> Option<Aggregate> {
         match name {
             "avg" => Some(Aggregate::Average),
             "count" => Some(Aggregate::Count),
@@ -420,9 +420,9 @@ impl<'a> Planner<'a> {
     }
 
     /// Checks whether a given expression is an aggregate expression.
-    fn is_aggregate(expr: &ast::Expression) -> bool {
+    fn is_aggregate(&self, expr: &ast::Expression) -> bool {
         expr.contains(&|e| match e {
-            ast::Expression::Function(f, _) => Self::aggregate_from_name(f).is_some(),
+            ast::Expression::Function(f, _) => self.aggregate_from_name(f).is_some(),
             _ => false,
         })
     }
