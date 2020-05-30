@@ -71,8 +71,8 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Nothing => Nothing::new(),
             Node::Offset { source, offset } => Offset::new(Self::build(*source), offset),
             Node::Order { source, orders } => Order::new(Self::build(*source), orders),
-            Node::Projection { source, labels, expressions } => {
-                Projection::new(Self::build(*source), labels, expressions)
+            Node::Projection { source, expressions } => {
+                Projection::new(Self::build(*source), expressions)
             }
             Node::Scan { table, filter, alias: _ } => Scan::new(table, filter),
             Node::Update { table, source, expressions } => {

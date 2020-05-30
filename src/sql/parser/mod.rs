@@ -482,25 +482,26 @@ impl<'a> Parser<'a> {
         if self.next_if_token(Keyword::Select.into()).is_none() {
             return Ok(None);
         }
-        let mut clause = ast::SelectClause { expressions: Vec::new(), labels: Vec::new() };
+        let mut select = ast::SelectClause { expressions: Vec::new() };
         loop {
-            if self.next_if_token(Token::Asterisk).is_some() && clause.expressions.is_empty() {
+            if self.next_if_token(Token::Asterisk).is_some() && select.expressions.is_empty() {
                 break;
             }
-            clause.expressions.push(self.parse_expression(0)?);
-            clause.labels.push(match self.peek()? {
+            let expr = self.parse_expression(0)?;
+            let label = match self.peek()? {
                 Some(Token::Keyword(Keyword::As)) => {
                     self.next()?;
                     Some(self.next_ident()?)
                 }
                 Some(Token::Ident(_)) => Some(self.next_ident()?),
                 _ => None,
-            });
+            };
+            select.expressions.push((expr, label));
             if self.next_if_token(Token::Comma).is_none() {
                 break;
             }
         }
-        Ok(Some(clause))
+        Ok(Some(select))
     }
 
     /// Parses a WHERE clause

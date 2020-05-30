@@ -18,18 +18,17 @@ use std::collections::BTreeMap;
 pub struct Plan(pub Node);
 
 impl Plan {
-    /// Builds a plan from an AST statement
-    /// FIXME Catalog should be generic, not trait object
+    /// Builds a plan from an AST statement.
     pub fn build<C: Catalog>(statement: ast::Statement, catalog: &mut C) -> Result<Self> {
         Planner::new(catalog).build(statement)
     }
 
-    /// Executes the plan, consuming it
+    /// Executes the plan, consuming it.
     pub fn execute<T: Transaction + 'static>(self, txn: &mut T) -> Result<ResultSet> {
         Executor::build(self.0).execute(txn)
     }
 
-    /// Optimizes the plan, consuming it
+    /// Optimizes the plan, consuming it.
     pub fn optimize<C: Catalog>(self, catalog: &mut C) -> Result<Self> {
         let mut root = self.0;
         root = optimizer::ConstantFolder.optimize(root)?;
@@ -98,8 +97,7 @@ pub enum Node {
     },
     Projection {
         source: Box<Node>,
-        labels: Vec<Option<String>>,
-        expressions: Expressions,
+        expressions: Vec<(Expression, Option<String>)>,
     },
     Scan {
         table: String,
@@ -155,11 +153,9 @@ impl Node {
             Self::Order { source, orders } => {
                 Self::Order { source: source.transform(pre, post)?.into(), orders }
             }
-            Self::Projection { source, labels, expressions } => Self::Projection {
-                source: source.transform(pre, post)?.into(),
-                labels,
-                expressions,
-            },
+            Self::Projection { source, expressions } => {
+                Self::Projection { source: source.transform(pre, post)?.into(), expressions }
+            }
             Self::Update { table, source, expressions } => {
                 Self::Update { table, source: source.transform(pre, post)?.into(), expressions }
             }
@@ -204,12 +200,11 @@ impl Node {
                     .map(|(e, o)| e.transform(pre, post).map(|e| (e, o)))
                     .collect::<Result<_>>()?,
             },
-            Self::Projection { source, labels, expressions } => Self::Projection {
+            Self::Projection { source, expressions } => Self::Projection {
                 source,
-                labels,
                 expressions: expressions
                     .into_iter()
-                    .map(|e| e.transform(pre, post))
+                    .map(|(e, l)| Ok((e.transform(pre, post)?, l)))
                     .collect::<Result<_>>()?,
             },
             Self::Scan { table, alias, filter: Some(filter) } => {

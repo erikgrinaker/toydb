@@ -1,6 +1,6 @@
 use super::super::parser::ast;
 use super::super::schema::{Catalog, Column, Table};
-use super::super::types::{Expression, Expressions, Value};
+use super::super::types::{Expression, Value};
 use super::{Aggregate, Direction, Node, Plan};
 use crate::error::{Error, Result};
 
@@ -91,7 +91,12 @@ impl<'a> Planner<'a> {
                 columns: columns.unwrap_or_else(Vec::new),
                 expressions: values
                     .into_iter()
-                    .map(|exprs| self.build_expressions(&mut Scope::new(), exprs))
+                    .map(|exprs| {
+                        exprs
+                            .into_iter()
+                            .map(|expr| self.build_expression(&mut Scope::constant(), expr))
+                            .collect::<Result<_>>()
+                    })
                     .collect::<Result<_>>()?,
             },
 
@@ -148,7 +153,7 @@ impl<'a> Planner<'a> {
 
                 // Build SELECT clause.
                 if !select.expressions.is_empty() {
-                    let mut exprs = select.expressions.clone(); // FIXME No need to clone
+                    let mut exprs = select.expressions;
 
                     // Extract any aggregate functions and GROUP BY expressions, replacing them with
                     // Column placeholders. Aggregations are handled by evaluating group expressions
@@ -157,7 +162,7 @@ impl<'a> Planner<'a> {
                     // in the post-projection. See build_aggregates() for details.
                     let aggregates = self.extract_aggregates(&mut exprs)?;
                     let groups = if let Some(ast::GroupByClause(group_by)) = group_by {
-                        self.extract_groups(&mut exprs, &select.labels, group_by, aggregates.len())?
+                        self.extract_groups(&mut exprs, group_by, aggregates.len())?
                     } else {
                         Vec::new()
                     };
@@ -166,15 +171,12 @@ impl<'a> Planner<'a> {
                     }
 
                     // Build the remaining non-aggregate projection.
-                    let exprs = self.build_expressions(scope, exprs)?;
-                    scope.project(
-                        exprs.iter().cloned().zip(select.labels.iter().cloned()).collect(),
-                    )?;
-                    node = Node::Projection {
-                        source: Box::new(node),
-                        labels: select.labels,
-                        expressions: exprs,
-                    };
+                    let expressions: Vec<(Expression, Option<String>)> = exprs
+                        .into_iter()
+                        .map(|(e, l)| Ok((self.build_expression(scope, e)?, l)))
+                        .collect::<Result<_>>()?;
+                    scope.project(expressions.clone())?;
+                    node = Node::Projection { source: Box::new(node), expressions };
                 };
 
                 // Build HAVING clause.
@@ -308,21 +310,18 @@ impl<'a> Planner<'a> {
     ) -> Result<Node> {
         let mut aggregates = Vec::new();
         let mut expressions = Vec::new();
-        let mut labels = Vec::new();
         for (aggregate, expr) in aggregations {
             aggregates.push(aggregate);
-            expressions.push(self.build_expression(scope, expr)?);
-            labels.push(None);
+            expressions.push((self.build_expression(scope, expr)?, None));
         }
         for (expr, label) in groups {
-            expressions.push(self.build_expression(scope, expr)?);
-            labels.push(label);
+            expressions.push((self.build_expression(scope, expr)?, label));
         }
         // FIXME This is probably wrong for the aggregate columns, since we don't want to inherit
         // from them if they are simple field references.
-        scope.project(expressions.iter().cloned().zip(labels.iter().cloned()).collect())?;
+        scope.project(expressions.clone())?;
         let node = Node::Aggregation {
-            source: Box::new(Node::Projection { source: Box::new(source), labels, expressions }),
+            source: Box::new(Node::Projection { source: Box::new(source), expressions }),
             aggregates,
         };
         Ok(node)
@@ -333,10 +332,10 @@ impl<'a> Planner<'a> {
     /// to aggregates, and returns them along with their argument expressions.
     fn extract_aggregates(
         &self,
-        exprs: &mut [ast::Expression],
+        exprs: &mut [(ast::Expression, Option<String>)],
     ) -> Result<Vec<(Aggregate, ast::Expression)>> {
         let mut aggregates = Vec::new();
-        for expr in exprs {
+        for (expr, _) in exprs {
             expr.replace_with(|e| {
                 e.transform(
                     &mut |mut e| match &mut e {
@@ -369,33 +368,29 @@ impl<'a> Planner<'a> {
     /// SELECT released / 100 AS century, COUNT(*) FROM movies GROUP BY century
     /// SELECT released / 100, COUNT(*) FROM movies GROUP BY released / 100
     /// SELECT COUNT(*) FROM movies GROUP BY released / 100
-    ///
-    /// FIXME Perhaps put labels and expressions in common structure, and add new type for labels.
     fn extract_groups(
         &self,
-        exprs: &mut Vec<ast::Expression>,
-        labels: &[Option<String>],
+        exprs: &mut Vec<(ast::Expression, Option<String>)>,
         group_by: Vec<ast::Expression>,
         offset: usize,
     ) -> Result<Vec<(ast::Expression, Option<String>)>> {
-        let labels = labels.to_vec(); // FIXME Avoid this
         let mut groups = Vec::new();
         for g in group_by {
             // Look for references to SELECT columns with AS labels
             if let ast::Expression::Field(None, label) = &g {
-                if let Some(i) = labels.iter().position(|l| l.as_deref() == Some(label)) {
+                if let Some(i) = exprs.iter().position(|(_, l)| l.as_deref() == Some(label)) {
                     groups.push((
-                        replace(&mut exprs[i], ast::Expression::Column(offset + groups.len())),
-                        labels[i].clone(),
+                        replace(&mut exprs[i].0, ast::Expression::Column(offset + groups.len())),
+                        exprs[i].1.clone(),
                     ));
                     continue;
                 }
             }
             // Look for expressions exactly equal to the group expression
-            if let Some(i) = exprs.iter().position(|e| e == &g) {
+            if let Some(i) = exprs.iter().position(|(e, _)| e == &g) {
                 groups.push((
-                    replace(&mut exprs[i], ast::Expression::Column(offset + groups.len())),
-                    labels[i].clone(),
+                    replace(&mut exprs[i].0, ast::Expression::Column(offset + groups.len())),
+                    exprs[i].1.clone(),
                 ));
                 continue;
             }
@@ -542,11 +537,6 @@ impl<'a> Planner<'a> {
                 ),
             },
         })
-    }
-
-    /// Builds expressions from AST expressions
-    fn build_expressions(&self, scope: &mut Scope, exprs: ast::Expressions) -> Result<Expressions> {
-        exprs.into_iter().map(|e| self.build_expression(scope, e)).collect()
     }
 
     /// Builds and evaluates a constant AST expression.

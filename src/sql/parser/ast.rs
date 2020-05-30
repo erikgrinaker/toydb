@@ -65,10 +65,7 @@ pub struct Column {
 /// A SELECT clause
 #[derive(Clone, Debug, PartialEq)]
 pub struct SelectClause {
-    /// The expressions to select. Empty list means everything, i.e. *.
-    pub expressions: Vec<Expression>,
-    /// The expression labels, if any
-    pub labels: Vec<Option<String>>,
+    pub expressions: Vec<(Expression, Option<String>)>,
 }
 
 /// A FROM clause
