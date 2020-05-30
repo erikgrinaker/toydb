@@ -52,16 +52,12 @@ Plan: Plan(
         source: NestedLoopJoin {
             outer: Scan {
                 table: "movies",
-                alias: Some(
-                    "m",
-                ),
+                label: "m",
                 filter: None,
             },
             inner: Scan {
                 table: "genres",
-                alias: Some(
-                    "g",
-                ),
+                label: "g",
                 filter: None,
             },
             predicate: None,
@@ -74,16 +70,26 @@ Plan: Plan(
         ],
         expressions: [
             Field(
+                0,
                 Some(
-                    "m",
+                    (
+                        Some(
+                            "m",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                7,
                 Some(
-                    "g",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
         ],
     },
@@ -94,16 +100,12 @@ Optimized plan: Plan(
         source: NestedLoopJoin {
             outer: Scan {
                 table: "movies",
-                alias: Some(
-                    "m",
-                ),
+                label: "m",
                 filter: None,
             },
             inner: Scan {
                 table: "genres",
-                alias: Some(
-                    "g",
-                ),
+                label: "g",
                 filter: None,
             },
             predicate: None,
@@ -116,16 +118,26 @@ Optimized plan: Plan(
         ],
         expressions: [
             Field(
+                0,
                 Some(
-                    "m",
+                    (
+                        Some(
+                            "m",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                7,
                 Some(
-                    "g",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
         ],
     },

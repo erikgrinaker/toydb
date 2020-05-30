@@ -64,7 +64,7 @@ Plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -73,12 +73,22 @@ Plan: Plan(
                     ],
                     expressions: [
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Field(
-                            None,
-                            "studio_id",
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                     ],
                 },
@@ -92,19 +102,25 @@ Plan: Plan(
             ],
             expressions: [
                 Field(
+                    1,
                     None,
-                    "studio_id",
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "studio_id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -119,7 +135,7 @@ Optimized plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -128,12 +144,22 @@ Optimized plan: Plan(
                     ],
                     expressions: [
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Field(
-                            None,
-                            "studio_id",
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                     ],
                 },
@@ -147,19 +173,25 @@ Optimized plan: Plan(
             ],
             expressions: [
                 Field(
+                    1,
                     None,
-                    "studio_id",
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "studio_id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),

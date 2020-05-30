@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::types::{Environment, Expressions};
+use super::super::types::Expressions;
 use super::{Context, Executor, ResultSet};
 use crate::error::Result;
 
@@ -22,11 +22,10 @@ impl Insert {
 impl<T: Transaction> Executor<T> for Insert {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let table = ctx.txn.must_read_table(&self.table)?;
-        let env = Environment::new();
         let mut count = 0;
         for expressions in self.rows {
             let mut row =
-                expressions.into_iter().map(|expr| expr.evaluate(&env)).collect::<Result<_>>()?;
+                expressions.into_iter().map(|expr| expr.evaluate(None)).collect::<Result<_>>()?;
             if self.columns.is_empty() {
                 row = table.pad_row(row)?;
             } else {

@@ -130,12 +130,11 @@ impl Session {
             let mut response = tokio::task::block_in_place(|| self.request(request));
             let mut rows: Box<dyn Iterator<Item = Result<Response>> + Send> =
                 Box::new(std::iter::empty());
-            if let Ok(Response::Execute(ResultSet::Query { ref mut relation })) = &mut response {
+            if let Ok(Response::Execute(ResultSet::Query { rows: ref mut resultrows, .. })) =
+                &mut response
+            {
                 rows = Box::new(
-                    relation
-                        .rows
-                        .take()
-                        .unwrap_or_else(|| Box::new(std::iter::empty()))
+                    std::mem::replace(resultrows, Box::new(std::iter::empty()))
                         .map(|result| result.map(|row| Response::Row(Some(row))))
                         .chain(std::iter::once(Ok(Response::Row(None))))
                         .scan(false, |err_sent, response| match (&err_sent, &response) {

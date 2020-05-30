@@ -86,8 +86,10 @@ macro_rules! test_query {
             };
             write!(f, "{:#?}\n\n", ast)?;
 
+            let mut txn = engine.begin(Mode::ReadWrite)?;
+
             write!(f, "Plan: ")?;
-            let plan = match Plan::build(ast) {
+            let plan = match Plan::build(ast, &mut txn) {
                 Ok(plan) => plan,
                 Err(err) => {
                     write!(f, "{:?}", err)?;
@@ -96,7 +98,6 @@ macro_rules! test_query {
             };
             write!(f, "{:#?}\n\n", plan)?;
 
-            let mut txn = engine.begin(Mode::ReadWrite)?;
             write!(f, "Optimized plan: ")?;
             let plan = match plan.optimize(&mut txn) {
                 Ok(plan) => plan,
@@ -120,9 +121,8 @@ macro_rules! test_query {
             };
             txn.commit()?;
             match result {
-                ResultSet::Query{relation} => {
-                    let columns = relation.columns.clone();
-                    let rows: Vec<Row> = match relation.collect() {
+                ResultSet::Query{columns, rows} => {
+                    let rows: Vec<Row> = match rows.collect() {
                         Ok(rows) => rows,
                         Err(err) => {
                             write!(f, " {:?}", err)?;
@@ -178,8 +178,11 @@ test_query! {
     as_qualified: r#"SELECT 1 AS a.b FROM movies"#,
 
     from_bare: "SELECT * FROM",
-    from_unknown: "SELECT * FROM unknown",
     from_multiple: "SELECT * FROM movies, genres, countries",
+    from_unknown: "SELECT * FROM unknown",
+    from_alias_duplicate: "SELECT * FROM movies a, genres a",
+    from_alias_duplicate_join: "SELECT * FROM movies a JOIN genres a ON TRUE",
+    from_duplicate: "SELECT * FROM movies, movies",
 
     where_bare: "SELECT * FROM movies WHERE",
     where_true: "SELECT * FROM movies WHERE TRUE",

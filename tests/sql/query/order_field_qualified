@@ -91,12 +91,12 @@ Plan: Plan(
                 source: NestedLoopJoin {
                     outer: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     inner: Scan {
                         table: "genres",
-                        alias: None,
+                        label: "genres",
                         filter: None,
                     },
                     predicate: None,
@@ -105,16 +105,26 @@ Plan: Plan(
                 },
                 predicate: Equal(
                     Field(
+                        3,
                         Some(
-                            "movies",
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "genre_id",
+                            ),
                         ),
-                        "genre_id",
                     ),
                     Field(
+                        7,
                         Some(
-                            "genres",
+                            (
+                                Some(
+                                    "genres",
+                                ),
+                                "id",
+                            ),
                         ),
-                        "id",
                     ),
                 ),
             },
@@ -125,37 +135,62 @@ Plan: Plan(
             ],
             expressions: [
                 Field(
+                    0,
                     Some(
-                        "movies",
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "id",
+                        ),
                     ),
-                    "id",
                 ),
                 Field(
-                    None,
-                    "title",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
+                    ),
                 ),
                 Field(
-                    None,
-                    "name",
+                    8,
+                    Some(
+                        (
+                            None,
+                            "name",
+                        ),
+                    ),
                 ),
             ],
         },
         orders: [
             (
                 Field(
+                    2,
                     Some(
-                        "genres",
+                        (
+                            Some(
+                                "genres",
+                            ),
+                            "name",
+                        ),
                     ),
-                    "name",
                 ),
                 Ascending,
             ),
             (
                 Field(
+                    1,
                     Some(
-                        "movies",
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "title",
+                        ),
                     ),
-                    "title",
                 ),
                 Ascending,
             ),
@@ -169,27 +204,37 @@ Optimized plan: Plan(
             source: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 inner: Scan {
                     table: "genres",
-                    alias: None,
+                    label: "genres",
                     filter: None,
                 },
                 predicate: Some(
                     Equal(
                         Field(
+                            3,
                             Some(
-                                "movies",
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "genre_id",
+                                ),
                             ),
-                            "genre_id",
                         ),
                         Field(
+                            7,
                             Some(
-                                "genres",
+                                (
+                                    Some(
+                                        "genres",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                     ),
                 ),
@@ -203,37 +248,62 @@ Optimized plan: Plan(
             ],
             expressions: [
                 Field(
+                    0,
                     Some(
-                        "movies",
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "id",
+                        ),
                     ),
-                    "id",
                 ),
                 Field(
-                    None,
-                    "title",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
+                    ),
                 ),
                 Field(
-                    None,
-                    "name",
+                    8,
+                    Some(
+                        (
+                            None,
+                            "name",
+                        ),
+                    ),
                 ),
             ],
         },
         orders: [
             (
                 Field(
+                    2,
                     Some(
-                        "genres",
+                        (
+                            Some(
+                                "genres",
+                            ),
+                            "name",
+                        ),
                     ),
-                    "name",
                 ),
                 Ascending,
             ),
             (
                 Field(
+                    1,
                     Some(
-                        "movies",
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "title",
+                        ),
                     ),
-                    "title",
                 ),
                 Ascending,
             ),

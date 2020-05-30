@@ -23,22 +23,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan(
-    Scan {
-        table: "unknown",
-        alias: None,
-        filter: None,
-    },
-)
-
-Optimized plan: Plan(
-    Scan {
-        table: "unknown",
-        alias: None,
-        filter: None,
-    },
-)
-
-Query: SELECT * FROM unknown
-
-Result: Value("Table unknown does not exist")
+Plan: Value("Table unknown does not exist")

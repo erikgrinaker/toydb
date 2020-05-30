@@ -35,14 +35,19 @@ Plan: Plan(
     Order {
         source: Scan {
             table: "booleans",
-            alias: None,
+            label: "booleans",
             filter: None,
         },
         orders: [
             (
                 Field(
-                    None,
-                    "value",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "value",
+                        ),
+                    ),
                 ),
                 Descending,
             ),
@@ -54,14 +59,19 @@ Optimized plan: Plan(
     Order {
         source: Scan {
             table: "booleans",
-            alias: None,
+            label: "booleans",
             filter: None,
         },
         orders: [
             (
                 Field(
-                    None,
-                    "value",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "value",
+                        ),
+                    ),
                 ),
                 Descending,
             ),

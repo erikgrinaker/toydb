@@ -1,9 +1,8 @@
 mod expression;
-pub use expression::{Environment, Expression, Expressions};
+pub use expression::{Expression, Expressions};
 
 use crate::error::{Error, Result};
 
-use derivative::Derivative;
 use serde_derive::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -184,51 +183,9 @@ pub type Rows = Box<dyn Iterator<Item = Result<Row>> + Send>;
 /// A column (in a result set, see schema::Column for table columns)
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Column {
-    pub relation: Option<String>,
+    pub table: Option<String>,
     pub name: Option<String>,
 }
 
 /// A set of columns
 pub type Columns = Vec<Column>;
-
-/// A relation, i.e. combination of columns and rows - used for query results.
-/// FIXME This should possibly have a name as well, and be used to qualify query fields.
-#[derive(Derivative, Serialize, Deserialize)]
-#[derivative(Debug, PartialEq)]
-pub struct Relation {
-    pub columns: Columns,
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    #[serde(skip)]
-    pub rows: Option<Rows>,
-}
-
-impl Relation {
-    /// Converts the relation into a single row, if any
-    pub fn into_row(mut self) -> Result<Option<Row>> {
-        self.next().transpose()
-    }
-
-    /// Converts the relation into the first value of the first row, if any
-    pub fn into_value(self) -> Result<Option<Value>> {
-        Ok(self.into_row()?.filter(|row| !row.is_empty()).map(|mut row| row.remove(0)))
-    }
-}
-
-impl Iterator for Relation {
-    type Item = Result<Row>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Make sure iteration is aborted on the first error, otherwise callers
-        // will keep calling next for as long as it keeps returning errors
-        if let Some(ref mut rows) = self.rows {
-            let result = rows.next();
-            if let Some(Err(_)) = result {
-                self.rows = None;
-            }
-            result
-        } else {
-            None
-        }
-    }
-}

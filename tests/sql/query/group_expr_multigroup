@@ -87,7 +87,7 @@ Plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -97,16 +97,31 @@ Plan: Plan(
                     ],
                     expressions: [
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Field(
-                            None,
-                            "studio_id",
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         Field(
-                            None,
-                            "genre_id",
+                            3,
+                            Some(
+                                (
+                                    None,
+                                    "genre_id",
+                                ),
+                            ),
                         ),
                     ],
                 },
@@ -125,31 +140,52 @@ Plan: Plan(
             expressions: [
                 Add(
                     Field(
-                        None,
-                        "studio_id",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "genre_id",
+                        2,
+                        Some(
+                            (
+                                None,
+                                "genre_id",
+                            ),
+                        ),
                     ),
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "rating",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
-                    None,
-                    "multi",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "multi",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -164,7 +200,7 @@ Optimized plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -174,16 +210,31 @@ Optimized plan: Plan(
                     ],
                     expressions: [
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Field(
-                            None,
-                            "studio_id",
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         Field(
-                            None,
-                            "genre_id",
+                            3,
+                            Some(
+                                (
+                                    None,
+                                    "genre_id",
+                                ),
+                            ),
                         ),
                     ],
                 },
@@ -202,31 +253,52 @@ Optimized plan: Plan(
             expressions: [
                 Add(
                     Field(
-                        None,
-                        "studio_id",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "genre_id",
+                        2,
+                        Some(
+                            (
+                                None,
+                                "genre_id",
+                            ),
+                        ),
                     ),
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "rating",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
-                    None,
-                    "multi",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "multi",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),

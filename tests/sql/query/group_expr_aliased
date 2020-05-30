@@ -75,7 +75,7 @@ Plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -86,13 +86,23 @@ Plan: Plan(
                     ],
                     expressions: [
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Multiply(
                             Field(
-                                None,
-                                "studio_id",
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
+                                    ),
+                                ),
                             ),
                             Constant(
                                 Integer(
@@ -113,19 +123,26 @@ Plan: Plan(
                 None,
             ],
             expressions: [
-                Column(
+                Field(
                     1,
+                    None,
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "twice",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "twice",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -140,7 +157,7 @@ Optimized plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -151,13 +168,23 @@ Optimized plan: Plan(
                     ],
                     expressions: [
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Multiply(
                             Field(
-                                None,
-                                "studio_id",
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
+                                    ),
+                                ),
                             ),
                             Constant(
                                 Integer(
@@ -178,19 +205,26 @@ Optimized plan: Plan(
                 None,
             ],
             expressions: [
-                Column(
+                Field(
                     1,
+                    None,
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "twice",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "twice",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),

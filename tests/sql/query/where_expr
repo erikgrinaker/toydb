@@ -51,15 +51,20 @@ Plan: Plan(
     Filter {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         predicate: And(
             Or(
                 GreaterThan(
                     Field(
-                        None,
-                        "released",
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(
@@ -69,8 +74,13 @@ Plan: Plan(
                 ),
                 Equal(
                     Field(
-                        None,
-                        "released",
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(
@@ -80,8 +90,13 @@ Plan: Plan(
                 ),
             ),
             Field(
-                None,
-                "ultrahd",
+                6,
+                Some(
+                    (
+                        None,
+                        "ultrahd",
+                    ),
+                ),
             ),
         ),
     },
@@ -90,14 +105,19 @@ Plan: Plan(
 Optimized plan: Plan(
     Scan {
         table: "movies",
-        alias: None,
+        label: "movies",
         filter: Some(
             And(
                 Or(
                     GreaterThan(
                         Field(
-                            None,
-                            "released",
+                            4,
+                            Some(
+                                (
+                                    None,
+                                    "released",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -107,8 +127,13 @@ Optimized plan: Plan(
                     ),
                     Equal(
                         Field(
-                            None,
-                            "released",
+                            4,
+                            Some(
+                                (
+                                    None,
+                                    "released",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -118,8 +143,13 @@ Optimized plan: Plan(
                     ),
                 ),
                 Field(
-                    None,
-                    "ultrahd",
+                    6,
+                    Some(
+                        (
+                            None,
+                            "ultrahd",
+                        ),
+                    ),
                 ),
             ),
         ),

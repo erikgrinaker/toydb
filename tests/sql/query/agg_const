@@ -127,20 +127,25 @@ Plan: Plan(
             None,
         ],
         expressions: [
-            Column(
+            Field(
                 0,
+                None,
             ),
-            Column(
+            Field(
                 1,
+                None,
             ),
-            Column(
+            Field(
                 2,
+                None,
             ),
-            Column(
+            Field(
                 3,
+                None,
             ),
-            Column(
+            Field(
                 4,
+                None,
             ),
         ],
     },
@@ -202,20 +207,25 @@ Optimized plan: Plan(
             None,
         ],
         expressions: [
-            Column(
+            Field(
                 0,
+                None,
             ),
-            Column(
+            Field(
                 1,
+                None,
             ),
-            Column(
+            Field(
                 2,
+                None,
             ),
-            Column(
+            Field(
                 3,
+                None,
             ),
-            Column(
+            Field(
                 4,
+                None,
             ),
         ],
     },

@@ -32,48 +32,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan(
-    Projection {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        labels: [
-            None,
-        ],
-        expressions: [
-            Field(
-                Some(
-                    "movies",
-                ),
-                "unknown",
-            ),
-        ],
-    },
-)
-
-Optimized plan: Plan(
-    Projection {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        labels: [
-            None,
-        ],
-        expressions: [
-            Field(
-                Some(
-                    "movies",
-                ),
-                "unknown",
-            ),
-        ],
-    },
-)
-
-Query: SELECT movies.unknown FROM movies
-
-Result: Value("Unknown field movies.unknown")
+Plan: Value("Unknown field movies.unknown")

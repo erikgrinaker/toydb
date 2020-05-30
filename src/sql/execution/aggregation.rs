@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::plan::Aggregate;
-use super::super::types::{Column, Relation, Value};
+use super::super::types::{Column, Value};
 use super::{Context, Executor, ResultSet};
 use crate::error::{Error, Result};
 
@@ -28,8 +28,8 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
     fn execute(mut self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let agg_count = self.aggregates.len();
         match self.source.execute(ctx)? {
-            ResultSet::Query { mut relation } => {
-                while let Some(mut row) = relation.next().transpose()? {
+            ResultSet::Query { columns, mut rows } => {
+                while let Some(mut row) = rows.next().transpose()? {
                     self.accumulators
                         .entry(row.split_off(self.aggregates.len()))
                         .or_insert(
@@ -41,36 +41,33 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                 }
                 // If there were no rows and no group-by columns, return a row of empty accumulators:
                 // SELECT COUNT(*) FROM t WHERE FALSE
-                if self.accumulators.is_empty() && self.aggregates.len() == relation.columns.len() {
+                if self.accumulators.is_empty() && self.aggregates.len() == columns.len() {
                     self.accumulators.insert(
                         Vec::new(),
                         self.aggregates.iter().map(|agg| Accumulator::from(agg)).collect(),
                     );
                 }
                 Ok(ResultSet::Query {
-                    relation: Relation {
-                        columns: relation
-                            .columns
-                            .into_iter()
-                            .enumerate()
-                            .map(|(i, c)| {
+                    columns: columns
+                        .into_iter()
+                        .enumerate()
+                        .map(
+                            |(i, c)| {
                                 if i < agg_count {
-                                    Column { relation: None, name: None }
+                                    Column { table: None, name: None }
                                 } else {
                                     c
                                 }
-                            })
-                            .collect(),
-                        rows: Some(Box::new(self.accumulators.into_iter().map(
-                            |(bucket, accs)| {
-                                Ok(accs
-                                    .into_iter()
-                                    .map(|acc| acc.aggregate())
-                                    .chain(bucket.into_iter())
-                                    .collect())
                             },
-                        ))),
-                    },
+                        )
+                        .collect(),
+                    rows: Box::new(self.accumulators.into_iter().map(|(bucket, accs)| {
+                        Ok(accs
+                            .into_iter()
+                            .map(|acc| acc.aggregate())
+                            .chain(bucket.into_iter())
+                            .collect())
+                    })),
                 })
             }
             r => Err(Error::Internal(format!("Unexpected result {:?}", r))),

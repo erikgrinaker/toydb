@@ -72,7 +72,7 @@ impl Client {
                 Response::Execute(rs) => rs,
                 resp => return Err(Error::Internal(format!("Unexpected response {:?}", resp))),
             };
-        if let ResultSet::Query { ref mut relation } = &mut resultset {
+        if let ResultSet::Query { columns, .. } = resultset {
             // FIXME We buffer rows for now to avoid lifetime hassles
             let mut rows = Vec::new();
             while let Some(result) = conn.try_next().await? {
@@ -84,7 +84,7 @@ impl Client {
                     }
                 }
             }
-            relation.rows = Some(Box::new(rows.into_iter().map(Ok)));
+            resultset = ResultSet::Query { columns, rows: Box::new(rows.into_iter().map(Ok)) }
         };
         match &resultset {
             ResultSet::Begin { id, mode } => self.txn.set(Some((*id, *mode))),

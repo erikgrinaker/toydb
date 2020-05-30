@@ -95,7 +95,7 @@ Plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -106,8 +106,13 @@ Plan: Plan(
                     expressions: [
                         Multiply(
                             Field(
-                                None,
-                                "rating",
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
                             ),
                             Constant(
                                 Integer(
@@ -121,8 +126,13 @@ Plan: Plan(
                             ),
                         ),
                         Field(
-                            None,
-                            "studio_id",
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                     ],
                 },
@@ -137,21 +147,28 @@ Plan: Plan(
             ],
             expressions: [
                 Field(
+                    2,
                     None,
-                    "studio_id",
                 ),
                 Add(
                     Divide(
-                        Column(
+                        Field(
                             0,
+                            None,
                         ),
-                        Column(
+                        Field(
                             1,
+                            None,
                         ),
                     ),
                     Field(
-                        None,
-                        "studio_id",
+                        2,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
                     ),
                 ),
             ],
@@ -159,8 +176,13 @@ Plan: Plan(
         orders: [
             (
                 Field(
-                    None,
-                    "studio_id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -175,7 +197,7 @@ Optimized plan: Plan(
                 source: Projection {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     labels: [
@@ -186,8 +208,13 @@ Optimized plan: Plan(
                     expressions: [
                         Multiply(
                             Field(
-                                None,
-                                "rating",
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
                             ),
                             Constant(
                                 Integer(
@@ -201,8 +228,13 @@ Optimized plan: Plan(
                             ),
                         ),
                         Field(
-                            None,
-                            "studio_id",
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                     ],
                 },
@@ -217,21 +249,28 @@ Optimized plan: Plan(
             ],
             expressions: [
                 Field(
+                    2,
                     None,
-                    "studio_id",
                 ),
                 Add(
                     Divide(
-                        Column(
+                        Field(
                             0,
+                            None,
                         ),
-                        Column(
+                        Field(
                             1,
+                            None,
                         ),
                     ),
                     Field(
-                        None,
-                        "studio_id",
+                        2,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
                     ),
                 ),
             ],
@@ -239,8 +278,13 @@ Optimized plan: Plan(
         orders: [
             (
                 Field(
-                    None,
-                    "studio_id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),

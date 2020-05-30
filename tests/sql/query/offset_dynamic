@@ -37,4 +37,4 @@ AST: Select {
     ),
 }
 
-Plan: Value("Offset must be constant value")
+Plan: Value("Expression must be constant, found field released")

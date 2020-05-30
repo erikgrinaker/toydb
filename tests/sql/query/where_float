@@ -35,7 +35,7 @@ Plan: Plan(
     Filter {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         predicate: Constant(
@@ -49,7 +49,7 @@ Plan: Plan(
 Optimized plan: Plan(
     Scan {
         table: "movies",
-        alias: None,
+        label: "movies",
         filter: Some(
             Constant(
                 Float(

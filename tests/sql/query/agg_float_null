@@ -81,7 +81,7 @@ Plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "floats",
-                    alias: None,
+                    label: "floats",
                     filter: None,
                 },
                 labels: [
@@ -93,24 +93,49 @@ Plan: Plan(
                 ],
                 expressions: [
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                 ],
             },
@@ -130,20 +155,25 @@ Plan: Plan(
             None,
         ],
         expressions: [
-            Column(
+            Field(
                 0,
+                None,
             ),
-            Column(
+            Field(
                 1,
+                None,
             ),
-            Column(
+            Field(
                 2,
+                None,
             ),
-            Column(
+            Field(
                 3,
+                None,
             ),
-            Column(
+            Field(
                 4,
+                None,
             ),
         ],
     },
@@ -155,7 +185,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "floats",
-                    alias: None,
+                    label: "floats",
                     filter: None,
                 },
                 labels: [
@@ -167,24 +197,49 @@ Optimized plan: Plan(
                 ],
                 expressions: [
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                 ],
             },
@@ -204,20 +259,25 @@ Optimized plan: Plan(
             None,
         ],
         expressions: [
-            Column(
+            Field(
                 0,
+                None,
             ),
-            Column(
+            Field(
                 1,
+                None,
             ),
-            Column(
+            Field(
                 2,
+                None,
             ),
-            Column(
+            Field(
                 3,
+                None,
             ),
-            Column(
+            Field(
                 4,
+                None,
             ),
         ],
     },

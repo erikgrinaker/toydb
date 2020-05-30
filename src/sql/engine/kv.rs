@@ -181,7 +181,7 @@ impl super::Transaction for Transaction {
                 .map(|r| r.and_then(|(_, v)| deserialize(&v)))
                 .filter_map(move |r| match r {
                     Ok(row) => match &filter {
-                        Some(filter) => match filter.evaluate(&table.row_env(&row)) {
+                        Some(filter) => match filter.evaluate(Some(&row)) {
                             Ok(Value::Boolean(b)) if b => Some(Ok(row)),
                             Ok(Value::Boolean(_)) | Ok(Value::Null) => None,
                             Ok(v) => Some(Err(Error::Value(format!(

@@ -30,33 +30,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        predicate: Field(
-            None,
-            "unknown",
-        ),
-    },
-)
-
-Optimized plan: Plan(
-    Scan {
-        table: "movies",
-        alias: None,
-        filter: Some(
-            Field(
-                None,
-                "unknown",
-            ),
-        ),
-    },
-)
-
-Query: SELECT * FROM movies WHERE unknown
-
-Result: Value("Unknown field unknown")
+Plan: Value("Unknown field unknown")

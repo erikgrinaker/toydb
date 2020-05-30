@@ -1,7 +1,7 @@
 use super::super::engine::Transaction;
 use super::super::types::Expression;
 use super::super::types::Value;
-use super::{Context, Executor, ResultColumns, ResultSet};
+use super::{Context, Executor, ResultSet};
 use crate::error::{Error, Result};
 
 /// A filter executor
@@ -21,12 +21,12 @@ impl<T: Transaction> Filter<T> {
 impl<T: Transaction> Executor<T> for Filter<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         let result = self.source.execute(ctx)?;
-        if let ResultSet::Query { mut relation } = result {
-            if let Some(rows) = relation.rows {
-                let columns = ResultColumns::from_new_columns(relation.columns.clone());
-                let predicate = self.predicate;
-                relation.rows = Some(Box::new(rows.filter_map(move |r| {
-                    r.and_then(|row| match predicate.evaluate(&columns.as_env(&row))? {
+        if let ResultSet::Query { columns, rows } = result {
+            let predicate = self.predicate;
+            Ok(ResultSet::Query {
+                columns,
+                rows: Box::new(rows.filter_map(move |r| {
+                    r.and_then(|row| match predicate.evaluate(Some(&row))? {
                         Value::Boolean(true) => Ok(Some(row)),
                         Value::Boolean(false) => Ok(None),
                         Value::Null => Ok(None),
@@ -36,10 +36,10 @@ impl<T: Transaction> Executor<T> for Filter<T> {
                         ))),
                     })
                     .transpose()
-                })));
-            }
-            return Ok(ResultSet::Query { relation });
+                })),
+            })
+        } else {
+            Err(Error::Internal("Unexpected result".into()))
         }
-        Err(Error::Internal("Unexpected result".into()))
     }
 }

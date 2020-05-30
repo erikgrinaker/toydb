@@ -50,37 +50,50 @@ AST: Select {
 Plan: Plan(
     Order {
         source: Projection {
-            source: Projection {
-                source: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                labels: [
-                    None,
-                ],
-                expressions: [
-                    Field(
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        label: "movies",
+                        filter: None,
+                    },
+                    labels: [
                         None,
-                        "title",
-                    ),
-                ],
+                    ],
+                    expressions: [
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
+                                ),
+                            ),
+                        ),
+                    ],
+                },
+                aggregates: [],
             },
             labels: [
                 None,
             ],
             expressions: [
                 Field(
+                    0,
                     None,
-                    "title",
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "title",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -91,37 +104,50 @@ Plan: Plan(
 Optimized plan: Plan(
     Order {
         source: Projection {
-            source: Projection {
-                source: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                labels: [
-                    None,
-                ],
-                expressions: [
-                    Field(
+            source: Aggregation {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        label: "movies",
+                        filter: None,
+                    },
+                    labels: [
                         None,
-                        "title",
-                    ),
-                ],
+                    ],
+                    expressions: [
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
+                                ),
+                            ),
+                        ),
+                    ],
+                },
+                aggregates: [],
             },
             labels: [
                 None,
             ],
             expressions: [
                 Field(
+                    0,
                     None,
-                    "title",
                 ),
             ],
         },
         orders: [
             (
                 Field(
-                    None,
-                    "title",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),

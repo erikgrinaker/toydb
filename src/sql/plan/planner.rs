@@ -1,58 +1,125 @@
 use super::super::parser::ast;
-use super::super::schema;
-use super::super::types::{Environment, Expression, Expressions, Value};
-use super::{Aggregate, Aggregates, Node, Plan};
+use super::super::schema::{Catalog, Column, Table};
+use super::super::types::{Expression, Expressions, Value};
+use super::{Aggregate, Direction, Node, Plan};
 use crate::error::{Error, Result};
 
-/// The plan builder
-pub struct Planner {}
+use std::collections::{HashMap, HashSet};
+use std::mem::replace;
 
-impl Planner {
+/// The plan builder
+pub struct Planner<'a> {
+    catalog: &'a mut dyn Catalog,
+}
+
+impl<'a> Planner<'a> {
     /// Creates a new planner
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(catalog: &'a mut dyn Catalog) -> Self {
+        Self { catalog }
     }
 
     /// Builds a plan tree for an AST statement
-    pub fn build(&self, statement: ast::Statement) -> Result<Plan> {
+    pub fn build(&mut self, statement: ast::Statement) -> Result<Plan> {
         Ok(Plan(self.build_statement(statement)?))
     }
 
     /// Builds a plan node for a statement
-    fn build_statement(&self, statement: ast::Statement) -> Result<Node> {
+    fn build_statement(&mut self, statement: ast::Statement) -> Result<Node> {
         Ok(match statement {
+            // Transaction control and explain statements should be handled by session.
             ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
                 return Err(Error::Internal(format!(
                     "Unexpected transaction statement {:?}",
                     statement
                 )))
             }
+
             ast::Statement::Explain(_) => {
                 return Err(Error::Internal("Unexpected explain statement".into()))
             }
-            ast::Statement::CreateTable { name, columns } => {
-                Node::CreateTable { schema: self.build_schema_table(name, columns)? }
-            }
-            ast::Statement::Delete { table, r#where } => Node::Delete {
-                table: table.clone(),
-                source: Box::new(Node::Scan {
-                    table,
-                    alias: None,
-                    filter: match r#where {
-                        Some(ast::WhereClause(expr)) => Some(self.build_expression(expr)?),
-                        None => None,
-                    },
-                }),
+
+            // Data definition language.
+            ast::Statement::CreateTable { name, columns } => Node::CreateTable {
+                schema: Table::new(
+                    name,
+                    columns
+                        .into_iter()
+                        .map(|c| {
+                            let nullable = c.nullable.unwrap_or(!c.primary_key);
+                            let default = match c.default {
+                                Some(expr) => {
+                                    Some(self.build_expression_constant(expr)?.evaluate(None)?)
+                                }
+                                None if nullable => Some(Value::Null),
+                                None => None,
+                            };
+                            Ok(Column {
+                                name: c.name,
+                                datatype: c.datatype,
+                                primary_key: c.primary_key,
+                                nullable,
+                                default,
+                                index: c.index && !c.primary_key,
+                                unique: c.unique || c.primary_key,
+                                references: c.references,
+                            })
+                        })
+                        .collect::<Result<_>>()?,
+                )?,
             },
+
             ast::Statement::DropTable(name) => Node::DropTable { name },
+
+            // Data modification language.
+            // FIXME Delete and update should handle aliases in the same way as select
+            ast::Statement::Delete { table, r#where } => {
+                let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
+                Node::Delete {
+                    table: table.clone(),
+                    source: Box::new(Node::Scan {
+                        label: table.clone(),
+                        table,
+                        filter: match r#where {
+                            Some(ast::WhereClause(expr)) => {
+                                Some(self.build_expression(scope, expr)?)
+                            }
+                            None => None,
+                        },
+                    }),
+                }
+            }
+
             ast::Statement::Insert { table, columns, values } => Node::Insert {
                 table,
                 columns: columns.unwrap_or_else(Vec::new),
                 expressions: values
                     .into_iter()
-                    .map(|exprs| self.build_expressions(exprs))
+                    .map(|exprs| self.build_expressions(&mut Scope::new(), exprs))
                     .collect::<Result<_>>()?,
             },
+
+            ast::Statement::Update { table, set, r#where } => {
+                let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
+                Node::Update {
+                    table: table.clone(),
+                    source: Box::new(Node::Scan {
+                        label: table.clone(),
+                        table,
+                        filter: match r#where {
+                            Some(ast::WhereClause(expr)) => {
+                                Some(self.build_expression(scope, expr)?)
+                            }
+                            None => None,
+                        },
+                    }),
+                    expressions: set
+                        .into_iter()
+                        .map(|(c, e)| self.build_expression(scope, e).map(|e| (c, e)))
+                        .collect::<Result<_>>()?,
+                }
+            }
+
+            // Queries.
             ast::Statement::Select {
                 select,
                 from,
@@ -63,129 +130,95 @@ impl Planner {
                 limit,
                 offset,
             } => {
-                let mut n: Node = match from {
-                    Some(from) => {
-                        let mut items = from.items.into_iter().rev();
-                        let mut node = match items.next() {
-                            Some(item) => self.build_from_item(item)?,
-                            None => return Err(Error::Value("No from items given".into())),
-                        };
-                        for item in items {
-                            node = Node::NestedLoopJoin {
-                                outer: Box::new(self.build_from_item(item)?),
-                                inner: Box::new(node),
-                                predicate: None,
-                                pad: false,
-                                flip: false,
-                            }
-                        }
-                        node
-                    }
+                let scope = &mut Scope::new();
+
+                // Build FROM clause.
+                let mut node = match from {
+                    Some(from) => self.build_from_clause(scope, from)?,
                     None if select.expressions.is_empty() => {
                         return Err(Error::Value("Can't select * without a table".into()))
                     }
                     None => Node::Nothing,
                 };
+
+                // Build WHERE clause.
                 if let Some(ast::WhereClause(expr)) = r#where {
-                    n = Node::Filter {
-                        source: Box::new(n),
-                        predicate: self.build_expression(expr)?,
+                    node = Node::Filter {
+                        source: Box::new(node),
+                        predicate: self.build_expression(scope, expr)?,
                     };
                 };
+
+                // Build SELECT clause.
                 if !select.expressions.is_empty() {
-                    let (mut pre, aggregates, mut post) =
-                        self.build_aggregate_expressions(select.expressions)?;
-                    let mut pre_labels: Vec<Option<String>> =
-                        std::iter::repeat(None).take(pre.len()).collect();
-                    if let Some(ast::GroupByClause(exprs)) = group_by {
-                        for group in self.build_expressions(exprs)? {
-                            if let Expression::Field(None, label) = &group {
-                                // If the group is a field reference to an AS label in the output,
-                                // move the SELECT expression to the pre-projection and reference it
-                                // in post unless it contains an aggregate. This handles e.g.:
-                                // SELECT a * 2 AS p, SUM(b) FROM t GROUP BY p
-                                if let Some(index) =
-                                    select.labels.iter().position(|l| l.as_deref() == Some(label))
-                                {
-                                    if !post[index].walk(&|expr| match expr {
-                                        Expression::Column(i) if i < &aggregates.len() => false,
-                                        _ => true,
-                                    }) {
-                                        return Err(Error::Value(
-                                            "cannot group by aggregate column".into(),
-                                        ));
-                                    }
-                                    pre.push(std::mem::replace(
-                                        &mut post[index],
-                                        Expression::Column(pre.len()),
-                                    ));
-                                    pre_labels.push(Some(label.clone()));
-                                } else {
-                                    pre.push(group);
-                                    pre_labels.push(None);
-                                }
-                            } else {
-                                // If the group expression is exactly equal as a SELECT expression,
-                                // push them both to the pre-projection.
-                                let mut pushed = false;
-                                while let Some(index) = post.iter().position(|e| e == &group) {
-                                    pre.push(std::mem::replace(
-                                        &mut post[index],
-                                        Expression::Column(pre.len()),
-                                    ));
-                                    pre_labels.push(None);
-                                    pushed = true;
-                                }
-                                if !pushed {
-                                    pre.push(group);
-                                    pre_labels.push(None);
-                                }
-                            }
-                        }
-                    }
-                    if !pre.is_empty() {
-                        n = Node::Projection {
-                            source: Box::new(n),
-                            labels: pre_labels,
-                            expressions: pre,
-                        };
-                    }
-                    if !aggregates.is_empty() {
-                        n = Node::Aggregation { source: Box::new(n), aggregates };
-                    }
-                    n = Node::Projection {
-                        source: Box::new(n),
-                        labels: select.labels,
-                        expressions: post,
-                    }
-                };
+                    let mut exprs = select.expressions.clone(); // FIXME No need to clone
 
-                if let Some(ast::HavingClause(expr)) = having {
-                    n = Node::Filter {
-                        source: Box::new(n),
-                        predicate: self.build_expression(expr)?,
+                    // Extract any aggregate functions and GROUP BY expressions, replacing them with
+                    // Column placeholders. Aggregations are handled by evaluating group expressions
+                    // and aggregate function arguments in a pre-projection, passing the results
+                    // to an aggregation node, and then evaluating the final SELECT expressions
+                    // in the post-projection. See build_aggregates() for details.
+                    let aggregates = self.extract_aggregates(&mut exprs)?;
+                    let groups = if let Some(ast::GroupByClause(group_by)) = group_by {
+                        self.extract_groups(&mut exprs, &select.labels, group_by, aggregates.len())?
+                    } else {
+                        Vec::new()
+                    };
+                    if !aggregates.is_empty() || !groups.is_empty() {
+                        node = self.build_aggregation(scope, node, groups, aggregates)?;
+                    }
+
+                    // Build the remaining non-aggregate projection.
+                    let exprs = self.build_expressions(scope, exprs)?;
+                    scope.project(
+                        exprs.iter().cloned().zip(select.labels.iter().cloned()).collect(),
+                    )?;
+                    node = Node::Projection {
+                        source: Box::new(node),
+                        labels: select.labels,
+                        expressions: exprs,
                     };
                 };
 
+                // Build HAVING clause.
+                if let Some(ast::HavingClause(expr)) = having {
+                    node = Node::Filter {
+                        source: Box::new(node),
+                        predicate: self.build_expression(scope, expr)?,
+                    };
+                };
+
+                // Build ORDER clause.
                 // FIXME Because the projection doesn't retain original table values, we can't
                 // order by fields which are not in the result set.
                 if !order.is_empty() {
-                    n = Node::Order {
-                        source: Box::new(n),
+                    node = Node::Order {
+                        source: Box::new(node),
                         orders: order
                             .into_iter()
-                            .map(|(e, o)| self.build_expression(e).map(|e| (e, o.into())))
+                            .map(|(e, o)| {
+                                if Self::is_aggregate(&e) {
+                                    return Err(Error::Value(
+                                        "Aggregate function not allowed here".into(),
+                                    ));
+                                }
+                                Ok((
+                                    self.build_expression(scope, e)?,
+                                    match o {
+                                        ast::Order::Ascending => Direction::Ascending,
+                                        ast::Order::Descending => Direction::Descending,
+                                    },
+                                ))
+                            })
                             .collect::<Result<_>>()?,
                     };
                 }
+
+                // Build OFFSET clause.
                 if let Some(expr) = offset {
-                    let expr = self.build_expression(expr)?;
-                    if !expr.is_constant() {
-                        return Err(Error::Value("Offset must be constant value".into()));
-                    }
-                    n = Node::Offset {
-                        source: Box::new(n),
-                        offset: match expr.evaluate(&Environment::new())? {
+                    node = Node::Offset {
+                        source: Box::new(node),
+                        offset: match self.build_expression_constant(expr)?.evaluate(None)? {
                             Value::Integer(i) if i >= 0 => i as u64,
                             v => {
                                 return Err(Error::Value(format!("Invalid value {} for offset", v)))
@@ -193,14 +226,12 @@ impl Planner {
                         },
                     }
                 }
+
+                // Build LIMIT clause.
                 if let Some(expr) = limit {
-                    let expr = self.build_expression(expr)?;
-                    if !expr.is_constant() {
-                        return Err(Error::Value("Limit must be constant value".into()));
-                    }
-                    n = Node::Limit {
-                        source: Box::new(n),
-                        limit: match expr.evaluate(&Environment::new())? {
+                    node = Node::Limit {
+                        source: Box::new(node),
+                        limit: match self.build_expression_constant(expr)?.evaluate(None)? {
                             Value::Integer(i) if i >= 0 => i as u64,
                             v => {
                                 return Err(Error::Value(format!("Invalid value {} for limit", v)))
@@ -208,49 +239,63 @@ impl Planner {
                         },
                     }
                 }
-                n
+                node
             }
-            ast::Statement::Update { table, set, r#where } => Node::Update {
-                table: table.clone(),
-                source: Box::new(Node::Scan {
-                    table,
-                    alias: None,
-                    filter: match r#where {
-                        Some(ast::WhereClause(expr)) => Some(self.build_expression(expr)?),
-                        None => None,
-                    },
-                }),
-                expressions: set
-                    .into_iter()
-                    .map(|(c, e)| self.build_expression(e).map(|e| (c, e)))
-                    .collect::<Result<_>>()?,
-            },
         })
     }
 
-    /// Builds FROM items
-    fn build_from_item(&self, item: ast::FromItem) -> Result<Node> {
+    /// Builds a FROM clause consisting of several items. Each item is either a single table or a
+    /// join of an arbitrary number of tables. All of the items are joined, since e.g. 'SELECT * FROM
+    /// a, b' is an implicit join of a and b.
+    fn build_from_clause(&mut self, scope: &mut Scope, from: ast::FromClause) -> Result<Node> {
+        let mut items = from.items.into_iter();
+        let mut node = match items.next() {
+            Some(item) => self.build_from_item(scope, item)?,
+            None => return Err(Error::Value("No from items given".into())),
+        };
+        for item in items {
+            node = Node::NestedLoopJoin {
+                outer: Box::new(node),
+                inner: Box::new(self.build_from_item(scope, item)?),
+                predicate: None,
+                pad: false,
+                flip: false,
+            }
+        }
+        Ok(node)
+    }
+
+    /// Builds FROM items, which can either be a single table or a chained join of multiple tables,
+    /// e.g. 'SELECT * FROM a LEFT JOIN b ON b.a_id = a.id'. Any tables will be stored in
+    /// self.tables keyed by their query name (i.e. alias if given, otherwise name). The table can
+    /// only be referenced by the query name (so if alias is given, cannot reference by name).
+    fn build_from_item(&mut self, scope: &mut Scope, item: ast::FromItem) -> Result<Node> {
         Ok(match item {
-            ast::FromItem::Table { name, alias } => Node::Scan { table: name, alias, filter: None },
+            ast::FromItem::Table { name, alias } => {
+                let label = alias.unwrap_or_else(|| name.clone());
+                scope.add_table(label.clone(), self.catalog.must_read_table(&name)?)?;
+                Node::Scan { table: name, label, filter: None }
+            }
+
             ast::FromItem::Join { left, right, r#type, predicate } => match r#type {
                 ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
-                    outer: Box::new(self.build_from_item(*left)?),
-                    inner: Box::new(self.build_from_item(*right)?),
-                    predicate: predicate.map(|e| self.build_expression(e)).transpose()?,
+                    outer: Box::new(self.build_from_item(scope, *left)?),
+                    inner: Box::new(self.build_from_item(scope, *right)?),
+                    predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
                     pad: false,
                     flip: false,
                 },
                 ast::JoinType::Left => Node::NestedLoopJoin {
-                    outer: Box::new(self.build_from_item(*left)?),
-                    inner: Box::new(self.build_from_item(*right)?),
-                    predicate: predicate.map(|e| self.build_expression(e)).transpose()?,
+                    outer: Box::new(self.build_from_item(scope, *left)?),
+                    inner: Box::new(self.build_from_item(scope, *right)?),
+                    predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
                     pad: true,
                     flip: false,
                 },
                 ast::JoinType::Right => Node::NestedLoopJoin {
-                    outer: Box::new(self.build_from_item(*left)?),
-                    inner: Box::new(self.build_from_item(*right)?),
-                    predicate: predicate.map(|e| self.build_expression(e)).transpose()?,
+                    outer: Box::new(self.build_from_item(scope, *left)?),
+                    inner: Box::new(self.build_from_item(scope, *right)?),
+                    predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
                     pad: true,
                     flip: true,
                 },
@@ -258,102 +303,176 @@ impl Planner {
         })
     }
 
+    /// Builds an aggregation node.
+    fn build_aggregation(
+        &self,
+        scope: &mut Scope,
+        source: Node,
+        groups: Vec<(ast::Expression, Option<String>)>,
+        aggregations: Vec<(Aggregate, ast::Expression)>,
+    ) -> Result<Node> {
+        let mut aggregates = Vec::new();
+        let mut expressions = Vec::new();
+        let mut labels = Vec::new();
+        for (aggregate, expr) in aggregations {
+            aggregates.push(aggregate);
+            expressions.push(self.build_expression(scope, expr)?);
+            labels.push(None);
+        }
+        for (expr, label) in groups {
+            expressions.push(self.build_expression(scope, expr)?);
+            labels.push(label);
+        }
+        // FIXME This is probably wrong for the aggregate columns, since we don't want to inherit
+        // from them if they are simple field references.
+        scope.project(expressions.iter().cloned().zip(labels.iter().cloned()).collect())?;
+        let node = Node::Aggregation {
+            source: Box::new(Node::Projection { source: Box::new(source), labels, expressions }),
+            aggregates,
+        };
+        Ok(node)
+    }
+
     /// Builds an expression from an AST expression
-    fn build_expression(&self, expr: ast::Expression) -> Result<Expression> {
-        ExpressionBuilder::build(expr)
+    fn build_expression(&self, scope: &mut Scope, expr: ast::Expression) -> Result<Expression> {
+        ExpressionBuilder::build(scope, expr)
+    }
+
+    /// Build a constant expression from an AST expression
+    fn build_expression_constant(&self, expr: ast::Expression) -> Result<Expression> {
+        ExpressionBuilder::build_constant(expr)
     }
 
     /// Builds expressions from AST expressions
-    fn build_expressions(&self, exprs: ast::Expressions) -> Result<Expressions> {
-        ExpressionBuilder::build_many(exprs)
+    fn build_expressions(&self, scope: &mut Scope, exprs: ast::Expressions) -> Result<Expressions> {
+        ExpressionBuilder::build_many(scope, exprs)
     }
 
-    /// Builds partitioned aggregate expressions from AST expressions
-    fn build_aggregate_expressions(
+    /// Extracts aggregate functions from an AST expression tree. This finds the aggregate
+    /// function calls, replaces them with ast::Expression::Column(i), maps the aggregate functions
+    /// to aggregates, and returns them along with their argument expressions.
+    fn extract_aggregates(
         &self,
-        exprs: ast::Expressions,
-    ) -> Result<(Expressions, Vec<Aggregate>, Expressions)> {
-        ExpressionBuilder::build_aggregates(exprs)
-    }
-
-    /// Builds a table schema from an AST CreateTable node
-    fn build_schema_table(
-        &self,
-        name: String,
-        columns: Vec<ast::ColumnSpec>,
-    ) -> Result<schema::Table> {
-        schema::Table::new(
-            name,
-            columns
-                .into_iter()
-                .map(|c| {
-                    let nullable = c.nullable.unwrap_or(!c.primary_key);
-                    let default = if let Some(expr) = c.default {
-                        let expr = self.build_expression(expr)?;
-                        if !expr.is_constant() {
-                            return Err(Error::Value(format!(
-                                "Default expression for column {} must be constant",
-                                c.name
-                            )));
+        exprs: &mut [ast::Expression],
+    ) -> Result<Vec<(Aggregate, ast::Expression)>> {
+        let mut aggregates = Vec::new();
+        for expr in exprs {
+            expr.replace_with(|e| {
+                e.transform(
+                    &mut |mut e| match &mut e {
+                        ast::Expression::Function(f, args) if args.len() == 1 => {
+                            if let Some(aggregate) = Self::aggregate_from_name(f) {
+                                aggregates.push((aggregate, args.remove(0)));
+                                Ok(ast::Expression::Column(aggregates.len() - 1))
+                            } else {
+                                Ok(e)
+                            }
                         }
-                        Some(expr.evaluate(&Environment::new())?)
-                    } else if nullable {
-                        Some(Value::Null)
-                    } else {
-                        None
-                    };
+                        _ => Ok(e),
+                    },
+                    &mut |e| Ok(e),
+                )
+            })?;
+        }
+        for (_, expr) in &aggregates {
+            if Self::is_aggregate(expr) {
+                return Err(Error::Value("Aggregate functions can't be nested".into()));
+            }
+        }
+        Ok(aggregates)
+    }
 
-                    Ok(schema::Column {
-                        name: c.name,
-                        datatype: c.datatype,
-                        primary_key: c.primary_key,
-                        nullable,
-                        default,
-                        index: c.index && !c.primary_key,
-                        unique: c.unique || c.primary_key,
-                        references: c.references,
-                    })
-                })
-                .collect::<Result<_>>()?,
-        )
+    /// Extracts group by expressions, and replaces them with column references with the given
+    /// offset. These can be either an arbitray expression, a reference to a SELECT column, or the
+    /// same expression as a SELECT column. The following are all valid:
+    ///
+    /// SELECT released / 100 AS century, COUNT(*) FROM movies GROUP BY century
+    /// SELECT released / 100, COUNT(*) FROM movies GROUP BY released / 100
+    /// SELECT COUNT(*) FROM movies GROUP BY released / 100
+    ///
+    /// FIXME Perhaps put labels and expressions in common structure, and add new type for labels.
+    fn extract_groups(
+        &self,
+        exprs: &mut Vec<ast::Expression>,
+        labels: &[Option<String>],
+        group_by: Vec<ast::Expression>,
+        offset: usize,
+    ) -> Result<Vec<(ast::Expression, Option<String>)>> {
+        let labels = labels.to_vec(); // FIXME Avoid this
+        let mut groups = Vec::new();
+        for g in group_by {
+            // Look for references to SELECT columns with AS labels
+            if let ast::Expression::Field(None, label) = &g {
+                if let Some(i) = labels.iter().position(|l| l.as_deref() == Some(label)) {
+                    groups.push((
+                        replace(&mut exprs[i], ast::Expression::Column(offset + groups.len())),
+                        labels[i].clone(),
+                    ));
+                    continue;
+                }
+            }
+            // Look for expressions exactly equal to the group expression
+            if let Some(i) = exprs.iter().position(|e| e == &g) {
+                groups.push((
+                    replace(&mut exprs[i], ast::Expression::Column(offset + groups.len())),
+                    labels[i].clone(),
+                ));
+                continue;
+            }
+            // Otherwise, just use the group expression directly
+            groups.push((g, None))
+        }
+        // Make sure no group expressions contain Column references, which would be placed here
+        // during extract_aggregates().
+        for (expr, _) in &groups {
+            if Self::is_aggregate(expr) {
+                return Err(Error::Value("Group expression cannot contain aggregates".into()));
+            }
+        }
+        Ok(groups)
+    }
+
+    /// Returns the aggregate corresponding to the given aggregate function name.
+    fn aggregate_from_name(name: &str) -> Option<Aggregate> {
+        match name {
+            "avg" => Some(Aggregate::Average),
+            "count" => Some(Aggregate::Count),
+            "max" => Some(Aggregate::Max),
+            "min" => Some(Aggregate::Min),
+            "sum" => Some(Aggregate::Sum),
+            _ => None,
+        }
+    }
+
+    /// Checks whether a given expression is an aggregate expression.
+    fn is_aggregate(expr: &ast::Expression) -> bool {
+        expr.contains(&|e| match e {
+            ast::Expression::Function(f, _) => Self::aggregate_from_name(f).is_some(),
+            _ => false,
+        })
     }
 }
 
 /// Builds expressions.
-struct ExpressionBuilder {
-    agg_allow: bool,
-    aggs: Vec<Aggregate>,
-    agg_args: Expressions,
+struct ExpressionBuilder<'a> {
+    // Variable scope
+    scope: &'a Scope,
 }
 
-impl ExpressionBuilder {
+impl<'a> ExpressionBuilder<'a> {
     /// Builds a single expression.
-    fn build(expr: ast::Expression) -> Result<Expression> {
-        Ok(*ExpressionBuilder { agg_allow: false, aggs: Vec::new(), agg_args: Vec::new() }
-            .make(Box::new(expr))?)
+    fn build(scope: &'a Scope, expr: ast::Expression) -> Result<Expression> {
+        Ok(*ExpressionBuilder { scope }.make(Box::new(expr))?)
+    }
+
+    /// Builds a single expression, errors if it's not constant (i.e. has field reference).
+    fn build_constant(expr: ast::Expression) -> Result<Expression> {
+        Ok(*ExpressionBuilder { scope: &mut Scope::constant() }.make(Box::new(expr))?)
     }
 
     /// Builds multiple expressions.
-    fn build_many(exprs: ast::Expressions) -> Result<Expressions> {
-        exprs.into_iter().map(Self::build).collect()
-    }
-
-    /// Builds aggregate expressions as a pre-projection, aggregation, and post-projection. All
-    /// non-constant, non-aggregate expressions are pushed to the pre-projection as grouping
-    /// expressions (caller should validate against GROUP BY), following expressions referenced by
-    /// the aggregates.
-    fn build_aggregates(exprs: ast::Expressions) -> Result<(Expressions, Aggregates, Expressions)> {
-        let mut builder =
-            ExpressionBuilder { agg_allow: true, aggs: Vec::new(), agg_args: Vec::new() };
-
-        let mut post = Vec::new();
-        for expr in exprs.into_iter() {
-            post.push(*builder.make(Box::new(expr))?);
-        }
-        let pre = builder.agg_args;
-        let aggs = builder.aggs;
-
-        Ok((pre, aggs, post))
+    fn build_many(scope: &'a Scope, exprs: ast::Expressions) -> Result<Expressions> {
+        exprs.into_iter().map(|e| Self::build(scope, e)).collect()
     }
 
     /// Used internally, with more convenient signature.
@@ -368,19 +487,17 @@ impl ExpressionBuilder {
                 ast::Literal::Float(f) => Value::Float(f),
                 ast::Literal::String(s) => Value::String(s),
             }),
-            ast::Expression::Field(rel, name) => Field(rel, name),
-            ast::Expression::Function(name, mut args) => match name.as_str() {
-                "avg" | "count" | "max" | "min" | "sum" if args.len() == 1 => {
-                    *self.make_aggregate(&name, Box::new(args.remove(0)))?
-                }
-                _ => {
-                    return Err(Error::Value(format!(
-                        "Unknown function {} with {} arguments",
-                        name,
-                        args.len()
-                    )))
-                }
-            },
+            ast::Expression::Column(i) => Field(self.scope.assert(i)?, None),
+            ast::Expression::Field(table, name) => {
+                Field(self.scope.resolve(table.as_deref(), &name)?, Some((table, name)))
+            }
+            ast::Expression::Function(name, args) => {
+                return Err(Error::Value(format!(
+                    "Unknown function {} with {} arguments",
+                    name,
+                    args.len()
+                )))
+            }
             ast::Expression::Operation(op) => match op {
                 // Logical operators
                 ast::Operation::And(lhs, rhs) => And(self.make(lhs)?, self.make(rhs)?),
@@ -422,35 +539,154 @@ impl ExpressionBuilder {
             },
         }))
     }
+}
 
-    fn make_aggregate(
-        &mut self,
-        name: &str,
-        expr: Box<ast::Expression>,
-    ) -> Result<Box<Expression>> {
-        if !self.agg_allow {
+/// Manages names available to expressions and executors, and maps them onto columns/fields.
+#[derive(Debug)]
+pub struct Scope {
+    // If true, the scope is constant and cannot contain any variables.
+    constant: bool,
+    // Currently visible tables, by query name (i.e. alias or actual name).
+    tables: HashMap<String, Table>,
+    // Column labels, if any (qualified by table name when available)
+    columns: Vec<(Option<String>, Option<String>)>,
+    // Qualified names to column indexes.
+    qualified: HashMap<(String, String), usize>,
+    // Unqualified names to column indexes, if unique.
+    unqualified: HashMap<String, usize>,
+    // Unqialified ambiguous names.
+    ambiguous: HashSet<String>,
+}
+
+impl Scope {
+    /// Creates a new, empty scope.
+    fn new() -> Self {
+        Self {
+            constant: false,
+            tables: HashMap::new(),
+            columns: Vec::new(),
+            qualified: HashMap::new(),
+            unqualified: HashMap::new(),
+            ambiguous: HashSet::new(),
+        }
+    }
+
+    /// Creates a constant scope.
+    fn constant() -> Self {
+        let mut scope = Self::new();
+        scope.constant = true;
+        scope
+    }
+
+    /// Creates a scope from a table.
+    fn from_table(table: Table) -> Result<Self> {
+        let mut scope = Self::new();
+        scope.add_table(table.name.clone(), table)?;
+        Ok(scope)
+    }
+
+    /// Adds a column to the scope.
+    #[allow(clippy::map_entry)]
+    fn add_column(&mut self, table: Option<String>, label: Option<String>) {
+        if let Some(l) = label.clone() {
+            if let Some(t) = table.clone() {
+                self.qualified.insert((t, l.clone()), self.columns.len());
+            }
+            if !self.ambiguous.contains(&l) {
+                if !self.unqualified.contains_key(&l) {
+                    self.unqualified.insert(l, self.columns.len());
+                } else {
+                    self.unqualified.remove(&l);
+                    self.ambiguous.insert(l);
+                }
+            }
+        }
+        self.columns.push((table, label));
+    }
+
+    /// Adds a table to the scope.
+    fn add_table(&mut self, label: String, table: Table) -> Result<()> {
+        if self.constant {
+            return Err(Error::Internal("Can't modify constant scope".into()));
+        }
+        if self.tables.contains_key(&label) {
+            return Err(Error::Value(format!("Duplicate table name {}", label)));
+        }
+        for column in &table.columns {
+            self.add_column(Some(label.clone()), Some(column.name.clone()));
+        }
+        self.tables.insert(label, table);
+        Ok(())
+    }
+
+    /// Checks if a column index is present in the scope, errors if missing or constant.
+    fn assert(&self, index: usize) -> Result<usize> {
+        if self.constant {
             return Err(Error::Value(format!(
-                "Aggregate function {}() not allowed here",
-                name.to_uppercase()
+                "Expression must be constant, found column {}",
+                index
             )));
         }
-        self.aggs.push(match name {
-            "avg" => Aggregate::Average,
-            "count" => Aggregate::Count,
-            "max" => Aggregate::Max,
-            "min" => Aggregate::Min,
-            "sum" => Aggregate::Sum,
-            _ => {
-                return Err(Error::Internal(format!(
-                    "Invalid aggregate function {}()",
-                    name.to_uppercase()
-                )))
+        if index >= self.columns.len() {
+            return Err(Error::Value(format!("Column index {} not found", index)));
+        }
+        Ok(index)
+    }
+
+    /// Resolves a name, optionally qualified by a table name.
+    fn resolve(&self, table: Option<&str>, name: &str) -> Result<usize> {
+        if self.constant {
+            return Err(Error::Value(format!(
+                "Expression must be constant, found field {}",
+                if let Some(table) = table { format!("{}.{}", table, name) } else { name.into() }
+            )));
+        }
+        if let Some(table) = table {
+            if !self.tables.contains_key(table) {
+                return Err(Error::Value(format!("Unknown table {}", table)));
             }
-        });
-        self.agg_allow = false;
-        let arg = *self.make(expr)?;
-        self.agg_args.push(arg);
-        self.agg_allow = true;
-        Ok(Box::new(Expression::Column(self.aggs.len() - 1)))
+            self.qualified
+                .get(&(table.into(), name.into()))
+                .copied()
+                .ok_or_else(|| Error::Value(format!("Unknown field {}.{}", table, name)))
+        } else if self.ambiguous.contains(name) {
+            Err(Error::Value(format!("Ambiguous field {}", name)))
+        } else {
+            self.unqualified
+                .get(name)
+                .copied()
+                .ok_or_else(|| Error::Value(format!("Unknown field {}", name)))
+        }
+    }
+
+    /// Projects the scope. This takes a set of expressions and labels in the current scope,
+    /// and returns a new scope for the projection.
+    fn project(&mut self, projection: Vec<(Expression, Option<String>)>) -> Result<()> {
+        if self.constant {
+            return Err(Error::Internal("Can't modify constant scope".into()));
+        }
+        let mut new = Self::new();
+        new.tables = self.tables.clone();
+        for (expr, label) in projection {
+            match (expr, label) {
+                (_, Some(label)) => new.add_column(None, Some(label)),
+                (Expression::Field(_, Some((Some(table), name))), _) => {
+                    new.add_column(Some(table), Some(name))
+                }
+                (Expression::Field(_, Some((None, name))), _) => {
+                    if let Some(i) = self.unqualified.get(&name) {
+                        let (table, name) = self.columns[*i].clone();
+                        new.add_column(table, name);
+                    }
+                }
+                (Expression::Field(i, None), _) => {
+                    let (table, label) = self.columns.get(i).cloned().unwrap_or((None, None));
+                    new.add_column(table, label)
+                }
+                _ => new.add_column(None, None),
+            }
+        }
+        replace(self, new);
+        Ok(())
     }
 }

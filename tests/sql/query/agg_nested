@@ -40,4 +40,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Value("Aggregate function MIN() not allowed here")
+Plan: Value("Aggregate functions can\'t be nested")

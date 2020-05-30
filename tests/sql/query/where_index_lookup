@@ -52,13 +52,18 @@ Plan: Plan(
         source: Filter {
             source: Scan {
                 table: "movies",
-                alias: None,
+                label: "movies",
                 filter: None,
             },
             predicate: Equal(
                 Field(
-                    None,
-                    "genre_id",
+                    3,
+                    Some(
+                        (
+                            None,
+                            "genre_id",
+                        ),
+                    ),
                 ),
                 Constant(
                     Integer(
@@ -70,8 +75,13 @@ Plan: Plan(
         orders: [
             (
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -94,8 +104,13 @@ Optimized plan: Plan(
         orders: [
             (
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),

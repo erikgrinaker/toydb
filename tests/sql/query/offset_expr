@@ -42,7 +42,7 @@ Plan: Plan(
     Offset {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         offset: 3,
@@ -53,7 +53,7 @@ Optimized plan: Plan(
     Offset {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         offset: 3,

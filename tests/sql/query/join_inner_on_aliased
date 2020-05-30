@@ -56,31 +56,37 @@ Plan: Plan(
     NestedLoopJoin {
         outer: Scan {
             table: "movies",
-            alias: Some(
-                "m",
-            ),
+            label: "m",
             filter: None,
         },
         inner: Scan {
             table: "genres",
-            alias: Some(
-                "g",
-            ),
+            label: "g",
             filter: None,
         },
         predicate: Some(
             Equal(
                 Field(
+                    3,
                     Some(
-                        "m",
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "genre_id",
+                        ),
                     ),
-                    "genre_id",
                 ),
                 Field(
+                    7,
                     Some(
-                        "g",
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
                     ),
-                    "id",
                 ),
             ),
         ),
@@ -93,31 +99,37 @@ Optimized plan: Plan(
     NestedLoopJoin {
         outer: Scan {
             table: "movies",
-            alias: Some(
-                "m",
-            ),
+            label: "m",
             filter: None,
         },
         inner: Scan {
             table: "genres",
-            alias: Some(
-                "g",
-            ),
+            label: "g",
             filter: None,
         },
         predicate: Some(
             Equal(
                 Field(
+                    3,
                     Some(
-                        "m",
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "genre_id",
+                        ),
                     ),
-                    "genre_id",
                 ),
                 Field(
+                    7,
                     Some(
-                        "g",
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
                     ),
-                    "id",
                 ),
             ),
         ),

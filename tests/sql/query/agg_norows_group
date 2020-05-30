@@ -99,7 +99,7 @@ Plan: Plan(
                 source: Filter {
                     source: Scan {
                         table: "movies",
-                        alias: None,
+                        label: "movies",
                         filter: None,
                     },
                     predicate: Constant(
@@ -118,28 +118,58 @@ Plan: Plan(
                 ],
                 expressions: [
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                 ],
             },
@@ -159,20 +189,25 @@ Plan: Plan(
             None,
         ],
         expressions: [
-            Column(
+            Field(
                 0,
+                None,
             ),
-            Column(
+            Field(
                 1,
+                None,
             ),
-            Column(
+            Field(
                 2,
+                None,
             ),
-            Column(
+            Field(
                 3,
+                None,
             ),
-            Column(
+            Field(
                 4,
+                None,
             ),
         ],
     },
@@ -184,7 +219,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: Some(
                         Constant(
                             Boolean(
@@ -203,28 +238,58 @@ Optimized plan: Plan(
                 ],
                 expressions: [
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                 ],
             },
@@ -244,20 +309,25 @@ Optimized plan: Plan(
             None,
         ],
         expressions: [
-            Column(
+            Field(
                 0,
+                None,
             ),
-            Column(
+            Field(
                 1,
+                None,
             ),
-            Column(
+            Field(
                 2,
+                None,
             ),
-            Column(
+            Field(
                 3,
+                None,
             ),
-            Column(
+            Field(
                 4,
+                None,
             ),
         ],
     },

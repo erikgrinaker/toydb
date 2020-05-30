@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
-use super::super::types::{Columns, Expression, Relation, Rows};
-use super::{Context, Executor, ResultColumns, ResultSet, Row, Value};
+use super::super::types::{Columns, Expression, Rows};
+use super::{Context, Executor, ResultSet, Row, Value};
 use crate::error::{Error, Result};
 
 /// A nested loop join executor
@@ -37,37 +37,28 @@ impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
         } else {
             (self.outer.execute(ctx)?, self.inner.execute(ctx)?)
         };
-        if let ResultSet::Query { relation } = result {
-            if let ResultSet::Query { relation: inner } = inner {
-                let env_columns = ResultColumns::from_new_columns(relation.columns.clone())
-                    .merge(ResultColumns::from_new_columns(inner.columns.clone()));
-                let mut join = Relation { columns: Columns::new(), rows: None };
+        if let ResultSet::Query { columns, rows } = result {
+            if let ResultSet::Query { columns: inner_columns, rows: inner_rows } = inner {
+                let mut join_columns = Columns::new();
                 if self.flip {
-                    join.columns.extend(inner.columns);
-                    join.columns.extend(relation.columns);
+                    join_columns.extend(inner_columns);
+                    join_columns.extend(columns);
                 } else {
-                    join.columns.extend(relation.columns);
-                    join.columns.extend(inner.columns);
+                    join_columns.extend(columns);
+                    join_columns.extend(inner_columns);
                 }
 
-                let mut inner_rows = vec![];
-                if let Some(mut rows) = inner.rows {
-                    while let Some(row) = rows.next().transpose()? {
-                        inner_rows.push(row);
-                    }
-                }
-
-                if let Some(rows) = relation.rows {
-                    join.rows = Some(Box::new(NestedLoopRows::new(
-                        env_columns,
+                return Ok(ResultSet::Query {
+                    columns: join_columns.clone(),
+                    rows: Box::new(NestedLoopRows::new(
+                        join_columns,
                         rows,
-                        inner_rows,
+                        inner_rows.collect::<Result<Vec<_>>>()?,
                         self.predicate,
                         self.pad_inner,
                         self.flip,
-                    )));
-                }
-                return Ok(ResultSet::Query { relation: join });
+                    )),
+                });
             }
         }
         Err(Error::Internal("Unexpected result set".into()))
@@ -75,7 +66,7 @@ impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
 }
 
 struct NestedLoopRows {
-    columns: ResultColumns,
+    columns: Columns,
     predicate: Option<Expression>,
     outer: Rows,
     outer_cur: Option<Result<Row>>,
@@ -89,7 +80,7 @@ struct NestedLoopRows {
 
 impl NestedLoopRows {
     fn new(
-        columns: ResultColumns,
+        columns: Columns,
         mut outer: Rows,
         inner: Vec<Row>,
         predicate: Option<Expression>,
@@ -117,10 +108,15 @@ impl NestedLoopRows {
         };
         while let Some(i) = self.inner.next() {
             if let Some(predicate) = &self.predicate {
-                let mut row = o.clone();
-                row.extend(i.clone());
-                let env = self.columns.as_env(&row);
-                match predicate.evaluate(&env)? {
+                let mut row = Vec::new();
+                if self.flipped {
+                    row.extend(i.clone());
+                    row.extend(o.clone());
+                } else {
+                    row.extend(o.clone());
+                    row.extend(i.clone());
+                }
+                match predicate.evaluate(Some(&row))? {
                     Value::Boolean(true) => return Ok(Some(i)),
                     Value::Boolean(false) => {}
                     Value::Null => {}
@@ -157,7 +153,7 @@ impl Iterator for NestedLoopRows {
                     self.inner = Box::new(self.inner_orig.clone().into_iter());
                     if self.inner_pad && !self.inner_emitted {
                         let mut row = self.outer_cur.clone().unwrap().unwrap();
-                        while row.len() < self.columns.columns.len() {
+                        while row.len() < self.columns.len() {
                             if self.flipped {
                                 row.insert(0, Value::Null)
                             } else {

@@ -184,19 +184,18 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
             ResultSet::CreateTable { name } => println!("Created table {}", name),
             ResultSet::DropTable { name } => println!("Dropped table {}", name),
             ResultSet::Explain(plan) => println!("{:#?}", plan),
-            ResultSet::Query { mut relation } => {
+            ResultSet::Query { columns, mut rows } => {
                 if self.show_headers {
                     println!(
                         "{}",
-                        relation
-                            .columns
+                        columns
                             .iter()
                             .map(|c| c.name.as_deref().unwrap_or("?"))
                             .collect::<Vec<_>>()
                             .join("|")
                     );
                 }
-                while let Some(row) = relation.next().transpose()? {
+                while let Some(row) = rows.next().transpose()? {
                     println!(
                         "{}",
                         row.into_iter().map(|v| format!("{}", v)).collect::<Vec<_>>().join("|")

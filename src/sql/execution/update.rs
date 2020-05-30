@@ -29,7 +29,7 @@ impl<T: Transaction> Update<T> {
 impl<T: Transaction> Executor<T> for Update<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         match self.source.execute(ctx)? {
-            ResultSet::Query { mut relation } => {
+            ResultSet::Query { mut rows, .. } => {
                 let table = ctx.txn.must_read_table(&self.table)?;
 
                 // The iterator will see our changes, such that the same item may be iterated over
@@ -40,15 +40,14 @@ impl<T: Transaction> Executor<T> for Update<T> {
                 // multiple times - it should be possible to come up with a pathological case that
                 // loops forever (e.g. UPDATE test SET id = id + 1).
                 let mut updated = HashSet::new();
-                while let Some(row) = relation.next().transpose()? {
+                while let Some(row) = rows.next().transpose()? {
                     let id = table.get_row_key(&row)?;
                     if updated.contains(&id) {
                         continue;
                     }
-                    let env = table.row_env(&row);
                     let mut new = row.clone();
                     for (field, expr) in &self.expressions {
-                        table.set_row_field(&mut new, field, expr.evaluate(&env)?)?;
+                        table.set_row_field(&mut new, field, expr.evaluate(Some(&row))?)?;
                     }
                     ctx.txn.update(&table.name, &id, new)?;
                     updated.insert(id);

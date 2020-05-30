@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::types::{Column, Relation, Row, Value};
+use super::super::types::{Column, Row, Value};
 use super::{Context, Executor, ResultSet};
 use crate::error::Result;
 
@@ -46,14 +46,12 @@ impl<T: Transaction> Executor<T> for IndexLookup {
             .collect::<Result<Vec<Row>>>()?;
 
         Ok(ResultSet::Query {
-            relation: Relation {
-                columns: table
-                    .columns
-                    .iter()
-                    .map(|c| Column { relation: Some(name.clone()), name: Some(c.name.clone()) })
-                    .collect(),
-                rows: Some(Box::new(rows.into_iter().map(Ok))),
-            },
+            columns: table
+                .columns
+                .iter()
+                .map(|c| Column { table: Some(name.clone()), name: Some(c.name.clone()) })
+                .collect(),
+            rows: Box::new(rows.into_iter().map(Ok)),
         })
     }
 }

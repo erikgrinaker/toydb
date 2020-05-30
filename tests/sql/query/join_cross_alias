@@ -156,16 +156,12 @@ Plan: Plan(
                 outer: NestedLoopJoin {
                     outer: Scan {
                         table: "movies",
-                        alias: Some(
-                            "m",
-                        ),
+                        label: "m",
                         filter: None,
                     },
                     inner: Scan {
                         table: "genres",
-                        alias: Some(
-                            "g",
-                        ),
+                        label: "g",
                         filter: None,
                     },
                     predicate: None,
@@ -174,9 +170,7 @@ Plan: Plan(
                 },
                 inner: Scan {
                     table: "countries",
-                    alias: Some(
-                        "c",
-                    ),
+                    label: "c",
                     filter: None,
                 },
                 predicate: None,
@@ -188,10 +182,15 @@ Plan: Plan(
                     Or(
                         GreaterThan(
                             Field(
+                                0,
                                 Some(
-                                    "m",
+                                    (
+                                        Some(
+                                            "m",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
-                                "id",
                             ),
                             Constant(
                                 Integer(
@@ -201,10 +200,15 @@ Plan: Plan(
                         ),
                         Equal(
                             Field(
+                                0,
                                 Some(
-                                    "m",
+                                    (
+                                        Some(
+                                            "m",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
-                                "id",
                             ),
                             Constant(
                                 Integer(
@@ -215,10 +219,15 @@ Plan: Plan(
                     ),
                     Equal(
                         Field(
+                            7,
                             Some(
-                                "g",
+                                (
+                                    Some(
+                                        "g",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                         Constant(
                             Integer(
@@ -230,10 +239,15 @@ Plan: Plan(
                 Not(
                     Equal(
                         Field(
+                            9,
                             Some(
-                                "c",
+                                (
+                                    Some(
+                                        "c",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                         Constant(
                             String(
@@ -254,40 +268,70 @@ Plan: Plan(
         ],
         expressions: [
             Field(
+                0,
                 Some(
-                    "m",
+                    (
+                        Some(
+                            "m",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                1,
                 Some(
-                    "m",
+                    (
+                        Some(
+                            "m",
+                        ),
+                        "title",
+                    ),
                 ),
-                "title",
             ),
             Field(
+                7,
                 Some(
-                    "g",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                8,
                 Some(
-                    "g",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
             Field(
+                9,
                 Some(
-                    "c",
+                    (
+                        Some(
+                            "c",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                10,
                 Some(
-                    "c",
+                    (
+                        Some(
+                            "c",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
         ],
     },
@@ -299,16 +343,12 @@ Optimized plan: Plan(
             outer: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: Some(
-                        "m",
-                    ),
+                    label: "m",
                     filter: None,
                 },
                 inner: Scan {
                     table: "genres",
-                    alias: Some(
-                        "g",
-                    ),
+                    label: "g",
                     filter: None,
                 },
                 predicate: None,
@@ -317,9 +357,7 @@ Optimized plan: Plan(
             },
             inner: Scan {
                 table: "countries",
-                alias: Some(
-                    "c",
-                ),
+                label: "c",
                 filter: None,
             },
             predicate: Some(
@@ -328,10 +366,15 @@ Optimized plan: Plan(
                         Or(
                             GreaterThan(
                                 Field(
+                                    0,
                                     Some(
-                                        "m",
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "id",
+                                        ),
                                     ),
-                                    "id",
                                 ),
                                 Constant(
                                     Integer(
@@ -341,10 +384,15 @@ Optimized plan: Plan(
                             ),
                             Equal(
                                 Field(
+                                    0,
                                     Some(
-                                        "m",
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "id",
+                                        ),
                                     ),
-                                    "id",
                                 ),
                                 Constant(
                                     Integer(
@@ -355,10 +403,15 @@ Optimized plan: Plan(
                         ),
                         Equal(
                             Field(
+                                7,
                                 Some(
-                                    "g",
+                                    (
+                                        Some(
+                                            "g",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
-                                "id",
                             ),
                             Constant(
                                 Integer(
@@ -370,10 +423,15 @@ Optimized plan: Plan(
                     Not(
                         Equal(
                             Field(
+                                9,
                                 Some(
-                                    "c",
+                                    (
+                                        Some(
+                                            "c",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
-                                "id",
                             ),
                             Constant(
                                 String(
@@ -397,40 +455,70 @@ Optimized plan: Plan(
         ],
         expressions: [
             Field(
+                0,
                 Some(
-                    "m",
+                    (
+                        Some(
+                            "m",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                1,
                 Some(
-                    "m",
+                    (
+                        Some(
+                            "m",
+                        ),
+                        "title",
+                    ),
                 ),
-                "title",
             ),
             Field(
+                7,
                 Some(
-                    "g",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                8,
                 Some(
-                    "g",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
             Field(
+                9,
                 Some(
-                    "c",
+                    (
+                        Some(
+                            "c",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                10,
                 Some(
-                    "c",
+                    (
+                        Some(
+                            "c",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
         ],
     },

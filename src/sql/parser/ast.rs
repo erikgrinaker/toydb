@@ -1,6 +1,8 @@
 use super::super::types::DataType;
+use crate::error::Result;
 
 use std::collections::BTreeMap;
+use std::mem::replace;
 
 /// Statements
 #[derive(Clone, Debug, PartialEq)]
@@ -114,6 +116,7 @@ pub enum Order {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     Field(Option<String>, String),
+    Column(usize), // only used during plan building to break off expression subtrees
     Literal(Literal),
     Function(String, Expressions),
     Operation(Operation),
@@ -173,4 +176,108 @@ pub enum Operation {
 
     // String operators
     Like(Box<Expression>, Box<Expression>),
+}
+
+impl Expression {
+    /// Walks the expression tree while calling a closure. Returns true as soon as the closure
+    /// returns true. This is the inverse of walk().
+    pub fn contains<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
+        !self.walk(&|e| !visitor(e))
+    }
+
+    /// Replaces the expression with result of the closure. Mosty helper function for transform().
+    pub fn replace_with<F: FnMut(Self) -> Result<Self>>(&mut self, mut f: F) -> Result<()> {
+        // Temporarily replace expression with a null value, in case closure panics. May consider
+        // replace_with crate if this hampers performance.
+        let expr = replace(self, Expression::Literal(Literal::Null));
+        replace(self, f(expr)?);
+        Ok(())
+    }
+
+    /// Transforms the expression tree by applying a closure before and after descending.
+    pub fn transform<B, A>(mut self, before: &mut B, after: &mut A) -> Result<Self>
+    where
+        B: FnMut(Self) -> Result<Self>,
+        A: FnMut(Self) -> Result<Self>,
+    {
+        use Operation::*;
+        self = before(self)?;
+        match &mut self {
+            Self::Operation(Add(lhs, rhs))
+            | Self::Operation(And(lhs, rhs))
+            | Self::Operation(Divide(lhs, rhs))
+            | Self::Operation(Equal(lhs, rhs))
+            | Self::Operation(Exponentiate(lhs, rhs))
+            | Self::Operation(GreaterThan(lhs, rhs))
+            | Self::Operation(GreaterThanOrEqual(lhs, rhs))
+            | Self::Operation(LessThan(lhs, rhs))
+            | Self::Operation(LessThanOrEqual(lhs, rhs))
+            | Self::Operation(Like(lhs, rhs))
+            | Self::Operation(Modulo(lhs, rhs))
+            | Self::Operation(Multiply(lhs, rhs))
+            | Self::Operation(NotEqual(lhs, rhs))
+            | Self::Operation(Or(lhs, rhs))
+            | Self::Operation(Subtract(lhs, rhs)) => {
+                Self::replace_with(lhs, |e| e.transform(before, after))?;
+                Self::replace_with(rhs, |e| e.transform(before, after))?;
+            }
+
+            Self::Operation(Assert(expr))
+            | Self::Operation(Factorial(expr))
+            | Self::Operation(IsNull(expr))
+            | Self::Operation(Negate(expr))
+            | Self::Operation(Not(expr)) => {
+                Self::replace_with(expr, |e| e.transform(before, after))?
+            }
+
+            Self::Function(_, exprs) => {
+                for expr in exprs {
+                    Self::replace_with(expr, |e| e.transform(before, after))?;
+                }
+            }
+
+            Self::Literal(_) | Self::Field(_, _) | Self::Column(_) => {}
+        };
+        after(self)
+    }
+
+    /// Walks the expression tree, calling a closure for every node. Halts if closure returns false.
+    pub fn walk<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
+        use Operation::*;
+        visitor(self)
+            && match self {
+                Self::Operation(Add(lhs, rhs))
+                | Self::Operation(And(lhs, rhs))
+                | Self::Operation(Divide(lhs, rhs))
+                | Self::Operation(Equal(lhs, rhs))
+                | Self::Operation(Exponentiate(lhs, rhs))
+                | Self::Operation(GreaterThan(lhs, rhs))
+                | Self::Operation(GreaterThanOrEqual(lhs, rhs))
+                | Self::Operation(LessThan(lhs, rhs))
+                | Self::Operation(LessThanOrEqual(lhs, rhs))
+                | Self::Operation(Like(lhs, rhs))
+                | Self::Operation(Modulo(lhs, rhs))
+                | Self::Operation(Multiply(lhs, rhs))
+                | Self::Operation(NotEqual(lhs, rhs))
+                | Self::Operation(Or(lhs, rhs))
+                | Self::Operation(Subtract(lhs, rhs)) => lhs.walk(visitor) && rhs.walk(visitor),
+
+                Self::Operation(Assert(expr))
+                | Self::Operation(Factorial(expr))
+                | Self::Operation(IsNull(expr))
+                | Self::Operation(Negate(expr))
+                | Self::Operation(Not(expr)) => expr.walk(visitor),
+
+                Self::Function(_, exprs) => {
+                    for expr in exprs {
+                        if !expr.walk(visitor) {
+                            return false;
+                        }
+                    }
+                    true
+                }
+
+                Self::Literal(_) | Self::Field(_, _) | Self::Column(_) => true,
+            }
+    }
 }

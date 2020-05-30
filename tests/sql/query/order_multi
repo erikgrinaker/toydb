@@ -42,21 +42,31 @@ Plan: Plan(
     Order {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         orders: [
             (
                 Field(
-                    None,
-                    "ultrahd",
+                    6,
+                    Some(
+                        (
+                            None,
+                            "ultrahd",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Descending,
             ),
@@ -68,21 +78,31 @@ Optimized plan: Plan(
     Order {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         orders: [
             (
                 Field(
-                    None,
-                    "ultrahd",
+                    6,
+                    Some(
+                        (
+                            None,
+                            "ultrahd",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Descending,
             ),

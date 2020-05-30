@@ -97,96 +97,18 @@ Plan: Plan(
                 source: Filter {
                     source: Scan {
                         table: "floats",
-                        alias: None,
+                        label: "floats",
                         filter: None,
                     },
                     predicate: Not(
                         IsNull(
                             Field(
-                                None,
-                                "f",
-                            ),
-                        ),
-                    ),
-                },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
-                expressions: [
-                    Field(
-                        None,
-                        "f",
-                    ),
-                    Field(
-                        None,
-                        "f",
-                    ),
-                    Field(
-                        None,
-                        "f",
-                    ),
-                    Field(
-                        None,
-                        "f",
-                    ),
-                    Field(
-                        None,
-                        "f",
-                    ),
-                ],
-            },
-            aggregates: [
-                Min,
-                Max,
-                Sum,
-                Count,
-                Average,
-            ],
-        },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
-        expressions: [
-            Column(
-                0,
-            ),
-            Column(
-                1,
-            ),
-            Column(
-                2,
-            ),
-            Column(
-                3,
-            ),
-            Column(
-                4,
-            ),
-        ],
-    },
-)
-
-Optimized plan: Plan(
-    Projection {
-        source: Aggregation {
-            source: Projection {
-                source: Scan {
-                    table: "floats",
-                    alias: None,
-                    filter: Some(
-                        Not(
-                            IsNull(
-                                Field(
-                                    None,
-                                    "f",
+                                1,
+                                Some(
+                                    (
+                                        None,
+                                        "f",
+                                    ),
                                 ),
                             ),
                         ),
@@ -201,24 +123,49 @@ Optimized plan: Plan(
                 ],
                 expressions: [
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "f",
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
                     ),
                 ],
             },
@@ -238,20 +185,143 @@ Optimized plan: Plan(
             None,
         ],
         expressions: [
-            Column(
+            Field(
                 0,
+                None,
             ),
-            Column(
+            Field(
                 1,
+                None,
             ),
-            Column(
+            Field(
                 2,
+                None,
             ),
-            Column(
+            Field(
                 3,
+                None,
             ),
-            Column(
+            Field(
                 4,
+                None,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Projection {
+        source: Aggregation {
+            source: Projection {
+                source: Scan {
+                    table: "floats",
+                    label: "floats",
+                    filter: Some(
+                        Not(
+                            IsNull(
+                                Field(
+                                    1,
+                                    Some(
+                                        (
+                                            None,
+                                            "f",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "f",
+                            ),
+                        ),
+                    ),
+                ],
+            },
+            aggregates: [
+                Min,
+                Max,
+                Sum,
+                Count,
+                Average,
+            ],
+        },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        expressions: [
+            Field(
+                0,
+                None,
+            ),
+            Field(
+                1,
+                None,
+            ),
+            Field(
+                2,
+                None,
+            ),
+            Field(
+                3,
+                None,
+            ),
+            Field(
+                4,
+                None,
             ),
         ],
     },

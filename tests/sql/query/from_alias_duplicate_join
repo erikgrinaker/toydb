@@ -1,0 +1,44 @@
+Query: SELECT * FROM movies a JOIN genres a ON TRUE
+
+AST: Select {
+    select: SelectClause {
+        expressions: [],
+        labels: [],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Join {
+                    left: Table {
+                        name: "movies",
+                        alias: Some(
+                            "a",
+                        ),
+                    },
+                    right: Table {
+                        name: "genres",
+                        alias: Some(
+                            "a",
+                        ),
+                    },
+                    type: Inner,
+                    predicate: Some(
+                        Literal(
+                            Boolean(
+                                true,
+                            ),
+                        ),
+                    ),
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: None,
+    order: [],
+    limit: None,
+    offset: None,
+}
+
+Plan: Value("Duplicate table name a")

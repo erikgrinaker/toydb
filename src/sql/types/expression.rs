@@ -1,17 +1,16 @@
-use super::Value;
+use super::{Row, Value};
 use crate::error::{Error, Result};
 
 use regex::Regex;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::mem::replace;
 
 /// An expression, made up of constants and operations
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expression {
     // Values
     Constant(Value),
-    Field(Option<String>, String),
-    Column(usize),
+    Field(usize, Option<(Option<String>, String)>),
 
     // Logical operations
     And(Box<Expression>, Box<Expression>),
@@ -44,16 +43,15 @@ pub type Expressions = Vec<Expression>;
 
 impl Expression {
     /// Evaluates an expression to a value, given an environment
-    pub fn evaluate(&self, env: &Environment) -> Result<Value> {
+    pub fn evaluate(&self, row: Option<&Row>) -> Result<Value> {
         use Value::*;
         Ok(match self {
             // Constant values
             Self::Constant(c) => c.clone(),
-            Self::Field(r, f) => env.lookup_field(r.as_deref(), f)?,
-            Self::Column(i) => env.lookup_index(*i)?,
+            Self::Field(i, _) => row.and_then(|row| row.get(*i).cloned()).unwrap_or(Null),
 
             // Logical operations
-            Self::And(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::And(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs && rhs),
                 (Boolean(lhs), Null) if !lhs => Boolean(false),
                 (Boolean(_), Null) => Null,
@@ -62,12 +60,12 @@ impl Expression {
                 (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't and {} and {}", lhs, rhs))),
             },
-            Self::Not(expr) => match expr.evaluate(env)? {
+            Self::Not(expr) => match expr.evaluate(row)? {
                 Boolean(b) => Boolean(!b),
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
             },
-            Self::Or(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Or(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
                 (Boolean(lhs), Null) if lhs => Boolean(true),
                 (Boolean(_), Null) => Null,
@@ -79,7 +77,7 @@ impl Expression {
 
             // Comparison operations
             #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
-            Self::Equal(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Equal(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Float(rhs)) => Boolean(lhs as f64 == rhs),
@@ -91,7 +89,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            Self::GreaterThan(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::GreaterThan(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs > rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs > rhs),
@@ -104,7 +102,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            Self::LessThan(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::LessThan(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs < rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs < rhs),
@@ -117,13 +115,13 @@ impl Expression {
                     return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
                 }
             },
-            Self::IsNull(expr) => match expr.evaluate(env)? {
+            Self::IsNull(expr) => match expr.evaluate(row)? {
                 Null => Boolean(true),
                 _ => Boolean(false),
             },
 
             // Mathematical operations
-            Self::Add(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Add(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(
                     lhs.checked_add(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
                 ),
@@ -137,13 +135,13 @@ impl Expression {
                 (Null, Null) => Null,
                 (lhs, rhs) => return Err(Error::Value(format!("Can't add {} and {}", lhs, rhs))),
             },
-            Self::Assert(expr) => match expr.evaluate(env)? {
+            Self::Assert(expr) => match expr.evaluate(row)? {
                 Float(f) => Float(f),
                 Integer(i) => Integer(i),
                 Null => Null,
                 expr => return Err(Error::Value(format!("Can't take the positive of {}", expr))),
             },
-            Self::Divide(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Divide(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(_), Integer(rhs)) if rhs == 0 => {
                     return Err(Error::Value("Can't divide by zero".into()))
                 }
@@ -160,7 +158,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't divide {} and {}", lhs, rhs)))
                 }
             },
-            Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(lhs), Integer(rhs)) if rhs >= 0 => Integer(
                     lhs.checked_pow(rhs as u32)
                         .ok_or_else(|| Error::Value("Integer overflow".into()))?,
@@ -178,7 +176,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't exponentiate {} and {}", lhs, rhs)))
                 }
             },
-            Self::Factorial(expr) => match expr.evaluate(env)? {
+            Self::Factorial(expr) => match expr.evaluate(row)? {
                 Integer(i) if i < 0 => {
                     return Err(Error::Value("Can't take factorial of negative number".into()))
                 }
@@ -186,7 +184,7 @@ impl Expression {
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't take factorial of {}", value))),
             },
-            Self::Modulo(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Modulo(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 // This uses remainder semantics, like Postgres.
                 (Integer(_), Integer(rhs)) if rhs == 0 => {
                     return Err(Error::Value("Can't divide by zero".into()))
@@ -204,7 +202,7 @@ impl Expression {
                     return Err(Error::Value(format!("Can't take modulo of {} and {}", lhs, rhs)))
                 }
             },
-            Self::Multiply(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Multiply(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(
                     lhs.checked_mul(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
                 ),
@@ -220,13 +218,13 @@ impl Expression {
                     return Err(Error::Value(format!("Can't multiply {} and {}", lhs, rhs)))
                 }
             },
-            Self::Negate(expr) => match expr.evaluate(env)? {
+            Self::Negate(expr) => match expr.evaluate(row)? {
                 Integer(i) => Integer(-i),
                 Float(f) => Float(-f),
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't negate {}", value))),
             },
-            Self::Subtract(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Subtract(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(lhs), Integer(rhs)) => Integer(
                     lhs.checked_sub(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
                 ),
@@ -244,7 +242,7 @@ impl Expression {
             },
 
             // String operations
-            Self::Like(lhs, rhs) => match (lhs.evaluate(env)?, rhs.evaluate(env)?) {
+            Self::Like(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (String(lhs), String(rhs)) => Boolean(
                     Regex::new(&format!(
                         "^{}$",
@@ -263,88 +261,37 @@ impl Expression {
         })
     }
 
-    /// Checks whether the expression is constant
+    /// Walks the expression tree while calling a closure. Returns true as soon as the closure
+    /// returns true. This is the inverse of walk().
+    pub fn contains<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
+        !self.walk(&|e| !visitor(e))
+    }
+
+    /// Checks whether the expression is constant, i.e. that it does not contains field references.
     pub fn is_constant(&self) -> bool {
-        self.walk(&|expr| match expr {
-            Self::Column(_) => false,
-            Self::Field(_, _) => false,
-            _ => true,
+        !self.contains(&|expr| match expr {
+            Self::Field(_, _) => true,
+            _ => false,
         })
     }
 
-    /// Transforms the expression tree, by applying a callback function to it
-    /// before and/or after descending into it.
-    pub fn transform<B, A>(mut self, pre: &B, post: &A) -> Result<Self>
+    /// Replaces the expression with result of the closure. Helper function for transform().
+    fn replace_with<F: Fn(Self) -> Result<Self>>(&mut self, f: F) -> Result<()> {
+        // Temporarily replace expression with a null value, in case closure panics. May consider
+        // replace_with crate if this hampers performance.
+        let expr = replace(self, Expression::Constant(Value::Null));
+        replace(self, f(expr)?);
+        Ok(())
+    }
+
+    /// Transforms the expression tree by applying a closure before and after descending.
+    pub fn transform<B, A>(mut self, before: &B, after: &A) -> Result<Self>
     where
         B: Fn(Self) -> Result<Self>,
         A: Fn(Self) -> Result<Self>,
     {
-        self = pre(self)?;
-        // FIXME Ugly having to explicitly reconstruct each variant, but unable to
-        // find a way to dynamically construct or update without changing signatures
-        // to use mutable references over ownership.
-        self = match self {
-            // Constants
-            node @ Self::Constant(_) | node @ Self::Field(_, _) | node @ Self::Column(_) => node,
-
-            // Logical operations
-            Self::And(lhs, rhs) => {
-                Self::And(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::Not(expr) => Self::Not(expr.transform(pre, post)?.into()),
-            Self::Or(lhs, rhs) => {
-                Self::Or(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-
-            // Comparisons
-            Self::Equal(lhs, rhs) => {
-                Self::Equal(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::GreaterThan(lhs, rhs) => Self::GreaterThan(
-                lhs.transform(pre, post)?.into(),
-                rhs.transform(pre, post)?.into(),
-            ),
-            Self::LessThan(lhs, rhs) => {
-                Self::LessThan(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::IsNull(expr) => Self::IsNull(expr.transform(pre, post)?.into()),
-
-            // Mathematical operations
-            Self::Add(lhs, rhs) => {
-                Self::Add(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::Assert(expr) => Self::Assert(expr.transform(pre, post)?.into()),
-            Self::Divide(lhs, rhs) => {
-                Self::Divide(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::Exponentiate(lhs, rhs) => Self::Exponentiate(
-                lhs.transform(pre, post)?.into(),
-                rhs.transform(pre, post)?.into(),
-            ),
-            Self::Factorial(expr) => Self::Factorial(expr.transform(pre, post)?.into()),
-            Self::Modulo(lhs, rhs) => {
-                Self::Modulo(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::Multiply(lhs, rhs) => {
-                Self::Multiply(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-            Self::Negate(expr) => Self::Negate(expr.transform(pre, post)?.into()),
-            Self::Subtract(lhs, rhs) => {
-                Self::Subtract(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-
-            // String operations
-            Self::Like(lhs, rhs) => {
-                Self::Like(lhs.transform(pre, post)?.into(), rhs.transform(pre, post)?.into())
-            }
-        };
-        post(self)
-    }
-
-    /// Walks the expression tree depth-first, calling a closure for every element.
-    /// If the closure returns false, walking is halted.
-    pub fn walk<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
-        if match self {
+        self = before(self)?;
+        match &mut self {
             Self::Add(lhs, rhs)
             | Self::And(lhs, rhs)
             | Self::Divide(lhs, rhs)
@@ -356,83 +303,46 @@ impl Expression {
             | Self::Modulo(lhs, rhs)
             | Self::Multiply(lhs, rhs)
             | Self::Or(lhs, rhs)
-            | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
+            | Self::Subtract(lhs, rhs) => {
+                Self::replace_with(lhs, |e| e.transform(before, after))?;
+                Self::replace_with(rhs, |e| e.transform(before, after))?;
+            }
 
             Self::Assert(expr)
             | Self::Factorial(expr)
             | Self::IsNull(expr)
             | Self::Negate(expr)
-            | Self::Not(expr) => expr.walk(visitor),
+            | Self::Not(expr) => Self::replace_with(expr, |e| e.transform(before, after))?,
 
-            Self::Constant(_) | Self::Field(_, _) | Self::Column(_) => true,
-        } {
-            visitor(self)
-        } else {
-            false
-        }
-    }
-}
-
-/// An expression evaluation environment
-pub struct Environment<'a> {
-    // For lookups by index (i.e. column number)
-    index: Vec<&'a Value>,
-    // For qualified lookups, with both relation and field name
-    qualified: HashMap<(&'a str, &'a str), &'a Value>,
-    // For unqualified lookups. Multiple fields with same unqualified name are ambiguous.
-    unqualified: HashMap<&'a str, &'a Value>,
-    ambiguous: HashSet<&'a str>,
-}
-
-impl<'a> Environment<'a> {
-    /// Creates a new environment
-    pub fn new() -> Self {
-        Self {
-            index: Vec::new(),
-            qualified: HashMap::new(),
-            unqualified: HashMap::new(),
-            ambiguous: HashSet::new(),
-        }
+            Self::Constant(_) | Self::Field(_, _) => {}
+        };
+        after(self)
     }
 
-    /// Appends a value to the environment
-    pub fn append(&mut self, relation: Option<&'a str>, field: Option<&'a str>, value: &'a Value) {
-        self.index.push(value);
-        if let Some(field) = field {
-            if self.unqualified.contains_key(field) {
-                self.unqualified.remove(field);
-                self.ambiguous.insert(field);
-            } else {
-                self.unqualified.insert(field, value);
+    /// Walks the expression tree, calling a closure for every node. Halts if closure returns false.
+    pub fn walk<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
+        visitor(self)
+            && match self {
+                Self::Add(lhs, rhs)
+                | Self::And(lhs, rhs)
+                | Self::Divide(lhs, rhs)
+                | Self::Equal(lhs, rhs)
+                | Self::Exponentiate(lhs, rhs)
+                | Self::GreaterThan(lhs, rhs)
+                | Self::LessThan(lhs, rhs)
+                | Self::Like(lhs, rhs)
+                | Self::Modulo(lhs, rhs)
+                | Self::Multiply(lhs, rhs)
+                | Self::Or(lhs, rhs)
+                | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
+
+                Self::Assert(expr)
+                | Self::Factorial(expr)
+                | Self::IsNull(expr)
+                | Self::Negate(expr)
+                | Self::Not(expr) => expr.walk(visitor),
+
+                Self::Constant(_) | Self::Field(_, _) => true,
             }
-        }
-        if let (Some(relation), Some(field)) = (relation, field) {
-            self.qualified.insert((relation, field), value);
-        }
-    }
-
-    /// Looks up a value by field
-    pub fn lookup_field(&self, relation: Option<&'a str>, field: &'a str) -> Result<Value> {
-        if let Some(relation) = relation {
-            match self.qualified.get(&(relation, field)) {
-                Some(r) => Ok((*r).clone()),
-                None => Err(Error::Value(format!("Unknown field {}.{}", relation, field))),
-            }
-        } else if self.ambiguous.contains(field) {
-            Err(Error::Value(format!("Ambiguous field {}", field)))
-        } else {
-            match self.unqualified.get(field) {
-                Some(r) => Ok((*r).clone()),
-                None => Err(Error::Value(format!("Unknown field {}", field))),
-            }
-        }
-    }
-
-    /// Looks up a value by index
-    pub fn lookup_index(&self, index: usize) -> Result<Value> {
-        match self.index.get(index) {
-            Some(r) => Ok((*r).clone()),
-            None => Err(Error::Value(format!("Index {} out of bounds", index))),
-        }
     }
 }

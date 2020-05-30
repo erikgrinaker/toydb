@@ -65,7 +65,7 @@ Plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 labels: [
@@ -74,19 +74,34 @@ Plan: Plan(
                 ],
                 expressions: [
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "rating",
+                        5,
+                        Some(
+                            (
+                                None,
+                                "rating",
+                            ),
+                        ),
                     ),
                 ],
             },
             predicate: GreaterThan(
                 Field(
-                    None,
-                    "rating",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Constant(
                     Integer(
@@ -98,8 +113,13 @@ Plan: Plan(
         orders: [
             (
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -113,7 +133,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 labels: [
@@ -122,19 +142,34 @@ Optimized plan: Plan(
                 ],
                 expressions: [
                     Field(
-                        None,
-                        "id",
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
                     ),
                     Field(
-                        None,
-                        "rating",
+                        5,
+                        Some(
+                            (
+                                None,
+                                "rating",
+                            ),
+                        ),
                     ),
                 ],
             },
             predicate: GreaterThan(
                 Field(
-                    None,
-                    "rating",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Constant(
                     Integer(
@@ -146,8 +181,13 @@ Optimized plan: Plan(
         orders: [
             (
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),

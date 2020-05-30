@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
-use super::super::types::{Column, Expression, Expressions, Relation};
-use super::{Context, Executor, ResultColumns, ResultSet};
+use super::super::types::{Column, Expression, Expressions};
+use super::{Context, Executor, ResultSet};
 use crate::error::{Error, Result};
 
 /// A filter executor
@@ -26,43 +26,32 @@ impl<T: Transaction> Projection<T> {
 impl<T: Transaction> Executor<T> for Projection<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
         match self.source.execute(ctx)? {
-            ResultSet::Query { relation } => {
+            ResultSet::Query { columns, rows } => {
                 let labels = self.labels;
-                let columns = ResultColumns::from_new_columns(relation.columns);
-                let mut projection = Relation {
-                    columns: self
-                        .expressions
-                        .iter()
-                        .enumerate()
-                        .map(|(i, e)| {
-                            Ok(if let Some(Some(label)) = labels.get(i) {
-                                Column { relation: None, name: Some(label.clone()) }
-                            } else if let Expression::Field(relation, field) = e {
-                                let (r, f) = columns.get(relation.as_deref(), field)?;
-                                Column { relation: r, name: Some(f) }
-                            } else if let Expression::Column(i) = e {
-                                let (r, f) = columns.columns[*i].clone(); // FIXME Should have method for this
-                                Column { relation: r, name: f }
-                            } else {
-                                Column { relation: None, name: None }
-                            })
+                let columns = self
+                    .expressions
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| {
+                        Ok(if let Some(Some(label)) = labels.get(i) {
+                            Column { table: None, name: Some(label.clone()) }
+                        } else if let Expression::Field(i, _) = e {
+                            columns[*i].clone()
+                        } else {
+                            Column { table: None, name: None }
                         })
-                        .collect::<Result<Vec<_>>>()?,
-                    rows: None,
-                };
-                if let Some(rows) = relation.rows {
-                    let expressions = self.expressions;
-                    projection.rows = Some(Box::new(rows.map(move |r| {
-                        r.and_then(|row| {
-                            let env = columns.as_env(&row);
-                            Ok(expressions
-                                .iter()
-                                .map(|e| e.evaluate(&env))
-                                .collect::<Result<_>>()?)
-                        })
-                    })));
-                }
-                Ok(ResultSet::Query { relation: projection })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let expressions = self.expressions;
+                let rows = Box::new(rows.map(move |r| {
+                    r.and_then(|row| {
+                        Ok(expressions
+                            .iter()
+                            .map(|e| e.evaluate(Some(&row)))
+                            .collect::<Result<_>>()?)
+                    })
+                }));
+                Ok(ResultSet::Query { columns, rows })
             }
             r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
         }

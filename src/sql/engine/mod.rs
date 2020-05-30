@@ -112,21 +112,24 @@ impl<E: Engine + 'static> Session<E> {
                 Ok(result)
             }
             ast::Statement::Explain(statement) => self.with_txn(Mode::ReadOnly, |txn| {
-                Ok(ResultSet::Explain(Plan::build(*statement)?.optimize(txn)?.0))
+                Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?.0))
             }),
-            statement if self.txn.is_some() => Plan::build(statement)?
+            statement if self.txn.is_some() => Plan::build(statement, self.txn.as_mut().unwrap())?
                 .optimize(self.txn.as_mut().unwrap())?
                 .execute(Context { txn: self.txn.as_mut().unwrap() }),
             statement @ ast::Statement::Select { .. } => {
                 let mut txn = self.engine.begin(Mode::ReadOnly)?;
-                let result =
-                    Plan::build(statement)?.optimize(&mut txn)?.execute(Context { txn: &mut txn });
+                let result = Plan::build(statement, &mut txn)?
+                    .optimize(&mut txn)?
+                    .execute(Context { txn: &mut txn });
                 txn.rollback()?;
                 result
             }
             statement => {
                 let mut txn = self.engine.begin(Mode::ReadWrite)?;
-                match Plan::build(statement)?.optimize(&mut txn)?.execute(Context { txn: &mut txn })
+                match Plan::build(statement, &mut txn)?
+                    .optimize(&mut txn)?
+                    .execute(Context { txn: &mut txn })
                 {
                     Ok(result) => {
                         txn.commit()?;

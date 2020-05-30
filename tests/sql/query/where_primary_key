@@ -43,13 +43,18 @@ Plan: Plan(
     Filter {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         predicate: Equal(
             Field(
-                None,
-                "id",
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
+                    ),
+                ),
             ),
             Constant(
                 Integer(

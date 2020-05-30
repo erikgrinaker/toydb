@@ -1,6 +1,6 @@
 use super::engine::Transaction;
 use super::parser::format_ident;
-use super::types::{DataType, Environment, Row, Value};
+use super::types::{DataType, Row, Value};
 use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
@@ -170,16 +170,6 @@ impl Table {
             }
         }
         Ok(row)
-    }
-
-    /// Creates an expression environment for a row in a table
-    #[allow(clippy::ptr_arg)]
-    pub fn row_env<'a>(&'a self, row: &'a Row) -> Environment<'a> {
-        let mut env = Environment::new();
-        for (c, v) in self.columns.iter().zip(row.iter().chain(std::iter::repeat(&Value::Null))) {
-            env.append(Some(&self.name), Some(&c.name), v)
-        }
-        env
     }
 
     /// Sets a named row field to a value

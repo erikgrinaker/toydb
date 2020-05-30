@@ -69,7 +69,7 @@ Plan: Plan(
     Projection {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         labels: [
@@ -105,8 +105,13 @@ Plan: Plan(
                     ),
                 ),
                 Field(
-                    None,
-                    "released",
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
+                        ),
+                    ),
                 ),
             ),
         ],
@@ -117,7 +122,7 @@ Optimized plan: Plan(
     Projection {
         source: Scan {
             table: "movies",
-            alias: None,
+            label: "movies",
             filter: None,
         },
         labels: [
@@ -139,8 +144,13 @@ Optimized plan: Plan(
                     ),
                 ),
                 Field(
-                    None,
-                    "released",
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
+                        ),
+                    ),
                 ),
             ),
         ],

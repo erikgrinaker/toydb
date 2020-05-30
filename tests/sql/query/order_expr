@@ -78,7 +78,7 @@ Plan: Plan(
         source: Projection {
             source: Scan {
                 table: "movies",
-                alias: None,
+                label: "movies",
                 filter: None,
             },
             labels: [
@@ -91,21 +91,41 @@ Plan: Plan(
             ],
             expressions: [
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Field(
-                    None,
-                    "title",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
+                    ),
                 ),
                 Field(
-                    None,
-                    "released",
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
+                        ),
+                    ),
                 ),
                 Modulo(
                     Field(
-                        None,
-                        "released",
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(
@@ -119,8 +139,13 @@ Plan: Plan(
             (
                 Modulo(
                     Field(
-                        None,
-                        "released",
+                        2,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(
@@ -139,7 +164,7 @@ Optimized plan: Plan(
         source: Projection {
             source: Scan {
                 table: "movies",
-                alias: None,
+                label: "movies",
                 filter: None,
             },
             labels: [
@@ -152,21 +177,41 @@ Optimized plan: Plan(
             ],
             expressions: [
                 Field(
-                    None,
-                    "id",
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
                 ),
                 Field(
-                    None,
-                    "title",
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
+                    ),
                 ),
                 Field(
-                    None,
-                    "released",
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
+                        ),
+                    ),
                 ),
                 Modulo(
                     Field(
-                        None,
-                        "released",
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(
@@ -180,8 +225,13 @@ Optimized plan: Plan(
             (
                 Modulo(
                     Field(
-                        None,
-                        "released",
+                        2,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(

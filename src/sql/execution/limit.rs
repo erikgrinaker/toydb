@@ -18,13 +18,10 @@ impl<T: Transaction> Limit<T> {
 
 impl<T: Transaction> Executor<T> for Limit<T> {
     fn execute(self: Box<Self>, ctx: &mut Context<T>) -> Result<ResultSet> {
-        let result = self.source.execute(ctx)?;
-        if let ResultSet::Query { mut relation } = result {
-            if let Some(rows) = relation.rows {
-                relation.rows = Some(Box::new(rows.take(self.limit as usize)))
-            }
-            return Ok(ResultSet::Query { relation });
+        if let ResultSet::Query { columns, rows } = self.source.execute(ctx)? {
+            Ok(ResultSet::Query { columns, rows: Box::new(rows.take(self.limit as usize)) })
+        } else {
+            Err(Error::Internal("Unexpected result".into()))
         }
-        Err(Error::Internal("Unexpected result".into()))
     }
 }

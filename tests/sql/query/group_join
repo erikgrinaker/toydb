@@ -101,31 +101,37 @@ Plan: Plan(
                     source: NestedLoopJoin {
                         outer: Scan {
                             table: "movies",
-                            alias: Some(
-                                "m",
-                            ),
+                            label: "m",
                             filter: None,
                         },
                         inner: Scan {
                             table: "studios",
-                            alias: Some(
-                                "s",
-                            ),
+                            label: "s",
                             filter: None,
                         },
                         predicate: Some(
                             Equal(
                                 Field(
+                                    2,
                                     Some(
-                                        "m",
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "studio_id",
+                                        ),
                                     ),
-                                    "studio_id",
                                 ),
                                 Field(
+                                    7,
                                     Some(
-                                        "s",
+                                        (
+                                            Some(
+                                                "s",
+                                            ),
+                                            "id",
+                                        ),
                                     ),
-                                    "id",
                                 ),
                             ),
                         ),
@@ -143,10 +149,15 @@ Plan: Plan(
                             ),
                         ),
                         Field(
+                            8,
                             Some(
-                                "s",
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "name",
+                                ),
                             ),
-                            "name",
                         ),
                     ],
                 },
@@ -159,21 +170,28 @@ Plan: Plan(
                 None,
             ],
             expressions: [
-                Column(
+                Field(
                     1,
+                    None,
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
+                    0,
                     Some(
-                        "s",
+                        (
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
                     ),
-                    "name",
                 ),
                 Ascending,
             ),
@@ -189,31 +207,37 @@ Optimized plan: Plan(
                     source: NestedLoopJoin {
                         outer: Scan {
                             table: "movies",
-                            alias: Some(
-                                "m",
-                            ),
+                            label: "m",
                             filter: None,
                         },
                         inner: Scan {
                             table: "studios",
-                            alias: Some(
-                                "s",
-                            ),
+                            label: "s",
                             filter: None,
                         },
                         predicate: Some(
                             Equal(
                                 Field(
+                                    2,
                                     Some(
-                                        "m",
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "studio_id",
+                                        ),
                                     ),
-                                    "studio_id",
                                 ),
                                 Field(
+                                    7,
                                     Some(
-                                        "s",
+                                        (
+                                            Some(
+                                                "s",
+                                            ),
+                                            "id",
+                                        ),
                                     ),
-                                    "id",
                                 ),
                             ),
                         ),
@@ -231,10 +255,15 @@ Optimized plan: Plan(
                             ),
                         ),
                         Field(
+                            8,
                             Some(
-                                "s",
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "name",
+                                ),
                             ),
-                            "name",
                         ),
                     ],
                 },
@@ -247,21 +276,28 @@ Optimized plan: Plan(
                 None,
             ],
             expressions: [
-                Column(
+                Field(
                     1,
+                    None,
                 ),
-                Column(
+                Field(
                     0,
+                    None,
                 ),
             ],
         },
         orders: [
             (
                 Field(
+                    0,
                     Some(
-                        "s",
+                        (
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
                     ),
-                    "name",
                 ),
                 Ascending,
             ),

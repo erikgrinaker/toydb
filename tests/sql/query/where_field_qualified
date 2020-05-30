@@ -86,12 +86,12 @@ Plan: Plan(
             source: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 inner: Scan {
                     table: "genres",
-                    alias: None,
+                    label: "genres",
                     filter: None,
                 },
                 predicate: None,
@@ -102,10 +102,15 @@ Plan: Plan(
                 Or(
                     GreaterThan(
                         Field(
+                            0,
                             Some(
-                                "movies",
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                         Constant(
                             Integer(
@@ -115,10 +120,15 @@ Plan: Plan(
                     ),
                     Equal(
                         Field(
+                            0,
                             Some(
-                                "movies",
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                         Constant(
                             Integer(
@@ -129,10 +139,15 @@ Plan: Plan(
                 ),
                 Equal(
                     Field(
+                        7,
                         Some(
-                            "genres",
+                            (
+                                Some(
+                                    "genres",
+                                ),
+                                "id",
+                            ),
                         ),
-                        "id",
                     ),
                     Constant(
                         Integer(
@@ -148,16 +163,26 @@ Plan: Plan(
         ],
         expressions: [
             Field(
+                0,
                 Some(
-                    "movies",
+                    (
+                        Some(
+                            "movies",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                7,
                 Some(
-                    "genres",
+                    (
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
         ],
     },
@@ -168,12 +193,12 @@ Optimized plan: Plan(
         source: NestedLoopJoin {
             outer: Scan {
                 table: "movies",
-                alias: None,
+                label: "movies",
                 filter: None,
             },
             inner: Scan {
                 table: "genres",
-                alias: None,
+                label: "genres",
                 filter: None,
             },
             predicate: Some(
@@ -181,10 +206,15 @@ Optimized plan: Plan(
                     Or(
                         GreaterThan(
                             Field(
+                                0,
                                 Some(
-                                    "movies",
+                                    (
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
-                                "id",
                             ),
                             Constant(
                                 Integer(
@@ -194,10 +224,15 @@ Optimized plan: Plan(
                         ),
                         Equal(
                             Field(
+                                0,
                                 Some(
-                                    "movies",
+                                    (
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
-                                "id",
                             ),
                             Constant(
                                 Integer(
@@ -208,10 +243,15 @@ Optimized plan: Plan(
                     ),
                     Equal(
                         Field(
+                            7,
                             Some(
-                                "genres",
+                                (
+                                    Some(
+                                        "genres",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                         Constant(
                             Integer(
@@ -230,16 +270,26 @@ Optimized plan: Plan(
         ],
         expressions: [
             Field(
+                0,
                 Some(
-                    "movies",
+                    (
+                        Some(
+                            "movies",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
             Field(
+                7,
                 Some(
-                    "genres",
+                    (
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
                 ),
-                "id",
             ),
         ],
     },

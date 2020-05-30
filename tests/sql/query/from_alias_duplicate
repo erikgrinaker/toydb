@@ -1,4 +1,4 @@
-Query: SELECT * FROM movies ORDER BY unknown
+Query: SELECT * FROM movies a, genres a
 
 AST: Select {
     select: SelectClause {
@@ -10,7 +10,15 @@ AST: Select {
             items: [
                 Table {
                     name: "movies",
-                    alias: None,
+                    alias: Some(
+                        "a",
+                    ),
+                },
+                Table {
+                    name: "genres",
+                    alias: Some(
+                        "a",
+                    ),
                 },
             ],
         },
@@ -18,17 +26,9 @@ AST: Select {
     where: None,
     group_by: None,
     having: None,
-    order: [
-        (
-            Field(
-                None,
-                "unknown",
-            ),
-            Ascending,
-        ),
-    ],
+    order: [],
     limit: None,
     offset: None,
 }
 
-Plan: Value("Unknown field unknown")
+Plan: Value("Duplicate table name a")

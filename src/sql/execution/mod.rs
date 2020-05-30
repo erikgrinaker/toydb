@@ -34,10 +34,10 @@ use update::Update;
 
 use super::engine::{Mode, Transaction};
 use super::plan::Node;
-use super::types::Environment;
-use super::types::{Columns, Relation, Row, Value};
+use super::types::{Columns, Row, Rows, Value};
 use crate::error::{Error, Result};
 
+use derivative::Derivative;
 use serde_derive::{Deserialize, Serialize};
 
 /// A plan executor
@@ -74,7 +74,7 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Projection { source, labels, expressions } => {
                 Projection::new(Self::build(*source), labels, expressions)
             }
-            Node::Scan { table, alias, filter } => Scan::new(table, alias, filter),
+            Node::Scan { table, label, filter } => Scan::new(table, label, filter),
             Node::Update { table, source, expressions } => {
                 Update::new(table, Self::build(*source), expressions)
             }
@@ -89,148 +89,71 @@ pub struct Context<'a, T: Transaction> {
 }
 
 /// An executor result set
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Derivative, Serialize, Deserialize)]
+#[derivative(Debug, PartialEq)]
 pub enum ResultSet {
     // Transaction started
-    Begin { id: u64, mode: Mode },
+    Begin {
+        id: u64,
+        mode: Mode,
+    },
     // Transaction committed
-    Commit { id: u64 },
+    Commit {
+        id: u64,
+    },
     // Transaction rolled back
-    Rollback { id: u64 },
+    Rollback {
+        id: u64,
+    },
     // Rows created
-    Create { count: u64 },
+    Create {
+        count: u64,
+    },
     // Rows deleted
-    Delete { count: u64 },
+    Delete {
+        count: u64,
+    },
     // Rows updated
-    Update { count: u64 },
+    Update {
+        count: u64,
+    },
     // Table created
-    CreateTable { name: String },
+    CreateTable {
+        name: String,
+    },
     // Table dropped
-    DropTable { name: String },
+    DropTable {
+        name: String,
+    },
     // Query result
-    Query { relation: Relation },
+    Query {
+        columns: Columns,
+        #[derivative(Debug = "ignore")]
+        #[derivative(PartialEq = "ignore")]
+        #[serde(skip, default = "ResultSet::empty_rows")]
+        rows: Rows,
+    },
     // Explain result
     Explain(Node),
 }
 
 impl ResultSet {
-    /// Converts the ResultSet into a Relation, or errors if not a query result.
-    pub fn into_relation(self) -> Result<Relation> {
-        match self {
-            ResultSet::Query { relation } => Ok(relation),
-            r => Err(Error::Value(format!("Not a query result: {:?}", r))),
-        }
+    /// Creates an empty row iteratur, for use by serde(default).
+    fn empty_rows() -> Rows {
+        Box::new(std::iter::empty())
     }
 
-    /// Converts the ResultSet into a Row, or errors if not a query result with rows.
+    /// Converts the ResultSet into a row, or errors if not a query result with rows.
     pub fn into_row(self) -> Result<Row> {
-        self.into_relation()?.into_row()?.ok_or_else(|| Error::Value("No rows returned".into()))
+        if let ResultSet::Query { mut rows, .. } = self {
+            rows.next().transpose()?.ok_or_else(|| Error::Value("No rows returned".into()))
+        } else {
+            Err(Error::Value(format!("Not a query result: {:?}", self)))
+        }
     }
 
-    /// Converts the ResultSet into a Value, if possible.
+    /// Converts the ResultSet into a value, if possible.
     pub fn into_value(self) -> Result<Value> {
-        self.into_relation()?.into_value()?.ok_or_else(|| Error::Value("No value returned".into()))
-    }
-}
-
-/// Column metadata for a result.
-/// FIXME This is outdated and should be removed.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ResultColumns {
-    columns: Vec<(Option<String>, Option<String>)>,
-}
-
-impl ResultColumns {
-    pub fn new(columns: Vec<(Option<String>, Option<String>)>) -> Self {
-        Self { columns }
-    }
-
-    pub fn from(columns: Vec<Option<String>>) -> Self {
-        Self { columns: columns.into_iter().map(|c| (None, c)).collect() }
-    }
-
-    pub fn from_new_columns(columns: Columns) -> Self {
-        Self { columns: columns.into_iter().map(|c| (c.relation, c.name)).collect() }
-    }
-
-    fn as_env<'b>(&'b self, row: &'b [Value]) -> Environment<'b> {
-        let mut env = Environment::new();
-        for ((relation, field), value) in self.columns.iter().zip(row.iter()) {
-            env.append(relation.as_deref(), field.as_deref(), value)
-        }
-        env
-    }
-
-    fn format(&self, relation: Option<&str>, field: &str) -> String {
-        let mut s = super::parser::format_ident(field);
-        if let Some(relation) = relation {
-            s = format!("{}.{}", super::parser::format_ident(relation), s)
-        }
-        s
-    }
-
-    fn get(&self, relation: Option<&str>, field: &str) -> Result<(Option<String>, String)> {
-        let matches: Vec<_> = self
-            .columns
-            .iter()
-            .filter_map(|(r, c)| {
-                if c.as_deref() == Some(field) {
-                    if relation.is_none() || r.as_deref() == relation {
-                        Some((r.clone(), c.clone().unwrap()))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect();
-        match matches.len() {
-            0 => Err(Error::Value(format!("Unknown field {}", self.format(relation, field)))),
-            1 => Ok(matches.into_iter().next().unwrap()),
-            _ => Err(Error::Value(format!("Field reference {} is ambiguous", field))),
-        }
-    }
-
-    pub fn index(&self, relation: Option<&str>, field: &str) -> Result<usize> {
-        let matches: Vec<_> = self
-            .columns
-            .iter()
-            .enumerate()
-            .filter_map(|(i, (r, c))| {
-                if c.as_deref() == Some(field) {
-                    if relation.is_none() || r.as_deref() == relation {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect();
-        match matches.len() {
-            0 => Err(Error::Value(format!("Unknown field {}", self.format(relation, field)))),
-            1 => Ok(matches.into_iter().next().unwrap()),
-            _ => Err(Error::Value(format!("Field reference {} is ambiguous", field))),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.columns.len() == 0
-    }
-
-    pub fn len(&self) -> usize {
-        self.columns.len()
-    }
-
-    pub fn merge(self, other: Self) -> Self {
-        let mut columns = self.columns;
-        columns.extend(other.columns);
-        Self::new(columns)
-    }
-
-    pub fn names(&self) -> Vec<Option<String>> {
-        self.columns.iter().map(|(_, c)| c.clone()).collect()
+        self.into_row()?.into_iter().next().ok_or_else(|| Error::Value("No value returned".into()))
     }
 }

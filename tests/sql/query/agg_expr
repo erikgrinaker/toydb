@@ -64,7 +64,7 @@ Plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 labels: [
@@ -74,8 +74,13 @@ Plan: Plan(
                 expressions: [
                     Multiply(
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -100,11 +105,13 @@ Plan: Plan(
         ],
         expressions: [
             Divide(
-                Column(
+                Field(
                     0,
+                    None,
                 ),
-                Column(
+                Field(
                     1,
+                    None,
                 ),
             ),
         ],
@@ -117,7 +124,7 @@ Optimized plan: Plan(
             source: Projection {
                 source: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 labels: [
@@ -127,8 +134,13 @@ Optimized plan: Plan(
                 expressions: [
                     Multiply(
                         Field(
-                            None,
-                            "rating",
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -153,11 +165,13 @@ Optimized plan: Plan(
         ],
         expressions: [
             Divide(
-                Column(
+                Field(
                     0,
+                    None,
                 ),
-                Column(
+                Field(
                     1,
+                    None,
                 ),
             ),
         ],

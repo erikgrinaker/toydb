@@ -7,7 +7,7 @@ use toydb::raft;
 use toydb::sql::engine::{Mode, Status};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
-use toydb::sql::types::{Column, DataType, Relation, Value};
+use toydb::sql::types::{Column, DataType, Value};
 use toydb::storage::kv;
 use toydb::Client;
 
@@ -147,13 +147,11 @@ async fn execute() -> Result<()> {
     assert_eq!(
         result,
         ResultSet::Query {
-            relation: Relation {
-                columns: vec![
-                    Column { relation: Some("genres".into()), name: Some("id".into()) },
-                    Column { relation: Some("genres".into()), name: Some("name".into()) }
-                ],
-                rows: None
-            }
+            columns: vec![
+                Column { table: Some("genres".into()), name: Some("id".into()) },
+                Column { table: Some("genres".into()), name: Some("name".into()) }
+            ],
+            rows: Box::new(std::iter::empty()),
         }
     );
     assert_rows(
@@ -169,13 +167,11 @@ async fn execute() -> Result<()> {
     assert_eq!(
         result,
         ResultSet::Query {
-            relation: Relation {
-                columns: vec![
-                    Column { relation: Some("genres".into()), name: Some("id".into()) },
-                    Column { relation: Some("genres".into()), name: Some("name".into()) }
-                ],
-                rows: None
-            }
+            columns: vec![
+                Column { table: Some("genres".into()), name: Some("id".into()) },
+                Column { table: Some("genres".into()), name: Some("name".into()) }
+            ],
+            rows: Box::new(std::iter::empty()),
         }
     );
     assert_rows(result, Vec::new());

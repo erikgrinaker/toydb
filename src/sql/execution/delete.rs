@@ -21,8 +21,8 @@ impl<T: Transaction> Executor<T> for Delete<T> {
         let table = ctx.txn.must_read_table(&self.table)?;
         let mut count = 0;
         match self.source.execute(ctx)? {
-            ResultSet::Query { mut relation } => {
-                while let Some(row) = relation.next().transpose()? {
+            ResultSet::Query { mut rows, .. } => {
+                while let Some(row) = rows.next().transpose()? {
                     ctx.txn.delete(&table.name, &table.get_row_key(&row)?)?;
                     count += 1
                 }

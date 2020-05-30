@@ -110,27 +110,37 @@ Plan: Plan(
             outer: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 inner: Scan {
                     table: "genres",
-                    alias: None,
+                    label: "genres",
                     filter: None,
                 },
                 predicate: Some(
                     Equal(
                         Field(
+                            3,
                             Some(
-                                "movies",
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "genre_id",
+                                ),
                             ),
-                            "genre_id",
                         ),
                         Field(
+                            7,
                             Some(
-                                "genres",
+                                (
+                                    Some(
+                                        "genres",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                     ),
                 ),
@@ -139,22 +149,32 @@ Plan: Plan(
             },
             inner: Scan {
                 table: "studios",
-                alias: None,
+                label: "studios",
                 filter: None,
             },
             predicate: Some(
                 Equal(
                     Field(
+                        2,
                         Some(
-                            "movies",
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
                         ),
-                        "studio_id",
                     ),
                     Field(
+                        9,
                         Some(
-                            "studios",
+                            (
+                                Some(
+                                    "studios",
+                                ),
+                                "id",
+                            ),
                         ),
-                        "id",
                     ),
                 ),
             ),
@@ -172,22 +192,37 @@ Plan: Plan(
         ],
         expressions: [
             Field(
+                1,
                 Some(
-                    "movies",
+                    (
+                        Some(
+                            "movies",
+                        ),
+                        "title",
+                    ),
                 ),
-                "title",
             ),
             Field(
+                8,
                 Some(
-                    "genres",
+                    (
+                        Some(
+                            "genres",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
             Field(
+                10,
                 Some(
-                    "studios",
+                    (
+                        Some(
+                            "studios",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
         ],
     },
@@ -199,27 +234,37 @@ Optimized plan: Plan(
             outer: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    label: "movies",
                     filter: None,
                 },
                 inner: Scan {
                     table: "genres",
-                    alias: None,
+                    label: "genres",
                     filter: None,
                 },
                 predicate: Some(
                     Equal(
                         Field(
+                            3,
                             Some(
-                                "movies",
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "genre_id",
+                                ),
                             ),
-                            "genre_id",
                         ),
                         Field(
+                            7,
                             Some(
-                                "genres",
+                                (
+                                    Some(
+                                        "genres",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "id",
                         ),
                     ),
                 ),
@@ -228,22 +273,32 @@ Optimized plan: Plan(
             },
             inner: Scan {
                 table: "studios",
-                alias: None,
+                label: "studios",
                 filter: None,
             },
             predicate: Some(
                 Equal(
                     Field(
+                        2,
                         Some(
-                            "movies",
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
                         ),
-                        "studio_id",
                     ),
                     Field(
+                        9,
                         Some(
-                            "studios",
+                            (
+                                Some(
+                                    "studios",
+                                ),
+                                "id",
+                            ),
                         ),
-                        "id",
                     ),
                 ),
             ),
@@ -261,22 +316,37 @@ Optimized plan: Plan(
         ],
         expressions: [
             Field(
+                1,
                 Some(
-                    "movies",
+                    (
+                        Some(
+                            "movies",
+                        ),
+                        "title",
+                    ),
                 ),
-                "title",
             ),
             Field(
+                8,
                 Some(
-                    "genres",
+                    (
+                        Some(
+                            "genres",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
             Field(
+                10,
                 Some(
-                    "studios",
+                    (
+                        Some(
+                            "studios",
+                        ),
+                        "name",
+                    ),
                 ),
-                "name",
             ),
         ],
     },

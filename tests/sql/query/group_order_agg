@@ -62,4 +62,4 @@ AST: Select {
     offset: None,
 }
 
-Plan: Value("Aggregate function MAX() not allowed here")
+Plan: Value("Aggregate function not allowed here")

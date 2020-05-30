@@ -19,8 +19,8 @@ pub struct Plan(pub Node);
 
 impl Plan {
     /// Builds a plan from an AST statement
-    pub fn build(statement: ast::Statement) -> Result<Self> {
-        Planner::new().build(statement)
+    pub fn build(statement: ast::Statement, catalog: &mut dyn Catalog) -> Result<Self> {
+        Planner::new(catalog).build(statement)
     }
 
     /// Executes the plan, consuming it
@@ -102,7 +102,7 @@ pub enum Node {
     },
     Scan {
         table: String,
-        alias: Option<String>,
+        label: String,
         filter: Option<Expression>,
     },
     // Uses BTreeMap for test stability
@@ -211,8 +211,8 @@ impl Node {
                     .map(|e| e.transform(pre, post))
                     .collect::<Result<_>>()?,
             },
-            Self::Scan { table, alias, filter: Some(filter) } => {
-                Self::Scan { table, alias, filter: Some(filter.transform(pre, post)?) }
+            Self::Scan { table, label, filter: Some(filter) } => {
+                Self::Scan { table, label, filter: Some(filter.transform(pre, post)?) }
             }
             Self::Update { table, source, expressions } => Self::Update {
                 table,
@@ -243,13 +243,4 @@ pub type Aggregates = Vec<Aggregate>;
 pub enum Direction {
     Ascending,
     Descending,
-}
-
-impl From<ast::Order> for Direction {
-    fn from(order: ast::Order) -> Self {
-        match order {
-            ast::Order::Ascending => Self::Ascending,
-            ast::Order::Descending => Self::Descending,
-        }
-    }
 }
