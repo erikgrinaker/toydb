@@ -3,25 +3,27 @@ Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m, genres g WHERE m
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "m",
+            (
+                Field(
+                    Some(
+                        "m",
+                    ),
+                    "id",
                 ),
-                "id",
-            ),
-            Field(
                 Some(
-                    "g",
+                    "movie_id",
                 ),
-                "id",
             ),
-        ],
-        labels: [
-            Some(
-                "movie_id",
-            ),
-            Some(
-                "genre_id",
+            (
+                Field(
+                    Some(
+                        "g",
+                    ),
+                    "id",
+                ),
+                Some(
+                    "genre_id",
+                ),
             ),
         ],
     },

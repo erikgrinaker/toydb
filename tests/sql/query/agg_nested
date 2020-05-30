@@ -3,23 +3,23 @@ Query: SELECT MAX(MIN(rating)) FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "max",
-                [
-                    Function(
-                        "min",
-                        [
-                            Field(
-                                None,
-                                "rating",
-                            ),
-                        ],
-                    ),
-                ],
+            (
+                Function(
+                    "max",
+                    [
+                        Function(
+                            "min",
+                            [
+                                Field(
+                                    None,
+                                    "rating",
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: Some(

@@ -3,7 +3,6 @@ Query: SELECT * FROM movies CROSS JOIN genres
 AST: Select {
     select: SelectClause {
         expressions: [],
-        labels: [],
     },
     from: Some(
         FromClause {

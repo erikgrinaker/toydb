@@ -3,14 +3,14 @@ Query: select 1
 AST: Select {
     select: SelectClause {
         expressions: [
-            Literal(
-                Integer(
-                    1,
+            (
+                Literal(
+                    Integer(
+                        1,
+                    ),
                 ),
+                None,
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: None,
@@ -25,14 +25,14 @@ AST: Select {
 Plan: Plan(
     Projection {
         source: Nothing,
-        labels: [
-            None,
-        ],
         expressions: [
-            Constant(
-                Integer(
-                    1,
+            (
+                Constant(
+                    Integer(
+                        1,
+                    ),
                 ),
+                None,
             ),
         ],
     },
@@ -41,14 +41,14 @@ Plan: Plan(
 Optimized plan: Plan(
     Projection {
         source: Nothing,
-        labels: [
-            None,
-        ],
         expressions: [
-            Constant(
-                Integer(
-                    1,
+            (
+                Constant(
+                    Integer(
+                        1,
+                    ),
                 ),
+                None,
             ),
         ],
     },

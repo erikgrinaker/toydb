@@ -3,58 +3,66 @@ Query: SELECT MIN(f), MAX(f), SUM(f), COUNT(f), AVG(f) FROM floats
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "min",
-                [
-                    Field(
-                        None,
-                        "f",
-                    ),
-                ],
+            (
+                Function(
+                    "min",
+                    [
+                        Field(
+                            None,
+                            "f",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "f",
-                    ),
-                ],
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "f",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "sum",
-                [
-                    Field(
-                        None,
-                        "f",
-                    ),
-                ],
+            (
+                Function(
+                    "sum",
+                    [
+                        Field(
+                            None,
+                            "f",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "count",
-                [
-                    Field(
-                        None,
-                        "f",
-                    ),
-                ],
+            (
+                Function(
+                    "count",
+                    [
+                        Field(
+                            None,
+                            "f",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "avg",
-                [
-                    Field(
-                        None,
-                        "f",
-                    ),
-                ],
+            (
+                Function(
+                    "avg",
+                    [
+                        Field(
+                            None,
+                            "f",
+                        ),
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
         ],
     },
     from: Some(
@@ -84,58 +92,66 @@ Plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -147,32 +163,40 @@ Plan: Plan(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                1,
+            (
+                Field(
+                    1,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                2,
+            (
+                Field(
+                    2,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                3,
+            (
+                Field(
+                    3,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                4,
+            (
+                Field(
+                    4,
+                    None,
+                ),
                 None,
             ),
         ],
@@ -188,58 +212,66 @@ Optimized plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "f",
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "f",
+                                ),
                             ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -251,32 +283,40 @@ Optimized plan: Plan(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                1,
+            (
+                Field(
+                    1,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                2,
+            (
+                Field(
+                    2,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                3,
+            (
+                Field(
+                    3,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                4,
+            (
+                Field(
+                    4,
+                    None,
+                ),
                 None,
             ),
         ],

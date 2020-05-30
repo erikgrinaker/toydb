@@ -3,44 +3,52 @@ Query: SELECT 1, 2 b, 3 AS c, 4 AS "👋", id AS "some id" FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Literal(
-                Integer(
-                    1,
+            (
+                Literal(
+                    Integer(
+                        1,
+                    ),
                 ),
-            ),
-            Literal(
-                Integer(
-                    2,
-                ),
-            ),
-            Literal(
-                Integer(
-                    3,
-                ),
-            ),
-            Literal(
-                Integer(
-                    4,
-                ),
-            ),
-            Field(
                 None,
-                "id",
             ),
-        ],
-        labels: [
-            None,
-            Some(
-                "b",
+            (
+                Literal(
+                    Integer(
+                        2,
+                    ),
+                ),
+                Some(
+                    "b",
+                ),
             ),
-            Some(
-                "c",
+            (
+                Literal(
+                    Integer(
+                        3,
+                    ),
+                ),
+                Some(
+                    "c",
+                ),
             ),
-            Some(
-                "👋",
+            (
+                Literal(
+                    Integer(
+                        4,
+                    ),
+                ),
+                Some(
+                    "👋",
+                ),
             ),
-            Some(
-                "some id",
+            (
+                Field(
+                    None,
+                    "id",
+                ),
+                Some(
+                    "some id",
+                ),
             ),
         ],
     },
@@ -69,49 +77,57 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-            Some(
-                "b",
-            ),
-            Some(
-                "c",
-            ),
-            Some(
-                "👋",
-            ),
-            Some(
-                "some id",
-            ),
-        ],
         expressions: [
-            Constant(
-                Integer(
-                    1,
-                ),
-            ),
-            Constant(
-                Integer(
-                    2,
-                ),
-            ),
-            Constant(
-                Integer(
-                    3,
-                ),
-            ),
-            Constant(
-                Integer(
-                    4,
-                ),
-            ),
-            Field(
-                0,
-                Some(
-                    (
-                        None,
-                        "id",
+            (
+                Constant(
+                    Integer(
+                        1,
                     ),
+                ),
+                None,
+            ),
+            (
+                Constant(
+                    Integer(
+                        2,
+                    ),
+                ),
+                Some(
+                    "b",
+                ),
+            ),
+            (
+                Constant(
+                    Integer(
+                        3,
+                    ),
+                ),
+                Some(
+                    "c",
+                ),
+            ),
+            (
+                Constant(
+                    Integer(
+                        4,
+                    ),
+                ),
+                Some(
+                    "👋",
+                ),
+            ),
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
+                ),
+                Some(
+                    "some id",
                 ),
             ),
         ],
@@ -125,49 +141,57 @@ Optimized plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-            Some(
-                "b",
-            ),
-            Some(
-                "c",
-            ),
-            Some(
-                "👋",
-            ),
-            Some(
-                "some id",
-            ),
-        ],
         expressions: [
-            Constant(
-                Integer(
-                    1,
-                ),
-            ),
-            Constant(
-                Integer(
-                    2,
-                ),
-            ),
-            Constant(
-                Integer(
-                    3,
-                ),
-            ),
-            Constant(
-                Integer(
-                    4,
-                ),
-            ),
-            Field(
-                0,
-                Some(
-                    (
-                        None,
-                        "id",
+            (
+                Constant(
+                    Integer(
+                        1,
                     ),
+                ),
+                None,
+            ),
+            (
+                Constant(
+                    Integer(
+                        2,
+                    ),
+                ),
+                Some(
+                    "b",
+                ),
+            ),
+            (
+                Constant(
+                    Integer(
+                        3,
+                    ),
+                ),
+                Some(
+                    "c",
+                ),
+            ),
+            (
+                Constant(
+                    Integer(
+                        4,
+                    ),
+                ),
+                Some(
+                    "👋",
+                ),
+            ),
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
+                ),
+                Some(
+                    "some id",
                 ),
             ),
         ],

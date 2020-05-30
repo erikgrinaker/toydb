@@ -3,48 +3,50 @@ Query: SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope
 AST: Select {
     select: SelectClause {
         expressions: [
-            Operation(
-                Add(
-                    Literal(
-                        Integer(
-                            1,
-                        ),
-                    ),
-                    Operation(
-                        Multiply(
-                            Literal(
-                                Integer(
-                                    2,
-                                ),
+            (
+                Operation(
+                    Add(
+                        Literal(
+                            Integer(
+                                1,
                             ),
-                            Literal(
-                                Integer(
-                                    3,
+                        ),
+                        Operation(
+                            Multiply(
+                                Literal(
+                                    Integer(
+                                        2,
+                                    ),
+                                ),
+                                Literal(
+                                    Integer(
+                                        3,
+                                    ),
                                 ),
                             ),
                         ),
                     ),
                 ),
+                None,
             ),
-            Operation(
-                Like(
-                    Literal(
-                        String(
-                            "abc",
+            (
+                Operation(
+                    Like(
+                        Literal(
+                            String(
+                                "abc",
+                            ),
                         ),
-                    ),
-                    Literal(
-                        String(
-                            "x%",
+                        Literal(
+                            String(
+                                "x%",
+                            ),
                         ),
                     ),
                 ),
-            ),
-        ],
-        labels: [
-            None,
-            Some(
-                "nope",
+                Some(
+                    "nope",
+                ),
             ),
         ],
     },
@@ -60,42 +62,44 @@ AST: Select {
 Plan: Plan(
     Projection {
         source: Nothing,
-        labels: [
-            None,
-            Some(
-                "nope",
-            ),
-        ],
         expressions: [
-            Add(
-                Constant(
-                    Integer(
-                        1,
-                    ),
-                ),
-                Multiply(
+            (
+                Add(
                     Constant(
                         Integer(
-                            2,
+                            1,
                         ),
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    Multiply(
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
                     ),
                 ),
+                None,
             ),
-            Like(
-                Constant(
-                    String(
-                        "abc",
+            (
+                Like(
+                    Constant(
+                        String(
+                            "abc",
+                        ),
+                    ),
+                    Constant(
+                        String(
+                            "x%",
+                        ),
                     ),
                 ),
-                Constant(
-                    String(
-                        "x%",
-                    ),
+                Some(
+                    "nope",
                 ),
             ),
         ],
@@ -105,21 +109,23 @@ Plan: Plan(
 Optimized plan: Plan(
     Projection {
         source: Nothing,
-        labels: [
-            None,
-            Some(
-                "nope",
-            ),
-        ],
         expressions: [
-            Constant(
-                Integer(
-                    7,
+            (
+                Constant(
+                    Integer(
+                        7,
+                    ),
                 ),
+                None,
             ),
-            Constant(
-                Boolean(
-                    false,
+            (
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+                Some(
+                    "nope",
                 ),
             ),
         ],

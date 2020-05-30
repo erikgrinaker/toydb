@@ -3,58 +3,66 @@ Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FA
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "min",
-                [
-                    Field(
-                        None,
-                        "id",
-                    ),
-                ],
+            (
+                Function(
+                    "min",
+                    [
+                        Field(
+                            None,
+                            "id",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "id",
-                    ),
-                ],
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "id",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "sum",
-                [
-                    Field(
-                        None,
-                        "id",
-                    ),
-                ],
+            (
+                Function(
+                    "sum",
+                    [
+                        Field(
+                            None,
+                            "id",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "count",
-                [
-                    Field(
-                        None,
-                        "id",
-                    ),
-                ],
+            (
+                Function(
+                    "count",
+                    [
+                        Field(
+                            None,
+                            "id",
+                        ),
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "avg",
-                [
-                    Field(
-                        None,
-                        "id",
-                    ),
-                ],
+            (
+                Function(
+                    "avg",
+                    [
+                        Field(
+                            None,
+                            "id",
+                        ),
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
         ],
     },
     from: Some(
@@ -108,68 +116,78 @@ Plan: Plan(
                         ),
                     ),
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -181,32 +199,40 @@ Plan: Plan(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                1,
+            (
+                Field(
+                    1,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                2,
+            (
+                Field(
+                    2,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                3,
+            (
+                Field(
+                    3,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                4,
+            (
+                Field(
+                    4,
+                    None,
+                ),
                 None,
             ),
         ],
@@ -228,68 +254,78 @@ Optimized plan: Plan(
                         ),
                     ),
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -301,32 +337,40 @@ Optimized plan: Plan(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                1,
+            (
+                Field(
+                    1,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                2,
+            (
+                Field(
+                    2,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                3,
+            (
+                Field(
+                    3,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                4,
+            (
+                Field(
+                    4,
+                    None,
+                ),
                 None,
             ),
         ],

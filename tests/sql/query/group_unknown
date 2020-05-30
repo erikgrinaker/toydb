@@ -3,19 +3,19 @@ Query: SELECT COUNT(*) FROM movies GROUP BY unknown
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "count",
-                [
-                    Literal(
-                        Boolean(
-                            true,
+            (
+                Function(
+                    "count",
+                    [
+                        Literal(
+                            Boolean(
+                                true,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: Some(

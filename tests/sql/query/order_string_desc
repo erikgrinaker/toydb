@@ -3,7 +3,6 @@ Query: SELECT * FROM strings ORDER BY value DESC
 AST: Select {
     select: SelectClause {
         expressions: [],
-        labels: [],
     },
     from: Some(
         FromClause {

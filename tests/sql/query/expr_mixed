@@ -3,47 +3,49 @@ Query: SELECT 1 + 2 * 3, 2020 - released AS age FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Operation(
-                Add(
-                    Literal(
-                        Integer(
-                            1,
-                        ),
-                    ),
-                    Operation(
-                        Multiply(
-                            Literal(
-                                Integer(
-                                    2,
-                                ),
+            (
+                Operation(
+                    Add(
+                        Literal(
+                            Integer(
+                                1,
                             ),
-                            Literal(
-                                Integer(
-                                    3,
+                        ),
+                        Operation(
+                            Multiply(
+                                Literal(
+                                    Integer(
+                                        2,
+                                    ),
+                                ),
+                                Literal(
+                                    Integer(
+                                        3,
+                                    ),
                                 ),
                             ),
                         ),
                     ),
                 ),
+                None,
             ),
-            Operation(
-                Subtract(
-                    Literal(
-                        Integer(
-                            2020,
+            (
+                Operation(
+                    Subtract(
+                        Literal(
+                            Integer(
+                                2020,
+                            ),
+                        ),
+                        Field(
+                            None,
+                            "released",
                         ),
                     ),
-                    Field(
-                        None,
-                        "released",
-                    ),
                 ),
-            ),
-        ],
-        labels: [
-            None,
-            Some(
-                "age",
+                Some(
+                    "age",
+                ),
             ),
         ],
     },
@@ -72,46 +74,48 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-            Some(
-                "age",
-            ),
-        ],
         expressions: [
-            Add(
-                Constant(
-                    Integer(
-                        1,
-                    ),
-                ),
-                Multiply(
+            (
+                Add(
                     Constant(
                         Integer(
-                            2,
+                            1,
                         ),
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    Multiply(
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
                     ),
                 ),
+                None,
             ),
-            Subtract(
-                Constant(
-                    Integer(
-                        2020,
-                    ),
-                ),
-                Field(
-                    4,
-                    Some(
-                        (
-                            None,
-                            "released",
+            (
+                Subtract(
+                    Constant(
+                        Integer(
+                            2020,
                         ),
                     ),
+                    Field(
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
+                    ),
+                ),
+                Some(
+                    "age",
                 ),
             ),
         ],
@@ -125,32 +129,34 @@ Optimized plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-            Some(
-                "age",
-            ),
-        ],
         expressions: [
-            Constant(
-                Integer(
-                    7,
-                ),
-            ),
-            Subtract(
+            (
                 Constant(
                     Integer(
-                        2020,
+                        7,
                     ),
                 ),
-                Field(
-                    4,
-                    Some(
-                        (
-                            None,
-                            "released",
+                None,
+            ),
+            (
+                Subtract(
+                    Constant(
+                        Integer(
+                            2020,
                         ),
                     ),
+                    Field(
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
+                            ),
+                        ),
+                    ),
+                ),
+                Some(
+                    "age",
                 ),
             ),
         ],

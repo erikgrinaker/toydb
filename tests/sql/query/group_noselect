@@ -3,19 +3,19 @@ Query: SELECT MAX(rating) AS best FROM movies GROUP BY studio_id ORDER BY best D
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "rating",
-                    ),
-                ],
-            ),
-        ],
-        labels: [
-            Some(
-                "best",
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                    ],
+                ),
+                Some(
+                    "best",
+                ),
             ),
         ],
     },
@@ -64,28 +64,30 @@ Plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
+                        (
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
                                 ),
                             ),
+                            None,
                         ),
-                        Field(
-                            2,
-                            Some(
-                                (
-                                    None,
-                                    "studio_id",
+                        (
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
+                                    ),
                                 ),
                             ),
+                            None,
                         ),
                     ],
                 },
@@ -93,15 +95,15 @@ Plan: Plan(
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    "best",
-                ),
-            ],
             expressions: [
-                Field(
-                    0,
-                    None,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Some(
+                        "best",
+                    ),
                 ),
             ],
         },
@@ -132,28 +134,30 @@ Optimized plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
+                        (
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
                                 ),
                             ),
+                            None,
                         ),
-                        Field(
-                            2,
-                            Some(
-                                (
-                                    None,
-                                    "studio_id",
+                        (
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
+                                    ),
                                 ),
                             ),
+                            None,
                         ),
                     ],
                 },
@@ -161,15 +165,15 @@ Optimized plan: Plan(
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    "best",
-                ),
-            ],
             expressions: [
-                Field(
-                    0,
-                    None,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Some(
+                        "best",
+                    ),
                 ),
             ],
         },

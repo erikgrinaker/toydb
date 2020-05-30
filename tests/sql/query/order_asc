@@ -3,7 +3,6 @@ Query: SELECT * FROM movies ORDER BY released ASC
 AST: Select {
     select: SelectClause {
         expressions: [],
-        labels: [],
     },
     from: Some(
         FromClause {

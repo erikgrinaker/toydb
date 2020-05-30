@@ -3,25 +3,27 @@ Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN g
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "m",
+            (
+                Field(
+                    Some(
+                        "m",
+                    ),
+                    "id",
                 ),
-                "id",
-            ),
-            Field(
                 Some(
-                    "g",
+                    "movie_id",
                 ),
-                "id",
             ),
-        ],
-        labels: [
-            Some(
-                "movie_id",
-            ),
-            Some(
-                "genre_id",
+            (
+                Field(
+                    Some(
+                        "g",
+                    ),
+                    "id",
+                ),
+                Some(
+                    "genre_id",
+                ),
             ),
         ],
     },
@@ -118,35 +120,37 @@ Plan: Plan(
             pad: true,
             flip: false,
         },
-        labels: [
-            Some(
-                "movie_id",
-            ),
-            Some(
-                "genre_id",
-            ),
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        Some(
-                            "m",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
-            ),
-            Field(
-                7,
                 Some(
-                    (
-                        Some(
-                            "g",
+                    "movie_id",
+                ),
+            ),
+            (
+                Field(
+                    7,
+                    Some(
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
+                ),
+                Some(
+                    "genre_id",
                 ),
             ),
         ],
@@ -199,35 +203,37 @@ Optimized plan: Plan(
             pad: true,
             flip: false,
         },
-        labels: [
-            Some(
-                "movie_id",
-            ),
-            Some(
-                "genre_id",
-            ),
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        Some(
-                            "m",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
-            ),
-            Field(
-                7,
                 Some(
-                    (
-                        Some(
-                            "g",
+                    "movie_id",
+                ),
+            ),
+            (
+                Field(
+                    7,
+                    Some(
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
+                ),
+                Some(
+                    "genre_id",
                 ),
             ),
         ],

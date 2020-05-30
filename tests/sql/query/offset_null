@@ -3,7 +3,6 @@ Query: SELECT * FROM movies OFFSET NULL
 AST: Select {
     select: SelectClause {
         expressions: [],
-        labels: [],
     },
     from: Some(
         FromClause {

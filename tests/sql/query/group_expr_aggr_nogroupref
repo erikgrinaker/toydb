@@ -3,54 +3,56 @@ Query: SELECT studio_id, SUM(rating * 10) / COUNT(*) + id FROM movies GROUP BY s
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
+            (
+                Field(
+                    None,
+                    "studio_id",
+                ),
                 None,
-                "studio_id",
             ),
-            Operation(
-                Add(
-                    Operation(
-                        Divide(
-                            Function(
-                                "sum",
-                                [
-                                    Operation(
-                                        Multiply(
-                                            Field(
-                                                None,
-                                                "rating",
-                                            ),
-                                            Literal(
-                                                Integer(
-                                                    10,
+            (
+                Operation(
+                    Add(
+                        Operation(
+                            Divide(
+                                Function(
+                                    "sum",
+                                    [
+                                        Operation(
+                                            Multiply(
+                                                Field(
+                                                    None,
+                                                    "rating",
+                                                ),
+                                                Literal(
+                                                    Integer(
+                                                        10,
+                                                    ),
                                                 ),
                                             ),
                                         ),
-                                    ),
-                                ],
-                            ),
-                            Function(
-                                "count",
-                                [
-                                    Literal(
-                                        Boolean(
-                                            true,
+                                    ],
+                                ),
+                                Function(
+                                    "count",
+                                    [
+                                        Literal(
+                                            Boolean(
+                                                true,
+                                            ),
                                         ),
-                                    ),
-                                ],
+                                    ],
+                                ),
                             ),
                         ),
-                    ),
-                    Field(
-                        None,
-                        "id",
+                        Field(
+                            None,
+                            "id",
+                        ),
                     ),
                 ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(

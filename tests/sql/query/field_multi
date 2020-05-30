@@ -3,18 +3,20 @@ Query: SELECT id, title FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
+            (
+                Field(
+                    None,
+                    "id",
+                ),
                 None,
-                "id",
             ),
-            Field(
+            (
+                Field(
+                    None,
+                    "title",
+                ),
                 None,
-                "title",
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(
@@ -42,28 +44,30 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        None,
-                        "id",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
                     ),
                 ),
+                None,
             ),
-            Field(
-                1,
-                Some(
-                    (
-                        None,
-                        "title",
+            (
+                Field(
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
                     ),
                 ),
+                None,
             ),
         ],
     },
@@ -76,28 +80,30 @@ Optimized plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        None,
-                        "id",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
                     ),
                 ),
+                None,
             ),
-            Field(
-                1,
-                Some(
-                    (
-                        None,
-                        "title",
+            (
+                Field(
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
+                        ),
                     ),
                 ),
+                None,
             ),
         ],
     },

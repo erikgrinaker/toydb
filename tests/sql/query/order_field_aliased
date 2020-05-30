@@ -3,28 +3,32 @@ Query: SELECT movies.id, title, genres.name AS genre FROM movies, genres WHERE m
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "movies",
+            (
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
                 ),
-                "id",
-            ),
-            Field(
                 None,
-                "title",
             ),
-            Field(
-                Some(
-                    "genres",
+            (
+                Field(
+                    None,
+                    "title",
                 ),
-                "name",
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
-            Some(
-                "genre",
+            (
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "name",
+                ),
+                Some(
+                    "genre",
+                ),
             ),
         ],
     },
@@ -128,43 +132,47 @@ Plan: Plan(
                     ),
                 ),
             },
-            labels: [
-                None,
-                None,
-                Some(
-                    "genre",
-                ),
-            ],
             expressions: [
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
+                (
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
                             ),
-                            "id",
                         ),
                     ),
+                    None,
                 ),
-                Field(
-                    1,
-                    Some(
-                        (
-                            None,
-                            "title",
+                (
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "title",
+                            ),
                         ),
                     ),
+                    None,
                 ),
-                Field(
-                    8,
-                    Some(
-                        (
-                            Some(
-                                "genres",
+                (
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "genres",
+                                ),
+                                "name",
                             ),
-                            "name",
                         ),
+                    ),
+                    Some(
+                        "genre",
                     ),
                 ),
             ],
@@ -241,43 +249,47 @@ Optimized plan: Plan(
                 pad: false,
                 flip: false,
             },
-            labels: [
-                None,
-                None,
-                Some(
-                    "genre",
-                ),
-            ],
             expressions: [
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
+                (
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
                             ),
-                            "id",
                         ),
                     ),
+                    None,
                 ),
-                Field(
-                    1,
-                    Some(
-                        (
-                            None,
-                            "title",
+                (
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "title",
+                            ),
                         ),
                     ),
+                    None,
                 ),
-                Field(
-                    8,
-                    Some(
-                        (
-                            Some(
-                                "genres",
+                (
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "genres",
+                                ),
+                                "name",
                             ),
-                            "name",
                         ),
+                    ),
+                    Some(
+                        "genre",
                     ),
                 ),
             ],

@@ -3,13 +3,13 @@ Query: SELECT id FROM movies, genres
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
+            (
+                Field(
+                    None,
+                    "id",
+                ),
                 None,
-                "id",
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: Some(

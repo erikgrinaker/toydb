@@ -3,23 +3,25 @@ Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
+            (
+                Field(
+                    None,
+                    "studio_id",
+                ),
                 None,
-                "studio_id",
             ),
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "rating",
-                    ),
-                ],
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(

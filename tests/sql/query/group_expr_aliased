@@ -3,34 +3,36 @@ Query: SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORD
 AST: Select {
     select: SelectClause {
         expressions: [
-            Operation(
-                Multiply(
-                    Field(
-                        None,
-                        "studio_id",
-                    ),
-                    Literal(
-                        Integer(
-                            2,
+            (
+                Operation(
+                    Multiply(
+                        Field(
+                            None,
+                            "studio_id",
+                        ),
+                        Literal(
+                            Integer(
+                                2,
+                            ),
                         ),
                     ),
                 ),
+                Some(
+                    "twice",
+                ),
             ),
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "rating",
-                    ),
-                ],
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            Some(
-                "twice",
-            ),
-            None,
         ],
     },
     from: Some(
@@ -78,36 +80,38 @@ Plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        Some(
-                            "twice",
-                        ),
-                    ],
                     expressions: [
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
-                            ),
-                        ),
-                        Multiply(
+                        (
                             Field(
-                                2,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "studio_id",
+                                        "rating",
                                     ),
                                 ),
                             ),
-                            Constant(
-                                Integer(
+                            None,
+                        ),
+                        (
+                            Multiply(
+                                Field(
                                     2,
+                                    Some(
+                                        (
+                                            None,
+                                            "studio_id",
+                                        ),
+                                    ),
                                 ),
+                                Constant(
+                                    Integer(
+                                        2,
+                                    ),
+                                ),
+                            ),
+                            Some(
+                                "twice",
                             ),
                         ),
                     ],
@@ -116,19 +120,21 @@ Plan: Plan(
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    "twice",
-                ),
-                None,
-            ],
             expressions: [
-                Field(
-                    1,
-                    None,
+                (
+                    Field(
+                        1,
+                        None,
+                    ),
+                    Some(
+                        "twice",
+                    ),
                 ),
-                Field(
-                    0,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
                     None,
                 ),
             ],
@@ -160,36 +166,38 @@ Optimized plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        Some(
-                            "twice",
-                        ),
-                    ],
                     expressions: [
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
-                            ),
-                        ),
-                        Multiply(
+                        (
                             Field(
-                                2,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "studio_id",
+                                        "rating",
                                     ),
                                 ),
                             ),
-                            Constant(
-                                Integer(
+                            None,
+                        ),
+                        (
+                            Multiply(
+                                Field(
                                     2,
+                                    Some(
+                                        (
+                                            None,
+                                            "studio_id",
+                                        ),
+                                    ),
                                 ),
+                                Constant(
+                                    Integer(
+                                        2,
+                                    ),
+                                ),
+                            ),
+                            Some(
+                                "twice",
                             ),
                         ),
                     ],
@@ -198,19 +206,21 @@ Optimized plan: Plan(
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    "twice",
-                ),
-                None,
-            ],
             expressions: [
-                Field(
-                    1,
-                    None,
+                (
+                    Field(
+                        1,
+                        None,
+                    ),
+                    Some(
+                        "twice",
+                    ),
                 ),
-                Field(
-                    0,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
                     None,
                 ),
             ],

@@ -3,19 +3,19 @@ Query: SELECT COUNT(*) FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "count",
-                [
-                    Literal(
-                        Boolean(
-                            true,
+            (
+                Function(
+                    "count",
+                    [
+                        Literal(
+                            Boolean(
+                                true,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: Some(
@@ -45,14 +45,14 @@ Plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                ],
                 expressions: [
-                    Constant(
-                        Boolean(
-                            true,
+                    (
+                        Constant(
+                            Boolean(
+                                true,
+                            ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -60,12 +60,12 @@ Plan: Plan(
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
         ],
@@ -81,14 +81,14 @@ Optimized plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                ],
                 expressions: [
-                    Constant(
-                        Boolean(
-                            true,
+                    (
+                        Constant(
+                            Boolean(
+                                true,
+                            ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -96,12 +96,12 @@ Optimized plan: Plan(
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
         ],

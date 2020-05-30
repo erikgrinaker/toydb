@@ -3,26 +3,28 @@ Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.i
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "s",
-                ),
-                "name",
-            ),
-            Function(
-                "count",
-                [
-                    Literal(
-                        Boolean(
-                            true,
-                        ),
+            (
+                Field(
+                    Some(
+                        "s",
                     ),
-                ],
+                    "name",
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
+            (
+                Function(
+                    "count",
+                    [
+                        Literal(
+                            Boolean(
+                                true,
+                            ),
+                        ),
+                    ],
+                ),
+                None,
+            ),
         ],
     },
     from: Some(
@@ -142,26 +144,28 @@ Plan: Plan(
                         pad: false,
                         flip: false,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Constant(
-                            Boolean(
-                                true,
-                            ),
-                        ),
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "name",
+                        (
+                            Constant(
+                                Boolean(
+                                    true,
                                 ),
                             ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                8,
+                                Some(
+                                    (
+                                        Some(
+                                            "s",
+                                        ),
+                                        "name",
+                                    ),
+                                ),
+                            ),
+                            None,
                         ),
                     ],
                 },
@@ -169,17 +173,19 @@ Plan: Plan(
                     Count,
                 ],
             },
-            labels: [
-                None,
-                None,
-            ],
             expressions: [
-                Field(
-                    1,
+                (
+                    Field(
+                        1,
+                        None,
+                    ),
                     None,
                 ),
-                Field(
-                    0,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
                     None,
                 ),
             ],
@@ -252,26 +258,28 @@ Optimized plan: Plan(
                         pad: false,
                         flip: false,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Constant(
-                            Boolean(
-                                true,
-                            ),
-                        ),
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "name",
+                        (
+                            Constant(
+                                Boolean(
+                                    true,
                                 ),
                             ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                8,
+                                Some(
+                                    (
+                                        Some(
+                                            "s",
+                                        ),
+                                        "name",
+                                    ),
+                                ),
+                            ),
+                            None,
                         ),
                     ],
                 },
@@ -279,17 +287,19 @@ Optimized plan: Plan(
                     Count,
                 ],
             },
-            labels: [
-                None,
-                None,
-            ],
             expressions: [
-                Field(
-                    1,
+                (
+                    Field(
+                        1,
+                        None,
+                    ),
                     None,
                 ),
-                Field(
-                    0,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
                     None,
                 ),
             ],

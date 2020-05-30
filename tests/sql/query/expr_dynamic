@@ -3,23 +3,23 @@ Query: SELECT 2020 - year AS age FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Operation(
-                Subtract(
-                    Literal(
-                        Integer(
-                            2020,
+            (
+                Operation(
+                    Subtract(
+                        Literal(
+                            Integer(
+                                2020,
+                            ),
+                        ),
+                        Field(
+                            None,
+                            "year",
                         ),
                     ),
-                    Field(
-                        None,
-                        "year",
-                    ),
                 ),
-            ),
-        ],
-        labels: [
-            Some(
-                "age",
+                Some(
+                    "age",
+                ),
             ),
         ],
     },

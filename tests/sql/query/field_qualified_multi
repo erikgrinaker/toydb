@@ -3,22 +3,24 @@ Query: SELECT movies.id, genres.id FROM movies, genres
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "movies",
+            (
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
                 ),
-                "id",
+                None,
             ),
-            Field(
-                Some(
-                    "genres",
+            (
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
                 ),
-                "id",
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(
@@ -60,32 +62,34 @@ Plan: Plan(
             pad: false,
             flip: false,
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        Some(
-                            "movies",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
+                None,
             ),
-            Field(
-                7,
-                Some(
-                    (
-                        Some(
-                            "genres",
+            (
+                Field(
+                    7,
+                    Some(
+                        (
+                            Some(
+                                "genres",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
+                None,
             ),
         ],
     },
@@ -108,32 +112,34 @@ Optimized plan: Plan(
             pad: false,
             flip: false,
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        Some(
-                            "movies",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
+                None,
             ),
-            Field(
-                7,
-                Some(
-                    (
-                        Some(
-                            "genres",
+            (
+                Field(
+                    7,
+                    Some(
+                        (
+                            Some(
+                                "genres",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
+                None,
             ),
         ],
     },

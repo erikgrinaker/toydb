@@ -3,42 +3,44 @@ Query: SELECT studio_id * 2 + 1, MAX(rating) AS rating FROM movies GROUP BY stud
 AST: Select {
     select: SelectClause {
         expressions: [
-            Operation(
-                Add(
-                    Operation(
-                        Multiply(
-                            Field(
-                                None,
-                                "studio_id",
-                            ),
-                            Literal(
-                                Integer(
-                                    2,
+            (
+                Operation(
+                    Add(
+                        Operation(
+                            Multiply(
+                                Field(
+                                    None,
+                                    "studio_id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        2,
+                                    ),
                                 ),
                             ),
                         ),
-                    ),
-                    Literal(
-                        Integer(
-                            1,
+                        Literal(
+                            Integer(
+                                1,
+                            ),
                         ),
                     ),
                 ),
+                None,
             ),
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "rating",
-                    ),
-                ],
-            ),
-        ],
-        labels: [
-            None,
-            Some(
-                "rating",
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                    ],
+                ),
+                Some(
+                    "rating",
+                ),
             ),
         ],
     },

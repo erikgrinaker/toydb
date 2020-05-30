@@ -3,7 +3,6 @@ Query: SELECT * FROM movies LIMIT 0
 AST: Select {
     select: SelectClause {
         expressions: [],
-        labels: [],
     },
     from: Some(
         FromClause {

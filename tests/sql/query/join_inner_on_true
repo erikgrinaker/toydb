@@ -3,7 +3,6 @@ Query: SELECT * FROM movies INNER JOIN genres ON TRUE
 AST: Select {
     select: SelectClause {
         expressions: [],
-        labels: [],
     },
     from: Some(
         FromClause {

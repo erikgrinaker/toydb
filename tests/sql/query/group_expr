@@ -3,19 +3,19 @@ Query: SELECT MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY 
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "rating",
-                    ),
-                ],
-            ),
-        ],
-        labels: [
-            Some(
-                "rating",
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                    ],
+                ),
+                Some(
+                    "rating",
+                ),
             ),
         ],
     },
@@ -73,35 +73,37 @@ Plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
-                            ),
-                        ),
-                        Multiply(
+                        (
                             Field(
-                                2,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "studio_id",
+                                        "rating",
                                     ),
                                 ),
                             ),
-                            Constant(
-                                Integer(
+                            None,
+                        ),
+                        (
+                            Multiply(
+                                Field(
                                     2,
+                                    Some(
+                                        (
+                                            None,
+                                            "studio_id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        2,
+                                    ),
                                 ),
                             ),
+                            None,
                         ),
                     ],
                 },
@@ -109,15 +111,15 @@ Plan: Plan(
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    "rating",
-                ),
-            ],
             expressions: [
-                Field(
-                    0,
-                    None,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Some(
+                        "rating",
+                    ),
                 ),
             ],
         },
@@ -148,35 +150,37 @@ Optimized plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
-                            ),
-                        ),
-                        Multiply(
+                        (
                             Field(
-                                2,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "studio_id",
+                                        "rating",
                                     ),
                                 ),
                             ),
-                            Constant(
-                                Integer(
+                            None,
+                        ),
+                        (
+                            Multiply(
+                                Field(
                                     2,
+                                    Some(
+                                        (
+                                            None,
+                                            "studio_id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        2,
+                                    ),
                                 ),
                             ),
+                            None,
                         ),
                     ],
                 },
@@ -184,15 +188,15 @@ Optimized plan: Plan(
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    "rating",
-                ),
-            ],
             expressions: [
-                Field(
-                    0,
-                    None,
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Some(
+                        "rating",
+                    ),
                 ),
             ],
         },

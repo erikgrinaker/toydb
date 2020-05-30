@@ -3,63 +3,71 @@ Query: SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3) FROM genres
 AST: Select {
     select: SelectClause {
         expressions: [
-            Function(
-                "min",
-                [
-                    Literal(
-                        Integer(
-                            3,
+            (
+                Function(
+                    "min",
+                    [
+                        Literal(
+                            Integer(
+                                3,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "max",
-                [
-                    Literal(
-                        Integer(
-                            3,
+            (
+                Function(
+                    "max",
+                    [
+                        Literal(
+                            Integer(
+                                3,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "sum",
-                [
-                    Literal(
-                        Integer(
-                            3,
+            (
+                Function(
+                    "sum",
+                    [
+                        Literal(
+                            Integer(
+                                3,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "count",
-                [
-                    Literal(
-                        Integer(
-                            3,
+            (
+                Function(
+                    "count",
+                    [
+                        Literal(
+                            Integer(
+                                3,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-            Function(
-                "avg",
-                [
-                    Literal(
-                        Integer(
-                            3,
+            (
+                Function(
+                    "avg",
+                    [
+                        Literal(
+                            Integer(
+                                3,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
         ],
     },
     from: Some(
@@ -89,38 +97,46 @@ Plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -132,32 +148,40 @@ Plan: Plan(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                1,
+            (
+                Field(
+                    1,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                2,
+            (
+                Field(
+                    2,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                3,
+            (
+                Field(
+                    3,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                4,
+            (
+                Field(
+                    4,
+                    None,
+                ),
                 None,
             ),
         ],
@@ -173,38 +197,46 @@ Optimized plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
-                    Constant(
-                        Integer(
-                            3,
+                    (
+                        Constant(
+                            Integer(
+                                3,
+                            ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -216,32 +248,40 @@ Optimized plan: Plan(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
-            Field(
-                0,
+            (
+                Field(
+                    0,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                1,
+            (
+                Field(
+                    1,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                2,
+            (
+                Field(
+                    2,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                3,
+            (
+                Field(
+                    3,
+                    None,
+                ),
                 None,
             ),
-            Field(
-                4,
+            (
+                Field(
+                    4,
+                    None,
+                ),
                 None,
             ),
         ],

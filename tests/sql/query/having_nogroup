@@ -3,18 +3,20 @@ Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
+            (
+                Field(
+                    None,
+                    "id",
+                ),
                 None,
-                "id",
             ),
-            Field(
+            (
+                Field(
+                    None,
+                    "rating",
+                ),
                 None,
-                "rating",
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(
@@ -68,28 +70,30 @@ Plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        5,
-                        Some(
-                            (
-                                None,
-                                "rating",
+                    (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
                             ),
                         ),
+                        None,
                     ),
                 ],
             },
@@ -136,28 +140,30 @@ Optimized plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
                             ),
                         ),
+                        None,
                     ),
-                    Field(
-                        5,
-                        Some(
-                            (
-                                None,
-                                "rating",
+                    (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
                             ),
                         ),
+                        None,
                     ),
                 ],
             },

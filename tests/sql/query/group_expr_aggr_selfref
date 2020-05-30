@@ -3,54 +3,56 @@ Query: SELECT studio_id, SUM(rating * 10) / COUNT(*) + studio_id FROM movies GRO
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
+            (
+                Field(
+                    None,
+                    "studio_id",
+                ),
                 None,
-                "studio_id",
             ),
-            Operation(
-                Add(
-                    Operation(
-                        Divide(
-                            Function(
-                                "sum",
-                                [
-                                    Operation(
-                                        Multiply(
-                                            Field(
-                                                None,
-                                                "rating",
-                                            ),
-                                            Literal(
-                                                Integer(
-                                                    10,
+            (
+                Operation(
+                    Add(
+                        Operation(
+                            Divide(
+                                Function(
+                                    "sum",
+                                    [
+                                        Operation(
+                                            Multiply(
+                                                Field(
+                                                    None,
+                                                    "rating",
+                                                ),
+                                                Literal(
+                                                    Integer(
+                                                        10,
+                                                    ),
                                                 ),
                                             ),
                                         ),
-                                    ),
-                                ],
-                            ),
-                            Function(
-                                "count",
-                                [
-                                    Literal(
-                                        Boolean(
-                                            true,
+                                    ],
+                                ),
+                                Function(
+                                    "count",
+                                    [
+                                        Literal(
+                                            Boolean(
+                                                true,
+                                            ),
                                         ),
-                                    ),
-                                ],
+                                    ],
+                                ),
                             ),
                         ),
-                    ),
-                    Field(
-                        None,
-                        "studio_id",
+                        Field(
+                            None,
+                            "studio_id",
+                        ),
                     ),
                 ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(
@@ -98,31 +100,71 @@ Plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Multiply(
-                            Field(
-                                5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
+                        (
+                            Multiply(
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        10,
                                     ),
                                 ),
                             ),
+                            None,
+                        ),
+                        (
                             Constant(
-                                Integer(
-                                    10,
+                                Boolean(
+                                    true,
                                 ),
                             ),
+                            None,
                         ),
-                        Constant(
-                            Boolean(
-                                true,
+                        (
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Sum,
+                    Count,
+                ],
+            },
+            expressions: [
+                (
+                    Field(
+                        2,
+                        None,
+                    ),
+                    None,
+                ),
+                (
+                    Add(
+                        Divide(
+                            Field(
+                                0,
+                                None,
+                            ),
+                            Field(
+                                1,
+                                None,
                             ),
                         ),
                         Field(
@@ -134,42 +176,8 @@ Plan: Plan(
                                 ),
                             ),
                         ),
-                    ],
-                },
-                aggregates: [
-                    Sum,
-                    Count,
-                ],
-            },
-            labels: [
-                None,
-                None,
-            ],
-            expressions: [
-                Field(
-                    2,
+                    ),
                     None,
-                ),
-                Add(
-                    Divide(
-                        Field(
-                            0,
-                            None,
-                        ),
-                        Field(
-                            1,
-                            None,
-                        ),
-                    ),
-                    Field(
-                        2,
-                        Some(
-                            (
-                                None,
-                                "studio_id",
-                            ),
-                        ),
-                    ),
                 ),
             ],
         },
@@ -200,31 +208,71 @@ Optimized plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
-                        Multiply(
-                            Field(
-                                5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
+                        (
+                            Multiply(
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        10,
                                     ),
                                 ),
                             ),
+                            None,
+                        ),
+                        (
                             Constant(
-                                Integer(
-                                    10,
+                                Boolean(
+                                    true,
                                 ),
                             ),
+                            None,
                         ),
-                        Constant(
-                            Boolean(
-                                true,
+                        (
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                    ],
+                },
+                aggregates: [
+                    Sum,
+                    Count,
+                ],
+            },
+            expressions: [
+                (
+                    Field(
+                        2,
+                        None,
+                    ),
+                    None,
+                ),
+                (
+                    Add(
+                        Divide(
+                            Field(
+                                0,
+                                None,
+                            ),
+                            Field(
+                                1,
+                                None,
                             ),
                         ),
                         Field(
@@ -236,42 +284,8 @@ Optimized plan: Plan(
                                 ),
                             ),
                         ),
-                    ],
-                },
-                aggregates: [
-                    Sum,
-                    Count,
-                ],
-            },
-            labels: [
-                None,
-                None,
-            ],
-            expressions: [
-                Field(
-                    2,
+                    ),
                     None,
-                ),
-                Add(
-                    Divide(
-                        Field(
-                            0,
-                            None,
-                        ),
-                        Field(
-                            1,
-                            None,
-                        ),
-                    ),
-                    Field(
-                        2,
-                        Some(
-                            (
-                                None,
-                                "studio_id",
-                            ),
-                        ),
-                    ),
                 ),
             ],
         },

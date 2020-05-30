@@ -3,24 +3,26 @@ Query: SELECT studio_id, COUNT(*) FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
+            (
+                Field(
+                    None,
+                    "studio_id",
+                ),
                 None,
-                "studio_id",
             ),
-            Function(
-                "count",
-                [
-                    Literal(
-                        Boolean(
-                            true,
+            (
+                Function(
+                    "count",
+                    [
+                        Literal(
+                            Boolean(
+                                true,
+                            ),
                         ),
-                    ),
-                ],
+                    ],
+                ),
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(

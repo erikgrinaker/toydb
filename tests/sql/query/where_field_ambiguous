@@ -3,22 +3,24 @@ Query: SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "movies",
+            (
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
                 ),
-                "id",
+                None,
             ),
-            Field(
-                Some(
-                    "genres",
+            (
+                Field(
+                    Some(
+                        "genres",
+                    ),
+                    "id",
                 ),
-                "id",
+                None,
             ),
-        ],
-        labels: [
-            None,
-            None,
         ],
     },
     from: Some(

@@ -3,15 +3,15 @@ Query: SELECT movies.id FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "movies",
+            (
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "id",
                 ),
-                "id",
+                None,
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: Some(
@@ -39,20 +39,20 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        Some(
-                            "movies",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
+                None,
             ),
         ],
     },
@@ -65,20 +65,20 @@ Optimized plan: Plan(
             alias: None,
             filter: None,
         },
-        labels: [
-            None,
-        ],
         expressions: [
-            Field(
-                0,
-                Some(
-                    (
-                        Some(
-                            "movies",
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "id",
                         ),
-                        "id",
                     ),
                 ),
+                None,
             ),
         ],
     },

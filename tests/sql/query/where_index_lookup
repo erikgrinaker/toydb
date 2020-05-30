@@ -3,7 +3,6 @@ Query: SELECT * FROM movies WHERE genre_id = 2 ORDER BY id
 AST: Select {
     select: SelectClause {
         expressions: [],
-        labels: [],
     },
     from: Some(
         FromClause {

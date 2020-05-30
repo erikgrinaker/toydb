@@ -3,15 +3,15 @@ Query: SELECT movies.unknown FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Field(
-                Some(
-                    "movies",
+            (
+                Field(
+                    Some(
+                        "movies",
+                    ),
+                    "unknown",
                 ),
-                "unknown",
+                None,
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: Some(

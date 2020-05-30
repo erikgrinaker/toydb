@@ -3,41 +3,41 @@ Query: SELECT SUM(rating * 10) / COUNT(*) FROM movies
 AST: Select {
     select: SelectClause {
         expressions: [
-            Operation(
-                Divide(
-                    Function(
-                        "sum",
-                        [
-                            Operation(
-                                Multiply(
-                                    Field(
-                                        None,
-                                        "rating",
-                                    ),
-                                    Literal(
-                                        Integer(
-                                            10,
+            (
+                Operation(
+                    Divide(
+                        Function(
+                            "sum",
+                            [
+                                Operation(
+                                    Multiply(
+                                        Field(
+                                            None,
+                                            "rating",
+                                        ),
+                                        Literal(
+                                            Integer(
+                                                10,
+                                            ),
                                         ),
                                     ),
                                 ),
-                            ),
-                        ],
-                    ),
-                    Function(
-                        "count",
-                        [
-                            Literal(
-                                Boolean(
-                                    true,
+                            ],
+                        ),
+                        Function(
+                            "count",
+                            [
+                                Literal(
+                                    Boolean(
+                                        true,
+                                    ),
                                 ),
-                            ),
-                        ],
+                            ],
+                        ),
                     ),
                 ),
+                None,
             ),
-        ],
-        labels: [
-            None,
         ],
     },
     from: Some(
@@ -67,31 +67,33 @@ Plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Multiply(
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
+                    (
+                        Multiply(
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    10,
                                 ),
                             ),
                         ),
+                        None,
+                    ),
+                    (
                         Constant(
-                            Integer(
-                                10,
+                            Boolean(
+                                true,
                             ),
                         ),
-                    ),
-                    Constant(
-                        Boolean(
-                            true,
-                        ),
+                        None,
                     ),
                 ],
             },
@@ -100,19 +102,19 @@ Plan: Plan(
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
-            Divide(
-                Field(
-                    0,
-                    None,
+            (
+                Divide(
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Field(
+                        1,
+                        None,
+                    ),
                 ),
-                Field(
-                    1,
-                    None,
-                ),
+                None,
             ),
         ],
     },
@@ -127,31 +129,33 @@ Optimized plan: Plan(
                     alias: None,
                     filter: None,
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
-                    Multiply(
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
+                    (
+                        Multiply(
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    10,
                                 ),
                             ),
                         ),
+                        None,
+                    ),
+                    (
                         Constant(
-                            Integer(
-                                10,
+                            Boolean(
+                                true,
                             ),
                         ),
-                    ),
-                    Constant(
-                        Boolean(
-                            true,
-                        ),
+                        None,
                     ),
                 ],
             },
@@ -160,19 +164,19 @@ Optimized plan: Plan(
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
-            Divide(
-                Field(
-                    0,
-                    None,
+            (
+                Divide(
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Field(
+                        1,
+                        None,
+                    ),
                 ),
-                Field(
-                    1,
-                    None,
-                ),
+                None,
             ),
         ],
     },
