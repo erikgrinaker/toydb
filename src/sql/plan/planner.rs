@@ -347,22 +347,20 @@ impl<'a, C: Catalog> Planner<'a, C> {
     ) -> Result<Vec<(Aggregate, ast::Expression)>> {
         let mut aggregates = Vec::new();
         for (expr, _) in exprs {
-            expr.replace_with(|e| {
-                e.transform(
-                    &mut |mut e| match &mut e {
-                        ast::Expression::Function(f, args) if args.len() == 1 => {
-                            if let Some(aggregate) = self.aggregate_from_name(f) {
-                                aggregates.push((aggregate, args.remove(0)));
-                                Ok(ast::Expression::Column(aggregates.len() - 1))
-                            } else {
-                                Ok(e)
-                            }
+            expr.transform_mut(
+                &mut |mut e| match &mut e {
+                    ast::Expression::Function(f, args) if args.len() == 1 => {
+                        if let Some(aggregate) = self.aggregate_from_name(f) {
+                            aggregates.push((aggregate, args.remove(0)));
+                            Ok(ast::Expression::Column(aggregates.len() - 1))
+                        } else {
+                            Ok(e)
                         }
-                        _ => Ok(e),
-                    },
-                    &mut |e| Ok(e),
-                )
-            })?;
+                    }
+                    _ => Ok(e),
+                },
+                &mut |e| Ok(e),
+            )?;
         }
         for (_, expr) in &aggregates {
             if self.is_aggregate(expr) {
@@ -435,47 +433,43 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 continue;
             }
             if let Some(label) = label {
-                expr.replace_with(|expr| {
-                    expr.transform(
-                        &mut |e| match e {
-                            ast::Expression::Field(None, ref l) if l == label => {
-                                Ok(ast::Expression::Column(i))
-                            }
-                            e => Ok(e),
-                        },
-                        &mut |e| Ok(e),
-                    )
-                })?;
+                expr.transform_mut(
+                    &mut |e| match e {
+                        ast::Expression::Field(None, ref l) if l == label => {
+                            Ok(ast::Expression::Column(i))
+                        }
+                        e => Ok(e),
+                    },
+                    &mut |e| Ok(e),
+                )?;
             }
         }
         // Any remaining aggregate functions and field references must be extracted as hidden
         // columns.
         let mut hidden = 0;
-        expr.replace_with(|expr| {
-            expr.transform(
-                &mut |e| match &e {
-                    ast::Expression::Function(f, a) if self.aggregate_from_name(f).is_some() => {
-                        if let ast::Expression::Column(c) = a[0] {
-                            if self.is_aggregate(&select[c].0) {
-                                return Err(Error::Value(
-                                    "Aggregate function cannot reference aggregate".into(),
-                                ));
-                            }
+        expr.transform_mut(
+            &mut |e| match &e {
+                ast::Expression::Function(f, a) if self.aggregate_from_name(f).is_some() => {
+                    if let ast::Expression::Column(c) = a[0] {
+                        if self.is_aggregate(&select[c].0) {
+                            return Err(Error::Value(
+                                "Aggregate function cannot reference aggregate".into(),
+                            ));
                         }
-                        select.push((e, None));
-                        hidden += 1;
-                        Ok(ast::Expression::Column(select.len() - 1))
                     }
-                    ast::Expression::Field(_, _) => {
-                        select.push((e, None));
-                        hidden += 1;
-                        Ok(ast::Expression::Column(select.len() - 1))
-                    }
-                    _ => Ok(e),
-                },
-                &mut |e| Ok(e),
-            )
-        })?;
+                    select.push((e, None));
+                    hidden += 1;
+                    Ok(ast::Expression::Column(select.len() - 1))
+                }
+                ast::Expression::Field(_, _) => {
+                    select.push((e, None));
+                    hidden += 1;
+                    Ok(ast::Expression::Column(select.len() - 1))
+                }
+                _ => Ok(e),
+            },
+            &mut |e| Ok(e),
+        )?;
         Ok(hidden)
     }
 

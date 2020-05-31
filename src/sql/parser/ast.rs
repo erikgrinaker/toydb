@@ -164,8 +164,8 @@ impl Expression {
         !self.walk(&|e| !visitor(e))
     }
 
-    /// Replaces the expression with result of the closure. Mosty helper function for transform().
-    pub fn replace_with<F: FnMut(Self) -> Result<Self>>(&mut self, mut f: F) -> Result<()> {
+    /// Replaces the expression with result of the closure. Helper function for transform().
+    fn replace_with<F: FnMut(Self) -> Result<Self>>(&mut self, mut f: F) -> Result<()> {
         // Temporarily replace expression with a null value, in case closure panics. May consider
         // replace_with crate if this hampers performance.
         let expr = replace(self, Expression::Literal(Literal::Null));
@@ -218,6 +218,15 @@ impl Expression {
             Self::Literal(_) | Self::Field(_, _) | Self::Column(_) => {}
         };
         after(self)
+    }
+
+    /// Transforms an expression using a mutable reference.
+    pub fn transform_mut<B, A>(&mut self, before: &mut B, after: &mut A) -> Result<()>
+    where
+        B: FnMut(Self) -> Result<Self>,
+        A: FnMut(Self) -> Result<Self>,
+    {
+        self.replace_with(|e| e.transform(before, after))
     }
 
     /// Walks the expression tree, calling a closure for every node. Halts if closure returns false.
