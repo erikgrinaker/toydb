@@ -94,7 +94,7 @@ Optimized plan: Plan(
             table: "movies",
             alias: None,
             column: "genre_id",
-            keys: [
+            values: [
                 Integer(
                     2,
                 ),

@@ -9,11 +9,8 @@ use std::collections::HashMap;
 
 /// An aggregation executor
 pub struct Aggregation<T: Transaction> {
-    /// The source of rows to filter
     source: Box<dyn Executor<T>>,
-    /// Aggregates to apply
     aggregates: Vec<Aggregate>,
-    /// The bucketed accumulators
     accumulators: HashMap<Vec<Value>, Vec<Box<dyn Accumulator>>>,
 }
 

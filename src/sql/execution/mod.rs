@@ -1,36 +1,16 @@
 mod aggregation;
-mod create_table;
-mod delete;
-mod drop_table;
-mod filter;
-mod index_lookup;
-mod insert;
-mod key_lookup;
-mod limit;
-mod nested_loop_join;
-mod nothing;
-mod offset;
-mod order;
-mod projection;
-mod scan;
-mod update;
+mod join;
+mod mutation;
+mod query;
+mod schema;
+mod source;
 
 use aggregation::Aggregation;
-use create_table::CreateTable;
-use delete::Delete;
-use drop_table::DropTable;
-use filter::Filter;
-use index_lookup::IndexLookup;
-use insert::Insert;
-use key_lookup::KeyLookup;
-use limit::Limit;
-use nested_loop_join::NestedLoopJoin;
-use nothing::Nothing;
-use offset::Offset;
-use order::Order;
-use projection::Projection;
-use scan::Scan;
-use update::Update;
+use join::NestedLoopJoin;
+use mutation::{Delete, Insert, Update};
+use query::{Filter, Limit, Offset, Order, Projection};
+use schema::{CreateTable, DropTable};
+use source::{IndexLookup, KeyLookup, Nothing, Scan};
 
 use super::engine::{Mode, Transaction};
 use super::plan::Node;
@@ -57,8 +37,8 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
             Node::DropTable { table } => DropTable::new(table),
             Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
-            Node::IndexLookup { table, alias: _, column, keys } => {
-                IndexLookup::new(table, column, keys)
+            Node::IndexLookup { table, alias: _, column, values } => {
+                IndexLookup::new(table, column, values)
             }
             Node::Insert { table, columns, expressions } => {
                 Insert::new(table, columns, expressions)

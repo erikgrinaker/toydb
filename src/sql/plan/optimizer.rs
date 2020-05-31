@@ -115,7 +115,7 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
                                     table: table.name,
                                     alias,
                                     column: column.name,
-                                    keys: vec![value],
+                                    values: vec![value],
                                 });
                             }
                         }

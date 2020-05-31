@@ -63,7 +63,7 @@ pub enum Node {
         table: String,
         alias: Option<String>,
         column: String,
-        keys: Vec<Value>,
+        values: Vec<Value>,
     },
     Insert {
         table: String,

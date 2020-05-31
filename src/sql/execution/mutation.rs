@@ -3,15 +3,44 @@ use super::super::types::Expression;
 use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
+/// An INSERT executor
+pub struct Insert {
+    table: String,
+    columns: Vec<String>,
+    rows: Vec<Vec<Expression>>,
+}
+
+impl Insert {
+    pub fn new(table: String, columns: Vec<String>, rows: Vec<Vec<Expression>>) -> Box<Self> {
+        Box::new(Self { table, columns, rows })
+    }
+}
+
+impl<T: Transaction> Executor<T> for Insert {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        let table = txn.must_read_table(&self.table)?;
+        let mut count = 0;
+        for expressions in self.rows {
+            let mut row =
+                expressions.into_iter().map(|expr| expr.evaluate(None)).collect::<Result<_>>()?;
+            if self.columns.is_empty() {
+                row = table.pad_row(row)?;
+            } else {
+                row = table.make_row(&self.columns, row)?;
+            }
+            txn.create(&table.name, row)?;
+            count += 1;
+        }
+        Ok(ResultSet::Create { count })
+    }
+}
+
 use std::collections::{BTreeMap, HashSet};
 
 /// An UPDATE executor
 pub struct Update<T: Transaction> {
-    /// The table to update
     table: String,
-    /// The source of rows to update
     source: Box<dyn Executor<T>>,
-    /// The expressions to update columns with
     /// FIXME Uses BTreeMap instead of HashMap for test stability
     expressions: BTreeMap<String, Expression>,
 }
@@ -55,6 +84,35 @@ impl<T: Transaction> Executor<T> for Update<T> {
                 Ok(ResultSet::Update { count: updated.len() as u64 })
             }
             r => Err(Error::Internal(format!("Unexpected response {:?}", r))),
+        }
+    }
+}
+
+/// A DELETE executor
+pub struct Delete<T: Transaction> {
+    table: String,
+    source: Box<dyn Executor<T>>,
+}
+
+impl<T: Transaction> Delete<T> {
+    pub fn new(table: String, source: Box<dyn Executor<T>>) -> Box<Self> {
+        Box::new(Self { table, source })
+    }
+}
+
+impl<T: Transaction> Executor<T> for Delete<T> {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        let table = txn.must_read_table(&self.table)?;
+        let mut count = 0;
+        match self.source.execute(txn)? {
+            ResultSet::Query { mut rows, .. } => {
+                while let Some(row) = rows.next().transpose()? {
+                    txn.delete(&table.name, &table.get_row_key(&row)?)?;
+                    count += 1
+                }
+                Ok(ResultSet::Delete { count })
+            }
+            r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
         }
     }
 }
