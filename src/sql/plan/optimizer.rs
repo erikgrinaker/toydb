@@ -14,11 +14,24 @@ pub struct ConstantFolder;
 
 impl Optimizer for ConstantFolder {
     fn optimize(&mut self, node: Node) -> Result<Node> {
-        node.transform(&|n| Ok(n), &|n| {
-            n.transform_expressions(&|e| Ok(e), &|e| {
-                Ok(if e.is_constant() { Expression::Constant(e.evaluate(None)?) } else { e })
-            })
-        })
+        node.transform(
+            &|n| {
+                n.transform_expressions(
+                    &|e| {
+                        if !e.contains(&|expr| match expr {
+                            Expression::Field(_, _) => true,
+                            _ => false,
+                        }) {
+                            Ok(Expression::Constant(e.evaluate(None)?))
+                        } else {
+                            Ok(e)
+                        }
+                    },
+                    &|e| Ok(e),
+                )
+            },
+            &|n| Ok(n),
+        )
     }
 }
 

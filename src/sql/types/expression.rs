@@ -264,14 +264,6 @@ impl Expression {
         !self.walk(&|e| !visitor(e))
     }
 
-    /// Checks whether the expression is constant, i.e. that it does not contains field references.
-    pub fn is_constant(&self) -> bool {
-        !self.contains(&|expr| match expr {
-            Self::Field(_, _) => true,
-            _ => false,
-        })
-    }
-
     /// Replaces the expression with result of the closure. Helper function for transform().
     fn replace_with<F: Fn(Self) -> Result<Self>>(&mut self, f: F) -> Result<()> {
         // Temporarily replace expression with a null value, in case closure panics. May consider
