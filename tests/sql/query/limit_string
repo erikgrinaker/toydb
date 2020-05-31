@@ -18,6 +18,7 @@ AST: Select {
     group_by: None,
     having: None,
     order: [],
+    offset: None,
     limit: Some(
         Literal(
             String(
@@ -25,7 +26,6 @@ AST: Select {
             ),
         ),
     ),
-    offset: None,
 }
 
 Plan: Value("Invalid limit abc")

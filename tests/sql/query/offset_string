@@ -18,7 +18,6 @@ AST: Select {
     group_by: None,
     having: None,
     order: [],
-    limit: None,
     offset: Some(
         Literal(
             String(
@@ -26,6 +25,7 @@ AST: Select {
             ),
         ),
     ),
+    limit: None,
 }
 
 Plan: Value("Invalid offset abc")

@@ -86,8 +86,8 @@ AST: Select {
             Ascending,
         ),
     ],
-    limit: None,
     offset: None,
+    limit: None,
 }
 
 Plan: Value("Unknown field id")

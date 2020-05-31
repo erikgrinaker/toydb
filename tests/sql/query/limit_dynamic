@@ -18,6 +18,7 @@ AST: Select {
     group_by: None,
     having: None,
     order: [],
+    offset: None,
     limit: Some(
         Operation(
             Subtract(
@@ -33,7 +34,6 @@ AST: Select {
             ),
         ),
     ),
-    offset: None,
 }
 
 Plan: Value("Expression must be constant, found field released")

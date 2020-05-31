@@ -41,8 +41,8 @@ AST: Select {
     ),
     having: None,
     order: [],
-    limit: None,
     offset: None,
+    limit: None,
 }
 
 Plan: Value("Unknown field unknown")

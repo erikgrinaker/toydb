@@ -44,8 +44,8 @@ pub enum Statement {
         group_by: Option<GroupByClause>,
         having: Option<HavingClause>,
         order: Vec<(Expression, Order)>,
-        limit: Option<Expression>,
         offset: Option<Expression>,
+        limit: Option<Expression>,
     },
 }
 

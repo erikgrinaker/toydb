@@ -18,7 +18,6 @@ AST: Select {
     group_by: None,
     having: None,
     order: [],
-    limit: None,
     offset: Some(
         Operation(
             Add(
@@ -35,6 +34,7 @@ AST: Select {
             ),
         ),
     ),
+    limit: None,
 }
 
 Plan: Plan(

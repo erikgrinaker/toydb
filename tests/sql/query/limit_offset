@@ -18,17 +18,17 @@ AST: Select {
     group_by: None,
     having: None,
     order: [],
-    limit: Some(
-        Literal(
-            Integer(
-                2,
-            ),
-        ),
-    ),
     offset: Some(
         Literal(
             Integer(
                 1,
+            ),
+        ),
+    ),
+    limit: Some(
+        Literal(
+            Integer(
+                2,
             ),
         ),
     ),

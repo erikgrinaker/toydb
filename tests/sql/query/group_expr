@@ -59,8 +59,8 @@ AST: Select {
             Ascending,
         ),
     ],
-    limit: None,
     offset: None,
+    limit: None,
 }
 
 Plan: Plan(

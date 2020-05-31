@@ -129,8 +129,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 group_by,
                 having,
                 order,
-                limit,
                 offset,
+                limit,
             } => {
                 let scope = &mut Scope::new();
 

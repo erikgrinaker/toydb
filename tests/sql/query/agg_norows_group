@@ -96,8 +96,8 @@ AST: Select {
     ),
     having: None,
     order: [],
-    limit: None,
     offset: None,
+    limit: None,
 }
 
 Plan: Plan(

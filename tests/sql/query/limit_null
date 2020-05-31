@@ -18,12 +18,12 @@ AST: Select {
     group_by: None,
     having: None,
     order: [],
+    offset: None,
     limit: Some(
         Literal(
             Null,
         ),
     ),
-    offset: None,
 }
 
 Plan: Value("Invalid limit NULL")

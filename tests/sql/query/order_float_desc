@@ -26,8 +26,8 @@ AST: Select {
             Descending,
         ),
     ],
-    limit: None,
     offset: None,
+    limit: None,
 }
 
 Plan: Plan(

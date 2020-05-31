@@ -36,8 +36,8 @@ AST: Select {
     group_by: None,
     having: None,
     order: [],
-    limit: None,
     offset: None,
+    limit: None,
 }
 
 Plan: Value("Aggregate functions can\'t be nested")
