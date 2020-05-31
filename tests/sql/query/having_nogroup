@@ -62,140 +62,180 @@ AST: Select {
 }
 
 Plan: Plan(
-    Order {
-        source: Filter {
-            source: Projection {
-                source: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    None,
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                    (
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                ],
-            },
-            predicate: GreaterThan(
-                Field(
-                    1,
-                    Some(
+    Projection {
+        source: Order {
+            source: Filter {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                        filter: None,
+                    },
+                    expressions: [
                         (
+                            Field(
+                                0,
+                                Some(
+                                    (
+                                        None,
+                                        "id",
+                                    ),
+                                ),
+                            ),
                             None,
-                            "rating",
+                        ),
+                        (
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                    ],
+                },
+                predicate: GreaterThan(
+                    Field(
+                        2,
+                        None,
+                    ),
+                    Constant(
+                        Integer(
+                            8,
                         ),
                     ),
                 ),
-                Constant(
-                    Integer(
-                        8,
+            },
+            orders: [
+                (
+                    Field(
+                        0,
+                        None,
                     ),
+                    Ascending,
                 ),
-            ),
+            ],
         },
-        orders: [
+        expressions: [
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
-                    ),
+                    None,
                 ),
-                Ascending,
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
             ),
         ],
     },
 )
 
 Optimized plan: Plan(
-    Order {
-        source: Filter {
-            source: Projection {
-                source: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    None,
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                    (
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                ],
-            },
-            predicate: GreaterThan(
-                Field(
-                    1,
-                    Some(
+    Projection {
+        source: Order {
+            source: Filter {
+                source: Projection {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                        filter: None,
+                    },
+                    expressions: [
                         (
+                            Field(
+                                0,
+                                Some(
+                                    (
+                                        None,
+                                        "id",
+                                    ),
+                                ),
+                            ),
                             None,
-                            "rating",
+                        ),
+                        (
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                    ],
+                },
+                predicate: GreaterThan(
+                    Field(
+                        2,
+                        None,
+                    ),
+                    Constant(
+                        Integer(
+                            8,
                         ),
                     ),
                 ),
-                Constant(
-                    Integer(
-                        8,
+            },
+            orders: [
+                (
+                    Field(
+                        0,
+                        None,
                     ),
+                    Ascending,
                 ),
-            ),
+            ],
         },
-        orders: [
+        expressions: [
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
-                    ),
+                    None,
                 ),
-                Ascending,
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
             ),
         ],
     },

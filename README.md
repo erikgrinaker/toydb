@@ -123,5 +123,3 @@ The primary goal is to build a minimally functional yet correct distributed data
 ### Query Engine
 
 * **Type checking:** query type checking (e.g. `SELECT a + b` must receive two numbers) is done at query evaluation time, not at query compile time.
-
-* **Streamed evaluation:** it's not possible to operate on fields that were not output by a preceding plan node - e.g. it's only possible to order on `SELECT` output columns.

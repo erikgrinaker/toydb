@@ -89,139 +89,26 @@ AST: Select {
 }
 
 Plan: Plan(
-    Order {
-        source: Projection {
-            source: Filter {
-                source: NestedLoopJoin {
-                    outer: Scan {
-                        table: "movies",
-                        alias: None,
-                        filter: None,
+    Projection {
+        source: Order {
+            source: Projection {
+                source: Filter {
+                    source: NestedLoopJoin {
+                        outer: Scan {
+                            table: "movies",
+                            alias: None,
+                            filter: None,
+                        },
+                        inner: Scan {
+                            table: "genres",
+                            alias: None,
+                            filter: None,
+                        },
+                        predicate: None,
+                        pad: false,
+                        flip: false,
                     },
-                    inner: Scan {
-                        table: "genres",
-                        alias: None,
-                        filter: None,
-                    },
-                    predicate: None,
-                    pad: false,
-                    flip: false,
-                },
-                predicate: Equal(
-                    Field(
-                        3,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "genre_id",
-                            ),
-                        ),
-                    ),
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "genres",
-                                ),
-                                "id",
-                            ),
-                        ),
-                    ),
-                ),
-            },
-            expressions: [
-                (
-                    Field(
-                        0,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "id",
-                            ),
-                        ),
-                    ),
-                    None,
-                ),
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "title",
-                            ),
-                        ),
-                    ),
-                    None,
-                ),
-                (
-                    Field(
-                        8,
-                        Some(
-                            (
-                                None,
-                                "name",
-                            ),
-                        ),
-                    ),
-                    None,
-                ),
-            ],
-        },
-        orders: [
-            (
-                Field(
-                    2,
-                    Some(
-                        (
-                            Some(
-                                "genres",
-                            ),
-                            "name",
-                        ),
-                    ),
-                ),
-                Ascending,
-            ),
-            (
-                Field(
-                    1,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "title",
-                        ),
-                    ),
-                ),
-                Ascending,
-            ),
-        ],
-    },
-)
-
-Optimized plan: Plan(
-    Order {
-        source: Projection {
-            source: NestedLoopJoin {
-                outer: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: None,
-                },
-                inner: Scan {
-                    table: "genres",
-                    alias: None,
-                    filter: None,
-                },
-                predicate: Some(
-                    Equal(
+                    predicate: Equal(
                         Field(
                             3,
                             Some(
@@ -245,79 +132,270 @@ Optimized plan: Plan(
                             ),
                         ),
                     ),
-                ),
-                pad: false,
-                flip: false,
-            },
-            expressions: [
-                (
-                    Field(
-                        0,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
+                },
+                expressions: [
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "id",
                                 ),
-                                "id",
                             ),
                         ),
+                        None,
                     ),
-                    None,
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    None,
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    Some(
+                                        "genres",
+                                    ),
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                ],
+            },
+            orders: [
+                (
+                    Field(
+                        3,
+                        None,
+                    ),
+                    Ascending,
                 ),
                 (
                     Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "title",
-                            ),
-                        ),
+                        4,
+                        None,
                     ),
-                    None,
-                ),
-                (
-                    Field(
-                        8,
-                        Some(
-                            (
-                                None,
-                                "name",
-                            ),
-                        ),
-                    ),
-                    None,
+                    Ascending,
                 ),
             ],
         },
-        orders: [
+        expressions: [
             (
                 Field(
-                    2,
-                    Some(
-                        (
-                            Some(
-                                "genres",
-                            ),
-                            "name",
-                        ),
-                    ),
+                    0,
+                    None,
                 ),
-                Ascending,
+                None,
             ),
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            Some(
-                                "movies",
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    2,
+                    None,
+                ),
+                None,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Projection {
+        source: Order {
+            source: Projection {
+                source: NestedLoopJoin {
+                    outer: Scan {
+                        table: "movies",
+                        alias: None,
+                        filter: None,
+                    },
+                    inner: Scan {
+                        table: "genres",
+                        alias: None,
+                        filter: None,
+                    },
+                    predicate: Some(
+                        Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "genre_id",
+                                    ),
+                                ),
                             ),
-                            "title",
+                            Field(
+                                7,
+                                Some(
+                                    (
+                                        Some(
+                                            "genres",
+                                        ),
+                                        "id",
+                                    ),
+                                ),
+                            ),
                         ),
                     ),
+                    pad: false,
+                    flip: false,
+                },
+                expressions: [
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    None,
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    Some(
+                                        "genres",
+                                    ),
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                ],
+            },
+            orders: [
+                (
+                    Field(
+                        3,
+                        None,
+                    ),
+                    Ascending,
                 ),
-                Ascending,
+                (
+                    Field(
+                        4,
+                        None,
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    2,
+                    None,
+                ),
+                None,
             ),
         ],
     },

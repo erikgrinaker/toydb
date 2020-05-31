@@ -194,14 +194,7 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),
@@ -308,14 +301,7 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),

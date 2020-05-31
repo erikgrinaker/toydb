@@ -1,0 +1,214 @@
+Query: SELECT id, title FROM movies ORDER BY released
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            (
+                Field(
+                    None,
+                    "id",
+                ),
+                None,
+            ),
+            (
+                Field(
+                    None,
+                    "title",
+                ),
+                None,
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: None,
+    having: None,
+    order: [
+        (
+            Field(
+                None,
+                "released",
+            ),
+            Ascending,
+        ),
+    ],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    Projection {
+        source: Order {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                    filter: None,
+                },
+                expressions: [
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            4,
+                            Some(
+                                (
+                                    None,
+                                    "released",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                ],
+            },
+            orders: [
+                (
+                    Field(
+                        2,
+                        None,
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Projection {
+        source: Order {
+            source: Projection {
+                source: Scan {
+                    table: "movies",
+                    alias: None,
+                    filter: None,
+                },
+                expressions: [
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            4,
+                            Some(
+                                (
+                                    None,
+                                    "released",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                ],
+            },
+            orders: [
+                (
+                    Field(
+                        2,
+                        None,
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
+            ),
+        ],
+    },
+)
+
+Query: SELECT id, title FROM movies ORDER BY released
+
+Result: ["id", "title"]
+[Integer(6), String("Solaris")]
+[Integer(1), String("Stalker")]
+[Integer(4), String("Heat")]
+[Integer(3), String("Primer")]
+[Integer(5), String("The Fountain")]
+[Integer(10), String("Inception")]
+[Integer(7), String("Gravity")]
+[Integer(9), String("Birdman")]
+[Integer(2), String("Sicario")]
+[Integer(8), String("Blindspotting")]

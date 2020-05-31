@@ -1,4 +1,4 @@
-Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)
+Query: SELECT studio_id, MAX(rating) AS best FROM movies GROUP BY studio_id HAVING MIN(best) > 7 ORDER BY studio_id
 
 AST: Select {
     select: SelectClause {
@@ -20,7 +20,9 @@ AST: Select {
                         ),
                     ],
                 ),
-                None,
+                Some(
+                    "best",
+                ),
             ),
         ],
     },
@@ -45,17 +47,33 @@ AST: Select {
             ],
         ),
     ),
-    having: None,
+    having: Some(
+        HavingClause(
+            Operation(
+                GreaterThan(
+                    Function(
+                        "min",
+                        [
+                            Field(
+                                None,
+                                "best",
+                            ),
+                        ],
+                    ),
+                    Literal(
+                        Integer(
+                            7,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
     order: [
         (
-            Function(
-                "max",
-                [
-                    Field(
-                        None,
-                        "rating",
-                    ),
-                ],
+            Field(
+                None,
+                "studio_id",
             ),
             Ascending,
         ),
@@ -64,4 +82,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Aggregate function not allowed here")
+Plan: Value("Aggregate function cannot reference aggregate")

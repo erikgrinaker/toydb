@@ -127,12 +127,7 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "rating",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),
@@ -204,12 +199,7 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "rating",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),

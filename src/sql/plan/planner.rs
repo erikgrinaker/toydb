@@ -152,17 +152,40 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 };
 
                 // Build SELECT clause.
+                let mut order = order;
+                let mut having = having.map(|c| c.0);
+                let mut hidden = 0;
                 if !select.expressions.is_empty() {
-                    let mut exprs = select.expressions;
+                    let mut expressions = select.expressions;
+
+                    // Inject hidden SELECT columns for fields and aggregates used in ORDER BY and
+                    // HAVING expressions but not present in existing SELECT output. These will be
+                    // removed again by a later projection.
+                    if let Some(ref mut expr) = having {
+                        hidden += self.inject_hidden(expr, &mut expressions)?;
+                    }
+                    for (expr, _) in order.iter_mut() {
+                        hidden += self.inject_hidden(expr, &mut expressions)?;
+                    }
 
                     // Extract any aggregate functions and GROUP BY expressions, replacing them with
                     // Column placeholders. Aggregations are handled by evaluating group expressions
                     // and aggregate function arguments in a pre-projection, passing the results
                     // to an aggregation node, and then evaluating the final SELECT expressions
-                    // in the post-projection. See build_aggregates() for details.
-                    let aggregates = self.extract_aggregates(&mut exprs)?;
+                    // in the post-projection. See build_aggregation() for details. For example:
+                    //
+                    // SELECT (MAX(rating * 100) - MIN(rating * 100)) / 100
+                    // FROM movies
+                    // GROUP BY released - 2000
+                    //
+                    // Results in the following nodes:
+                    //
+                    // - Projection: rating * 100, rating * 100, released - 2000
+                    // - Aggregation: max(#0), min(#1) group by #2
+                    // - Projection: (#0 - #1) / 100
+                    let aggregates = self.extract_aggregates(&mut expressions)?;
                     let groups = if let Some(ast::GroupByClause(group_by)) = group_by {
-                        self.extract_groups(&mut exprs, group_by, aggregates.len())?
+                        self.extract_groups(&mut expressions, group_by, aggregates.len())?
                     } else {
                         Vec::new()
                     };
@@ -171,7 +194,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     }
 
                     // Build the remaining non-aggregate projection.
-                    let expressions: Vec<(Expression, Option<String>)> = exprs
+                    let expressions: Vec<(Expression, Option<String>)> = expressions
                         .into_iter()
                         .map(|(e, l)| Ok((self.build_expression(scope, e)?, l)))
                         .collect::<Result<_>>()?;
@@ -180,7 +203,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 };
 
                 // Build HAVING clause.
-                if let Some(ast::HavingClause(expr)) = having {
+                if let Some(expr) = having {
                     node = Node::Filter {
                         source: Box::new(node),
                         predicate: self.build_expression(scope, expr)?,
@@ -188,19 +211,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 };
 
                 // Build ORDER clause.
-                // FIXME Because the projection doesn't retain original table values, we can't
-                // order by fields which are not in the result set.
                 if !order.is_empty() {
                     node = Node::Order {
                         source: Box::new(node),
                         orders: order
                             .into_iter()
                             .map(|(e, o)| {
-                                if self.is_aggregate(&e) {
-                                    return Err(Error::Value(
-                                        "Aggregate function not allowed here".into(),
-                                    ));
-                                }
                                 Ok((
                                     self.build_expression(scope, e)?,
                                     match o {
@@ -234,6 +250,17 @@ impl<'a, C: Catalog> Planner<'a, C> {
                         }?,
                     }
                 }
+
+                // Remove any hidden columns.
+                if hidden > 0 {
+                    node = Node::Projection {
+                        source: Box::new(node),
+                        expressions: (0..(scope.len() - hidden))
+                            .map(|i| (Expression::Field(i, None), None))
+                            .collect(),
+                    }
+                }
+
                 node
             }
         })
@@ -300,7 +327,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
         })
     }
 
-    /// Builds an aggregation node.
+    /// Builds an aggregation node. All aggregate parameters and GROUP BY expressions are evaluated
+    /// in a pre-projection, whose results are fed into an Aggregate node. This node computes the
+    /// aggregates for the given groups, passing the group values through directly.
     fn build_aggregation(
         &self,
         scope: &mut Scope,
@@ -405,6 +434,67 @@ impl<'a, C: Catalog> Planner<'a, C> {
             }
         }
         Ok(groups)
+    }
+
+    /// Injects hidden expressions into SELECT expressions. This is used for ORDER BY and HAVING, in
+    /// order to apply these to fields or aggregates that are not present in the SELECT output, e.g.
+    /// to order on a column that is not selected. This is done by replacing the relevant parts of
+    /// the given expression with Column references to either existing columns or new, hidden
+    /// columns in the select expressions. Returns the number of hidden columns added.
+    fn inject_hidden(
+        &self,
+        expr: &mut ast::Expression,
+        select: &mut Vec<(ast::Expression, Option<String>)>,
+    ) -> Result<usize> {
+        // Replace any identical expressions or label references with column references.
+        for (i, (sexpr, label)) in select.iter().enumerate() {
+            if expr == sexpr {
+                replace(expr, ast::Expression::Column(i));
+                continue;
+            }
+            if let Some(label) = label {
+                expr.replace_with(|expr| {
+                    expr.transform(
+                        &mut |e| match e {
+                            ast::Expression::Field(None, ref l) if l == label => {
+                                Ok(ast::Expression::Column(i))
+                            }
+                            e => Ok(e),
+                        },
+                        &mut |e| Ok(e),
+                    )
+                })?;
+            }
+        }
+        // Any remaining aggregate functions and field references must be extracted as hidden
+        // columns.
+        let mut hidden = 0;
+        expr.replace_with(|expr| {
+            expr.transform(
+                &mut |e| match &e {
+                    ast::Expression::Function(f, a) if self.aggregate_from_name(f).is_some() => {
+                        if let ast::Expression::Column(c) = a[0] {
+                            if self.is_aggregate(&select[c].0) {
+                                return Err(Error::Value(
+                                    "Aggregate function cannot reference aggregate".into(),
+                                ));
+                            }
+                        }
+                        select.push((e, None));
+                        hidden += 1;
+                        Ok(ast::Expression::Column(select.len() - 1))
+                    }
+                    ast::Expression::Field(_, _) => {
+                        select.push((e, None));
+                        hidden += 1;
+                        Ok(ast::Expression::Column(select.len() - 1))
+                    }
+                    _ => Ok(e),
+                },
+                &mut |e| Ok(e),
+            )
+        })?;
+        Ok(hidden)
     }
 
     /// Returns the aggregate corresponding to the given aggregate function name.
@@ -661,6 +751,11 @@ impl Scope {
                 .copied()
                 .ok_or_else(|| Error::Value(format!("Unknown field {}", name)))
         }
+    }
+
+    /// Number of columns in the current scope.
+    fn len(&self) -> usize {
+        self.columns.len()
     }
 
     /// Projects the scope. This takes a set of expressions and labels in the current scope,

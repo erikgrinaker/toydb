@@ -121,12 +121,7 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "studio_id",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),
@@ -196,12 +191,7 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "studio_id",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),

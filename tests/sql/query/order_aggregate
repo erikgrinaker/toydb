@@ -1,4 +1,4 @@
-Query: SELECT title FROM movies GROUP BY title ORDER BY title ASC
+Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)
 
 AST: Select {
     select: SelectClause {
@@ -6,7 +6,19 @@ AST: Select {
             (
                 Field(
                     None,
-                    "title",
+                    "studio_id",
+                ),
+                None,
+            ),
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                    ],
                 ),
                 None,
             ),
@@ -28,7 +40,7 @@ AST: Select {
             [
                 Field(
                     None,
-                    "title",
+                    "studio_id",
                 ),
             ],
         ),
@@ -36,9 +48,14 @@ AST: Select {
     having: None,
     order: [
         (
-            Field(
-                None,
-                "title",
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
             ),
             Ascending,
         ),
@@ -60,11 +77,23 @@ Plan: Plan(
                     expressions: [
                         (
                             Field(
-                                1,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "title",
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
                                     ),
                                 ),
                             ),
@@ -72,9 +101,18 @@ Plan: Plan(
                         ),
                     ],
                 },
-                aggregates: [],
+                aggregates: [
+                    Max,
+                ],
             },
             expressions: [
+                (
+                    Field(
+                        1,
+                        None,
+                    ),
+                    None,
+                ),
                 (
                     Field(
                         0,
@@ -87,7 +125,7 @@ Plan: Plan(
         orders: [
             (
                 Field(
-                    0,
+                    1,
                     None,
                 ),
                 Ascending,
@@ -109,11 +147,23 @@ Optimized plan: Plan(
                     expressions: [
                         (
                             Field(
-                                1,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "title",
+                                        "rating",
+                                    ),
+                                ),
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
                                     ),
                                 ),
                             ),
@@ -121,9 +171,18 @@ Optimized plan: Plan(
                         ),
                     ],
                 },
-                aggregates: [],
+                aggregates: [
+                    Max,
+                ],
             },
             expressions: [
+                (
+                    Field(
+                        1,
+                        None,
+                    ),
+                    None,
+                ),
                 (
                     Field(
                         0,
@@ -136,7 +195,7 @@ Optimized plan: Plan(
         orders: [
             (
                 Field(
-                    0,
+                    1,
                     None,
                 ),
                 Ascending,
@@ -145,16 +204,10 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT title FROM movies GROUP BY title ORDER BY title ASC
+Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)
 
-Result: ["title"]
-[String("Birdman")]
-[String("Blindspotting")]
-[String("Gravity")]
-[String("Heat")]
-[String("Inception")]
-[String("Primer")]
-[String("Sicario")]
-[String("Solaris")]
-[String("Stalker")]
-[String("The Fountain")]
+Result: ["studio_id", "?"]
+[Integer(3), Float(6.9)]
+[Integer(2), Float(7.6)]
+[Integer(1), Float(8.2)]
+[Integer(4), Float(8.8)]

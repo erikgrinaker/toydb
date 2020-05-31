@@ -181,24 +181,14 @@ Plan: Plan(
             (
                 Field(
                     2,
-                    Some(
-                        (
-                            None,
-                            "genre",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "title",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),
@@ -298,24 +288,14 @@ Optimized plan: Plan(
             (
                 Field(
                     2,
-                    Some(
-                        (
-                            None,
-                            "genre",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "title",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),

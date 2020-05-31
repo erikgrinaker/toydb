@@ -143,12 +143,7 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "twice",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),
@@ -229,12 +224,7 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "twice",
-                        ),
-                    ),
+                    None,
                 ),
                 Ascending,
             ),

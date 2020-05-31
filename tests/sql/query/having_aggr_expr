@@ -1,0 +1,395 @@
+Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id HAVING MAX(rating) - MIN(rating) < 1 ORDER BY studio_id
+
+AST: Select {
+    select: SelectClause {
+        expressions: [
+            (
+                Field(
+                    None,
+                    "studio_id",
+                ),
+                None,
+            ),
+            (
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
+                        ),
+                    ],
+                ),
+                None,
+            ),
+        ],
+    },
+    from: Some(
+        FromClause {
+            items: [
+                Table {
+                    name: "movies",
+                    alias: None,
+                },
+            ],
+        },
+    ),
+    where: None,
+    group_by: Some(
+        GroupByClause(
+            [
+                Field(
+                    None,
+                    "studio_id",
+                ),
+            ],
+        ),
+    ),
+    having: Some(
+        HavingClause(
+            Operation(
+                LessThan(
+                    Operation(
+                        Subtract(
+                            Function(
+                                "max",
+                                [
+                                    Field(
+                                        None,
+                                        "rating",
+                                    ),
+                                ],
+                            ),
+                            Function(
+                                "min",
+                                [
+                                    Field(
+                                        None,
+                                        "rating",
+                                    ),
+                                ],
+                            ),
+                        ),
+                    ),
+                    Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    order: [
+        (
+            Field(
+                None,
+                "studio_id",
+            ),
+            Ascending,
+        ),
+    ],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    Projection {
+        source: Order {
+            source: Filter {
+                source: Projection {
+                    source: Aggregation {
+                        source: Projection {
+                            source: Scan {
+                                table: "movies",
+                                alias: None,
+                                filter: None,
+                            },
+                            expressions: [
+                                (
+                                    Field(
+                                        5,
+                                        Some(
+                                            (
+                                                None,
+                                                "rating",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                                (
+                                    Field(
+                                        5,
+                                        Some(
+                                            (
+                                                None,
+                                                "rating",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                                (
+                                    Field(
+                                        5,
+                                        Some(
+                                            (
+                                                None,
+                                                "rating",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                                (
+                                    Field(
+                                        2,
+                                        Some(
+                                            (
+                                                None,
+                                                "studio_id",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                            ],
+                        },
+                        aggregates: [
+                            Max,
+                            Max,
+                            Min,
+                        ],
+                    },
+                    expressions: [
+                        (
+                            Field(
+                                3,
+                                None,
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                0,
+                                None,
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                1,
+                                None,
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                2,
+                                None,
+                            ),
+                            None,
+                        ),
+                    ],
+                },
+                predicate: LessThan(
+                    Subtract(
+                        Field(
+                            2,
+                            None,
+                        ),
+                        Field(
+                            3,
+                            None,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                ),
+            },
+            orders: [
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Projection {
+        source: Order {
+            source: Filter {
+                source: Projection {
+                    source: Aggregation {
+                        source: Projection {
+                            source: Scan {
+                                table: "movies",
+                                alias: None,
+                                filter: None,
+                            },
+                            expressions: [
+                                (
+                                    Field(
+                                        5,
+                                        Some(
+                                            (
+                                                None,
+                                                "rating",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                                (
+                                    Field(
+                                        5,
+                                        Some(
+                                            (
+                                                None,
+                                                "rating",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                                (
+                                    Field(
+                                        5,
+                                        Some(
+                                            (
+                                                None,
+                                                "rating",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                                (
+                                    Field(
+                                        2,
+                                        Some(
+                                            (
+                                                None,
+                                                "studio_id",
+                                            ),
+                                        ),
+                                    ),
+                                    None,
+                                ),
+                            ],
+                        },
+                        aggregates: [
+                            Max,
+                            Max,
+                            Min,
+                        ],
+                    },
+                    expressions: [
+                        (
+                            Field(
+                                3,
+                                None,
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                0,
+                                None,
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                1,
+                                None,
+                            ),
+                            None,
+                        ),
+                        (
+                            Field(
+                                2,
+                                None,
+                            ),
+                            None,
+                        ),
+                    ],
+                },
+                predicate: LessThan(
+                    Subtract(
+                        Field(
+                            2,
+                            None,
+                        ),
+                        Field(
+                            3,
+                            None,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                ),
+            },
+            orders: [
+                (
+                    Field(
+                        0,
+                        None,
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
+            ),
+        ],
+    },
+)
+
+Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id HAVING MAX(rating) - MIN(rating) < 1 ORDER BY studio_id
+
+Result: ["studio_id", "?"]
+[Integer(1), Float(8.2)]
+[Integer(2), Float(7.6)]
+[Integer(3), Float(6.9)]

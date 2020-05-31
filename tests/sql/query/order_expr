@@ -149,21 +149,9 @@ Plan: Plan(
         },
         orders: [
             (
-                Modulo(
-                    Field(
-                        2,
-                        Some(
-                            (
-                                None,
-                                "released",
-                            ),
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            4,
-                        ),
-                    ),
+                Field(
+                    3,
+                    None,
                 ),
                 Ascending,
             ),
@@ -241,21 +229,9 @@ Optimized plan: Plan(
         },
         orders: [
             (
-                Modulo(
-                    Field(
-                        2,
-                        Some(
-                            (
-                                None,
-                                "released",
-                            ),
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            4,
-                        ),
-                    ),
+                Field(
+                    3,
+                    None,
                 ),
                 Ascending,
             ),

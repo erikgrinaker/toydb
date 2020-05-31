@@ -1,4 +1,4 @@
-Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id
+Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MIN(rating)
 
 AST: Select {
     select: SelectClause {
@@ -20,9 +20,7 @@ AST: Select {
                         ),
                     ],
                 ),
-                Some(
-                    "rating",
-                ),
+                None,
             ),
         ],
     },
@@ -47,28 +45,17 @@ AST: Select {
             ],
         ),
     ),
-    having: Some(
-        HavingClause(
-            Operation(
-                GreaterThan(
+    having: None,
+    order: [
+        (
+            Function(
+                "min",
+                [
                     Field(
                         None,
                         "rating",
                     ),
-                    Literal(
-                        Integer(
-                            8,
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    ),
-    order: [
-        (
-            Field(
-                None,
-                "studio_id",
+                ],
             ),
             Ascending,
         ),
@@ -78,8 +65,8 @@ AST: Select {
 }
 
 Plan: Plan(
-    Order {
-        source: Filter {
+    Projection {
+        source: Order {
             source: Projection {
                 source: Aggregation {
                     source: Projection {
@@ -89,6 +76,18 @@ Plan: Plan(
                             filter: None,
                         },
                         expressions: [
+                            (
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
+                                        ),
+                                    ),
+                                ),
+                                None,
+                            ),
                             (
                                 Field(
                                     5,
@@ -117,12 +116,13 @@ Plan: Plan(
                     },
                     aggregates: [
                         Max,
+                        Min,
                     ],
                 },
                 expressions: [
                     (
                         Field(
-                            1,
+                            2,
                             None,
                         ),
                         None,
@@ -132,39 +132,49 @@ Plan: Plan(
                             0,
                             None,
                         ),
-                        Some(
-                            "rating",
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            None,
                         ),
+                        None,
                     ),
                 ],
             },
-            predicate: GreaterThan(
-                Field(
-                    1,
-                    None,
-                ),
-                Constant(
-                    Integer(
-                        8,
+            orders: [
+                (
+                    Field(
+                        2,
+                        None,
                     ),
+                    Ascending,
                 ),
-            ),
+            ],
         },
-        orders: [
+        expressions: [
             (
                 Field(
                     0,
                     None,
                 ),
-                Ascending,
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
             ),
         ],
     },
 )
 
 Optimized plan: Plan(
-    Order {
-        source: Filter {
+    Projection {
+        source: Order {
             source: Projection {
                 source: Aggregation {
                     source: Projection {
@@ -174,6 +184,18 @@ Optimized plan: Plan(
                             filter: None,
                         },
                         expressions: [
+                            (
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
+                                        ),
+                                    ),
+                                ),
+                                None,
+                            ),
                             (
                                 Field(
                                     5,
@@ -202,12 +224,13 @@ Optimized plan: Plan(
                     },
                     aggregates: [
                         Max,
+                        Min,
                     ],
                 },
                 expressions: [
                     (
                         Field(
-                            1,
+                            2,
                             None,
                         ),
                         None,
@@ -217,38 +240,50 @@ Optimized plan: Plan(
                             0,
                             None,
                         ),
-                        Some(
-                            "rating",
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            None,
                         ),
+                        None,
                     ),
                 ],
             },
-            predicate: GreaterThan(
-                Field(
-                    1,
-                    None,
-                ),
-                Constant(
-                    Integer(
-                        8,
+            orders: [
+                (
+                    Field(
+                        2,
+                        None,
                     ),
+                    Ascending,
                 ),
-            ),
+            ],
         },
-        orders: [
+        expressions: [
             (
                 Field(
                     0,
                     None,
                 ),
-                Ascending,
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
             ),
         ],
     },
 )
 
-Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id
+Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MIN(rating)
 
-Result: ["studio_id", "rating"]
-[Integer(1), Float(8.2)]
+Result: ["studio_id", "?"]
+[Integer(3), Float(6.9)]
 [Integer(4), Float(8.8)]
+[Integer(2), Float(7.6)]
+[Integer(1), Float(8.2)]

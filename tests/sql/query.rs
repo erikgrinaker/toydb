@@ -208,12 +208,16 @@ test_query! {
     order_desc_lowercase: "SELECT * FROM movies ORDER BY released desc",
     order_expr: "SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC",
     order_multi: "SELECT * FROM movies ORDER BY ultrahd ASC, id DESC",
+    order_noselect: "SELECT id, title FROM movies ORDER BY released",
     order_unknown_dir: "SELECT * FROM movies ORDER BY id X",
     order_field_unknown: "SELECT * FROM movies ORDER BY unknown",
     order_field_qualified: "SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title",
     order_field_aliased: "SELECT movies.id, title, genres.name AS genre FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genre, title",
     order_field_ambiguous: "SELECT * FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY id",
     order_trailing_comma: "SELECT * FROM movies ORDER BY id,",
+    order_aggregate: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)",
+    order_aggregate_noselect: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MIN(rating)",
+    order_group_by_noselect: "SELECT MAX(rating) FROM movies GROUP BY studio_id ORDER BY studio_id",
 }
 test_query! { with [
         "CREATE TABLE booleans (id INTEGER PRIMARY KEY, value BOOLEAN)",
@@ -361,7 +365,6 @@ test_query! {
     group_noaggregate: "SELECT title FROM movies GROUP BY title ORDER BY title ASC",
     group_unknown: "SELECT COUNT(*) FROM movies GROUP BY unknown",
     group_join: "SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC",
-    group_order_agg: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)",
     group_expr: "SELECT MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating",
     group_expr_aliased: "SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORDER BY twice",
     group_expr_both: "SELECT studio_id * 2, MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating",
@@ -373,5 +376,10 @@ test_query! {
     group_expr_multigroup: "SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi",
 
     having: "SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id",
+    having_aggr: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id HAVING MIN(rating) > 7 ORDER BY studio_id",
+    having_aggr_expr: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id HAVING MAX(rating) - MIN(rating) < 1 ORDER BY studio_id",
+    having_aggr_nested: "SELECT studio_id, MAX(rating) AS best FROM movies GROUP BY studio_id HAVING MIN(best) > 7 ORDER BY studio_id",
     having_nogroup: "SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id",
+    having_noselect: "SELECT studio_id FROM movies GROUP BY studio_id HAVING MAX(rating) > 8 ORDER BY studio_id",
+    having_noaggr: "SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING studio_id >= 3 ORDER BY studio_id",
 }

@@ -111,12 +111,7 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "best",
-                        ),
-                    ),
+                    None,
                 ),
                 Descending,
             ),
@@ -181,12 +176,7 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "best",
-                        ),
-                    ),
+                    None,
                 ),
                 Descending,
             ),
