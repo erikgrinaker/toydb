@@ -24,7 +24,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     }
 
     /// Builds a plan node for a statement.
-    fn build_statement(&mut self, statement: ast::Statement) -> Result<Node> {
+    fn build_statement(&self, statement: ast::Statement) -> Result<Node> {
         Ok(match statement {
             // Transaction control and explain statements should have been handled by session.
             ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
@@ -68,7 +68,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             ast::Statement::DropTable(table) => Node::DropTable { table },
 
-            // Data modification language.
+            // DML statements (mutations).
             ast::Statement::Delete { table, r#where } => {
                 let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
                 Node::Delete {
@@ -175,7 +175,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                         .into_iter()
                         .map(|(e, l)| Ok((self.build_expression(scope, e)?, l)))
                         .collect::<Result<_>>()?;
-                    scope.project(expressions.clone())?;
+                    scope.project(&expressions)?;
                     node = Node::Projection { source: Box::new(node), expressions };
                 };
 
@@ -242,7 +242,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// Builds a FROM clause consisting of several items. Each item is either a single table or a
     /// join of an arbitrary number of tables. All of the items are joined, since e.g. 'SELECT * FROM
     /// a, b' is an implicit join of a and b.
-    fn build_from_clause(&mut self, scope: &mut Scope, from: ast::FromClause) -> Result<Node> {
+    fn build_from_clause(&self, scope: &mut Scope, from: ast::FromClause) -> Result<Node> {
         let mut items = from.items.into_iter();
         let mut node = match items.next() {
             Some(item) => self.build_from_item(scope, item)?,
@@ -264,7 +264,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// e.g. 'SELECT * FROM a LEFT JOIN b ON b.a_id = a.id'. Any tables will be stored in
     /// self.tables keyed by their query name (i.e. alias if given, otherwise name). The table can
     /// only be referenced by the query name (so if alias is given, cannot reference by name).
-    fn build_from_item(&mut self, scope: &mut Scope, item: ast::FromItem) -> Result<Node> {
+    fn build_from_item(&self, scope: &mut Scope, item: ast::FromItem) -> Result<Node> {
         Ok(match item {
             ast::FromItem::Table { name, alias } => {
                 scope.add_table(
@@ -319,7 +319,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         }
         // FIXME This is probably wrong for the aggregate columns, since we don't want to inherit
         // from them if they are simple field references.
-        scope.project(expressions.clone())?;
+        scope.project(&expressions)?;
         let node = Node::Aggregation {
             source: Box::new(Node::Projection { source: Box::new(source), expressions }),
             aggregates,
@@ -665,7 +665,7 @@ impl Scope {
 
     /// Projects the scope. This takes a set of expressions and labels in the current scope,
     /// and returns a new scope for the projection.
-    fn project(&mut self, projection: Vec<(Expression, Option<String>)>) -> Result<()> {
+    fn project(&mut self, projection: &[(Expression, Option<String>)]) -> Result<()> {
         if self.constant {
             return Err(Error::Internal("Can't modify constant scope".into()));
         }
@@ -673,18 +673,18 @@ impl Scope {
         new.tables = self.tables.clone();
         for (expr, label) in projection {
             match (expr, label) {
-                (_, Some(label)) => new.add_column(None, Some(label)),
+                (_, Some(label)) => new.add_column(None, Some(label.clone())),
                 (Expression::Field(_, Some((Some(table), name))), _) => {
-                    new.add_column(Some(table), Some(name))
+                    new.add_column(Some(table.clone()), Some(name.clone()))
                 }
                 (Expression::Field(_, Some((None, name))), _) => {
-                    if let Some(i) = self.unqualified.get(&name) {
+                    if let Some(i) = self.unqualified.get(name) {
                         let (table, name) = self.columns[*i].clone();
                         new.add_column(table, name);
                     }
                 }
                 (Expression::Field(i, None), _) => {
-                    let (table, label) = self.columns.get(i).cloned().unwrap_or((None, None));
+                    let (table, label) = self.columns.get(*i).cloned().unwrap_or((None, None));
                     new.add_column(table, label)
                 }
                 _ => new.add_column(None, None),
