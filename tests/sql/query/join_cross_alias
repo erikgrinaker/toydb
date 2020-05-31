@@ -163,6 +163,7 @@ Plan: Plan(
                         ),
                         filter: None,
                     },
+                    outer_size: 7,
                     inner: Scan {
                         table: "genres",
                         alias: Some(
@@ -174,6 +175,7 @@ Plan: Plan(
                     pad: false,
                     flip: false,
                 },
+                outer_size: 9,
                 inner: Scan {
                     table: "countries",
                     alias: Some(
@@ -366,6 +368,7 @@ Optimized plan: Plan(
                     ),
                     filter: None,
                 },
+                outer_size: 7,
                 inner: Scan {
                     table: "genres",
                     alias: Some(
@@ -377,6 +380,7 @@ Optimized plan: Plan(
                 pad: false,
                 flip: false,
             },
+            outer_size: 9,
             inner: Scan {
                 table: "countries",
                 alias: Some(

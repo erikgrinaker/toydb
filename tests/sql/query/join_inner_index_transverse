@@ -1,4 +1,4 @@
-Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id AND movies.id = genres.id
+Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id AND g.id = 4
 
 AST: Select {
     select: [],
@@ -6,11 +6,15 @@ AST: Select {
         Join {
             left: Table {
                 name: "movies",
-                alias: None,
+                alias: Some(
+                    "m",
+                ),
             },
             right: Table {
                 name: "genres",
-                alias: None,
+                alias: Some(
+                    "g",
+                ),
             },
             type: Inner,
             predicate: Some(
@@ -20,13 +24,13 @@ AST: Select {
                             Equal(
                                 Field(
                                     Some(
-                                        "movies",
+                                        "m",
                                     ),
                                     "genre_id",
                                 ),
                                 Field(
                                     Some(
-                                        "genres",
+                                        "g",
                                     ),
                                     "id",
                                 ),
@@ -36,15 +40,14 @@ AST: Select {
                             Equal(
                                 Field(
                                     Some(
-                                        "movies",
+                                        "g",
                                     ),
                                     "id",
                                 ),
-                                Field(
-                                    Some(
-                                        "genres",
+                                Literal(
+                                    Integer(
+                                        4,
                                     ),
-                                    "id",
                                 ),
                             ),
                         ),
@@ -65,13 +68,17 @@ Plan: Plan(
     NestedLoopJoin {
         outer: Scan {
             table: "movies",
-            alias: None,
+            alias: Some(
+                "m",
+            ),
             filter: None,
         },
         outer_size: 7,
         inner: Scan {
             table: "genres",
-            alias: None,
+            alias: Some(
+                "g",
+            ),
             filter: None,
         },
         predicate: Some(
@@ -82,7 +89,7 @@ Plan: Plan(
                         Some(
                             (
                                 Some(
-                                    "movies",
+                                    "m",
                                 ),
                                 "genre_id",
                             ),
@@ -93,7 +100,7 @@ Plan: Plan(
                         Some(
                             (
                                 Some(
-                                    "genres",
+                                    "g",
                                 ),
                                 "id",
                             ),
@@ -102,25 +109,19 @@ Plan: Plan(
                 ),
                 Equal(
                     Field(
-                        0,
+                        7,
                         Some(
                             (
                                 Some(
-                                    "movies",
+                                    "g",
                                 ),
                                 "id",
                             ),
                         ),
                     ),
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "genres",
-                                ),
-                                "id",
-                            ),
+                    Constant(
+                        Integer(
+                            4,
                         ),
                     ),
                 ),
@@ -135,62 +136,44 @@ Optimized plan: Plan(
     NestedLoopJoin {
         outer: Scan {
             table: "movies",
-            alias: None,
+            alias: Some(
+                "m",
+            ),
             filter: None,
         },
         outer_size: 7,
-        inner: Scan {
+        inner: KeyLookup {
             table: "genres",
-            alias: None,
-            filter: None,
+            alias: Some(
+                "g",
+            ),
+            keys: [
+                Integer(
+                    4,
+                ),
+            ],
         },
         predicate: Some(
-            And(
-                Equal(
-                    Field(
-                        3,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "genre_id",
+            Equal(
+                Field(
+                    3,
+                    Some(
+                        (
+                            Some(
+                                "m",
                             ),
-                        ),
-                    ),
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "genres",
-                                ),
-                                "id",
-                            ),
+                            "genre_id",
                         ),
                     ),
                 ),
-                Equal(
-                    Field(
-                        0,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "id",
+                Field(
+                    7,
+                    Some(
+                        (
+                            Some(
+                                "g",
                             ),
-                        ),
-                    ),
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "genres",
-                                ),
-                                "id",
-                            ),
+                            "id",
                         ),
                     ),
                 ),
@@ -201,8 +184,6 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id AND movies.id = genres.id
+Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id AND g.id = 4
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
-[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null, Integer(1), String("Science Fiction")]
-[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action")]

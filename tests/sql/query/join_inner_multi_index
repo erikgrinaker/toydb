@@ -1,15 +1,15 @@
 Query: 
-        SELECT movies.title, genres.name AS genre, studios.name AS studio
-        FROM movies
-            INNER JOIN genres ON movies.genre_id = genres.id
-            INNER JOIN studios ON movies.studio_id = studios.id
+        SELECT m.title, g.name AS genre, s.name AS studio
+        FROM movies m
+            INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
+            INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
 
 AST: Select {
     select: [
         (
             Field(
                 Some(
-                    "movies",
+                    "m",
                 ),
                 "title",
             ),
@@ -18,7 +18,7 @@ AST: Select {
         (
             Field(
                 Some(
-                    "genres",
+                    "g",
                 ),
                 "name",
             ),
@@ -29,7 +29,7 @@ AST: Select {
         (
             Field(
                 Some(
-                    "studios",
+                    "s",
                 ),
                 "name",
             ),
@@ -43,27 +43,50 @@ AST: Select {
             left: Join {
                 left: Table {
                     name: "movies",
-                    alias: None,
+                    alias: Some(
+                        "m",
+                    ),
                 },
                 right: Table {
                     name: "genres",
-                    alias: None,
+                    alias: Some(
+                        "g",
+                    ),
                 },
                 type: Inner,
                 predicate: Some(
                     Operation(
-                        Equal(
-                            Field(
-                                Some(
-                                    "movies",
+                        And(
+                            Operation(
+                                Equal(
+                                    Field(
+                                        Some(
+                                            "m",
+                                        ),
+                                        "genre_id",
+                                    ),
+                                    Field(
+                                        Some(
+                                            "g",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
-                                "genre_id",
                             ),
-                            Field(
-                                Some(
-                                    "genres",
+                            Operation(
+                                Equal(
+                                    Field(
+                                        Some(
+                                            "g",
+                                        ),
+                                        "id",
+                                    ),
+                                    Literal(
+                                        Integer(
+                                            1,
+                                        ),
+                                    ),
                                 ),
-                                "id",
                             ),
                         ),
                     ),
@@ -71,23 +94,44 @@ AST: Select {
             },
             right: Table {
                 name: "studios",
-                alias: None,
+                alias: Some(
+                    "s",
+                ),
             },
             type: Inner,
             predicate: Some(
                 Operation(
-                    Equal(
-                        Field(
-                            Some(
-                                "movies",
+                    And(
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "m",
+                                    ),
+                                    "studio_id",
+                                ),
+                                Field(
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
                             ),
-                            "studio_id",
                         ),
-                        Field(
-                            Some(
-                                "studios",
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        4,
+                                    ),
+                                ),
                             ),
-                            "id",
                         ),
                     ),
                 ),
@@ -108,36 +152,60 @@ Plan: Plan(
             outer: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    alias: Some(
+                        "m",
+                    ),
                     filter: None,
                 },
                 outer_size: 7,
                 inner: Scan {
                     table: "genres",
-                    alias: None,
+                    alias: Some(
+                        "g",
+                    ),
                     filter: None,
                 },
                 predicate: Some(
-                    Equal(
-                        Field(
-                            3,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
+                    And(
+                        Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        Some(
+                                            "m",
+                                        ),
+                                        "genre_id",
                                     ),
-                                    "genre_id",
+                                ),
+                            ),
+                            Field(
+                                7,
+                                Some(
+                                    (
+                                        Some(
+                                            "g",
+                                        ),
+                                        "id",
+                                    ),
                                 ),
                             ),
                         ),
-                        Field(
-                            7,
-                            Some(
-                                (
-                                    Some(
-                                        "genres",
+                        Equal(
+                            Field(
+                                7,
+                                Some(
+                                    (
+                                        Some(
+                                            "g",
+                                        ),
+                                        "id",
                                     ),
-                                    "id",
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    1,
                                 ),
                             ),
                         ),
@@ -149,30 +217,52 @@ Plan: Plan(
             outer_size: 9,
             inner: Scan {
                 table: "studios",
-                alias: None,
+                alias: Some(
+                    "s",
+                ),
                 filter: None,
             },
             predicate: Some(
-                Equal(
-                    Field(
-                        2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
+                And(
+                    Equal(
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "studio_id",
                                 ),
-                                "studio_id",
+                            ),
+                        ),
+                        Field(
+                            9,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
                             ),
                         ),
                     ),
-                    Field(
-                        9,
-                        Some(
-                            (
-                                Some(
-                                    "studios",
+                    Equal(
+                        Field(
+                            9,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
                                 ),
-                                "id",
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                4,
                             ),
                         ),
                     ),
@@ -188,7 +278,7 @@ Plan: Plan(
                     Some(
                         (
                             Some(
-                                "movies",
+                                "m",
                             ),
                             "title",
                         ),
@@ -202,7 +292,7 @@ Plan: Plan(
                     Some(
                         (
                             Some(
-                                "genres",
+                                "g",
                             ),
                             "name",
                         ),
@@ -218,7 +308,7 @@ Plan: Plan(
                     Some(
                         (
                             Some(
-                                "studios",
+                                "s",
                             ),
                             "name",
                         ),
@@ -238,14 +328,22 @@ Optimized plan: Plan(
             outer: NestedLoopJoin {
                 outer: Scan {
                     table: "movies",
-                    alias: None,
+                    alias: Some(
+                        "m",
+                    ),
                     filter: None,
                 },
                 outer_size: 7,
-                inner: Scan {
+                inner: KeyLookup {
                     table: "genres",
-                    alias: None,
-                    filter: None,
+                    alias: Some(
+                        "g",
+                    ),
+                    keys: [
+                        Integer(
+                            1,
+                        ),
+                    ],
                 },
                 predicate: Some(
                     Equal(
@@ -254,7 +352,7 @@ Optimized plan: Plan(
                             Some(
                                 (
                                     Some(
-                                        "movies",
+                                        "m",
                                     ),
                                     "genre_id",
                                 ),
@@ -265,7 +363,7 @@ Optimized plan: Plan(
                             Some(
                                 (
                                     Some(
-                                        "genres",
+                                        "g",
                                     ),
                                     "id",
                                 ),
@@ -277,10 +375,16 @@ Optimized plan: Plan(
                 flip: false,
             },
             outer_size: 9,
-            inner: Scan {
+            inner: KeyLookup {
                 table: "studios",
-                alias: None,
-                filter: None,
+                alias: Some(
+                    "s",
+                ),
+                keys: [
+                    Integer(
+                        4,
+                    ),
+                ],
             },
             predicate: Some(
                 Equal(
@@ -289,7 +393,7 @@ Optimized plan: Plan(
                         Some(
                             (
                                 Some(
-                                    "movies",
+                                    "m",
                                 ),
                                 "studio_id",
                             ),
@@ -300,7 +404,7 @@ Optimized plan: Plan(
                         Some(
                             (
                                 Some(
-                                    "studios",
+                                    "s",
                                 ),
                                 "id",
                             ),
@@ -318,7 +422,7 @@ Optimized plan: Plan(
                     Some(
                         (
                             Some(
-                                "movies",
+                                "m",
                             ),
                             "title",
                         ),
@@ -332,7 +436,7 @@ Optimized plan: Plan(
                     Some(
                         (
                             Some(
-                                "genres",
+                                "g",
                             ),
                             "name",
                         ),
@@ -348,7 +452,7 @@ Optimized plan: Plan(
                     Some(
                         (
                             Some(
-                                "studios",
+                                "s",
                             ),
                             "name",
                         ),
@@ -363,19 +467,12 @@ Optimized plan: Plan(
 )
 
 Query: 
-        SELECT movies.title, genres.name AS genre, studios.name AS studio
-        FROM movies
-            INNER JOIN genres ON movies.genre_id = genres.id
-            INNER JOIN studios ON movies.studio_id = studios.id
+        SELECT m.title, g.name AS genre, s.name AS studio
+        FROM movies m
+            INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
+            INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
 
 Result: ["title", "genre", "studio"]
-[String("Stalker"), String("Science Fiction"), String("Mosfilm")]
-[String("Sicario"), String("Action"), String("Lionsgate")]
-[String("Primer"), String("Science Fiction"), String("StudioCanal")]
-[String("Heat"), String("Action"), String("Warner Bros")]
 [String("The Fountain"), String("Science Fiction"), String("Warner Bros")]
-[String("Solaris"), String("Science Fiction"), String("Mosfilm")]
 [String("Gravity"), String("Science Fiction"), String("Warner Bros")]
-[String("Blindspotting"), String("Comedy"), String("Lionsgate")]
-[String("Birdman"), String("Comedy"), String("Warner Bros")]
 [String("Inception"), String("Science Fiction"), String("Warner Bros")]

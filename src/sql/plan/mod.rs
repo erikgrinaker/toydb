@@ -81,6 +81,7 @@ pub enum Node {
     },
     NestedLoopJoin {
         outer: Box<Node>,
+        outer_size: usize,
         inner: Box<Node>,
         predicate: Option<Expression>,
         pad: bool,
@@ -141,13 +142,16 @@ impl Node {
             Self::Limit { source, limit } => {
                 Self::Limit { source: source.transform(before, after)?.into(), limit }
             }
-            Self::NestedLoopJoin { outer, inner, predicate, pad, flip } => Self::NestedLoopJoin {
-                outer: outer.transform(before, after)?.into(),
-                inner: inner.transform(before, after)?.into(),
-                predicate,
-                pad,
-                flip,
-            },
+            Self::NestedLoopJoin { outer, outer_size, inner, predicate, pad, flip } => {
+                Self::NestedLoopJoin {
+                    outer: outer.transform(before, after)?.into(),
+                    outer_size,
+                    inner: inner.transform(before, after)?.into(),
+                    predicate,
+                    pad,
+                    flip,
+                }
+            }
             Self::Offset { source, offset } => {
                 Self::Offset { source: source.transform(before, after)?.into(), offset }
             }

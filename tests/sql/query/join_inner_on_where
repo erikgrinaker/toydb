@@ -65,6 +65,7 @@ Plan: Plan(
                 alias: None,
                 filter: None,
             },
+            outer_size: 7,
             inner: Scan {
                 table: "genres",
                 alias: None,
@@ -147,6 +148,7 @@ Optimized plan: Plan(
             alias: None,
             filter: None,
         },
+        outer_size: 7,
         inner: Scan {
             table: "genres",
             alias: None,

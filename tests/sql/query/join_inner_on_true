@@ -37,6 +37,7 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
+        outer_size: 7,
         inner: Scan {
             table: "genres",
             alias: None,
@@ -59,20 +60,21 @@ Optimized plan: Plan(
         outer: Scan {
             table: "movies",
             alias: None,
-            filter: None,
+            filter: Some(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
         },
+        outer_size: 7,
         inner: Scan {
             table: "genres",
             alias: None,
             filter: None,
         },
-        predicate: Some(
-            Constant(
-                Boolean(
-                    true,
-                ),
-            ),
-        ),
+        predicate: None,
         pad: false,
         flip: false,
     },

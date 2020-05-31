@@ -49,6 +49,7 @@ Plan: Plan(
                     alias: None,
                     filter: None,
                 },
+                outer_size: 7,
                 inner: Scan {
                     table: "genres",
                     alias: None,
@@ -58,6 +59,7 @@ Plan: Plan(
                 pad: false,
                 flip: false,
             },
+            outer_size: 9,
             inner: Scan {
                 table: "countries",
                 alias: None,
@@ -67,6 +69,7 @@ Plan: Plan(
             pad: false,
             flip: false,
         },
+        outer_size: 11,
         inner: Scan {
             table: "studios",
             alias: None,
@@ -87,6 +90,7 @@ Optimized plan: Plan(
                     alias: None,
                     filter: None,
                 },
+                outer_size: 7,
                 inner: Scan {
                     table: "genres",
                     alias: None,
@@ -96,6 +100,7 @@ Optimized plan: Plan(
                 pad: false,
                 flip: false,
             },
+            outer_size: 9,
             inner: Scan {
                 table: "countries",
                 alias: None,
@@ -105,6 +110,7 @@ Optimized plan: Plan(
             pad: false,
             flip: false,
         },
+        outer_size: 11,
         inner: Scan {
             table: "studios",
             alias: None,

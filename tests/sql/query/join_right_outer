@@ -78,6 +78,7 @@ Plan: Plan(
                 ),
                 filter: None,
             },
+            outer_size: 2,
             inner: Scan {
                 table: "movies",
                 alias: Some(
@@ -161,6 +162,7 @@ Optimized plan: Plan(
                 ),
                 filter: None,
             },
+            outer_size: 2,
             inner: Scan {
                 table: "movies",
                 alias: Some(

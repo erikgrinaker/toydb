@@ -98,6 +98,7 @@ Plan: Plan(
                             ),
                             filter: None,
                         },
+                        outer_size: 7,
                         inner: Scan {
                             table: "studios",
                             alias: Some(
@@ -205,6 +206,7 @@ Optimized plan: Plan(
                             ),
                             filter: None,
                         },
+                        outer_size: 7,
                         inner: Scan {
                             table: "studios",
                             alias: Some(
