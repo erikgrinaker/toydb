@@ -1,0 +1,234 @@
+Query: SELECT * FROM movies WHERE (genre_id = 2 OR genre_id = 3) AND studio_id = 2 ORDER BY id
+
+AST: Select {
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: Some(
+        Operation(
+            And(
+                Operation(
+                    Or(
+                        Operation(
+                            Equal(
+                                Field(
+                                    None,
+                                    "genre_id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        2,
+                                    ),
+                                ),
+                            ),
+                        ),
+                        Operation(
+                            Equal(
+                                Field(
+                                    None,
+                                    "genre_id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        3,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                Operation(
+                    Equal(
+                        Field(
+                            None,
+                            "studio_id",
+                        ),
+                        Literal(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [
+        (
+            Field(
+                None,
+                "id",
+            ),
+            Ascending,
+        ),
+    ],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    Order {
+        source: Filter {
+            source: Scan {
+                table: "movies",
+                alias: None,
+                filter: None,
+            },
+            predicate: And(
+                Or(
+                    Equal(
+                        Field(
+                            3,
+                            Some(
+                                (
+                                    None,
+                                    "genre_id",
+                                ),
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                    ),
+                    Equal(
+                        Field(
+                            3,
+                            Some(
+                                (
+                                    None,
+                                    "genre_id",
+                                ),
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                3,
+                            ),
+                        ),
+                    ),
+                ),
+                Equal(
+                    Field(
+                        2,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                ),
+            ),
+        },
+        orders: [
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
+                ),
+                Ascending,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Order {
+        source: Scan {
+            table: "movies",
+            alias: None,
+            filter: Some(
+                And(
+                    Or(
+                        Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        None,
+                                        "genre_id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                        ),
+                        Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        None,
+                                        "genre_id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                    ),
+                    Equal(
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        },
+        orders: [
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
+                ),
+                Ascending,
+            ),
+        ],
+    },
+)
+
+Query: SELECT * FROM movies WHERE (genre_id = 2 OR genre_id = 3) AND studio_id = 2 ORDER BY id
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(8), String("Blindspotting"), Integer(2), Integer(3), Integer(2018), Float(7.4), Boolean(true)]

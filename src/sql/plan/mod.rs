@@ -114,108 +114,109 @@ pub enum Node {
 
 impl Node {
     /// Recursively transforms nodes by applying functions before and after descending.
-    pub fn transform<B, A>(mut self, pre: &B, post: &A) -> Result<Self>
+    pub fn transform<B, A>(mut self, before: &B, after: &A) -> Result<Self>
     where
         B: Fn(Self) -> Result<Self>,
         A: Fn(Self) -> Result<Self>,
     {
-        self = pre(self)?;
+        self = before(self)?;
         self = match self {
-            n @ Self::CreateTable { .. } => n,
-            n @ Self::DropTable { .. } => n,
-            n @ Self::IndexLookup { .. } => n,
-            n @ Self::Insert { .. } => n,
-            n @ Self::KeyLookup { .. } => n,
-            n @ Self::Nothing => n,
-            n @ Self::Scan { .. } => n,
+            n @ Self::CreateTable { .. }
+            | n @ Self::DropTable { .. }
+            | n @ Self::IndexLookup { .. }
+            | n @ Self::Insert { .. }
+            | n @ Self::KeyLookup { .. }
+            | n @ Self::Nothing
+            | n @ Self::Scan { .. } => n,
+
             Self::Aggregation { source, aggregates } => {
-                Self::Aggregation { source: source.transform(pre, post)?.into(), aggregates }
+                Self::Aggregation { source: source.transform(before, after)?.into(), aggregates }
             }
             Self::Delete { table, source } => {
-                Self::Delete { table, source: source.transform(pre, post)?.into() }
+                Self::Delete { table, source: source.transform(before, after)?.into() }
             }
             Self::Filter { source, predicate } => {
-                Self::Filter { source: source.transform(pre, post)?.into(), predicate }
+                Self::Filter { source: source.transform(before, after)?.into(), predicate }
             }
             Self::Limit { source, limit } => {
-                Self::Limit { source: source.transform(pre, post)?.into(), limit }
+                Self::Limit { source: source.transform(before, after)?.into(), limit }
             }
             Self::NestedLoopJoin { outer, inner, predicate, pad, flip } => Self::NestedLoopJoin {
-                outer: outer.transform(pre, post)?.into(),
-                inner: inner.transform(pre, post)?.into(),
+                outer: outer.transform(before, after)?.into(),
+                inner: inner.transform(before, after)?.into(),
                 predicate,
                 pad,
                 flip,
             },
             Self::Offset { source, offset } => {
-                Self::Offset { source: source.transform(pre, post)?.into(), offset }
+                Self::Offset { source: source.transform(before, after)?.into(), offset }
             }
             Self::Order { source, orders } => {
-                Self::Order { source: source.transform(pre, post)?.into(), orders }
+                Self::Order { source: source.transform(before, after)?.into(), orders }
             }
             Self::Projection { source, expressions } => {
-                Self::Projection { source: source.transform(pre, post)?.into(), expressions }
+                Self::Projection { source: source.transform(before, after)?.into(), expressions }
             }
             Self::Update { table, source, expressions } => {
-                Self::Update { table, source: source.transform(pre, post)?.into(), expressions }
+                Self::Update { table, source: source.transform(before, after)?.into(), expressions }
             }
         };
-        post(self)
+        after(self)
     }
 
-    /// Transforms all expressions in a node by calling .transform() on them
-    /// with the given functions.
-    pub fn transform_expressions<B, A>(self, pre: &B, post: &A) -> Result<Self>
+    /// Transforms all expressions in a node by calling .transform() on them with the given closure.
+    pub fn transform_expressions<B, A>(self, before: &B, after: &A) -> Result<Self>
     where
         B: Fn(Expression) -> Result<Expression>,
         A: Fn(Expression) -> Result<Expression>,
     {
         Ok(match self {
-            n @ Self::Aggregation { .. } => n,
-            n @ Self::CreateTable { .. } => n,
-            n @ Self::Delete { .. } => n,
-            n @ Self::DropTable { .. } => n,
-            n @ Self::IndexLookup { .. } => n,
-            n @ Self::KeyLookup { .. } => n,
-            n @ Self::Limit { .. } => n,
-            n @ Self::NestedLoopJoin { .. } => n,
-            n @ Self::Nothing => n,
-            n @ Self::Offset { .. } => n,
-            n @ Self::Scan { filter: None, .. } => n,
+            n @ Self::Aggregation { .. }
+            | n @ Self::CreateTable { .. }
+            | n @ Self::Delete { .. }
+            | n @ Self::DropTable { .. }
+            | n @ Self::IndexLookup { .. }
+            | n @ Self::KeyLookup { .. }
+            | n @ Self::Limit { .. }
+            | n @ Self::NestedLoopJoin { .. }
+            | n @ Self::Nothing
+            | n @ Self::Offset { .. }
+            | n @ Self::Scan { filter: None, .. } => n,
+
             Self::Filter { source, predicate } => {
-                Self::Filter { source, predicate: predicate.transform(pre, post)? }
+                Self::Filter { source, predicate: predicate.transform(before, after)? }
             }
             Self::Insert { table, columns, expressions } => Self::Insert {
                 table,
                 columns,
                 expressions: expressions
                     .into_iter()
-                    .map(|exprs| exprs.into_iter().map(|e| e.transform(pre, post)).collect())
+                    .map(|exprs| exprs.into_iter().map(|e| e.transform(before, after)).collect())
                     .collect::<Result<_>>()?,
             },
             Self::Order { source, orders } => Self::Order {
                 source,
                 orders: orders
                     .into_iter()
-                    .map(|(e, o)| e.transform(pre, post).map(|e| (e, o)))
+                    .map(|(e, o)| e.transform(before, after).map(|e| (e, o)))
                     .collect::<Result<_>>()?,
             },
             Self::Projection { source, expressions } => Self::Projection {
                 source,
                 expressions: expressions
                     .into_iter()
-                    .map(|(e, l)| Ok((e.transform(pre, post)?, l)))
+                    .map(|(e, l)| Ok((e.transform(before, after)?, l)))
                     .collect::<Result<_>>()?,
             },
             Self::Scan { table, alias, filter: Some(filter) } => {
-                Self::Scan { table, alias, filter: Some(filter.transform(pre, post)?) }
+                Self::Scan { table, alias, filter: Some(filter.transform(before, after)?) }
             }
             Self::Update { table, source, expressions } => Self::Update {
                 table,
                 source,
                 expressions: expressions
                     .into_iter()
-                    .map(|(k, e)| e.transform(pre, post).map(|e| (k, e)))
+                    .map(|(k, e)| e.transform(before, after).map(|e| (k, e)))
                     .collect::<Result<_>>()?,
             },
         })

@@ -5,7 +5,7 @@ use crate::error::Result;
 
 /// A plan optimizer
 pub trait Optimizer {
-    fn optimize(&mut self, node: Node) -> Result<Node>;
+    fn optimize(&self, node: Node) -> Result<Node>;
 }
 
 /// A constant folding optimizer, which replaces constant expressions with their evaluated value, to
@@ -13,34 +13,27 @@ pub trait Optimizer {
 pub struct ConstantFolder;
 
 impl Optimizer for ConstantFolder {
-    fn optimize(&mut self, node: Node) -> Result<Node> {
-        node.transform(
-            &|n| {
-                n.transform_expressions(
-                    &|e| {
-                        if !e.contains(&|expr| match expr {
-                            Expression::Field(_, _) => true,
-                            _ => false,
-                        }) {
-                            Ok(Expression::Constant(e.evaluate(None)?))
-                        } else {
-                            Ok(e)
-                        }
-                    },
-                    &|e| Ok(e),
-                )
-            },
-            &|n| Ok(n),
-        )
+    fn optimize(&self, node: Node) -> Result<Node> {
+        node.transform(&|n| Ok(n), &|n| {
+            n.transform_expressions(
+                &|e| {
+                    if !e.contains(&|expr| matches!(expr, Expression::Field(_, _))) {
+                        Ok(Expression::Constant(e.evaluate(None)?))
+                    } else {
+                        Ok(e)
+                    }
+                },
+                &|e| Ok(e),
+            )
+        })
     }
 }
 
-/// A filter pushdown optimizer, which moves filter predicates into or
-/// closer to the source node.
+/// A filter pushdown optimizer, which moves filter predicates into or closer to the source node.
 pub struct FilterPushdown;
 
 impl Optimizer for FilterPushdown {
-    fn optimize(&mut self, node: Node) -> Result<Node> {
+    fn optimize(&self, node: Node) -> Result<Node> {
         node.transform(
             &|n| match n {
                 Node::Filter { source, predicate } => Self::pushdown(predicate, *source),
@@ -55,8 +48,7 @@ impl FilterPushdown {
     /// Attempts to push a predicate down into a target node, or returns a regular filter node.
     fn pushdown(mut predicate: Expression, target: Node) -> Result<Node> {
         Ok(match target {
-            // Filter nodes immediately before a scan node can be trivially pushed down, as long as
-            // we remove any field qualifyers (e.g. movies table aliased as m).
+            // Filter nodes immediately before a scan node can be trivially pushed down.
             Node::Scan { table, alias, filter } => {
                 if let Some(filter) = filter {
                     predicate = Expression::And(Box::new(predicate), Box::new(filter))
@@ -70,12 +62,13 @@ impl FilterPushdown {
                 }
                 Node::NestedLoopJoin { outer, inner, predicate: Some(predicate), pad, flip }
             }
+            // Pushdown failure just returns the filter node.
             n => Node::Filter { predicate, source: Box::new(n) },
         })
     }
 }
 
-/// An index lookup optimizer, which converts table scans to index lookups or scans.
+/// An index lookup optimizer, which converts table scans to index lookups.
 pub struct IndexLookup<'a, C: Catalog> {
     catalog: &'a mut C,
 }
@@ -85,59 +78,51 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
         Self { catalog }
     }
 
-    pub fn is_lookup(field: usize, expr: &Expression) -> Option<Value> {
-        if let Expression::Equal(lhs, rhs) = expr {
-            match (*lhs.clone(), *rhs.clone()) {
-                (Expression::Field(i, _), Expression::Constant(v))
-                | (Expression::Constant(v), Expression::Field(i, _))
-                    if field == i =>
-                {
-                    // FIXME Handle IS NULL instead
-                    return match v {
-                        Value::Null => None,
-                        v => Some(v),
-                    };
+    // Attempts to convert the given expression into a list of field values. Expressions must be a
+    // combination of =, IS NULL, OR to be converted.
+    fn as_lookups(&self, field: usize, expr: &Expression) -> Option<Vec<Value>> {
+        use Expression::*;
+        // FIXME This should use a single match level, but since the child expressions are boxed
+        // that would require box patterns, which are unstable.
+        match &*expr {
+            Equal(lhs, rhs) => match (&**lhs, &**rhs) {
+                (Field(i, _), Constant(v)) if i == &field => Some(vec![v.clone()]),
+                (Constant(v), Field(i, _)) if i == &field => Some(vec![v.clone()]),
+                (_, _) => None,
+            },
+            IsNull(e) => match &**e {
+                Field(i, _) if i == &field => Some(vec![Value::Null]),
+                _ => None,
+            },
+            Or(lhs, rhs) => match (self.as_lookups(field, lhs), self.as_lookups(field, rhs)) {
+                (Some(mut lvalues), Some(mut rvalues)) => {
+                    lvalues.append(&mut rvalues);
+                    Some(lvalues)
                 }
-                _ => {}
-            }
+                _ => None,
+            },
+            _ => None,
         }
-        None
     }
 }
 
 impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
-    fn optimize(&mut self, node: Node) -> Result<Node> {
-        node.transform(
-            &|n| match n {
-                // FIXME This needs to be smarter - at least handle ORs. Could be prettier too.
-                Node::Scan { table, alias, filter: Some(expr @ Expression::Equal(_, _)) } => {
-                    if let Some(table) = self.catalog.read_table(&table)? {
-                        let pk = table.get_column_index(&table.get_primary_key()?.name)?;
-                        if let Some(value) = Self::is_lookup(pk, &expr) {
-                            return Ok(Node::KeyLookup {
-                                table: table.name,
-                                alias,
-                                keys: vec![value],
-                            });
-                        }
-                        for (i, column) in
-                            table.columns.into_iter().enumerate().filter(|(_, c)| c.index)
-                        {
-                            if let Some(value) = Self::is_lookup(i, &expr) {
-                                return Ok(Node::IndexLookup {
-                                    table: table.name,
-                                    alias,
-                                    column: column.name,
-                                    values: vec![value],
-                                });
-                            }
-                        }
-                    }
-                    Ok(Node::Scan { table, alias, filter: Some(expr) })
+    fn optimize(&self, node: Node) -> Result<Node> {
+        node.transform(&|n| Ok(n), &|n| match n {
+            Node::Scan { table, alias, filter: Some(filter) } => {
+                let columns = self.catalog.must_read_table(&table)?.columns;
+                let pk = columns.iter().position(|c| c.primary_key).unwrap();
+                if let Some(keys) = self.as_lookups(pk, &filter) {
+                    return Ok(Node::KeyLookup { table, alias, keys });
                 }
-                n => Ok(n),
-            },
-            &|n| Ok(n),
-        )
+                for (i, column) in columns.into_iter().enumerate().filter(|(_, c)| c.index) {
+                    if let Some(values) = self.as_lookups(i, &filter) {
+                        return Ok(Node::IndexLookup { table, alias, column: column.name, values });
+                    }
+                }
+                Ok(Node::Scan { table, alias, filter: Some(filter) })
+            }
+            n => Ok(n),
+        })
     }
 }

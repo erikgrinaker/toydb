@@ -1,0 +1,152 @@
+Query: SELECT * FROM movies WHERE id = 3 OR id = 5 OR id = 7
+
+AST: Select {
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: Some(
+        Operation(
+            Or(
+                Operation(
+                    Or(
+                        Operation(
+                            Equal(
+                                Field(
+                                    None,
+                                    "id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        3,
+                                    ),
+                                ),
+                            ),
+                        ),
+                        Operation(
+                            Equal(
+                                Field(
+                                    None,
+                                    "id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        5,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                Operation(
+                    Equal(
+                        Field(
+                            None,
+                            "id",
+                        ),
+                        Literal(
+                            Integer(
+                                7,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    Filter {
+        source: Scan {
+            table: "movies",
+            alias: None,
+            filter: None,
+        },
+        predicate: Or(
+            Or(
+                Equal(
+                    Field(
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ),
+                Equal(
+                    Field(
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            5,
+                        ),
+                    ),
+                ),
+            ),
+            Equal(
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
+                        ),
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        7,
+                    ),
+                ),
+            ),
+        ),
+    },
+)
+
+Optimized plan: Plan(
+    KeyLookup {
+        table: "movies",
+        alias: None,
+        keys: [
+            Integer(
+                3,
+            ),
+            Integer(
+                5,
+            ),
+            Integer(
+                7,
+            ),
+        ],
+    },
+)
+
+Query: SELECT * FROM movies WHERE id = 3 OR id = 5 OR id = 7
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false)]
+[Integer(7), String("Gravity"), Integer(4), Integer(1), Integer(2013), Float(7.7), Boolean(true)]
