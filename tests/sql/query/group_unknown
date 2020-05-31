@@ -1,44 +1,34 @@
 Query: SELECT COUNT(*) FROM movies GROUP BY unknown
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "count",
-                    [
-                        Literal(
-                            Boolean(
-                                true,
-                            ),
+    select: [
+        (
+            Function(
+                "count",
+                [
+                    Literal(
+                        Boolean(
+                            true,
                         ),
-                    ],
-                ),
-                None,
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "unknown",
-                ),
-            ],
+            None,
         ),
-    ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "unknown",
+        ),
+    ],
     having: None,
     order: [],
     offset: None,

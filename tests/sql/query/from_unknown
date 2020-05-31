@@ -1,21 +1,15 @@
 Query: SELECT * FROM unknown
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "unknown",
-                    alias: None,
-                },
-            ],
+    select: [],
+    from: [
+        Table {
+            name: "unknown",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

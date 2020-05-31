@@ -1,28 +1,20 @@
 Query: SELECT * FROM movies WHERE unknown
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: Some(
-        WhereClause(
-            Field(
-                None,
-                "unknown",
-            ),
+        Field(
+            None,
+            "unknown",
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

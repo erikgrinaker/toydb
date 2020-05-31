@@ -1,69 +1,63 @@
 Query: SELECT 1, 2 b, 3 AS c, 4 AS "👋", id AS "some id" FROM movies
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Literal(
-                    Integer(
-                        1,
-                    ),
+    select: [
+        (
+            Literal(
+                Integer(
+                    1,
                 ),
+            ),
+            None,
+        ),
+        (
+            Literal(
+                Integer(
+                    2,
+                ),
+            ),
+            Some(
+                "b",
+            ),
+        ),
+        (
+            Literal(
+                Integer(
+                    3,
+                ),
+            ),
+            Some(
+                "c",
+            ),
+        ),
+        (
+            Literal(
+                Integer(
+                    4,
+                ),
+            ),
+            Some(
+                "👋",
+            ),
+        ),
+        (
+            Field(
                 None,
+                "id",
             ),
-            (
-                Literal(
-                    Integer(
-                        2,
-                    ),
-                ),
-                Some(
-                    "b",
-                ),
+            Some(
+                "some id",
             ),
-            (
-                Literal(
-                    Integer(
-                        3,
-                    ),
-                ),
-                Some(
-                    "c",
-                ),
-            ),
-            (
-                Literal(
-                    Integer(
-                        4,
-                    ),
-                ),
-                Some(
-                    "👋",
-                ),
-            ),
-            (
-                Field(
-                    None,
-                    "id",
-                ),
-                Some(
-                    "some id",
-                ),
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

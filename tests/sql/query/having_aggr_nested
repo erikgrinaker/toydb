@@ -1,69 +1,57 @@
 Query: SELECT studio_id, MAX(rating) AS best FROM movies GROUP BY studio_id HAVING MIN(best) > 7 ORDER BY studio_id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "studio_id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "studio_id",
             ),
-            (
+            None,
+        ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+            Some(
+                "best",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+    ],
+    having: Some(
+        Operation(
+            GreaterThan(
                 Function(
-                    "max",
+                    "min",
                     [
                         Field(
                             None,
-                            "rating",
+                            "best",
                         ),
                     ],
                 ),
-                Some(
-                    "best",
-                ),
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-            ],
-        ),
-    ),
-    having: Some(
-        HavingClause(
-            Operation(
-                GreaterThan(
-                    Function(
-                        "min",
-                        [
-                            Field(
-                                None,
-                                "best",
-                            ),
-                        ],
-                    ),
-                    Literal(
-                        Integer(
-                            7,
-                        ),
+                Literal(
+                    Integer(
+                        7,
                     ),
                 ),
             ),

@@ -1,64 +1,52 @@
 Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING studio_id >= 3 ORDER BY studio_id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "studio_id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "studio_id",
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "rating",
-                        ),
-                    ],
-                ),
-                Some(
-                    "rating",
-                ),
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-            ],
+            None,
         ),
-    ),
-    having: Some(
-        HavingClause(
-            Operation(
-                GreaterThanOrEqual(
+        (
+            Function(
+                "max",
+                [
                     Field(
                         None,
-                        "studio_id",
+                        "rating",
                     ),
-                    Literal(
-                        Integer(
-                            3,
-                        ),
+                ],
+            ),
+            Some(
+                "rating",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+    ],
+    having: Some(
+        Operation(
+            GreaterThanOrEqual(
+                Field(
+                    None,
+                    "studio_id",
+                ),
+                Literal(
+                    Integer(
+                        3,
                     ),
                 ),
             ),

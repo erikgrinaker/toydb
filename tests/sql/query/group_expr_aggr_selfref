@@ -1,81 +1,71 @@
 Query: SELECT studio_id, SUM(rating * 10) / COUNT(*) + studio_id FROM movies GROUP BY studio_id ORDER BY studio_id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "studio_id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "studio_id",
             ),
-            (
-                Operation(
-                    Add(
-                        Operation(
-                            Divide(
-                                Function(
-                                    "sum",
-                                    [
-                                        Operation(
-                                            Multiply(
-                                                Field(
-                                                    None,
-                                                    "rating",
-                                                ),
-                                                Literal(
-                                                    Integer(
-                                                        10,
-                                                    ),
+            None,
+        ),
+        (
+            Operation(
+                Add(
+                    Operation(
+                        Divide(
+                            Function(
+                                "sum",
+                                [
+                                    Operation(
+                                        Multiply(
+                                            Field(
+                                                None,
+                                                "rating",
+                                            ),
+                                            Literal(
+                                                Integer(
+                                                    10,
                                                 ),
                                             ),
                                         ),
-                                    ],
-                                ),
-                                Function(
-                                    "count",
-                                    [
-                                        Literal(
-                                            Boolean(
-                                                true,
-                                            ),
+                                    ),
+                                ],
+                            ),
+                            Function(
+                                "count",
+                                [
+                                    Literal(
+                                        Boolean(
+                                            true,
                                         ),
-                                    ],
-                                ),
+                                    ),
+                                ],
                             ),
                         ),
-                        Field(
-                            None,
-                            "studio_id",
-                        ),
+                    ),
+                    Field(
+                        None,
+                        "studio_id",
                     ),
                 ),
-                None,
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-            ],
+            None,
         ),
-    ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+    ],
     having: None,
     order: [
         (

@@ -1,45 +1,35 @@
 Query: SELECT MAX(rating) AS best FROM movies GROUP BY studio_id ORDER BY best DESC
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "rating",
-                        ),
-                    ],
-                ),
-                Some(
-                    "best",
-                ),
+    select: [
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-            ],
+            Some(
+                "best",
+            ),
         ),
-    ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+    ],
     having: None,
     order: [
         (

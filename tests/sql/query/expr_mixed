@@ -1,66 +1,60 @@
 Query: SELECT 1 + 2 * 3, 2020 - released AS age FROM movies
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Operation(
-                    Add(
-                        Literal(
-                            Integer(
-                                1,
-                            ),
+    select: [
+        (
+            Operation(
+                Add(
+                    Literal(
+                        Integer(
+                            1,
                         ),
-                        Operation(
-                            Multiply(
-                                Literal(
-                                    Integer(
-                                        2,
-                                    ),
+                    ),
+                    Operation(
+                        Multiply(
+                            Literal(
+                                Integer(
+                                    2,
                                 ),
-                                Literal(
-                                    Integer(
-                                        3,
-                                    ),
+                            ),
+                            Literal(
+                                Integer(
+                                    3,
                                 ),
                             ),
                         ),
                     ),
                 ),
-                None,
             ),
-            (
-                Operation(
-                    Subtract(
-                        Literal(
-                            Integer(
-                                2020,
-                            ),
-                        ),
-                        Field(
-                            None,
-                            "released",
+            None,
+        ),
+        (
+            Operation(
+                Subtract(
+                    Literal(
+                        Integer(
+                            2020,
                         ),
                     ),
-                ),
-                Some(
-                    "age",
+                    Field(
+                        None,
+                        "released",
+                    ),
                 ),
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            Some(
+                "age",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

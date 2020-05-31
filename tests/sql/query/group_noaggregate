@@ -1,38 +1,28 @@
 Query: SELECT title FROM movies GROUP BY title ORDER BY title ASC
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "title",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "title",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "title",
-                ),
-            ],
+            None,
         ),
-    ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "title",
+        ),
+    ],
     having: None,
     order: [
         (

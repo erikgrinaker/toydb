@@ -1,82 +1,76 @@
 Query: SELECT MIN(f), MAX(f), SUM(f), COUNT(f), AVG(f) FROM floats
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "min",
-                    [
-                        Field(
-                            None,
-                            "f",
-                        ),
-                    ],
-                ),
-                None,
+    select: [
+        (
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "f",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "f",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "f",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "sum",
-                    [
-                        Field(
-                            None,
-                            "f",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "f",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "count",
-                    [
-                        Field(
-                            None,
-                            "f",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "f",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "avg",
-                    [
-                        Field(
-                            None,
-                            "f",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "f",
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "floats",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "floats",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

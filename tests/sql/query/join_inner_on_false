@@ -1,35 +1,29 @@
 Query: SELECT * FROM movies INNER JOIN genres ON FALSE
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Join {
-                    left: Table {
-                        name: "movies",
-                        alias: None,
-                    },
-                    right: Table {
-                        name: "genres",
-                        alias: None,
-                    },
-                    type: Inner,
-                    predicate: Some(
-                        Literal(
-                            Boolean(
-                                false,
-                            ),
-                        ),
+    select: [],
+    from: [
+        Join {
+            left: Table {
+                name: "movies",
+                alias: None,
+            },
+            right: Table {
+                name: "genres",
+                alias: None,
+            },
+            type: Inner,
+            predicate: Some(
+                Literal(
+                    Boolean(
+                        false,
                     ),
-                },
-            ],
+                ),
+            ),
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

@@ -1,37 +1,29 @@
 Query: SELECT * FROM movies WHERE genre_id = 2 ORDER BY id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: Some(
-        WhereClause(
-            Operation(
-                Equal(
-                    Field(
-                        None,
-                        "genre_id",
-                    ),
-                    Literal(
-                        Integer(
-                            2,
-                        ),
+        Operation(
+            Equal(
+                Field(
+                    None,
+                    "genre_id",
+                ),
+                Literal(
+                    Integer(
+                        2,
                     ),
                 ),
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [
         (

@@ -1,21 +1,15 @@
 Query: SELECT * FROM integers ORDER BY value ASC
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "integers",
-                    alias: None,
-                },
-            ],
+    select: [],
+    from: [
+        Table {
+            name: "integers",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [
         (

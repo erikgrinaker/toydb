@@ -1,44 +1,38 @@
 Query: SELECT movies.id, genres.id FROM movies, genres
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
-                        "movies",
-                    ),
-                    "id",
+    select: [
+        (
+            Field(
+                Some(
+                    "movies",
                 ),
-                None,
+                "id",
             ),
-            (
-                Field(
-                    Some(
-                        "genres",
-                    ),
-                    "id",
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "genres",
                 ),
-                None,
+                "id",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-                Table {
-                    name: "genres",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+        Table {
+            name: "genres",
+            alias: None,
+        },
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

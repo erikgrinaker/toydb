@@ -1,84 +1,74 @@
 Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
-                        "s",
-                    ),
-                    "name",
+    select: [
+        (
+            Field(
+                Some(
+                    "s",
                 ),
-                None,
+                "name",
             ),
-            (
-                Function(
-                    "count",
-                    [
-                        Literal(
-                            Boolean(
-                                true,
-                            ),
-                        ),
-                    ],
-                ),
-                None,
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Join {
-                    left: Table {
-                        name: "movies",
-                        alias: Some(
-                            "m",
-                        ),
-                    },
-                    right: Table {
-                        name: "studios",
-                        alias: Some(
-                            "s",
-                        ),
-                    },
-                    type: Inner,
-                    predicate: Some(
-                        Operation(
-                            Equal(
-                                Field(
-                                    Some(
-                                        "m",
-                                    ),
-                                    "studio_id",
-                                ),
-                                Field(
-                                    Some(
-                                        "s",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                    ),
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    Some(
-                        "s",
-                    ),
-                    "name",
-                ),
-            ],
+            None,
         ),
-    ),
+        (
+            Function(
+                "count",
+                [
+                    Literal(
+                        Boolean(
+                            true,
+                        ),
+                    ),
+                ],
+            ),
+            None,
+        ),
+    ],
+    from: [
+        Join {
+            left: Table {
+                name: "movies",
+                alias: Some(
+                    "m",
+                ),
+            },
+            right: Table {
+                name: "studios",
+                alias: Some(
+                    "s",
+                ),
+            },
+            type: Inner,
+            predicate: Some(
+                Operation(
+                    Equal(
+                        Field(
+                            Some(
+                                "m",
+                            ),
+                            "studio_id",
+                        ),
+                        Field(
+                            Some(
+                                "s",
+                            ),
+                            "id",
+                        ),
+                    ),
+                ),
+            ),
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            Some(
+                "s",
+            ),
+            "name",
+        ),
+    ],
     having: None,
     order: [
         (

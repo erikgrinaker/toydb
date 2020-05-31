@@ -1,77 +1,69 @@
 Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m, genres g WHERE movie_id >= 3 AND genre_id = 1
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
-                        "m",
-                    ),
-                    "id",
-                ),
+    select: [
+        (
+            Field(
                 Some(
-                    "movie_id",
+                    "m",
                 ),
+                "id",
             ),
-            (
-                Field(
-                    Some(
-                        "g",
-                    ),
-                    "id",
-                ),
+            Some(
+                "movie_id",
+            ),
+        ),
+        (
+            Field(
                 Some(
-                    "genre_id",
+                    "g",
                 ),
+                "id",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: Some(
-                        "m",
-                    ),
-                },
-                Table {
-                    name: "genres",
-                    alias: Some(
-                        "g",
-                    ),
-                },
-            ],
+            Some(
+                "genre_id",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: Some(
+                "m",
+            ),
         },
-    ),
+        Table {
+            name: "genres",
+            alias: Some(
+                "g",
+            ),
+        },
+    ],
     where: Some(
-        WhereClause(
-            Operation(
-                And(
-                    Operation(
-                        GreaterThanOrEqual(
-                            Field(
-                                None,
-                                "movie_id",
-                            ),
-                            Literal(
-                                Integer(
-                                    3,
-                                ),
+        Operation(
+            And(
+                Operation(
+                    GreaterThanOrEqual(
+                        Field(
+                            None,
+                            "movie_id",
+                        ),
+                        Literal(
+                            Integer(
+                                3,
                             ),
                         ),
                     ),
-                    Operation(
-                        Equal(
-                            Field(
-                                None,
-                                "genre_id",
-                            ),
-                            Literal(
-                                Integer(
-                                    1,
-                                ),
+                ),
+                Operation(
+                    Equal(
+                        Field(
+                            None,
+                            "genre_id",
+                        ),
+                        Literal(
+                            Integer(
+                                1,
                             ),
                         ),
                     ),
@@ -79,7 +71,7 @@ AST: Select {
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

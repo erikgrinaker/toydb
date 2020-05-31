@@ -1,55 +1,43 @@
 Query: SELECT studio_id FROM movies GROUP BY studio_id HAVING MAX(rating) > 8 ORDER BY studio_id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "studio_id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "studio_id",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-            ],
+            None,
         ),
-    ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+    ],
     having: Some(
-        HavingClause(
-            Operation(
-                GreaterThan(
-                    Function(
-                        "max",
-                        [
-                            Field(
-                                None,
-                                "rating",
-                            ),
-                        ],
-                    ),
-                    Literal(
-                        Integer(
-                            8,
+        Operation(
+            GreaterThan(
+                Function(
+                    "max",
+                    [
+                        Field(
+                            None,
+                            "rating",
                         ),
+                    ],
+                ),
+                Literal(
+                    Integer(
+                        8,
                     ),
                 ),
             ),

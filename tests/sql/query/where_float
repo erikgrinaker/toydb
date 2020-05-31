@@ -1,29 +1,21 @@
 Query: SELECT * FROM movies WHERE 3.14
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: Some(
-        WhereClause(
-            Literal(
-                Float(
-                    3.14,
-                ),
+        Literal(
+            Float(
+                3.14,
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

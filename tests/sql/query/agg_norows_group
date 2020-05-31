@@ -1,99 +1,87 @@
 Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE GROUP BY id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "min",
-                    [
-                        Field(
-                            None,
-                            "id",
-                        ),
-                    ],
-                ),
-                None,
+    select: [
+        (
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "id",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "sum",
-                    [
-                        Field(
-                            None,
-                            "id",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "count",
-                    [
-                        Field(
-                            None,
-                            "id",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "avg",
-                    [
-                        Field(
-                            None,
-                            "id",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "id",
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: Some(
-        WhereClause(
-            Literal(
-                Boolean(
-                    false,
-                ),
+        Literal(
+            Boolean(
+                false,
             ),
         ),
     ),
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "id",
-                ),
-            ],
+    group_by: [
+        Field(
+            None,
+            "id",
         ),
-    ),
+    ],
     having: None,
     order: [],
     offset: None,

@@ -1,61 +1,51 @@
 Query: SELECT studio_id * 2, MAX(rating) AS rating FROM movies GROUP BY studio_id ORDER BY rating
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Operation(
-                    Multiply(
-                        Field(
-                            None,
-                            "studio_id",
-                        ),
-                        Literal(
-                            Integer(
-                                2,
-                            ),
+    select: [
+        (
+            Operation(
+                Multiply(
+                    Field(
+                        None,
+                        "studio_id",
+                    ),
+                    Literal(
+                        Integer(
+                            2,
                         ),
                     ),
                 ),
-                None,
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "rating",
-                        ),
-                    ],
-                ),
-                Some(
-                    "rating",
-                ),
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-            ],
+            None,
         ),
-    ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+            Some(
+                "rating",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+    ],
     having: None,
     order: [
         (

@@ -1,54 +1,44 @@
 Query: SELECT MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "rating",
-                        ),
-                    ],
-                ),
-                Some(
-                    "rating",
-                ),
+    select: [
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            Some(
+                "rating",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Operation(
-                    Multiply(
-                        Field(
-                            None,
-                            "studio_id",
-                        ),
-                        Literal(
-                            Integer(
-                                2,
-                            ),
-                        ),
+    group_by: [
+        Operation(
+            Multiply(
+                Field(
+                    None,
+                    "studio_id",
+                ),
+                Literal(
+                    Integer(
+                        2,
                     ),
                 ),
-            ],
+            ),
         ),
-    ),
+    ],
     having: None,
     order: [
         (

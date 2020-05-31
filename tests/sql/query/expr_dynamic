@@ -1,40 +1,34 @@
 Query: SELECT 2020 - year AS age FROM movies
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Operation(
-                    Subtract(
-                        Literal(
-                            Integer(
-                                2020,
-                            ),
-                        ),
-                        Field(
-                            None,
-                            "year",
+    select: [
+        (
+            Operation(
+                Subtract(
+                    Literal(
+                        Integer(
+                            2020,
                         ),
                     ),
-                ),
-                Some(
-                    "age",
+                    Field(
+                        None,
+                        "year",
+                    ),
                 ),
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            Some(
+                "age",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

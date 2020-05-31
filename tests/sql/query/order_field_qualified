@@ -1,68 +1,60 @@
 Query: SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
+    select: [
+        (
+            Field(
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+            None,
+        ),
+        (
+            Field(
+                None,
+                "title",
+            ),
+            None,
+        ),
+        (
+            Field(
+                None,
+                "name",
+            ),
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+        Table {
+            name: "genres",
+            alias: None,
+        },
+    ],
+    where: Some(
+        Operation(
+            Equal(
                 Field(
                     Some(
                         "movies",
                     ),
+                    "genre_id",
+                ),
+                Field(
+                    Some(
+                        "genres",
+                    ),
                     "id",
-                ),
-                None,
-            ),
-            (
-                Field(
-                    None,
-                    "title",
-                ),
-                None,
-            ),
-            (
-                Field(
-                    None,
-                    "name",
-                ),
-                None,
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-                Table {
-                    name: "genres",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: Some(
-        WhereClause(
-            Operation(
-                Equal(
-                    Field(
-                        Some(
-                            "movies",
-                        ),
-                        "genre_id",
-                    ),
-                    Field(
-                        Some(
-                            "genres",
-                        ),
-                        "id",
-                    ),
                 ),
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [
         (

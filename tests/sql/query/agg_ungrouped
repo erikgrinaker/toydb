@@ -1,42 +1,36 @@
 Query: SELECT studio_id, COUNT(*) FROM movies
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "studio_id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "studio_id",
             ),
-            (
-                Function(
-                    "count",
-                    [
-                        Literal(
-                            Boolean(
-                                true,
-                            ),
+            None,
+        ),
+        (
+            Function(
+                "count",
+                [
+                    Literal(
+                        Boolean(
+                            true,
                         ),
-                    ],
-                ),
-                None,
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

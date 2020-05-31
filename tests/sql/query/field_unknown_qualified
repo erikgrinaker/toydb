@@ -1,31 +1,25 @@
 Query: SELECT movies.unknown FROM movies
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
-                        "movies",
-                    ),
-                    "unknown",
+    select: [
+        (
+            Field(
+                Some(
+                    "movies",
                 ),
-                None,
+                "unknown",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

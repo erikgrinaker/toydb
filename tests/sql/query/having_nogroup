@@ -1,48 +1,40 @@
 Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "id",
             ),
-            (
+            None,
+        ),
+        (
+            Field(
+                None,
+                "rating",
+            ),
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [],
+    having: Some(
+        Operation(
+            GreaterThan(
                 Field(
                     None,
                     "rating",
                 ),
-                None,
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: None,
-    having: Some(
-        HavingClause(
-            Operation(
-                GreaterThan(
-                    Field(
-                        None,
-                        "rating",
-                    ),
-                    Literal(
-                        Integer(
-                            8,
-                        ),
+                Literal(
+                    Integer(
+                        8,
                     ),
                 ),
             ),

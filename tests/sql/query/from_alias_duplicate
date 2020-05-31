@@ -1,29 +1,23 @@
 Query: SELECT * FROM movies a, genres a
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: Some(
-                        "a",
-                    ),
-                },
-                Table {
-                    name: "genres",
-                    alias: Some(
-                        "a",
-                    ),
-                },
-            ],
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: Some(
+                "a",
+            ),
         },
-    ),
+        Table {
+            name: "genres",
+            alias: Some(
+                "a",
+            ),
+        },
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

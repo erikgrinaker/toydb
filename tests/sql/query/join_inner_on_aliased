@@ -1,50 +1,44 @@
 Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Join {
-                    left: Table {
-                        name: "movies",
-                        alias: Some(
-                            "m",
-                        ),
-                    },
-                    right: Table {
-                        name: "genres",
-                        alias: Some(
-                            "g",
-                        ),
-                    },
-                    type: Inner,
-                    predicate: Some(
-                        Operation(
-                            Equal(
-                                Field(
-                                    Some(
-                                        "m",
-                                    ),
-                                    "genre_id",
-                                ),
-                                Field(
-                                    Some(
-                                        "g",
-                                    ),
-                                    "id",
-                                ),
+    select: [],
+    from: [
+        Join {
+            left: Table {
+                name: "movies",
+                alias: Some(
+                    "m",
+                ),
+            },
+            right: Table {
+                name: "genres",
+                alias: Some(
+                    "g",
+                ),
+            },
+            type: Inner,
+            predicate: Some(
+                Operation(
+                    Equal(
+                        Field(
+                            Some(
+                                "m",
                             ),
+                            "genre_id",
+                        ),
+                        Field(
+                            Some(
+                                "g",
+                            ),
+                            "id",
                         ),
                     ),
-                },
-            ],
+                ),
+            ),
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

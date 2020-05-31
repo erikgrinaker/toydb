@@ -5,146 +5,138 @@ Query:
     
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
+    select: [
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "c",
+                ),
+                "id",
+            ),
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "c",
+                ),
+                "name",
+            ),
+            None,
+        ),
+    ],
+    from: [
+        Join {
+            left: Join {
+                left: Table {
+                    name: "movies",
+                    alias: Some(
                         "m",
                     ),
-                    "id",
-                ),
-                None,
-            ),
-            (
-                Field(
-                    Some(
-                        "m",
-                    ),
-                    "title",
-                ),
-                None,
-            ),
-            (
-                Field(
-                    Some(
-                        "g",
-                    ),
-                    "id",
-                ),
-                None,
-            ),
-            (
-                Field(
-                    Some(
-                        "g",
-                    ),
-                    "name",
-                ),
-                None,
-            ),
-            (
-                Field(
-                    Some(
-                        "c",
-                    ),
-                    "id",
-                ),
-                None,
-            ),
-            (
-                Field(
-                    Some(
-                        "c",
-                    ),
-                    "name",
-                ),
-                None,
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Join {
-                    left: Join {
-                        left: Table {
-                            name: "movies",
-                            alias: Some(
-                                "m",
-                            ),
-                        },
-                        right: Table {
-                            name: "genres",
-                            alias: Some(
-                                "g",
-                            ),
-                        },
-                        type: Cross,
-                        predicate: None,
-                    },
-                    right: Table {
-                        name: "countries",
-                        alias: Some(
-                            "c",
-                        ),
-                    },
-                    type: Cross,
-                    predicate: None,
                 },
-            ],
+                right: Table {
+                    name: "genres",
+                    alias: Some(
+                        "g",
+                    ),
+                },
+                type: Cross,
+                predicate: None,
+            },
+            right: Table {
+                name: "countries",
+                alias: Some(
+                    "c",
+                ),
+            },
+            type: Cross,
+            predicate: None,
         },
-    ),
+    ],
     where: Some(
-        WhereClause(
-            Operation(
-                And(
-                    Operation(
-                        And(
-                            Operation(
-                                GreaterThanOrEqual(
-                                    Field(
-                                        Some(
-                                            "m",
-                                        ),
-                                        "id",
+        Operation(
+            And(
+                Operation(
+                    And(
+                        Operation(
+                            GreaterThanOrEqual(
+                                Field(
+                                    Some(
+                                        "m",
                                     ),
-                                    Literal(
-                                        Integer(
-                                            3,
-                                        ),
+                                    "id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        3,
                                     ),
                                 ),
                             ),
-                            Operation(
-                                Equal(
-                                    Field(
-                                        Some(
-                                            "g",
-                                        ),
-                                        "id",
+                        ),
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "g",
                                     ),
-                                    Literal(
-                                        Integer(
-                                            2,
-                                        ),
+                                    "id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        2,
                                     ),
                                 ),
                             ),
                         ),
                     ),
-                    Operation(
-                        NotEqual(
-                            Field(
-                                Some(
-                                    "c",
-                                ),
-                                "id",
+                ),
+                Operation(
+                    NotEqual(
+                        Field(
+                            Some(
+                                "c",
                             ),
-                            Literal(
-                                String(
-                                    "us",
-                                ),
+                            "id",
+                        ),
+                        Literal(
+                            String(
+                                "us",
                             ),
                         ),
                     ),
@@ -152,7 +144,7 @@ AST: Select {
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

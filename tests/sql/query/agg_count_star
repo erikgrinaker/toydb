@@ -1,35 +1,29 @@
 Query: SELECT COUNT(*) FROM movies
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "count",
-                    [
-                        Literal(
-                            Boolean(
-                                true,
-                            ),
+    select: [
+        (
+            Function(
+                "count",
+                [
+                    Literal(
+                        Boolean(
+                            true,
                         ),
-                    ],
-                ),
-                None,
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

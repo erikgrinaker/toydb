@@ -1,60 +1,52 @@
 Query: SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
-                        "movies",
-                    ),
-                    "id",
+    select: [
+        (
+            Field(
+                Some(
+                    "movies",
                 ),
-                None,
+                "id",
             ),
-            (
-                Field(
-                    Some(
-                        "genres",
-                    ),
-                    "id",
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "genres",
                 ),
-                None,
+                "id",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-                Table {
-                    name: "genres",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+        Table {
+            name: "genres",
+            alias: None,
+        },
+    ],
     where: Some(
-        WhereClause(
-            Operation(
-                GreaterThanOrEqual(
-                    Field(
-                        None,
-                        "id",
-                    ),
-                    Literal(
-                        Integer(
-                            3,
-                        ),
+        Operation(
+            GreaterThanOrEqual(
+                Field(
+                    None,
+                    "id",
+                ),
+                Literal(
+                    Integer(
+                        3,
                     ),
                 ),
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

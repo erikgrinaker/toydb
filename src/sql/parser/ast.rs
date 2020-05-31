@@ -24,7 +24,7 @@ pub enum Statement {
 
     Delete {
         table: String,
-        r#where: Option<WhereClause>,
+        r#where: Option<Expression>,
     },
     Insert {
         table: String,
@@ -34,46 +34,22 @@ pub enum Statement {
     Update {
         table: String,
         set: BTreeMap<String, Expression>,
-        r#where: Option<WhereClause>,
+        r#where: Option<Expression>,
     },
 
     Select {
-        select: SelectClause,
-        from: Option<FromClause>,
-        r#where: Option<WhereClause>,
-        group_by: Option<GroupByClause>,
-        having: Option<HavingClause>,
+        select: Vec<(Expression, Option<String>)>,
+        from: Vec<FromItem>,
+        r#where: Option<Expression>,
+        group_by: Vec<Expression>,
+        having: Option<Expression>,
         order: Vec<(Expression, Order)>,
         offset: Option<Expression>,
         limit: Option<Expression>,
     },
 }
 
-/// A column
-#[derive(Clone, Debug, PartialEq)]
-pub struct Column {
-    pub name: String,
-    pub datatype: DataType,
-    pub primary_key: bool,
-    pub nullable: Option<bool>,
-    pub default: Option<Expression>,
-    pub unique: bool,
-    pub index: bool,
-    pub references: Option<String>,
-}
-
-/// A SELECT clause
-#[derive(Clone, Debug, PartialEq)]
-pub struct SelectClause {
-    pub expressions: Vec<(Expression, Option<String>)>,
-}
-
-/// A FROM clause
-#[derive(Clone, Debug, PartialEq)]
-pub struct FromClause {
-    pub items: Vec<FromItem>,
-}
-
+/// A FROM item
 #[derive(Clone, Debug, PartialEq)]
 pub enum FromItem {
     Table {
@@ -97,17 +73,18 @@ pub enum JoinType {
     Right,
 }
 
-/// A WHERE clause
+/// A column
 #[derive(Clone, Debug, PartialEq)]
-pub struct WhereClause(pub Expression);
-
-/// A GROUP BY clause
-#[derive(Clone, Debug, PartialEq)]
-pub struct GroupByClause(pub Vec<Expression>);
-
-/// A HAVING clause
-#[derive(Clone, Debug, PartialEq)]
-pub struct HavingClause(pub Expression);
+pub struct Column {
+    pub name: String,
+    pub datatype: DataType,
+    pub primary_key: bool,
+    pub nullable: Option<bool>,
+    pub default: Option<Expression>,
+    pub unique: bool,
+    pub index: bool,
+    pub references: Option<String>,
+}
 
 /// Sort orders
 #[derive(Clone, Debug, PartialEq)]

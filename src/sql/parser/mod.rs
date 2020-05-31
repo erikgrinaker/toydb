@@ -280,7 +280,7 @@ impl<'a> Parser<'a> {
     /// Parses a select statement
     fn parse_statement_select(&mut self) -> Result<ast::Statement> {
         Ok(ast::Statement::Select {
-            select: self.parse_clause_select()?.unwrap(),
+            select: self.parse_clause_select()?,
             from: self.parse_clause_from()?,
             r#where: self.parse_clause_where()?,
             group_by: self.parse_clause_group_by()?,
@@ -359,11 +359,11 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a from clause
-    fn parse_clause_from(&mut self) -> Result<Option<ast::FromClause>> {
+    fn parse_clause_from(&mut self) -> Result<Vec<ast::FromItem>> {
+        let mut from = Vec::new();
         if self.next_if_token(Keyword::From.into()).is_none() {
-            return Ok(None);
+            return Ok(from);
         }
-        let mut clause = ast::FromClause { items: Vec::new() };
         loop {
             let mut item = self.parse_clause_from_item()?;
             while let Some(jointype) = self.parse_clause_from_jointype()? {
@@ -379,12 +379,12 @@ impl<'a> Parser<'a> {
                 let r#type = jointype;
                 item = ast::FromItem::Join { left, right, r#type, predicate };
             }
-            clause.items.push(item);
+            from.push(item);
             if self.next_if_token(Token::Comma).is_none() {
                 break;
             }
         }
-        Ok(Some(clause))
+        Ok(from)
     }
 
     /// Parses a from clause item
@@ -429,27 +429,27 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a group by clause
-    fn parse_clause_group_by(&mut self) -> Result<Option<ast::GroupByClause>> {
+    fn parse_clause_group_by(&mut self) -> Result<Vec<ast::Expression>> {
+        let mut exprs = Vec::new();
         if self.next_if_token(Keyword::Group.into()).is_none() {
-            return Ok(None);
+            return Ok(exprs);
         }
         self.next_expect(Some(Keyword::By.into()))?;
-        let mut exprs = Vec::new();
         loop {
             exprs.push(self.parse_expression(0)?);
             if self.next_if_token(Token::Comma).is_none() {
                 break;
             }
         }
-        Ok(Some(ast::GroupByClause(exprs)))
+        Ok(exprs)
     }
 
     /// Parses a HAVING clause
-    fn parse_clause_having(&mut self) -> Result<Option<ast::HavingClause>> {
+    fn parse_clause_having(&mut self) -> Result<Option<ast::Expression>> {
         if self.next_if_token(Keyword::Having.into()).is_none() {
             return Ok(None);
         }
-        Ok(Some(ast::HavingClause(self.parse_expression(0)?)))
+        Ok(Some(self.parse_expression(0)?))
     }
 
     /// Parses an order clause
@@ -478,13 +478,13 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a select clause
-    fn parse_clause_select(&mut self) -> Result<Option<ast::SelectClause>> {
+    fn parse_clause_select(&mut self) -> Result<Vec<(ast::Expression, Option<String>)>> {
+        let mut select = Vec::new();
         if self.next_if_token(Keyword::Select.into()).is_none() {
-            return Ok(None);
+            return Ok(select);
         }
-        let mut select = ast::SelectClause { expressions: Vec::new() };
         loop {
-            if self.next_if_token(Token::Asterisk).is_some() && select.expressions.is_empty() {
+            if self.next_if_token(Token::Asterisk).is_some() && select.is_empty() {
                 break;
             }
             let expr = self.parse_expression(0)?;
@@ -496,20 +496,20 @@ impl<'a> Parser<'a> {
                 Some(Token::Ident(_)) => Some(self.next_ident()?),
                 _ => None,
             };
-            select.expressions.push((expr, label));
+            select.push((expr, label));
             if self.next_if_token(Token::Comma).is_none() {
                 break;
             }
         }
-        Ok(Some(select))
+        Ok(select)
     }
 
     /// Parses a WHERE clause
-    fn parse_clause_where(&mut self) -> Result<Option<ast::WhereClause>> {
+    fn parse_clause_where(&mut self) -> Result<Option<ast::Expression>> {
         if self.next_if_token(Keyword::Where.into()).is_none() {
             return Ok(None);
         }
-        Ok(Some(ast::WhereClause(self.parse_expression(0)?)))
+        Ok(Some(self.parse_expression(0)?))
     }
 
     /// Parses an expression consisting of at least one atom operated on by any

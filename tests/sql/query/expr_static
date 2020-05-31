@@ -1,58 +1,56 @@
 Query: SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Operation(
-                    Add(
-                        Literal(
-                            Integer(
-                                1,
-                            ),
+    select: [
+        (
+            Operation(
+                Add(
+                    Literal(
+                        Integer(
+                            1,
                         ),
-                        Operation(
-                            Multiply(
-                                Literal(
-                                    Integer(
-                                        2,
-                                    ),
+                    ),
+                    Operation(
+                        Multiply(
+                            Literal(
+                                Integer(
+                                    2,
                                 ),
-                                Literal(
-                                    Integer(
-                                        3,
-                                    ),
+                            ),
+                            Literal(
+                                Integer(
+                                    3,
                                 ),
                             ),
                         ),
                     ),
                 ),
-                None,
             ),
-            (
-                Operation(
-                    Like(
-                        Literal(
-                            String(
-                                "abc",
-                            ),
+            None,
+        ),
+        (
+            Operation(
+                Like(
+                    Literal(
+                        String(
+                            "abc",
                         ),
-                        Literal(
-                            String(
-                                "x%",
-                            ),
+                    ),
+                    Literal(
+                        String(
+                            "x%",
                         ),
                     ),
                 ),
-                Some(
-                    "nope",
-                ),
             ),
-        ],
-    },
-    from: None,
+            Some(
+                "nope",
+            ),
+        ),
+    ],
+    from: [],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

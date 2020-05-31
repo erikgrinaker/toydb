@@ -1,61 +1,55 @@
 Query: SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "id",
             ),
-            (
-                Field(
-                    None,
-                    "title",
-                ),
+            None,
+        ),
+        (
+            Field(
                 None,
+                "title",
             ),
-            (
-                Field(
-                    None,
-                    "released",
-                ),
+            None,
+        ),
+        (
+            Field(
                 None,
+                "released",
             ),
-            (
-                Operation(
-                    Modulo(
-                        Field(
-                            None,
-                            "released",
-                        ),
-                        Literal(
-                            Integer(
-                                4,
-                            ),
+            None,
+        ),
+        (
+            Operation(
+                Modulo(
+                    Field(
+                        None,
+                        "released",
+                    ),
+                    Literal(
+                        Integer(
+                            4,
                         ),
                     ),
                 ),
-                Some(
-                    "ord",
-                ),
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            Some(
+                "ord",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [
         (

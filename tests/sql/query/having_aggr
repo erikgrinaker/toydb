@@ -1,18 +1,45 @@
 Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id HAVING MIN(rating) > 7 ORDER BY studio_id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "studio_id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "studio_id",
             ),
-            (
+            None,
+        ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+    ],
+    having: Some(
+        Operation(
+            GreaterThan(
                 Function(
-                    "max",
+                    "min",
                     [
                         Field(
                             None,
@@ -20,48 +47,9 @@ AST: Select {
                         ),
                     ],
                 ),
-                None,
-            ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-            ],
-        ),
-    ),
-    having: Some(
-        HavingClause(
-            Operation(
-                GreaterThan(
-                    Function(
-                        "min",
-                        [
-                            Field(
-                                None,
-                                "rating",
-                            ),
-                        ],
-                    ),
-                    Literal(
-                        Integer(
-                            7,
-                        ),
+                Literal(
+                    Integer(
+                        7,
                     ),
                 ),
             ),

@@ -1,45 +1,37 @@
 Query: SELECT * FROM movies WHERE released >= 2000 AND ultrahd
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: Some(
-        WhereClause(
-            Operation(
-                And(
-                    Operation(
-                        GreaterThanOrEqual(
-                            Field(
-                                None,
-                                "released",
-                            ),
-                            Literal(
-                                Integer(
-                                    2000,
-                                ),
+        Operation(
+            And(
+                Operation(
+                    GreaterThanOrEqual(
+                        Field(
+                            None,
+                            "released",
+                        ),
+                        Literal(
+                            Integer(
+                                2000,
                             ),
                         ),
                     ),
-                    Field(
-                        None,
-                        "ultrahd",
-                    ),
+                ),
+                Field(
+                    None,
+                    "ultrahd",
                 ),
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

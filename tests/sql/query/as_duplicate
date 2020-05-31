@@ -1,33 +1,31 @@
 Query: SELECT 1 AS a, 2 AS a
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Literal(
-                    Integer(
-                        1,
-                    ),
-                ),
-                Some(
-                    "a",
+    select: [
+        (
+            Literal(
+                Integer(
+                    1,
                 ),
             ),
-            (
-                Literal(
-                    Integer(
-                        2,
-                    ),
-                ),
-                Some(
-                    "a",
+            Some(
+                "a",
+            ),
+        ),
+        (
+            Literal(
+                Integer(
+                    2,
                 ),
             ),
-        ],
-    },
-    from: None,
+            Some(
+                "a",
+            ),
+        ),
+    ],
+    from: [],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

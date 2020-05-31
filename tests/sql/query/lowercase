@@ -1,21 +1,19 @@
 Query: select 1
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Literal(
-                    Integer(
-                        1,
-                    ),
+    select: [
+        (
+            Literal(
+                Integer(
+                    1,
                 ),
-                None,
             ),
-        ],
-    },
-    from: None,
+            None,
+        ),
+    ],
+    from: [],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

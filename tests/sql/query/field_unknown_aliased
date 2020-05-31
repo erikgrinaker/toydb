@@ -1,33 +1,27 @@
 Query: SELECT movies.id FROM movies AS m
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
-                        "movies",
-                    ),
-                    "id",
+    select: [
+        (
+            Field(
+                Some(
+                    "movies",
                 ),
-                None,
+                "id",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: Some(
-                        "m",
-                    ),
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: Some(
+                "m",
+            ),
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

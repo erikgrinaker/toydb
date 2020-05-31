@@ -1,82 +1,76 @@
 Query: SELECT MIN(s), MAX(s), SUM(s), COUNT(s), AVG(s) FROM strings
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "min",
-                    [
-                        Field(
-                            None,
-                            "s",
-                        ),
-                    ],
-                ),
-                None,
+    select: [
+        (
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "s",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "sum",
-                    [
-                        Field(
-                            None,
-                            "s",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "count",
-                    [
-                        Field(
-                            None,
-                            "s",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "avg",
-                    [
-                        Field(
-                            None,
-                            "s",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "s",
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "strings",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "strings",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

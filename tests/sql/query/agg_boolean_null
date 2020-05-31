@@ -1,82 +1,76 @@
 Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "min",
-                    [
-                        Field(
-                            None,
-                            "b",
-                        ),
-                    ],
-                ),
-                None,
+    select: [
+        (
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "b",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "sum",
-                    [
-                        Field(
-                            None,
-                            "b",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "count",
-                    [
-                        Field(
-                            None,
-                            "b",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "avg",
-                    [
-                        Field(
-                            None,
-                            "b",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "b",
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "booleans",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "booleans",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

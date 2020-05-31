@@ -1,66 +1,56 @@
 Query: SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Operation(
-                    Add(
-                        Field(
-                            None,
-                            "studio_id",
-                        ),
-                        Field(
-                            None,
-                            "genre_id",
-                        ),
+    select: [
+        (
+            Operation(
+                Add(
+                    Field(
+                        None,
+                        "studio_id",
+                    ),
+                    Field(
+                        None,
+                        "genre_id",
                     ),
                 ),
-                Some(
-                    "multi",
-                ),
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "rating",
-                        ),
-                    ],
-                ),
-                Some(
-                    "rating",
-                ),
+            Some(
+                "multi",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
-        },
-    ),
-    where: None,
-    group_by: Some(
-        GroupByClause(
-            [
-                Field(
-                    None,
-                    "studio_id",
-                ),
-                Field(
-                    None,
-                    "genre_id",
-                ),
-            ],
         ),
-    ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "rating",
+                    ),
+                ],
+            ),
+            Some(
+                "rating",
+            ),
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [
+        Field(
+            None,
+            "studio_id",
+        ),
+        Field(
+            None,
+            "genre_id",
+        ),
+    ],
     having: None,
     order: [
         (

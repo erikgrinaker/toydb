@@ -1,29 +1,23 @@
 Query: SELECT * FROM movies CROSS JOIN genres
 
 AST: Select {
-    select: SelectClause {
-        expressions: [],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Join {
-                    left: Table {
-                        name: "movies",
-                        alias: None,
-                    },
-                    right: Table {
-                        name: "genres",
-                        alias: None,
-                    },
-                    type: Cross,
-                    predicate: None,
-                },
-            ],
+    select: [],
+    from: [
+        Join {
+            left: Table {
+                name: "movies",
+                alias: None,
+            },
+            right: Table {
+                name: "genres",
+                alias: None,
+            },
+            type: Cross,
+            predicate: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

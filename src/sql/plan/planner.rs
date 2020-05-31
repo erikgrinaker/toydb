@@ -76,12 +76,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     source: Box::new(Node::Scan {
                         table,
                         alias: None,
-                        filter: match r#where {
-                            Some(ast::WhereClause(expr)) => {
-                                Some(self.build_expression(scope, expr)?)
-                            }
-                            None => None,
-                        },
+                        filter: r#where.map(|e| self.build_expression(scope, e)).transpose()?,
                     }),
                 }
             }
@@ -107,12 +102,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     source: Box::new(Node::Scan {
                         table,
                         alias: None,
-                        filter: match r#where {
-                            Some(ast::WhereClause(expr)) => {
-                                Some(self.build_expression(scope, expr)?)
-                            }
-                            None => None,
-                        },
+                        filter: r#where.map(|e| self.build_expression(scope, e)).transpose()?,
                     }),
                     expressions: set
                         .into_iter()
@@ -123,28 +113,28 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             // Queries.
             ast::Statement::Select {
-                select,
+                mut select,
                 from,
                 r#where,
                 group_by,
-                having,
-                order,
+                mut having,
+                mut order,
                 offset,
                 limit,
             } => {
                 let scope = &mut Scope::new();
 
                 // Build FROM clause.
-                let mut node = match from {
-                    Some(from) => self.build_from_clause(scope, from)?,
-                    None if select.expressions.is_empty() => {
-                        return Err(Error::Value("Can't select * without a table".into()))
-                    }
-                    None => Node::Nothing,
+                let mut node = if !from.is_empty() {
+                    self.build_from_clause(scope, from)?
+                } else if select.is_empty() {
+                    return Err(Error::Value("Can't select * without a table".into()));
+                } else {
+                    Node::Nothing
                 };
 
                 // Build WHERE clause.
-                if let Some(ast::WhereClause(expr)) = r#where {
+                if let Some(expr) = r#where {
                     node = Node::Filter {
                         source: Box::new(node),
                         predicate: self.build_expression(scope, expr)?,
@@ -152,27 +142,23 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 };
 
                 // Build SELECT clause.
-                let mut order = order;
-                let mut having = having.map(|c| c.0);
                 let mut hidden = 0;
-                if !select.expressions.is_empty() {
-                    let mut expressions = select.expressions;
-
+                if !select.is_empty() {
                     // Inject hidden SELECT columns for fields and aggregates used in ORDER BY and
                     // HAVING expressions but not present in existing SELECT output. These will be
                     // removed again by a later projection.
                     if let Some(ref mut expr) = having {
-                        hidden += self.inject_hidden(expr, &mut expressions)?;
+                        hidden += self.inject_hidden(expr, &mut select)?;
                     }
                     for (expr, _) in order.iter_mut() {
-                        hidden += self.inject_hidden(expr, &mut expressions)?;
+                        hidden += self.inject_hidden(expr, &mut select)?;
                     }
 
                     // Extract any aggregate functions and GROUP BY expressions, replacing them with
                     // Column placeholders. Aggregations are handled by evaluating group expressions
                     // and aggregate function arguments in a pre-projection, passing the results
                     // to an aggregation node, and then evaluating the final SELECT expressions
-                    // in the post-projection. See build_aggregation() for details. For example:
+                    // in the post-projection. For example:
                     //
                     // SELECT (MAX(rating * 100) - MIN(rating * 100)) / 100
                     // FROM movies
@@ -183,18 +169,14 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     // - Projection: rating * 100, rating * 100, released - 2000
                     // - Aggregation: max(#0), min(#1) group by #2
                     // - Projection: (#0 - #1) / 100
-                    let aggregates = self.extract_aggregates(&mut expressions)?;
-                    let groups = if let Some(ast::GroupByClause(group_by)) = group_by {
-                        self.extract_groups(&mut expressions, group_by, aggregates.len())?
-                    } else {
-                        Vec::new()
-                    };
+                    let aggregates = self.extract_aggregates(&mut select)?;
+                    let groups = self.extract_groups(&mut select, group_by, aggregates.len())?;
                     if !aggregates.is_empty() || !groups.is_empty() {
                         node = self.build_aggregation(scope, node, groups, aggregates)?;
                     }
 
                     // Build the remaining non-aggregate projection.
-                    let expressions: Vec<(Expression, Option<String>)> = expressions
+                    let expressions: Vec<(Expression, Option<String>)> = select
                         .into_iter()
                         .map(|(e, l)| Ok((self.build_expression(scope, e)?, l)))
                         .collect::<Result<_>>()?;
@@ -269,8 +251,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// Builds a FROM clause consisting of several items. Each item is either a single table or a
     /// join of an arbitrary number of tables. All of the items are joined, since e.g. 'SELECT * FROM
     /// a, b' is an implicit join of a and b.
-    fn build_from_clause(&self, scope: &mut Scope, from: ast::FromClause) -> Result<Node> {
-        let mut items = from.items.into_iter();
+    fn build_from_clause(&self, scope: &mut Scope, from: Vec<ast::FromItem>) -> Result<Node> {
+        let mut items = from.into_iter();
         let mut node = match items.next() {
             Some(item) => self.build_from_item(scope, item)?,
             None => return Err(Error::Value("No from items given".into())),

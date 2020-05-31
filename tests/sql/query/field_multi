@@ -1,36 +1,30 @@
 Query: SELECT id, title FROM movies
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    None,
-                    "id",
-                ),
+    select: [
+        (
+            Field(
                 None,
+                "id",
             ),
-            (
-                Field(
-                    None,
-                    "title",
-                ),
+            None,
+        ),
+        (
+            Field(
                 None,
+                "title",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "movies",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

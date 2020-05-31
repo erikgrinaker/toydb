@@ -1,97 +1,89 @@
 Query: SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers WHERE i IS NOT NULL
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Function(
-                    "min",
-                    [
-                        Field(
-                            None,
-                            "i",
-                        ),
-                    ],
-                ),
-                None,
+    select: [
+        (
+            Function(
+                "min",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "max",
-                    [
-                        Field(
-                            None,
-                            "i",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "max",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "sum",
-                    [
-                        Field(
-                            None,
-                            "i",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "sum",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "count",
-                    [
-                        Field(
-                            None,
-                            "i",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "count",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
             ),
-            (
-                Function(
-                    "avg",
-                    [
-                        Field(
-                            None,
-                            "i",
-                        ),
-                    ],
-                ),
-                None,
+            None,
+        ),
+        (
+            Function(
+                "avg",
+                [
+                    Field(
+                        None,
+                        "i",
+                    ),
+                ],
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Table {
-                    name: "integers",
-                    alias: None,
-                },
-            ],
+            None,
+        ),
+    ],
+    from: [
+        Table {
+            name: "integers",
+            alias: None,
         },
-    ),
+    ],
     where: Some(
-        WhereClause(
-            Operation(
-                Not(
-                    Operation(
-                        IsNull(
-                            Field(
-                                None,
-                                "i",
-                            ),
+        Operation(
+            Not(
+                Operation(
+                    IsNull(
+                        Field(
+                            None,
+                            "i",
                         ),
                     ),
                 ),
             ),
         ),
     ),
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,

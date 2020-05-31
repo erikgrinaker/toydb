@@ -1,73 +1,67 @@
 Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN genres g ON m.id = g.id
 
 AST: Select {
-    select: SelectClause {
-        expressions: [
-            (
-                Field(
-                    Some(
-                        "m",
-                    ),
-                    "id",
-                ),
+    select: [
+        (
+            Field(
                 Some(
-                    "movie_id",
+                    "m",
                 ),
+                "id",
             ),
-            (
-                Field(
-                    Some(
-                        "g",
-                    ),
-                    "id",
-                ),
+            Some(
+                "movie_id",
+            ),
+        ),
+        (
+            Field(
                 Some(
-                    "genre_id",
+                    "g",
                 ),
+                "id",
             ),
-        ],
-    },
-    from: Some(
-        FromClause {
-            items: [
-                Join {
-                    left: Table {
-                        name: "movies",
-                        alias: Some(
-                            "m",
-                        ),
-                    },
-                    right: Table {
-                        name: "genres",
-                        alias: Some(
-                            "g",
-                        ),
-                    },
-                    type: Left,
-                    predicate: Some(
-                        Operation(
-                            Equal(
-                                Field(
-                                    Some(
-                                        "m",
-                                    ),
-                                    "id",
-                                ),
-                                Field(
-                                    Some(
-                                        "g",
-                                    ),
-                                    "id",
-                                ),
+            Some(
+                "genre_id",
+            ),
+        ),
+    ],
+    from: [
+        Join {
+            left: Table {
+                name: "movies",
+                alias: Some(
+                    "m",
+                ),
+            },
+            right: Table {
+                name: "genres",
+                alias: Some(
+                    "g",
+                ),
+            },
+            type: Left,
+            predicate: Some(
+                Operation(
+                    Equal(
+                        Field(
+                            Some(
+                                "m",
                             ),
+                            "id",
+                        ),
+                        Field(
+                            Some(
+                                "g",
+                            ),
+                            "id",
                         ),
                     ),
-                },
-            ],
+                ),
+            ),
         },
-    ),
+    ],
     where: None,
-    group_by: None,
+    group_by: [],
     having: None,
     order: [],
     offset: None,
