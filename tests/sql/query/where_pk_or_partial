@@ -1,0 +1,242 @@
+Query: SELECT * FROM movies WHERE (id = 2 OR id = 3 OR id = 4 OR id = 5) AND genre_id = 1
+
+AST: Select {
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: Some(
+        Operation(
+            And(
+                Operation(
+                    Or(
+                        Operation(
+                            Or(
+                                Operation(
+                                    Or(
+                                        Operation(
+                                            Equal(
+                                                Field(
+                                                    None,
+                                                    "id",
+                                                ),
+                                                Literal(
+                                                    Integer(
+                                                        2,
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                        Operation(
+                                            Equal(
+                                                Field(
+                                                    None,
+                                                    "id",
+                                                ),
+                                                Literal(
+                                                    Integer(
+                                                        3,
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                Operation(
+                                    Equal(
+                                        Field(
+                                            None,
+                                            "id",
+                                        ),
+                                        Literal(
+                                            Integer(
+                                                4,
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        Operation(
+                            Equal(
+                                Field(
+                                    None,
+                                    "id",
+                                ),
+                                Literal(
+                                    Integer(
+                                        5,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                Operation(
+                    Equal(
+                        Field(
+                            None,
+                            "genre_id",
+                        ),
+                        Literal(
+                            Integer(
+                                1,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    Filter {
+        source: Scan {
+            table: "movies",
+            alias: None,
+            filter: None,
+        },
+        predicate: And(
+            Or(
+                Or(
+                    Or(
+                        Equal(
+                            Field(
+                                0,
+                                Some(
+                                    (
+                                        None,
+                                        "id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                        ),
+                        Equal(
+                            Field(
+                                0,
+                                Some(
+                                    (
+                                        None,
+                                        "id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                    ),
+                    Equal(
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                4,
+                            ),
+                        ),
+                    ),
+                ),
+                Equal(
+                    Field(
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
+                            ),
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            5,
+                        ),
+                    ),
+                ),
+            ),
+            Equal(
+                Field(
+                    3,
+                    Some(
+                        (
+                            None,
+                            "genre_id",
+                        ),
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+            ),
+        ),
+    },
+)
+
+Optimized plan: Plan(
+    Filter {
+        source: KeyLookup {
+            table: "movies",
+            alias: None,
+            keys: [
+                Integer(
+                    2,
+                ),
+                Integer(
+                    3,
+                ),
+                Integer(
+                    4,
+                ),
+                Integer(
+                    5,
+                ),
+            ],
+        },
+        predicate: Equal(
+            Field(
+                3,
+                Some(
+                    (
+                        None,
+                        "genre_id",
+                    ),
+                ),
+            ),
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+        ),
+    },
+)
+
+Query: SELECT * FROM movies WHERE (id = 2 OR id = 3 OR id = 4 OR id = 5) AND genre_id = 1
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]
+[Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false)]

@@ -36,7 +36,7 @@ impl Optimizer for FilterPushdown {
     fn optimize(&self, node: Node) -> Result<Node> {
         node.transform(
             &|n| match n {
-                Node::Filter { source, predicate } => Self::pushdown(predicate, *source),
+                Node::Filter { source, predicate } => self.pushdown(predicate, *source),
                 n => Ok(n),
             },
             &|n| Ok(n),
@@ -46,7 +46,7 @@ impl Optimizer for FilterPushdown {
 
 impl FilterPushdown {
     /// Attempts to push a predicate down into a target node, or returns a regular filter node.
-    fn pushdown(mut predicate: Expression, target: Node) -> Result<Node> {
+    fn pushdown(&self, mut predicate: Expression, target: Node) -> Result<Node> {
         Ok(match target {
             // Filter nodes immediately before a scan node can be trivially pushed down.
             Node::Scan { table, alias, filter } => {
@@ -104,6 +104,18 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
             _ => None,
         }
     }
+
+    // Wraps a node in a filter for the given CNF vector, if any, otherwise returns the bare node.
+    fn wrap_cnf(&self, mut node: Node, mut cnf: Vec<Expression>) -> Node {
+        if !cnf.is_empty() {
+            let mut predicate = cnf.remove(0);
+            for rhs in cnf {
+                predicate = Expression::And(predicate.into(), rhs.into());
+            }
+            node = Node::Filter { source: Box::new(node), predicate }
+        }
+        node
+    }
 }
 
 impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
@@ -112,12 +124,29 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
             Node::Scan { table, alias, filter: Some(filter) } => {
                 let columns = self.catalog.must_read_table(&table)?.columns;
                 let pk = columns.iter().position(|c| c.primary_key).unwrap();
-                if let Some(keys) = self.as_lookups(pk, &filter) {
-                    return Ok(Node::KeyLookup { table, alias, keys });
-                }
-                for (i, column) in columns.into_iter().enumerate().filter(|(_, c)| c.index) {
-                    if let Some(values) = self.as_lookups(i, &filter) {
-                        return Ok(Node::IndexLookup { table, alias, column: column.name, values });
+
+                // Convert the filter into conjunctive normal form, and try to convert each
+                // sub-expression into a lookup. If a lookup is found, return a lookup node and then
+                // apply the remaining conjunctions as a filter node, if any.
+                let mut cnf = filter.clone().into_cnf_vec()?;
+                for i in 0..cnf.len() {
+                    if let Some(keys) = self.as_lookups(pk, &cnf[i]) {
+                        cnf.remove(i);
+                        return Ok(self.wrap_cnf(Node::KeyLookup { table, alias, keys }, cnf));
+                    }
+                    for (ci, column) in columns.iter().enumerate().filter(|(_, c)| c.index) {
+                        if let Some(values) = self.as_lookups(ci, &cnf[i]) {
+                            cnf.remove(i);
+                            return Ok(self.wrap_cnf(
+                                Node::IndexLookup {
+                                    table,
+                                    alias,
+                                    column: column.name.clone(),
+                                    values,
+                                },
+                                cnf,
+                            ));
+                        }
                     }
                 }
                 Ok(Node::Scan { table, alias, filter: Some(filter) })
