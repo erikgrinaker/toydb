@@ -1,18 +1,11 @@
 ///! Evaluates SQL expressions and compares with expectations.
 use toydb::error::{Error, Result};
 use toydb::sql::engine::Engine;
-use toydb::sql::execution::ResultSet;
 use toydb::sql::types::Value;
 
 fn eval_expr(expr: &str) -> Result<Value> {
     let engine = super::setup(Vec::new())?;
-    match engine.session()?.execute(&format!("SELECT {}", expr))? {
-        ResultSet::Query { mut rows, .. } => {
-            // FIXME Should use into_value or something
-            Ok(rows.next().unwrap().unwrap().get(0).unwrap().clone())
-        }
-        r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
-    }
+    engine.session()?.execute(&format!("SELECT {}", expr))?.into_value()
 }
 
 macro_rules! test_expr {
