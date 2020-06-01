@@ -116,16 +116,14 @@ Plan: Plan(
                         ),
                     ],
                 },
-                predicate: Some(
-                    GreaterThan(
-                        Field(
-                            1,
-                            None,
-                        ),
-                        Constant(
-                            Integer(
-                                8,
-                            ),
+                predicate: GreaterThan(
+                    Field(
+                        1,
+                        None,
+                    ),
+                    Constant(
+                        Integer(
+                            8,
                         ),
                     ),
                 ),
@@ -212,16 +210,14 @@ Optimized plan: Plan(
                         ),
                     ],
                 },
-                predicate: Some(
-                    GreaterThan(
-                        Field(
-                            1,
-                            None,
-                        ),
-                        Constant(
-                            Integer(
-                                8,
-                            ),
+                predicate: GreaterThan(
+                    Field(
+                        1,
+                        None,
+                    ),
+                    Constant(
+                        Integer(
+                            8,
                         ),
                     ),
                 ),

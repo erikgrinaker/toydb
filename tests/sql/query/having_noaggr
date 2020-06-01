@@ -139,28 +139,26 @@ Plan: Plan(
                         ),
                     ],
                 },
-                predicate: Some(
-                    Or(
-                        GreaterThan(
-                            Field(
-                                2,
-                                None,
-                            ),
-                            Constant(
-                                Integer(
-                                    3,
-                                ),
+                predicate: Or(
+                    GreaterThan(
+                        Field(
+                            2,
+                            None,
+                        ),
+                        Constant(
+                            Integer(
+                                3,
                             ),
                         ),
-                        Equal(
-                            Field(
-                                2,
-                                None,
-                            ),
-                            Constant(
-                                Integer(
-                                    3,
-                                ),
+                    ),
+                    Equal(
+                        Field(
+                            2,
+                            None,
+                        ),
+                        Constant(
+                            Integer(
+                                3,
                             ),
                         ),
                     ),
@@ -269,28 +267,26 @@ Optimized plan: Plan(
                         ),
                     ],
                 },
-                predicate: Some(
-                    Or(
-                        GreaterThan(
-                            Field(
-                                2,
-                                None,
-                            ),
-                            Constant(
-                                Integer(
-                                    3,
-                                ),
+                predicate: Or(
+                    GreaterThan(
+                        Field(
+                            2,
+                            None,
+                        ),
+                        Constant(
+                            Integer(
+                                3,
                             ),
                         ),
-                        Equal(
-                            Field(
-                                2,
-                                None,
-                            ),
-                            Constant(
-                                Integer(
-                                    3,
-                                ),
+                    ),
+                    Equal(
+                        Field(
+                            2,
+                            None,
+                        ),
+                        Constant(
+                            Integer(
+                                3,
                             ),
                         ),
                     ),

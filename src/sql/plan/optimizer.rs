@@ -1,7 +1,9 @@
 use super::super::schema::Catalog;
-use super::super::types::Expression;
+use super::super::types::{Expression, Value};
 use super::Node;
 use crate::error::Result;
+
+use std::mem::replace;
 
 /// A plan optimizer
 pub trait Optimizer {
@@ -10,7 +12,6 @@ pub trait Optimizer {
 
 /// A constant folding optimizer, which replaces constant expressions with their evaluated value, to
 /// prevent it from being re-evaluated over and over again during plan execution.
-/// FIXME Should optimize true and false filters as well.
 pub struct ConstantFolder;
 
 impl Optimizer for ConstantFolder {
@@ -37,13 +38,18 @@ impl Optimizer for FilterPushdown {
     fn optimize(&self, node: Node) -> Result<Node> {
         node.transform(
             &|n| match n {
-                Node::Filter { mut source, predicate: Some(predicate) } => {
+                Node::Filter { mut source, predicate } => {
                     // We don't replace the filter node here, since doing so would cause transform()
                     // to skip the source as it won't reapply the transform to the "same" node.
-                    // We leave an empty filter node instead, which will be cleaned up by a separate
-                    // optimizer.
-                    let predicate = self.pushdown(predicate, &mut *source);
-                    Ok(Node::Filter { source, predicate })
+                    // We leave a noop filter node instead, which will be cleaned up by NoopCleaner.
+                    if let Some(remainder) = self.pushdown(predicate, &mut *source) {
+                        Ok(Node::Filter { source, predicate: remainder })
+                    } else {
+                        Ok(Node::Filter {
+                            source,
+                            predicate: Expression::Constant(Value::Boolean(true)),
+                        })
+                    }
                 }
                 Node::NestedLoopJoin {
                     mut outer,
@@ -68,13 +74,22 @@ impl FilterPushdown {
     /// Attempts to push an expression down into a target node, returns any remaining expression.
     fn pushdown(&self, mut expression: Expression, target: &mut Node) -> Option<Expression> {
         match target {
-            Node::Filter { ref mut predicate, .. }
-            | Node::NestedLoopJoin { ref mut predicate, .. }
-            | Node::Scan { filter: ref mut predicate, .. } => {
+            Node::Scan { ref mut filter, .. } => {
+                if let Some(filter) = filter.take() {
+                    expression = Expression::And(Box::new(expression), Box::new(filter))
+                }
+                filter.replace(expression)
+            }
+            Node::NestedLoopJoin { ref mut predicate, .. } => {
                 if let Some(predicate) = predicate.take() {
                     expression = Expression::And(Box::new(expression), Box::new(predicate));
                 }
                 predicate.replace(expression)
+            }
+            Node::Filter { ref mut predicate, .. } => {
+                let p = replace(predicate, Expression::Constant(Value::Null));
+                replace(predicate, Expression::And(Box::new(p), Box::new(expression)));
+                None
             }
             _ => Some(expression),
         }
@@ -163,7 +178,7 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
     // Wraps a node in a filter for the given CNF vector, if any, otherwise returns the bare node.
     fn wrap_cnf(&self, node: Node, cnf: Vec<Expression>) -> Node {
         if let Some(predicate) = Expression::from_cnf_vec(cnf) {
-            Node::Filter { source: Box::new(node), predicate: Some(predicate) }
+            Node::Filter { source: Box::new(node), predicate }
         } else {
             node
         }
@@ -205,5 +220,52 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
             }
             n => Ok(n),
         })
+    }
+}
+
+/// Cleans up noops, e.g. filters with constant true/false predicates.
+/// FIXME This should perhaps replace nodes that can never return anything with a Nothing node,
+/// but that requires propagating the column names.
+pub struct NoopCleaner;
+
+impl Optimizer for NoopCleaner {
+    fn optimize(&self, node: Node) -> Result<Node> {
+        use Expression::*;
+        node.transform(
+            // While descending the node tree, clean up boolean expressions.
+            &|n| {
+                n.transform_expressions(&|e| Ok(e), &|e| match &e {
+                    And(lhs, rhs) => match (&**lhs, &**rhs) {
+                        (Constant(Value::Boolean(false)), _)
+                        | (Constant(Value::Null), _)
+                        | (_, Constant(Value::Boolean(false)))
+                        | (_, Constant(Value::Null)) => Ok(Constant(Value::Boolean(false))),
+                        (Constant(Value::Boolean(true)), e)
+                        | (e, Constant(Value::Boolean(true))) => Ok(e.clone()),
+                        _ => Ok(e),
+                    },
+                    Or(lhs, rhs) => match (&**lhs, &**rhs) {
+                        (Constant(Value::Boolean(false)), e)
+                        | (Constant(Value::Null), e)
+                        | (e, Constant(Value::Boolean(false)))
+                        | (e, Constant(Value::Null)) => Ok(e.clone()),
+                        (Constant(Value::Boolean(true)), _)
+                        | (_, Constant(Value::Boolean(true))) => Ok(Constant(Value::Boolean(true))),
+                        _ => Ok(e),
+                    },
+                    // No need to handle Not, constant folder should have evaluated it already.
+                    _ => Ok(e),
+                })
+            },
+            // While ascending the node tree, remove any unnecessary filters or nodes.
+            // FIXME This should replace scan and join predicates with None as well.
+            &|n| match n {
+                Node::Filter { source, predicate } => match predicate {
+                    Expression::Constant(Value::Boolean(true)) => Ok(*source),
+                    predicate => Ok(Node::Filter { source, predicate }),
+                },
+                n => Ok(n),
+            },
+        )
     }
 }

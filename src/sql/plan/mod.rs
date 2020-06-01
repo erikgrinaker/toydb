@@ -34,6 +34,7 @@ impl Plan {
         root = optimizer::ConstantFolder.optimize(root)?;
         root = optimizer::FilterPushdown.optimize(root)?;
         root = optimizer::IndexLookup::new(catalog).optimize(root)?;
+        root = optimizer::NoopCleaner.optimize(root)?;
         Ok(Plan(root))
     }
 }
@@ -57,10 +58,7 @@ pub enum Node {
     },
     Filter {
         source: Box<Node>,
-        // A filter node may not make sense, but it's useful during planning and optimization
-        // when we're moving predicates around - in particular, replacing a filter node with
-        // a source node during filter pushdown will cause Node.transform() to skip the source.
-        predicate: Option<Expression>,
+        predicate: Expression,
     },
     IndexLookup {
         table: String,
@@ -182,7 +180,6 @@ impl Node {
             | n @ Self::CreateTable { .. }
             | n @ Self::Delete { .. }
             | n @ Self::DropTable { .. }
-            | n @ Self::Filter { predicate: None, .. }
             | n @ Self::IndexLookup { .. }
             | n @ Self::KeyLookup { .. }
             | n @ Self::Limit { .. }
@@ -191,8 +188,8 @@ impl Node {
             | n @ Self::Offset { .. }
             | n @ Self::Scan { filter: None, .. } => n,
 
-            Self::Filter { source, predicate: Some(predicate) } => {
-                Self::Filter { source, predicate: Some(predicate.transform(before, after)?) }
+            Self::Filter { source, predicate } => {
+                Self::Filter { source, predicate: predicate.transform(before, after)? }
             }
             Self::Insert { table, columns, expressions } => Self::Insert {
                 table,

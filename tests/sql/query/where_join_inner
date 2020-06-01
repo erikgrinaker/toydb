@@ -55,6 +55,46 @@ Plan: Plan(
             pad: false,
             flip: false,
         },
+        predicate: Equal(
+            Field(
+                3,
+                Some(
+                    (
+                        Some(
+                            "movies",
+                        ),
+                        "genre_id",
+                    ),
+                ),
+            ),
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "genres",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
+        ),
+    },
+)
+
+Optimized plan: Plan(
+    NestedLoopJoin {
+        outer: Scan {
+            table: "movies",
+            alias: None,
+            filter: None,
+        },
+        outer_size: 7,
+        inner: Scan {
+            table: "genres",
+            alias: None,
+            filter: None,
+        },
         predicate: Some(
             Equal(
                 Field(
@@ -81,53 +121,8 @@ Plan: Plan(
                 ),
             ),
         ),
-    },
-)
-
-Optimized plan: Plan(
-    Filter {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: None,
-                filter: None,
-            },
-            outer_size: 7,
-            inner: Scan {
-                table: "genres",
-                alias: None,
-                filter: None,
-            },
-            predicate: Some(
-                Equal(
-                    Field(
-                        3,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "genre_id",
-                            ),
-                        ),
-                    ),
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "genres",
-                                ),
-                                "id",
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-            pad: false,
-            flip: false,
-        },
-        predicate: None,
+        pad: false,
+        flip: false,
     },
 )
 

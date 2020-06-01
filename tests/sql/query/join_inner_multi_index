@@ -362,23 +362,21 @@ Optimized plan: Plan(
                                 ),
                             ],
                         },
-                        predicate: Some(
-                            Equal(
-                                Field(
-                                    3,
-                                    Some(
-                                        (
-                                            Some(
-                                                "m",
-                                            ),
-                                            "genre_id",
+                        predicate: Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        Some(
+                                            "m",
                                         ),
+                                        "genre_id",
                                     ),
                                 ),
-                                Constant(
-                                    Integer(
-                                        1,
-                                    ),
+                            ),
+                            Constant(
+                                Integer(
+                                    1,
                                 ),
                             ),
                         ),

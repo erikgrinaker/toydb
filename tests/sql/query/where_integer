@@ -29,30 +29,25 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        predicate: Some(
-            Constant(
-                Integer(
-                    7,
-                ),
+        predicate: Constant(
+            Integer(
+                7,
             ),
         ),
     },
 )
 
 Optimized plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: Some(
-                Constant(
-                    Integer(
-                        7,
-                    ),
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            Constant(
+                Integer(
+                    7,
                 ),
             ),
-        },
-        predicate: None,
+        ),
     },
 )
 

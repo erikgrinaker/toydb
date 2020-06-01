@@ -37,21 +37,19 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        predicate: Some(
-            Equal(
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
+        predicate: Equal(
+            Field(
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
                     ),
                 ),
-                Constant(
-                    Integer(
-                        3,
-                    ),
+            ),
+            Constant(
+                Integer(
+                    3,
                 ),
             ),
         ),
@@ -59,17 +57,14 @@ Plan: Plan(
 )
 
 Optimized plan: Plan(
-    Filter {
-        source: KeyLookup {
-            table: "movies",
-            alias: None,
-            keys: [
-                Integer(
-                    3,
-                ),
-            ],
-        },
-        predicate: None,
+    KeyLookup {
+        table: "movies",
+        alias: None,
+        keys: [
+            Integer(
+                3,
+            ),
+        ],
     },
 )
 

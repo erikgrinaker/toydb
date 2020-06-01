@@ -46,21 +46,19 @@ Plan: Plan(
                 alias: None,
                 filter: None,
             },
-            predicate: Some(
-                Equal(
-                    Field(
-                        3,
-                        Some(
-                            (
-                                None,
-                                "genre_id",
-                            ),
+            predicate: Equal(
+                Field(
+                    3,
+                    Some(
+                        (
+                            None,
+                            "genre_id",
                         ),
                     ),
-                    Constant(
-                        Integer(
-                            2,
-                        ),
+                ),
+                Constant(
+                    Integer(
+                        2,
                     ),
                 ),
             ),
@@ -84,18 +82,15 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Order {
-        source: Filter {
-            source: IndexLookup {
-                table: "movies",
-                alias: None,
-                column: "genre_id",
-                values: [
-                    Integer(
-                        2,
-                    ),
-                ],
-            },
-            predicate: None,
+        source: IndexLookup {
+            table: "movies",
+            alias: None,
+            column: "genre_id",
+            values: [
+                Integer(
+                    2,
+                ),
+            ],
         },
         orders: [
             (

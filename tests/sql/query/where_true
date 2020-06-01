@@ -29,30 +29,25 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        predicate: Some(
-            Constant(
-                Boolean(
-                    true,
-                ),
+        predicate: Constant(
+            Boolean(
+                true,
             ),
         ),
     },
 )
 
 Optimized plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: Some(
-                Constant(
-                    Boolean(
-                        true,
-                    ),
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            Constant(
+                Boolean(
+                    true,
                 ),
             ),
-        },
-        predicate: None,
+        ),
     },
 )
 

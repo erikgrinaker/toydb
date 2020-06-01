@@ -108,8 +108,66 @@ Plan: Plan(
             pad: false,
             flip: false,
         },
+        predicate: Equal(
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
+            Constant(
+                Integer(
+                    4,
+                ),
+            ),
+        ),
+    },
+)
+
+Optimized plan: Plan(
+    NestedLoopJoin {
+        outer: IndexLookup {
+            table: "movies",
+            alias: Some(
+                "m",
+            ),
+            column: "genre_id",
+            values: [
+                Integer(
+                    4,
+                ),
+            ],
+        },
+        outer_size: 7,
+        inner: KeyLookup {
+            table: "genres",
+            alias: Some(
+                "g",
+            ),
+            keys: [
+                Integer(
+                    4,
+                ),
+            ],
+        },
         predicate: Some(
             Equal(
+                Field(
+                    3,
+                    Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "genre_id",
+                        ),
+                    ),
+                ),
                 Field(
                     7,
                     Some(
@@ -121,73 +179,10 @@ Plan: Plan(
                         ),
                     ),
                 ),
-                Constant(
-                    Integer(
-                        4,
-                    ),
-                ),
             ),
         ),
-    },
-)
-
-Optimized plan: Plan(
-    Filter {
-        source: NestedLoopJoin {
-            outer: IndexLookup {
-                table: "movies",
-                alias: Some(
-                    "m",
-                ),
-                column: "genre_id",
-                values: [
-                    Integer(
-                        4,
-                    ),
-                ],
-            },
-            outer_size: 7,
-            inner: KeyLookup {
-                table: "genres",
-                alias: Some(
-                    "g",
-                ),
-                keys: [
-                    Integer(
-                        4,
-                    ),
-                ],
-            },
-            predicate: Some(
-                Equal(
-                    Field(
-                        3,
-                        Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "genre_id",
-                            ),
-                        ),
-                    ),
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-            pad: false,
-            flip: false,
-        },
-        predicate: None,
+        pad: false,
+        flip: false,
     },
 )
 
