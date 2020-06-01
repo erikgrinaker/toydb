@@ -314,7 +314,8 @@ test_query! {
         SELECT m.title, g.name AS genre, s.name AS studio
         FROM movies m
             INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
-            INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4"#,
+            INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
+        ORDER BY m.title"#,
 
     join_left: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT JOIN genres g ON m.id = g.id",
     join_left_outer: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN genres g ON m.id = g.id",

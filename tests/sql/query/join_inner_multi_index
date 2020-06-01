@@ -3,6 +3,7 @@ Query:
         FROM movies m
             INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
             INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
+        ORDER BY m.title
 
 AST: Select {
     select: [
@@ -141,32 +142,260 @@ AST: Select {
     where: None,
     group_by: [],
     having: None,
-    order: [],
+    order: [
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+            Ascending,
+        ),
+    ],
     offset: None,
     limit: None,
 }
 
 Plan: Plan(
-    Projection {
-        source: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Scan {
-                    table: "movies",
-                    alias: Some(
-                        "m",
+    Order {
+        source: Projection {
+            source: NestedLoopJoin {
+                outer: NestedLoopJoin {
+                    outer: Scan {
+                        table: "movies",
+                        alias: Some(
+                            "m",
+                        ),
+                        filter: None,
+                    },
+                    outer_size: 7,
+                    inner: Scan {
+                        table: "genres",
+                        alias: Some(
+                            "g",
+                        ),
+                        filter: None,
+                    },
+                    predicate: Some(
+                        And(
+                            Equal(
+                                Field(
+                                    3,
+                                    Some(
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "genre_id",
+                                        ),
+                                    ),
+                                ),
+                                Field(
+                                    7,
+                                    Some(
+                                        (
+                                            Some(
+                                                "g",
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            Equal(
+                                Field(
+                                    7,
+                                    Some(
+                                        (
+                                            Some(
+                                                "g",
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        1,
+                                    ),
+                                ),
+                            ),
+                        ),
                     ),
-                    filter: None,
+                    pad: false,
+                    flip: false,
                 },
-                outer_size: 7,
+                outer_size: 9,
                 inner: Scan {
-                    table: "genres",
+                    table: "studios",
                     alias: Some(
-                        "g",
+                        "s",
                     ),
                     filter: None,
                 },
                 predicate: Some(
                     And(
+                        Equal(
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        Some(
+                                            "m",
+                                        ),
+                                        "studio_id",
+                                    ),
+                                ),
+                            ),
+                            Field(
+                                9,
+                                Some(
+                                    (
+                                        Some(
+                                            "s",
+                                        ),
+                                        "id",
+                                    ),
+                                ),
+                            ),
+                        ),
+                        Equal(
+                            Field(
+                                9,
+                                Some(
+                                    (
+                                        Some(
+                                            "s",
+                                        ),
+                                        "id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    4,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                pad: false,
+                flip: false,
+            },
+            expressions: [
+                (
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "title",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    Some(
+                        "genre",
+                    ),
+                ),
+                (
+                    Field(
+                        10,
+                        Some(
+                            (
+                                Some(
+                                    "s",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    Some(
+                        "studio",
+                    ),
+                ),
+            ],
+        },
+        orders: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                Ascending,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Order {
+        source: Projection {
+            source: NestedLoopJoin {
+                outer: NestedLoopJoin {
+                    outer: Filter {
+                        source: IndexLookup {
+                            table: "movies",
+                            alias: Some(
+                                "m",
+                            ),
+                            column: "studio_id",
+                            values: [
+                                Integer(
+                                    4,
+                                ),
+                            ],
+                        },
+                        predicate: Some(
+                            Equal(
+                                Field(
+                                    3,
+                                    Some(
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "genre_id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        1,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    },
+                    outer_size: 7,
+                    inner: KeyLookup {
+                        table: "genres",
+                        alias: Some(
+                            "g",
+                        ),
+                        keys: [
+                            Integer(
+                                1,
+                            ),
+                        ],
+                    },
+                    predicate: Some(
                         Equal(
                             Field(
                                 3,
@@ -191,39 +420,23 @@ Plan: Plan(
                                 ),
                             ),
                         ),
-                        Equal(
-                            Field(
-                                7,
-                                Some(
-                                    (
-                                        Some(
-                                            "g",
-                                        ),
-                                        "id",
-                                    ),
-                                ),
-                            ),
-                            Constant(
-                                Integer(
-                                    1,
-                                ),
-                            ),
-                        ),
                     ),
-                ),
-                pad: false,
-                flip: false,
-            },
-            outer_size: 9,
-            inner: Scan {
-                table: "studios",
-                alias: Some(
-                    "s",
-                ),
-                filter: None,
-            },
-            predicate: Some(
-                And(
+                    pad: false,
+                    flip: false,
+                },
+                outer_size: 9,
+                inner: KeyLookup {
+                    table: "studios",
+                    alias: Some(
+                        "s",
+                    ),
+                    keys: [
+                        Integer(
+                            4,
+                        ),
+                    ],
+                },
+                predicate: Some(
                     Equal(
                         Field(
                             2,
@@ -248,246 +461,66 @@ Plan: Plan(
                             ),
                         ),
                     ),
-                    Equal(
-                        Field(
-                            9,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        Constant(
-                            Integer(
-                                4,
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-            pad: false,
-            flip: false,
-        },
-        expressions: [
-            (
-                Field(
-                    1,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
-                        ),
-                    ),
-                ),
-                None,
-            ),
-            (
-                Field(
-                    8,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "name",
-                        ),
-                    ),
-                ),
-                Some(
-                    "genre",
-                ),
-            ),
-            (
-                Field(
-                    10,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
-                    ),
-                ),
-                Some(
-                    "studio",
-                ),
-            ),
-        ],
-    },
-)
-
-Optimized plan: Plan(
-    Projection {
-        source: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Filter {
-                    source: IndexLookup {
-                        table: "movies",
-                        alias: Some(
-                            "m",
-                        ),
-                        column: "studio_id",
-                        values: [
-                            Integer(
-                                4,
-                            ),
-                        ],
-                    },
-                    predicate: Some(
-                        Equal(
-                            Field(
-                                3,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "genre_id",
-                                    ),
-                                ),
-                            ),
-                            Constant(
-                                Integer(
-                                    1,
-                                ),
-                            ),
-                        ),
-                    ),
-                },
-                outer_size: 7,
-                inner: KeyLookup {
-                    table: "genres",
-                    alias: Some(
-                        "g",
-                    ),
-                    keys: [
-                        Integer(
-                            1,
-                        ),
-                    ],
-                },
-                predicate: Some(
-                    Equal(
-                        Field(
-                            3,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "genre_id",
-                                ),
-                            ),
-                        ),
-                        Field(
-                            7,
-                            Some(
-                                (
-                                    Some(
-                                        "g",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                    ),
                 ),
                 pad: false,
                 flip: false,
             },
-            outer_size: 9,
-            inner: KeyLookup {
-                table: "studios",
-                alias: Some(
-                    "s",
-                ),
-                keys: [
-                    Integer(
-                        4,
-                    ),
-                ],
-            },
-            predicate: Some(
-                Equal(
+            expressions: [
+                (
                     Field(
-                        2,
+                        1,
                         Some(
                             (
                                 Some(
                                     "m",
                                 ),
-                                "studio_id",
+                                "title",
                             ),
                         ),
                     ),
+                    None,
+                ),
+                (
                     Field(
-                        9,
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    Some(
+                        "genre",
+                    ),
+                ),
+                (
+                    Field(
+                        10,
                         Some(
                             (
                                 Some(
                                     "s",
                                 ),
-                                "id",
+                                "name",
                             ),
                         ),
                     ),
+                    Some(
+                        "studio",
+                    ),
                 ),
-            ),
-            pad: false,
-            flip: false,
+            ],
         },
-        expressions: [
+        orders: [
             (
                 Field(
-                    1,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
-                        ),
-                    ),
+                    0,
+                    None,
                 ),
-                None,
-            ),
-            (
-                Field(
-                    8,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "name",
-                        ),
-                    ),
-                ),
-                Some(
-                    "genre",
-                ),
-            ),
-            (
-                Field(
-                    10,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
-                    ),
-                ),
-                Some(
-                    "studio",
-                ),
+                Ascending,
             ),
         ],
     },
@@ -498,8 +531,9 @@ Query:
         FROM movies m
             INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
             INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
+        ORDER BY m.title
 
 Result: ["title", "genre", "studio"]
-[String("The Fountain"), String("Science Fiction"), String("Warner Bros")]
-[String("Inception"), String("Science Fiction"), String("Warner Bros")]
 [String("Gravity"), String("Science Fiction"), String("Warner Bros")]
+[String("Inception"), String("Science Fiction"), String("Warner Bros")]
+[String("The Fountain"), String("Science Fiction"), String("Warner Bros")]
