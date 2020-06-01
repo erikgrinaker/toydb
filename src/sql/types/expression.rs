@@ -461,4 +461,57 @@ impl Expression {
             None
         }
     }
+
+    // Checks if the expression is a field lookup, and returns the list of values looked up.
+    // Expressions must be a combination of =, IS NULL, OR to be converted.
+    pub fn as_lookup(&self, field: usize) -> Option<Vec<Value>> {
+        use Expression::*;
+        // FIXME This should use a single match level, but since the child expressions are boxed
+        // that would require box patterns, which are unstable.
+        match &*self {
+            Equal(lhs, rhs) => match (&**lhs, &**rhs) {
+                (Field(i, _), Constant(v)) if i == &field => Some(vec![v.clone()]),
+                (Constant(v), Field(i, _)) if i == &field => Some(vec![v.clone()]),
+                (_, _) => None,
+            },
+            IsNull(e) => match &**e {
+                Field(i, _) if i == &field => Some(vec![Value::Null]),
+                _ => None,
+            },
+            Or(lhs, rhs) => match (lhs.as_lookup(field), rhs.as_lookup(field)) {
+                (Some(mut lvalues), Some(mut rvalues)) => {
+                    lvalues.append(&mut rvalues);
+                    Some(lvalues)
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    // Creates an expression from a list of field lookup values.
+    pub fn from_lookup(
+        field: usize,
+        label: Option<(Option<String>, String)>,
+        values: Vec<Value>,
+    ) -> Self {
+        if values.is_empty() {
+            return Expression::Equal(
+                Expression::Field(field, label).into(),
+                Expression::Constant(Value::Null).into(),
+            );
+        }
+        Self::from_dnf_vec(
+            values
+                .into_iter()
+                .map(|v| {
+                    Expression::Equal(
+                        Expression::Field(field, label.clone()).into(),
+                        Expression::Constant(v).into(),
+                    )
+                })
+                .collect(),
+        )
+        .unwrap()
+    }
 }

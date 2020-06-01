@@ -71,8 +71,42 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        predicate: Or(
+        predicate: Some(
             Or(
+                Or(
+                    Equal(
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                3,
+                            ),
+                        ),
+                    ),
+                    Equal(
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    None,
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                5,
+                            ),
+                        ),
+                    ),
+                ),
                 Equal(
                     Field(
                         0,
@@ -85,40 +119,8 @@ Plan: Plan(
                     ),
                     Constant(
                         Integer(
-                            3,
+                            7,
                         ),
-                    ),
-                ),
-                Equal(
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            5,
-                        ),
-                    ),
-                ),
-            ),
-            Equal(
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
-                    ),
-                ),
-                Constant(
-                    Integer(
-                        7,
                     ),
                 ),
             ),
@@ -127,20 +129,23 @@ Plan: Plan(
 )
 
 Optimized plan: Plan(
-    KeyLookup {
-        table: "movies",
-        alias: None,
-        keys: [
-            Integer(
-                3,
-            ),
-            Integer(
-                5,
-            ),
-            Integer(
-                7,
-            ),
-        ],
+    Filter {
+        source: KeyLookup {
+            table: "movies",
+            alias: None,
+            keys: [
+                Integer(
+                    3,
+                ),
+                Integer(
+                    5,
+                ),
+                Integer(
+                    7,
+                ),
+            ],
+        },
+        predicate: None,
     },
 )
 

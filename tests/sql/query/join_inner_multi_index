@@ -326,12 +326,39 @@ Optimized plan: Plan(
     Projection {
         source: NestedLoopJoin {
             outer: NestedLoopJoin {
-                outer: Scan {
-                    table: "movies",
-                    alias: Some(
-                        "m",
+                outer: Filter {
+                    source: IndexLookup {
+                        table: "movies",
+                        alias: Some(
+                            "m",
+                        ),
+                        column: "studio_id",
+                        values: [
+                            Integer(
+                                4,
+                            ),
+                        ],
+                    },
+                    predicate: Some(
+                        Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        Some(
+                                            "m",
+                                        ),
+                                        "genre_id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    1,
+                                ),
+                            ),
+                        ),
                     ),
-                    filter: None,
                 },
                 outer_size: 7,
                 inner: KeyLookup {
@@ -474,5 +501,5 @@ Query:
 
 Result: ["title", "genre", "studio"]
 [String("The Fountain"), String("Science Fiction"), String("Warner Bros")]
-[String("Gravity"), String("Science Fiction"), String("Warner Bros")]
 [String("Inception"), String("Science Fiction"), String("Warner Bros")]
+[String("Gravity"), String("Science Fiction"), String("Warner Bros")]

@@ -181,20 +181,22 @@ Plan: Plan(
                         ),
                     ],
                 },
-                predicate: LessThan(
-                    Subtract(
-                        Field(
-                            2,
-                            None,
+                predicate: Some(
+                    LessThan(
+                        Subtract(
+                            Field(
+                                2,
+                                None,
+                            ),
+                            Field(
+                                3,
+                                None,
+                            ),
                         ),
-                        Field(
-                            3,
-                            None,
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            1,
+                        Constant(
+                            Integer(
+                                1,
+                            ),
                         ),
                     ),
                 ),
@@ -328,20 +330,22 @@ Optimized plan: Plan(
                         ),
                     ],
                 },
-                predicate: LessThan(
-                    Subtract(
-                        Field(
-                            2,
-                            None,
+                predicate: Some(
+                    LessThan(
+                        Subtract(
+                            Field(
+                                2,
+                                None,
+                            ),
+                            Field(
+                                3,
+                                None,
+                            ),
                         ),
-                        Field(
-                            3,
-                            None,
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            1,
+                        Constant(
+                            Integer(
+                                1,
+                            ),
                         ),
                     ),
                 ),

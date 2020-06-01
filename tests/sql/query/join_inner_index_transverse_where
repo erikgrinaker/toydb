@@ -1,0 +1,196 @@
+Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id WHERE g.id = 4
+
+AST: Select {
+    select: [],
+    from: [
+        Join {
+            left: Table {
+                name: "movies",
+                alias: Some(
+                    "m",
+                ),
+            },
+            right: Table {
+                name: "genres",
+                alias: Some(
+                    "g",
+                ),
+            },
+            type: Inner,
+            predicate: Some(
+                Operation(
+                    Equal(
+                        Field(
+                            Some(
+                                "m",
+                            ),
+                            "genre_id",
+                        ),
+                        Field(
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
+                    ),
+                ),
+            ),
+        },
+    ],
+    where: Some(
+        Operation(
+            Equal(
+                Field(
+                    Some(
+                        "g",
+                    ),
+                    "id",
+                ),
+                Literal(
+                    Integer(
+                        4,
+                    ),
+                ),
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: Some(
+                    "m",
+                ),
+                filter: None,
+            },
+            outer_size: 7,
+            inner: Scan {
+                table: "genres",
+                alias: Some(
+                    "g",
+                ),
+                filter: None,
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        3,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "genre_id",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        7,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "id",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            pad: false,
+            flip: false,
+        },
+        predicate: Some(
+            Equal(
+                Field(
+                    7,
+                    Some(
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
+                    ),
+                ),
+                Constant(
+                    Integer(
+                        4,
+                    ),
+                ),
+            ),
+        ),
+    },
+)
+
+Optimized plan: Plan(
+    Filter {
+        source: NestedLoopJoin {
+            outer: IndexLookup {
+                table: "movies",
+                alias: Some(
+                    "m",
+                ),
+                column: "genre_id",
+                values: [
+                    Integer(
+                        4,
+                    ),
+                ],
+            },
+            outer_size: 7,
+            inner: KeyLookup {
+                table: "genres",
+                alias: Some(
+                    "g",
+                ),
+                keys: [
+                    Integer(
+                        4,
+                    ),
+                ],
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        3,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "genre_id",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        7,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "id",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            pad: false,
+            flip: false,
+        },
+        predicate: None,
+    },
+)
+
+Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id WHERE g.id = 4
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]

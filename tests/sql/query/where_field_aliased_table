@@ -101,116 +101,6 @@ Plan: Plan(
                 pad: false,
                 flip: false,
             },
-            predicate: And(
-                Or(
-                    GreaterThan(
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        Constant(
-                            Integer(
-                                3,
-                            ),
-                        ),
-                    ),
-                    Equal(
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        Constant(
-                            Integer(
-                                3,
-                            ),
-                        ),
-                    ),
-                ),
-                Equal(
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            1,
-                        ),
-                    ),
-                ),
-            ),
-        },
-        expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "id",
-                        ),
-                    ),
-                ),
-                None,
-            ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
-                        ),
-                    ),
-                ),
-                None,
-            ),
-        ],
-    },
-)
-
-Optimized plan: Plan(
-    Projection {
-        source: NestedLoopJoin {
-            outer: Scan {
-                table: "movies",
-                alias: Some(
-                    "m",
-                ),
-                filter: None,
-            },
-            outer_size: 7,
-            inner: Scan {
-                table: "genres",
-                alias: Some(
-                    "g",
-                ),
-                filter: None,
-            },
             predicate: Some(
                 And(
                     Or(
@@ -271,8 +161,107 @@ Optimized plan: Plan(
                     ),
                 ),
             ),
-            pad: false,
-            flip: false,
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "id",
+                        ),
+                    ),
+                ),
+                None,
+            ),
+            (
+                Field(
+                    7,
+                    Some(
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
+                    ),
+                ),
+                None,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Projection {
+        source: Filter {
+            source: NestedLoopJoin {
+                outer: Scan {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                    filter: Some(
+                        Or(
+                            GreaterThan(
+                                Field(
+                                    0,
+                                    Some(
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        3,
+                                    ),
+                                ),
+                            ),
+                            Equal(
+                                Field(
+                                    0,
+                                    Some(
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        3,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                },
+                outer_size: 7,
+                inner: KeyLookup {
+                    table: "genres",
+                    alias: Some(
+                        "g",
+                    ),
+                    keys: [
+                        Integer(
+                            1,
+                        ),
+                    ],
+                },
+                predicate: None,
+                pad: false,
+                flip: false,
+            },
+            predicate: None,
         },
         expressions: [
             (

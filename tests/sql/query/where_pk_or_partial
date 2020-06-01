@@ -105,23 +105,41 @@ Plan: Plan(
             alias: None,
             filter: None,
         },
-        predicate: And(
-            Or(
+        predicate: Some(
+            And(
                 Or(
                     Or(
-                        Equal(
-                            Field(
-                                0,
-                                Some(
-                                    (
-                                        None,
-                                        "id",
+                        Or(
+                            Equal(
+                                Field(
+                                    0,
+                                    Some(
+                                        (
+                                            None,
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        2,
                                     ),
                                 ),
                             ),
-                            Constant(
-                                Integer(
-                                    2,
+                            Equal(
+                                Field(
+                                    0,
+                                    Some(
+                                        (
+                                            None,
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        3,
+                                    ),
                                 ),
                             ),
                         ),
@@ -137,7 +155,7 @@ Plan: Plan(
                             ),
                             Constant(
                                 Integer(
-                                    3,
+                                    4,
                                 ),
                             ),
                         ),
@@ -154,41 +172,25 @@ Plan: Plan(
                         ),
                         Constant(
                             Integer(
-                                4,
+                                5,
                             ),
                         ),
                     ),
                 ),
                 Equal(
                     Field(
-                        0,
+                        3,
                         Some(
                             (
                                 None,
-                                "id",
+                                "genre_id",
                             ),
                         ),
                     ),
                     Constant(
                         Integer(
-                            5,
+                            1,
                         ),
-                    ),
-                ),
-            ),
-            Equal(
-                Field(
-                    3,
-                    Some(
-                        (
-                            None,
-                            "genre_id",
-                        ),
-                    ),
-                ),
-                Constant(
-                    Integer(
-                        1,
                     ),
                 ),
             ),
@@ -198,40 +200,45 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Filter {
-        source: KeyLookup {
-            table: "movies",
-            alias: None,
-            keys: [
-                Integer(
-                    2,
-                ),
-                Integer(
-                    3,
-                ),
-                Integer(
-                    4,
-                ),
-                Integer(
-                    5,
-                ),
-            ],
-        },
-        predicate: Equal(
-            Field(
-                3,
-                Some(
-                    (
-                        None,
-                        "genre_id",
+        source: Filter {
+            source: KeyLookup {
+                table: "movies",
+                alias: None,
+                keys: [
+                    Integer(
+                        2,
+                    ),
+                    Integer(
+                        3,
+                    ),
+                    Integer(
+                        4,
+                    ),
+                    Integer(
+                        5,
+                    ),
+                ],
+            },
+            predicate: Some(
+                Equal(
+                    Field(
+                        3,
+                        Some(
+                            (
+                                None,
+                                "genre_id",
+                            ),
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            1,
+                        ),
                     ),
                 ),
             ),
-            Constant(
-                Integer(
-                    1,
-                ),
-            ),
-        ),
+        },
+        predicate: None,
     },
 )
 

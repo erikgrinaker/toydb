@@ -1,5 +1,5 @@
 use super::super::schema::Catalog;
-use super::super::types::{Expression, Value};
+use super::super::types::Expression;
 use super::Node;
 use crate::error::Result;
 
@@ -37,11 +37,13 @@ impl Optimizer for FilterPushdown {
     fn optimize(&self, node: Node) -> Result<Node> {
         node.transform(
             &|n| match n {
-                Node::Filter { mut source, predicate } => {
-                    match self.pushdown(predicate, &mut *source) {
-                        Some(remainder) => Ok(Node::Filter { source, predicate: remainder }),
-                        None => Ok(*source),
-                    }
+                Node::Filter { mut source, predicate: Some(predicate) } => {
+                    // We don't replace the filter node here, since doing so would cause transform()
+                    // to skip the source as it won't reapply the transform to the "same" node.
+                    // We leave an empty filter node instead, which will be cleaned up by a separate
+                    // optimizer.
+                    let predicate = self.pushdown(predicate, &mut *source);
+                    Ok(Node::Filter { source, predicate })
                 }
                 Node::NestedLoopJoin {
                     mut outer,
@@ -63,24 +65,18 @@ impl Optimizer for FilterPushdown {
 }
 
 impl FilterPushdown {
-    /// Attempts to push a predicate down into a target node, returns any remaining expression.
-    fn pushdown(&self, mut predicate: Expression, target: &mut Node) -> Option<Expression> {
+    /// Attempts to push an expression down into a target node, returns any remaining expression.
+    fn pushdown(&self, mut expression: Expression, target: &mut Node) -> Option<Expression> {
         match target {
-            // Filter nodes immediately before a scan node can be trivially pushed down.
-            Node::Scan { ref mut filter, .. } => {
-                if let Some(filter) = filter.take() {
-                    predicate = Expression::And(Box::new(predicate), Box::new(filter))
+            Node::Filter { ref mut predicate, .. }
+            | Node::NestedLoopJoin { ref mut predicate, .. }
+            | Node::Scan { filter: ref mut predicate, .. } => {
+                if let Some(predicate) = predicate.take() {
+                    expression = Expression::And(Box::new(expression), Box::new(predicate));
                 }
-                filter.replace(predicate)
+                predicate.replace(expression)
             }
-            // Filter nodes immediately before a nested loop join can be trivially pushed down.
-            Node::NestedLoopJoin { predicate: ref mut join_predicate, .. } => {
-                if let Some(join_predicate) = join_predicate.take() {
-                    predicate = Expression::And(Box::new(predicate), Box::new(join_predicate));
-                }
-                join_predicate.replace(predicate)
-            }
-            _ => Some(predicate),
+            _ => Some(expression),
         }
     }
 
@@ -93,22 +89,43 @@ impl FilterPushdown {
         right: &mut Node,
         boundary: usize,
     ) -> Option<Expression> {
+        // Convert the predicate into conjunctive normal form, and partition into expressions
+        // only referencing the left or right sources, leaving cross-source expressions.
         let cnf = predicate.into_cnf_vec();
-        let (push_left, cnf): (Vec<Expression>, Vec<Expression>) = cnf.into_iter().partition(|e| {
-            // Partition only if no expressions reference the right-hand source.
-            !e.contains(&|e| match e {
-                Expression::Field(i, _) if i >= &boundary => true,
-                _ => false,
-            })
-        });
-        let (push_right, mut cnf): (Vec<Expression>, Vec<Expression>) =
-            // Partition only if no expressions reference the left-hand source.
+        let (mut push_left, cnf): (Vec<Expression>, Vec<Expression>) =
             cnf.into_iter().partition(|e| {
+                // Partition only if no expressions reference the right-hand source.
+                !e.contains(&|e| match e {
+                    Expression::Field(i, _) if i >= &boundary => true,
+                    _ => false,
+                })
+            });
+        let (mut push_right, mut cnf): (Vec<Expression>, Vec<Expression>) =
+            cnf.into_iter().partition(|e| {
+                // Partition only if no expressions reference the left-hand source.
                 !e.contains(&|e| match e {
                     Expression::Field(i, _) if i < &boundary => true,
                     _ => false,
                 })
             });
+
+        // Look for equijoins that have constant lookups on either side, and transfer the constants
+        // to the other side of the join as well. This allows index lookup optimization in both
+        // sides. We already know that the remaining cnf expressions span both sources.
+        for e in &cnf {
+            if let Expression::Equal(ref lhs, ref rhs) = e {
+                if let (Expression::Field(l, ln), Expression::Field(r, rn)) = (&**lhs, &**rhs) {
+                    let (l, ln, r, rn) = if l > r { (r, rn, l, ln) } else { (l, ln, r, rn) };
+                    if let Some(lvals) = push_left.iter().find_map(|e| e.as_lookup(*l)) {
+                        push_right.push(Expression::from_lookup(*r, rn.clone(), lvals));
+                    } else if let Some(rvals) = push_right.iter().find_map(|e| e.as_lookup(*r)) {
+                        push_left.push(Expression::from_lookup(*l, ln.clone(), rvals));
+                    }
+                }
+            }
+        }
+
+        // Push predicates down into the sources.
         if let Some(push_left) = Expression::from_cnf_vec(push_left) {
             if let Some(remainder) = self.pushdown(push_left, left) {
                 cnf.push(remainder)
@@ -143,37 +160,10 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
         Self { catalog }
     }
 
-    // Attempts to convert the given expression into a list of field values. Expressions must be a
-    // combination of =, IS NULL, OR to be converted.
-    fn as_lookups(&self, field: usize, expr: &Expression) -> Option<Vec<Value>> {
-        use Expression::*;
-        // FIXME This should use a single match level, but since the child expressions are boxed
-        // that would require box patterns, which are unstable.
-        match &*expr {
-            Equal(lhs, rhs) => match (&**lhs, &**rhs) {
-                (Field(i, _), Constant(v)) if i == &field => Some(vec![v.clone()]),
-                (Constant(v), Field(i, _)) if i == &field => Some(vec![v.clone()]),
-                (_, _) => None,
-            },
-            IsNull(e) => match &**e {
-                Field(i, _) if i == &field => Some(vec![Value::Null]),
-                _ => None,
-            },
-            Or(lhs, rhs) => match (self.as_lookups(field, lhs), self.as_lookups(field, rhs)) {
-                (Some(mut lvalues), Some(mut rvalues)) => {
-                    lvalues.append(&mut rvalues);
-                    Some(lvalues)
-                }
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
     // Wraps a node in a filter for the given CNF vector, if any, otherwise returns the bare node.
     fn wrap_cnf(&self, node: Node, cnf: Vec<Expression>) -> Node {
         if let Some(predicate) = Expression::from_cnf_vec(cnf) {
-            Node::Filter { source: Box::new(node), predicate }
+            Node::Filter { source: Box::new(node), predicate: Some(predicate) }
         } else {
             node
         }
@@ -192,12 +182,12 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
                 // apply the remaining conjunctions as a filter node, if any.
                 let mut cnf = filter.clone().into_cnf_vec();
                 for i in 0..cnf.len() {
-                    if let Some(keys) = self.as_lookups(pk, &cnf[i]) {
+                    if let Some(keys) = cnf[i].as_lookup(pk) {
                         cnf.remove(i);
                         return Ok(self.wrap_cnf(Node::KeyLookup { table, alias, keys }, cnf));
                     }
                     for (ci, column) in columns.iter().enumerate().filter(|(_, c)| c.index) {
-                        if let Some(values) = self.as_lookups(ci, &cnf[i]) {
+                        if let Some(values) = cnf[i].as_lookup(ci) {
                             cnf.remove(i);
                             return Ok(self.wrap_cnf(
                                 Node::IndexLookup {

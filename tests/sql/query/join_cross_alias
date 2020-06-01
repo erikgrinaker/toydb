@@ -187,34 +187,54 @@ Plan: Plan(
                 pad: false,
                 flip: false,
             },
-            predicate: And(
+            predicate: Some(
                 And(
-                    Or(
-                        GreaterThan(
-                            Field(
-                                0,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
+                    And(
+                        Or(
+                            GreaterThan(
+                                Field(
+                                    0,
+                                    Some(
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "id",
                                         ),
-                                        "id",
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        3,
                                     ),
                                 ),
                             ),
-                            Constant(
-                                Integer(
-                                    3,
+                            Equal(
+                                Field(
+                                    0,
+                                    Some(
+                                        (
+                                            Some(
+                                                "m",
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        3,
+                                    ),
                                 ),
                             ),
                         ),
                         Equal(
                             Field(
-                                0,
+                                7,
                                 Some(
                                     (
                                         Some(
-                                            "m",
+                                            "g",
                                         ),
                                         "id",
                                     ),
@@ -222,46 +242,28 @@ Plan: Plan(
                             ),
                             Constant(
                                 Integer(
-                                    3,
+                                    2,
                                 ),
                             ),
                         ),
                     ),
-                    Equal(
-                        Field(
-                            7,
-                            Some(
-                                (
-                                    Some(
-                                        "g",
+                    Not(
+                        Equal(
+                            Field(
+                                9,
+                                Some(
+                                    (
+                                        Some(
+                                            "c",
+                                        ),
+                                        "id",
                                     ),
-                                    "id",
                                 ),
                             ),
-                        ),
-                        Constant(
-                            Integer(
-                                2,
-                            ),
-                        ),
-                    ),
-                ),
-                Not(
-                    Equal(
-                        Field(
-                            9,
-                            Some(
-                                (
-                                    Some(
-                                        "c",
-                                    ),
-                                    "id",
+                            Constant(
+                                String(
+                                    "us",
                                 ),
-                            ),
-                        ),
-                        Constant(
-                            String(
-                                "us",
                             ),
                         ),
                     ),
@@ -359,119 +361,105 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Projection {
-        source: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Scan {
-                    table: "movies",
-                    alias: Some(
-                        "m",
-                    ),
-                    filter: None,
-                },
-                outer_size: 7,
-                inner: Scan {
-                    table: "genres",
-                    alias: Some(
-                        "g",
-                    ),
-                    filter: None,
-                },
-                predicate: None,
-                pad: false,
-                flip: false,
-            },
-            outer_size: 9,
-            inner: Scan {
-                table: "countries",
-                alias: Some(
-                    "c",
-                ),
-                filter: None,
-            },
-            predicate: Some(
-                And(
-                    And(
-                        Or(
-                            GreaterThan(
-                                Field(
-                                    0,
-                                    Some(
-                                        (
-                                            Some(
-                                                "m",
+        source: Filter {
+            source: NestedLoopJoin {
+                outer: NestedLoopJoin {
+                    outer: Scan {
+                        table: "movies",
+                        alias: Some(
+                            "m",
+                        ),
+                        filter: Some(
+                            Or(
+                                GreaterThan(
+                                    Field(
+                                        0,
+                                        Some(
+                                            (
+                                                Some(
+                                                    "m",
+                                                ),
+                                                "id",
                                             ),
-                                            "id",
+                                        ),
+                                    ),
+                                    Constant(
+                                        Integer(
+                                            3,
                                         ),
                                     ),
                                 ),
-                                Constant(
-                                    Integer(
-                                        3,
+                                Equal(
+                                    Field(
+                                        0,
+                                        Some(
+                                            (
+                                                Some(
+                                                    "m",
+                                                ),
+                                                "id",
+                                            ),
+                                        ),
+                                    ),
+                                    Constant(
+                                        Integer(
+                                            3,
+                                        ),
                                     ),
                                 ),
                             ),
+                        ),
+                    },
+                    outer_size: 7,
+                    inner: KeyLookup {
+                        table: "genres",
+                        alias: Some(
+                            "g",
+                        ),
+                        keys: [
+                            Integer(
+                                2,
+                            ),
+                        ],
+                    },
+                    predicate: None,
+                    pad: false,
+                    flip: false,
+                },
+                outer_size: 9,
+                inner: Scan {
+                    table: "countries",
+                    alias: Some(
+                        "c",
+                    ),
+                    filter: Some(
+                        Not(
                             Equal(
                                 Field(
                                     0,
                                     Some(
                                         (
                                             Some(
-                                                "m",
+                                                "c",
                                             ),
                                             "id",
                                         ),
                                     ),
                                 ),
                                 Constant(
-                                    Integer(
-                                        3,
+                                    String(
+                                        "us",
                                     ),
-                                ),
-                            ),
-                        ),
-                        Equal(
-                            Field(
-                                7,
-                                Some(
-                                    (
-                                        Some(
-                                            "g",
-                                        ),
-                                        "id",
-                                    ),
-                                ),
-                            ),
-                            Constant(
-                                Integer(
-                                    2,
                                 ),
                             ),
                         ),
                     ),
-                    Not(
-                        Equal(
-                            Field(
-                                9,
-                                Some(
-                                    (
-                                        Some(
-                                            "c",
-                                        ),
-                                        "id",
-                                    ),
-                                ),
-                            ),
-                            Constant(
-                                String(
-                                    "us",
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-            pad: false,
-            flip: false,
+                },
+                predicate: None,
+                pad: false,
+                flip: false,
+            },
+            predicate: None,
         },
         expressions: [
             (

@@ -7,35 +7,37 @@ use crate::error::{Error, Result};
 /// A filter executor
 pub struct Filter<T: Transaction> {
     source: Box<dyn Executor<T>>,
-    predicate: Expression,
+    predicate: Option<Expression>,
 }
 
 impl<T: Transaction> Filter<T> {
-    pub fn new(source: Box<dyn Executor<T>>, predicate: Expression) -> Box<Self> {
+    pub fn new(source: Box<dyn Executor<T>>, predicate: Option<Expression>) -> Box<Self> {
         Box::new(Self { source, predicate })
     }
 }
 
 impl<T: Transaction> Executor<T> for Filter<T> {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
-        let result = self.source.execute(txn)?;
-        if let ResultSet::Query { columns, rows } = result {
-            let predicate = self.predicate;
-            Ok(ResultSet::Query {
-                columns,
-                rows: Box::new(rows.filter_map(move |r| {
-                    r.and_then(|row| match predicate.evaluate(Some(&row))? {
-                        Value::Boolean(true) => Ok(Some(row)),
-                        Value::Boolean(false) => Ok(None),
-                        Value::Null => Ok(None),
-                        value => Err(Error::Value(format!(
-                            "Filter returned {}, expected boolean",
-                            value
-                        ))),
-                    })
-                    .transpose()
-                })),
-            })
+        if let ResultSet::Query { columns, rows } = self.source.execute(txn)? {
+            if let Some(predicate) = self.predicate {
+                Ok(ResultSet::Query {
+                    columns,
+                    rows: Box::new(rows.filter_map(move |r| {
+                        r.and_then(|row| match predicate.evaluate(Some(&row))? {
+                            Value::Boolean(true) => Ok(Some(row)),
+                            Value::Boolean(false) => Ok(None),
+                            Value::Null => Ok(None),
+                            value => Err(Error::Value(format!(
+                                "Filter returned {}, expected boolean",
+                                value
+                            ))),
+                        })
+                        .transpose()
+                    })),
+                })
+            } else {
+                Ok(ResultSet::Query { columns, rows })
+            }
         } else {
             Err(Error::Internal("Unexpected result".into()))
         }

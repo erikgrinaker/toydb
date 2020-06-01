@@ -137,7 +137,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 if let Some(expr) = r#where {
                     node = Node::Filter {
                         source: Box::new(node),
-                        predicate: self.build_expression(scope, expr)?,
+                        predicate: Some(self.build_expression(scope, expr)?),
                     };
                 };
 
@@ -188,7 +188,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 if let Some(expr) = having {
                     node = Node::Filter {
                         source: Box::new(node),
-                        predicate: self.build_expression(scope, expr)?,
+                        predicate: Some(self.build_expression(scope, expr)?),
                     };
                 };
 

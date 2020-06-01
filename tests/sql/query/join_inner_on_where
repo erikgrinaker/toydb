@@ -100,40 +100,42 @@ Plan: Plan(
             pad: false,
             flip: false,
         },
-        predicate: Or(
-            GreaterThan(
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
+        predicate: Some(
+            Or(
+                GreaterThan(
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
                             ),
-                            "id",
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
                     ),
                 ),
-                Constant(
-                    Integer(
-                        3,
-                    ),
-                ),
-            ),
-            Equal(
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
+                Equal(
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
                             ),
-                            "id",
                         ),
                     ),
-                ),
-                Constant(
-                    Integer(
-                        3,
+                    Constant(
+                        Integer(
+                            3,
+                        ),
                     ),
                 ),
             ),
@@ -142,58 +144,59 @@ Plan: Plan(
 )
 
 Optimized plan: Plan(
-    NestedLoopJoin {
-        outer: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        outer_size: 7,
-        inner: Scan {
-            table: "genres",
-            alias: None,
-            filter: None,
-        },
-        predicate: Some(
-            And(
-                Or(
-                    GreaterThan(
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
+    Filter {
+        source: NestedLoopJoin {
+            outer: Scan {
+                table: "movies",
+                alias: None,
+                filter: Some(
+                    Or(
+                        GreaterThan(
+                            Field(
+                                0,
+                                Some(
+                                    (
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "id",
                                     ),
-                                    "id",
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
                                 ),
                             ),
                         ),
-                        Constant(
-                            Integer(
-                                3,
-                            ),
-                        ),
-                    ),
-                    Equal(
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
+                        Equal(
+                            Field(
+                                0,
+                                Some(
+                                    (
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "id",
                                     ),
-                                    "id",
                                 ),
                             ),
-                        ),
-                        Constant(
-                            Integer(
-                                3,
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
                             ),
                         ),
                     ),
                 ),
+            },
+            outer_size: 7,
+            inner: Scan {
+                table: "genres",
+                alias: None,
+                filter: None,
+            },
+            predicate: Some(
                 Equal(
                     Field(
                         3,
@@ -219,9 +222,10 @@ Optimized plan: Plan(
                     ),
                 ),
             ),
-        ),
-        pad: false,
-        flip: false,
+            pad: false,
+            flip: false,
+        },
+        predicate: None,
     },
 )
 

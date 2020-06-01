@@ -93,9 +93,11 @@ Plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    predicate: Constant(
-                        Boolean(
-                            false,
+                    predicate: Some(
+                        Constant(
+                            Boolean(
+                                false,
+                            ),
                         ),
                     ),
                 },
@@ -214,16 +216,19 @@ Optimized plan: Plan(
     Projection {
         source: Aggregation {
             source: Projection {
-                source: Scan {
-                    table: "movies",
-                    alias: None,
-                    filter: Some(
-                        Constant(
-                            Boolean(
-                                false,
+                source: Filter {
+                    source: Scan {
+                        table: "movies",
+                        alias: None,
+                        filter: Some(
+                            Constant(
+                                Boolean(
+                                    false,
+                                ),
                             ),
                         ),
-                    ),
+                    },
+                    predicate: None,
                 },
                 expressions: [
                     (

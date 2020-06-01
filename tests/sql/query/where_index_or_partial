@@ -80,15 +80,49 @@ Plan: Plan(
                 alias: None,
                 filter: None,
             },
-            predicate: And(
-                Or(
+            predicate: Some(
+                And(
+                    Or(
+                        Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        None,
+                                        "genre_id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                        ),
+                        Equal(
+                            Field(
+                                3,
+                                Some(
+                                    (
+                                        None,
+                                        "genre_id",
+                                    ),
+                                ),
+                            ),
+                            Constant(
+                                Integer(
+                                    3,
+                                ),
+                            ),
+                        ),
+                    ),
                     Equal(
                         Field(
-                            3,
+                            2,
                             Some(
                                 (
                                     None,
-                                    "genre_id",
+                                    "studio_id",
                                 ),
                             ),
                         ),
@@ -96,38 +130,6 @@ Plan: Plan(
                             Integer(
                                 2,
                             ),
-                        ),
-                    ),
-                    Equal(
-                        Field(
-                            3,
-                            Some(
-                                (
-                                    None,
-                                    "genre_id",
-                                ),
-                            ),
-                        ),
-                        Constant(
-                            Integer(
-                                3,
-                            ),
-                        ),
-                    ),
-                ),
-                Equal(
-                    Field(
-                        2,
-                        Some(
-                            (
-                                None,
-                                "studio_id",
-                            ),
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            2,
                         ),
                     ),
                 ),
@@ -153,35 +155,40 @@ Plan: Plan(
 Optimized plan: Plan(
     Order {
         source: Filter {
-            source: IndexLookup {
-                table: "movies",
-                alias: None,
-                column: "genre_id",
-                values: [
-                    Integer(
-                        2,
-                    ),
-                    Integer(
-                        3,
-                    ),
-                ],
-            },
-            predicate: Equal(
-                Field(
-                    2,
-                    Some(
-                        (
-                            None,
-                            "studio_id",
+            source: Filter {
+                source: IndexLookup {
+                    table: "movies",
+                    alias: None,
+                    column: "genre_id",
+                    values: [
+                        Integer(
+                            2,
+                        ),
+                        Integer(
+                            3,
+                        ),
+                    ],
+                },
+                predicate: Some(
+                    Equal(
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    None,
+                                    "studio_id",
+                                ),
+                            ),
+                        ),
+                        Constant(
+                            Integer(
+                                2,
+                            ),
                         ),
                     ),
                 ),
-                Constant(
-                    Integer(
-                        2,
-                    ),
-                ),
-            ),
+            },
+            predicate: None,
         },
         orders: [
             (

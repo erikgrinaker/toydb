@@ -304,6 +304,7 @@ test_query! {
     join_inner_on_missing: "SELECT * FROM movies INNER JOIN genres",
     join_inner_on_where: "SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id WHERE movies.id >= 3",
     join_inner_index_transverse: "SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id AND g.id = 4",
+    join_inner_index_transverse_where: "SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id WHERE g.id = 4",
     join_inner_multi: r#"
         SELECT movies.title, genres.name AS genre, studios.name AS studio
         FROM movies

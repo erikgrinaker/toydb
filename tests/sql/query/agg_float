@@ -100,14 +100,16 @@ Plan: Plan(
                         alias: None,
                         filter: None,
                     },
-                    predicate: Not(
-                        IsNull(
-                            Field(
-                                1,
-                                Some(
-                                    (
-                                        None,
-                                        "f",
+                    predicate: Some(
+                        Not(
+                            IsNull(
+                                Field(
+                                    1,
+                                    Some(
+                                        (
+                                            None,
+                                            "f",
+                                        ),
                                     ),
                                 ),
                             ),
@@ -229,24 +231,27 @@ Optimized plan: Plan(
     Projection {
         source: Aggregation {
             source: Projection {
-                source: Scan {
-                    table: "floats",
-                    alias: None,
-                    filter: Some(
-                        Not(
-                            IsNull(
-                                Field(
-                                    1,
-                                    Some(
-                                        (
-                                            None,
-                                            "f",
+                source: Filter {
+                    source: Scan {
+                        table: "floats",
+                        alias: None,
+                        filter: Some(
+                            Not(
+                                IsNull(
+                                    Field(
+                                        1,
+                                        Some(
+                                            (
+                                                None,
+                                                "f",
+                                            ),
                                         ),
                                     ),
                                 ),
                             ),
                         ),
-                    ),
+                    },
+                    predicate: None,
                 },
                 expressions: [
                     (

@@ -134,12 +134,17 @@ Plan: Plan(
 
 Optimized plan: Plan(
     NestedLoopJoin {
-        outer: Scan {
+        outer: IndexLookup {
             table: "movies",
             alias: Some(
                 "m",
             ),
-            filter: None,
+            column: "genre_id",
+            values: [
+                Integer(
+                    4,
+                ),
+            ],
         },
         outer_size: 7,
         inner: KeyLookup {

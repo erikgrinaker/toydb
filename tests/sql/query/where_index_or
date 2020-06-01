@@ -97,22 +97,40 @@ Plan: Plan(
                 alias: None,
                 filter: None,
             },
-            predicate: Or(
+            predicate: Some(
                 Or(
                     Or(
-                        Equal(
-                            Field(
-                                3,
-                                Some(
-                                    (
-                                        None,
-                                        "genre_id",
+                        Or(
+                            Equal(
+                                Field(
+                                    3,
+                                    Some(
+                                        (
+                                            None,
+                                            "genre_id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        2,
                                     ),
                                 ),
                             ),
-                            Constant(
-                                Integer(
-                                    2,
+                            Equal(
+                                Field(
+                                    3,
+                                    Some(
+                                        (
+                                            None,
+                                            "genre_id",
+                                        ),
+                                    ),
+                                ),
+                                Constant(
+                                    Integer(
+                                        3,
+                                    ),
                                 ),
                             ),
                         ),
@@ -128,7 +146,7 @@ Plan: Plan(
                             ),
                             Constant(
                                 Integer(
-                                    3,
+                                    4,
                                 ),
                             ),
                         ),
@@ -145,24 +163,8 @@ Plan: Plan(
                         ),
                         Constant(
                             Integer(
-                                4,
+                                5,
                             ),
-                        ),
-                    ),
-                ),
-                Equal(
-                    Field(
-                        3,
-                        Some(
-                            (
-                                None,
-                                "genre_id",
-                            ),
-                        ),
-                    ),
-                    Constant(
-                        Integer(
-                            5,
                         ),
                     ),
                 ),
@@ -187,24 +189,27 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Order {
-        source: IndexLookup {
-            table: "movies",
-            alias: None,
-            column: "genre_id",
-            values: [
-                Integer(
-                    2,
-                ),
-                Integer(
-                    3,
-                ),
-                Integer(
-                    4,
-                ),
-                Integer(
-                    5,
-                ),
-            ],
+        source: Filter {
+            source: IndexLookup {
+                table: "movies",
+                alias: None,
+                column: "genre_id",
+                values: [
+                    Integer(
+                        2,
+                    ),
+                    Integer(
+                        3,
+                    ),
+                    Integer(
+                        4,
+                    ),
+                    Integer(
+                        5,
+                    ),
+                ],
+            },
+            predicate: None,
         },
         orders: [
             (
