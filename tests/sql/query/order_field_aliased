@@ -174,14 +174,26 @@ Plan: Plan(
             (
                 Field(
                     2,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "genre",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
                     1,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -282,14 +294,26 @@ Optimized plan: Plan(
             (
                 Field(
                     2,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "genre",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
                     1,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -298,6 +322,13 @@ Optimized plan: Plan(
 )
 
 Query: SELECT movies.id, title, genres.name AS genre FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genre, title
+
+Explain:
+Order: genre asc, movies.title asc
+└─ Projection: movies.id, title, genres.name
+   └─ NestedLoopJoin: inner on movies.genre_id = genres.id
+      ├─ Scan: movies
+      └─ Scan: genres
 
 Result: ["id", "title", "genre"]
 [Integer(4), String("Heat"), String("Action")]

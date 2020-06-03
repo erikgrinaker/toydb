@@ -80,6 +80,10 @@ Optimized plan: Plan(
 
 Query: SELECT movies.id FROM movies
 
+Explain:
+Projection: movies.id
+└─ Scan: movies
+
 Result: ["id"]
 [Integer(1)]
 [Integer(2)]

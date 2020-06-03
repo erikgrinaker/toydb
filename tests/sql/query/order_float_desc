@@ -74,6 +74,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM floats ORDER BY value DESC
 
+Explain:
+Order: value desc
+└─ Scan: floats
+
 Result: ["id", "value"]
 [Integer(1), Float(3.14)]
 [Integer(4), Float(1.618)]

@@ -105,7 +105,14 @@ Plan: Plan(
                 predicate: GreaterThan(
                     Field(
                         2,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "rating",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(
@@ -118,7 +125,14 @@ Plan: Plan(
                 (
                     Field(
                         0,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -195,7 +209,14 @@ Optimized plan: Plan(
                 predicate: GreaterThan(
                     Field(
                         2,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "rating",
+                            ),
+                        ),
                     ),
                     Constant(
                         Integer(
@@ -208,7 +229,14 @@ Optimized plan: Plan(
                 (
                     Field(
                         0,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "id",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -234,6 +262,13 @@ Optimized plan: Plan(
 )
 
 Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
+
+Explain:
+Projection: #0, #1
+└─ Order: movies.id asc
+   └─ Filter: movies.rating > 8
+      └─ Projection: id, rating, rating
+         └─ Scan: movies
 
 Result: ["id", "rating"]
 [Integer(1), Float(8.2)]

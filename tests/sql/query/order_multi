@@ -105,6 +105,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies ORDER BY ultrahd ASC, id DESC
 
+Explain:
+Order: ultrahd asc, id desc
+└─ Scan: movies
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(6), String("Solaris"), Integer(1), Integer(1), Integer(1972), Float(8.1), Null]
 [Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]

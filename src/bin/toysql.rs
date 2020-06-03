@@ -183,7 +183,7 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
             ResultSet::Update { count } => println!("Updated {} rows", count),
             ResultSet::CreateTable { name } => println!("Created table {}", name),
             ResultSet::DropTable { name } => println!("Dropped table {}", name),
-            ResultSet::Explain(plan) => println!("{:#?}", plan),
+            ResultSet::Explain(plan) => println!("{}", plan.to_string()),
             ResultSet::Query { columns, mut rows } => {
                 if self.show_headers {
                     println!(

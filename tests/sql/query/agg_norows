@@ -338,5 +338,11 @@ Optimized plan: Plan(
 
 Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: id, id, id, id, id
+      └─ Scan: movies (FALSE)
+
 Result: ["?", "?", "?", "?", "?"]
 [Null, Null, Null, Integer(0), Null]

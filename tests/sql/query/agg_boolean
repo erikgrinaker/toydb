@@ -361,5 +361,11 @@ Optimized plan: Plan(
 
 Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans WHERE b IS NOT NULL
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: b, b, b, b, b
+      └─ Scan: booleans (NOT b IS NULL)
+
 Result: ["?", "?", "?", "?", "?"]
 [Boolean(false), Boolean(true), Null, Integer(2), Null]

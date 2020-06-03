@@ -74,6 +74,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM integers ORDER BY value ASC
 
+Explain:
+Order: value asc
+└─ Scan: integers
+
 Result: ["id", "value"]
 [Integer(2), Null]
 [Integer(3), Integer(-3)]

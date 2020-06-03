@@ -361,5 +361,11 @@ Optimized plan: Plan(
 
 Query: SELECT MIN(f), MAX(f), SUM(f), COUNT(f), AVG(f) FROM floats WHERE f IS NOT NULL
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: f, f, f, f, f
+      └─ Scan: floats (NOT f IS NULL)
+
 Result: ["?", "?", "?", "?", "?"]
 [Float(-2.718), Float(3.14), Float(2.04), Integer(4), Float(0.51)]

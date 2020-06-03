@@ -117,7 +117,12 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -189,7 +194,12 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -198,6 +208,13 @@ Optimized plan: Plan(
 )
 
 Query: SELECT MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating
+
+Explain:
+Order: rating asc
+└─ Projection: #0
+   └─ Aggregation: maximum
+      └─ Projection: rating, studio_id * 2
+         └─ Scan: movies
 
 Result: ["rating"]
 [Float(6.9)]

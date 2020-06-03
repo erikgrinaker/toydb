@@ -131,6 +131,11 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id
 
+Explain:
+NestedLoopJoin: inner on movies.genre_id = genres.id
+├─ Scan: movies
+└─ Scan: genres
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
 [Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null, Integer(1), String("Science Fiction")]
 [Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true), Integer(2), String("Action")]

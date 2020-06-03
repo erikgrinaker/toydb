@@ -55,6 +55,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies OFFSET 1 + 2
 
+Explain:
+Offset: 3
+└─ Scan: movies
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
 [Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false)]

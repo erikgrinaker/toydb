@@ -281,6 +281,12 @@ Optimized plan: Plan(
 
 Query: SELECT movies.id, genres.id FROM movies, genres WHERE movies.id >= 3 AND genres.id = 1
 
+Explain:
+Projection: movies.id, genres.id
+└─ NestedLoopJoin: inner
+   ├─ Scan: movies (movies.id > 3 OR movies.id = 3)
+   └─ KeyLookup: genres (1)
+
 Result: ["id", "id"]
 [Integer(3), Integer(1)]
 [Integer(4), Integer(1)]

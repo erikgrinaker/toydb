@@ -113,7 +113,14 @@ Plan: Plan(
                     (
                         Field(
                             2,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         None,
                     ),
@@ -221,7 +228,14 @@ Optimized plan: Plan(
                     (
                         Field(
                             2,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         None,
                     ),
@@ -271,6 +285,14 @@ Optimized plan: Plan(
 )
 
 Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MIN(rating)
+
+Explain:
+Projection: #0, #1
+└─ Order: #2 asc
+   └─ Projection: movies.studio_id, #0, #1
+      └─ Aggregation: maximum, minimum
+         └─ Projection: rating, rating, studio_id
+            └─ Scan: movies
 
 Result: ["studio_id", "?"]
 [Integer(3), Float(6.9)]

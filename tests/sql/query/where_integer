@@ -53,4 +53,7 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies WHERE 7
 
+Explain:
+Scan: movies (7)
+
 Result: Value("Filter returned 7, expected boolean")

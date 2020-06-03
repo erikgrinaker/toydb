@@ -168,7 +168,14 @@ Plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "s",
+                                ),
+                                "name",
+                            ),
+                        ),
                     ),
                     None,
                 ),
@@ -185,7 +192,14 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -276,7 +290,14 @@ Optimized plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "s",
+                                ),
+                                "name",
+                            ),
+                        ),
                     ),
                     None,
                 ),
@@ -293,7 +314,14 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -302,6 +330,15 @@ Optimized plan: Plan(
 )
 
 Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC
+
+Explain:
+Order: s.name asc
+└─ Projection: s.name, #0
+   └─ Aggregation: count
+      └─ Projection: TRUE, s.name
+         └─ NestedLoopJoin: inner on m.studio_id = s.id
+            ├─ Scan: movies
+            └─ Scan: studios
 
 Result: ["name", "?"]
 [String("Lionsgate"), Integer(2)]

@@ -68,7 +68,14 @@ Plan: Plan(
                 (
                     Field(
                         0,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "title",
+                            ),
+                        ),
                     ),
                     None,
                 ),
@@ -78,7 +85,14 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -117,7 +131,14 @@ Optimized plan: Plan(
                 (
                     Field(
                         0,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "title",
+                            ),
+                        ),
                     ),
                     None,
                 ),
@@ -127,7 +148,14 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -136,6 +164,13 @@ Optimized plan: Plan(
 )
 
 Query: SELECT title FROM movies GROUP BY title ORDER BY title ASC
+
+Explain:
+Order: movies.title asc
+└─ Projection: movies.title
+   └─ Aggregation: 
+      └─ Projection: title
+         └─ Scan: movies
 
 Result: ["title"]
 [String("Birdman")]

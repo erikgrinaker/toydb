@@ -155,6 +155,12 @@ Optimized plan: Plan(
 
 Query: SELECT m.id, g.id FROM movies AS m, genres g
 
+Explain:
+Projection: m.id, g.id
+└─ NestedLoopJoin: inner
+   ├─ Scan: movies
+   └─ Scan: genres
+
 Result: ["id", "id"]
 [Integer(1), Integer(1)]
 [Integer(1), Integer(2)]

@@ -237,6 +237,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies WHERE (id = 2 OR id = 3 OR id = 4 OR id = 5) AND genre_id = 1
 
+Explain:
+Filter: genre_id = 1
+└─ KeyLookup: movies (2, 3, 4, 5)
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]
 [Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false)]

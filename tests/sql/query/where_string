@@ -53,4 +53,7 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies WHERE 'abc'
 
+Explain:
+Scan: movies (abc)
+
 Result: Value("Filter returned abc, expected boolean")

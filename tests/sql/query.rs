@@ -110,6 +110,8 @@ macro_rules! test_query {
 
             write!(f, "Query: {}\n\n", $query)?;
 
+            write!(f, "Explain:\n{}\n\n", plan)?;
+
             write!(f, "Result:")?;
             let result = match plan.execute(&mut txn) {
                 Ok(result) => result,

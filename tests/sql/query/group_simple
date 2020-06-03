@@ -94,7 +94,14 @@ Plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     None,
                 ),
@@ -111,7 +118,14 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -164,7 +178,14 @@ Optimized plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     None,
                 ),
@@ -181,7 +202,14 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -190,6 +218,13 @@ Optimized plan: Plan(
 )
 
 Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY studio_id
+
+Explain:
+Order: movies.studio_id asc
+└─ Projection: movies.studio_id, #0
+   └─ Aggregation: maximum
+      └─ Projection: rating, studio_id
+         └─ Scan: movies
 
 Result: ["studio_id", "?"]
 [Integer(1), Float(8.2)]

@@ -336,7 +336,14 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -516,7 +523,14 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "title",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -530,6 +544,16 @@ Query:
             INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
             INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
         ORDER BY m.title
+
+Explain:
+Order: m.title asc
+└─ Projection: m.title, g.name, s.name
+   └─ NestedLoopJoin: inner on m.studio_id = s.id
+      ├─ NestedLoopJoin: inner on m.genre_id = g.id
+      │  ├─ Filter: m.genre_id = 1
+      │  │  └─ IndexLookup: movies.studio_id (4)
+      │  └─ KeyLookup: genres (1)
+      └─ KeyLookup: studios (4)
 
 Result: ["title", "genre", "studio"]
 [String("Gravity"), String("Science Fiction"), String("Warner Bros")]

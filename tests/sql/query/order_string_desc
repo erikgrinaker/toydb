@@ -74,6 +74,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM strings ORDER BY value DESC
 
+Explain:
+Order: value desc
+└─ Scan: strings
+
 Result: ["id", "value"]
 [Integer(7), String("åa")]
 [Integer(8), String("Åa")]

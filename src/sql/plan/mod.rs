@@ -12,10 +12,17 @@ use crate::error::Result;
 
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::fmt::{self, Display};
 
 /// A query plan
 #[derive(Debug)]
 pub struct Plan(pub Node);
+
+impl Display for Plan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_string())
+    }
+}
 
 impl Plan {
     /// Builds a plan from an AST statement.
@@ -226,6 +233,146 @@ impl Node {
             },
         })
     }
+
+    // Displays the node, where prefix gives the node prefix.
+    pub fn format(&self, mut indent: String, root: bool, last: bool) -> String {
+        let mut s = indent.clone();
+        if !last {
+            s += "├─ ";
+            indent += "│  "
+        } else if !root {
+            s += "└─ ";
+            indent += "   ";
+        }
+        match self {
+            Self::Aggregation { source, aggregates } => {
+                s += &format!(
+                    "Aggregation: {}\n",
+                    aggregates.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ")
+                );
+                s += &source.format(indent, false, true);
+            }
+            Self::CreateTable { schema } => {
+                s += &format!("CreateTable: {}\n", schema.name);
+            }
+            Self::Delete { source, table } => {
+                s += &format!("Delete: {}\n", table);
+                s += &source.format(indent, false, true);
+            }
+            Self::DropTable { table } => {
+                s += &format!("DropTable: {}\n", table);
+            }
+            Self::Filter { source, predicate } => {
+                s += &format!("Filter: {}\n", predicate);
+                s += &source.format(indent, false, true);
+            }
+            Self::IndexLookup { table, column, alias: _, values } => {
+                s += &format!("IndexLookup: {}.{}", table, column);
+                if !values.is_empty() && values.len() < 10 {
+                    s += &format!(
+                        " ({})",
+                        values.iter().map(|k| k.to_string()).collect::<Vec<_>>().join(", ")
+                    );
+                } else {
+                    s += &format!(" ({} values)", values.len());
+                }
+                s += "\n";
+            }
+            Self::Insert { table, columns: _, expressions } => {
+                s += &format!("Insert: {} ({} rows)\n", table, expressions.len());
+            }
+            Self::KeyLookup { table, alias: _, keys } => {
+                s += &format!("KeyLookup: {}", table);
+                if !keys.is_empty() && keys.len() < 10 {
+                    s += &format!(
+                        " ({})",
+                        keys.iter().map(|k| k.to_string()).collect::<Vec<_>>().join(", ")
+                    );
+                } else {
+                    s += &format!(" ({} keys)", keys.len());
+                }
+                s += "\n";
+            }
+            Self::Limit { source, limit } => {
+                s += &format!("Limit: {}\n", limit);
+                s += &source.format(indent, false, true);
+            }
+            Self::NestedLoopJoin { outer, outer_size: _, inner, predicate, pad, flip } => {
+                s += "NestedLoopJoin:";
+                if !pad {
+                    s += " inner";
+                } else if !flip {
+                    s += " left outer";
+                } else if *flip {
+                    s += " right outer";
+                };
+                if let Some(expr) = predicate {
+                    s += &format!(" on {}", expr);
+                }
+                s += "\n";
+                s += &outer.format(indent.clone(), false, false);
+                s += &inner.format(indent, false, true);
+            }
+            Self::Nothing {} => {
+                s += "Nothing\n";
+            }
+            Self::Offset { source, offset } => {
+                s += &format!("Offset: {}\n", offset);
+                s += &source.format(indent, false, true);
+            }
+            Self::Order { source, orders } => {
+                s += &format!(
+                    "Order: {}\n",
+                    orders
+                        .iter()
+                        .map(|(expr, dir)| format!("{} {}", expr, dir))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                s += &source.format(indent, false, true);
+            }
+            Self::Projection { source, expressions } => {
+                s += &format!(
+                    "Projection: {}\n",
+                    expressions
+                        .iter()
+                        .map(|(expr, _)| expr.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                s += &source.format(indent, false, true);
+            }
+            Self::Scan { table, alias: _, filter } => {
+                s += &format!("Scan: {}", table);
+                if let Some(expr) = filter {
+                    s += &format!(" ({})", expr);
+                }
+                s += "\n";
+            }
+            Self::Update { source, table, expressions } => {
+                s += &format!(
+                    "Update: {} ({})\n",
+                    table,
+                    expressions
+                        .iter()
+                        .map(|(l, e)| format!("{}={}", l, e))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                );
+                s += &source.format(indent, false, true);
+            }
+        };
+        if root {
+            s = s.trim_end().to_string()
+        }
+        s
+    }
+}
+
+impl Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format("".into(), true, true))
+    }
 }
 
 /// An aggregate operation
@@ -238,6 +385,22 @@ pub enum Aggregate {
     Sum,
 }
 
+impl Display for Aggregate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Average => "average",
+                Self::Count => "count",
+                Self::Max => "maximum",
+                Self::Min => "minimum",
+                Self::Sum => "sum",
+            }
+        )
+    }
+}
+
 pub type Aggregates = Vec<Aggregate>;
 
 /// A sort order direction
@@ -245,4 +408,17 @@ pub type Aggregates = Vec<Aggregate>;
 pub enum Direction {
     Ascending,
     Descending,
+}
+
+impl Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Ascending => "asc",
+                Self::Descending => "desc",
+            }
+        )
+    }
 }

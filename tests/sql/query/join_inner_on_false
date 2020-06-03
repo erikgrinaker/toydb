@@ -82,4 +82,9 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies INNER JOIN genres ON FALSE
 
+Explain:
+NestedLoopJoin: inner
+├─ Scan: movies (FALSE)
+└─ Scan: genres
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]

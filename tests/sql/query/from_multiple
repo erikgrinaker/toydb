@@ -86,6 +86,13 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies, genres, countries
 
+Explain:
+NestedLoopJoin: inner
+├─ NestedLoopJoin: inner
+│  ├─ Scan: movies
+│  └─ Scan: genres
+└─ Scan: countries
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name", "id", "name"]
 [Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null, Integer(1), String("Science Fiction"), String("fr"), String("France")]
 [Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null, Integer(1), String("Science Fiction"), String("ru"), String("Russia")]

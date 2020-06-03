@@ -226,6 +226,11 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies INNER JOIN genres ON movies.genre_id = genres.id WHERE movies.id >= 3
 
+Explain:
+NestedLoopJoin: inner on movies.genre_id = genres.id
+├─ Scan: movies (movies.id > 3 OR movies.id = 3)
+└─ Scan: genres
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
 [Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null, Integer(1), String("Science Fiction")]
 [Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true), Integer(2), String("Action")]

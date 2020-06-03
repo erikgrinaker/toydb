@@ -368,6 +368,14 @@ Query:
             INNER JOIN genres ON movies.genre_id = genres.id
             INNER JOIN studios ON movies.studio_id = studios.id
 
+Explain:
+Projection: movies.title, genres.name, studios.name
+└─ NestedLoopJoin: inner on movies.studio_id = studios.id
+   ├─ NestedLoopJoin: inner on movies.genre_id = genres.id
+   │  ├─ Scan: movies
+   │  └─ Scan: genres
+   └─ Scan: studios
+
 Result: ["title", "genre", "studio"]
 [String("Stalker"), String("Science Fiction"), String("Mosfilm")]
 [String("Sicario"), String("Action"), String("Lionsgate")]

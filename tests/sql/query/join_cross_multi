@@ -124,6 +124,15 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies CROSS JOIN genres CROSS JOIN countries CROSS JOIN studios
 
+Explain:
+NestedLoopJoin: inner
+├─ NestedLoopJoin: inner
+│  ├─ NestedLoopJoin: inner
+│  │  ├─ Scan: movies
+│  │  └─ Scan: genres
+│  └─ Scan: countries
+└─ Scan: studios
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name", "id", "name", "id", "name", "country_id"]
 [Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null, Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(1), String("Mosfilm"), String("ru")]
 [Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null, Integer(1), String("Science Fiction"), String("fr"), String("France"), Integer(2), String("Lionsgate"), String("us")]

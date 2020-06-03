@@ -112,7 +112,14 @@ Plan: Plan(
                         (
                             Field(
                                 1,
-                                None,
+                                Some(
+                                    (
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "studio_id",
+                                    ),
+                                ),
                             ),
                             None,
                         ),
@@ -143,7 +150,14 @@ Plan: Plan(
                     GreaterThan(
                         Field(
                             2,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -154,7 +168,14 @@ Plan: Plan(
                     Equal(
                         Field(
                             2,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -168,7 +189,14 @@ Plan: Plan(
                 (
                     Field(
                         0,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -240,7 +268,14 @@ Optimized plan: Plan(
                         (
                             Field(
                                 1,
-                                None,
+                                Some(
+                                    (
+                                        Some(
+                                            "movies",
+                                        ),
+                                        "studio_id",
+                                    ),
+                                ),
                             ),
                             None,
                         ),
@@ -271,7 +306,14 @@ Optimized plan: Plan(
                     GreaterThan(
                         Field(
                             2,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -282,7 +324,14 @@ Optimized plan: Plan(
                     Equal(
                         Field(
                             2,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         Constant(
                             Integer(
@@ -296,7 +345,14 @@ Optimized plan: Plan(
                 (
                     Field(
                         0,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -322,6 +378,15 @@ Optimized plan: Plan(
 )
 
 Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING studio_id >= 3 ORDER BY studio_id
+
+Explain:
+Projection: #0, #1
+└─ Order: movies.studio_id asc
+   └─ Filter: movies.studio_id > 3 OR movies.studio_id = 3
+      └─ Projection: movies.studio_id, #0, studio_id
+         └─ Aggregation: maximum
+            └─ Projection: rating, studio_id
+               └─ Scan: movies
 
 Result: ["studio_id", "rating"]
 [Integer(3), Float(6.9)]

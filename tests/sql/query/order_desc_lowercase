@@ -74,6 +74,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies ORDER BY released desc
 
+Explain:
+Order: released desc
+└─ Scan: movies
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(8), String("Blindspotting"), Integer(2), Integer(3), Integer(2018), Float(7.4), Boolean(true)]
 [Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]

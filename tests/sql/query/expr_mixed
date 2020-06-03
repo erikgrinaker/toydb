@@ -159,6 +159,10 @@ Optimized plan: Plan(
 
 Query: SELECT 1 + 2 * 3, 2020 - released AS age FROM movies
 
+Explain:
+Projection: 7, 2020 - released
+└─ Scan: movies
+
 Result: ["?", "age"]
 [Integer(7), Integer(41)]
 [Integer(7), Integer(5)]

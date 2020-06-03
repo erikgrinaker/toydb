@@ -111,7 +111,14 @@ Plan: Plan(
                     (
                         Field(
                             1,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         None,
                     ),
@@ -129,7 +136,12 @@ Plan: Plan(
             predicate: GreaterThan(
                 Field(
                     1,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Constant(
                     Integer(
@@ -142,7 +154,14 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -196,7 +215,14 @@ Optimized plan: Plan(
                     (
                         Field(
                             1,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         None,
                     ),
@@ -214,7 +240,12 @@ Optimized plan: Plan(
             predicate: GreaterThan(
                 Field(
                     1,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Constant(
                     Integer(
@@ -227,7 +258,14 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "studio_id",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -236,6 +274,14 @@ Optimized plan: Plan(
 )
 
 Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id
+
+Explain:
+Order: movies.studio_id asc
+└─ Filter: rating > 8
+   └─ Projection: movies.studio_id, #0
+      └─ Aggregation: maximum
+         └─ Projection: rating, studio_id
+            └─ Scan: movies
 
 Result: ["studio_id", "rating"]
 [Integer(1), Float(8.2)]

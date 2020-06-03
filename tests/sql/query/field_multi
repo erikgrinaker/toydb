@@ -105,6 +105,10 @@ Optimized plan: Plan(
 
 Query: SELECT id, title FROM movies
 
+Explain:
+Projection: id, title
+└─ Scan: movies
+
 Result: ["id", "title"]
 [Integer(1), String("Stalker")]
 [Integer(2), String("Sicario")]

@@ -238,6 +238,12 @@ Optimized plan: Plan(
 
 Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN genres g ON m.id = g.id
 
+Explain:
+Projection: m.id, g.id
+└─ NestedLoopJoin: left outer on m.id = g.id
+   ├─ Scan: movies
+   └─ Scan: genres
+
 Result: ["movie_id", "genre_id"]
 [Integer(1), Integer(1)]
 [Integer(2), Integer(2)]

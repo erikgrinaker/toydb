@@ -132,5 +132,9 @@ Optimized plan: Plan(
 
 Query: SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope
 
+Explain:
+Projection: 7, FALSE
+└─ Nothing
+
 Result: ["?", "nope"]
 [Integer(7), Boolean(false)]

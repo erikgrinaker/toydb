@@ -91,7 +91,14 @@ Plan: Plan(
                 (
                     Field(
                         2,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "released",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -168,7 +175,14 @@ Optimized plan: Plan(
                 (
                     Field(
                         2,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "released",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -194,6 +208,12 @@ Optimized plan: Plan(
 )
 
 Query: SELECT id, title FROM movies ORDER BY released
+
+Explain:
+Projection: #0, #1
+└─ Order: movies.released asc
+   └─ Projection: id, title, released
+      └─ Scan: movies
 
 Result: ["id", "title"]
 [Integer(6), String("Solaris")]

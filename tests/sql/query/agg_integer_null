@@ -319,5 +319,11 @@ Optimized plan: Plan(
 
 Query: SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: i, i, i, i, i
+      └─ Scan: integers
+
 Result: ["?", "?", "?", "?", "?"]
 [Null, Null, Null, Integer(4), Null]

@@ -46,4 +46,8 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies LIMIT 0
 
+Explain:
+Limit: 0
+└─ Scan: movies
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]

@@ -95,7 +95,14 @@ Plan: Plan(
                     (
                         Field(
                             1,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         None,
                     ),
@@ -105,7 +112,14 @@ Plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -176,7 +190,14 @@ Optimized plan: Plan(
                     (
                         Field(
                             1,
-                            None,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
                         ),
                         None,
                     ),
@@ -186,7 +207,14 @@ Optimized plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
                     ),
                     Ascending,
                 ),
@@ -205,6 +233,14 @@ Optimized plan: Plan(
 )
 
 Query: SELECT MAX(rating) FROM movies GROUP BY studio_id ORDER BY studio_id
+
+Explain:
+Projection: #0
+└─ Order: movies.studio_id asc
+   └─ Projection: #0, movies.studio_id
+      └─ Aggregation: maximum
+         └─ Projection: rating, studio_id
+            └─ Scan: movies
 
 Result: ["?"]
 [Float(8.2)]

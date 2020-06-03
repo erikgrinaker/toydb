@@ -114,7 +114,12 @@ Plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                None,
+                                "twice",
+                            ),
+                        ),
                     ),
                     Some(
                         "twice",
@@ -133,7 +138,12 @@ Plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "twice",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -195,7 +205,12 @@ Optimized plan: Plan(
                 (
                     Field(
                         1,
-                        None,
+                        Some(
+                            (
+                                None,
+                                "twice",
+                            ),
+                        ),
                     ),
                     Some(
                         "twice",
@@ -214,7 +229,12 @@ Optimized plan: Plan(
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "twice",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -223,6 +243,13 @@ Optimized plan: Plan(
 )
 
 Query: SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORDER BY twice
+
+Explain:
+Order: twice asc
+└─ Projection: twice, #0
+   └─ Aggregation: maximum
+      └─ Projection: rating, studio_id * 2
+         └─ Scan: movies
 
 Result: ["twice", "?"]
 [Integer(2), Float(8.2)]

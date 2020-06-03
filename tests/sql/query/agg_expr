@@ -178,5 +178,11 @@ Optimized plan: Plan(
 
 Query: SELECT SUM(rating * 10) / COUNT(*) FROM movies
 
+Explain:
+Projection: #0 / #1
+└─ Aggregation: sum, count
+   └─ Projection: rating * 10, TRUE
+      └─ Scan: movies
+
 Result: ["?"]
 [Float(77.8)]

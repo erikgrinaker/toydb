@@ -70,5 +70,8 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies WHERE id = 3
 
+Explain:
+KeyLookup: movies (3)
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]

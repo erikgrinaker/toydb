@@ -145,7 +145,12 @@ Plan: Plan(
             (
                 Field(
                     3,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "ord",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -225,7 +230,12 @@ Optimized plan: Plan(
             (
                 Field(
                     3,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "ord",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -234,6 +244,11 @@ Optimized plan: Plan(
 )
 
 Query: SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC
+
+Explain:
+Order: ord asc
+└─ Projection: id, title, released, released % 4
+   └─ Scan: movies
 
 Result: ["id", "title", "released", "ord"]
 [Integer(3), String("Primer"), Integer(2004), Integer(0)]

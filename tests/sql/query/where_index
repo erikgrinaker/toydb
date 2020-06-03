@@ -111,6 +111,10 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies WHERE genre_id = 2 ORDER BY id
 
+Explain:
+Order: id asc
+└─ IndexLookup: movies.genre_id (2)
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
 [Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]

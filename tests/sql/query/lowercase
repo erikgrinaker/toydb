@@ -54,5 +54,9 @@ Optimized plan: Plan(
 
 Query: select 1
 
+Explain:
+Projection: 1
+└─ Nothing
+
 Result: ["?"]
 [Integer(1)]

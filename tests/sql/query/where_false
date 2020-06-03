@@ -53,4 +53,7 @@ Optimized plan: Plan(
 
 Query: SELECT * FROM movies WHERE FALSE
 
+Explain:
+Scan: movies (FALSE)
+
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]

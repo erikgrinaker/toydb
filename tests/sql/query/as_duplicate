@@ -90,5 +90,9 @@ Optimized plan: Plan(
 
 Query: SELECT 1 AS a, 2 AS a
 
+Explain:
+Projection: 1, 2
+└─ Nothing
+
 Result: ["a", "a"]
 [Integer(1), Integer(2)]

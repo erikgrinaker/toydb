@@ -166,14 +166,24 @@ Plan: Plan(
             (
                 Field(
                     1,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "multi",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -275,14 +285,24 @@ Optimized plan: Plan(
             (
                 Field(
                     1,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "rating",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
             (
                 Field(
                     0,
-                    None,
+                    Some(
+                        (
+                            None,
+                            "multi",
+                        ),
+                    ),
                 ),
                 Ascending,
             ),
@@ -291,6 +311,13 @@ Optimized plan: Plan(
 )
 
 Query: SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi
+
+Explain:
+Order: rating asc, multi asc
+└─ Projection: studio_id + genre_id, #0
+   └─ Aggregation: maximum
+      └─ Projection: rating, studio_id, genre_id
+         └─ Scan: movies
 
 Result: ["multi", "rating"]
 [Integer(4), Float(6.9)]

@@ -332,9 +332,22 @@ impl<'a, C: Catalog> Planner<'a, C> {
         for (expr, label) in groups {
             expressions.push((self.build_expression(scope, expr)?, label));
         }
-        // FIXME This is probably wrong for the aggregate columns, since we don't want to inherit
-        // from them if they are simple field references.
-        scope.project(&expressions)?;
+        scope.project(
+            &expressions
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(i, (e, l))| {
+                    if i < aggregates.len() {
+                        // We pass null values here since we don't want field references to hit
+                        // the fields in scope before the aggregation.
+                        (Expression::Constant(Value::Null), None)
+                    } else {
+                        (e, l)
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )?;
         let node = Node::Aggregation {
             source: Box::new(Node::Projection { source: Box::new(source), expressions }),
             aggregates,
@@ -508,7 +521,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Literal::Float(f) => Value::Float(f),
                 ast::Literal::String(s) => Value::String(s),
             }),
-            ast::Expression::Column(i) => Field(scope.assert(i)?, None),
+            ast::Expression::Column(i) => {
+                let label = match scope.get_column(i)? {
+                    (table, Some(name)) => Some((table, name)),
+                    _ => None,
+                };
+                Field(i, label)
+            }
             ast::Expression::Field(table, name) => {
                 Field(scope.resolve(table.as_deref(), &name)?, Some((table, name)))
             }
@@ -693,18 +712,18 @@ impl Scope {
         Ok(())
     }
 
-    /// Checks if a column index is present in the scope, errors if missing or constant.
-    fn assert(&self, index: usize) -> Result<usize> {
+    /// Fetches a column from the scope by index.
+    fn get_column(&self, index: usize) -> Result<(Option<String>, Option<String>)> {
         if self.constant {
             return Err(Error::Value(format!(
                 "Expression must be constant, found column {}",
                 index
             )));
         }
-        if index >= self.columns.len() {
-            return Err(Error::Value(format!("Column index {} not found", index)));
-        }
-        Ok(index)
+        self.columns
+            .get(index)
+            .cloned()
+            .ok_or_else(|| Error::Value(format!("Column index {} not found", index)))
     }
 
     /// Resolves a name, optionally qualified by a table name.
