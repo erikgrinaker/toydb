@@ -144,7 +144,24 @@ impl super::Transaction for Transaction {
 
     fn delete(&mut self, table: &str, id: &Value) -> Result<()> {
         let table = self.must_read_table(&table)?;
-        table.assert_unreferenced_key(id, self)?;
+        for (t, cs) in self.table_references(&table.name, true)? {
+            let t = self.must_read_table(&t)?;
+            let cs = cs
+                .into_iter()
+                .map(|c| Ok((t.get_column_index(&c)?, c)))
+                .collect::<Result<Vec<_>>>()?;
+            let mut scan = self.scan(&t.name, None)?;
+            while let Some(row) = scan.next().transpose()? {
+                for (i, c) in &cs {
+                    if &row[*i] == id && (table.name != t.name || id != &table.get_row_key(&row)?) {
+                        return Err(Error::Value(format!(
+                            "Primary key {} is referenced by table {} column {}",
+                            id, t.name, c
+                        )));
+                    }
+                }
+            }
+        }
 
         let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
         if !indexes.is_empty() {
@@ -262,7 +279,12 @@ impl Catalog for Transaction {
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
         let table = self.must_read_table(&table)?;
-        table.assert_unreferenced(self)?;
+        if let Some((t, cs)) = self.table_references(&table.name, false)?.first() {
+            return Err(Error::Value(format!(
+                "Table {} is referenced by table {} column {}",
+                table.name, t, cs[0]
+            )));
+        }
         let mut scan = self.scan(&table.name, None)?;
         while let Some(row) = scan.next().transpose()? {
             self.delete(&table.name, &table.get_row_key(&row)?)?

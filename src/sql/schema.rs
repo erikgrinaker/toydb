@@ -23,6 +23,25 @@ pub trait Catalog {
         self.read_table(table)?
             .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
     }
+
+    /// Returns all references to a table, as table,column pairs.
+    fn table_references(&self, table: &str, with_self: bool) -> Result<Vec<(String, Vec<String>)>> {
+        Ok(self
+            .scan_tables()?
+            .filter(|t| with_self || t.name != table)
+            .map(|t| {
+                (
+                    t.name,
+                    t.columns
+                        .iter()
+                        .filter(|c| c.references.as_deref() == Some(table))
+                        .map(|c| c.name.clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .filter(|(_, cs)| !cs.is_empty())
+            .collect())
+    }
 }
 
 /// A table scan iterator
@@ -40,50 +59,6 @@ impl Table {
     pub fn new(name: String, columns: Vec<Column>) -> Result<Self> {
         let table = Self { name, columns };
         Ok(table)
-    }
-
-    /// Asserts that the table is not referenced by other tables, otherwise returns an error
-    pub fn assert_unreferenced(&self, txn: &mut dyn Transaction) -> Result<()> {
-        for source in txn.scan_tables()?.filter(|t| t.name != self.name) {
-            if let Some(column) =
-                source.columns.iter().find(|c| c.references.as_ref() == Some(&self.name))
-            {
-                return Err(Error::Value(format!(
-                    "Table {} is referenced by table {} column {}",
-                    self.name, source.name, column.name
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Asserts that this primary key is not referenced from any other rows, otherwise errors
-    pub fn assert_unreferenced_key(&self, pk: &Value, txn: &mut dyn Transaction) -> Result<()> {
-        for source in txn.scan_tables()? {
-            let refs = source
-                .columns
-                .iter()
-                .enumerate()
-                .filter(|(_, c)| c.references.as_deref() == Some(&self.name))
-                .collect::<Vec<_>>();
-            if refs.is_empty() {
-                continue;
-            }
-            let mut scan = txn.scan(&source.name, None)?;
-            while let Some(row) = scan.next().transpose()? {
-                for (i, column) in refs.iter() {
-                    if row.get(*i).unwrap_or(&Value::Null) == pk
-                        && (source.name != self.name || &source.get_row_key(&row)? != pk)
-                    {
-                        return Err(Error::Value(format!(
-                            "Primary key {} is referenced by table {} column {}",
-                            pk, source.name, column.name
-                        )));
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Fetches a column by name
