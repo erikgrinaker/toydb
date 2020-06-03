@@ -30,7 +30,7 @@ macro_rules! test_schema {
                 write!(f, "Storage:")?;
                 let txn = engine.begin(Mode::ReadWrite)?;
                 for table in txn.scan_tables()? {
-                    write!(f, "\n{}\n", table.as_sql())?;
+                    write!(f, "\n{}\n", table)?;
                     for row in txn.scan(&table.name, None)? {
                         write!(f, "{:?}\n", row?)?;
                     }

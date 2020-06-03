@@ -152,7 +152,7 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
             }
             "!table" => {
                 let args = getargs(1)?;
-                println!("{}", self.client.get_table(args[0]).await?.as_sql());
+                println!("{}", self.client.get_table(args[0]).await?);
             }
             "!tables" => {
                 getargs(0)?;

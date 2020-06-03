@@ -5,6 +5,7 @@ use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::{self, Display};
 
 /// The catalog stores schema information
 pub trait Catalog {
@@ -30,9 +31,7 @@ pub type Tables = Box<dyn DoubleEndedIterator<Item = Table> + Send>;
 /// A table schema
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Table {
-    /// The table name
     pub name: String,
-    /// The table columns
     pub columns: Vec<Column>,
 }
 
@@ -41,19 +40,6 @@ impl Table {
     pub fn new(name: String, columns: Vec<Column>) -> Result<Self> {
         let table = Self { name, columns };
         Ok(table)
-    }
-
-    /// Generates an SQL DDL query for the table schema
-    pub fn as_sql(&self) -> String {
-        format!(
-            "CREATE TABLE {} (\n{}\n)",
-            format_ident(&self.name),
-            self.columns
-                .iter()
-                .map(|c| format!("  {}", c.as_sql()))
-                .collect::<Vec<String>>()
-                .join(",\n")
-        )
     }
 
     /// Asserts that the table is not referenced by other tables, otherwise returns an error
@@ -208,6 +194,17 @@ impl Table {
     }
 }
 
+impl Display for Table {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CREATE TABLE {} (\n{}\n)",
+            format_ident(&self.name),
+            self.columns.iter().map(|c| format!("  {}", c)).collect::<Vec<String>>().join(",\n")
+        )
+    }
+}
+
 /// A table column schema
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Column {
@@ -230,31 +227,6 @@ pub struct Column {
 }
 
 impl Column {
-    /// Generates SQL DDL for the column
-    pub fn as_sql(&self) -> String {
-        let mut sql = format_ident(&self.name);
-        sql += &format!(" {}", self.datatype);
-        if self.primary_key {
-            sql += " PRIMARY KEY";
-        }
-        if !self.nullable && !self.primary_key {
-            sql += " NOT NULL";
-        }
-        if let Some(default) = &self.default {
-            sql += &format!(" DEFAULT {}", default);
-        }
-        if self.unique && !self.primary_key {
-            sql += " UNIQUE";
-        }
-        if let Some(reference) = &self.references {
-            sql += &format!(" REFERENCES {}", reference);
-        }
-        if self.index {
-            sql += " INDEX";
-        }
-        sql
-    }
-
     /// Validates the column schema
     pub fn validate(&self, table: &Table, txn: &mut dyn Transaction) -> Result<()> {
         // Validate primary key
@@ -371,5 +343,31 @@ impl Column {
         }
 
         Ok(())
+    }
+}
+
+impl Display for Column {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut sql = format_ident(&self.name);
+        sql += &format!(" {}", self.datatype);
+        if self.primary_key {
+            sql += " PRIMARY KEY";
+        }
+        if !self.nullable && !self.primary_key {
+            sql += " NOT NULL";
+        }
+        if let Some(default) = &self.default {
+            sql += &format!(" DEFAULT {}", default);
+        }
+        if self.unique && !self.primary_key {
+            sql += " UNIQUE";
+        }
+        if let Some(reference) = &self.references {
+            sql += &format!(" REFERENCES {}", reference);
+        }
+        if self.index {
+            sql += " INDEX";
+        }
+        write!(f, "{}", sql)
     }
 }
