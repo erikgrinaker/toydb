@@ -6,14 +6,10 @@ use crate::error::{Error, Result};
 /// A nested loop join executor
 /// FIXME This code is horrible, clean it up at some point
 pub struct NestedLoopJoin<T: Transaction> {
-    /// The left source
     left: Box<dyn Executor<T>>,
-    /// The right source
     right: Box<dyn Executor<T>>,
-    /// The join predicate
     predicate: Option<Expression>,
-    /// Whether to pad missing right items (for outer joins)
-    pad: bool,
+    outer: bool,
 }
 
 impl<T: Transaction> NestedLoopJoin<T> {
@@ -21,9 +17,9 @@ impl<T: Transaction> NestedLoopJoin<T> {
         left: Box<dyn Executor<T>>,
         right: Box<dyn Executor<T>>,
         predicate: Option<Expression>,
-        pad: bool,
+        outer: bool,
     ) -> Box<Self> {
-        Box::new(Self { left, right, predicate, pad })
+        Box::new(Self { left, right, predicate, outer })
     }
 }
 
@@ -40,7 +36,7 @@ impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
                         rows,
                         right_rows.collect::<Result<Vec<_>>>()?,
                         self.predicate,
-                        self.pad,
+                        self.outer,
                     )),
                     columns,
                 });

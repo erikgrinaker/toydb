@@ -88,7 +88,7 @@ Plan: Plan(
                 ),
             ),
         ),
-        pad: false,
+        outer: false,
     },
 )
 
@@ -135,7 +135,7 @@ Optimized plan: Plan(
                 ),
             ),
         ),
-        pad: false,
+        outer: false,
     },
 )
 

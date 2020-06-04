@@ -132,7 +132,7 @@ Plan: Plan(
                                 ),
                             ),
                         ),
-                        pad: false,
+                        outer: false,
                     },
                     expressions: [
                         (
@@ -253,7 +253,7 @@ Optimized plan: Plan(
                                 ),
                             ),
                         ),
-                        pad: false,
+                        outer: false,
                     },
                     expressions: [
                         (

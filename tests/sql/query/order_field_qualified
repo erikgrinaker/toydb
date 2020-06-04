@@ -98,7 +98,7 @@ Plan: Plan(
                             filter: None,
                         },
                         predicate: None,
-                        pad: false,
+                        outer: false,
                     },
                     predicate: Equal(
                         Field(
@@ -293,7 +293,7 @@ Optimized plan: Plan(
                             ),
                         ),
                     ),
-                    pad: false,
+                    outer: false,
                 },
                 expressions: [
                     (

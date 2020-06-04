@@ -90,7 +90,7 @@ Plan: Plan(
                     filter: None,
                 },
                 predicate: None,
-                pad: false,
+                outer: false,
             },
             predicate: And(
                 Or(
@@ -242,7 +242,7 @@ Optimized plan: Plan(
                 ],
             },
             predicate: None,
-            pad: false,
+            outer: false,
         },
         expressions: [
             (

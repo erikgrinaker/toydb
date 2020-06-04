@@ -263,7 +263,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 left_size: scope.len(),
                 right: Box::new(self.build_from_item(scope, item)?),
                 predicate: None,
-                pad: false,
+                outer: false,
             }
         }
         Ok(node)
@@ -294,11 +294,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let left_size = scope.len();
                 let right = Box::new(self.build_from_item(scope, *right)?);
                 let predicate = predicate.map(|e| self.build_expression(scope, e)).transpose()?;
-                let pad = match r#type {
+                let outer = match r#type {
                     ast::JoinType::Cross | ast::JoinType::Inner => false,
                     ast::JoinType::Left | ast::JoinType::Right => true,
                 };
-                let mut node = Node::NestedLoopJoin { left, left_size, right, predicate, pad };
+                let mut node = Node::NestedLoopJoin { left, left_size, right, predicate, outer };
                 if matches!(r#type, ast::JoinType::Right) {
                     let expressions = (left_size..scope.len())
                         .chain(0..left_size)

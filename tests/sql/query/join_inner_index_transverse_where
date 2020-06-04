@@ -105,7 +105,7 @@ Plan: Plan(
                     ),
                 ),
             ),
-            pad: false,
+            outer: false,
         },
         predicate: Equal(
             Field(
@@ -180,7 +180,7 @@ Optimized plan: Plan(
                 ),
             ),
         ),
-        pad: false,
+        outer: false,
     },
 )
 

@@ -223,7 +223,7 @@ Plan: Plan(
                             ),
                         ),
                     ),
-                    pad: false,
+                    outer: false,
                 },
                 left_size: 9,
                 right: Scan {
@@ -279,7 +279,7 @@ Plan: Plan(
                         ),
                     ),
                 ),
-                pad: false,
+                outer: false,
             },
             expressions: [
                 (
@@ -424,7 +424,7 @@ Optimized plan: Plan(
                             ),
                         ),
                     ),
-                    pad: false,
+                    outer: false,
                 },
                 left_size: 9,
                 right: KeyLookup {
@@ -464,7 +464,7 @@ Optimized plan: Plan(
                         ),
                     ),
                 ),
-                pad: false,
+                outer: false,
             },
             expressions: [
                 (

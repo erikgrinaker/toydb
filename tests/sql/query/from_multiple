@@ -39,7 +39,7 @@ Plan: Plan(
                 filter: None,
             },
             predicate: None,
-            pad: false,
+            outer: false,
         },
         left_size: 9,
         right: Scan {
@@ -48,7 +48,7 @@ Plan: Plan(
             filter: None,
         },
         predicate: None,
-        pad: false,
+        outer: false,
     },
 )
 
@@ -67,7 +67,7 @@ Optimized plan: Plan(
                 filter: None,
             },
             predicate: None,
-            pad: false,
+            outer: false,
         },
         left_size: 9,
         right: Scan {
@@ -76,7 +76,7 @@ Optimized plan: Plan(
             filter: None,
         },
         predicate: None,
-        pad: false,
+        outer: false,
     },
 )
 

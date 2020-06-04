@@ -62,7 +62,7 @@ Plan: Plan(
                 filter: None,
             },
             predicate: None,
-            pad: false,
+            outer: false,
         },
         expressions: [
             (
@@ -116,7 +116,7 @@ Optimized plan: Plan(
                 filter: None,
             },
             predicate: None,
-            pad: false,
+            outer: false,
         },
         expressions: [
             (

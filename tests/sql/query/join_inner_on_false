@@ -50,7 +50,7 @@ Plan: Plan(
                 ),
             ),
         ),
-        pad: false,
+        outer: false,
     },
 )
 
@@ -74,7 +74,7 @@ Optimized plan: Plan(
             filter: None,
         },
         predicate: None,
-        pad: false,
+        outer: false,
     },
 )
 

@@ -172,7 +172,7 @@ Plan: Plan(
                         filter: None,
                     },
                     predicate: None,
-                    pad: false,
+                    outer: false,
                 },
                 left_size: 9,
                 right: Scan {
@@ -183,7 +183,7 @@ Plan: Plan(
                     filter: None,
                 },
                 predicate: None,
-                pad: false,
+                outer: false,
             },
             predicate: And(
                 And(
@@ -418,7 +418,7 @@ Optimized plan: Plan(
                     ],
                 },
                 predicate: None,
-                pad: false,
+                outer: false,
             },
             left_size: 9,
             right: Scan {
@@ -450,7 +450,7 @@ Optimized plan: Plan(
                 ),
             },
             predicate: None,
-            pad: false,
+            outer: false,
         },
         expressions: [
             (
