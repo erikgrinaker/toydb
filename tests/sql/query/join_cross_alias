@@ -155,16 +155,16 @@ Plan: Plan(
     Projection {
         source: Filter {
             source: NestedLoopJoin {
-                outer: NestedLoopJoin {
-                    outer: Scan {
+                left: NestedLoopJoin {
+                    left: Scan {
                         table: "movies",
                         alias: Some(
                             "m",
                         ),
                         filter: None,
                     },
-                    outer_size: 7,
-                    inner: Scan {
+                    left_size: 7,
+                    right: Scan {
                         table: "genres",
                         alias: Some(
                             "g",
@@ -175,8 +175,8 @@ Plan: Plan(
                     pad: false,
                     flip: false,
                 },
-                outer_size: 9,
-                inner: Scan {
+                left_size: 9,
+                right: Scan {
                     table: "countries",
                     alias: Some(
                         "c",
@@ -360,8 +360,8 @@ Plan: Plan(
 Optimized plan: Plan(
     Projection {
         source: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Scan {
+            left: NestedLoopJoin {
+                left: Scan {
                     table: "movies",
                     alias: Some(
                         "m",
@@ -407,8 +407,8 @@ Optimized plan: Plan(
                         ),
                     ),
                 },
-                outer_size: 7,
-                inner: KeyLookup {
+                left_size: 7,
+                right: KeyLookup {
                     table: "genres",
                     alias: Some(
                         "g",
@@ -423,8 +423,8 @@ Optimized plan: Plan(
                 pad: false,
                 flip: false,
             },
-            outer_size: 9,
-            inner: Scan {
+            left_size: 9,
+            right: Scan {
                 table: "countries",
                 alias: Some(
                     "c",

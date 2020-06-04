@@ -63,13 +63,13 @@ AST: Select {
 
 Plan: Plan(
     NestedLoopJoin {
-        outer: Scan {
+        left: Scan {
             table: "movies",
             alias: None,
             filter: None,
         },
-        outer_size: 7,
-        inner: Scan {
+        left_size: 7,
+        right: Scan {
             table: "genres",
             alias: None,
             filter: None,
@@ -133,13 +133,13 @@ Plan: Plan(
 
 Optimized plan: Plan(
     NestedLoopJoin {
-        outer: Scan {
+        left: Scan {
             table: "movies",
             alias: None,
             filter: None,
         },
-        outer_size: 7,
-        inner: Scan {
+        left_size: 7,
+        right: Scan {
             table: "genres",
             alias: None,
             filter: None,

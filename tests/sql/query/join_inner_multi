@@ -105,14 +105,14 @@ AST: Select {
 Plan: Plan(
     Projection {
         source: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Scan {
+            left: NestedLoopJoin {
+                left: Scan {
                     table: "movies",
                     alias: None,
                     filter: None,
                 },
-                outer_size: 7,
-                inner: Scan {
+                left_size: 7,
+                right: Scan {
                     table: "genres",
                     alias: None,
                     filter: None,
@@ -146,8 +146,8 @@ Plan: Plan(
                 pad: false,
                 flip: false,
             },
-            outer_size: 9,
-            inner: Scan {
+            left_size: 9,
+            right: Scan {
                 table: "studios",
                 alias: None,
                 filter: None,
@@ -235,14 +235,14 @@ Plan: Plan(
 Optimized plan: Plan(
     Projection {
         source: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Scan {
+            left: NestedLoopJoin {
+                left: Scan {
                     table: "movies",
                     alias: None,
                     filter: None,
                 },
-                outer_size: 7,
-                inner: Scan {
+                left_size: 7,
+                right: Scan {
                     table: "genres",
                     alias: None,
                     filter: None,
@@ -276,8 +276,8 @@ Optimized plan: Plan(
                 pad: false,
                 flip: false,
             },
-            outer_size: 9,
-            inner: Scan {
+            left_size: 9,
+            right: Scan {
                 table: "studios",
                 alias: None,
                 filter: None,

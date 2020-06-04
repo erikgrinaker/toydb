@@ -78,13 +78,13 @@ Plan: Plan(
     Projection {
         source: Filter {
             source: NestedLoopJoin {
-                outer: Scan {
+                left: Scan {
                     table: "movies",
                     alias: None,
                     filter: None,
                 },
-                outer_size: 7,
-                inner: Scan {
+                left_size: 7,
+                right: Scan {
                     table: "genres",
                     alias: None,
                     filter: None,
@@ -188,7 +188,7 @@ Plan: Plan(
 Optimized plan: Plan(
     Projection {
         source: NestedLoopJoin {
-            outer: Scan {
+            left: Scan {
                 table: "movies",
                 alias: None,
                 filter: Some(
@@ -232,8 +232,8 @@ Optimized plan: Plan(
                     ),
                 ),
             },
-            outer_size: 7,
-            inner: KeyLookup {
+            left_size: 7,
+            right: KeyLookup {
                 table: "genres",
                 alias: None,
                 keys: [

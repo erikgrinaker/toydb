@@ -259,9 +259,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
         };
         for item in items {
             node = Node::NestedLoopJoin {
-                outer: Box::new(node),
-                outer_size: scope.len(),
-                inner: Box::new(self.build_from_item(scope, item)?),
+                left: Box::new(node),
+                left_size: scope.len(),
+                right: Box::new(self.build_from_item(scope, item)?),
                 predicate: None,
                 pad: false,
                 flip: false,
@@ -286,25 +286,25 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             ast::FromItem::Join { left, right, r#type, predicate } => match r#type {
                 ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
-                    outer: Box::new(self.build_from_item(scope, *left)?),
-                    outer_size: scope.len(),
-                    inner: Box::new(self.build_from_item(scope, *right)?),
+                    left: Box::new(self.build_from_item(scope, *left)?),
+                    left_size: scope.len(),
+                    right: Box::new(self.build_from_item(scope, *right)?),
                     predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
                     pad: false,
                     flip: false,
                 },
                 ast::JoinType::Left => Node::NestedLoopJoin {
-                    outer: Box::new(self.build_from_item(scope, *left)?),
-                    outer_size: scope.len(),
-                    inner: Box::new(self.build_from_item(scope, *right)?),
+                    left: Box::new(self.build_from_item(scope, *left)?),
+                    left_size: scope.len(),
+                    right: Box::new(self.build_from_item(scope, *right)?),
                     predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
                     pad: true,
                     flip: false,
                 },
                 ast::JoinType::Right => Node::NestedLoopJoin {
-                    outer: Box::new(self.build_from_item(scope, *left)?),
-                    outer_size: scope.len(),
-                    inner: Box::new(self.build_from_item(scope, *right)?),
+                    left: Box::new(self.build_from_item(scope, *left)?),
+                    left_size: scope.len(),
+                    right: Box::new(self.build_from_item(scope, *right)?),
                     predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
                     pad: true,
                     flip: true,

@@ -71,15 +71,15 @@ AST: Select {
 Plan: Plan(
     Projection {
         source: NestedLoopJoin {
-            outer: Scan {
+            left: Scan {
                 table: "genres",
                 alias: Some(
                     "g",
                 ),
                 filter: None,
             },
-            outer_size: 2,
-            inner: Scan {
+            left_size: 2,
+            right: Scan {
                 table: "movies",
                 alias: Some(
                     "m",
@@ -155,15 +155,15 @@ Plan: Plan(
 Optimized plan: Plan(
     Projection {
         source: NestedLoopJoin {
-            outer: Scan {
+            left: Scan {
                 table: "genres",
                 alias: Some(
                     "g",
                 ),
                 filter: None,
             },
-            outer_size: 2,
-            inner: Scan {
+            left_size: 2,
+            right: Scan {
                 table: "movies",
                 alias: Some(
                     "m",

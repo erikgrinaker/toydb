@@ -52,16 +52,15 @@ impl Optimizer for FilterPushdown {
                     }
                 }
                 Node::NestedLoopJoin {
-                    mut outer,
-                    outer_size,
-                    mut inner,
+                    mut left,
+                    left_size,
+                    mut right,
                     predicate: Some(predicate),
                     pad,
                     flip,
                 } => {
-                    let predicate =
-                        self.pushdown_join(predicate, &mut outer, &mut inner, outer_size);
-                    Ok(Node::NestedLoopJoin { outer, outer_size, inner, predicate, pad, flip })
+                    let predicate = self.pushdown_join(predicate, &mut left, &mut right, left_size);
+                    Ok(Node::NestedLoopJoin { left, left_size, right, predicate, pad, flip })
                 }
                 n => Ok(n),
             },

@@ -42,15 +42,15 @@ AST: Select {
 
 Plan: Plan(
     NestedLoopJoin {
-        outer: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Scan {
+        left: NestedLoopJoin {
+            left: NestedLoopJoin {
+                left: Scan {
                     table: "movies",
                     alias: None,
                     filter: None,
                 },
-                outer_size: 7,
-                inner: Scan {
+                left_size: 7,
+                right: Scan {
                     table: "genres",
                     alias: None,
                     filter: None,
@@ -59,8 +59,8 @@ Plan: Plan(
                 pad: false,
                 flip: false,
             },
-            outer_size: 9,
-            inner: Scan {
+            left_size: 9,
+            right: Scan {
                 table: "countries",
                 alias: None,
                 filter: None,
@@ -69,8 +69,8 @@ Plan: Plan(
             pad: false,
             flip: false,
         },
-        outer_size: 11,
-        inner: Scan {
+        left_size: 11,
+        right: Scan {
             table: "studios",
             alias: None,
             filter: None,
@@ -83,15 +83,15 @@ Plan: Plan(
 
 Optimized plan: Plan(
     NestedLoopJoin {
-        outer: NestedLoopJoin {
-            outer: NestedLoopJoin {
-                outer: Scan {
+        left: NestedLoopJoin {
+            left: NestedLoopJoin {
+                left: Scan {
                     table: "movies",
                     alias: None,
                     filter: None,
                 },
-                outer_size: 7,
-                inner: Scan {
+                left_size: 7,
+                right: Scan {
                     table: "genres",
                     alias: None,
                     filter: None,
@@ -100,8 +100,8 @@ Optimized plan: Plan(
                 pad: false,
                 flip: false,
             },
-            outer_size: 9,
-            inner: Scan {
+            left_size: 9,
+            right: Scan {
                 table: "countries",
                 alias: None,
                 filter: None,
@@ -110,8 +110,8 @@ Optimized plan: Plan(
             pad: false,
             flip: false,
         },
-        outer_size: 11,
-        inner: Scan {
+        left_size: 11,
+        right: Scan {
             table: "studios",
             alias: None,
             filter: None,

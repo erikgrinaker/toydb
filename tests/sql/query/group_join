@@ -91,15 +91,15 @@ Plan: Plan(
             source: Aggregation {
                 source: Projection {
                     source: NestedLoopJoin {
-                        outer: Scan {
+                        left: Scan {
                             table: "movies",
                             alias: Some(
                                 "m",
                             ),
                             filter: None,
                         },
-                        outer_size: 7,
-                        inner: Scan {
+                        left_size: 7,
+                        right: Scan {
                             table: "studios",
                             alias: Some(
                                 "s",
@@ -213,15 +213,15 @@ Optimized plan: Plan(
             source: Aggregation {
                 source: Projection {
                     source: NestedLoopJoin {
-                        outer: Scan {
+                        left: Scan {
                             table: "movies",
                             alias: Some(
                                 "m",
                             ),
                             filter: None,
                         },
-                        outer_size: 7,
-                        inner: Scan {
+                        left_size: 7,
+                        right: Scan {
                             table: "studios",
                             alias: Some(
                                 "s",

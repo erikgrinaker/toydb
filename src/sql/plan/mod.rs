@@ -88,9 +88,9 @@ pub enum Node {
         limit: u64,
     },
     NestedLoopJoin {
-        outer: Box<Node>,
-        outer_size: usize,
-        inner: Box<Node>,
+        left: Box<Node>,
+        left_size: usize,
+        right: Box<Node>,
         predicate: Option<Expression>,
         pad: bool,
         flip: bool,
@@ -150,11 +150,11 @@ impl Node {
             Self::Limit { source, limit } => {
                 Self::Limit { source: source.transform(before, after)?.into(), limit }
             }
-            Self::NestedLoopJoin { outer, outer_size, inner, predicate, pad, flip } => {
+            Self::NestedLoopJoin { left, left_size, right, predicate, pad, flip } => {
                 Self::NestedLoopJoin {
-                    outer: outer.transform(before, after)?.into(),
-                    outer_size,
-                    inner: inner.transform(before, after)?.into(),
+                    left: left.transform(before, after)?.into(),
+                    left_size,
+                    right: right.transform(before, after)?.into(),
                     predicate,
                     pad,
                     flip,
@@ -297,7 +297,7 @@ impl Node {
                 s += &format!("Limit: {}\n", limit);
                 s += &source.format(indent, false, true);
             }
-            Self::NestedLoopJoin { outer, outer_size: _, inner, predicate, pad, flip } => {
+            Self::NestedLoopJoin { left, left_size: _, right, predicate, pad, flip } => {
                 s += "NestedLoopJoin:";
                 if !pad {
                     s += " inner";
@@ -310,8 +310,8 @@ impl Node {
                     s += &format!(" on {}", expr);
                 }
                 s += "\n";
-                s += &outer.format(indent.clone(), false, false);
-                s += &inner.format(indent, false, true);
+                s += &left.format(indent.clone(), false, false);
+                s += &right.format(indent, false, true);
             }
             Self::Nothing {} => {
                 s += "Nothing\n";
