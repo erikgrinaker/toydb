@@ -98,7 +98,6 @@ Plan: Plan(
                 ),
             ),
             pad: false,
-            flip: false,
         },
         predicate: Or(
             GreaterThan(
@@ -220,7 +219,6 @@ Optimized plan: Plan(
             ),
         ),
         pad: false,
-        flip: false,
     },
 )
 

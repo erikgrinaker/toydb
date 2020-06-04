@@ -45,8 +45,8 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             }
             Node::KeyLookup { table, alias: _, keys } => KeyLookup::new(table, keys),
             Node::Limit { source, limit } => Limit::new(Self::build(*source), limit),
-            Node::NestedLoopJoin { left, left_size: _, right, predicate, pad, flip } => {
-                NestedLoopJoin::new(Self::build(*left), Self::build(*right), predicate, pad, flip)
+            Node::NestedLoopJoin { left, left_size: _, right, predicate, pad } => {
+                NestedLoopJoin::new(Self::build(*left), Self::build(*right), predicate, pad)
             }
             Node::Nothing => Nothing::new(),
             Node::Offset { source, offset } => Offset::new(Self::build(*source), offset),

@@ -55,7 +55,6 @@ Plan: Plan(
             },
             predicate: None,
             pad: false,
-            flip: false,
         },
         expressions: [
             (
@@ -106,7 +105,6 @@ Optimized plan: Plan(
             },
             predicate: None,
             pad: false,
-            flip: false,
         },
         expressions: [
             (

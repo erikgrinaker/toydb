@@ -144,7 +144,6 @@ Plan: Plan(
                     ),
                 ),
                 pad: false,
-                flip: false,
             },
             left_size: 9,
             right: Scan {
@@ -179,7 +178,6 @@ Plan: Plan(
                 ),
             ),
             pad: false,
-            flip: false,
         },
         expressions: [
             (
@@ -274,7 +272,6 @@ Optimized plan: Plan(
                     ),
                 ),
                 pad: false,
-                flip: false,
             },
             left_size: 9,
             right: Scan {
@@ -309,7 +306,6 @@ Optimized plan: Plan(
                 ),
             ),
             pad: false,
-            flip: false,
         },
         expressions: [
             (

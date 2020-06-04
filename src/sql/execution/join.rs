@@ -14,8 +14,6 @@ pub struct NestedLoopJoin<T: Transaction> {
     predicate: Option<Expression>,
     /// Whether to pad missing right items (for outer joins)
     pad: bool,
-    /// Whether to flip inputs (for right outer joins)
-    flip: bool,
 }
 
 impl<T: Transaction> NestedLoopJoin<T> {
@@ -24,40 +22,27 @@ impl<T: Transaction> NestedLoopJoin<T> {
         right: Box<dyn Executor<T>>,
         predicate: Option<Expression>,
         pad: bool,
-        flip: bool,
     ) -> Box<Self> {
-        Box::new(Self { left, right, predicate, pad, flip })
+        Box::new(Self { left, right, predicate, pad })
     }
 }
 
 impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
-        let (result, right) = if self.flip {
-            (self.right.execute(txn)?, self.left.execute(txn)?)
-        } else {
-            (self.left.execute(txn)?, self.right.execute(txn)?)
-        };
-        if let ResultSet::Query { columns, rows } = result {
+        let result = self.left.execute(txn)?;
+        let right = self.right.execute(txn)?;
+        if let ResultSet::Query { mut columns, rows } = result {
             if let ResultSet::Query { columns: right_columns, rows: right_rows } = right {
-                let mut join_columns = Columns::new();
-                if self.flip {
-                    join_columns.extend(right_columns);
-                    join_columns.extend(columns);
-                } else {
-                    join_columns.extend(columns);
-                    join_columns.extend(right_columns);
-                }
-
+                columns.extend(right_columns);
                 return Ok(ResultSet::Query {
-                    columns: join_columns.clone(),
                     rows: Box::new(NestedLoopRows::new(
-                        join_columns,
+                        columns.clone(),
                         rows,
                         right_rows.collect::<Result<Vec<_>>>()?,
                         self.predicate,
                         self.pad,
-                        self.flip,
                     )),
+                    columns,
                 });
             }
         }
@@ -75,7 +60,6 @@ struct NestedLoopRows {
     right_orig: Vec<Row>,
     right_pad: bool,
     right_emitted: bool,
-    flipped: bool,
 }
 
 impl NestedLoopRows {
@@ -85,7 +69,6 @@ impl NestedLoopRows {
         right: Vec<Row>,
         predicate: Option<Expression>,
         right_pad: bool,
-        flipped: bool,
     ) -> Self {
         Self {
             columns,
@@ -96,7 +79,6 @@ impl NestedLoopRows {
             right_orig: right,
             right_pad,
             right_emitted: false,
-            flipped,
         }
     }
 
@@ -109,13 +91,8 @@ impl NestedLoopRows {
         while let Some(i) = self.right.next() {
             if let Some(predicate) = &self.predicate {
                 let mut row = Vec::new();
-                if self.flipped {
-                    row.extend(i.clone());
-                    row.extend(o.clone());
-                } else {
-                    row.extend(o.clone());
-                    row.extend(i.clone());
-                }
+                row.extend(o.clone());
+                row.extend(i.clone());
                 match predicate.evaluate(Some(&row))? {
                     Value::Boolean(true) => return Ok(Some(i)),
                     Value::Boolean(false) => {}
@@ -143,7 +120,7 @@ impl Iterator for NestedLoopRows {
             if let Some(Err(e)) = &self.left_cur {
                 return Some(Err(e.clone()));
             }
-            let mut i = match self.next_right().transpose() {
+            let i = match self.next_right().transpose() {
                 Some(Ok(i)) => {
                     self.right_emitted = true;
                     i
@@ -154,11 +131,7 @@ impl Iterator for NestedLoopRows {
                     if self.right_pad && !self.right_emitted {
                         let mut row = self.left_cur.clone().unwrap().unwrap();
                         while row.len() < self.columns.len() {
-                            if self.flipped {
-                                row.insert(0, Value::Null)
-                            } else {
-                                row.push(Value::Null)
-                            }
+                            row.push(Value::Null)
                         }
                         self.left_cur = self.left.next();
                         return Some(Ok(row));
@@ -173,13 +146,8 @@ impl Iterator for NestedLoopRows {
                 Some(Err(e)) => return Some(Err(e)),
                 None => return None,
             };
-            if self.flipped {
-                i.extend(o);
-                return Some(Ok(i));
-            } else {
-                o.extend(i);
-                return Some(Ok(o));
-            }
+            o.extend(i);
+            return Some(Ok(o));
         }
         None
     }

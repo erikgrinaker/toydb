@@ -113,7 +113,6 @@ Plan: Plan(
                 ),
             ),
             pad: true,
-            flip: false,
         },
         expressions: [
             (
@@ -197,7 +196,6 @@ Optimized plan: Plan(
                 ),
             ),
             pad: true,
-            flip: false,
         },
         expressions: [
             (
@@ -240,7 +238,7 @@ Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT JOIN genres 
 
 Explain:
 Projection: m.id, g.id
-└─ NestedLoopJoin: left outer on m.id = g.id
+└─ NestedLoopJoin: outer on m.id = g.id
    ├─ Scan: movies
    └─ Scan: genres
 

@@ -133,7 +133,6 @@ Plan: Plan(
                             ),
                         ),
                         pad: false,
-                        flip: false,
                     },
                     expressions: [
                         (
@@ -255,7 +254,6 @@ Optimized plan: Plan(
                             ),
                         ),
                         pad: false,
-                        flip: false,
                     },
                     expressions: [
                         (

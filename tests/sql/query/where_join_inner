@@ -53,7 +53,6 @@ Plan: Plan(
             },
             predicate: None,
             pad: false,
-            flip: false,
         },
         predicate: Equal(
             Field(
@@ -122,7 +121,6 @@ Optimized plan: Plan(
             ),
         ),
         pad: false,
-        flip: false,
     },
 )
 

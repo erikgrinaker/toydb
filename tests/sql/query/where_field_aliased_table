@@ -99,7 +99,6 @@ Plan: Plan(
                 },
                 predicate: None,
                 pad: false,
-                flip: false,
             },
             predicate: And(
                 Or(
@@ -256,7 +255,6 @@ Optimized plan: Plan(
             },
             predicate: None,
             pad: false,
-            flip: false,
         },
         expressions: [
             (

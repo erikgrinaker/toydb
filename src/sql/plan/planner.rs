@@ -264,7 +264,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 right: Box::new(self.build_from_item(scope, item)?),
                 predicate: None,
                 pad: false,
-                flip: false,
             }
         }
         Ok(node)
@@ -284,32 +283,32 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 Node::Scan { table: name, alias, filter: None }
             }
 
-            ast::FromItem::Join { left, right, r#type, predicate } => match r#type {
-                ast::JoinType::Cross | ast::JoinType::Inner => Node::NestedLoopJoin {
-                    left: Box::new(self.build_from_item(scope, *left)?),
-                    left_size: scope.len(),
-                    right: Box::new(self.build_from_item(scope, *right)?),
-                    predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
-                    pad: false,
-                    flip: false,
-                },
-                ast::JoinType::Left => Node::NestedLoopJoin {
-                    left: Box::new(self.build_from_item(scope, *left)?),
-                    left_size: scope.len(),
-                    right: Box::new(self.build_from_item(scope, *right)?),
-                    predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
-                    pad: true,
-                    flip: false,
-                },
-                ast::JoinType::Right => Node::NestedLoopJoin {
-                    left: Box::new(self.build_from_item(scope, *left)?),
-                    left_size: scope.len(),
-                    right: Box::new(self.build_from_item(scope, *right)?),
-                    predicate: predicate.map(|e| self.build_expression(scope, e)).transpose()?,
-                    pad: true,
-                    flip: true,
-                },
-            },
+            ast::FromItem::Join { left, right, r#type, predicate } => {
+                // Right outer joins are built as a left outer join with an additional projection
+                // to swap the resulting columns.
+                let (left, right) = match r#type {
+                    ast::JoinType::Right => (right, left),
+                    _ => (left, right),
+                };
+                let left = Box::new(self.build_from_item(scope, *left)?);
+                let left_size = scope.len();
+                let right = Box::new(self.build_from_item(scope, *right)?);
+                let predicate = predicate.map(|e| self.build_expression(scope, e)).transpose()?;
+                let pad = match r#type {
+                    ast::JoinType::Cross | ast::JoinType::Inner => false,
+                    ast::JoinType::Left | ast::JoinType::Right => true,
+                };
+                let mut node = Node::NestedLoopJoin { left, left_size, right, predicate, pad };
+                if matches!(r#type, ast::JoinType::Right) {
+                    let expressions = (left_size..scope.len())
+                        .chain(0..left_size)
+                        .map(|i| Ok((Expression::Field(i, scope.get_label(i)?), None)))
+                        .collect::<Result<Vec<_>>>()?;
+                    scope.project(&expressions)?;
+                    node = Node::Projection { source: Box::new(node), expressions }
+                }
+                node
+            }
         })
     }
 
@@ -521,13 +520,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Literal::Float(f) => Value::Float(f),
                 ast::Literal::String(s) => Value::String(s),
             }),
-            ast::Expression::Column(i) => {
-                let label = match scope.get_column(i)? {
-                    (table, Some(name)) => Some((table, name)),
-                    _ => None,
-                };
-                Field(i, label)
-            }
+            ast::Expression::Column(i) => Field(i, scope.get_label(i)?),
             ast::Expression::Field(table, name) => {
                 Field(scope.resolve(table.as_deref(), &name)?, Some((table, name)))
             }
@@ -724,6 +717,14 @@ impl Scope {
             .get(index)
             .cloned()
             .ok_or_else(|| Error::Value(format!("Column index {} not found", index)))
+    }
+
+    /// Fetches a column label by index, if any.
+    fn get_label(&self, index: usize) -> Result<Option<(Option<String>, String)>> {
+        Ok(match self.get_column(index)? {
+            (table, Some(name)) => Some((table, name)),
+            _ => None,
+        })
     }
 
     /// Resolves a name, optionally qualified by a table name.

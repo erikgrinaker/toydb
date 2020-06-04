@@ -70,26 +70,55 @@ AST: Select {
 
 Plan: Plan(
     Projection {
-        source: NestedLoopJoin {
-            left: Scan {
-                table: "movies",
-                alias: Some(
-                    "m",
+        source: Projection {
+            source: NestedLoopJoin {
+                left: Scan {
+                    table: "genres",
+                    alias: Some(
+                        "g",
+                    ),
+                    filter: None,
+                },
+                left_size: 2,
+                right: Scan {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                    filter: None,
+                },
+                predicate: Some(
+                    Equal(
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "g",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
-                filter: None,
+                pad: true,
             },
-            left_size: 7,
-            right: Scan {
-                table: "genres",
-                alias: Some(
-                    "g",
-                ),
-                filter: None,
-            },
-            predicate: Some(
-                Equal(
+            expressions: [
+                (
                     Field(
-                        0,
+                        2,
                         Some(
                             (
                                 Some(
@@ -99,8 +128,95 @@ Plan: Plan(
                             ),
                         ),
                     ),
+                    None,
+                ),
+                (
+                    Field(
+                        3,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "title",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        4,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        5,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "genre_id",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        6,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "released",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
                     Field(
                         7,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "rating",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "ultrahd",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        0,
                         Some(
                             (
                                 Some(
@@ -110,10 +226,23 @@ Plan: Plan(
                             ),
                         ),
                     ),
+                    None,
                 ),
-            ),
-            pad: true,
-            flip: true,
+                (
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+            ],
         },
         expressions: [
             (
@@ -154,26 +283,55 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Projection {
-        source: NestedLoopJoin {
-            left: Scan {
-                table: "movies",
-                alias: Some(
-                    "m",
+        source: Projection {
+            source: NestedLoopJoin {
+                left: Scan {
+                    table: "genres",
+                    alias: Some(
+                        "g",
+                    ),
+                    filter: None,
+                },
+                left_size: 2,
+                right: Scan {
+                    table: "movies",
+                    alias: Some(
+                        "m",
+                    ),
+                    filter: None,
+                },
+                predicate: Some(
+                    Equal(
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "g",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
-                filter: None,
+                pad: true,
             },
-            left_size: 7,
-            right: Scan {
-                table: "genres",
-                alias: Some(
-                    "g",
-                ),
-                filter: None,
-            },
-            predicate: Some(
-                Equal(
+            expressions: [
+                (
                     Field(
-                        0,
+                        2,
                         Some(
                             (
                                 Some(
@@ -183,8 +341,95 @@ Optimized plan: Plan(
                             ),
                         ),
                     ),
+                    None,
+                ),
+                (
+                    Field(
+                        3,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "title",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        4,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        5,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "genre_id",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        6,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "released",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
                     Field(
                         7,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "rating",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "ultrahd",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+                (
+                    Field(
+                        0,
                         Some(
                             (
                                 Some(
@@ -194,10 +439,23 @@ Optimized plan: Plan(
                             ),
                         ),
                     ),
+                    None,
                 ),
-            ),
-            pad: true,
-            flip: true,
+                (
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    None,
+                ),
+            ],
         },
         expressions: [
             (
@@ -240,9 +498,10 @@ Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m RIGHT JOIN genres
 
 Explain:
 Projection: m.id, g.id
-└─ NestedLoopJoin: right outer on m.id = g.id
-   ├─ Scan: movies
-   └─ Scan: genres
+└─ Projection: m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd, g.id, g.name
+   └─ NestedLoopJoin: outer on m.id = g.id
+      ├─ Scan: genres
+      └─ Scan: movies
 
 Result: ["movie_id", "genre_id"]
 [Integer(1), Integer(1)]

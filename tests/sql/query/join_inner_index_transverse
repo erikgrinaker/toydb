@@ -128,7 +128,6 @@ Plan: Plan(
             ),
         ),
         pad: false,
-        flip: false,
     },
 )
 
@@ -185,7 +184,6 @@ Optimized plan: Plan(
             ),
         ),
         pad: false,
-        flip: false,
     },
 )
 

@@ -93,7 +93,6 @@ pub enum Node {
         right: Box<Node>,
         predicate: Option<Expression>,
         pad: bool,
-        flip: bool,
     },
     Nothing,
     Offset {
@@ -150,14 +149,13 @@ impl Node {
             Self::Limit { source, limit } => {
                 Self::Limit { source: source.transform(before, after)?.into(), limit }
             }
-            Self::NestedLoopJoin { left, left_size, right, predicate, pad, flip } => {
+            Self::NestedLoopJoin { left, left_size, right, predicate, pad } => {
                 Self::NestedLoopJoin {
                     left: left.transform(before, after)?.into(),
                     left_size,
                     right: right.transform(before, after)?.into(),
                     predicate,
                     pad,
-                    flip,
                 }
             }
             Self::Offset { source, offset } => {
@@ -297,15 +295,8 @@ impl Node {
                 s += &format!("Limit: {}\n", limit);
                 s += &source.format(indent, false, true);
             }
-            Self::NestedLoopJoin { left, left_size: _, right, predicate, pad, flip } => {
-                s += "NestedLoopJoin:";
-                if !pad {
-                    s += " inner";
-                } else if !flip {
-                    s += " left outer";
-                } else if *flip {
-                    s += " right outer";
-                };
+            Self::NestedLoopJoin { left, left_size: _, right, predicate, pad } => {
+                s += &format!("NestedLoopJoin: {}", if *pad { "outer" } else { "inner" });
                 if let Some(expr) = predicate {
                     s += &format!(" on {}", expr);
                 }
