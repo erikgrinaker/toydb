@@ -1,10 +1,9 @@
 use super::engine::Transaction;
 use super::parser::format_ident;
-use super::types::{DataType, Row, Value};
+use super::types::{DataType, Value};
 use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fmt::{self, Display};
 
 /// The catalog stores schema information
@@ -93,51 +92,6 @@ impl Table {
         )
         .cloned()
         .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
-    }
-
-    // Builds a row from a set of values, optionally with a set of column names, padding
-    // it with default values as necessary.
-    pub fn make_row(&self, columns: &[String], values: Vec<Value>) -> Result<Row> {
-        if columns.len() != values.len() {
-            return Err(Error::Value("Column and value counts do not match".into()));
-        }
-        let mut inputs = HashMap::new();
-        for (c, v) in columns.iter().zip(values.into_iter()) {
-            self.get_column(c)?;
-            if inputs.insert(c.clone(), v).is_some() {
-                return Err(Error::Value(format!("Column {} given multiple times", c)));
-            }
-        }
-        let mut row = Row::new();
-        for column in self.columns.iter() {
-            if let Some(value) = inputs.get(&column.name) {
-                row.push(value.clone())
-            } else if let Some(value) = &column.default {
-                row.push(value.clone())
-            } else {
-                return Err(Error::Value(format!("No value given for column {}", column.name)));
-            }
-        }
-        Ok(row)
-    }
-
-    /// Pads a row with default values where possible
-    pub fn pad_row(&self, mut row: Row) -> Result<Row> {
-        for column in self.columns.iter().skip(row.len()) {
-            if let Some(default) = &column.default {
-                row.push(default.clone())
-            } else {
-                return Err(Error::Value(format!("No default value for column {}", column.name)));
-            }
-        }
-        Ok(row)
-    }
-
-    /// Sets a named row field to a value
-    pub fn set_row_field(&self, row: &mut Row, field: &str, value: Value) -> Result<()> {
-        *row.get_mut(self.get_column_index(field)?)
-            .ok_or_else(|| Error::Value(format!("Field {} not found in row", field)))? = value;
-        Ok(())
     }
 
     /// Validates the table schema
