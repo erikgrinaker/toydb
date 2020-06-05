@@ -1,5 +1,4 @@
-///! DML-related tests, using an in-memory database against golden files in tests/sql/dml/
-///! Note that schema-related tests are in schema.rs, this is just for the basic DML functionality
+///! Mutation tests, using an in-memory database against golden files in tests/sql/mutation/
 use toydb::error::Result;
 use toydb::sql::engine::{Engine as _, Mode, Transaction as _};
 use toydb::sql::schema::Catalog as _;
@@ -7,7 +6,7 @@ use toydb::sql::schema::Catalog as _;
 use goldenfile::Mint;
 use std::io::Write;
 
-macro_rules! test_dml {
+macro_rules! test_mutation {
     ( $( $name:ident: $query:expr, )* ) => {
         $(
             test_schema! { with []; $name: $query, }
@@ -19,7 +18,7 @@ macro_rules! test_dml {
             fn $name() -> Result<()> {
                 let setup: &[&str] = &$setup;
                 let engine = super::setup(setup.into())?;
-                let mut mint = Mint::new("tests/sql/dml");
+                let mut mint = Mint::new("tests/sql/mutation");
                 let mut f = mint.new_goldenfile(stringify!($name))?;
 
                 write!(f, "Query: {}\n", $query.trim())?;
@@ -56,7 +55,7 @@ macro_rules! test_dml {
     }
 }
 
-test_dml! { with [
+test_mutation! { with [
         "CREATE TABLE test (
             id INTEGER PRIMARY KEY DEFAULT 0,
             name STRING INDEX,
@@ -86,7 +85,7 @@ test_dml! { with [
     delete_bare_where: "DELETE FROM test WHERE",
 }
 
-test_dml! { with [
+test_mutation! { with [
         "CREATE TABLE test (
             id INTEGER PRIMARY KEY DEFAULT 0,
             name STRING INDEX,
@@ -119,7 +118,7 @@ test_dml! { with [
     insert_bare_values: "INSERT INTO test VALUES",
 }
 
-test_dml! { with [
+test_mutation! { with [
         "CREATE TABLE test (
             id INTEGER PRIMARY KEY DEFAULT 0,
             name STRING INDEX,
