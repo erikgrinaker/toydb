@@ -204,7 +204,7 @@ impl Node {
             | n @ Self::IndexLookup { .. }
             | n @ Self::KeyLookup { .. }
             | n @ Self::Limit { .. }
-            | n @ Self::NestedLoopJoin { .. } // FIXME Handle predicate
+            | n @ Self::NestedLoopJoin { predicate: None, .. }
             | n @ Self::Nothing
             | n @ Self::Offset { .. }
             | n @ Self::Scan { filter: None, .. } => n,
@@ -227,6 +227,15 @@ impl Node {
                     .map(|(e, o)| e.transform(before, after).map(|e| (e, o)))
                     .collect::<Result<_>>()?,
             },
+            Self::NestedLoopJoin { left, left_size, right, predicate: Some(predicate), outer } => {
+                Self::NestedLoopJoin {
+                    left,
+                    left_size,
+                    right,
+                    predicate: Some(predicate.transform(before, after)?),
+                    outer,
+                }
+            }
             Self::Projection { source, expressions } => Self::Projection {
                 source,
                 expressions: expressions
