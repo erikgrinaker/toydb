@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies OFFSET TRUE
 
+Error: Invalid offset TRUE
+
 AST: Select {
     select: [],
     from: [

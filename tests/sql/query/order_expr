@@ -1,5 +1,22 @@
 Query: SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC
 
+Explain:
+Order: ord asc
+└─ Projection: id, title, released, released % 4
+   └─ Scan: movies
+
+Result: ["id", "title", "released", "ord"]
+[Integer(3), String("Primer"), Integer(2004), Integer(0)]
+[Integer(6), String("Solaris"), Integer(1972), Integer(0)]
+[Integer(7), String("Gravity"), Integer(2013), Integer(1)]
+[Integer(5), String("The Fountain"), Integer(2006), Integer(2)]
+[Integer(8), String("Blindspotting"), Integer(2018), Integer(2)]
+[Integer(9), String("Birdman"), Integer(2014), Integer(2)]
+[Integer(10), String("Inception"), Integer(2010), Integer(2)]
+[Integer(1), String("Stalker"), Integer(1979), Integer(3)]
+[Integer(2), String("Sicario"), Integer(2015), Integer(3)]
+[Integer(4), String("Heat"), Integer(1995), Integer(3)]
+
 AST: Select {
     select: [
         (
@@ -243,21 +260,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC
-
-Explain:
-Order: ord asc
-└─ Projection: id, title, released, released % 4
-   └─ Scan: movies
-
-Result: ["id", "title", "released", "ord"]
-[Integer(3), String("Primer"), Integer(2004), Integer(0)]
-[Integer(6), String("Solaris"), Integer(1972), Integer(0)]
-[Integer(7), String("Gravity"), Integer(2013), Integer(1)]
-[Integer(5), String("The Fountain"), Integer(2006), Integer(2)]
-[Integer(8), String("Blindspotting"), Integer(2018), Integer(2)]
-[Integer(9), String("Birdman"), Integer(2014), Integer(2)]
-[Integer(10), String("Inception"), Integer(2010), Integer(2)]
-[Integer(1), String("Stalker"), Integer(1979), Integer(3)]
-[Integer(2), String("Sicario"), Integer(2015), Integer(3)]
-[Integer(4), String("Heat"), Integer(1995), Integer(3)]

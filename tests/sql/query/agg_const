@@ -1,5 +1,14 @@
 Query: SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3)
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: 3, 3, 3, 3, 3
+      └─ Nothing
+
+Result: ["?", "?", "?", "?", "?"]
+[Integer(3), Integer(3), Integer(3), Integer(1), Integer(3)]
+
 AST: Select {
     select: [
         (
@@ -269,13 +278,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT MIN(3), MAX(3), SUM(3), COUNT(3), AVG(3)
-
-Explain:
-Projection: #0, #1, #2, #3, #4
-└─ Aggregation: minimum, maximum, sum, count, average
-   └─ Projection: 3, 3, 3, 3, 3
-      └─ Nothing
-
-Result: ["?", "?", "?", "?", "?"]
-[Integer(3), Integer(3), Integer(3), Integer(1), Integer(3)]

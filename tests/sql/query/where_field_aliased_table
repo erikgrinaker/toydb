@@ -1,5 +1,21 @@
 Query: SELECT m.id, g.id FROM movies m, genres g WHERE m.id >= 3 AND g.id = 1
 
+Explain:
+Projection: m.id, g.id
+└─ NestedLoopJoin: inner
+   ├─ Scan: movies as m (m.id > 3 OR m.id = 3)
+   └─ KeyLookup: genres as g (1)
+
+Result: ["id", "id"]
+[Integer(3), Integer(1)]
+[Integer(4), Integer(1)]
+[Integer(5), Integer(1)]
+[Integer(6), Integer(1)]
+[Integer(7), Integer(1)]
+[Integer(8), Integer(1)]
+[Integer(9), Integer(1)]
+[Integer(10), Integer(1)]
+
 AST: Select {
     select: [
         (
@@ -289,20 +305,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT m.id, g.id FROM movies m, genres g WHERE m.id >= 3 AND g.id = 1
-
-Explain:
-Projection: m.id, g.id
-└─ NestedLoopJoin: inner
-   ├─ Scan: movies as m (m.id > 3 OR m.id = 3)
-   └─ KeyLookup: genres as g (1)
-
-Result: ["id", "id"]
-[Integer(3), Integer(1)]
-[Integer(4), Integer(1)]
-[Integer(5), Integer(1)]
-[Integer(6), Integer(1)]
-[Integer(7), Integer(1)]
-[Integer(8), Integer(1)]
-[Integer(9), Integer(1)]
-[Integer(10), Integer(1)]

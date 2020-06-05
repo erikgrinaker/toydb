@@ -1,59 +1,6 @@
 Query: SELECT * FROM movies WHERE 3.14
 
-AST: Select {
-    select: [],
-    from: [
-        Table {
-            name: "movies",
-            alias: None,
-        },
-    ],
-    where: Some(
-        Literal(
-            Float(
-                3.14,
-            ),
-        ),
-    ),
-    group_by: [],
-    having: None,
-    order: [],
-    offset: None,
-    limit: None,
-}
-
-Plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        predicate: Constant(
-            Float(
-                3.14,
-            ),
-        ),
-    },
-)
-
-Optimized plan: Plan(
-    Scan {
-        table: "movies",
-        alias: None,
-        filter: Some(
-            Constant(
-                Float(
-                    3.14,
-                ),
-            ),
-        ),
-    },
-)
-
-Query: SELECT * FROM movies WHERE 3.14
-
 Explain:
 Scan: movies (3.14)
 
-Result: Value("Filter returned 3.14, expected boolean")
+ Value("Filter returned 3.14, expected boolean")

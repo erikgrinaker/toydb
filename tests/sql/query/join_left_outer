@@ -1,5 +1,23 @@
 Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN genres g ON m.id = g.id
 
+Explain:
+Projection: m.id, g.id
+└─ HashJoin: outer on m.id = g.id
+   ├─ Scan: movies as m
+   └─ Scan: genres as g
+
+Result: ["movie_id", "genre_id"]
+[Integer(1), Integer(1)]
+[Integer(2), Integer(2)]
+[Integer(3), Integer(3)]
+[Integer(4), Null]
+[Integer(5), Null]
+[Integer(6), Null]
+[Integer(7), Null]
+[Integer(8), Null]
+[Integer(9), Null]
+[Integer(10), Null]
+
 AST: Select {
     select: [
         (
@@ -229,22 +247,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN genres g ON m.id = g.id
-
-Explain:
-Projection: m.id, g.id
-└─ HashJoin: outer on m.id = g.id
-   ├─ Scan: movies as m
-   └─ Scan: genres as g
-
-Result: ["movie_id", "genre_id"]
-[Integer(1), Integer(1)]
-[Integer(2), Integer(2)]
-[Integer(3), Integer(3)]
-[Integer(4), Null]
-[Integer(5), Null]
-[Integer(6), Null]
-[Integer(7), Null]
-[Integer(8), Null]
-[Integer(9), Null]
-[Integer(10), Null]

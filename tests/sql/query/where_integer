@@ -1,59 +1,6 @@
 Query: SELECT * FROM movies WHERE 7
 
-AST: Select {
-    select: [],
-    from: [
-        Table {
-            name: "movies",
-            alias: None,
-        },
-    ],
-    where: Some(
-        Literal(
-            Integer(
-                7,
-            ),
-        ),
-    ),
-    group_by: [],
-    having: None,
-    order: [],
-    offset: None,
-    limit: None,
-}
-
-Plan: Plan(
-    Filter {
-        source: Scan {
-            table: "movies",
-            alias: None,
-            filter: None,
-        },
-        predicate: Constant(
-            Integer(
-                7,
-            ),
-        ),
-    },
-)
-
-Optimized plan: Plan(
-    Scan {
-        table: "movies",
-        alias: None,
-        filter: Some(
-            Constant(
-                Integer(
-                    7,
-                ),
-            ),
-        ),
-    },
-)
-
-Query: SELECT * FROM movies WHERE 7
-
 Explain:
 Scan: movies (7)
 
-Result: Value("Filter returned 7, expected boolean")
+ Value("Filter returned 7, expected boolean")

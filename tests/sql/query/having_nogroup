@@ -1,5 +1,18 @@
 Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
 
+Explain:
+Projection: #0, #1
+└─ Order: movies.id asc
+   └─ Filter: movies.rating > 8
+      └─ Projection: id, rating, rating
+         └─ Scan: movies
+
+Result: ["id", "rating"]
+[Integer(1), Float(8.2)]
+[Integer(4), Float(8.2)]
+[Integer(6), Float(8.1)]
+[Integer(10), Float(8.8)]
+
 AST: Select {
     select: [
         (
@@ -261,17 +274,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT id, rating FROM movies HAVING rating > 8 ORDER BY id
-
-Explain:
-Projection: #0, #1
-└─ Order: movies.id asc
-   └─ Filter: movies.rating > 8
-      └─ Projection: id, rating, rating
-         └─ Scan: movies
-
-Result: ["id", "rating"]
-[Integer(1), Float(8.2)]
-[Integer(4), Float(8.2)]
-[Integer(6), Float(8.1)]
-[Integer(10), Float(8.8)]

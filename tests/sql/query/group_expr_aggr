@@ -1,5 +1,18 @@
 Query: SELECT studio_id, SUM(rating * 10) / COUNT(*) FROM movies GROUP BY studio_id ORDER BY studio_id
 
+Explain:
+Order: movies.studio_id asc
+└─ Projection: movies.studio_id, #0 / #1
+   └─ Aggregation: sum, count
+      └─ Projection: rating * 10, TRUE, studio_id
+         └─ Scan: movies
+
+Result: ["studio_id", "?"]
+[Integer(1), Float(81.5)]
+[Integer(2), Float(75.0)]
+[Integer(3), Float(69.0)]
+[Integer(4), Float(79.2)]
+
 AST: Select {
     select: [
         (
@@ -284,17 +297,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT studio_id, SUM(rating * 10) / COUNT(*) FROM movies GROUP BY studio_id ORDER BY studio_id
-
-Explain:
-Order: movies.studio_id asc
-└─ Projection: movies.studio_id, #0 / #1
-   └─ Aggregation: sum, count
-      └─ Projection: rating * 10, TRUE, studio_id
-         └─ Scan: movies
-
-Result: ["studio_id", "?"]
-[Integer(1), Float(81.5)]
-[Integer(2), Float(75.0)]
-[Integer(3), Float(69.0)]
-[Integer(4), Float(79.2)]

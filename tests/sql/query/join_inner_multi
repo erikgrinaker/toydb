@@ -4,6 +4,26 @@ Query:
             INNER JOIN genres ON movies.genre_id = genres.id
             INNER JOIN studios ON movies.studio_id = studios.id
 
+Explain:
+Projection: movies.title, genres.name, studios.name
+└─ HashJoin: inner on movies.studio_id = studios.id
+   ├─ HashJoin: inner on movies.genre_id = genres.id
+   │  ├─ Scan: movies
+   │  └─ Scan: genres
+   └─ Scan: studios
+
+Result: ["title", "genre", "studio"]
+[String("Stalker"), String("Science Fiction"), String("Mosfilm")]
+[String("Sicario"), String("Action"), String("Lionsgate")]
+[String("Primer"), String("Science Fiction"), String("StudioCanal")]
+[String("Heat"), String("Action"), String("Warner Bros")]
+[String("The Fountain"), String("Science Fiction"), String("Warner Bros")]
+[String("Solaris"), String("Science Fiction"), String("Mosfilm")]
+[String("Gravity"), String("Science Fiction"), String("Warner Bros")]
+[String("Blindspotting"), String("Comedy"), String("Lionsgate")]
+[String("Birdman"), String("Comedy"), String("Warner Bros")]
+[String("Inception"), String("Science Fiction"), String("Warner Bros")]
+
 AST: Select {
     select: [
         (
@@ -348,28 +368,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: 
-        SELECT movies.title, genres.name AS genre, studios.name AS studio
-        FROM movies
-            INNER JOIN genres ON movies.genre_id = genres.id
-            INNER JOIN studios ON movies.studio_id = studios.id
-
-Explain:
-Projection: movies.title, genres.name, studios.name
-└─ HashJoin: inner on movies.studio_id = studios.id
-   ├─ HashJoin: inner on movies.genre_id = genres.id
-   │  ├─ Scan: movies
-   │  └─ Scan: genres
-   └─ Scan: studios
-
-Result: ["title", "genre", "studio"]
-[String("Stalker"), String("Science Fiction"), String("Mosfilm")]
-[String("Sicario"), String("Action"), String("Lionsgate")]
-[String("Primer"), String("Science Fiction"), String("StudioCanal")]
-[String("Heat"), String("Action"), String("Warner Bros")]
-[String("The Fountain"), String("Science Fiction"), String("Warner Bros")]
-[String("Solaris"), String("Science Fiction"), String("Mosfilm")]
-[String("Gravity"), String("Science Fiction"), String("Warner Bros")]
-[String("Blindspotting"), String("Comedy"), String("Lionsgate")]
-[String("Birdman"), String("Comedy"), String("Warner Bros")]
-[String("Inception"), String("Science Fiction"), String("Warner Bros")]

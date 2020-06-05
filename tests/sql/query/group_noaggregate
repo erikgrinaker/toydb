@@ -1,5 +1,24 @@
 Query: SELECT title FROM movies GROUP BY title ORDER BY title ASC
 
+Explain:
+Order: movies.title asc
+└─ Projection: movies.title
+   └─ Aggregation: 
+      └─ Projection: title
+         └─ Scan: movies
+
+Result: ["title"]
+[String("Birdman")]
+[String("Blindspotting")]
+[String("Gravity")]
+[String("Heat")]
+[String("Inception")]
+[String("Primer")]
+[String("Sicario")]
+[String("Solaris")]
+[String("Stalker")]
+[String("The Fountain")]
+
 AST: Select {
     select: [
         (
@@ -163,23 +182,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT title FROM movies GROUP BY title ORDER BY title ASC
-
-Explain:
-Order: movies.title asc
-└─ Projection: movies.title
-   └─ Aggregation: 
-      └─ Projection: title
-         └─ Scan: movies
-
-Result: ["title"]
-[String("Birdman")]
-[String("Blindspotting")]
-[String("Gravity")]
-[String("Heat")]
-[String("Inception")]
-[String("Primer")]
-[String("Sicario")]
-[String("Solaris")]
-[String("Stalker")]
-[String("The Fountain")]

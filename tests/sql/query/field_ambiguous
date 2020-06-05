@@ -1,5 +1,7 @@
 Query: SELECT id FROM movies, genres
 
+Error: Ambiguous field id
+
 AST: Select {
     select: [
         (

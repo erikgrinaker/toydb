@@ -1,5 +1,19 @@
 Query: SELECT * FROM strings ORDER BY value DESC
 
+Explain:
+Order: value desc
+└─ Scan: strings
+
+Result: ["id", "value"]
+[Integer(7), String("åa")]
+[Integer(8), String("Åa")]
+[Integer(2), String("ab")]
+[Integer(3), String("aaa")]
+[Integer(6), String("aA")]
+[Integer(1), String("a")]
+[Integer(4), String("A")]
+[Integer(5), Null]
+
 AST: Select {
     select: [],
     from: [
@@ -72,18 +86,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM strings ORDER BY value DESC
-
-Explain:
-Order: value desc
-└─ Scan: strings
-
-Result: ["id", "value"]
-[Integer(7), String("åa")]
-[Integer(8), String("Åa")]
-[Integer(2), String("ab")]
-[Integer(3), String("aaa")]
-[Integer(6), String("aA")]
-[Integer(1), String("a")]
-[Integer(4), String("A")]
-[Integer(5), Null]

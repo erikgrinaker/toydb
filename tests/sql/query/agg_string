@@ -1,5 +1,14 @@
 Query: SELECT MIN(s), MAX(s), SUM(s), COUNT(s), AVG(s) FROM strings WHERE s IS NOT NULL
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: s, s, s, s, s
+      └─ Scan: strings (NOT s IS NULL)
+
+Result: ["?", "?", "?", "?", "?"]
+[String("A"), String("åa"), Null, Integer(7), Null]
+
 AST: Select {
     select: [
         (
@@ -359,13 +368,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT MIN(s), MAX(s), SUM(s), COUNT(s), AVG(s) FROM strings WHERE s IS NOT NULL
-
-Explain:
-Projection: #0, #1, #2, #3, #4
-└─ Aggregation: minimum, maximum, sum, count, average
-   └─ Projection: s, s, s, s, s
-      └─ Scan: strings (NOT s IS NULL)
-
-Result: ["?", "?", "?", "?", "?"]
-[String("A"), String("åa"), Null, Integer(7), Null]

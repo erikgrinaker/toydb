@@ -1,5 +1,23 @@
 Query: SELECT * FROM genres g RIGHT JOIN movies m ON m.id = g.id
 
+Explain:
+Projection: g.id, g.name, m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd
+└─ HashJoin: outer on m.id = g.id
+   ├─ Scan: movies as m
+   └─ Scan: genres as g
+
+Result: ["id", "name", "id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(1), String("Science Fiction"), Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null]
+[Integer(2), String("Action"), Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Comedy"), Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]
+[Null, Null, Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Null, Null, Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false)]
+[Null, Null, Integer(6), String("Solaris"), Integer(1), Integer(1), Integer(1972), Float(8.1), Null]
+[Null, Null, Integer(7), String("Gravity"), Integer(4), Integer(1), Integer(2013), Float(7.7), Boolean(true)]
+[Null, Null, Integer(8), String("Blindspotting"), Integer(2), Integer(3), Integer(2018), Float(7.4), Boolean(true)]
+[Null, Null, Integer(9), String("Birdman"), Integer(4), Integer(3), Integer(2014), Float(7.7), Boolean(true)]
+[Null, Null, Integer(10), String("Inception"), Integer(4), Integer(1), Integer(2010), Float(8.8), Boolean(true)]
+
 AST: Select {
     select: [],
     from: [
@@ -394,22 +412,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM genres g RIGHT JOIN movies m ON m.id = g.id
-
-Explain:
-Projection: g.id, g.name, m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd
-└─ HashJoin: outer on m.id = g.id
-   ├─ Scan: movies as m
-   └─ Scan: genres as g
-
-Result: ["id", "name", "id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
-[Integer(1), String("Science Fiction"), Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null]
-[Integer(2), String("Action"), Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
-[Integer(3), String("Comedy"), Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]
-[Null, Null, Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
-[Null, Null, Integer(5), String("The Fountain"), Integer(4), Integer(1), Integer(2006), Float(7.2), Boolean(false)]
-[Null, Null, Integer(6), String("Solaris"), Integer(1), Integer(1), Integer(1972), Float(8.1), Null]
-[Null, Null, Integer(7), String("Gravity"), Integer(4), Integer(1), Integer(2013), Float(7.7), Boolean(true)]
-[Null, Null, Integer(8), String("Blindspotting"), Integer(2), Integer(3), Integer(2018), Float(7.4), Boolean(true)]
-[Null, Null, Integer(9), String("Birdman"), Integer(4), Integer(3), Integer(2014), Float(7.7), Boolean(true)]
-[Null, Null, Integer(10), String("Inception"), Integer(4), Integer(1), Integer(2010), Float(8.8), Boolean(true)]

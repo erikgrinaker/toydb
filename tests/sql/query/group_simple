@@ -1,5 +1,18 @@
 Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY studio_id
 
+Explain:
+Order: movies.studio_id asc
+└─ Projection: movies.studio_id, #0
+   └─ Aggregation: maximum
+      └─ Projection: rating, studio_id
+         └─ Scan: movies
+
+Result: ["studio_id", "?"]
+[Integer(1), Float(8.2)]
+[Integer(2), Float(7.6)]
+[Integer(3), Float(6.9)]
+[Integer(4), Float(8.8)]
+
 AST: Select {
     select: [
         (
@@ -217,17 +230,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY studio_id
-
-Explain:
-Order: movies.studio_id asc
-└─ Projection: movies.studio_id, #0
-   └─ Aggregation: maximum
-      └─ Projection: rating, studio_id
-         └─ Scan: movies
-
-Result: ["studio_id", "?"]
-[Integer(1), Float(8.2)]
-[Integer(2), Float(7.6)]
-[Integer(3), Float(6.9)]
-[Integer(4), Float(8.8)]

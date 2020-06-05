@@ -1,5 +1,7 @@
 Query: SELECT 2020 - year AS age FROM movies
 
+Error: Unknown field year
+
 AST: Select {
     select: [
         (

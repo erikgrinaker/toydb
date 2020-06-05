@@ -1,5 +1,25 @@
 Query: SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title
 
+Explain:
+Projection: #0, #1, #2
+└─ Order: genres.name asc, movies.title asc
+   └─ Projection: movies.id, title, name, genres.name, movies.title
+      └─ HashJoin: inner on movies.genre_id = genres.id
+         ├─ Scan: movies
+         └─ Scan: genres
+
+Result: ["id", "title", "name"]
+[Integer(4), String("Heat"), String("Action")]
+[Integer(2), String("Sicario"), String("Action")]
+[Integer(9), String("Birdman"), String("Comedy")]
+[Integer(8), String("Blindspotting"), String("Comedy")]
+[Integer(7), String("Gravity"), String("Science Fiction")]
+[Integer(10), String("Inception"), String("Science Fiction")]
+[Integer(3), String("Primer"), String("Science Fiction")]
+[Integer(6), String("Solaris"), String("Science Fiction")]
+[Integer(1), String("Stalker"), String("Science Fiction")]
+[Integer(5), String("The Fountain"), String("Science Fiction")]
+
 AST: Select {
     select: [
         (
@@ -416,24 +436,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title
-
-Explain:
-Projection: #0, #1, #2
-└─ Order: genres.name asc, movies.title asc
-   └─ Projection: movies.id, title, name, genres.name, movies.title
-      └─ HashJoin: inner on movies.genre_id = genres.id
-         ├─ Scan: movies
-         └─ Scan: genres
-
-Result: ["id", "title", "name"]
-[Integer(4), String("Heat"), String("Action")]
-[Integer(2), String("Sicario"), String("Action")]
-[Integer(9), String("Birdman"), String("Comedy")]
-[Integer(8), String("Blindspotting"), String("Comedy")]
-[Integer(7), String("Gravity"), String("Science Fiction")]
-[Integer(10), String("Inception"), String("Science Fiction")]
-[Integer(3), String("Primer"), String("Science Fiction")]
-[Integer(6), String("Solaris"), String("Science Fiction")]
-[Integer(1), String("Stalker"), String("Science Fiction")]
-[Integer(5), String("The Fountain"), String("Science Fiction")]

@@ -1,5 +1,15 @@
 Query: SELECT * FROM movies WHERE genre_id = 2 OR genre_id = 3 OR genre_id = 4 OR genre_id = 5 ORDER BY id
 
+Explain:
+Order: id asc
+└─ IndexLookup: movies column genre_id (2, 3, 4, 5)
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
+[Integer(8), String("Blindspotting"), Integer(2), Integer(3), Integer(2018), Float(7.4), Boolean(true)]
+[Integer(9), String("Birdman"), Integer(4), Integer(3), Integer(2014), Float(7.7), Boolean(true)]
+
 AST: Select {
     select: [],
     from: [
@@ -223,14 +233,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM movies WHERE genre_id = 2 OR genre_id = 3 OR genre_id = 4 OR genre_id = 5 ORDER BY id
-
-Explain:
-Order: id asc
-└─ IndexLookup: movies column genre_id (2, 3, 4, 5)
-
-Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
-[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
-[Integer(4), String("Heat"), Integer(4), Integer(2), Integer(1995), Float(8.2), Boolean(true)]
-[Integer(8), String("Blindspotting"), Integer(2), Integer(3), Integer(2018), Float(7.4), Boolean(true)]
-[Integer(9), String("Birdman"), Integer(4), Integer(3), Integer(2014), Float(7.7), Boolean(true)]

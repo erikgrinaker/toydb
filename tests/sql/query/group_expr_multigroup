@@ -1,5 +1,21 @@
 Query: SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi
 
+Explain:
+Order: rating asc, multi asc
+└─ Projection: studio_id + genre_id, #0
+   └─ Aggregation: maximum
+      └─ Projection: rating, studio_id, genre_id
+         └─ Scan: movies
+
+Result: ["multi", "rating"]
+[Integer(4), Float(6.9)]
+[Integer(5), Float(7.4)]
+[Integer(4), Float(7.6)]
+[Integer(7), Float(7.7)]
+[Integer(2), Float(8.2)]
+[Integer(6), Float(8.2)]
+[Integer(5), Float(8.8)]
+
 AST: Select {
     select: [
         (
@@ -310,20 +326,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies GROUP BY studio_id, genre_id ORDER BY rating, multi
-
-Explain:
-Order: rating asc, multi asc
-└─ Projection: studio_id + genre_id, #0
-   └─ Aggregation: maximum
-      └─ Projection: rating, studio_id, genre_id
-         └─ Scan: movies
-
-Result: ["multi", "rating"]
-[Integer(4), Float(6.9)]
-[Integer(5), Float(7.4)]
-[Integer(4), Float(7.6)]
-[Integer(7), Float(7.7)]
-[Integer(2), Float(8.2)]
-[Integer(6), Float(8.2)]
-[Integer(5), Float(8.8)]

@@ -5,6 +5,21 @@ Query:
             INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
         ORDER BY m.title
 
+Explain:
+Order: m.title asc
+└─ Projection: m.title, g.name, s.name
+   └─ HashJoin: inner on m.studio_id = s.id
+      ├─ HashJoin: inner on m.genre_id = g.id
+      │  ├─ Filter: m.genre_id = 1
+      │  │  └─ IndexLookup: movies as m column studio_id (4)
+      │  └─ KeyLookup: genres as g (1)
+      └─ KeyLookup: studios as s (4)
+
+Result: ["title", "genre", "studio"]
+[String("Gravity"), String("Science Fiction"), String("Warner Bros")]
+[String("Inception"), String("Science Fiction"), String("Warner Bros")]
+[String("The Fountain"), String("Science Fiction"), String("Warner Bros")]
+
 AST: Select {
     select: [
         (
@@ -524,24 +539,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: 
-        SELECT m.title, g.name AS genre, s.name AS studio
-        FROM movies m
-            INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
-            INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
-        ORDER BY m.title
-
-Explain:
-Order: m.title asc
-└─ Projection: m.title, g.name, s.name
-   └─ HashJoin: inner on m.studio_id = s.id
-      ├─ HashJoin: inner on m.genre_id = g.id
-      │  ├─ Filter: m.genre_id = 1
-      │  │  └─ IndexLookup: movies as m column studio_id (4)
-      │  └─ KeyLookup: genres as g (1)
-      └─ KeyLookup: studios as s (4)
-
-Result: ["title", "genre", "studio"]
-[String("Gravity"), String("Science Fiction"), String("Warner Bros")]
-[String("Inception"), String("Science Fiction"), String("Warner Bros")]
-[String("The Fountain"), String("Science Fiction"), String("Warner Bros")]

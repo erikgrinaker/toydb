@@ -1,5 +1,14 @@
 Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: b, b, b, b, b
+      └─ Scan: booleans
+
+Result: ["?", "?", "?", "?", "?"]
+[Null, Null, Null, Integer(2), Null]
+
 AST: Select {
     select: [
         (
@@ -317,13 +326,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans
-
-Explain:
-Projection: #0, #1, #2, #3, #4
-└─ Aggregation: minimum, maximum, sum, count, average
-   └─ Projection: b, b, b, b, b
-      └─ Scan: booleans
-
-Result: ["?", "?", "?", "?", "?"]
-[Null, Null, Null, Integer(2), Null]

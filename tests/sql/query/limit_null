@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies LIMIT NULL
 
+Error: Invalid limit NULL
+
 AST: Select {
     select: [],
     from: [

@@ -4,6 +4,32 @@ Query:
         WHERE m.id >= 3 AND g.id = 2 AND c.id != 'us'
     
 
+Explain:
+Projection: m.id, m.title, g.id, g.name, c.id, c.name
+└─ NestedLoopJoin: inner
+   ├─ NestedLoopJoin: inner
+   │  ├─ Scan: movies as m (m.id > 3 OR m.id = 3)
+   │  └─ KeyLookup: genres as g (2)
+   └─ Scan: countries as c (NOT c.id = us)
+
+Result: ["id", "title", "id", "name", "id", "name"]
+[Integer(3), String("Primer"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(3), String("Primer"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(4), String("Heat"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(4), String("Heat"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(5), String("The Fountain"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(5), String("The Fountain"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(6), String("Solaris"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(6), String("Solaris"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(7), String("Gravity"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(7), String("Gravity"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(8), String("Blindspotting"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(8), String("Blindspotting"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(9), String("Birdman"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(9), String("Birdman"), Integer(2), String("Action"), String("ru"), String("Russia")]
+[Integer(10), String("Inception"), Integer(2), String("Action"), String("fr"), String("France")]
+[Integer(10), String("Inception"), Integer(2), String("Action"), String("ru"), String("Russia")]
+
 AST: Select {
     select: [
         (
@@ -541,34 +567,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: 
-        SELECT m.id, m.title, g.id, g.name, c.id, c.name
-        FROM movies AS m CROSS JOIN genres g CROSS JOIN countries c
-        WHERE m.id >= 3 AND g.id = 2 AND c.id != 'us'
-    
-
-Explain:
-Projection: m.id, m.title, g.id, g.name, c.id, c.name
-└─ NestedLoopJoin: inner
-   ├─ NestedLoopJoin: inner
-   │  ├─ Scan: movies as m (m.id > 3 OR m.id = 3)
-   │  └─ KeyLookup: genres as g (2)
-   └─ Scan: countries as c (NOT c.id = us)
-
-Result: ["id", "title", "id", "name", "id", "name"]
-[Integer(3), String("Primer"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(3), String("Primer"), Integer(2), String("Action"), String("ru"), String("Russia")]
-[Integer(4), String("Heat"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(4), String("Heat"), Integer(2), String("Action"), String("ru"), String("Russia")]
-[Integer(5), String("The Fountain"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(5), String("The Fountain"), Integer(2), String("Action"), String("ru"), String("Russia")]
-[Integer(6), String("Solaris"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(6), String("Solaris"), Integer(2), String("Action"), String("ru"), String("Russia")]
-[Integer(7), String("Gravity"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(7), String("Gravity"), Integer(2), String("Action"), String("ru"), String("Russia")]
-[Integer(8), String("Blindspotting"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(8), String("Blindspotting"), Integer(2), String("Action"), String("ru"), String("Russia")]
-[Integer(9), String("Birdman"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(9), String("Birdman"), Integer(2), String("Action"), String("ru"), String("Russia")]
-[Integer(10), String("Inception"), Integer(2), String("Action"), String("fr"), String("France")]
-[Integer(10), String("Inception"), Integer(2), String("Action"), String("ru"), String("Russia")]

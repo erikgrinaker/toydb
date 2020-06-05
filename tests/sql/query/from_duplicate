@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies, movies
 
+Error: Duplicate table name movies
+
 AST: Select {
     select: [],
     from: [

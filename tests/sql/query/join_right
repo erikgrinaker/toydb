@@ -1,5 +1,24 @@
 Query: SELECT g.id AS genre_id, m.id AS movie_id FROM genres g RIGHT JOIN movies m ON m.id = g.id
 
+Explain:
+Projection: g.id, m.id
+└─ Projection: g.id, g.name, m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd
+   └─ HashJoin: outer on m.id = g.id
+      ├─ Scan: movies as m
+      └─ Scan: genres as g
+
+Result: ["genre_id", "movie_id"]
+[Integer(1), Integer(1)]
+[Integer(2), Integer(2)]
+[Integer(3), Integer(3)]
+[Null, Integer(4)]
+[Null, Integer(5)]
+[Null, Integer(6)]
+[Null, Integer(7)]
+[Null, Integer(8)]
+[Null, Integer(9)]
+[Null, Integer(10)]
+
 AST: Select {
     select: [
         (
@@ -489,23 +508,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT g.id AS genre_id, m.id AS movie_id FROM genres g RIGHT JOIN movies m ON m.id = g.id
-
-Explain:
-Projection: g.id, m.id
-└─ Projection: g.id, g.name, m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd
-   └─ HashJoin: outer on m.id = g.id
-      ├─ Scan: movies as m
-      └─ Scan: genres as g
-
-Result: ["genre_id", "movie_id"]
-[Integer(1), Integer(1)]
-[Integer(2), Integer(2)]
-[Integer(3), Integer(3)]
-[Null, Integer(4)]
-[Null, Integer(5)]
-[Null, Integer(6)]
-[Null, Integer(7)]
-[Null, Integer(8)]
-[Null, Integer(9)]
-[Null, Integer(10)]

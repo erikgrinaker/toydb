@@ -1,5 +1,7 @@
 Query: SELECT movies.id, genres.id FROM movies, genres WHERE id >= 3
 
+Error: Ambiguous field id
+
 AST: Select {
     select: [
         (

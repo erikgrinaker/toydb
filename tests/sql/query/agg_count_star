@@ -1,5 +1,14 @@
 Query: SELECT COUNT(*) FROM movies
 
+Explain:
+Projection: #0
+└─ Aggregation: count
+   └─ Projection: TRUE
+      └─ Scan: movies
+
+Result: ["?"]
+[Integer(10)]
+
 AST: Select {
     select: [
         (
@@ -102,13 +111,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT COUNT(*) FROM movies
-
-Explain:
-Projection: #0
-└─ Aggregation: count
-   └─ Projection: TRUE
-      └─ Scan: movies
-
-Result: ["?"]
-[Integer(10)]

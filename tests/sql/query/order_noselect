@@ -1,5 +1,23 @@
 Query: SELECT id, title FROM movies ORDER BY released
 
+Explain:
+Projection: #0, #1
+└─ Order: movies.released asc
+   └─ Projection: id, title, released
+      └─ Scan: movies
+
+Result: ["id", "title"]
+[Integer(6), String("Solaris")]
+[Integer(1), String("Stalker")]
+[Integer(4), String("Heat")]
+[Integer(3), String("Primer")]
+[Integer(5), String("The Fountain")]
+[Integer(10), String("Inception")]
+[Integer(7), String("Gravity")]
+[Integer(9), String("Birdman")]
+[Integer(2), String("Sicario")]
+[Integer(8), String("Blindspotting")]
+
 AST: Select {
     select: [
         (
@@ -207,22 +225,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT id, title FROM movies ORDER BY released
-
-Explain:
-Projection: #0, #1
-└─ Order: movies.released asc
-   └─ Projection: id, title, released
-      └─ Scan: movies
-
-Result: ["id", "title"]
-[Integer(6), String("Solaris")]
-[Integer(1), String("Stalker")]
-[Integer(4), String("Heat")]
-[Integer(3), String("Primer")]
-[Integer(5), String("The Fountain")]
-[Integer(10), String("Inception")]
-[Integer(7), String("Gravity")]
-[Integer(9), String("Birdman")]
-[Integer(2), String("Sicario")]
-[Integer(8), String("Blindspotting")]

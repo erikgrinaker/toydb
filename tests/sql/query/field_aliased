@@ -1,5 +1,43 @@
 Query: SELECT m.id, g.id FROM movies AS m, genres g
 
+Explain:
+Projection: m.id, g.id
+└─ NestedLoopJoin: inner
+   ├─ Scan: movies as m
+   └─ Scan: genres as g
+
+Result: ["id", "id"]
+[Integer(1), Integer(1)]
+[Integer(1), Integer(2)]
+[Integer(1), Integer(3)]
+[Integer(2), Integer(1)]
+[Integer(2), Integer(2)]
+[Integer(2), Integer(3)]
+[Integer(3), Integer(1)]
+[Integer(3), Integer(2)]
+[Integer(3), Integer(3)]
+[Integer(4), Integer(1)]
+[Integer(4), Integer(2)]
+[Integer(4), Integer(3)]
+[Integer(5), Integer(1)]
+[Integer(5), Integer(2)]
+[Integer(5), Integer(3)]
+[Integer(6), Integer(1)]
+[Integer(6), Integer(2)]
+[Integer(6), Integer(3)]
+[Integer(7), Integer(1)]
+[Integer(7), Integer(2)]
+[Integer(7), Integer(3)]
+[Integer(8), Integer(1)]
+[Integer(8), Integer(2)]
+[Integer(8), Integer(3)]
+[Integer(9), Integer(1)]
+[Integer(9), Integer(2)]
+[Integer(9), Integer(3)]
+[Integer(10), Integer(1)]
+[Integer(10), Integer(2)]
+[Integer(10), Integer(3)]
+
 AST: Select {
     select: [
         (
@@ -151,42 +189,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT m.id, g.id FROM movies AS m, genres g
-
-Explain:
-Projection: m.id, g.id
-└─ NestedLoopJoin: inner
-   ├─ Scan: movies as m
-   └─ Scan: genres as g
-
-Result: ["id", "id"]
-[Integer(1), Integer(1)]
-[Integer(1), Integer(2)]
-[Integer(1), Integer(3)]
-[Integer(2), Integer(1)]
-[Integer(2), Integer(2)]
-[Integer(2), Integer(3)]
-[Integer(3), Integer(1)]
-[Integer(3), Integer(2)]
-[Integer(3), Integer(3)]
-[Integer(4), Integer(1)]
-[Integer(4), Integer(2)]
-[Integer(4), Integer(3)]
-[Integer(5), Integer(1)]
-[Integer(5), Integer(2)]
-[Integer(5), Integer(3)]
-[Integer(6), Integer(1)]
-[Integer(6), Integer(2)]
-[Integer(6), Integer(3)]
-[Integer(7), Integer(1)]
-[Integer(7), Integer(2)]
-[Integer(7), Integer(3)]
-[Integer(8), Integer(1)]
-[Integer(8), Integer(2)]
-[Integer(8), Integer(3)]
-[Integer(9), Integer(1)]
-[Integer(9), Integer(2)]
-[Integer(9), Integer(3)]
-[Integer(10), Integer(1)]
-[Integer(10), Integer(2)]
-[Integer(10), Integer(3)]

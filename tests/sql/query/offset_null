@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies OFFSET NULL
 
+Error: Invalid offset NULL
+
 AST: Select {
     select: [],
     from: [

@@ -1,87 +1,5 @@
 Query: SELECT * FROM movies, genres, countries
 
-AST: Select {
-    select: [],
-    from: [
-        Table {
-            name: "movies",
-            alias: None,
-        },
-        Table {
-            name: "genres",
-            alias: None,
-        },
-        Table {
-            name: "countries",
-            alias: None,
-        },
-    ],
-    where: None,
-    group_by: [],
-    having: None,
-    order: [],
-    offset: None,
-    limit: None,
-}
-
-Plan: Plan(
-    NestedLoopJoin {
-        left: NestedLoopJoin {
-            left: Scan {
-                table: "movies",
-                alias: None,
-                filter: None,
-            },
-            left_size: 7,
-            right: Scan {
-                table: "genres",
-                alias: None,
-                filter: None,
-            },
-            predicate: None,
-            outer: false,
-        },
-        left_size: 9,
-        right: Scan {
-            table: "countries",
-            alias: None,
-            filter: None,
-        },
-        predicate: None,
-        outer: false,
-    },
-)
-
-Optimized plan: Plan(
-    NestedLoopJoin {
-        left: NestedLoopJoin {
-            left: Scan {
-                table: "movies",
-                alias: None,
-                filter: None,
-            },
-            left_size: 7,
-            right: Scan {
-                table: "genres",
-                alias: None,
-                filter: None,
-            },
-            predicate: None,
-            outer: false,
-        },
-        left_size: 9,
-        right: Scan {
-            table: "countries",
-            alias: None,
-            filter: None,
-        },
-        predicate: None,
-        outer: false,
-    },
-)
-
-Query: SELECT * FROM movies, genres, countries
-
 Explain:
 NestedLoopJoin: inner
 ├─ NestedLoopJoin: inner
@@ -180,3 +98,84 @@ Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"
 [Integer(10), String("Inception"), Integer(4), Integer(1), Integer(2010), Float(8.8), Boolean(true), Integer(3), String("Comedy"), String("fr"), String("France")]
 [Integer(10), String("Inception"), Integer(4), Integer(1), Integer(2010), Float(8.8), Boolean(true), Integer(3), String("Comedy"), String("ru"), String("Russia")]
 [Integer(10), String("Inception"), Integer(4), Integer(1), Integer(2010), Float(8.8), Boolean(true), Integer(3), String("Comedy"), String("us"), String("United States of America")]
+
+AST: Select {
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+        Table {
+            name: "genres",
+            alias: None,
+        },
+        Table {
+            name: "countries",
+            alias: None,
+        },
+    ],
+    where: None,
+    group_by: [],
+    having: None,
+    order: [],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    NestedLoopJoin {
+        left: NestedLoopJoin {
+            left: Scan {
+                table: "movies",
+                alias: None,
+                filter: None,
+            },
+            left_size: 7,
+            right: Scan {
+                table: "genres",
+                alias: None,
+                filter: None,
+            },
+            predicate: None,
+            outer: false,
+        },
+        left_size: 9,
+        right: Scan {
+            table: "countries",
+            alias: None,
+            filter: None,
+        },
+        predicate: None,
+        outer: false,
+    },
+)
+
+Optimized plan: Plan(
+    NestedLoopJoin {
+        left: NestedLoopJoin {
+            left: Scan {
+                table: "movies",
+                alias: None,
+                filter: None,
+            },
+            left_size: 7,
+            right: Scan {
+                table: "genres",
+                alias: None,
+                filter: None,
+            },
+            predicate: None,
+            outer: false,
+        },
+        left_size: 9,
+        right: Scan {
+            table: "countries",
+            alias: None,
+            filter: None,
+        },
+        predicate: None,
+        outer: false,
+    },
+)
+

@@ -1,5 +1,13 @@
 Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE GROUP BY id
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: id, id, id, id, id, id
+      └─ Scan: movies (FALSE)
+
+Result: ["?", "?", "?", "?", "?"]
+
 AST: Select {
     select: [
         (
@@ -365,12 +373,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT MIN(id), MAX(id), SUM(id), COUNT(id), AVG(id) FROM movies WHERE FALSE GROUP BY id
-
-Explain:
-Projection: #0, #1, #2, #3, #4
-└─ Aggregation: minimum, maximum, sum, count, average
-   └─ Projection: id, id, id, id, id, id
-      └─ Scan: movies (FALSE)
-
-Result: ["?", "?", "?", "?", "?"]

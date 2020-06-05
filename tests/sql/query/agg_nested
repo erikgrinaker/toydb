@@ -1,5 +1,7 @@
 Query: SELECT MAX(MIN(rating)) FROM movies
 
+Error: Aggregate functions can't be nested
+
 AST: Select {
     select: [
         (

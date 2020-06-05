@@ -1,5 +1,7 @@
 Query: SELECT unknown.id FROM movies
 
+Error: Unknown table unknown
+
 AST: Select {
     select: [
         (

@@ -1,5 +1,11 @@
 Query: SELECT * FROM movies OFFSET 9223372036854775807
 
+Explain:
+Offset: 9223372036854775807
+└─ Scan: movies
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+
 AST: Select {
     select: [],
     from: [
@@ -44,10 +50,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM movies OFFSET 9223372036854775807
-
-Explain:
-Offset: 9223372036854775807
-└─ Scan: movies
-
-Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]

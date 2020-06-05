@@ -1,5 +1,21 @@
 Query: SELECT 1 + 2 * 3, 2020 - released AS age FROM movies
 
+Explain:
+Projection: 7, 2020 - released
+└─ Scan: movies
+
+Result: ["?", "age"]
+[Integer(7), Integer(41)]
+[Integer(7), Integer(5)]
+[Integer(7), Integer(16)]
+[Integer(7), Integer(25)]
+[Integer(7), Integer(14)]
+[Integer(7), Integer(48)]
+[Integer(7), Integer(7)]
+[Integer(7), Integer(2)]
+[Integer(7), Integer(6)]
+[Integer(7), Integer(10)]
+
 AST: Select {
     select: [
         (
@@ -157,20 +173,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT 1 + 2 * 3, 2020 - released AS age FROM movies
-
-Explain:
-Projection: 7, 2020 - released
-└─ Scan: movies
-
-Result: ["?", "age"]
-[Integer(7), Integer(41)]
-[Integer(7), Integer(5)]
-[Integer(7), Integer(16)]
-[Integer(7), Integer(25)]
-[Integer(7), Integer(14)]
-[Integer(7), Integer(48)]
-[Integer(7), Integer(7)]
-[Integer(7), Integer(2)]
-[Integer(7), Integer(6)]
-[Integer(7), Integer(10)]

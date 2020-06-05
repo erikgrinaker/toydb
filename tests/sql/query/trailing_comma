@@ -1,3 +1,5 @@
 Query: SELECT 1,
 
+Error: Unexpected end of input
+
 AST: Parse("Unexpected end of input")

@@ -1,5 +1,7 @@
 Query: SELECT studio_id, SUM(rating * 10) / COUNT(*) + id FROM movies GROUP BY studio_id ORDER BY studio_id
 
+Error: Unknown field id
+
 AST: Select {
     select: [
         (

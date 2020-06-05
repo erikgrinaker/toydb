@@ -1,5 +1,16 @@
 Query: SELECT * FROM integers ORDER BY value ASC
 
+Explain:
+Order: value asc
+└─ Scan: integers
+
+Result: ["id", "value"]
+[Integer(2), Null]
+[Integer(3), Integer(-3)]
+[Integer(5), Integer(0)]
+[Integer(4), Integer(3)]
+[Integer(1), Integer(7)]
+
 AST: Select {
     select: [],
     from: [
@@ -72,15 +83,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM integers ORDER BY value ASC
-
-Explain:
-Order: value asc
-└─ Scan: integers
-
-Result: ["id", "value"]
-[Integer(2), Null]
-[Integer(3), Integer(-3)]
-[Integer(5), Integer(0)]
-[Integer(4), Integer(3)]
-[Integer(1), Integer(7)]

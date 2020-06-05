@@ -76,6 +76,47 @@ macro_rules! test_query {
 
             write!(f, "Query: {}\n\n", $query)?;
 
+            let mut txn = engine.begin(Mode::ReadWrite)?;
+
+            // First, just try to generate a plan and execute it
+            let result = Parser::new($query).parse()
+                .and_then(|ast| Plan::build(ast, &mut txn))
+                .and_then(|plan| plan.optimize(&mut txn))
+                .and_then(|plan| {
+                    write!(f, "Explain:\n{}\n\n", plan)?;
+                    plan.execute(&mut txn)
+                });
+
+            match result {
+                Ok(ResultSet::Query{columns, rows}) => {
+                    let rows: Vec<Row> = match rows.collect() {
+                        Ok(rows) => rows,
+                        Err(err) => {
+                            write!(f, " {:?}", err)?;
+                            return Ok(())
+                        }
+                    };
+                    write!(f, "Result:")?;
+                    if !columns.is_empty() || !rows.is_empty() {
+                        write!(f, " {:?}\n", columns
+                            .into_iter()
+                            .map(|c| c.name.unwrap_or_else(|| "?".to_string()))
+                            .collect::<Vec<_>>())?;
+                        for row in rows {
+                            write!(f, "{:?}\n", row)?;
+                        }
+                    } else {
+                        write!(f, " <none>\n")?;
+                    }
+                }
+                Ok(r) => return Err(Error::Internal(format!("Unexpected result {:?}\n", r))),
+                Err(err) => {
+                    write!(f, "Error: {}\n", err)?;
+                }
+            }
+            write!(f, "\n")?;
+
+            // Then output some parse and plan trees, for debugging.
             write!(f, "AST: ")?;
             let ast = match Parser::new($query).parse() {
                 Ok(ast) => ast,
@@ -85,8 +126,6 @@ macro_rules! test_query {
                 }
             };
             write!(f, "{:#?}\n\n", ast)?;
-
-            let mut txn = engine.begin(Mode::ReadWrite)?;
 
             write!(f, "Plan: ")?;
             let plan = match Plan::build(ast, &mut txn) {
@@ -108,42 +147,7 @@ macro_rules! test_query {
             };
             write!(f, "{:#?}\n\n", plan)?;
 
-            write!(f, "Query: {}\n\n", $query)?;
-
-            write!(f, "Explain:\n{}\n\n", plan)?;
-
-            write!(f, "Result:")?;
-            let result = match plan.execute(&mut txn) {
-                Ok(result) => result,
-                Err(err) => {
-                    write!(f, " {:?}", err)?;
-                    return Ok(())
-                }
-            };
             txn.commit()?;
-            match result {
-                ResultSet::Query{columns, rows} => {
-                    let rows: Vec<Row> = match rows.collect() {
-                        Ok(rows) => rows,
-                        Err(err) => {
-                            write!(f, " {:?}", err)?;
-                            return Ok(())
-                        }
-                    };
-                    if !columns.is_empty() || !rows.is_empty() {
-                        write!(f, " {:?}\n", columns
-                            .into_iter()
-                            .map(|c| c.name.unwrap_or_else(|| "?".to_string()))
-                            .collect::<Vec<_>>())?;
-                        for row in rows {
-                            write!(f, "{:?}\n", row)?;
-                        }
-                    } else {
-                        write!(f, " <none>\n")?;
-                    }
-                }
-                result => return Err(Error::Internal(format!("Unexpected result {:?}", result))),
-            }
             Ok(())
         }
     )*

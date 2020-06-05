@@ -1,5 +1,14 @@
 Query: SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers WHERE i IS NOT NULL
 
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: minimum, maximum, sum, count, average
+   └─ Projection: i, i, i, i, i
+      └─ Scan: integers (NOT i IS NULL)
+
+Result: ["?", "?", "?", "?", "?"]
+[Integer(-3), Integer(7), Integer(9), Integer(4), Integer(2)]
+
 AST: Select {
     select: [
         (
@@ -359,13 +368,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers WHERE i IS NOT NULL
-
-Explain:
-Projection: #0, #1, #2, #3, #4
-└─ Aggregation: minimum, maximum, sum, count, average
-   └─ Projection: i, i, i, i, i
-      └─ Scan: integers (NOT i IS NULL)
-
-Result: ["?", "?", "?", "?", "?"]
-[Integer(-3), Integer(7), Integer(9), Integer(4), Integer(2)]

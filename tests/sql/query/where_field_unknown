@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies WHERE unknown
 
+Error: Unknown field unknown
+
 AST: Select {
     select: [],
     from: [

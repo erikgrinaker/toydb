@@ -1,5 +1,7 @@
 Query: SELECT movies.unknown FROM movies
 
+Error: Unknown field movies.unknown
+
 AST: Select {
     select: [
         (

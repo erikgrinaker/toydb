@@ -1,5 +1,12 @@
 Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id WHERE g.id = 4
 
+Explain:
+HashJoin: inner on m.genre_id = g.id
+├─ IndexLookup: movies as m column genre_id (4)
+└─ KeyLookup: genres as g (4)
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
+
 AST: Select {
     select: [],
     from: [
@@ -179,11 +186,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id WHERE g.id = 4
-
-Explain:
-HashJoin: inner on m.genre_id = g.id
-├─ IndexLookup: movies as m column genre_id (4)
-└─ KeyLookup: genres as g (4)
-
-Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]

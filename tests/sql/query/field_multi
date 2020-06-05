@@ -1,5 +1,21 @@
 Query: SELECT id, title FROM movies
 
+Explain:
+Projection: id, title
+└─ Scan: movies
+
+Result: ["id", "title"]
+[Integer(1), String("Stalker")]
+[Integer(2), String("Sicario")]
+[Integer(3), String("Primer")]
+[Integer(4), String("Heat")]
+[Integer(5), String("The Fountain")]
+[Integer(6), String("Solaris")]
+[Integer(7), String("Gravity")]
+[Integer(8), String("Blindspotting")]
+[Integer(9), String("Birdman")]
+[Integer(10), String("Inception")]
+
 AST: Select {
     select: [
         (
@@ -103,20 +119,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT id, title FROM movies
-
-Explain:
-Projection: id, title
-└─ Scan: movies
-
-Result: ["id", "title"]
-[Integer(1), String("Stalker")]
-[Integer(2), String("Sicario")]
-[Integer(3), String("Primer")]
-[Integer(4), String("Heat")]
-[Integer(5), String("The Fountain")]
-[Integer(6), String("Solaris")]
-[Integer(7), String("Gravity")]
-[Integer(8), String("Blindspotting")]
-[Integer(9), String("Birdman")]
-[Integer(10), String("Inception")]

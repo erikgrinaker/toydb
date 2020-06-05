@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies a JOIN genres a ON TRUE
 
+Error: Duplicate table name a
+
 AST: Select {
     select: [],
     from: [

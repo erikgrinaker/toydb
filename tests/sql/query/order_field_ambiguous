@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY id
 
+Error: Ambiguous field id
+
 AST: Select {
     select: [],
     from: [

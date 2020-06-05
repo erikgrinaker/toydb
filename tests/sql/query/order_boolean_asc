@@ -1,5 +1,14 @@
 Query: SELECT * FROM booleans ORDER BY value ASC
 
+Explain:
+Order: value asc
+└─ Scan: booleans
+
+Result: ["id", "value"]
+[Integer(2), Null]
+[Integer(3), Boolean(false)]
+[Integer(1), Boolean(true)]
+
 AST: Select {
     select: [],
     from: [
@@ -72,13 +81,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM booleans ORDER BY value ASC
-
-Explain:
-Order: value asc
-└─ Scan: booleans
-
-Result: ["id", "value"]
-[Integer(2), Null]
-[Integer(3), Boolean(false)]
-[Integer(1), Boolean(true)]

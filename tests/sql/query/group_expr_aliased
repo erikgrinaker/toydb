@@ -1,5 +1,18 @@
 Query: SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORDER BY twice
 
+Explain:
+Order: twice asc
+└─ Projection: twice, #0
+   └─ Aggregation: maximum
+      └─ Projection: rating, studio_id * 2
+         └─ Scan: movies
+
+Result: ["twice", "?"]
+[Integer(2), Float(8.2)]
+[Integer(4), Float(7.6)]
+[Integer(6), Float(6.9)]
+[Integer(8), Float(8.8)]
+
 AST: Select {
     select: [
         (
@@ -242,17 +255,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORDER BY twice
-
-Explain:
-Order: twice asc
-└─ Projection: twice, #0
-   └─ Aggregation: maximum
-      └─ Projection: rating, studio_id * 2
-         └─ Scan: movies
-
-Result: ["twice", "?"]
-[Integer(2), Float(8.2)]
-[Integer(4), Float(7.6)]
-[Integer(6), Float(6.9)]
-[Integer(8), Float(8.8)]

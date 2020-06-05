@@ -1,5 +1,20 @@
 Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC
 
+Explain:
+Order: s.name asc
+└─ Projection: s.name, #0
+   └─ Aggregation: count
+      └─ Projection: TRUE, s.name
+         └─ HashJoin: inner on m.studio_id = s.id
+            ├─ Scan: movies as m
+            └─ Scan: studios as s
+
+Result: ["name", "?"]
+[String("Lionsgate"), Integer(2)]
+[String("Mosfilm"), Integer(2)]
+[String("StudioCanal"), Integer(1)]
+[String("Warner Bros"), Integer(5)]
+
 AST: Select {
     select: [
         (
@@ -322,19 +337,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT s.name, COUNT(*) FROM movies m JOIN studios s ON m.studio_id = s.id GROUP BY s.name ORDER BY s.name ASC
-
-Explain:
-Order: s.name asc
-└─ Projection: s.name, #0
-   └─ Aggregation: count
-      └─ Projection: TRUE, s.name
-         └─ HashJoin: inner on m.studio_id = s.id
-            ├─ Scan: movies as m
-            └─ Scan: studios as s
-
-Result: ["name", "?"]
-[String("Lionsgate"), Integer(2)]
-[String("Mosfilm"), Integer(2)]
-[String("StudioCanal"), Integer(1)]
-[String("Warner Bros"), Integer(5)]

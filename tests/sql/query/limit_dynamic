@@ -1,5 +1,7 @@
 Query: SELECT * FROM movies LIMIT 2000 - released
 
+Error: Expression must be constant, found field released
+
 AST: Select {
     select: [],
     from: [

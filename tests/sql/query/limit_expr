@@ -1,5 +1,14 @@
 Query: SELECT * FROM movies LIMIT 1 + 2
 
+Explain:
+Limit: 3
+└─ Scan: movies
+
+Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
+[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null]
+[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
+[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]
+
 AST: Select {
     select: [],
     from: [
@@ -53,13 +62,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT * FROM movies LIMIT 1 + 2
-
-Explain:
-Limit: 3
-└─ Scan: movies
-
-Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
-[Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null]
-[Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]
-[Integer(3), String("Primer"), Integer(3), Integer(1), Integer(2004), Float(6.9), Null]

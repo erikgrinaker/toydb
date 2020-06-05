@@ -1,5 +1,17 @@
 Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id
 
+Explain:
+Order: movies.studio_id asc
+└─ Filter: rating > 8
+   └─ Projection: movies.studio_id, #0
+      └─ Aggregation: maximum
+         └─ Projection: rating, studio_id
+            └─ Scan: movies
+
+Result: ["studio_id", "rating"]
+[Integer(1), Float(8.2)]
+[Integer(4), Float(8.8)]
+
 AST: Select {
     select: [
         (
@@ -273,16 +285,3 @@ Optimized plan: Plan(
     },
 )
 
-Query: SELECT studio_id, MAX(rating) AS rating FROM movies GROUP BY studio_id HAVING rating > 8 ORDER BY studio_id
-
-Explain:
-Order: movies.studio_id asc
-└─ Filter: rating > 8
-   └─ Projection: movies.studio_id, #0
-      └─ Aggregation: maximum
-         └─ Projection: rating, studio_id
-            └─ Scan: movies
-
-Result: ["studio_id", "rating"]
-[Integer(1), Float(8.2)]
-[Integer(4), Float(8.8)]
