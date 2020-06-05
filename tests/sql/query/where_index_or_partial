@@ -205,7 +205,7 @@ Query: SELECT * FROM movies WHERE (genre_id = 2 OR genre_id = 3) AND studio_id =
 Explain:
 Order: id asc
 └─ Filter: studio_id = 2
-   └─ IndexLookup: movies.genre_id (2, 3)
+   └─ IndexLookup: movies column genre_id (2, 3)
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(2), String("Sicario"), Integer(2), Integer(2), Integer(2015), Float(7.6), Boolean(true)]

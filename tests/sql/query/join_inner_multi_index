@@ -537,9 +537,9 @@ Order: m.title asc
    └─ HashJoin: inner on m.studio_id = s.id
       ├─ HashJoin: inner on m.genre_id = g.id
       │  ├─ Filter: m.genre_id = 1
-      │  │  └─ IndexLookup: movies.studio_id (4)
-      │  └─ KeyLookup: genres (1)
-      └─ KeyLookup: studios (4)
+      │  │  └─ IndexLookup: movies as m column studio_id (4)
+      │  └─ KeyLookup: genres as g (1)
+      └─ KeyLookup: studios as s (4)
 
 Result: ["title", "genre", "studio"]
 [String("Gravity"), String("Science Fiction"), String("Warner Bros")]

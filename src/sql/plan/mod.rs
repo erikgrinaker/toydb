@@ -307,8 +307,12 @@ impl Node {
                 s += &left.format(indent.clone(), false, false);
                 s += &right.format(indent, false, true);
             }
-            Self::IndexLookup { table, column, alias: _, values } => {
-                s += &format!("IndexLookup: {}.{}", table, column);
+            Self::IndexLookup { table, column, alias, values } => {
+                s += &format!("IndexLookup: {}", table);
+                if let Some(alias) = alias {
+                    s += &format!(" as {}", alias);
+                }
+                s += &format!(" column {}", column);
                 if !values.is_empty() && values.len() < 10 {
                     s += &format!(
                         " ({})",
@@ -322,8 +326,11 @@ impl Node {
             Self::Insert { table, columns: _, expressions } => {
                 s += &format!("Insert: {} ({} rows)\n", table, expressions.len());
             }
-            Self::KeyLookup { table, alias: _, keys } => {
+            Self::KeyLookup { table, alias, keys } => {
                 s += &format!("KeyLookup: {}", table);
+                if let Some(alias) = alias {
+                    s += &format!(" as {}", alias);
+                }
                 if !keys.is_empty() && keys.len() < 10 {
                     s += &format!(
                         " ({})",
@@ -376,8 +383,11 @@ impl Node {
                 );
                 s += &source.format(indent, false, true);
             }
-            Self::Scan { table, alias: _, filter } => {
+            Self::Scan { table, alias, filter } => {
                 s += &format!("Scan: {}", table);
+                if let Some(alias) = alias {
+                    s += &format!(" as {}", alias);
+                }
                 if let Some(expr) = filter {
                     s += &format!(" ({})", expr);
                 }

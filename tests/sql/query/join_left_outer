@@ -234,8 +234,8 @@ Query: SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT OUTER JOIN g
 Explain:
 Projection: m.id, g.id
 └─ HashJoin: outer on m.id = g.id
-   ├─ Scan: movies
-   └─ Scan: genres
+   ├─ Scan: movies as m
+   └─ Scan: genres as g
 
 Result: ["movie_id", "genre_id"]
 [Integer(1), Integer(1)]

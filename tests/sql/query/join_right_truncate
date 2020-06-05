@@ -495,8 +495,8 @@ Explain:
 Projection: m.id, g.id
 └─ Projection: m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd, g.id, g.name
    └─ HashJoin: outer on g.id = m.id
-      ├─ Scan: genres
-      └─ Scan: movies
+      ├─ Scan: genres as g
+      └─ Scan: movies as m
 
 Result: ["movie_id", "genre_id"]
 [Integer(1), Integer(1)]

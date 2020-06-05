@@ -399,8 +399,8 @@ Query: SELECT * FROM genres g RIGHT JOIN movies m ON m.id = g.id
 Explain:
 Projection: g.id, g.name, m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd
 └─ HashJoin: outer on m.id = g.id
-   ├─ Scan: movies
-   └─ Scan: genres
+   ├─ Scan: movies as m
+   └─ Scan: genres as g
 
 Result: ["id", "name", "id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(1), String("Science Fiction"), Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null]

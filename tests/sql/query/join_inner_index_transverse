@@ -186,7 +186,7 @@ Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id AND g.id 
 
 Explain:
 HashJoin: inner on m.genre_id = g.id
-├─ IndexLookup: movies.genre_id (4)
-└─ KeyLookup: genres (4)
+├─ IndexLookup: movies as m column genre_id (4)
+└─ KeyLookup: genres as g (4)
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]

@@ -330,8 +330,8 @@ Order: s.name asc
    └─ Aggregation: count
       └─ Projection: TRUE, s.name
          └─ HashJoin: inner on m.studio_id = s.id
-            ├─ Scan: movies
-            └─ Scan: studios
+            ├─ Scan: movies as m
+            └─ Scan: studios as s
 
 Result: ["name", "?"]
 [String("Lionsgate"), Integer(2)]

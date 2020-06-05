@@ -156,8 +156,8 @@ Query: SELECT m.id, g.id FROM movies AS m, genres g
 Explain:
 Projection: m.id, g.id
 └─ NestedLoopJoin: inner
-   ├─ Scan: movies
-   └─ Scan: genres
+   ├─ Scan: movies as m
+   └─ Scan: genres as g
 
 Result: ["id", "id"]
 [Integer(1), Integer(1)]

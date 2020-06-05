@@ -551,9 +551,9 @@ Explain:
 Projection: m.id, m.title, g.id, g.name, c.id, c.name
 └─ NestedLoopJoin: inner
    ├─ NestedLoopJoin: inner
-   │  ├─ Scan: movies (m.id > 3 OR m.id = 3)
-   │  └─ KeyLookup: genres (2)
-   └─ Scan: countries (NOT c.id = us)
+   │  ├─ Scan: movies as m (m.id > 3 OR m.id = 3)
+   │  └─ KeyLookup: genres as g (2)
+   └─ Scan: countries as c (NOT c.id = us)
 
 Result: ["id", "title", "id", "name", "id", "name"]
 [Integer(3), String("Primer"), Integer(2), String("Action"), String("fr"), String("France")]
