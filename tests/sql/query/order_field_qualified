@@ -255,41 +255,36 @@ Optimized plan: Plan(
     Projection {
         source: Order {
             source: Projection {
-                source: NestedLoopJoin {
+                source: HashJoin {
                     left: Scan {
                         table: "movies",
                         alias: None,
                         filter: None,
                     },
-                    left_size: 7,
+                    left_field: (
+                        3,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
+                                ),
+                                "genre_id",
+                            ),
+                        ),
+                    ),
                     right: Scan {
                         table: "genres",
                         alias: None,
                         filter: None,
                     },
-                    predicate: Some(
-                        Equal(
-                            Field(
-                                3,
+                    right_field: (
+                        0,
+                        Some(
+                            (
                                 Some(
-                                    (
-                                        Some(
-                                            "movies",
-                                        ),
-                                        "genre_id",
-                                    ),
+                                    "genres",
                                 ),
-                            ),
-                            Field(
-                                7,
-                                Some(
-                                    (
-                                        Some(
-                                            "genres",
-                                        ),
-                                        "id",
-                                    ),
-                                ),
+                                "id",
                             ),
                         ),
                     ),
@@ -427,7 +422,7 @@ Explain:
 Projection: #0, #1, #2
 └─ Order: genres.name asc, movies.title asc
    └─ Projection: movies.id, title, name, genres.name, movies.title
-      └─ NestedLoopJoin: inner on movies.genre_id = genres.id
+      └─ HashJoin: inner on movies.genre_id = genres.id
          ├─ Scan: movies
          └─ Scan: genres
 

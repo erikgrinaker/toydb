@@ -3,6 +3,8 @@ use super::super::types::{Expression, Rows};
 use super::{Executor, ResultSet, Row, Value};
 use crate::error::{Error, Result};
 
+use std::collections::HashMap;
+
 /// A nested loop join executor
 /// FIXME This code is horrible, clean it up at some point
 pub struct NestedLoopJoin<T: Transaction> {
@@ -133,5 +135,56 @@ impl Iterator for NestedLoopRows {
             return Some(Ok(row));
         }
         self.left_cur.clone()
+    }
+}
+
+/// A hash join executor
+pub struct HashJoin<T: Transaction> {
+    left: Box<dyn Executor<T>>,
+    left_field: usize,
+    right: Box<dyn Executor<T>>,
+    right_field: usize,
+    outer: bool,
+}
+
+impl<T: Transaction> HashJoin<T> {
+    pub fn new(
+        left: Box<dyn Executor<T>>,
+        left_field: usize,
+        right: Box<dyn Executor<T>>,
+        right_field: usize,
+        outer: bool,
+    ) -> Box<Self> {
+        Box::new(Self { left, left_field, right, right_field, outer })
+    }
+}
+
+impl<T: Transaction> Executor<T> for HashJoin<T> {
+    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        if let ResultSet::Query { mut columns, rows } = self.left.execute(txn)? {
+            if let ResultSet::Query { columns: rcolumns, rows: rrows } = self.right.execute(txn)? {
+                let (l, r, outer) = (self.left_field, self.right_field, self.outer);
+                let right: HashMap<Value, Row> =
+                    rrows.map(|res| res.map(|row| (row[r].clone(), row))).collect::<Result<_>>()?;
+                let empty = std::iter::repeat(Value::Null).take(rcolumns.len());
+                columns.extend(rcolumns);
+                let rows = Box::new(rows.filter_map(move |res| match res {
+                    Ok(mut row) => match right.get(&row[l]) {
+                        Some(hit) => {
+                            row.extend(hit.clone());
+                            Some(Ok(row))
+                        }
+                        None if outer => {
+                            row.extend(empty.clone());
+                            Some(Ok(row))
+                        }
+                        None => None,
+                    },
+                    Err(err) => Some(Err(err)),
+                }));
+                return Ok(ResultSet::Query { columns, rows });
+            }
+        }
+        Err(Error::Internal("Unexpected result set".into()))
     }
 }

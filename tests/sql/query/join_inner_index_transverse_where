@@ -129,7 +129,7 @@ Plan: Plan(
 )
 
 Optimized plan: Plan(
-    NestedLoopJoin {
+    HashJoin {
         left: IndexLookup {
             table: "movies",
             alias: Some(
@@ -142,7 +142,17 @@ Optimized plan: Plan(
                 ),
             ],
         },
-        left_size: 7,
+        left_field: (
+            3,
+            Some(
+                (
+                    Some(
+                        "m",
+                    ),
+                    "genre_id",
+                ),
+            ),
+        ),
         right: KeyLookup {
             table: "genres",
             alias: Some(
@@ -154,29 +164,14 @@ Optimized plan: Plan(
                 ),
             ],
         },
-        predicate: Some(
-            Equal(
-                Field(
-                    3,
+        right_field: (
+            0,
+            Some(
+                (
                     Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "genre_id",
-                        ),
+                        "g",
                     ),
-                ),
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
-                        ),
-                    ),
+                    "id",
                 ),
             ),
         ),
@@ -187,7 +182,7 @@ Optimized plan: Plan(
 Query: SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id WHERE g.id = 4
 
 Explain:
-NestedLoopJoin: inner on m.genre_id = g.id
+HashJoin: inner on m.genre_id = g.id
 ├─ IndexLookup: movies.genre_id (4)
 └─ KeyLookup: genres (4)
 

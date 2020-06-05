@@ -352,8 +352,8 @@ Plan: Plan(
 Optimized plan: Plan(
     Order {
         source: Projection {
-            source: NestedLoopJoin {
-                left: NestedLoopJoin {
+            source: HashJoin {
+                left: HashJoin {
                     left: Filter {
                         source: IndexLookup {
                             table: "movies",
@@ -386,7 +386,17 @@ Optimized plan: Plan(
                             ),
                         ),
                     },
-                    left_size: 7,
+                    left_field: (
+                        3,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "genre_id",
+                            ),
+                        ),
+                    ),
                     right: KeyLookup {
                         table: "genres",
                         alias: Some(
@@ -398,35 +408,30 @@ Optimized plan: Plan(
                             ),
                         ],
                     },
-                    predicate: Some(
-                        Equal(
-                            Field(
-                                3,
+                    right_field: (
+                        0,
+                        Some(
+                            (
                                 Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "genre_id",
-                                    ),
+                                    "g",
                                 ),
-                            ),
-                            Field(
-                                7,
-                                Some(
-                                    (
-                                        Some(
-                                            "g",
-                                        ),
-                                        "id",
-                                    ),
-                                ),
+                                "id",
                             ),
                         ),
                     ),
                     outer: false,
                 },
-                left_size: 9,
+                left_field: (
+                    2,
+                    Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "studio_id",
+                        ),
+                    ),
+                ),
                 right: KeyLookup {
                     table: "studios",
                     alias: Some(
@@ -438,29 +443,14 @@ Optimized plan: Plan(
                         ),
                     ],
                 },
-                predicate: Some(
-                    Equal(
-                        Field(
-                            2,
+                right_field: (
+                    0,
+                    Some(
+                        (
                             Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "studio_id",
-                                ),
+                                "s",
                             ),
-                        ),
-                        Field(
-                            9,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "id",
-                                ),
-                            ),
+                            "id",
                         ),
                     ),
                 ),
@@ -544,8 +534,8 @@ Query:
 Explain:
 Order: m.title asc
 └─ Projection: m.title, g.name, s.name
-   └─ NestedLoopJoin: inner on m.studio_id = s.id
-      ├─ NestedLoopJoin: inner on m.genre_id = g.id
+   └─ HashJoin: inner on m.studio_id = s.id
+      ├─ HashJoin: inner on m.genre_id = g.id
       │  ├─ Filter: m.genre_id = 1
       │  │  └─ IndexLookup: movies.studio_id (4)
       │  └─ KeyLookup: genres (1)

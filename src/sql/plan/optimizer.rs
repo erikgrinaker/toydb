@@ -267,3 +267,41 @@ impl Optimizer for NoopCleaner {
         )
     }
 }
+
+// Optimizes join types, currently by swapping nested-loop joins with hash joins where appropriate.
+pub struct JoinType;
+
+impl Optimizer for JoinType {
+    fn optimize(&self, node: Node) -> Result<Node> {
+        node.transform(
+            &|n| match n {
+                // Replace nested-loop equijoins with hash joins.
+                Node::NestedLoopJoin {
+                    left,
+                    left_size,
+                    right,
+                    predicate: Some(Expression::Equal(a, b)),
+                    outer,
+                } => match (*a, *b) {
+                    (Expression::Field(a, a_label), Expression::Field(b, b_label)) => {
+                        let (left_field, right_field) = if a < left_size {
+                            ((a, a_label), (b - left_size, b_label))
+                        } else {
+                            ((b, b_label), (a - left_size, a_label))
+                        };
+                        Ok(Node::HashJoin { left, left_field, right, right_field, outer })
+                    }
+                    (a, b) => Ok(Node::NestedLoopJoin {
+                        left,
+                        left_size,
+                        right,
+                        predicate: Some(Expression::Equal(a.into(), b.into())),
+                        outer,
+                    }),
+                },
+                n => Ok(n),
+            },
+            &|n| Ok(n),
+        )
+    }
+}

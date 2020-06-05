@@ -42,6 +42,7 @@ impl Plan {
         root = optimizer::FilterPushdown.optimize(root)?;
         root = optimizer::IndexLookup::new(catalog).optimize(root)?;
         root = optimizer::NoopCleaner.optimize(root)?;
+        root = optimizer::JoinType.optimize(root)?;
         Ok(Plan(root))
     }
 }
@@ -66,6 +67,13 @@ pub enum Node {
     Filter {
         source: Box<Node>,
         predicate: Expression,
+    },
+    HashJoin {
+        left: Box<Node>,
+        left_field: (usize, Option<(Option<String>, String)>),
+        right: Box<Node>,
+        right_field: (usize, Option<(Option<String>, String)>),
+        outer: bool,
     },
     IndexLookup {
         table: String,
@@ -146,6 +154,13 @@ impl Node {
             Self::Filter { source, predicate } => {
                 Self::Filter { source: source.transform(before, after)?.into(), predicate }
             }
+            Self::HashJoin { left, left_field, right, right_field, outer } => Self::HashJoin {
+                left: left.transform(before, after)?.into(),
+                left_field,
+                right: right.transform(before, after)?.into(),
+                right_field,
+                outer,
+            },
             Self::Limit { source, limit } => {
                 Self::Limit { source: source.transform(before, after)?.into(), limit }
             }
@@ -185,10 +200,11 @@ impl Node {
             | n @ Self::CreateTable { .. }
             | n @ Self::Delete { .. }
             | n @ Self::DropTable { .. }
+            | n @ Self::HashJoin { .. }
             | n @ Self::IndexLookup { .. }
             | n @ Self::KeyLookup { .. }
             | n @ Self::Limit { .. }
-            | n @ Self::NestedLoopJoin { .. }
+            | n @ Self::NestedLoopJoin { .. } // FIXME Handle predicate
             | n @ Self::Nothing
             | n @ Self::Offset { .. }
             | n @ Self::Scan { filter: None, .. } => n,
@@ -263,6 +279,24 @@ impl Node {
             Self::Filter { source, predicate } => {
                 s += &format!("Filter: {}\n", predicate);
                 s += &source.format(indent, false, true);
+            }
+            Self::HashJoin { left, left_field, right, right_field, outer } => {
+                s += &format!(
+                    "HashJoin: {} on {} = {}\n",
+                    if *outer { "outer" } else { "inner" },
+                    match left_field {
+                        (_, Some((Some(t), n))) => format!("{}.{}", t, n),
+                        (_, Some((None, n))) => n.clone(),
+                        (i, None) => format!("left #{}", i),
+                    },
+                    match right_field {
+                        (_, Some((Some(t), n))) => format!("{}.{}", t, n),
+                        (_, Some((None, n))) => n.clone(),
+                        (i, None) => format!("right #{}", i),
+                    },
+                );
+                s += &left.format(indent.clone(), false, false);
+                s += &right.format(indent, false, true);
             }
             Self::IndexLookup { table, column, alias: _, values } => {
                 s += &format!("IndexLookup: {}.{}", table, column);

@@ -224,7 +224,7 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Projection {
-        source: NestedLoopJoin {
+        source: HashJoin {
             left: Scan {
                 table: "movies",
                 alias: Some(
@@ -232,7 +232,17 @@ Optimized plan: Plan(
                 ),
                 filter: None,
             },
-            left_size: 7,
+            left_field: (
+                0,
+                Some(
+                    (
+                        Some(
+                            "m",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
             right: Scan {
                 table: "genres",
                 alias: Some(
@@ -240,29 +250,14 @@ Optimized plan: Plan(
                 ),
                 filter: None,
             },
-            predicate: Some(
-                Equal(
-                    Field(
-                        0,
+            right_field: (
+                0,
+                Some(
+                    (
                         Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "id",
-                            ),
+                            "g",
                         ),
-                    ),
-                    Field(
-                        7,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
-                        ),
+                        "id",
                     ),
                 ),
             ),
@@ -403,7 +398,7 @@ Query: SELECT * FROM genres g RIGHT JOIN movies m ON m.id = g.id
 
 Explain:
 Projection: g.id, g.name, m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd
-└─ NestedLoopJoin: outer on m.id = g.id
+└─ HashJoin: outer on m.id = g.id
    ├─ Scan: movies
    └─ Scan: genres
 

@@ -203,41 +203,36 @@ Plan: Plan(
 Optimized plan: Plan(
     Order {
         source: Projection {
-            source: NestedLoopJoin {
+            source: HashJoin {
                 left: Scan {
                     table: "movies",
                     alias: None,
                     filter: None,
                 },
-                left_size: 7,
+                left_field: (
+                    3,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "genre_id",
+                        ),
+                    ),
+                ),
                 right: Scan {
                     table: "genres",
                     alias: None,
                     filter: None,
                 },
-                predicate: Some(
-                    Equal(
-                        Field(
-                            3,
+                right_field: (
+                    0,
+                    Some(
+                        (
                             Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "genre_id",
-                                ),
+                                "genres",
                             ),
-                        ),
-                        Field(
-                            7,
-                            Some(
-                                (
-                                    Some(
-                                        "genres",
-                                    ),
-                                    "id",
-                                ),
-                            ),
+                            "id",
                         ),
                     ),
                 ),
@@ -324,7 +319,7 @@ Query: SELECT movies.id, title, genres.name AS genre FROM movies, genres WHERE m
 Explain:
 Order: genre asc, movies.title asc
 └─ Projection: movies.id, title, genres.name
-   └─ NestedLoopJoin: inner on movies.genre_id = genres.id
+   └─ HashJoin: inner on movies.genre_id = genres.id
       ├─ Scan: movies
       └─ Scan: genres
 

@@ -6,7 +6,7 @@ mod schema;
 mod source;
 
 use aggregation::Aggregation;
-use join::NestedLoopJoin;
+use join::{HashJoin, NestedLoopJoin};
 use mutation::{Delete, Insert, Update};
 use query::{Filter, Limit, Offset, Order, Projection};
 use schema::{CreateTable, DropTable};
@@ -37,6 +37,13 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
             Node::DropTable { table } => DropTable::new(table),
             Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
+            Node::HashJoin { left, left_field, right, right_field, outer } => HashJoin::new(
+                Self::build(*left),
+                left_field.0,
+                Self::build(*right),
+                right_field.0,
+                outer,
+            ),
             Node::IndexLookup { table, alias: _, column, values } => {
                 IndexLookup::new(table, column, values)
             }

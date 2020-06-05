@@ -153,7 +153,7 @@ Plan: Plan(
 
 Optimized plan: Plan(
     Projection {
-        source: NestedLoopJoin {
+        source: HashJoin {
             left: Scan {
                 table: "genres",
                 alias: Some(
@@ -161,7 +161,17 @@ Optimized plan: Plan(
                 ),
                 filter: None,
             },
-            left_size: 2,
+            left_field: (
+                0,
+                Some(
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
+                ),
+            ),
             right: Scan {
                 table: "movies",
                 alias: Some(
@@ -169,29 +179,14 @@ Optimized plan: Plan(
                 ),
                 filter: None,
             },
-            predicate: Some(
-                Equal(
-                    Field(
-                        2,
+            right_field: (
+                0,
+                Some(
+                    (
                         Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "id",
-                            ),
+                            "m",
                         ),
-                    ),
-                    Field(
-                        0,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
-                        ),
+                        "id",
                     ),
                 ),
             ),
@@ -238,7 +233,7 @@ Query: SELECT g.id AS genre_id, m.id AS movie_id FROM genres g LEFT JOIN movies 
 
 Explain:
 Projection: g.id, m.id
-└─ NestedLoopJoin: outer on m.id = g.id
+└─ HashJoin: outer on g.id = m.id
    ├─ Scan: genres
    └─ Scan: movies
 

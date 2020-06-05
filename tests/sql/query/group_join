@@ -211,7 +211,7 @@ Optimized plan: Plan(
         source: Projection {
             source: Aggregation {
                 source: Projection {
-                    source: NestedLoopJoin {
+                    source: HashJoin {
                         left: Scan {
                             table: "movies",
                             alias: Some(
@@ -219,7 +219,17 @@ Optimized plan: Plan(
                             ),
                             filter: None,
                         },
-                        left_size: 7,
+                        left_field: (
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
+                        ),
                         right: Scan {
                             table: "studios",
                             alias: Some(
@@ -227,29 +237,14 @@ Optimized plan: Plan(
                             ),
                             filter: None,
                         },
-                        predicate: Some(
-                            Equal(
-                                Field(
-                                    2,
+                        right_field: (
+                            0,
+                            Some(
+                                (
                                     Some(
-                                        (
-                                            Some(
-                                                "m",
-                                            ),
-                                            "studio_id",
-                                        ),
+                                        "s",
                                     ),
-                                ),
-                                Field(
-                                    7,
-                                    Some(
-                                        (
-                                            Some(
-                                                "s",
-                                            ),
-                                            "id",
-                                        ),
-                                    ),
+                                    "id",
                                 ),
                             ),
                         ),
@@ -334,7 +329,7 @@ Order: s.name asc
 └─ Projection: s.name, #0
    └─ Aggregation: count
       └─ Projection: TRUE, s.name
-         └─ NestedLoopJoin: inner on m.studio_id = s.id
+         └─ HashJoin: inner on m.studio_id = s.id
             ├─ Scan: movies
             └─ Scan: studios
 
