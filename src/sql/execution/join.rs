@@ -5,8 +5,8 @@ use crate::error::{Error, Result};
 
 use std::collections::HashMap;
 
-/// A nested loop join executor
-/// FIXME This code is horrible, clean it up at some point
+/// A nested loop join executor, which checks each row in the left source against every row in
+/// the right source using the given predicate.
 pub struct NestedLoopJoin<T: Transaction> {
     left: Box<dyn Executor<T>>,
     right: Box<dyn Executor<T>>,
@@ -29,12 +29,16 @@ impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
         if let ResultSet::Query { mut columns, rows } = self.left.execute(txn)? {
             if let ResultSet::Query { columns: rcolumns, rows: rrows } = self.right.execute(txn)? {
+                let right_width = rcolumns.len();
                 columns.extend(rcolumns);
+                // FIXME Since making the iterators or sources clonable is non-trivial (requiring
+                // either avoiding Rust standard iterators or making sources generic), we simply
+                // fetch the entire right result as a vector.
                 return Ok(ResultSet::Query {
                     rows: Box::new(NestedLoopRows::new(
-                        columns.len(),
                         rows,
                         rrows.collect::<Result<Vec<_>>>()?,
+                        right_width,
                         self.predicate,
                         self.outer,
                     )),
@@ -47,48 +51,70 @@ impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
 }
 
 struct NestedLoopRows {
-    size: usize,
-    predicate: Option<Expression>,
     left: Rows,
-    left_cur: Option<Result<Row>>,
-    // FIXME right should be Rows too, but requires impl Clone
+    left_row: Option<Result<Row>>,
     right: Box<dyn Iterator<Item = Row> + Send>,
-    right_orig: Vec<Row>,
-    right_pad: bool,
-    right_emitted: bool,
+    right_vec: Vec<Row>,
+    right_empty: Vec<Value>,
+    right_hit: bool,
+    predicate: Option<Expression>,
+    outer: bool,
 }
 
 impl NestedLoopRows {
     fn new(
-        size: usize,
         mut left: Rows,
         right: Vec<Row>,
+        right_width: usize,
         predicate: Option<Expression>,
-        right_pad: bool,
+        outer: bool,
     ) -> Self {
         Self {
-            size,
-            predicate,
-            left_cur: left.next(),
+            left_row: left.next(),
             left,
             right: Box::new(right.clone().into_iter()),
-            right_orig: right,
-            right_pad,
-            right_emitted: false,
+            right_vec: right,
+            right_empty: std::iter::repeat(Value::Null).take(right_width).collect(),
+            right_hit: false,
+            predicate,
+            outer,
         }
     }
 
-    fn next_right(&mut self) -> Result<Option<Row>> {
-        let left_row = match self.left_cur.clone().transpose()? {
-            Some(r) => r,
-            None => return Ok(None),
-        };
+    // Tries to get the next joined row, with error handling.
+    fn try_next(&mut self) -> Result<Option<Row>> {
+        // While there is a valid left row, look for a right-hand match to return.
+        while let Some(Ok(left_row)) = self.left_row.clone() {
+            // If there is a hit in the remaining right rows, return it.
+            if let Some(row) = self.try_next_hit(&left_row)? {
+                self.right_hit = true;
+                return Ok(Some(row));
+            }
+
+            // Otherwise, continue with the next left row and reset the right source.
+            self.left_row = self.left.next();
+            self.right = Box::new(self.right_vec.clone().into_iter());
+
+            // If this is an outer join, when we reach the end of the right items without a hit,
+            // we should return a row with nulls for the right fields.
+            if self.outer && !self.right_hit {
+                let mut row = left_row;
+                row.extend(self.right_empty.clone());
+                return Ok(Some(row));
+            }
+            self.right_hit = false;
+        }
+        self.left_row.clone().transpose()
+    }
+
+    /// Tries to find the next combined row that matches the predicate in the remaining right rows.
+    fn try_next_hit(&mut self, left_row: &[Value]) -> Result<Option<Row>> {
         while let Some(right_row) = self.right.next() {
+            let mut row = left_row.to_vec();
+            row.extend(right_row);
             if let Some(predicate) = &self.predicate {
-                let mut row = left_row.clone();
-                row.extend(right_row.clone());
                 match predicate.evaluate(Some(&row))? {
-                    Value::Boolean(true) => return Ok(Some(right_row)),
+                    Value::Boolean(true) => return Ok(Some(row)),
                     Value::Boolean(false) => {}
                     Value::Null => {}
                     value => {
@@ -99,7 +125,7 @@ impl NestedLoopRows {
                     }
                 }
             } else {
-                return Ok(Some(right_row));
+                return Ok(Some(row));
             }
         }
         Ok(None)
@@ -110,31 +136,7 @@ impl Iterator for NestedLoopRows {
     type Item = Result<Row>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(Ok(mut row)) = self.left_cur.clone() {
-            let right_row = match self.next_right().transpose() {
-                Some(Ok(i)) => {
-                    self.right_emitted = true;
-                    i
-                }
-                Some(Err(e)) => return Some(Err(e)),
-                None => {
-                    self.right = Box::new(self.right_orig.clone().into_iter());
-                    if self.right_pad && !self.right_emitted {
-                        while row.len() < self.size {
-                            row.push(Value::Null)
-                        }
-                        self.left_cur = self.left.next();
-                        return Some(Ok(row));
-                    }
-                    self.right_emitted = false;
-                    self.left_cur = self.left.next();
-                    continue;
-                }
-            };
-            row.extend(right_row);
-            return Some(Ok(row));
-        }
-        self.left_cur.clone()
+        self.try_next().transpose()
     }
 }
 
