@@ -1,6 +1,18 @@
 /*
- * Simulates a bank, by setting a set of accounts and making transfers between them. Records the
- * transaction throughput and checks invariants.
+ * Simulates a bank, by creating a set of accounts and making concurrent transfers between them:
+ *
+ * - Connect to the given toyDB hosts (-h default 127.0.0.1:9605, can give multiple)
+ * - Create C customers (-C default 10)
+ * - Create a accounts per customer with initial balance 100 (-a default 10)
+ * - Spawn c concurrent workers (-c default 4)
+ * - Queue t transactions between two random customers (-t default 100)
+ *   - Begin a new transaction
+ *   - Find the sender account with the largest balance
+ *   - Find the receiver account with the lowest balance
+ *   - Reduce the sender account by a random amount
+ *   - Increase the receiver account by the same amount
+ *   - Commit the transaction, or retry with exponential backoff on serialization errors
+ * - Check that invariants still hold (same total balance, no negative balances)
  */
 
 #![warn(clippy::all)]
@@ -63,7 +75,7 @@ async fn main() -> Result<()> {
                 .help("Number of account transfers to execute")
                 .takes_value(true)
                 .required(true)
-                .default_value("20"),
+                .default_value("100"),
         )
         .get_matches();
 
@@ -87,7 +99,7 @@ struct Bank {
 impl Bank {
     const INITIAL_BALANCE: u64 = 100;
 
-    // Creates a new bank simulation
+    // Creates a new bank simulation.
     async fn new<A: ToSocketAddrs + Clone>(
         addrs: Vec<A>,
         concurrency: u64,
@@ -101,16 +113,16 @@ impl Bank {
         })
     }
 
-    // Runs the bank simulation
+    // Runs the bank simulation, making transfers between customer accounts.
     async fn run(&self, transactions: u64) -> Result<()> {
         self.setup().await?;
         self.verify().await?;
         println!();
 
         let mut rng = rand::thread_rng();
-        let custs = rand::distributions::Uniform::from(1..=self.customers as i64);
+        let customers = rand::distributions::Uniform::from(1..=self.customers as i64);
         let transfers = futures::stream::iter(
-            std::iter::from_fn(|| Some((custs.sample(&mut rng), custs.sample(&mut rng))))
+            std::iter::from_fn(|| Some((customers.sample(&mut rng), customers.sample(&mut rng))))
                 .filter(|(from, to)| from != to)
                 .map(Ok)
                 .take(transactions as usize),
@@ -134,7 +146,7 @@ impl Bank {
         Ok(())
     }
 
-    // Sets up the database
+    // Sets up the database with customers and accounts.
     async fn setup(&self) -> Result<()> {
         let client = self.clients.get().await;
         let start = std::time::Instant::now();
@@ -188,7 +200,7 @@ impl Bank {
         Ok(())
     }
 
-    /// Verifies that all invariants hold
+    /// Verifies that all invariants hold (same total balance, no negative balances).
     async fn verify(&self) -> Result<()> {
         let client = self.clients.get().await;
         let expect = self.customers * self.customer_accounts * Self::INITIAL_BALANCE as i64;
@@ -212,7 +224,7 @@ impl Bank {
         Ok(())
     }
 
-    /// Transfers a random amount between two customers.
+    /// Transfers a random amount between two customers, retrying serialization failures.
     async fn transfer(&self, from: i64, to: i64) -> Result<()> {
         let client = self.clients.get().await;
         let attempts = Rc::new(Cell::new(0_u8));
