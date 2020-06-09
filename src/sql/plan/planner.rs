@@ -106,7 +106,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     }),
                     expressions: set
                         .into_iter()
-                        .map(|(c, e)| self.build_expression(scope, e).map(|e| (c, e)))
+                        .map(|(c, e)| {
+                            Ok((
+                                scope.resolve(None, &c)?,
+                                Some(c),
+                                self.build_expression(scope, e)?,
+                            ))
+                        })
                         .collect::<Result<_>>()?,
                 }
             }

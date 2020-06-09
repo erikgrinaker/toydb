@@ -83,8 +83,6 @@ impl Transaction {
     }
 
     /// Saves an index entry.
-    /// FIXME We save the index key as part of the value, to avoid having to implement key decoders
-    /// right now.
     fn index_save(
         &mut self,
         table: &str,

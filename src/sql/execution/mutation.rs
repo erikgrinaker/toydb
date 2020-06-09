@@ -4,7 +4,7 @@ use super::super::types::{Expression, Row, Value};
 use super::{Executor, ResultSet};
 use crate::error::{Error, Result};
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 /// An INSERT executor
 pub struct Insert {
@@ -79,24 +79,16 @@ impl<T: Transaction> Executor<T> for Insert {
 pub struct Update<T: Transaction> {
     table: String,
     source: Box<dyn Executor<T>>,
-    /// FIXME Uses BTreeMap instead of HashMap for test stability
-    expressions: BTreeMap<String, Expression>,
+    expressions: Vec<(usize, Expression)>,
 }
 
 impl<T: Transaction> Update<T> {
     pub fn new(
         table: String,
         source: Box<dyn Executor<T>>,
-        expressions: BTreeMap<String, Expression>,
+        expressions: Vec<(usize, Expression)>,
     ) -> Box<Self> {
         Box::new(Self { table, source, expressions })
-    }
-
-    /// Sets a named row field to a value
-    pub fn set_row_field(table: &Table, row: &mut Row, field: &str, value: Value) -> Result<()> {
-        *row.get_mut(table.get_column_index(field)?)
-            .ok_or_else(|| Error::Value(format!("Field {} not found in row", field)))? = value;
-        Ok(())
     }
 }
 
@@ -121,7 +113,7 @@ impl<T: Transaction> Executor<T> for Update<T> {
                     }
                     let mut new = row.clone();
                     for (field, expr) in &self.expressions {
-                        Self::set_row_field(&table, &mut new, field, expr.evaluate(Some(&row))?)?;
+                        new[*field] = expr.evaluate(Some(&row))?;
                     }
                     txn.update(&table.name, &id, new)?;
                     updated.insert(id);

@@ -48,7 +48,7 @@ impl Hash for Value {
             Value::Null => self.hash(state),
             Value::Boolean(v) => v.hash(state),
             Value::Integer(v) => v.hash(state),
-            Value::Float(v) => v.to_be_bytes().hash(state), // FIXME Is this sane?
+            Value::Float(v) => v.to_be_bytes().hash(state),
             Value::String(v) => v.hash(state),
         }
     }

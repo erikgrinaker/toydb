@@ -62,9 +62,11 @@ impl<T: Transaction + 'static> dyn Executor<T> {
                 Projection::new(Self::build(*source), expressions)
             }
             Node::Scan { table, filter, alias: _ } => Scan::new(table, filter),
-            Node::Update { table, source, expressions } => {
-                Update::new(table, Self::build(*source), expressions)
-            }
+            Node::Update { table, source, expressions } => Update::new(
+                table,
+                Self::build(*source),
+                expressions.into_iter().map(|(i, _, e)| (i, e)).collect(),
+            ),
         }
     }
 }

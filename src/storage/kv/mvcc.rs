@@ -19,12 +19,10 @@ pub struct Status {
 
 /// An MVCC-based transactional key-value store.
 pub struct MVCC {
-    /// The underlying KV store. It is protected by a mutex so it can be shared between multiple
-    /// transactions.
+    /// The underlying KV store. It is protected by a mutex so it can be shared between txns.
     store: Arc<RwLock<Box<dyn Store>>>,
 }
 
-// FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
 impl Clone for MVCC {
     fn clone(&self) -> Self {
         MVCC { store: self.store.clone() }
@@ -1151,7 +1149,7 @@ pub mod tests {
         assert_eq!(Some(b"1".to_vec()), t1.get(b"a")?);
         assert_eq!(Some(b"2".to_vec()), t2.get(b"b")?);
 
-        // FIXME Some of the following operations should error
+        // Some of the following operations should error
         t1.set(b"a", b"2".to_vec())?;
         t2.set(b"b", b"1".to_vec())?;
 

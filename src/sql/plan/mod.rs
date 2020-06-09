@@ -11,7 +11,6 @@ use super::types::{Expression, Value};
 use crate::error::Result;
 
 use serde_derive::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::fmt::{self, Display};
 
 /// A query plan
@@ -120,11 +119,10 @@ pub enum Node {
         alias: Option<String>,
         filter: Option<Expression>,
     },
-    // Uses BTreeMap for test stability
     Update {
         table: String,
         source: Box<Node>,
-        expressions: BTreeMap<String, Expression>,
+        expressions: Vec<(usize, Option<String>, Expression)>,
     },
 }
 
@@ -251,7 +249,7 @@ impl Node {
                 source,
                 expressions: expressions
                     .into_iter()
-                    .map(|(k, e)| e.transform(before, after).map(|e| (k, e)))
+                    .map(|(i, l, e)| e.transform(before, after).map(|e| (i, l, e)))
                     .collect::<Result<_>>()?,
             },
         })
@@ -399,7 +397,11 @@ impl Node {
                     table,
                     expressions
                         .iter()
-                        .map(|(l, e)| format!("{}={}", l, e))
+                        .map(|(i, l, e)| format!(
+                            "{}={}",
+                            l.clone().unwrap_or_else(|| format!("#{}", i)),
+                            e
+                        ))
                         .collect::<Vec<_>>()
                         .join(",")
                 );
