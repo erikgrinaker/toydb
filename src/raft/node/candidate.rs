@@ -337,10 +337,11 @@ mod tests {
                     id: vec![0xaf],
                     address: Address::Client,
                     command: vec![0xf0],
+                    term: 3,
                     index: 2,
                     quorum: 3,
                 },
-                Instruction::Vote { index: 2, address: Address::Local },
+                Instruction::Vote { term: 3, index: 2, address: Address::Local },
             ],
         );
         Ok(())

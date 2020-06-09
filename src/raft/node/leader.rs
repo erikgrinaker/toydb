@@ -113,8 +113,11 @@ impl RoleNode<Leader> {
         match msg.event {
             Event::ConfirmLeader { commit_index, has_committed } => {
                 if let Address::Peer(from) = msg.from.clone() {
-                    self.state_tx
-                        .send(Instruction::Vote { index: commit_index, address: msg.from })?;
+                    self.state_tx.send(Instruction::Vote {
+                        term: msg.term,
+                        index: commit_index,
+                        address: msg.from,
+                    })?;
                     if !has_committed {
                         self.replicate(&from)?;
                     }
@@ -141,16 +144,16 @@ impl RoleNode<Leader> {
             }
 
             Event::ClientRequest { id, request: Request::Query(command) } => {
-                // FIXME This needs to wait until the first entry from our term has been
-                // committed, see: https://stackoverflow.com/questions/37207682/raft-some-questions-about-read-only-queries
                 self.state_tx.send(Instruction::Query {
                     id,
                     address: msg.from,
                     command,
+                    term: self.term,
                     index: self.log.commit_index,
                     quorum: self.quorum(),
                 })?;
                 self.state_tx.send(Instruction::Vote {
+                    term: self.term,
                     index: self.log.commit_index,
                     address: Address::Local,
                 })?;
@@ -283,7 +286,7 @@ mod tests {
         assert_messages(&mut node_rx, vec![]);
         assert_messages(
             &mut state_rx,
-            vec![Instruction::Vote { index: 2, address: Address::Peer("b".into()) }],
+            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer("b".into()) }],
         );
         Ok(())
     }
@@ -312,7 +315,7 @@ mod tests {
         );
         assert_messages(
             &mut state_rx,
-            vec![Instruction::Vote { index: 2, address: Address::Peer("b".into()) }],
+            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer("b".into()) }],
         );
         Ok(())
     }
@@ -582,10 +585,11 @@ mod tests {
                     id: vec![0x01],
                     address: Address::Client,
                     command: vec![0xaf],
+                    term: 3,
                     index: 2,
                     quorum,
                 },
-                Instruction::Vote { index: 2, address: Address::Local },
+                Instruction::Vote { term: 3, index: 2, address: Address::Local },
             ],
         );
         Ok(())

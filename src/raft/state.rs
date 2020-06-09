@@ -28,17 +28,18 @@ pub enum Instruction {
     Apply { entry: Entry },
     /// Notify the given address with the result of applying the entry at the given index.
     Notify { id: Vec<u8>, address: Address, index: u64 },
-    /// Query the state machine when the given index has been confirmed by vote.
-    Query { id: Vec<u8>, address: Address, command: Vec<u8>, index: u64, quorum: u64 },
+    /// Query the state machine when the given term and index has been confirmed by vote.
+    Query { id: Vec<u8>, address: Address, command: Vec<u8>, term: u64, index: u64, quorum: u64 },
     /// Extend the given server status and return it to the given address.
     Status { id: Vec<u8>, address: Address, status: Box<Status> },
-    /// Votes for queries at the given commit index.
-    Vote { index: u64, address: Address },
+    /// Votes for queries at the given term and commit index.
+    Vote { term: u64, index: u64, address: Address },
 }
 
 /// A driver query.
 struct Query {
     id: Vec<u8>,
+    term: u64,
     address: Address,
     command: Vec<u8>,
     quorum: u64,
@@ -131,10 +132,10 @@ impl Driver {
                 }
             }
 
-            Instruction::Query { id, address, command, index, quorum } => {
+            Instruction::Query { id, address, command, index, term, quorum } => {
                 self.queries.entry(index).or_default().insert(
                     id.clone(),
-                    Query { id, address, command, quorum, votes: HashSet::new() },
+                    Query { id, term, address, command, quorum, votes: HashSet::new() },
                 );
             }
 
@@ -146,8 +147,8 @@ impl Driver {
                 )?;
             }
 
-            Instruction::Vote { index, address } => {
-                self.query_vote(index, address);
+            Instruction::Vote { term, index, address } => {
+                self.query_vote(term, index, address);
                 self.query_execute(state)?;
             }
         }
@@ -225,11 +226,13 @@ impl Driver {
         ready
     }
 
-    /// Votes for queries up to and including a given commit index by an address.
-    fn query_vote(&mut self, commit_index: u64, address: Address) {
+    /// Votes for queries up to and including a given commit index for a term by an address.
+    fn query_vote(&mut self, term: u64, commit_index: u64, address: Address) {
         for (_, queries) in self.queries.range_mut(..=commit_index) {
             for (_, query) in queries.iter_mut() {
-                query.votes.insert(address.clone());
+                if term >= query.term {
+                    query.votes.insert(address.clone());
+                }
             }
         }
     }
@@ -311,10 +314,11 @@ pub mod tests {
             id: vec![0x02],
             address: Address::Client,
             command: vec![0xf0],
+            term: 1,
             index: 1,
             quorum: 2,
         })?;
-        state_tx.send(Instruction::Vote { index: 1, address: Address::Local })?;
+        state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Local })?;
         state_tx.send(Instruction::Abort)?;
         std::mem::drop(state_tx);
 
@@ -381,14 +385,19 @@ pub mod tests {
             id: vec![0x01],
             address: Address::Client,
             command: vec![0xf0],
+            term: 2,
             index: 1,
             quorum: 2,
         })?;
         state_tx.send(Instruction::Apply {
-            entry: Entry { index: 1, term: 1, command: Some(vec![0xaf]) },
+            entry: Entry { index: 1, term: 2, command: Some(vec![0xaf]) },
         })?;
-        state_tx.send(Instruction::Vote { index: 1, address: Address::Local })?;
-        state_tx.send(Instruction::Vote { index: 1, address: Address::Peer("a".into()) })?;
+        state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Local })?;
+        state_tx.send(Instruction::Vote {
+            term: 2,
+            index: 1,
+            address: Address::Peer("a".into()),
+        })?;
         std::mem::drop(state_tx);
 
         assert_eq!(
@@ -407,6 +416,34 @@ pub mod tests {
         Ok(())
     }
 
+    // A query for an index submitted in a given term cannot be satisfied by votes below that term.
+    #[tokio::test(core_threads = 2)]
+    async fn driver_query_noterm() -> Result<()> {
+        let (_, state_tx, node_rx) = setup().await?;
+
+        state_tx.send(Instruction::Query {
+            id: vec![0x01],
+            address: Address::Client,
+            command: vec![0xf0],
+            term: 2,
+            index: 1,
+            quorum: 2,
+        })?;
+        state_tx.send(Instruction::Apply {
+            entry: Entry { index: 1, term: 1, command: Some(vec![0xaf]) },
+        })?;
+        state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Local })?;
+        state_tx.send(Instruction::Vote {
+            term: 1,
+            index: 1,
+            address: Address::Peer("a".into()),
+        })?;
+        std::mem::drop(state_tx);
+
+        assert_eq!(node_rx.collect::<Vec<_>>().await, vec![]);
+        Ok(())
+    }
+
     #[tokio::test(core_threads = 2)]
     async fn driver_query_noquorum() -> Result<()> {
         let (_, state_tx, node_rx) = setup().await?;
@@ -415,13 +452,14 @@ pub mod tests {
             id: vec![0x01],
             address: Address::Client,
             command: vec![0xf0],
+            term: 1,
             index: 1,
             quorum: 2,
         })?;
         state_tx.send(Instruction::Apply {
             entry: Entry { index: 1, term: 1, command: Some(vec![0xaf]) },
         })?;
-        state_tx.send(Instruction::Vote { index: 1, address: Address::Local })?;
+        state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Local })?;
         std::mem::drop(state_tx);
 
         assert_eq!(node_rx.collect::<Vec<_>>().await, vec![]);
