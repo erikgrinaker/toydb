@@ -87,8 +87,40 @@ toydb@1> SELECT * FROM movies
 Performance is not a primary goal of toyDB, but a bank simulation is included as a basic gauge of
 concurrent transaction throughput and correctness. This creates a set of customers and accounts,
 and then spawns a set of concurrent workers which makes random transfers between them, retrying
-serialization failures and verifying invariants (e.g. total balance). Each transaction consists of 
-six statements:
+serialization failures and verifying invariants (e.g. total balance).
+
+A bank simulation with 8 workers, 100 customers, 10 accounts each, and 1000 transactions can be run
+against a toyDB server on `localhost:9605` as:
+
+```sh
+$ cargo run --release --bin bank -- -c 8 -C 100 -t 1000
+Created 100 customers (1000 accounts) in 0.123s
+Verified that total balance is 100000 with no negative balances
+
+Thread 0 transferred   18 from  92 (0911) to 100 (0994) in 0.007s (1 attempts)
+Thread 1 transferred   84 from  61 (0601) to  85 (0843) in 0.007s (1 attempts)
+Thread 3 transferred   15 from  40 (0393) to  62 (0614) in 0.007s (1 attempts)
+[...]
+Thread 6 transferred   48 from  78 (0777) to  52 (0513) in 0.004s (1 attempts)
+Thread 3 transferred   57 from  93 (0921) to  19 (0188) in 0.065s (2 attempts)
+Thread 4 transferred   70 from  35 (0347) to  49 (0484) in 0.068s (2 attempts)
+
+Ran 1000 transactions in 0.937s (1067.691/s)
+Verified that total balance is 100000 with no negative balances
+```
+
+This shows transaction throughput of over 1000 transactions per second, an order of magnitude
+larger than the 100 txns/s that was an initial informal target. For a non-optimized
+implementation, this is certainly "good enough". However, this is against a single node with
+fsync disabled - other configurations have the following throughput, showing clear potential
+for improvement:
+
+|             | `sync: false` | `sync: true` |
+| ----------- | ------------- | ------------ |
+| **1 node**  | 1067 txn/s    | 38 txn/s     |
+| **5 nodes** | 417 txn/s     | 19 txn/s     |
+
+Note that each transaction consists of six statements, including joins, not just a single update:
 
 ```sql
 BEGIN;
@@ -113,41 +145,6 @@ UPDATE account SET balance = balance + {amount} WHERE id = {destination};
 
 COMMIT;
 ```
-
-A bank simulation with 8 workers, 100 customers, 10 accounts each, and 1000 transactions can be run
-against a toyDB server on `localhost:9605` as:
-
-```sh
-$ cargo run --release --bin bank -- -c 8 -C 100 -t 1000
-Created 100 customers (1000 accounts) in 0.123s
-Verified that total balance is 100000 with no negative balances
-
-Thread 0 transferred   18 from  92 (0911) to 100 (0994) in 0.007s (1 attempts)
-Thread 1 transferred   84 from  61 (0601) to  85 (0843) in 0.007s (1 attempts)
-Thread 3 transferred   15 from  40 (0393) to  62 (0614) in 0.007s (1 attempts)
-Thread 5 transferred    5 from  38 (0377) to  93 (0922) in 0.008s (1 attempts)
-Thread 2 transferred   72 from  78 (0771) to   2 (0011) in 0.008s (1 attempts)
-[...]
-Thread 5 transferred   69 from  36 (0356) to  85 (0841) in 0.004s (1 attempts)
-Thread 6 transferred   48 from  78 (0777) to  52 (0513) in 0.004s (1 attempts)
-Thread 1 transferred   66 from  42 (0417) to  79 (0783) in 0.076s (2 attempts)
-Thread 3 transferred   57 from  93 (0921) to  19 (0188) in 0.065s (2 attempts)
-Thread 4 transferred   70 from  35 (0347) to  49 (0484) in 0.068s (2 attempts)
-
-Ran 1000 transactions in 0.937s (1067.691/s)
-Verified that total balance is 100000 with no negative balances
-```
-
-This shows transaction throughput of over 1000 transactions per second, an order of magnitude
-larger than the 100 txns/s that was an initial informal target. For a non-optimized
-implementation, this is certainly "good enough". However, this is against a single node with
-fsync disabled - other configurations have the following throughput, showing a clear potential
-for improvement:
-
-|             | `sync: false` | `sync: true` |
-| ----------- | ------------- | ------------ |
-| **1 node**  | 1067 txn/s    | 38 txn/s     |
-| **5 nodes** | 417 txn/s     | 19 txn/s     |
 
 ## Known Issues
 
