@@ -2,13 +2,13 @@
 
 [![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
 
-Distributed SQL database in Rust, written as a learning project. Most components have been built from scratch, including:
-
-* Pluggable storage engine with B+tree and log-structured backends.
+Distributed SQL database in Rust, written as a learning project. Most components are built from scratch, including:
 
 * Raft-based distributed consensus engine for linearizable state machine replication.
 
 * ACID-compliant transaction engine with MVCC-based snapshot isolation.
+
+* Pluggable storage engine with B+tree and log-structured backends.
 
 * Iterator-based query engine with heuristic optimization and time-travel support.
 
@@ -84,12 +84,12 @@ toydb@1> SELECT * FROM movies
 
 ## Performance
 
-Performance is not a primary goal of toyDB, but a bank simulation is included as a basic gauge of
-concurrent transaction throughput and correctness. This creates a set of customers and accounts,
-and then spawns a set of concurrent workers which makes random transfers between them, retrying
-serialization failures and verifying invariants (e.g. total balance).
+Performance is not a primary goal of toyDB, but it uses a bank simulation as a basic gauge of
+throughput and correctness. This creates a set of customers and accounts, then spawns several
+concurrent workers that make random transfers between them, retrying serialization failures and
+verifying invariants.
 
-A bank simulation with 8 workers, 100 customers, 10 accounts each, and 1000 transactions can be run
+A simulation with 8 workers, 100 customers, 10 accounts each, and 1000 transactions can be run
 against a toyDB server on `localhost:9605` as:
 
 ```sh
@@ -109,11 +109,10 @@ Ran 1000 transactions in 0.937s (1067.691/s)
 Verified that total balance is 100000 with no negative balances
 ```
 
-This shows transaction throughput of over 1000 transactions per second, an order of magnitude
-larger than the 100 txns/s that was an initial informal target. For a non-optimized
-implementation, this is certainly "good enough". However, this is against a single node with
-fsync disabled - other configurations have the following throughput, showing clear potential
-for improvement:
+The informal target was 100 transactions per second, but the above results beat that by an order
+of magnitude. For an unoptimized implementation, this is certainly "good enough". However,
+these results are for a single node with fsync disabled - the below table shows results for other
+configurations, revealing clear potential for improvements:
 
 |             | `sync: false` | `sync: true` |
 | ----------- | ------------- | ------------ |
@@ -163,8 +162,6 @@ The primary goal is to build a minimally functional yet correct distributed data
 * **Log replication:** only the simplest form of Raft log replication is implemented, without snapshots or rapid log replay.
 
 ### Storage
-
-* **Recovery:** there is no WAL or other form of crash recovery - unexpected termination is likely to corrupt data.
 
 * **Garbage collection:** old Raft log entries or MVCC versions are never removed, giving unbounded disk usage but also unbounded data history.
 
