@@ -40,9 +40,9 @@ toydb>
 A basic subset of SQL has been partially implemented, e.g.:
 
 ```
-toydb> CREATE TABLE movies (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL)
-toydb> INSERT INTO movies VALUES (1, 'Sicario'), (2, 'Stalker'), (3, 'Her')
-toydb> SELECT * FROM movies
+toydb> CREATE TABLE movies (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL);
+toydb> INSERT INTO movies VALUES (1, 'Sicario'), (2, 'Stalker'), (3, 'Her');
+toydb> SELECT * FROM movies;
 1|Sicario
 2|Stalker
 3|Her
@@ -51,19 +51,19 @@ toydb> SELECT * FROM movies
 ACID transactions are supported via snapshot isolation:
 
 ```
-toydb> BEGIN
+toydb> BEGIN;
 Began transaction 3
-toydb:3> INSERT INTO movies VALUES (4, 'Alien vs. Predator')
-toydb:3> ROLLBACK
+toydb:3> INSERT INTO movies VALUES (4, 'Alien vs. Predator');
+toydb:3> ROLLBACK;
 Rolled back transaction 3
 
-toydb> BEGIN
+toydb> BEGIN;
 Began transaction 4
-toydb:4> INSERT INTO movies VALUES (4, 'Alien'), (5, 'Predator')
-toydb:4> COMMIT
+toydb:4> INSERT INTO movies VALUES (4, 'Alien'), (5, 'Predator');
+toydb:4> COMMIT;
 Committed transaction 4
 
-toydb> SELECT * FROM movies
+toydb> SELECT * FROM movies;
 1|Sicario
 2|Stalker
 3|Her
@@ -74,9 +74,9 @@ toydb> SELECT * FROM movies
 Time-travel queries are also supported:
 
 ```
-toydb> BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME 2
+toydb> BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME 2;
 Began read-only transaction in snapshot of version 2
-toydb@1> SELECT * FROM movies
+toydb@1> SELECT * FROM movies;
 1|Sicario
 2|Stalker
 3|Her

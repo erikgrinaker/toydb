@@ -29,6 +29,7 @@ pub enum Token {
     OpenParen,
     CloseParen,
     Comma,
+    Semicolon,
 }
 
 impl std::fmt::Display for Token {
@@ -57,6 +58,7 @@ impl std::fmt::Display for Token {
             Token::OpenParen => "(",
             Token::CloseParen => ")",
             Token::Comma => ",",
+            Token::Semicolon => ";",
         })
     }
 }
@@ -439,6 +441,7 @@ impl<'a> Lexer<'a> {
             '(' => Some(Token::OpenParen),
             ')' => Some(Token::CloseParen),
             ',' => Some(Token::Comma),
+            ';' => Some(Token::Semicolon),
             _ => None,
         })
         .map(|token| match token {

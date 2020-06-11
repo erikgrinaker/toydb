@@ -6,10 +6,13 @@
 #![warn(clippy::all)]
 
 use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
+use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{error::ReadlineError, Editor};
+use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 use toydb::error::{Error, Result};
 use toydb::sql::engine::Mode;
 use toydb::sql::execution::ResultSet;
+use toydb::sql::parser::{Lexer, Token};
 use toydb::Client;
 
 #[tokio::main]
@@ -54,7 +57,7 @@ async fn main() -> Result<()> {
 /// The ToySQL REPL
 struct ToySQL {
     client: Client,
-    editor: Editor<()>,
+    editor: Editor<InputValidator>,
     history_path: Option<std::path::PathBuf>,
     show_headers: bool,
 }
@@ -64,7 +67,7 @@ impl ToySQL {
     async fn new(host: &str, port: u16) -> Result<Self> {
         Ok(Self {
             client: Client::new((host, port)).await?,
-            editor: Editor::<()>::new(),
+            editor: Editor::new(),
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
             show_headers: false,
@@ -110,8 +113,8 @@ impl ToySQL {
             },
             "!help" => println!(
                 r#"
-Enter a SQL statement on a single line to execute it and display the result.
-Semicolons are not supported. The following commands are also available:
+Enter a SQL statement terminated by a semicolon (;) to execute it and display the result.
+The following commands are also available:
 
     !headers <on|off>  Enable or disable column headers
     !help              This help message
@@ -233,6 +236,9 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
                 Err(err) => return Err(err.into()),
             };
         }
+        self.editor.set_helper(Some(InputValidator));
+        // Make sure multiline pastes are interpreted as normal inputs.
+        self.editor.bind_sequence(rustyline::KeyPress::BracketedPasteStart, rustyline::Cmd::Noop);
 
         let status = self.client.status().await?;
         println!(
@@ -252,5 +258,37 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
             self.editor.save_history(path)?;
         }
         Ok(())
+    }
+}
+
+/// A Rustyline helper for multiline editing. It parses input lines and determines if they make up a
+/// complete command or not.
+#[derive(Completer, Helper, Highlighter, Hinter)]
+struct InputValidator;
+
+impl Validator for InputValidator {
+    fn validate(&self, ctx: &mut ValidationContext) -> rustyline::Result<ValidationResult> {
+        let input = ctx.input();
+
+        // Empty lines and ! commands are fine.
+        if input.is_empty() || input.starts_with('!') || input == ";" {
+            return Ok(ValidationResult::Valid(None));
+        }
+
+        // For SQL statements, just look for any semicolon or lexer error and if found accept the
+        // input and rely on the server to do further validation and error handling. Otherwise,
+        // wait for more input.
+        for result in Lexer::new(ctx.input()) {
+            match result {
+                Ok(Token::Semicolon) => return Ok(ValidationResult::Valid(None)),
+                Err(_) => return Ok(ValidationResult::Valid(None)),
+                _ => {}
+            }
+        }
+        Ok(ValidationResult::Incomplete)
+    }
+
+    fn validate_while_typing(&self) -> bool {
+        false
     }
 }

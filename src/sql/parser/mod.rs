@@ -23,6 +23,7 @@ impl<'a> Parser<'a> {
     /// Parses the input string into an AST statement
     pub fn parse(&mut self) -> Result<ast::Statement> {
         let statement = self.parse_statement()?;
+        self.next_if_token(Token::Semicolon);
         self.next_expect(None)?;
         Ok(statement)
     }
