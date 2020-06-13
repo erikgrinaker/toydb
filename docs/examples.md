@@ -417,7 +417,7 @@ toydb> SELECT * FROM genres;
 
 We'll demonstrate transactions by covering most common transaction anomalies given two
 concurrent sessions, and show how toyDB prevents these anomalies in all cases but one. In these
-examples, the left half is user A and the right is user B, and time flows downwards such that 
+examples, the left half is user A and the right is user B. Time flows downwards such that
 commands on the same line happen at the same time.
 
 **Dirty write:** an uncommitted write by A should not be affected by a concurrent B write.
