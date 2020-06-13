@@ -18,28 +18,18 @@ For details, see the [documentation](docs/).
 
 ## Usage
 
-A local five-node cluster can be started on `localhost` ports `9601` to `9605` by running:
+With a [Rust compiler](https://www.rust-lang.org/tools/install) installed, a local five-node 
+cluster can be started on `localhost` ports `9601` to `9605`:
 
 ```
-# Local processes
 $ (cd clusters/local && ./run.sh)
-
-# Docker containers 
-$ (cd clusters/docker && docker-compose up --build)
 ```
 
-A command-line REPL client can be built and used with the node on `localhost` port `9605`
-by running:
+A command-line REPL client can be built and used with the node on `localhost` port `9605`:
 
 ```
-$ cargo run --bin toysql
+$ cargo run --release --bin toysql
 Connected to node "toydb-e" (version 0.1.0). Enter !help for instructions.
-toydb>
-```
-
-A basic subset of SQL has been partially implemented, e.g.:
-
-```
 toydb> CREATE TABLE movies (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL);
 toydb> INSERT INTO movies VALUES (1, 'Sicario'), (2, 'Stalker'), (3, 'Her');
 toydb> SELECT * FROM movies;
@@ -48,49 +38,27 @@ toydb> SELECT * FROM movies;
 3|Her
 ```
 
-ACID transactions are supported via snapshot isolation:
+toyDB supports most common SQL features, including joins, aggregates, and ACID transactions.
+For more information, see the [SQL usage examples](docs/examples.md) or the
+[SQL reference](docs/sql.md).
 
-```
-toydb> BEGIN;
-Began transaction 3
-toydb:3> INSERT INTO movies VALUES (4, 'Alien vs. Predator');
-toydb:3> ROLLBACK;
-Rolled back transaction 3
+## Tests
 
-toydb> BEGIN;
-Began transaction 4
-toydb:4> INSERT INTO movies VALUES (4, 'Alien'), (5, 'Predator');
-toydb:4> COMMIT;
-Committed transaction 4
+toyDB has decent test coverage, with about a thousand tests of core functionality. These are
+comprised of in-code unit-tests for many low-level components (e.g. Raft protocol, B+tree
+storage, and MVCC engine), golden master integration tests of the SQL engine under `tests/sql`,
+and a basic set of end-to-end cluster tests under `tests/`. Jepsen tests, or similar
+system-wide correctness and reliability tests, are desirable but not yet implemented.
 
-toydb> SELECT * FROM movies;
-1|Sicario
-2|Stalker
-3|Her
-4|Alien
-5|Predator
-```
-
-Time-travel queries are also supported:
-
-```
-toydb> BEGIN TRANSACTION READ ONLY AS OF SYSTEM TIME 2;
-Began read-only transaction in snapshot of version 2
-toydb@1> SELECT * FROM movies;
-1|Sicario
-2|Stalker
-3|Her
-```
+To run all tests, execute `cargo test`, or check out the latest
+[CI run](https://cloud.drone.io/erikgrinaker/toydb).
 
 ## Performance
 
-Performance is not a primary goal of toyDB, but it uses a bank simulation as a basic gauge of
+Performance is not a primary goal of toyDB, but it has a bank simulation as a basic gauge of
 throughput and correctness. This creates a set of customers and accounts, then spawns several
 concurrent workers that make random transfers between them, retrying serialization failures and
-verifying invariants.
-
-A simulation with 8 workers, 100 customers, 10 accounts each, and 1000 transactions can be run
-against a toyDB server on `localhost:9605` as:
+verifying invariants:
 
 ```sh
 $ cargo run --release --bin bank -- -c 8 -C 100 -t 1000
@@ -109,13 +77,13 @@ Ran 1000 transactions in 0.937s (1067.691/s)
 Verified that total balance is 100000 with no negative balances
 ```
 
-The informal target was 100 transactions per second, but the above results beat that by an order
-of magnitude. For an unoptimized implementation, this is certainly "good enough". However,
-these results are for a single node with fsync disabled - the below table shows results for other
-configurations, revealing clear potential for improvements:
+The informal target was 100 transactions per second, but these results exceed that by an order
+of magnitude. For an unoptimized implementation, this is certainly "good enough". However, this
+used a single node with fsync disabled - the below table shows results for other configurations,
+revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
-| ----------- | ------------- | ------------ |
+|-------------|---------------|--------------|
 | **1 node**  | 1067 txn/s    | 38 txn/s     |
 | **5 nodes** | 417 txn/s     | 19 txn/s     |
 

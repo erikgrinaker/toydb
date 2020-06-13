@@ -1,3 +1,5 @@
 # toyDB Documentation
 
-* [SQL reference](sql.md)
+* [SQL Usage Examples](examples.md)
+* 
+* [SQL Reference](sql.md)
