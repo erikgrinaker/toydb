@@ -146,8 +146,8 @@ impl Client {
             }
             .await;
             if result.is_err() {
-                self.execute("ROLLBACK").await?;
-                if let Err(Error::Serialization) = result {
+                self.execute("ROLLBACK").await.ok();
+                if matches!(result, Err(Error::Serialization) | Err(Error::Abort)) {
                     continue;
                 }
             }

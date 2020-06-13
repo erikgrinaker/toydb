@@ -100,16 +100,28 @@ impl<E: Engine + 'static> Session<E> {
                 Err(Error::Value("Not in a transaction".into()))
             }
             ast::Statement::Commit => {
-                let txn = std::mem::replace(&mut self.txn, None).unwrap();
-                let result = ResultSet::Commit { id: txn.id() };
-                txn.commit()?;
-                Ok(result)
+                let txn = self.txn.take().unwrap();
+                let id = txn.id();
+                if let Err(err) = txn.commit() {
+                    // If the commit fails, we try to recover the transaction.
+                    if let Ok(t) = self.engine.resume(id) {
+                        self.txn = Some(t);
+                    }
+                    return Err(err);
+                }
+                Ok(ResultSet::Commit { id })
             }
             ast::Statement::Rollback => {
-                let txn = std::mem::replace(&mut self.txn, None).unwrap();
-                let result = ResultSet::Rollback { id: txn.id() };
-                txn.rollback()?;
-                Ok(result)
+                let txn = self.txn.take().unwrap();
+                let id = txn.id();
+                if let Err(err) = txn.rollback() {
+                    // If the rollback fails, we try to recover the transaction.
+                    if let Ok(t) = self.engine.resume(id) {
+                        self.txn = Some(t);
+                    }
+                    return Err(err);
+                }
+                Ok(ResultSet::Rollback { id })
             }
             ast::Statement::Explain(statement) => self.with_txn(Mode::ReadOnly, |txn| {
                 Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?.0))
