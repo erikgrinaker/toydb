@@ -1,0 +1,882 @@
+Query: 
+        SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating
+        FROM movies m JOIN genres g ON m.genre_id = g.id,
+            studios s JOIN movies good ON good.studio_id = s.id AND good.rating >= 8
+        WHERE m.studio_id = s.id
+        ORDER BY m.rating DESC, m.released ASC, m.id ASC
+    
+
+Explain:
+Projection: #0, #1, #2, #3, #4
+└─ Order: m.rating desc, m.released asc, m.id asc
+   └─ Projection: m.id, m.title, g.name, s.name, m.rating, m.released
+      └─ HashJoin: inner on m.studio_id = s.id
+         ├─ HashJoin: inner on m.genre_id = g.id
+         │  ├─ Scan: movies as m
+         │  └─ Scan: genres as g
+         └─ HashJoin: inner on s.id = good.studio_id
+            ├─ Scan: studios as s
+            └─ Scan: movies as good (good.rating > 8 OR good.rating = 8)
+
+Result: ["id", "title", "genre", "studio", "rating"]
+[Integer(10), String("Inception"), String("Science Fiction"), String("Warner Bros"), Float(8.8)]
+[Integer(1), String("Stalker"), String("Science Fiction"), String("Mosfilm"), Float(8.2)]
+[Integer(4), String("Heat"), String("Action"), String("Warner Bros"), Float(8.2)]
+[Integer(6), String("Solaris"), String("Science Fiction"), String("Mosfilm"), Float(8.1)]
+[Integer(7), String("Gravity"), String("Science Fiction"), String("Warner Bros"), Float(7.7)]
+[Integer(9), String("Birdman"), String("Comedy"), String("Warner Bros"), Float(7.7)]
+[Integer(5), String("The Fountain"), String("Science Fiction"), String("Warner Bros"), Float(7.2)]
+
+AST: Select {
+    select: [
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+            None,
+        ),
+        (
+            Field(
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+            Some(
+                "genre",
+            ),
+        ),
+        (
+            Field(
+                Some(
+                    "s",
+                ),
+                "name",
+            ),
+            Some(
+                "studio",
+            ),
+        ),
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+            None,
+        ),
+    ],
+    from: [
+        Join {
+            left: Table {
+                name: "movies",
+                alias: Some(
+                    "m",
+                ),
+            },
+            right: Table {
+                name: "genres",
+                alias: Some(
+                    "g",
+                ),
+            },
+            type: Inner,
+            predicate: Some(
+                Operation(
+                    Equal(
+                        Field(
+                            Some(
+                                "m",
+                            ),
+                            "genre_id",
+                        ),
+                        Field(
+                            Some(
+                                "g",
+                            ),
+                            "id",
+                        ),
+                    ),
+                ),
+            ),
+        },
+        Join {
+            left: Table {
+                name: "studios",
+                alias: Some(
+                    "s",
+                ),
+            },
+            right: Table {
+                name: "movies",
+                alias: Some(
+                    "good",
+                ),
+            },
+            type: Inner,
+            predicate: Some(
+                Operation(
+                    And(
+                        Operation(
+                            Equal(
+                                Field(
+                                    Some(
+                                        "good",
+                                    ),
+                                    "studio_id",
+                                ),
+                                Field(
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        Operation(
+                            GreaterThanOrEqual(
+                                Field(
+                                    Some(
+                                        "good",
+                                    ),
+                                    "rating",
+                                ),
+                                Literal(
+                                    Integer(
+                                        8,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        },
+    ],
+    where: Some(
+        Operation(
+            Equal(
+                Field(
+                    Some(
+                        "m",
+                    ),
+                    "studio_id",
+                ),
+                Field(
+                    Some(
+                        "s",
+                    ),
+                    "id",
+                ),
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+            Descending,
+        ),
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "released",
+            ),
+            Ascending,
+        ),
+        (
+            Field(
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+            Ascending,
+        ),
+    ],
+    offset: None,
+    limit: None,
+}
+
+Plan: Plan(
+    Projection {
+        source: Order {
+            source: Projection {
+                source: Filter {
+                    source: NestedLoopJoin {
+                        left: NestedLoopJoin {
+                            left: Scan {
+                                table: "movies",
+                                alias: Some(
+                                    "m",
+                                ),
+                                filter: None,
+                            },
+                            left_size: 7,
+                            right: Scan {
+                                table: "genres",
+                                alias: Some(
+                                    "g",
+                                ),
+                                filter: None,
+                            },
+                            predicate: Some(
+                                Equal(
+                                    Field(
+                                        3,
+                                        Some(
+                                            (
+                                                Some(
+                                                    "m",
+                                                ),
+                                                "genre_id",
+                                            ),
+                                        ),
+                                    ),
+                                    Field(
+                                        7,
+                                        Some(
+                                            (
+                                                Some(
+                                                    "g",
+                                                ),
+                                                "id",
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            outer: false,
+                        },
+                        left_size: 9,
+                        right: NestedLoopJoin {
+                            left: Scan {
+                                table: "studios",
+                                alias: Some(
+                                    "s",
+                                ),
+                                filter: None,
+                            },
+                            left_size: 3,
+                            right: Scan {
+                                table: "movies",
+                                alias: Some(
+                                    "good",
+                                ),
+                                filter: None,
+                            },
+                            predicate: Some(
+                                And(
+                                    Equal(
+                                        Field(
+                                            5,
+                                            Some(
+                                                (
+                                                    Some(
+                                                        "good",
+                                                    ),
+                                                    "studio_id",
+                                                ),
+                                            ),
+                                        ),
+                                        Field(
+                                            0,
+                                            Some(
+                                                (
+                                                    Some(
+                                                        "s",
+                                                    ),
+                                                    "id",
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                    Or(
+                                        GreaterThan(
+                                            Field(
+                                                8,
+                                                Some(
+                                                    (
+                                                        Some(
+                                                            "good",
+                                                        ),
+                                                        "rating",
+                                                    ),
+                                                ),
+                                            ),
+                                            Constant(
+                                                Integer(
+                                                    8,
+                                                ),
+                                            ),
+                                        ),
+                                        Equal(
+                                            Field(
+                                                8,
+                                                Some(
+                                                    (
+                                                        Some(
+                                                            "good",
+                                                        ),
+                                                        "rating",
+                                                    ),
+                                                ),
+                                            ),
+                                            Constant(
+                                                Integer(
+                                                    8,
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            outer: false,
+                        },
+                        predicate: None,
+                        outer: false,
+                    },
+                    predicate: Equal(
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
+                        ),
+                        Field(
+                            9,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                    ),
+                },
+                expressions: [
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    Some(
+                                        "g",
+                                    ),
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        Some(
+                            "genre",
+                        ),
+                    ),
+                    (
+                        Field(
+                            10,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        Some(
+                            "studio",
+                        ),
+                    ),
+                    (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "rating",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            4,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "released",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                ],
+            },
+            orders: [
+                (
+                    Field(
+                        4,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "rating",
+                            ),
+                        ),
+                    ),
+                    Descending,
+                ),
+                (
+                    Field(
+                        5,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "released",
+                            ),
+                        ),
+                    ),
+                    Ascending,
+                ),
+                (
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "id",
+                            ),
+                        ),
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    2,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    3,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    4,
+                    None,
+                ),
+                None,
+            ),
+        ],
+    },
+)
+
+Optimized plan: Plan(
+    Projection {
+        source: Order {
+            source: Projection {
+                source: HashJoin {
+                    left: HashJoin {
+                        left: Scan {
+                            table: "movies",
+                            alias: Some(
+                                "m",
+                            ),
+                            filter: None,
+                        },
+                        left_field: (
+                            3,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "genre_id",
+                                ),
+                            ),
+                        ),
+                        right: Scan {
+                            table: "genres",
+                            alias: Some(
+                                "g",
+                            ),
+                            filter: None,
+                        },
+                        right_field: (
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "g",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        outer: false,
+                    },
+                    left_field: (
+                        2,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "studio_id",
+                            ),
+                        ),
+                    ),
+                    right: HashJoin {
+                        left: Scan {
+                            table: "studios",
+                            alias: Some(
+                                "s",
+                            ),
+                            filter: None,
+                        },
+                        left_field: (
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        right: Scan {
+                            table: "movies",
+                            alias: Some(
+                                "good",
+                            ),
+                            filter: Some(
+                                Or(
+                                    GreaterThan(
+                                        Field(
+                                            5,
+                                            Some(
+                                                (
+                                                    Some(
+                                                        "good",
+                                                    ),
+                                                    "rating",
+                                                ),
+                                            ),
+                                        ),
+                                        Constant(
+                                            Integer(
+                                                8,
+                                            ),
+                                        ),
+                                    ),
+                                    Equal(
+                                        Field(
+                                            5,
+                                            Some(
+                                                (
+                                                    Some(
+                                                        "good",
+                                                    ),
+                                                    "rating",
+                                                ),
+                                            ),
+                                        ),
+                                        Constant(
+                                            Integer(
+                                                8,
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        },
+                        right_field: (
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "good",
+                                    ),
+                                    "studio_id",
+                                ),
+                            ),
+                        ),
+                        outer: false,
+                    },
+                    right_field: (
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "s",
+                                ),
+                                "id",
+                            ),
+                        ),
+                    ),
+                    outer: false,
+                },
+                expressions: [
+                    (
+                        Field(
+                            0,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "id",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "title",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    Some(
+                                        "g",
+                                    ),
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        Some(
+                            "genre",
+                        ),
+                    ),
+                    (
+                        Field(
+                            10,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
+                                    ),
+                                    "name",
+                                ),
+                            ),
+                        ),
+                        Some(
+                            "studio",
+                        ),
+                    ),
+                    (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "rating",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                    (
+                        Field(
+                            4,
+                            Some(
+                                (
+                                    Some(
+                                        "m",
+                                    ),
+                                    "released",
+                                ),
+                            ),
+                        ),
+                        None,
+                    ),
+                ],
+            },
+            orders: [
+                (
+                    Field(
+                        4,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "rating",
+                            ),
+                        ),
+                    ),
+                    Descending,
+                ),
+                (
+                    Field(
+                        5,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "released",
+                            ),
+                        ),
+                    ),
+                    Ascending,
+                ),
+                (
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "id",
+                            ),
+                        ),
+                    ),
+                    Ascending,
+                ),
+            ],
+        },
+        expressions: [
+            (
+                Field(
+                    0,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    1,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    2,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    3,
+                    None,
+                ),
+                None,
+            ),
+            (
+                Field(
+                    4,
+                    None,
+                ),
+                None,
+            ),
+        ],
+    },
+)
+

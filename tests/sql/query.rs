@@ -322,6 +322,13 @@ test_query! {
             INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
             INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
         ORDER BY m.title"#,
+    join_inner_multi_same: r#"
+        SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating
+        FROM movies m JOIN genres g ON m.genre_id = g.id,
+            studios s JOIN movies good ON good.studio_id = s.id AND good.rating >= 8
+        WHERE m.studio_id = s.id
+        ORDER BY m.rating DESC, m.released ASC, m.id ASC
+    "#,
 
     join_left: "SELECT m.id AS movie_id, g.id AS genre_id FROM movies m LEFT JOIN genres g ON m.id = g.id",
     join_left_all: "SELECT * FROM movies m LEFT JOIN genres g ON m.id = g.id",

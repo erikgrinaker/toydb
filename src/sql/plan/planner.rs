@@ -258,19 +258,23 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// join of an arbitrary number of tables. All of the items are joined, since e.g. 'SELECT * FROM
     /// a, b' is an implicit join of a and b.
     fn build_from_clause(&self, scope: &mut Scope, from: Vec<ast::FromItem>) -> Result<Node> {
+        let base_scope = scope.clone();
         let mut items = from.into_iter();
         let mut node = match items.next() {
             Some(item) => self.build_from_item(scope, item)?,
             None => return Err(Error::Value("No from items given".into())),
         };
         for item in items {
+            let mut right_scope = base_scope.clone();
+            let right = self.build_from_item(&mut right_scope, item)?;
             node = Node::NestedLoopJoin {
                 left: Box::new(node),
                 left_size: scope.len(),
-                right: Box::new(self.build_from_item(scope, item)?),
+                right: Box::new(right),
                 predicate: None,
                 outer: false,
-            }
+            };
+            scope.merge(right_scope)?;
         }
         Ok(node)
     }
@@ -634,7 +638,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 }
 
 /// Manages names available to expressions and executors, and maps them onto columns/fields.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Scope {
     // If true, the scope is constant and cannot contain any variables.
     constant: bool,
@@ -731,6 +735,23 @@ impl Scope {
             (table, Some(name)) => Some((table, name)),
             _ => None,
         })
+    }
+
+    /// Merges two scopes, by appending the given scope to self.
+    fn merge(&mut self, scope: Scope) -> Result<()> {
+        if self.constant {
+            return Err(Error::Internal("Can't modify constant scope".into()));
+        }
+        for (label, table) in scope.tables {
+            if self.tables.contains_key(&label) {
+                return Err(Error::Value(format!("Duplicate table name {}", label)));
+            }
+            self.tables.insert(label, table);
+        }
+        for (table, label) in scope.columns {
+            self.add_column(table, label);
+        }
+        Ok(())
     }
 
     /// Resolves a name, optionally qualified by a table name.

@@ -166,11 +166,21 @@ impl<T: Transaction> Executor<T> for HashJoin<T> {
         if let ResultSet::Query { mut columns, rows } = self.left.execute(txn)? {
             if let ResultSet::Query { columns: rcolumns, rows: rrows } = self.right.execute(txn)? {
                 let (l, r, outer) = (self.left_field, self.right_field, self.outer);
-                let right: HashMap<Value, Row> =
-                    rrows.map(|res| res.map(|row| (row[r].clone(), row))).collect::<Result<_>>()?;
+                let right: HashMap<Value, Row> = rrows
+                    .map(|res| match res {
+                        Ok(row) if row.len() <= r => {
+                            Err(Error::Internal(format!("Right index {} out of bounds", r)))
+                        }
+                        Ok(row) => Ok((row[r].clone(), row)),
+                        Err(err) => Err(err),
+                    })
+                    .collect::<Result<_>>()?;
                 let empty = std::iter::repeat(Value::Null).take(rcolumns.len());
                 columns.extend(rcolumns);
                 let rows = Box::new(rows.filter_map(move |res| match res {
+                    Ok(row) if row.len() <= l => {
+                        Some(Err(Error::Value(format!("Left index {} out of bounds", l))))
+                    }
                     Ok(mut row) => match right.get(&row[l]) {
                         Some(hit) => {
                             row.extend(hit.clone());
