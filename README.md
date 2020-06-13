@@ -14,12 +14,17 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 * SQL interface including projections, filters, joins, aggregates, and transactions.
 
-For details, see the [documentation](docs/). This database is not suitable for any kind of
-real-world use.
+toyDB is not suitable for any kind of real-world use.
 
 I'm interested in contributing to a strongly consistent ACID-compliant distributed database,
 preferably a main-memory database in Rust or Go. If you're building something like this, feel free
 to get in touch.
+
+## Documentation
+
+* [SQL usage examples](docs/examples.md): comprehensive examples of toyDB's SQL features.
+
+* [SQL reference](docs/sql.md): detailed reference documentation for toyDB's SQL dialect.
 
 ## Usage
 
@@ -44,8 +49,6 @@ toydb> SELECT * FROM movies;
 ```
 
 toyDB supports most common SQL features, including joins, aggregates, and ACID transactions.
-For more information, see the [SQL usage examples](docs/examples.md) or the
-[SQL reference](docs/sql.md).
 
 ## Tests
 
@@ -88,7 +91,7 @@ is with a single node and fsync disabled - the table below shows results for oth
 revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
-|-------------|---------------|--------------|
+| ----------- | ------------- | ------------ |
 | **1 node**  | 1067 txn/s    | 38 txn/s     |
 | **5 nodes** | 417 txn/s     | 19 txn/s     |
 
