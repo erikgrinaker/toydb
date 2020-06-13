@@ -186,7 +186,7 @@ SELECT 3! + 7 % 4 - 2 ^ 3;
 1
 ```
 
-Complete 64-bit floating point support is also provided, included handling of infinity and NaN:
+64-bit floating point arithmetic is also supported, including infinity and NaN:
 
 ```sql
 toydb> SELECT 3.14 * 2.718;
@@ -265,7 +265,7 @@ toydb> SELECT g.id, g.name, s.name FROM genres g RIGHT JOIN studios s ON g.id = 
 NULL|NULL|Focus Features
 ```
 
-As well as cross joins (both implicit and explicit):
+And cross joins (both implicit and explicit):
 
 ```sql
 toydb> SELECT g.name, s.name FROM genres g, studios s WHERE s.name < 'S';
@@ -325,7 +325,7 @@ toydb> SELECT   m.id, m.title, g.name AS genre, m.released, s.name AS studio
 ## Explain
 
 When optimizing complex queries with several joins, it can often be useful to inspect the query
-plan via an `EXPLAIN` query, as with the previous join example:
+plan via an `EXPLAIN` query:
 
 ```sql
 toydb> EXPLAIN
@@ -390,8 +390,9 @@ toydb> SELECT s.id, s.name, ((MAX(rating^2) - MIN(rating^2)) / AVG(rating^2)) ^ 
 ## Transactions
 
 toyDB supports ACID transactions via MVCC-based snapshot isolation. This provides atomic
-transactions with good isolation without taking out locks or writes blocking reads. As a
-basic example, the below transaction is rolled back without taking effect:
+transactions with good isolation, without taking out locks or writes blocking reads. As a basic
+example, the below transaction is rolled back without taking effect, as opposed to `COMMIT`
+which would make it permanent:
 
 ```sql
 toydb> BEGIN;
@@ -416,7 +417,7 @@ toydb> SELECT * FROM genres;
 
 We'll demonstrate transactions by covering most common transaction anomalies given two
 concurrent sessions, and show how toyDB prevents these anomalies in all cases but one. In these
-examples, the left half is user A and the right is user B, and time flows downwards, such that 
+examples, the left half is user A and the right is user B, and time flows downwards such that 
 commands on the same line happen at the same time.
 
 **Dirty write:** an uncommitted write by A should not be affected by a concurrent B write.
@@ -424,8 +425,8 @@ commands on the same line happen at the same time.
 ```sql
 a> BEGIN;
 a> INSERT INTO genres VALUES (5, 'Western');
-                                                 b> INSERT INTO genres VALUES (5, 'Romance');
-                                                 Error: Serialization failure, retry transaction
+                                                   b> INSERT INTO genres VALUES (5, 'Romance');
+                                                   Error: Serialization failure, retry transaction
 a> SELECT * FROM genres WHERE id = 5;
 5|Western
 ```
@@ -438,23 +439,23 @@ optimal strategy, but it is correct in terms of preventing serialization anomali
 ```sql
 a> BEGIN;
 a> INSERT INTO genres VALUES (5, 'Western');
-                                                 b> SELECT * FROM genres WHERE id = 5;
-                                                 No rows returned
+                                                  b> SELECT * FROM genres WHERE id = 5;
+                                                  No rows returned
 a> COMMIT;
-                                                 b> SELECT * FROM genres WHERE id = 5;
-                                                 5|Western
+                                                  b> SELECT * FROM genres WHERE id = 5;
+                                                  5|Western
 ```
 
 **Lost update:** when A and B both read a value, before updating it in turn, the first write should
 not be overwritten by the second.
 
 ```sql
-a> BEGIN;                                          b> BEGIN;
-a> SELECT title, rating FROM movies WHERE id = 2;  b> SELECT title, rating FROM movies WHERE id = 2;
-Sicario|7.6                                        Sicario|7.6
+a> BEGIN;                                         b> BEGIN;
+a> SELECT title, rating FROM movies WHERE id = 2; b> SELECT title, rating FROM movies WHERE id = 2;
+Sicario|7.6                                       Sicario|7.6
 a> UPDATE movies SET rating = 7.8 WHERE id = 2;
-                                                   b> UPDATE movies SET rating = 7.7 WHERE id = 2;
-                                                   Error: Serialization failure, retry transaction
+                                                  b> UPDATE movies SET rating = 7.7 WHERE id = 2;
+                                                  Error: Serialization failure, retry transaction
 a> COMMIT;
 ```
 
@@ -462,17 +463,17 @@ a> COMMIT;
 new value.
 
 ```sql
-a> BEGIN;                                        b> BEGIN;
-                                                 b> SELECT * FROM genres WHERE id = 1;
-                                                 1|Science Fiction
+a> BEGIN;                                         b> BEGIN;
+                                                  b> SELECT * FROM genres WHERE id = 1;
+                                                  1|Science Fiction
 a> UPDATE genres SET name = 'Scifi' WHERE id = 1;
 a> COMMIT;
-                                                 b> SELECT * FROM genres WHERE id = 1;
-                                                 1|Science Fiction
-                                                 b> COMMIT;
+                                                  b> SELECT * FROM genres WHERE id = 1;
+                                                  1|Science Fiction
+                                                  b> COMMIT;
 
-                                                 b> SELECT * FROM genres WHERE id = 1;
-                                                 1|Scifi
+                                                  b> SELECT * FROM genres WHERE id = 1;
+                                                  1|Scifi
 ```
 
 **Read skew:** if A reads two values, and B modifies the second value in between the reads, A 
@@ -482,45 +483,45 @@ should see the old second value.
 a> BEGIN;
 a> SELECT * FROM genres WHERE id = 2;
 2|Action
-                                                 b> BEGIN;
-                                                 b> UPDATE genres SET name = 'Drama' WHERE id = 2;
-                                                 b> UPDATE genres SET name = 'Action' WHERE id = 3;
-                                                 b> COMMIT;
+                                                  b> BEGIN;
+                                                  b> UPDATE genres SET name = 'Drama' WHERE id = 2;
+                                                  b> UPDATE genres SET name = 'Action' WHERE id = 3;
+                                                  b> COMMIT;
 a> SELECT * FROM genres WHERE id = 3;
 3|Drama
 ```
 
-**Phantom read:** when A runs a query with some predicate, and B commits a matching write, A should
-not see the write when rerunning the query.
+**Phantom read:** when A runs a query with a predicate, and B commits a matching write, A should
+not see the write when rerunning it.
 
 ```sql
 a> BEGIN;
 a> SELECT * FROM genres WHERE id > 2;
 3|Drama
 4|Comedy
-                                                 b> INSERT INTO genres VALUES (5, 'Western');
+                                                  b> INSERT INTO genres VALUES (5, 'Western');
 a> SELECT * FROM genres WHERE id > 2;
 3|Drama
 4|Comedy
 ```
 
-**Write skew:**  when A reads row X and writes it to row Y, B should not concurrently be able to
+**Write skew:** when A reads row X and writes it to row Y, B should not concurrently be able to
 read row Y and write it to row X.
 
 ```sql
-a> BEGIN;                                        b> BEGIN;
+a> BEGIN;                                         b> BEGIN;
 a> SELECT * FROM genres WHERE id = 2;
 2|Action
-                                                 b> SELECT * FROM genres WHERE id = 3;
-                                                 3|Drama
-                                                 b> UPDATE genres SET name = 'Drama' WHERE id = 2;
+                                                  b> SELECT * FROM genres WHERE id = 3;
+                                                  3|Drama
+                                                  b> UPDATE genres SET name = 'Drama' WHERE id = 2;
 a> UPDATE genres SET name = 'Action' WHERE id = 3;
-a> COMMIT;                                       b> COMMIT;
+a> COMMIT;                                        b> COMMIT;
 ```
 
 Here, the writes actually go through. This anomaly is not protected against by snapshot isolation, 
-and thus not by toyDB either. Doing so would require implementing serializable snapshot isolation. 
-However, this is the only common serialization anomaly not handled by toyDB, and is not among the
+and thus not by toyDB either - doing so would require implementing serializable snapshot isolation. 
+However, this is the only common serialization anomaly not handled by toyDB, and is not amongst the
 most serious.
 
 ## Time-Travel Queries

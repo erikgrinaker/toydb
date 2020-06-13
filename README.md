@@ -34,7 +34,7 @@ A command-line REPL client can be built and used with the node on `localhost` po
 
 ```
 $ cargo run --release --bin toysql
-Connected to node "toydb-e" (version 0.1.0). Enter !help for instructions.
+Connected to toyDB node "toydb-e". Enter !help for instructions.
 toydb> CREATE TABLE movies (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL);
 toydb> INSERT INTO movies VALUES (1, 'Sicario'), (2, 'Stalker'), (3, 'Her');
 toydb> SELECT * FROM movies;
