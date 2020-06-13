@@ -170,3 +170,9 @@ impl Session {
         })
     }
 }
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        tokio::task::block_in_place(|| self.sql.execute("ROLLBACK").ok());
+    }
+}
