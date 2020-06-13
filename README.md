@@ -44,8 +44,8 @@ For more information, see the [SQL usage examples](docs/examples.md) or the
 
 ## Tests
 
-toyDB has decent test coverage, with about a thousand tests of core functionality. These are
-comprised of in-code unit-tests for many low-level components (e.g. Raft protocol, B+tree
+toyDB has decent test coverage, with about a thousand tests of core functionality. These 
+consist of in-code unit-tests for many low-level components (e.g. Raft protocol, B+tree
 storage, and MVCC engine), golden master integration tests of the SQL engine under `tests/sql`,
 and a basic set of end-to-end cluster tests under `tests/`. Jepsen tests, or similar
 system-wide correctness and reliability tests, are desirable but not yet implemented.
@@ -79,7 +79,7 @@ Verified that total balance is 100000 with no negative balances
 
 The informal target was 100 transactions per second, but these results exceed that by an order
 of magnitude. For an unoptimized implementation, this is certainly "good enough". However, this
-used a single node with fsync disabled - the below table shows results for other configurations,
+used a single node with fsync disabled - the table below shows results for other configurations,
 revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
