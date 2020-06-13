@@ -14,7 +14,12 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 * SQL interface including projections, filters, joins, aggregates, and transactions.
 
-For details, see the [documentation](docs/).
+For details, see the [documentation](docs/). This database is not suitable for any kind of
+real-world use.
+
+I'm interested in contributing to a strongly consistent ACID-compliant distributed database,
+preferably a main-memory database in Rust or Go. If you're building something like this, feel free
+to get in touch.
 
 ## Usage
 
@@ -77,9 +82,9 @@ Ran 1000 transactions in 0.937s (1067.691/s)
 Verified that total balance is 100000 with no negative balances
 ```
 
-The informal target was 100 transactions per second, but these results exceed that by an order
+The informal target was 100 transactions per second, and these results exceed that by an order
 of magnitude. For an unoptimized implementation, this is certainly "good enough". However, this
-used a single node with fsync disabled - the table below shows results for other configurations,
+is with a single node and fsync disabled - the table below shows results for other configurations,
 revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
