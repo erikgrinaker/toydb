@@ -65,7 +65,7 @@ concurrent workers that make random transfers between them, retrying serializati
 verifying invariants:
 
 ```sh
-$ cargo run --release --bin bank -- -c 8 -C 100 -t 1000
+$ cargo run --release --bin bank
 Created 100 customers (1000 accounts) in 0.123s
 Verified that total balance is 100000 with no negative balances
 

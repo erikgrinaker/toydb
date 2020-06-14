@@ -2,10 +2,10 @@
  * Simulates a bank, by creating a set of accounts and making concurrent transfers between them:
  *
  * - Connect to the given toyDB hosts (-h default 127.0.0.1:9605, can give multiple)
- * - Create C customers (-C default 10)
+ * - Create C customers (-C default 100)
  * - Create a accounts per customer with initial balance 100 (-a default 10)
- * - Spawn c concurrent workers (-c default 4)
- * - Queue t transactions between two random customers (-t default 100)
+ * - Spawn c concurrent workers (-c default 8)
+ * - Queue t transactions between two random customers (-t default 1000)
  *   - Begin a new transaction
  *   - Find the sender account with the largest balance
  *   - Find the receiver account with the lowest balance
@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
                 .help("Concurrent workers to spawn")
                 .takes_value(true)
                 .required(true)
-                .default_value("4"),
+                .default_value("8"),
         )
         .arg(
             clap::Arg::with_name("customers")
@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
                 .help("Number of customers to create")
                 .takes_value(true)
                 .required(true)
-                .default_value("10"),
+                .default_value("100"),
         )
         .arg(
             clap::Arg::with_name("accounts")
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
                 .help("Number of account transfers to execute")
                 .takes_value(true)
                 .required(true)
-                .default_value("100"),
+                .default_value("1000"),
         )
         .get_matches();
 
