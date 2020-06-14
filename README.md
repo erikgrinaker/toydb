@@ -16,13 +16,9 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 toyDB is not suitable for any kind of real-world use.
 
-I'm interested in contributing to a strongly consistent ACID-compliant distributed database,
-preferably a main-memory database in Rust or Go. If you're building something like this, feel free
-to get in touch.
-
 ## Documentation
 
-* [SQL usage examples](docs/examples.md): comprehensive examples of toyDB's SQL features.
+* [SQL examples](docs/examples.md): comprehensive examples of toyDB's SQL features.
 
 * [SQL reference](docs/sql.md): detailed reference documentation for toyDB's SQL dialect.
 
@@ -91,7 +87,7 @@ is with a single node and fsync disabled - the table below shows results for oth
 revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
-| ----------- | ------------- | ------------ |
+|-------------|---------------|--------------|
 | **1 node**  | 1067 txn/s    | 38 txn/s     |
 | **5 nodes** | 417 txn/s     | 19 txn/s     |
 
@@ -142,8 +138,6 @@ The primary goal is to build a minimally functional yet correct distributed data
 * **Garbage collection:** old Raft log entries or MVCC versions are never removed, giving unbounded disk usage but also unbounded data history.
 
 ### Transactions
-
-* **Abortion:** client disconnects or system crashes do not abort transactions, which may cause serialization failures for other transactions due to uncommitted writes.
 
 * **Transient reads:** all statements, including trivial `SELECT`s, will be wrapped in a transaction with a globally allocated, persistent transaction ID.
 

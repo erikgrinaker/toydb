@@ -1,4 +1,4 @@
-# SQL Usage Examples
+# SQL Examples
 
 The following examples demonstrate some of toyDB's SQL features. For more details, see the
 [SQL reference](sql.md).
