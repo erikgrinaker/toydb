@@ -1,3 +1,9 @@
+/*
+ * toydb is the toyDB server. It takes configuration via a configuration file, command-line
+ * parameters, and environment variables, then starts up a toyDB TCP server that communicates with
+ * SQL clients (port 9605) and Raft peers (port 9705).
+ */
+
 #![warn(clippy::all)]
 
 use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};

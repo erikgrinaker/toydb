@@ -1,6 +1,6 @@
 /*
- * ToySQL is a command-line client for toyDB. It can connect to any toyDB node
- * via gRPC and run SQL queries through a REPL interface.
+ * toysql is a command-line client for toyDB. It connects to a toyDB cluster node and executes SQL
+ * queries against it via a REPL interface.
  */
 
 #![warn(clippy::all)]
