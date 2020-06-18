@@ -2,7 +2,8 @@
 
 [![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
 
-Distributed SQL database in Rust, written as a learning project. Most components are built from scratch, including:
+Distributed SQL database in Rust, written as a learning project. Most components are built from
+scratch, including:
 
 * Raft-based distributed consensus engine for linearizable state machine replication.
 
@@ -14,9 +15,12 @@ Distributed SQL database in Rust, written as a learning project. Most components
 
 * SQL interface including projections, filters, joins, aggregates, and transactions.
 
-toyDB is not suitable for any kind of real-world use.
+toyDB is not suitable for real-world use, but may be of interest to others learning about
+database internals.
 
 ## Documentation
+
+* [Architecture guide](docs/architecture.md): a guide to toyDB's architecture and implementation.
 
 * [SQL examples](docs/examples.md): comprehensive examples of toyDB's SQL features.
 
@@ -31,7 +35,7 @@ cluster can be started on `localhost` ports `9601` to `9605`:
 $ (cd clusters/local && ./run.sh)
 ```
 
-A command-line REPL client can be built and used with the node on `localhost` port `9605`:
+A command-line client can be built and used with the node on `localhost` port `9605`:
 
 ```
 $ cargo run --release --bin toysql
@@ -46,21 +50,31 @@ toydb> SELECT * FROM movies;
 
 toyDB supports most common SQL features, including joins, aggregates, and ACID transactions.
 
+## Architecture
+
+[![toyDB architecture](./docs/architecture.svg)](./docs/architecture.md)
+
+toyDB's architecture is fairly typical for distributed SQL databases: a transactional
+key/value store managed by a Raft cluster with a SQL query engine on top. See the
+[architecture guide](./docs/architecture.md) for more details.
+
 ## Tests
 
-toyDB has decent test coverage, with about a thousand tests of core functionality. These 
-consist of in-code unit-tests for many low-level components (e.g. Raft protocol, B+tree
-storage, and MVCC engine), golden master integration tests of the SQL engine under `tests/sql`,
-and a basic set of end-to-end cluster tests under `tests/`. Jepsen tests, or similar
-system-wide correctness and reliability tests, are desirable but not yet implemented.
+toyDB has decent test coverage, with about a thousand tests of core functionality. These consist
+of in-code unit-tests for many low-level components, golden master integration tests of the SQL
+engine under [`tests/sql`](https://github.com/erikgrinaker/toydb/tree/master/tests/sql), and a
+basic set of end-to-end cluster tests under
+[`tests/`](https://github.com/erikgrinaker/toydb/tree/master/tests).
+[Jepsen tests](https://jepsen.io), or similar system-wide correctness and reliability tests, are 
+desirable but not yet implemented.
 
-To run all tests, execute `cargo test`, or check out the latest
+Execute `cargo test` to run all tests, or check out the latest
 [CI run](https://cloud.drone.io/erikgrinaker/toydb).
 
 ## Performance
 
 Performance is not a primary goal of toyDB, but it has a bank simulation as a basic gauge of
-throughput and correctness. This creates a set of customers and accounts, then spawns several
+throughput and correctness. This creates a set of customers and accounts, and spawns several
 concurrent workers that make random transfers between them, retrying serialization failures and
 verifying invariants:
 
@@ -87,7 +101,7 @@ is with a single node and fsync disabled - the table below shows results for oth
 revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
-|-------------|---------------|--------------|
+| ----------- | ------------- | ------------ |
 | **1 node**  | 1067 txn/s    | 38 txn/s     |
 | **5 nodes** | 417 txn/s     | 19 txn/s     |
 
@@ -116,41 +130,3 @@ UPDATE account SET balance = balance + {amount} WHERE id = {destination};
 
 COMMIT;
 ```
-
-## Known Issues
-
-The primary goal is to build a minimally functional yet correct distributed database. Performance, security, reliability, and convenience are non-goals. Below is an incomplete list of known issues preventing this from being a "real" database.
-
-### Networking
-
-* **No security:** all network traffic is unauthenticated and in plaintext.
-
-### Raft
-
-* **Cluster reconfiguration:** the Raft cluster must consist of a static set of nodes available via static IP addresses. It is not possible to resize the cluster without a full cluster restart.
-
-* **Single-threaded state:** all state machine operations are processed by a single thread on a single node, preventing horizontal scalability.
-
-* **Log replication:** only the simplest form of Raft log replication is implemented, without snapshots or rapid log replay.
-
-### Storage
-
-* **Garbage collection:** old Raft log entries or MVCC versions are never removed, giving unbounded disk usage but also unbounded data history.
-
-### Transactions
-
-* **Transient reads:** all statements, including trivial `SELECT`s, will be wrapped in a transaction with a globally allocated, persistent transaction ID.
-
-* **Serializability:** transactions use MVCC without serializable snapshot isolation, and are thus vulnerable to write skew anomalies.
-
-* **ID overflow:** transaction IDs are stored as unsigned 64-bit integers without wraparound, thus no new transactions can be started beyond transaction number 2⁶⁴-1.
-
-### Schema
-
-* **Single database:** only a single, unnamed database is supported per toyDB cluster.
-
-* **Schema changes:** schema changes other than creating or dropping tables is not supported.
-
-### Query Engine
-
-* **Type checking:** query type checking (e.g. `SELECT a + b` must receive two numbers) is done at query evaluation time, not at query compile time.

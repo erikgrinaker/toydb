@@ -9,7 +9,7 @@ use std::fmt::{self, Display};
 /// The catalog stores schema information
 pub trait Catalog {
     /// Creates a new table
-    fn create_table(&mut self, table: &Table) -> Result<()>;
+    fn create_table(&mut self, table: Table) -> Result<()>;
     /// Deletes an existing table, or errors if it does not exist
     fn delete_table(&mut self, table: &str) -> Result<()>;
     /// Reads a table, if it exists

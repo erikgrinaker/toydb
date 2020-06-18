@@ -236,10 +236,8 @@ impl super::Transaction for Transaction {
 }
 
 impl Catalog for Transaction {
-    fn create_table(&mut self, table: &Table) -> Result<()> {
-        Raft::deserialize(
-            &self.mutate(Mutation::CreateTable { txn_id: self.id, schema: table.clone() })?,
-        )
+    fn create_table(&mut self, table: Table) -> Result<()> {
+        Raft::deserialize(&self.mutate(Mutation::CreateTable { txn_id: self.id, schema: table })?)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
@@ -299,7 +297,7 @@ impl State {
             }
 
             Mutation::CreateTable { txn_id, schema } => {
-                Raft::serialize(&self.engine.resume(txn_id)?.create_table(&schema)?)
+                Raft::serialize(&self.engine.resume(txn_id)?.create_table(schema)?)
             }
             Mutation::DeleteTable { txn_id, table } => {
                 Raft::serialize(&self.engine.resume(txn_id)?.delete_table(&table)?)

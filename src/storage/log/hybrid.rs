@@ -13,7 +13,7 @@ use std::sync::{Mutex, MutexGuard};
 /// A hybrid log store, storing committed entries in an append-only file, uncommitted entries
 /// in memory, and metadata in a separate file (should be an on-disk key-value store).
 ///
-/// The log file contains sequential binary log entries, length-prefixed with a big-endian u64.
+/// The log file contains sequential binary log entries, length-prefixed with a big-endian u32.
 /// Entries are only flushed to disk when they are committed and permanent, thus the file is
 /// written append-only.
 ///

@@ -390,7 +390,7 @@ toydb> SELECT s.id, s.name, ((MAX(rating^2) - MIN(rating^2)) / AVG(rating^2)) ^ 
 ## Transactions
 
 toyDB supports ACID transactions via MVCC-based snapshot isolation. This provides atomic
-transactions with good isolation, without taking out locks or writes blocking reads. As a basic
+transactions with good isolation, without taking out locks or blocking reads on writes. As a basic
 example, the below transaction is rolled back without taking effect, as opposed to `COMMIT`
 which would make it permanent:
 
@@ -521,8 +521,8 @@ a> COMMIT;                                        b> COMMIT;
 
 Here, the writes actually go through. This anomaly is not protected against by snapshot isolation, 
 and thus not by toyDB either - doing so would require implementing serializable snapshot isolation. 
-However, this is the only common serialization anomaly not handled by toyDB, and is not amongst the
-most serious.
+However, this is the only common serialization anomaly not handled by toyDB, and is not among the
+most severe.
 
 ## Time-Travel Queries
 

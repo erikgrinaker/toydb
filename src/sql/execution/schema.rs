@@ -16,8 +16,9 @@ impl CreateTable {
 
 impl<T: Transaction> Executor<T> for CreateTable {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
-        txn.create_table(&self.table)?;
-        Ok(ResultSet::CreateTable { name: self.table.name })
+        let name = self.table.name.clone();
+        txn.create_table(self.table)?;
+        Ok(ResultSet::CreateTable { name })
     }
 }
 
