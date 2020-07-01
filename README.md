@@ -26,6 +26,8 @@ database internals.
 
 * [SQL reference](docs/sql.md): detailed reference documentation for toyDB's SQL dialect.
 
+* [References](docs/references.md): books and other research material used while building toyDB.
+
 ## Usage
 
 With a [Rust compiler](https://www.rust-lang.org/tools/install) installed, a local five-node 
