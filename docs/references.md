@@ -48,7 +48,7 @@ climbing algorithm, which is the algorithm I found the most elegant:
 Jepsen (i.e. Kyle Kingsbury) has an excellent overview of consistency and isolation models, which 
 is very helpful in making sense of the jungle of overlapping and ill-defined terms:
 
-- 🔗 [**Consistency Models**](https://jepsen.io/consistency) (Jepsen 2016)
+- 🔗 [Consistency Models](https://jepsen.io/consistency) (Jepsen 2016)
 
 For more background on this, in particular on how snapshot isolation provided by the MVCC 
 transaction engine used in toyDB does not fit into the traditional SQL isolation levels, the 
