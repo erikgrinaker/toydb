@@ -1,4 +1,4 @@
-# toyDB
+# <a>![toyDB](docs/toydb-32.png)</a> toyDB
 
 [![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
 
@@ -132,3 +132,7 @@ UPDATE account SET balance = balance + {amount} WHERE id = {destination};
 
 COMMIT;
 ```
+
+## Credits
+
+toyDB logo is courtesy of [@jonasmerlin](https://github.com/jonasmerlin).
