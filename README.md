@@ -1,4 +1,4 @@
-# <img src="./docs/images/toydb.svg" height="40" valign="top" /> toyDB
+# <a><img src="./docs/images/toydb.svg" height="40" valign="top" /></a> toyDB
 
 [![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
 
@@ -103,7 +103,7 @@ is with a single node and fsync disabled - the table below shows results for oth
 revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
-|-------------|---------------|--------------|
+| ----------- | ------------- | ------------ |
 | **1 node**  | 1067 txn/s    | 38 txn/s     |
 | **5 nodes** | 417 txn/s     | 19 txn/s     |
 
