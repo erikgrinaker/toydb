@@ -394,7 +394,7 @@ Expression::Multiply(
 )
 ```
 
-Calling `evaluate()` on the expression will recursively evaluate it, returning `Value::Integer(6)`.
+Calling `evaluate()` on the expression will recursively evaluate it, returning `Value::Integer(9)`.
 
 ### Schemas
 
