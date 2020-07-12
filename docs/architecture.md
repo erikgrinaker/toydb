@@ -47,7 +47,7 @@ A toyDB node consists of three main components:
 These components are integrated in the toyDB server, which handles network communication with
 clients and other nodes. The following diagram illustrates its internal structure:
 
-![toyDB architecture](./architecture.svg)
+![toyDB architecture](./images/architecture.svg)
 
 At the bottom is a simple [key/value store](https://en.wikipedia.org/wiki/Key–value_database), 
 which stores all SQL data. This is wrapped inside an

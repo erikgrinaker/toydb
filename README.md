@@ -1,4 +1,4 @@
-# <a>![toyDB](docs/toydb-32.png)</a> toyDB
+# <img src="./docs/images/toydb.svg" height="40" valign="top" /> toyDB
 
 [![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
 
@@ -54,7 +54,7 @@ toyDB supports most common SQL features, including joins, aggregates, and ACID t
 
 ## Architecture
 
-[![toyDB architecture](./docs/architecture.svg)](./docs/architecture.md)
+[![toyDB architecture](./docs/images/architecture.svg)](./docs/architecture.md)
 
 toyDB's architecture is fairly typical for distributed SQL databases: a transactional
 key/value store managed by a Raft cluster with a SQL query engine on top. See the
@@ -103,7 +103,7 @@ is with a single node and fsync disabled - the table below shows results for oth
 revealing clear potential for improvement:
 
 |             | `sync: false` | `sync: true` |
-| ----------- | ------------- | ------------ |
+|-------------|---------------|--------------|
 | **1 node**  | 1067 txn/s    | 38 txn/s     |
 | **5 nodes** | 417 txn/s     | 19 txn/s     |
 
