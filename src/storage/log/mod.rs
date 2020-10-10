@@ -163,6 +163,7 @@ trait TestSuite<S: Store> {
         Ok(())
     }
 
+    #[allow(clippy::reversed_empty_ranges)]
     fn test_scan() -> Result<()> {
         let mut s = Self::setup()?;
         s.append(vec![0x01])?;

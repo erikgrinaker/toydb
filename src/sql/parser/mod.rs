@@ -81,10 +81,7 @@ impl<'a> Parser<'a> {
 
     /// Grabs the next lexer token if it is a keyword
     fn next_if_keyword(&mut self) -> Option<Token> {
-        self.next_if(|t| match t {
-            Token::Keyword(_) => true,
-            _ => false,
-        })
+        self.next_if(|t| matches!(t, Token::Keyword(_)))
     }
 
     /// Grabs the next lexer token if it is a given token

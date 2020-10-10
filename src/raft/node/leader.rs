@@ -55,7 +55,7 @@ impl RoleNode<Leader> {
     fn commit(&mut self) -> Result<u64> {
         let mut last_indexes = vec![self.log.last_index];
         last_indexes.extend(self.role.peer_last_index.values());
-        last_indexes.sort();
+        last_indexes.sort_unstable();
         last_indexes.reverse();
         let quorum_index = last_indexes[self.quorum() as usize - 1];
 

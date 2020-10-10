@@ -86,7 +86,7 @@ impl FilterPushdown {
             }
             Node::Filter { ref mut predicate, .. } => {
                 let p = replace(predicate, Expression::Constant(Value::Null));
-                replace(predicate, Expression::And(Box::new(p), Box::new(expression)));
+                *predicate = Expression::And(Box::new(p), Box::new(expression));
                 None
             }
             _ => Some(expression),
@@ -108,18 +108,12 @@ impl FilterPushdown {
         let (mut push_left, cnf): (Vec<Expression>, Vec<Expression>) =
             cnf.into_iter().partition(|e| {
                 // Partition only if no expressions reference the right-hand source.
-                !e.contains(&|e| match e {
-                    Expression::Field(i, _) if i >= &boundary => true,
-                    _ => false,
-                })
+                !e.contains(&|e| matches!(e, Expression::Field(i, _) if i >= &boundary))
             });
         let (mut push_right, mut cnf): (Vec<Expression>, Vec<Expression>) =
             cnf.into_iter().partition(|e| {
                 // Partition only if no expressions reference the left-hand source.
-                !e.contains(&|e| match e {
-                    Expression::Field(i, _) if i < &boundary => true,
-                    _ => false,
-                })
+                !e.contains(&|e| matches!(e, Expression::Field(i, _) if i < &boundary))
             });
 
         // Look for equijoins that have constant lookups on either side, and transfer the constants

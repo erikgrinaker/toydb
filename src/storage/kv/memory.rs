@@ -92,7 +92,7 @@ impl Node {
                 // If we now have a single child, pull it up into the root.
                 while children.len() == 1 && matches!(children[0], Node::Inner{..}) {
                     if let Node::Inner(c) = children.remove(0) {
-                        replace(children, c);
+                        *children = c;
                     }
                 }
                 // If we have a single empty child, remove it.
@@ -157,7 +157,7 @@ impl Node {
                     root_children.keys.push(split_key);
                     root_children.nodes.push(Node::Inner(replace(children, Children::empty())));
                     root_children.nodes.push(Node::Inner(split_children));
-                    replace(children, root_children);
+                    *children = root_children;
                 }
                 None
             }

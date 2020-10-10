@@ -169,7 +169,7 @@ impl Expression {
         // Temporarily replace expression with a null value, in case closure panics. May consider
         // replace_with crate if this hampers performance.
         let expr = replace(self, Expression::Literal(Literal::Null));
-        replace(self, f(expr)?);
+        *self = f(expr)?;
         Ok(())
     }
 

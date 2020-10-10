@@ -64,10 +64,7 @@ impl RoleNode<Follower> {
 
     /// Checks if an address is the current leader
     fn is_leader(&self, from: &Address) -> bool {
-        match (&self.role.leader, from) {
-            (Some(leader), Address::Peer(from)) if leader == from => true,
-            _ => false,
-        }
+        matches!((&self.role.leader, from), (Some(leader), Address::Peer(from)) if leader == from)
     }
 
     /// Processes a message.

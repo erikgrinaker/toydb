@@ -455,7 +455,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Replace any identical expressions or label references with column references.
         for (i, (sexpr, label)) in select.iter().enumerate() {
             if expr == sexpr {
-                replace(expr, ast::Expression::Column(i));
+                *expr = ast::Expression::Column(i);
                 continue;
             }
             if let Some(label) = label {
@@ -812,7 +812,7 @@ impl Scope {
                 _ => new.add_column(None, None),
             }
         }
-        replace(self, new);
+        *self = new;
         Ok(())
     }
 }
