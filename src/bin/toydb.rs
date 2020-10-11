@@ -71,6 +71,7 @@ impl Config {
     fn new(file: &str) -> Result<Self> {
         let mut c = config::Config::new();
         c.set_default("id", "toydb")?;
+        c.set_default("peers", HashMap::<String, String>::new())?;
         c.set_default("listen_sql", "0.0.0.0:9605")?;
         c.set_default("listen_raft", "0.0.0.0:9705")?;
         c.set_default("log_level", "info")?;
