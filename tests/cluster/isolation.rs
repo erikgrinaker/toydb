@@ -5,7 +5,7 @@ use toydb::sql::types::Value;
 
 use serial_test::serial;
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A dirty write is when b overwrites an uncommitted value written by a.
 async fn anomaly_dirty_write() -> Result<()> {
@@ -25,7 +25,7 @@ async fn anomaly_dirty_write() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A dirty read is when b can read an uncommitted value set by a.
 async fn anomaly_dirty_read() -> Result<()> {
@@ -39,7 +39,7 @@ async fn anomaly_dirty_read() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A lost update is when a and b both read a value and update it, where b's update replaces a.
 async fn anomaly_lost_update() -> Result<()> {
@@ -65,7 +65,7 @@ async fn anomaly_lost_update() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A fuzzy (or unrepeatable) read is when b sees a value change after a updates it.
 async fn anomaly_fuzzy_read() -> Result<()> {
@@ -90,7 +90,7 @@ async fn anomaly_fuzzy_read() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // Read skew is when a reads 1 and 2, but b modifies 2 in between the reads.
 async fn anomaly_read_skew() -> Result<()> {
@@ -115,7 +115,7 @@ async fn anomaly_read_skew() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A phantom read is when a reads entries matching some predicate, but a modification by
 // b changes the entries that match the predicate such that a later read by a returns them.

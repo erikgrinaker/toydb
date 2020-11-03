@@ -133,7 +133,7 @@ impl Client {
     {
         for i in 0..WITH_TXN_RETRIES {
             if i > 0 {
-                tokio::time::delay_for(std::time::Duration::from_millis(
+                tokio::time::sleep(std::time::Duration::from_millis(
                     2_u64.pow(i as u32 - 1) * rand::thread_rng().gen_range(25, 75),
                 ))
                 .await;

@@ -301,7 +301,7 @@ pub mod tests {
         Ok((state, state_tx, node_rx))
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn driver_abort() -> Result<()> {
         let (state, state_tx, node_rx) = setup().await?;
 
@@ -345,7 +345,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn driver_apply() -> Result<()> {
         let (state, state_tx, node_rx) = setup().await?;
 
@@ -377,7 +377,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn driver_query() -> Result<()> {
         let (_, state_tx, node_rx) = setup().await?;
 
@@ -417,7 +417,7 @@ pub mod tests {
     }
 
     // A query for an index submitted in a given term cannot be satisfied by votes below that term.
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn driver_query_noterm() -> Result<()> {
         let (_, state_tx, node_rx) = setup().await?;
 
@@ -444,7 +444,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn driver_query_noquorum() -> Result<()> {
         let (_, state_tx, node_rx) = setup().await?;
 

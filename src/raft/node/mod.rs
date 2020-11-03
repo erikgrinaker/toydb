@@ -467,7 +467,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_all() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let mut log = Log::new(Box::new(log::Test::new()))?;
@@ -479,13 +479,13 @@ mod tests {
         let state = Box::new(TestState::new(0));
 
         Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
-        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x01], vec![0x02]]);
         assert_eq!(state.applied_index(), 3);
         Ok(())
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_partial() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let mut log = Log::new(Box::new(log::Test::new()))?;
@@ -497,13 +497,13 @@ mod tests {
         let state = Box::new(TestState::new(2));
 
         Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
-        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x02]]);
         assert_eq!(state.applied_index(), 3);
         Ok(())
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_missing() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let mut log = Log::new(Box::new(log::Test::new()))?;
