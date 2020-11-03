@@ -14,7 +14,7 @@ use toydb::Client;
 use pretty_assertions::assert_eq;
 use serial_test::serial;
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn get_table() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
@@ -104,7 +104,7 @@ async fn get_table() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn list_tables() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
@@ -113,7 +113,7 @@ async fn list_tables() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn status() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
@@ -137,7 +137,7 @@ async fn status() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
@@ -220,7 +220,7 @@ async fn execute() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute_txn() -> Result<()> {
     let (c, _teardown) = setup::server_with_client(setup::movies()).await?;
@@ -310,7 +310,7 @@ async fn execute_txn() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute_txn_concurrent() -> Result<()> {
     let (a, _teardown) = setup::server_with_client(setup::movies()).await?;

@@ -5,7 +5,7 @@ use toydb::sql::types::Value;
 
 use serial_test::serial;
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A client disconnect or termination should roll back its transaction.
 async fn client_disconnect_rollback() -> Result<()> {
@@ -25,7 +25,7 @@ async fn client_disconnect_rollback() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn client_commit_error() -> Result<()> {
     let (a, b, _, _teardown) = setup::cluster_simple().await?;

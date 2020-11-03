@@ -200,7 +200,7 @@ impl Server {
                 }
                 Err(err) => error!("Failed connecting to Raft peer {}: {}", addr, err),
             }
-            tokio::time::delay_for(Duration::from_millis(1000)).await;
+            tokio::time::sleep(Duration::from_millis(1000)).await;
         }
         debug!("Disconnected from Raft peer {}", addr);
     }

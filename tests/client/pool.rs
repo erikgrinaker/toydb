@@ -9,7 +9,7 @@ use serial_test::serial;
 use std::collections::HashSet;
 use std::iter::FromIterator as _;
 
-#[tokio::test(core_threads = 4)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[serial]
 #[allow(clippy::many_single_char_names)]
 async fn get() -> Result<()> {
@@ -40,7 +40,7 @@ async fn get() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(core_threads = 4)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[serial]
 async fn drop_rollback() -> Result<()> {
     let (pool, _teardown) = setup::cluster_with_pool(3, 1, setup::simple()).await?;
