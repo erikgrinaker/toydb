@@ -460,7 +460,7 @@ impl Scan {
         while let Some((key, value)) = self.scan.next().transpose()? {
             // Only return the item if it is the last version of the key.
             if match self.scan.peek() {
-                Some(Ok((peek_key, _))) if peek_key != &&*key => true,
+                Some(Ok((peek_key, _))) if *peek_key != key => true,
                 Some(Ok(_)) => false,
                 Some(Err(err)) => return Err(err.clone()),
                 None => true,
@@ -479,7 +479,7 @@ impl Scan {
         while let Some((key, value)) = self.scan.next_back().transpose()? {
             // Only return the last version of the key (so skip if seen).
             if match &self.next_back_seen {
-                Some(seen_key) if seen_key != &&*key => true,
+                Some(seen_key) if *seen_key != key => true,
                 Some(_) => false,
                 None => true,
             } {
