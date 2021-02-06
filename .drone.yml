@@ -9,14 +9,14 @@ env: &env
 
 steps:
 - name: build
-  image: rust:1.47
+  image: rust:1.49
   pull: true
   environment: *env
   commands:
   - cargo build --tests
 
 - name: test
-  image: rust:1.47
+  image: rust:1.49
   environment: *env
   commands:
   - cargo test
@@ -24,7 +24,7 @@ steps:
   - build
 
 - name: lint
-  image: rust:1.47
+  image: rust:1.49
   environment: *env
   commands:
   - rustup component add clippy
