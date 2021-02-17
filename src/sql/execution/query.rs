@@ -109,7 +109,7 @@ impl<T: Transaction> Executor<T> for Order<T> {
                 struct Item {
                     row: Row,
                     values: Vec<Value>,
-                };
+                }
                 let mut items = Vec::new();
                 while let Some(row) = rows.next().transpose()? {
                     let mut values = Vec::new();
