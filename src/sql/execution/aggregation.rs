@@ -30,7 +30,10 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                     self.accumulators
                         .entry(row.split_off(self.aggregates.len()))
                         .or_insert(
-                            self.aggregates.iter().map(|agg| Accumulator::from(agg)).collect(),
+                            self.aggregates
+                                .iter()
+                                .map(|agg| <dyn Accumulator>::from(agg))
+                                .collect(),
                         )
                         .iter_mut()
                         .zip(row)
@@ -41,7 +44,7 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                 if self.accumulators.is_empty() && self.aggregates.len() == columns.len() {
                     self.accumulators.insert(
                         Vec::new(),
-                        self.aggregates.iter().map(|agg| Accumulator::from(agg)).collect(),
+                        self.aggregates.iter().map(|agg| <dyn Accumulator>::from(agg)).collect(),
                     );
                 }
                 Ok(ResultSet::Query {
