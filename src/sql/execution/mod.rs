@@ -121,7 +121,7 @@ pub enum ResultSet {
 }
 
 impl ResultSet {
-    /// Creates an empty row iteratur, for use by serde(default).
+    /// Creates an empty row iterator, for use by serde(default).
     fn empty_rows() -> Rows {
         Box::new(std::iter::empty())
     }
