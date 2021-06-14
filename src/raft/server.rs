@@ -6,8 +6,9 @@ use futures::{sink::SinkExt as _, FutureExt as _};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::stream::StreamExt as _;
 use tokio::sync::{mpsc, oneshot};
+use tokio_stream::wrappers::{ReceiverStream, TcpListenerStream, UnboundedReceiverStream};
+use tokio_stream::StreamExt as _;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use uuid::Uuid;
 
@@ -69,11 +70,15 @@ impl Server {
     /// Runs the event loop.
     async fn eventloop(
         mut node: Node,
-        mut node_rx: mpsc::UnboundedReceiver<Message>,
-        mut client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>,
-        mut tcp_rx: mpsc::UnboundedReceiver<Message>,
+        node_rx: mpsc::UnboundedReceiver<Message>,
+        client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>,
+        tcp_rx: mpsc::UnboundedReceiver<Message>,
         tcp_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<()> {
+        let mut node_rx = UnboundedReceiverStream::new(node_rx);
+        let mut tcp_rx = UnboundedReceiverStream::new(tcp_rx);
+        let mut client_rx = UnboundedReceiverStream::new(client_rx);
+
         let mut ticker = tokio::time::interval(TICK);
         let mut requests = HashMap::<Vec<u8>, oneshot::Sender<Result<Response>>>::new();
         loop {
@@ -113,9 +118,10 @@ impl Server {
 
     /// Receives inbound messages from peers via TCP.
     async fn tcp_receive(
-        mut listener: TcpListener,
+        listener: TcpListener,
         in_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<()> {
+        let mut listener = TcpListenerStream::new(listener);
         while let Some(socket) = listener.try_next().await? {
             let peer = socket.peer_addr()?;
             let peer_in_tx = in_tx.clone();
@@ -149,8 +155,9 @@ impl Server {
     async fn tcp_send(
         node_id: String,
         peers: HashMap<String, String>,
-        mut out_rx: mpsc::UnboundedReceiver<Message>,
+        out_rx: mpsc::UnboundedReceiver<Message>,
     ) -> Result<()> {
+        let mut out_rx = UnboundedReceiverStream::new(out_rx);
         let mut peer_txs: HashMap<String, mpsc::Sender<Message>> = HashMap::new();
 
         for (id, addr) in peers.into_iter() {
@@ -188,7 +195,8 @@ impl Server {
     }
 
     /// Sends outbound messages to a peer, continuously reconnecting.
-    async fn tcp_send_peer(addr: String, mut out_rx: mpsc::Receiver<Message>) {
+    async fn tcp_send_peer(addr: String, out_rx: mpsc::Receiver<Message>) {
+        let mut out_rx = ReceiverStream::new(out_rx);
         loop {
             match TcpStream::connect(&addr).await {
                 Ok(socket) => {
@@ -208,7 +216,7 @@ impl Server {
     /// Sends outbound messages to a peer via a TCP session.
     async fn tcp_send_peer_session(
         socket: TcpStream,
-        out_rx: &mut mpsc::Receiver<Message>,
+        out_rx: &mut ReceiverStream<Message>,
     ) -> Result<()> {
         let mut stream = tokio_serde::SymmetricallyFramed::<_, Message, _>::new(
             Framed::new(socket, LengthDelimitedCodec::new()),

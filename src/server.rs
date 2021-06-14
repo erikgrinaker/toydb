@@ -12,8 +12,9 @@ use futures::sink::SinkExt as _;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::stream::StreamExt as _;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::TcpListenerStream;
+use tokio_stream::StreamExt as _;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 /// A toyDB server.
@@ -73,7 +74,8 @@ impl Server {
     }
 
     /// Serves SQL clients.
-    async fn serve_sql(mut listener: TcpListener, engine: sql::engine::Raft) -> Result<()> {
+    async fn serve_sql(listener: TcpListener, engine: sql::engine::Raft) -> Result<()> {
+        let mut listener = TcpListenerStream::new(listener);
         while let Some(socket) = listener.try_next().await? {
             let peer = socket.peer_addr()?;
             let session = Session::new(engine.clone())?;
@@ -149,7 +151,7 @@ impl Session {
                 );
             }
             stream.send(response).await?;
-            stream.send_all(&mut tokio::stream::iter(rows.map(Ok))).await?;
+            stream.send_all(&mut tokio_stream::iter(rows.map(Ok))).await?;
         }
         Ok(())
     }
