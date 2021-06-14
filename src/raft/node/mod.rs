@@ -242,20 +242,19 @@ mod tests {
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
     use crate::storage::log;
+    use futures::FutureExt;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
     pub fn assert_messages<T: std::fmt::Debug + PartialEq>(
-        _rx: &mut mpsc::UnboundedReceiver<T>,
-        _msgs: Vec<T>,
+        rx: &mut mpsc::UnboundedReceiver<T>,
+        msgs: Vec<T>,
     ) {
-        // left != right because of removing try_recv()
-        //
-        // let mut actual = Vec::new();
-        // while let Ok(message) = rx.try_recv() {
-        //     actual.push(message)
-        // }
-        // assert_eq!(msgs, actual);
+        let mut actual = Vec::new();
+        while let Some(Some(message)) = rx.recv().now_or_never() {
+            actual.push(message)
+        }
+        assert_eq!(msgs, actual);
     }
 
     pub struct NodeAsserter<'a> {

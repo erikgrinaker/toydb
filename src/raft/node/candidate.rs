@@ -134,10 +134,11 @@ impl RoleNode<Candidate> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::{Instruction, Log, Request};
+    use super::super::super::{Entry, Instruction, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage::log;
+    use futures::FutureExt;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
@@ -271,7 +272,7 @@ mod tests {
     #[test]
     fn step_grantvote() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
-        let _peers = candidate.peers.clone();
+        let peers = candidate.peers.clone();
         let mut node = Node::Candidate(candidate);
 
         // The first vote is not sufficient for a quorum (3 votes including self)
@@ -294,33 +295,31 @@ mod tests {
         })?;
         assert_node(&node).is_leader().term(3);
 
-        // see https://github.com/tokio-rs/tokio/pull/3263: remove try_recv() from mpsc types
-        //
-        // assert_eq!(
-        //     node_rx.try_recv()?,
-        //     Message {
-        //         from: Address::Local,
-        //         to: Address::Peers,
-        //         term: 3,
-        //         event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
-        //     },
-        // );
-        //
-        // for to in peers.iter().cloned() {
-        //     assert_eq!(
-        //         node_rx.try_recv()?,
-        //         Message {
-        //             from: Address::Local,
-        //             to: Address::Peer(to),
-        //             term: 3,
-        //             event: Event::ReplicateEntries {
-        //                 base_index: 3,
-        //                 base_term: 2,
-        //                 entries: vec![Entry { index: 4, term: 3, command: None }],
-        //             },
-        //         }
-        //     )
-        // }
+        assert_eq!(
+            node_rx.recv().now_or_never(),
+            Some(Some(Message {
+                from: Address::Local,
+                to: Address::Peers,
+                term: 3,
+                event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
+            })),
+        );
+
+        for to in peers.iter().cloned() {
+            assert_eq!(
+                node_rx.recv().now_or_never(),
+                Some(Some(Message {
+                    from: Address::Local,
+                    to: Address::Peer(to),
+                    term: 3,
+                    event: Event::ReplicateEntries {
+                        base_index: 3,
+                        base_term: 2,
+                        entries: vec![Entry { index: 4, term: 3, command: None }],
+                    },
+                }))
+            )
+        }
 
         // Now that we're leader, we process the queued request
         assert_messages(
