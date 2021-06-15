@@ -7,7 +7,7 @@
 
 use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
-use rustyline::{error::ReadlineError, Editor};
+use rustyline::{error::ReadlineError, Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 use toydb::error::{Error, Result};
 use toydb::sql::engine::Mode;
@@ -238,7 +238,10 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
         }
         self.editor.set_helper(Some(InputValidator));
         // Make sure multiline pastes are interpreted as normal inputs.
-        self.editor.bind_sequence(rustyline::KeyPress::BracketedPasteStart, rustyline::Cmd::Noop);
+        self.editor.bind_sequence(
+            rustyline::KeyEvent(rustyline::KeyCode::BracketedPasteStart, Modifiers::NONE),
+            rustyline::Cmd::Noop,
+        );
 
         let status = self.client.status().await?;
         println!(

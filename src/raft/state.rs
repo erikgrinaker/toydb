@@ -3,8 +3,9 @@ use crate::error::{Error, Result};
 
 use log::{debug, error};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use tokio::stream::StreamExt as _;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::StreamExt as _;
 
 /// A Raft-managed state machine.
 pub trait State: Send {
@@ -48,7 +49,7 @@ struct Query {
 
 /// Drives a state machine, taking operations from state_rx and sending results via node_tx.
 pub struct Driver {
-    state_rx: mpsc::UnboundedReceiver<Instruction>,
+    state_rx: UnboundedReceiverStream<Instruction>,
     node_tx: mpsc::UnboundedSender<Message>,
     applied_index: u64,
     /// Notify clients when their mutation is applied. <index, (client, id)>
@@ -64,7 +65,7 @@ impl Driver {
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Self {
         Self {
-            state_rx,
+            state_rx: UnboundedReceiverStream::new(state_rx),
             node_tx,
             applied_index: 0,
             notify: HashMap::new(),
@@ -322,6 +323,7 @@ pub mod tests {
         state_tx.send(Instruction::Abort)?;
         std::mem::drop(state_tx);
 
+        let node_rx = UnboundedReceiverStream::new(node_rx);
         assert_eq!(
             node_rx.collect::<Vec<_>>().await,
             vec![
@@ -359,6 +361,8 @@ pub mod tests {
             entry: Entry { index: 2, term: 1, command: Some(vec![0xaf]) },
         })?;
         std::mem::drop(state_tx);
+
+        let node_rx = UnboundedReceiverStream::new(node_rx);
         assert_eq!(
             node_rx.collect::<Vec<_>>().await,
             vec![Message {
@@ -400,6 +404,7 @@ pub mod tests {
         })?;
         std::mem::drop(state_tx);
 
+        let node_rx = UnboundedReceiverStream::new(node_rx);
         assert_eq!(
             node_rx.collect::<Vec<_>>().await,
             vec![Message {
@@ -440,6 +445,7 @@ pub mod tests {
         })?;
         std::mem::drop(state_tx);
 
+        let node_rx = UnboundedReceiverStream::new(node_rx);
         assert_eq!(node_rx.collect::<Vec<_>>().await, vec![]);
         Ok(())
     }
@@ -462,6 +468,7 @@ pub mod tests {
         state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Local })?;
         std::mem::drop(state_tx);
 
+        let node_rx = UnboundedReceiverStream::new(node_rx);
         assert_eq!(node_rx.collect::<Vec<_>>().await, vec![]);
 
         Ok(())

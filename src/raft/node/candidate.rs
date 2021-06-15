@@ -23,7 +23,7 @@ impl Candidate {
             votes: 1, // We always start with a vote for ourselves.
             election_ticks: 0,
             election_timeout: rand::thread_rng()
-                .gen_range(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX),
+                .gen_range(ELECTION_TIMEOUT_MIN..=ELECTION_TIMEOUT_MAX),
         }
     }
 }
@@ -138,6 +138,7 @@ mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage::log;
+    use futures::FutureExt;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
@@ -295,19 +296,19 @@ mod tests {
         assert_node(&node).is_leader().term(3);
 
         assert_eq!(
-            node_rx.try_recv()?,
-            Message {
+            node_rx.recv().now_or_never(),
+            Some(Some(Message {
                 from: Address::Local,
                 to: Address::Peers,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
-            },
+            })),
         );
 
         for to in peers.iter().cloned() {
             assert_eq!(
-                node_rx.try_recv()?,
-                Message {
+                node_rx.recv().now_or_never(),
+                Some(Some(Message {
                     from: Address::Local,
                     to: Address::Peer(to),
                     term: 3,
@@ -316,7 +317,7 @@ mod tests {
                         base_term: 2,
                         entries: vec![Entry { index: 4, term: 3, command: None }],
                     },
-                }
+                }))
             )
         }
 
