@@ -23,7 +23,7 @@ rustyline-derive = "0.4.0"
 serde = "~1.0.126"
 serde_derive = "~1.0.126"
 simplelog = "0.10.0"
-tokio = { version = "~1.6.1", features = ["macros", "rt", "rt-multi-thread", "net", "io-util", "time", "sync"] }
+tokio = { version = "~1.6.2", features = ["macros", "rt", "rt-multi-thread", "net", "io-util", "time", "sync"] }
 tokio-serde = { version = "~0.8", features = ["bincode"] }
 tokio-stream = { version = "~0.1.6", features = ["net"]}
 tokio-util = { version = "~0.6.7", features = ["codec"] }
