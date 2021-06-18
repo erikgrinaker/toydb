@@ -235,6 +235,7 @@ mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage::log;
+    use futures::FutureExt;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
@@ -613,10 +614,11 @@ mod tests {
             term: 3,
             command: Some(vec![0xaf]),
         });
+
         for peer in peers.iter().cloned() {
             assert_eq!(
-                node_rx.try_recv()?,
-                Message {
+                node_rx.recv().now_or_never(),
+                Some(Some(Message {
                     from: Address::Local,
                     to: Address::Peer(peer),
                     term: 3,
@@ -625,7 +627,7 @@ mod tests {
                         base_term: 3,
                         entries: vec![Entry { index: 6, term: 3, command: Some(vec![0xaf]) },]
                     },
-                }
+                }))
             )
         }
         assert_messages(&mut node_rx, vec![]);
@@ -691,14 +693,15 @@ mod tests {
                 node = node.tick()?;
                 assert_node(&node).is_leader().term(3).committed(2);
             }
+
             assert_eq!(
-                node_rx.try_recv()?,
-                Message {
+                node_rx.recv().now_or_never(),
+                Some(Some(Message {
                     from: Address::Local,
                     to: Address::Peers,
                     term: 3,
                     event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
-                }
+                }))
             );
         }
         Ok(())

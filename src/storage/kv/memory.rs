@@ -90,7 +90,7 @@ impl Node {
             Self::Root(children) => {
                 children.delete(key);
                 // If we now have a single child, pull it up into the root.
-                while children.len() == 1 && matches!(children[0], Node::Inner{..}) {
+                while children.len() == 1 && matches!(children[0], Node::Inner { .. }) {
                     if let Node::Inner(c) = children.remove(0) {
                         *children = c;
                     }

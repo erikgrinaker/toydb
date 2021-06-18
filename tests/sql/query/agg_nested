@@ -36,4 +36,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Aggregate functions can\'t be nested")
+Plan: Value("Aggregate functions can't be nested")

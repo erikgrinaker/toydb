@@ -262,7 +262,7 @@ impl Bank {
                         .into_value()?
                         .integer()?;
 
-                    let amount = rand::thread_rng().gen_range(0, from_balance);
+                    let amount = rand::thread_rng().gen_range(0..=from_balance);
                     txn.execute(&format!(
                         "UPDATE account SET balance = balance - {} WHERE id = {}",
                         amount, from_account,
