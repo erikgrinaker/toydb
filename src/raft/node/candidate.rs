@@ -377,7 +377,7 @@ mod tests {
             vec![Message {
                 from: Address::Local,
                 to: Address::Peers,
-                term: 4,
+                term: 3,
                 event: Event::PreVote,
             }],
         );
