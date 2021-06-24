@@ -48,6 +48,9 @@ pub enum Event {
         /// and would like the leader to replicate it.
         has_committed: bool,
     },
+    /// Preventing disruptions when a server rejoins the cluster
+    /// see: https://web.stanford.edu/~ouster/cgi-bin/papers/OngaroPhD.pdf [9.6]
+    PreVote,
     /// Candidates solicit votes from all peers.
     SolicitVote {
         // The index of the candidate's last stored log entry
@@ -56,7 +59,9 @@ pub enum Event {
         last_term: u64,
     },
     /// Followers may grant votes to candidates.
-    GrantVote,
+    GrantVote {
+        pre_vote: bool
+    },
     /// Leaders replicate a set of log entries to followers.
     ReplicateEntries {
         /// The index of the log entry immediately preceding the submitted commands.

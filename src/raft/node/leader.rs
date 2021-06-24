@@ -101,7 +101,7 @@ impl RoleNode<Leader> {
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
         if let Err(err) = self.validate(&msg) {
-            warn!("Ignoring invalid message: {}", err);
+            warn!("Leader: Ignoring invalid message: {}", err);
             return Ok(self.into());
         }
         if msg.term > self.term {
@@ -200,7 +200,7 @@ impl RoleNode<Leader> {
 
             // We ignore these messages, since they are typically additional votes from the previous
             // election that we won after a quorum.
-            Event::SolicitVote { .. } | Event::GrantVote => {}
+            Event::PreVote | Event::SolicitVote { .. } | Event::GrantVote { .. } => {}
 
             Event::Heartbeat { .. } | Event::ReplicateEntries { .. } => {
                 warn!("Received unexpected message {:?}", msg)

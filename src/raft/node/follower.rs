@@ -35,13 +35,8 @@ impl RoleNode<Follower> {
     /// Transforms the node into a candidate.
     fn become_candidate(self) -> Result<RoleNode<Candidate>> {
         info!("Starting election for term {}", self.term + 1);
-        let mut node = self.become_role(Candidate::new())?;
-        node.term += 1;
-        node.log.save_term(node.term, None)?;
-        node.send(
-            Address::Peers,
-            Event::SolicitVote { last_index: node.log.last_index, last_term: node.log.last_term },
-        )?;
+        let node = self.become_role(Candidate::new())?;
+        node.send(Address::Peers, Event::PreVote)?;
         Ok(node)
     }
 
@@ -70,7 +65,7 @@ impl RoleNode<Follower> {
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
         if let Err(err) = self.validate(&msg) {
-            warn!("Ignoring invalid message: {}", err);
+            warn!("Follower: Ignoring invalid message: {}", err);
             return Ok(self.into());
         }
         if let Address::Peer(from) = &msg.from {
@@ -97,7 +92,11 @@ impl RoleNode<Follower> {
                     self.send(msg.from, Event::ConfirmLeader { commit_index, has_committed })?;
                 }
             }
-
+            Event::PreVote => {
+                if let Address::Peer(from) = msg.from {
+                    self.send(Address::Peer(from.clone()), Event::GrantVote { pre_vote: true })?;
+                }
+            }
             Event::SolicitVote { last_index, last_term } => {
                 if let Some(voted_for) = &self.role.voted_for {
                     if msg.from != Address::Peer(voted_for.clone()) {
@@ -112,7 +111,7 @@ impl RoleNode<Follower> {
                 }
                 if let Address::Peer(from) = msg.from {
                     info!("Voting for {} in term {} election", from, self.term);
-                    self.send(Address::Peer(from.clone()), Event::GrantVote)?;
+                    self.send(Address::Peer(from.clone()), Event::GrantVote { pre_vote: false })?;
                     self.log.save_term(self.term, Some(&from))?;
                     self.role.voted_for = Some(from);
                 }
@@ -148,7 +147,7 @@ impl RoleNode<Follower> {
             }
 
             // Ignore votes which are usually strays from the previous election that we lost.
-            Event::GrantVote => {}
+            Event::GrantVote { .. } => {}
 
             Event::ConfirmLeader { .. }
             | Event::AcceptEntries { .. }
@@ -426,7 +425,7 @@ pub mod tests {
                 from: Address::Local,
                 to: Address::Peer("c".into()),
                 term: 3,
-                event: Event::GrantVote,
+                event: Event::GrantVote { pre_vote: false },
             }],
         );
         assert_messages(&mut state_rx, vec![]);
@@ -445,7 +444,7 @@ pub mod tests {
                 from: Address::Local,
                 to: Address::Peer("c".into()),
                 term: 3,
-                event: Event::GrantVote,
+                event: Event::GrantVote { pre_vote: false },
             }],
         );
         assert_messages(&mut state_rx, vec![]);
@@ -471,7 +470,7 @@ pub mod tests {
             from: Address::Peer("b".into()),
             to: Address::Peer("a".into()),
             term: 3,
-            event: Event::GrantVote,
+            event: Event::GrantVote { pre_vote: false },
         })?;
         assert_node(&node).is_follower().term(3).leader(Some("b"));
         assert_messages(&mut node_rx, vec![]);
@@ -974,15 +973,15 @@ pub mod tests {
             assert_node(&node).is_follower().term(3).leader(Some("b"));
             node = node.tick()?;
         }
-        assert_node(&node).is_candidate().term(4);
+        assert_node(&node).is_candidate().term(3);
 
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
                 to: Address::Peers,
-                term: 4,
-                event: Event::SolicitVote { last_index: 3, last_term: 2 },
+                term: 3,
+                event: Event::PreVote,
             }],
         );
         assert_messages(&mut state_rx, vec![]);

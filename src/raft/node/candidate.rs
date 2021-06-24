@@ -14,6 +14,8 @@ pub struct Candidate {
     election_timeout: u64,
     /// Votes received (including ourself).
     votes: u64,
+    /// PreVotes received (including ourself)
+    pre_votes: u64,
 }
 
 impl Candidate {
@@ -21,6 +23,7 @@ impl Candidate {
     pub fn new() -> Self {
         Self {
             votes: 1, // We always start with a vote for ourselves.
+            pre_votes: 1,
             election_ticks: 0,
             election_timeout: rand::thread_rng()
                 .gen_range(ELECTION_TIMEOUT_MIN..=ELECTION_TIMEOUT_MAX),
@@ -61,7 +64,7 @@ impl RoleNode<Candidate> {
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
         if let Err(err) = self.validate(&msg) {
-            warn!("Ignoring invalid message: {}", err);
+            warn!("Candidate: Ignoring invalid message: {}", err);
             return Ok(self.into());
         }
         if msg.term > self.term {
@@ -77,16 +80,32 @@ impl RoleNode<Candidate> {
                 }
             }
 
-            Event::GrantVote => {
-                debug!("Received term {} vote from {:?}", self.term, msg.from);
-                self.role.votes += 1;
-                if self.role.votes >= self.quorum() {
-                    let queued = std::mem::replace(&mut self.queued_reqs, Vec::new());
-                    let mut node: Node = self.become_leader()?.into();
-                    for (from, event) in queued {
-                        node = node.step(Message { from, to: Address::Local, term: 0, event })?;
+            Event::GrantVote { pre_vote } => {
+                if pre_vote {
+                    self.role.pre_votes += 1;
+                    if self.role.pre_votes >= self.quorum() {
+                        info!("Grant preVote, starting new election for term {}", self.term + 1);
+                        self.term += 1;
+                        self.log.save_term(self.term, None)?;
+                        self.send(
+                            Address::Peers,
+                            Event::SolicitVote {
+                                last_index: self.log.last_index,
+                                last_term: self.log.last_term,
+                            },
+                        )?;
                     }
-                    return Ok(node);
+                } else {
+                    self.role.votes += 1;
+                    if self.role.votes >= self.quorum() {
+                        debug!("Received term {} vote from {:?}", self.term, msg.from);
+                        let queued = std::mem::replace(&mut self.queued_reqs, Vec::new());
+                        let mut node: Node = self.become_leader()?.into();
+                        for (from, event) in queued {
+                            node = node.step(Message { from, to: Address::Local, term: 0, event })?;
+                        }
+                        return Ok(node);
+                    }
                 }
             }
 
@@ -101,7 +120,7 @@ impl RoleNode<Candidate> {
             }
 
             // Ignore other candidates when we're also campaigning
-            Event::SolicitVote { .. } => {}
+            Event::SolicitVote { .. } | Event::PreVote => {}
 
             Event::ConfirmLeader { .. }
             | Event::ReplicateEntries { .. }
@@ -116,17 +135,9 @@ impl RoleNode<Candidate> {
         // If the election times out, start a new one for the next term.
         self.role.election_ticks += 1;
         if self.role.election_ticks >= self.role.election_timeout {
-            info!("Election timed out, starting new election for term {}", self.term + 1);
-            self.term += 1;
-            self.log.save_term(self.term, None)?;
+            info!("Election timed out, starting preVote");
             self.role = Candidate::new();
-            self.send(
-                Address::Peers,
-                Event::SolicitVote {
-                    last_index: self.log.last_index,
-                    last_term: self.log.last_term,
-                },
-            )?;
+            self.send(Address::Peers, Event::PreVote)?;
         }
         Ok(self.into())
     }
@@ -280,7 +291,7 @@ mod tests {
             from: Address::Peer("c".into()),
             to: Address::Peer("a".into()),
             term: 3,
-            event: Event::GrantVote,
+            event: Event::GrantVote { pre_vote: false },
         })?;
         assert_node(&node).is_candidate().term(3);
         assert_messages(&mut node_rx, vec![]);
@@ -291,7 +302,7 @@ mod tests {
             from: Address::Peer("e".into()),
             to: Address::Peer("a".into()),
             term: 3,
-            event: Event::GrantVote,
+            event: Event::GrantVote { pre_vote: false },
         })?;
         assert_node(&node).is_leader().term(3);
 
@@ -359,7 +370,7 @@ mod tests {
             assert_node(&node).is_candidate().term(3);
             node = node.tick()?;
         }
-        assert_node(&node).is_candidate().term(4);
+        assert_node(&node).is_candidate().term(3);
 
         assert_messages(
             &mut node_rx,
@@ -367,7 +378,7 @@ mod tests {
                 from: Address::Local,
                 to: Address::Peers,
                 term: 4,
-                event: Event::SolicitVote { last_index: 3, last_term: 2 },
+                event: Event::PreVote,
             }],
         );
         assert_messages(&mut state_rx, vec![]);
