@@ -109,7 +109,7 @@ impl NestedLoopRows {
 
     /// Tries to find the next combined row that matches the predicate in the remaining right rows.
     fn try_next_hit(&mut self, left_row: &[Value]) -> Result<Option<Row>> {
-        while let Some(right_row) = self.right.next() {
+        for right_row in &mut self.right {
             let mut row = left_row.to_vec();
             row.extend(right_row);
             if let Some(predicate) = &self.predicate {

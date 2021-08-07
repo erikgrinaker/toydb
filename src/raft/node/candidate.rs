@@ -81,7 +81,7 @@ impl RoleNode<Candidate> {
                 debug!("Received term {} vote from {:?}", self.term, msg.from);
                 self.role.votes += 1;
                 if self.role.votes >= self.quorum() {
-                    let queued = std::mem::replace(&mut self.queued_reqs, Vec::new());
+                    let queued = std::mem::take(&mut self.queued_reqs);
                     let mut node: Node = self.become_leader()?.into();
                     for (from, event) in queued {
                         node = node.step(Message { from, to: Address::Local, term: 0, event })?;

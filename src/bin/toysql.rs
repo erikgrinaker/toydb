@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
     }
 
     if let Some(command) = opts.value_of("command") {
-        toysql.execute(&command).await
+        toysql.execute(command).await
     } else {
         toysql.run().await
     }
@@ -77,9 +77,9 @@ impl ToySQL {
     /// Executes a line of input
     async fn execute(&mut self, input: &str) -> Result<()> {
         if input.starts_with('!') {
-            self.execute_command(&input).await
+            self.execute_command(input).await
         } else if !input.is_empty() {
-            self.execute_query(&input).await
+            self.execute_query(input).await
         } else {
             Ok(())
         }

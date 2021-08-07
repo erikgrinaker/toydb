@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
 
     let path = std::path::Path::new(&cfg.data_dir);
     let raft_store: Box<dyn storage::log::Store> = match cfg.storage_raft.as_str() {
-        "hybrid" | "" => Box::new(storage::log::Hybrid::new(&path, cfg.sync)?),
+        "hybrid" | "" => Box::new(storage::log::Hybrid::new(path, cfg.sync)?),
         "memory" => Box::new(storage::log::Memory::new()),
         name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
     };

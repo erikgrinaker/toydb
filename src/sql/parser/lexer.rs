@@ -300,10 +300,7 @@ impl<'a> Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Result<Token>> {
         match self.scan() {
             Ok(Some(token)) => Some(Ok(token)),
-            Ok(None) => match self.iter.peek() {
-                Some(c) => Some(Err(Error::Parse(format!("Unexpected character {}", c)))),
-                None => None,
-            },
+            Ok(None) => self.iter.peek().map(|c| Err(Error::Parse(format!("Unexpected character {}", c)))),
             Err(err) => Some(Err(err)),
         }
     }

@@ -168,7 +168,7 @@ impl<R> RoleNode<R> {
 
     /// Aborts any proxied requests.
     fn abort_proxied(&mut self) -> Result<()> {
-        for (id, address) in std::mem::replace(&mut self.proxied_reqs, HashMap::new()) {
+        for (id, address) in std::mem::take(&mut self.proxied_reqs) {
             self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
         }
         Ok(())
@@ -176,7 +176,7 @@ impl<R> RoleNode<R> {
 
     /// Sends any queued requests to the given leader.
     fn forward_queued(&mut self, leader: Address) -> Result<()> {
-        for (from, event) in std::mem::replace(&mut self.queued_reqs, Vec::new()) {
+        for (from, event) in std::mem::take(&mut self.queued_reqs) {
             if let Event::ClientRequest { id, .. } = &event {
                 self.proxied_reqs.insert(id.clone(), from.clone());
                 self.node_tx.send(Message {

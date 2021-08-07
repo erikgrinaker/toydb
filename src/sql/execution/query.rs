@@ -76,7 +76,7 @@ impl<T: Transaction> Executor<T> for Projection<T> {
                 .collect();
             let rows = Box::new(rows.map(move |r| {
                 r.and_then(|row| {
-                    Ok(expressions.iter().map(|e| e.evaluate(Some(&row))).collect::<Result<_>>()?)
+                    expressions.iter().map(|e| e.evaluate(Some(&row))).collect::<Result<_>>()
                 })
             }));
             Ok(ResultSet::Query { columns, rows })
