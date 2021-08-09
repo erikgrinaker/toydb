@@ -158,7 +158,7 @@ impl Driver {
 
     /// Aborts all pending notifications.
     fn notify_abort(&mut self) -> Result<()> {
-        for (_, (address, id)) in std::mem::replace(&mut self.notify, HashMap::new()) {
+        for (_, (address, id)) in std::mem::take(&mut self.notify) {
             self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
         }
         Ok(())
@@ -174,7 +174,7 @@ impl Driver {
 
     /// Aborts all pending queries.
     fn query_abort(&mut self) -> Result<()> {
-        for (_, queries) in std::mem::replace(&mut self.queries, BTreeMap::new()) {
+        for (_, queries) in std::mem::take(&mut self.queries) {
             for (id, query) in queries {
                 self.send(
                     query.address,

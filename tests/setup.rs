@@ -78,7 +78,7 @@ pub async fn server(
     let mut srv = Server::new(
         id,
         peers,
-        Box::new(storage::log::Hybrid::new(&dir.path(), false)?),
+        Box::new(storage::log::Hybrid::new(dir.path(), false)?),
         Box::new(storage::kv::Memory::new()),
     )
     .await?;

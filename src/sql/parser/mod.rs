@@ -60,7 +60,7 @@ impl<'a> Parser<'a> {
 
     /// Grabs the next lexer token if it satisfies the predicate function
     fn next_if<F: Fn(&Token) -> bool>(&mut self, predicate: F) -> Option<Token> {
-        self.peek().unwrap_or(None).filter(|t| predicate(&t))?;
+        self.peek().unwrap_or(None).filter(|t| predicate(t))?;
         self.next().ok()
     }
 

@@ -117,7 +117,7 @@ impl super::Transaction for Transaction {
     }
 
     fn create(&mut self, table: &str, row: Row) -> Result<()> {
-        let table = self.must_read_table(&table)?;
+        let table = self.must_read_table(table)?;
         table.validate_row(&row, self)?;
         let id = table.get_row_key(&row)?;
         if self.read(&table.name, &id)?.is_some() {
@@ -141,7 +141,7 @@ impl super::Transaction for Transaction {
     }
 
     fn delete(&mut self, table: &str, id: &Value) -> Result<()> {
-        let table = self.must_read_table(&table)?;
+        let table = self.must_read_table(table)?;
         for (t, cs) in self.table_references(&table.name, true)? {
             let t = self.must_read_table(&t)?;
             let cs = cs
@@ -189,7 +189,7 @@ impl super::Transaction for Transaction {
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan> {
-        let table = self.must_read_table(&table)?;
+        let table = self.must_read_table(table)?;
         Ok(Box::new(
             self.txn
                 .scan_prefix(&Key::Row((&table.name).into(), None).encode())?
@@ -213,7 +213,7 @@ impl super::Transaction for Transaction {
     }
 
     fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan> {
-        let table = self.must_read_table(&table)?;
+        let table = self.must_read_table(table)?;
         let column = table.get_column(column)?;
         if !column.index {
             return Err(Error::Value(format!("No index for {}.{}", table.name, column.name)));
@@ -235,7 +235,7 @@ impl super::Transaction for Transaction {
     }
 
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()> {
-        let table = self.must_read_table(&table)?;
+        let table = self.must_read_table(table)?;
         // If the primary key changes we do a delete and create, otherwise we replace the row
         if id != &table.get_row_key(&row)? {
             self.delete(&table.name, id)?;
@@ -276,7 +276,7 @@ impl Catalog for Transaction {
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
-        let table = self.must_read_table(&table)?;
+        let table = self.must_read_table(table)?;
         if let Some((t, cs)) = self.table_references(&table.name, false)?.first() {
             return Err(Error::Value(format!(
                 "Table {} is referenced by table {} column {}",

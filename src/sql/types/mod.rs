@@ -54,15 +54,15 @@ impl Hash for Value {
     }
 }
 
-impl<'a> Into<Cow<'a, Value>> for Value {
-    fn into(self) -> Cow<'a, Value> {
-        Cow::Owned(self)
+impl<'a> From<Value> for Cow<'a, Value> {
+    fn from(v: Value) -> Self {
+        Cow::Owned(v)
     }
 }
 
-impl<'a> Into<Cow<'a, Value>> for &'a Value {
-    fn into(self) -> Cow<'a, Value> {
-        Cow::Borrowed(self)
+impl<'a> From<&'a Value> for Cow<'a, Value> {
+    fn from(v: &'a Value) -> Self {
+        Cow::Borrowed(v)
     }
 }
 
