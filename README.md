@@ -78,6 +78,7 @@ Execute `cargo test` to run all tests, or check out the latest
 VS Code provides a very intuitive environment for debugging toyDB. Follow these steps to set it up:
 1. Install [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb) extension
 2. Go to "Run and Debug" and initialize launch.json, here is my [`launch.json`](https://gist.github.com/leotoff/78e20cb1948e8bb20631271576730865) for reference
+
 This lets debug `toysql` and unit tests (cluster debugging is still WIP).
 
 ## Performance
