@@ -91,8 +91,6 @@ configuration in `launch.json`, see
 (the path is specified in `config/toydb.yaml`)
 3. Go to "Run and Debug" tab, select "Debug executable 'toydb'", press run.
 
-If the last command fails with `Address already in use (os error 48)`, go to Activity Monitor and send the "Quit" signal to `toydb` processes. There might be some lingering processes after running the cluster command.
-
 ## Performance
 
 Performance is not a primary goal of toyDB, but it has a bank simulation as a basic gauge of
