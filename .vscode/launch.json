@@ -1,0 +1,177 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'toydb'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "toydb",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'bank'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=bank",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "bank",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'bank'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=bank",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "bank",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'toysql'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=toysql",
+          "--package=toydb",
+          "-c=${workspaceFolder}/config/toydb.yaml"
+        ],
+        "filter": {
+          "name": "toysql",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'toysql'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=toysql",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "toysql",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'toydb'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=toydb",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "toydb",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'toydb'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=toydb",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "toydb",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'tests'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=tests",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "tests",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug integration test 'setup'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=setup",
+          "--package=toydb"
+        ],
+        "filter": {
+          "name": "setup",
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
