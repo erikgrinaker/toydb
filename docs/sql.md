@@ -296,7 +296,7 @@ INSERT INTO movie
 VALUES
     (1, 'Sicario', 2015),
     (2, 'Stalker', 1979),
-    (3, 'Her', 2013
+    (3, 'Her', 2013)
 ```
 
 ### `ROLLBACK`
