@@ -178,7 +178,7 @@ impl Expression {
                 Integer(i) if i < 0 => {
                     return Err(Error::Value("Can't take factorial of negative number".into()))
                 }
-                Integer(i) => Integer((1..=i).fold(1, |a, b| a * b as i64)),
+                Integer(i) => Integer((1..=i).fold(1, |a, b| a * b)),
                 Null => Null,
                 value => return Err(Error::Value(format!("Can't take factorial of {}", value))),
             },
@@ -245,9 +245,9 @@ impl Expression {
                     Regex::new(&format!(
                         "^{}$",
                         regex::escape(&rhs)
-                            .replace("%", ".*")
+                            .replace('%', ".*")
                             .replace(".*.*", "%")
-                            .replace("_", ".")
+                            .replace('_', ".")
                             .replace("..", "_")
                     ))?
                     .is_match(&lhs),
@@ -352,7 +352,7 @@ impl Expression {
                 },
                 _ => Ok(e),
             },
-            &|e| Ok(e),
+            & Ok,
         )
         .unwrap()
     }
@@ -376,7 +376,7 @@ impl Expression {
                     },
                     e => Ok(e),
                 },
-                &|e| Ok(e),
+                & Ok,
             )
             .unwrap()
     }
@@ -416,7 +416,7 @@ impl Expression {
                     },
                     e => Ok(e),
                 },
-                &|e| Ok(e),
+                & Ok,
             )
             .unwrap()
     }
@@ -469,7 +469,7 @@ impl Expression {
         use Expression::*;
         // FIXME This should use a single match level, but since the child expressions are boxed
         // that would require box patterns, which are unstable.
-        match &*self {
+        match self {
             Equal(lhs, rhs) => match (&**lhs, &**rhs) {
                 (Field(i, _), Constant(v)) if i == &field => Some(vec![v.clone()]),
                 (Constant(v), Field(i, _)) if i == &field => Some(vec![v.clone()]),

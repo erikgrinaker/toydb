@@ -556,7 +556,7 @@ impl<'a> Parser<'a> {
                 }
             }
             Token::Number(n) => {
-                if n.chars().all(|c| c.is_digit(10)) {
+                if n.chars().all(|c| c.is_ascii_digit()) {
                     ast::Literal::Integer(n.parse()?).into()
                 } else {
                     ast::Literal::Float(n.parse()?).into()
@@ -789,6 +789,6 @@ pub(super) fn format_ident(ident: &str) -> String {
     if RE_IDENT.is_match(ident) && Keyword::from_str(ident).is_none() {
         ident.to_string()
     } else {
-        format!("\"{}\"", ident.replace("\"", "\"\""))
+        format!("\"{}\"", ident.replace('\"', "\"\""))
     }
 }

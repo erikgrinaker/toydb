@@ -12,7 +12,7 @@ pub struct Planner<'a, C: Catalog> {
     catalog: &'a mut C,
 }
 
-impl<'a, C: Catalog> Planner<'a, C> {
+impl<'a, C: Catalog + 'a> Planner<'a, C> {
     /// Creates a new planner.
     pub fn new(catalog: &'a mut C) -> Self {
         Self { catalog }
@@ -76,20 +76,20 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     source: Box::new(Node::Scan {
                         table,
                         alias: None,
-                        filter: r#where.map(|e| self.build_expression(scope, e)).transpose()?,
+                        filter: r#where.map(|e| Self::build_expression(scope, e)).transpose()?,
                     }),
                 }
             }
 
             ast::Statement::Insert { table, columns, values } => Node::Insert {
                 table,
-                columns: columns.unwrap_or_else(Vec::new),
+                columns: columns.unwrap_or_default(),
                 expressions: values
                     .into_iter()
                     .map(|exprs| {
                         exprs
                             .into_iter()
-                            .map(|expr| self.build_expression(&mut Scope::constant(), expr))
+                            .map(|expr| Self::build_expression(&mut Scope::constant(), expr))
                             .collect::<Result<_>>()
                     })
                     .collect::<Result<_>>()?,
@@ -102,7 +102,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     source: Box::new(Node::Scan {
                         table,
                         alias: None,
-                        filter: r#where.map(|e| self.build_expression(scope, e)).transpose()?,
+                        filter: r#where.map(|e| Self::build_expression(scope, e)).transpose()?,
                     }),
                     expressions: set
                         .into_iter()
@@ -110,7 +110,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                             Ok((
                                 scope.resolve(None, &c)?,
                                 Some(c),
-                                self.build_expression(scope, e)?,
+                                Self::build_expression(scope, e)?,
                             ))
                         })
                         .collect::<Result<_>>()?,
@@ -143,7 +143,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 if let Some(expr) = r#where {
                     node = Node::Filter {
                         source: Box::new(node),
-                        predicate: self.build_expression(scope, expr)?,
+                        predicate: Self::build_expression(scope, expr)?,
                     };
                 };
 
@@ -184,7 +184,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     // Build the remaining non-aggregate projection.
                     let expressions: Vec<(Expression, Option<String>)> = select
                         .into_iter()
-                        .map(|(e, l)| Ok((self.build_expression(scope, e)?, l)))
+                        .map(|(e, l)| Ok((Self::build_expression(scope, e)?, l)))
                         .collect::<Result<_>>()?;
                     scope.project(&expressions)?;
                     node = Node::Projection { source: Box::new(node), expressions };
@@ -194,7 +194,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 if let Some(expr) = having {
                     node = Node::Filter {
                         source: Box::new(node),
-                        predicate: self.build_expression(scope, expr)?,
+                        predicate: Self::build_expression(scope, expr)?,
                     };
                 };
 
@@ -206,7 +206,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                             .into_iter()
                             .map(|(e, o)| {
                                 Ok((
-                                    self.build_expression(scope, e)?,
+                                    Self::build_expression(scope, e)?,
                                     match o {
                                         ast::Order::Ascending => Direction::Ascending,
                                         ast::Order::Descending => Direction::Descending,
@@ -303,7 +303,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let left = Box::new(self.build_from_item(scope, *left)?);
                 let left_size = scope.len();
                 let right = Box::new(self.build_from_item(scope, *right)?);
-                let predicate = predicate.map(|e| self.build_expression(scope, e)).transpose()?;
+                let predicate = predicate.map(|e| Self::build_expression(scope, e)).transpose()?;
                 let outer = match r#type {
                     ast::JoinType::Cross | ast::JoinType::Inner => false,
                     ast::JoinType::Left | ast::JoinType::Right => true,
@@ -336,10 +336,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
         let mut expressions = Vec::new();
         for (aggregate, expr) in aggregations {
             aggregates.push(aggregate);
-            expressions.push((self.build_expression(scope, expr)?, None));
+            expressions.push((Self::build_expression(scope, expr)?, None));
         }
         for (expr, label) in groups {
-            expressions.push((self.build_expression(scope, expr)?, label));
+            expressions.push((Self::build_expression(scope, expr)?, label));
         }
         scope.project(
             &expressions
@@ -385,7 +385,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     }
                     _ => Ok(e),
                 },
-                &mut |e| Ok(e),
+                &mut Ok,
             )?;
         }
         for (_, expr) in &aggregates {
@@ -405,7 +405,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// SELECT COUNT(*) FROM movies GROUP BY released / 100
     fn extract_groups(
         &self,
-        exprs: &mut Vec<(ast::Expression, Option<String>)>,
+        exprs: &mut [(ast::Expression, Option<String>)],
         group_by: Vec<ast::Expression>,
         offset: usize,
     ) -> Result<Vec<(ast::Expression, Option<String>)>> {
@@ -466,7 +466,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                         }
                         e => Ok(e),
                     },
-                    &mut |e| Ok(e),
+                    &mut Ok,
                 )?;
             }
         }
@@ -494,7 +494,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 }
                 _ => Ok(e),
             },
-            &mut |e| Ok(e),
+            &mut Ok,
         )?;
         Ok(hidden)
     }
@@ -520,7 +520,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     }
 
     /// Builds an expression from an AST expression
-    fn build_expression(&self, scope: &mut Scope, expr: ast::Expression) -> Result<Expression> {
+    fn build_expression(scope: &mut Scope, expr: ast::Expression) -> Result<Expression> {
         use Expression::*;
         Ok(match expr {
             ast::Expression::Literal(l) => Constant(match l {
@@ -540,92 +540,92 @@ impl<'a, C: Catalog> Planner<'a, C> {
             ast::Expression::Operation(op) => match op {
                 // Logical operators
                 ast::Operation::And(lhs, rhs) => And(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Not(expr) => Not(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::Not(expr) => Not(Self::build_expression(scope, *expr)?.into()),
                 ast::Operation::Or(lhs, rhs) => Or(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
 
                 // Comparison operators
                 ast::Operation::Equal(lhs, rhs) => Equal(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::GreaterThan(lhs, rhs) => GreaterThan(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::GreaterThanOrEqual(lhs, rhs) => Or(
                     GreaterThan(
-                        self.build_expression(scope, *lhs.clone())?.into(),
-                        self.build_expression(scope, *rhs.clone())?.into(),
+                        Self::build_expression(scope, *lhs.clone())?.into(),
+                        Self::build_expression(scope, *rhs.clone())?.into(),
                     )
                     .into(),
                     Equal(
-                        self.build_expression(scope, *lhs)?.into(),
-                        self.build_expression(scope, *rhs)?.into(),
+                        Self::build_expression(scope, *lhs)?.into(),
+                        Self::build_expression(scope, *rhs)?.into(),
                     )
                     .into(),
                 ),
-                ast::Operation::IsNull(expr) => IsNull(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::IsNull(expr) => IsNull(Self::build_expression(scope, *expr)?.into()),
                 ast::Operation::LessThan(lhs, rhs) => LessThan(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::LessThanOrEqual(lhs, rhs) => Or(
                     LessThan(
-                        self.build_expression(scope, *lhs.clone())?.into(),
-                        self.build_expression(scope, *rhs.clone())?.into(),
+                        Self::build_expression(scope, *lhs.clone())?.into(),
+                        Self::build_expression(scope, *rhs.clone())?.into(),
                     )
                     .into(),
                     Equal(
-                        self.build_expression(scope, *lhs)?.into(),
-                        self.build_expression(scope, *rhs)?.into(),
+                        Self::build_expression(scope, *lhs)?.into(),
+                        Self::build_expression(scope, *rhs)?.into(),
                     )
                     .into(),
                 ),
                 ast::Operation::Like(lhs, rhs) => Like(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::NotEqual(lhs, rhs) => Not(Equal(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 )
                 .into()),
 
                 // Mathematical operators
-                ast::Operation::Assert(expr) => Assert(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::Assert(expr) => Assert(Self::build_expression(scope, *expr)?.into()),
                 ast::Operation::Add(lhs, rhs) => Add(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::Divide(lhs, rhs) => Divide(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::Exponentiate(lhs, rhs) => Exponentiate(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::Factorial(expr) => {
-                    Factorial(self.build_expression(scope, *expr)?.into())
+                    Factorial(Self::build_expression(scope, *expr)?.into())
                 }
                 ast::Operation::Modulo(lhs, rhs) => Modulo(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
                 ast::Operation::Multiply(lhs, rhs) => Multiply(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Negate(expr) => Negate(self.build_expression(scope, *expr)?.into()),
+                ast::Operation::Negate(expr) => Negate(Self::build_expression(scope, *expr)?.into()),
                 ast::Operation::Subtract(lhs, rhs) => Subtract(
-                    self.build_expression(scope, *lhs)?.into(),
-                    self.build_expression(scope, *rhs)?.into(),
+                    Self::build_expression(scope, *lhs)?.into(),
+                    Self::build_expression(scope, *rhs)?.into(),
                 ),
             },
         })
@@ -633,7 +633,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
     /// Builds and evaluates a constant AST expression.
     fn evaluate_constant(&self, expr: ast::Expression) -> Result<Value> {
-        self.build_expression(&mut Scope::constant(), expr)?.evaluate(None)
+        Self::build_expression(&mut Scope::constant(), expr)?.evaluate(None)
     }
 }
 

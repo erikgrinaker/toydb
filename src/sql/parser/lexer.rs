@@ -346,7 +346,7 @@ impl<'a> Lexer<'a> {
         match self.iter.peek() {
             Some('\'') => self.scan_string(),
             Some('"') => self.scan_ident_quoted(),
-            Some(c) if c.is_digit(10) => Ok(self.scan_number()),
+            Some(c) if c.is_ascii_digit() => Ok(self.scan_number()),
             Some(c) if c.is_alphabetic() => Ok(self.scan_ident()),
             Some(_) => Ok(self.scan_symbol()),
             None => Ok(None),
@@ -383,10 +383,10 @@ impl<'a> Lexer<'a> {
 
     /// Scans the input for the next number token, if any
     fn scan_number(&mut self) -> Option<Token> {
-        let mut num = self.next_while(|c| c.is_digit(10))?;
+        let mut num = self.next_while(|c| c.is_ascii_digit())?;
         if let Some(sep) = self.next_if(|c| c == '.') {
             num.push(sep);
-            while let Some(dec) = self.next_if(|c| c.is_digit(10)) {
+            while let Some(dec) = self.next_if(|c| c.is_ascii_digit()) {
                 num.push(dec)
             }
         }
@@ -395,7 +395,7 @@ impl<'a> Lexer<'a> {
             if let Some(sign) = self.next_if(|c| c == '+' || c == '-') {
                 num.push(sign)
             }
-            while let Some(c) = self.next_if(|c| c.is_digit(10)) {
+            while let Some(c) = self.next_if(|c| c.is_ascii_digit()) {
                 num.push(c)
             }
         }

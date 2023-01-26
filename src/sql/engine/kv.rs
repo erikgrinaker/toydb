@@ -79,7 +79,7 @@ impl Transaction {
             .get(&Key::Index(table.into(), column.into(), Some(value.into())).encode())?
             .map(|v| deserialize(&v))
             .transpose()?
-            .unwrap_or_else(HashSet::new))
+            .unwrap_or_default())
     }
 
     /// Saves an index entry.

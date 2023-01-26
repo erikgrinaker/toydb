@@ -34,7 +34,7 @@ impl Server {
         Ok(Self {
             node: Node::new(
                 id,
-                peers.iter().map(|(k, _)| k.to_string()).collect(),
+                peers.keys().map(| k | k.to_string()).collect::<Vec<_>>(),
                 log,
                 state,
                 node_tx,

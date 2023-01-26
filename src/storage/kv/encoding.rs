@@ -15,11 +15,7 @@ use std::convert::TryInto;
 
 /// Encodes a boolean, using 0x00 for false and 0x01 for true.
 pub fn encode_boolean(bool: bool) -> u8 {
-    if bool {
-        0x01
-    } else {
-        0x00
-    }
+    u8::from(bool)
 }
 
 /// Decodes a boolean. See encode_boolean() for format.
@@ -212,8 +208,10 @@ mod tests {
     #[test]
     fn decode_boolean() -> Result<()> {
         use super::decode_boolean;
-        assert_eq!(decode_boolean(0x00)?, false);
-        assert_eq!(decode_boolean(0x01)?, true);
+        // assert_eq!(decode_boolean(0x00)?, false);
+        assert!(!decode_boolean(0x00)?);
+        // assert_eq!(decode_boolean(0x01)?, true);
+        assert!(decode_boolean(0x01)?);
         assert!(decode_boolean(0x02).is_err());
         Ok(())
     }
@@ -222,7 +220,8 @@ mod tests {
     fn take_boolean() -> Result<()> {
         use super::take_boolean;
         let mut bytes: &[u8] = &[0x01, 0xaf];
-        assert_eq!(take_boolean(&mut bytes)?, true);
+        // assert_eq!(take_boolean(&mut bytes)?, true);
+        assert!(take_boolean(&mut bytes)?);
         assert_eq!(bytes, &[0xaf]);
         Ok(())
     }

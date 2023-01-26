@@ -32,7 +32,7 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                         .or_insert(
                             self.aggregates
                                 .iter()
-                                .map(|agg| <dyn Accumulator>::from(agg))
+                                .map(<dyn Accumulator>::from)
                                 .collect(),
                         )
                         .iter_mut()
@@ -44,7 +44,7 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                 if self.accumulators.is_empty() && self.aggregates.len() == columns.len() {
                     self.accumulators.insert(
                         Vec::new(),
-                        self.aggregates.iter().map(|agg| <dyn Accumulator>::from(agg)).collect(),
+                        self.aggregates.iter().map(<dyn Accumulator>::from).collect(),
                     );
                 }
                 Ok(ResultSet::Query {
