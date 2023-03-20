@@ -149,6 +149,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
                 // Build SELECT clause.
                 let mut hidden = 0;
+                if select.is_empty() && ! group_by.is_empty() {
+                    return Err(Error::Value("Wrong use of 'select *' and 'group_by' ".into()));
+                }
                 if !select.is_empty() {
                     // Inject hidden SELECT columns for fields and aggregates used in ORDER BY and
                     // HAVING expressions but not present in existing SELECT output. These will be
