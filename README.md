@@ -154,3 +154,5 @@ The debug configuration is included under `.vscode/launch.json`. Follow these st
 ## Credits
 
 toyDB logo is courtesy of [@jonasmerlin](https://github.com/jonasmerlin).
+
+Tathagata Roy.
