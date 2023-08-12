@@ -4,7 +4,6 @@ use crate::storage::log::Range;
 
 use ::log::debug;
 use serde::{Deserialize, Serialize};
-use serde_derive::{Deserialize, Serialize};
 use std::ops::RangeBounds;
 
 /// A replicated log entry

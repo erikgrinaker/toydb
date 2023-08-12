@@ -6,7 +6,6 @@ use crate::raft;
 use crate::storage::kv;
 
 use serde::{Deserialize, Serialize};
-use serde_derive::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// A Raft state machine mutation

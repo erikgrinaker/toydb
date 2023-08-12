@@ -69,19 +69,19 @@ struct Config {
 
 impl Config {
     fn new(file: &str) -> Result<Self> {
-        let mut c = config::Config::new();
-        c.set_default("id", "toydb")?;
-        c.set_default("peers", HashMap::<String, String>::new())?;
-        c.set_default("listen_sql", "0.0.0.0:9605")?;
-        c.set_default("listen_raft", "0.0.0.0:9705")?;
-        c.set_default("log_level", "info")?;
-        c.set_default("data_dir", "/var/lib/toydb")?;
-        c.set_default("sync", true)?;
-        c.set_default("storage_raft", "hybrid")?;
-        c.set_default("storage_sql", "memory")?;
-
-        c.merge(config::File::with_name(file))?;
-        c.merge(config::Environment::with_prefix("TOYDB"))?;
-        Ok(c.try_into()?)
+        Ok(config::Config::builder()
+            .set_default("id", "toydb")?
+            .set_default("peers", HashMap::<String, String>::new())?
+            .set_default("listen_sql", "0.0.0.0:9605")?
+            .set_default("listen_raft", "0.0.0.0:9705")?
+            .set_default("log_level", "info")?
+            .set_default("data_dir", "/var/lib/toydb")?
+            .set_default("sync", true)?
+            .set_default("storage_raft", "hybrid")?
+            .set_default("storage_sql", "memory")?
+            .add_source(config::File::with_name(file))
+            .add_source(config::Environment::with_prefix("TOYDB"))
+            .build()?
+            .try_deserialize()?)
     }
 }

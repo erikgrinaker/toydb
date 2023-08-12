@@ -2,7 +2,6 @@ use super::{encoding, Range, Store};
 use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
-use serde_derive::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::Peekable;
