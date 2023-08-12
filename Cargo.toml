@@ -15,23 +15,31 @@ futures = "~0.3.15"
 futures-util = "~0.3.15"
 lazy_static = "~1.4.0"
 log = "~0.4.14"
-names = "~0.11.0"
+names = "~0.14.0"
 rand = "~0.8.3"
 regex = "1.5.4"
 rustyline = "~8.2.0"
 rustyline-derive = "0.4.0"
 serde = "~1.0.126"
 serde_derive = "~1.0.126"
-simplelog = "0.10.0"
-tokio = { version = "~1.6.2", features = ["macros", "rt", "rt-multi-thread", "net", "io-util", "time", "sync"] }
+simplelog = "~0.12.1"
+tokio = { version = "~1.6.2", features = [
+    "macros",
+    "rt",
+    "rt-multi-thread",
+    "net",
+    "io-util",
+    "time",
+    "sync",
+] }
 tokio-serde = { version = "~0.8", features = ["bincode"] }
-tokio-stream = { version = "~0.1.6", features = ["net"]}
+tokio-stream = { version = "~0.1.6", features = ["net"] }
 tokio-util = { version = "~0.6.7", features = ["codec"] }
-uuid = { version = "~0.8.2", features = ["v4"] }
+uuid = { version = "~1.4.1", features = ["v4"] }
 
 [dev-dependencies]
-goldenfile = "~1.1.0"
-pretty_assertions = "~0.7.2"
-serial_test = "~0.5.1"
+goldenfile = "~1.5.2"
+pretty_assertions = "~1.4.0"
+serial_test = "~2.0.0"
 tempdir = "~0.3.7"
-tempfile = "~3.2.0"
+tempfile = "~3.7.1"
