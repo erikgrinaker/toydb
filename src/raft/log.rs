@@ -304,13 +304,13 @@ mod tests {
         let (mut l, _) = setup()?;
         l.append(2, Some(vec![0x01]))?;
 
-        assert_eq!(true, l.has(1, 2)?);
-        assert_eq!(true, l.has(0, 0)?);
-        assert_eq!(false, l.has(0, 1)?);
-        assert_eq!(false, l.has(1, 0)?);
-        assert_eq!(false, l.has(1, 3)?);
-        assert_eq!(false, l.has(2, 0)?);
-        assert_eq!(false, l.has(2, 1)?);
+        assert!(l.has(1, 2)?);
+        assert!(l.has(0, 0)?);
+        assert!(!l.has(0, 1)?);
+        assert!(!l.has(1, 0)?);
+        assert!(!l.has(1, 3)?);
+        assert!(!l.has(2, 0)?);
+        assert!(!l.has(2, 1)?);
         Ok(())
     }
 

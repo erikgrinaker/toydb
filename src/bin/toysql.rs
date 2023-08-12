@@ -146,7 +146,8 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
                     committed = status.raft.commit_index,
                     applied = status.raft.apply_index,
                     raft_storage = status.raft.storage,
-                    raft_size = format!("{:.3}", status.raft.storage_size as f64 / 1000.0 / 1000.0),
+                    raft_size =
+                        format_args!("{:.3}", status.raft.storage_size as f64 / 1000.0 / 1000.0),
                     logs = node_logs.join(" "),
                     txns = status.mvcc.txns,
                     txns_active = status.mvcc.txns_active,
@@ -186,7 +187,7 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
             ResultSet::Update { count } => println!("Updated {} rows", count),
             ResultSet::CreateTable { name } => println!("Created table {}", name),
             ResultSet::DropTable { name } => println!("Dropped table {}", name),
-            ResultSet::Explain(plan) => println!("{}", plan.to_string()),
+            ResultSet::Explain(plan) => println!("{}", plan),
             ResultSet::Query { columns, mut rows } => {
                 if self.show_headers {
                     println!(
@@ -253,7 +254,7 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
             match self.execute(&input).await {
                 Ok(()) => {}
                 error @ Err(Error::Internal(_)) => return error,
-                Err(error) => println!("Error: {}", error.to_string()),
+                Err(error) => println!("Error: {}", error),
             }
         }
 

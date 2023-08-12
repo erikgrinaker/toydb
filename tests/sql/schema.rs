@@ -1,4 +1,4 @@
-///! Schema-related tests, using an in-memory database against golden files in tests/sql/chema/
+//! Schema-related tests, using an in-memory database against golden files in tests/sql/chema/
 use toydb::error::Result;
 use toydb::sql::engine::{Engine as _, Mode, Transaction as _};
 use toydb::sql::schema::Catalog as _;

@@ -16,7 +16,7 @@ pub struct ConstantFolder;
 
 impl Optimizer for ConstantFolder {
     fn optimize(&self, node: Node) -> Result<Node> {
-        node.transform(&|n| Ok(n), &|n| {
+        node.transform(&Ok, &|n| {
             n.transform_expressions(
                 &|e| {
                     if !e.contains(&|expr| matches!(expr, Expression::Field(_, _))) {
@@ -25,7 +25,7 @@ impl Optimizer for ConstantFolder {
                         Ok(e)
                     }
                 },
-                &|e| Ok(e),
+                &Ok,
             )
         })
     }
@@ -42,7 +42,7 @@ impl Optimizer for FilterPushdown {
                     // We don't replace the filter node here, since doing so would cause transform()
                     // to skip the source as it won't reapply the transform to the "same" node.
                     // We leave a noop filter node instead, which will be cleaned up by NoopCleaner.
-                    if let Some(remainder) = self.pushdown(predicate, &mut *source) {
+                    if let Some(remainder) = self.pushdown(predicate, &mut source) {
                         Ok(Node::Filter { source, predicate: remainder })
                     } else {
                         Ok(Node::Filter {
@@ -63,7 +63,7 @@ impl Optimizer for FilterPushdown {
                 }
                 n => Ok(n),
             },
-            &|n| Ok(n),
+            &Ok,
         )
     }
 }
@@ -146,7 +146,7 @@ impl FilterPushdown {
                         Expression::Field(i, label) => Ok(Expression::Field(i - boundary, label)),
                         e => Ok(e),
                     },
-                    &|e| Ok(e),
+                    &Ok,
                 )
                 .unwrap();
             if let Some(remainder) = self.pushdown(push_right, right) {
@@ -179,7 +179,7 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
 
 impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
     fn optimize(&self, node: Node) -> Result<Node> {
-        node.transform(&|n| Ok(n), &|n| match n {
+        node.transform(&Ok, &|n| match n {
             Node::Scan { table, alias, filter: Some(filter) } => {
                 let columns = self.catalog.must_read_table(&table)?.columns;
                 let pk = columns.iter().position(|c| c.primary_key).unwrap();
@@ -226,7 +226,7 @@ impl Optimizer for NoopCleaner {
         node.transform(
             // While descending the node tree, clean up boolean expressions.
             &|n| {
-                n.transform_expressions(&|e| Ok(e), &|e| match &e {
+                n.transform_expressions(&Ok, &|e| match &e {
                     And(lhs, rhs) => match (&**lhs, &**rhs) {
                         (Constant(Value::Boolean(false)), _)
                         | (Constant(Value::Null), _)
@@ -295,7 +295,7 @@ impl Optimizer for JoinType {
                 },
                 n => Ok(n),
             },
-            &|n| Ok(n),
+            &Ok,
         )
     }
 }

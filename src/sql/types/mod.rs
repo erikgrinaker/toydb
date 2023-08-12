@@ -40,7 +40,7 @@ pub enum Value {
 
 impl std::cmp::Eq for Value {}
 
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.datatype().hash(state);

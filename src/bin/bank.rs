@@ -120,7 +120,7 @@ impl Bank {
         println!();
 
         let mut rng = rand::thread_rng();
-        let customers = rand::distributions::Uniform::from(1..=self.customers as i64);
+        let customers = rand::distributions::Uniform::from(1..=self.customers);
         let transfers = futures::stream::iter(
             std::iter::from_fn(|| Some((customers.sample(&mut rng), customers.sample(&mut rng))))
                 .filter(|(from, to)| from != to)

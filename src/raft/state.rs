@@ -87,7 +87,7 @@ impl Driver {
     }
 
     /// Synchronously (re)plays a set of log entries, for initial sync.
-    pub fn replay<'a>(&mut self, state: &mut dyn State, mut scan: Scan<'a>) -> Result<()> {
+    pub fn replay(&mut self, state: &mut dyn State, mut scan: Scan) -> Result<()> {
         while let Some(entry) = scan.next().transpose()? {
             debug!("Replaying {:?}", entry);
             if let Some(command) = entry.command {

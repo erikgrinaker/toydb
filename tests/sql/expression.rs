@@ -1,4 +1,4 @@
-///! Evaluates SQL expressions and compares with expectations.
+//! Evaluates SQL expressions and compares with expectations.
 use toydb::error::{Error, Result};
 use toydb::sql::engine::Engine;
 use toydb::sql::types::Value;

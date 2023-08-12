@@ -318,7 +318,7 @@ impl Children {
     /// Looks up the child responsible for a given key. This can only be called on non-empty
     /// child sets, which should be all child sets except for the initial root node.
     fn lookup(&self, key: &[u8]) -> (usize, &Node) {
-        let i = self.keys.iter().position(|k| k.deref() > key).unwrap_or_else(|| self.keys.len());
+        let i = self.keys.iter().position(|k| k.deref() > key).unwrap_or(self.keys.len());
         (i, &self[i])
     }
 
@@ -326,7 +326,7 @@ impl Children {
     /// can only be called on non-empty child sets, which should be all child sets except for the
     /// initial root node.
     fn lookup_mut(&mut self, key: &[u8]) -> (usize, &mut Node) {
-        let i = self.keys.iter().position(|k| k.deref() > key).unwrap_or_else(|| self.keys.len());
+        let i = self.keys.iter().position(|k| k.deref() > key).unwrap_or(self.keys.len());
         (i, &mut self[i])
     }
 
@@ -509,7 +509,7 @@ impl Values {
     /// Deletes a key from the set, if it exists.
     fn delete(&mut self, key: &[u8]) {
         for (i, (k, _)) in self.iter().enumerate() {
-            match (&**k).cmp(key) {
+            match (**k).cmp(key) {
                 Ordering::Greater => break,
                 Ordering::Equal => {
                     self.remove(i);
@@ -523,7 +523,7 @@ impl Values {
     /// Fetches a value from the set, if the key exists.
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         self.iter()
-            .find_map(|(k, v)| match (&**k).cmp(key) {
+            .find_map(|(k, v)| match (**k).cmp(key) {
                 Ordering::Greater => Some(None),
                 Ordering::Equal => Some(Some(v.to_vec())),
                 Ordering::Less => None,
@@ -544,7 +544,7 @@ impl Values {
     /// Fetches the next value after the given key, if it exists.
     fn get_next(&self, key: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
         self.iter()
-            .find_map(|(k, v)| match (&**k).cmp(key) {
+            .find_map(|(k, v)| match (**k).cmp(key) {
                 Ordering::Greater => Some(Some((k.to_vec(), v.to_vec()))),
                 Ordering::Equal => None,
                 Ordering::Less => None,
@@ -556,7 +556,7 @@ impl Values {
     fn get_prev(&self, key: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
         self.iter()
             .rev()
-            .find_map(|(k, v)| match (&**k).cmp(key) {
+            .find_map(|(k, v)| match (**k).cmp(key) {
                 Ordering::Less => Some(Some((k.to_vec(), v.to_vec()))),
                 Ordering::Equal => None,
                 Ordering::Greater => None,
@@ -570,7 +570,7 @@ impl Values {
         // Find position to insert at, or if the key already exists just update it.
         let mut insert_at = self.len();
         for (i, (k, v)) in self.iter_mut().enumerate() {
-            match (&**k).cmp(key) {
+            match (**k).cmp(key) {
                 Ordering::Greater => {
                     insert_at = i;
                     break;

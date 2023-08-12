@@ -83,7 +83,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             ast::Statement::Insert { table, columns, values } => Node::Insert {
                 table,
-                columns: columns.unwrap_or_else(Vec::new),
+                columns: columns.unwrap_or_default(),
                 expressions: values
                     .into_iter()
                     .map(|exprs| {
@@ -385,7 +385,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     }
                     _ => Ok(e),
                 },
-                &mut |e| Ok(e),
+                &mut Ok,
             )?;
         }
         for (_, expr) in &aggregates {
@@ -405,7 +405,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// SELECT COUNT(*) FROM movies GROUP BY released / 100
     fn extract_groups(
         &self,
-        exprs: &mut Vec<(ast::Expression, Option<String>)>,
+        exprs: &mut [(ast::Expression, Option<String>)],
         group_by: Vec<ast::Expression>,
         offset: usize,
     ) -> Result<Vec<(ast::Expression, Option<String>)>> {
@@ -466,7 +466,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                         }
                         e => Ok(e),
                     },
-                    &mut |e| Ok(e),
+                    &mut Ok,
                 )?;
             }
         }
@@ -494,7 +494,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 }
                 _ => Ok(e),
             },
-            &mut |e| Ok(e),
+            &mut Ok,
         )?;
         Ok(hidden)
     }
@@ -520,6 +520,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     }
 
     /// Builds an expression from an AST expression
+    #[allow(clippy::only_used_in_recursion)]
     fn build_expression(&self, scope: &mut Scope, expr: ast::Expression) -> Result<Expression> {
         use Expression::*;
         Ok(match expr {
