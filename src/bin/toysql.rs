@@ -5,6 +5,7 @@
 
 #![warn(clippy::all)]
 
+use rustyline::history::DefaultHistory;
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{error::ReadlineError, Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
@@ -49,7 +50,7 @@ async fn main() -> Result<()> {
 /// The ToySQL REPL
 struct ToySQL {
     client: Client,
-    editor: Editor<InputValidator>,
+    editor: Editor<InputValidator, DefaultHistory>,
     history_path: Option<std::path::PathBuf>,
     show_headers: bool,
 }
@@ -59,7 +60,7 @@ impl ToySQL {
     async fn new(host: &str, port: u16) -> Result<Self> {
         Ok(Self {
             client: Client::new((host, port)).await?,
-            editor: Editor::new(),
+            editor: Editor::new()?,
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
             show_headers: false,
@@ -212,7 +213,7 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
         };
         match self.editor.readline(&prompt) {
             Ok(input) => {
-                self.editor.add_history_entry(&input);
+                self.editor.add_history_entry(&input)?;
                 Ok(Some(input.trim().to_string()))
             }
             Err(ReadlineError::Eof) | Err(ReadlineError::Interrupted) => Ok(None),
