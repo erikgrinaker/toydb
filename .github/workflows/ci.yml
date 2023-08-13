@@ -1,0 +1,25 @@
+name: CI
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@1.71.1
+      id: toolchain
+      with:
+        components: clippy, rustfmt
+    - uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{runner.os}}-target-${{steps.toolchain.outputs.cachekey}}-${{hashFiles('Cargo.lock')}}
+    - run: cargo build --tests
+    - run: cargo test
+    - run: cargo clippy --tests --no-deps -- -D warnings
+    - run: cargo fmt --check
