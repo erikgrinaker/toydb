@@ -138,7 +138,6 @@ mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage::log;
-    use futures::FutureExt;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
@@ -296,19 +295,19 @@ mod tests {
         assert_node(&node).is_leader().term(3);
 
         assert_eq!(
-            node_rx.recv().now_or_never(),
-            Some(Some(Message {
+            node_rx.try_recv()?,
+            Message {
                 from: Address::Local,
                 to: Address::Peers,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
-            })),
+            },
         );
 
         for to in peers.iter().cloned() {
             assert_eq!(
-                node_rx.recv().now_or_never(),
-                Some(Some(Message {
+                node_rx.try_recv()?,
+                Message {
                     from: Address::Local,
                     to: Address::Peer(to),
                     term: 3,
@@ -317,7 +316,7 @@ mod tests {
                         base_term: 2,
                         entries: vec![Entry { index: 4, term: 3, command: None }],
                     },
-                }))
+                }
             )
         }
 

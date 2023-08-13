@@ -242,7 +242,6 @@ mod tests {
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
     use crate::storage::log;
-    use futures::FutureExt;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
@@ -251,7 +250,7 @@ mod tests {
         msgs: Vec<T>,
     ) {
         let mut actual = Vec::new();
-        while let Some(Some(message)) = rx.recv().now_or_never() {
+        while let Ok(message) = rx.try_recv() {
             actual.push(message)
         }
         assert_eq!(msgs, actual);

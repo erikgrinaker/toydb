@@ -115,13 +115,11 @@ impl From<tokio::task::JoinError> for Error {
     }
 }
 
-// see https://github.com/tokio-rs/tokio/pull/3263: remove try_recv() from mpsc types
-//
-// impl From<tokio::sync::mpsc::error::TryRecvError> for Error {
-//     fn from(err: tokio::sync::mpsc::error::TryRecvError) -> Self {
-//         Error::Internal(err.to_string())
-//     }
-// }
+impl From<tokio::sync::mpsc::error::TryRecvError> for Error {
+    fn from(err: tokio::sync::mpsc::error::TryRecvError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
     fn from(err: tokio::sync::mpsc::error::SendError<T>) -> Self {
