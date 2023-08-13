@@ -6,7 +6,6 @@
 
 #![warn(clippy::all)]
 
-use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use toydb::error::{Error, Result};
@@ -15,17 +14,16 @@ use toydb::Server;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opts = app_from_crate!()
+    let args = clap::command!()
         .arg(
-            clap::Arg::with_name("config")
-                .short("c")
+            clap::Arg::new("config")
+                .short('c')
                 .long("config")
                 .help("Configuration file path")
-                .takes_value(true)
                 .default_value("/etc/toydb.yaml"),
         )
         .get_matches();
-    let cfg = Config::new(opts.value_of("config").unwrap())?;
+    let cfg = Config::new(args.get_one::<String>("config").unwrap().as_ref())?;
 
     let loglevel = cfg.log_level.parse::<simplelog::LevelFilter>()?;
     let mut logconfig = simplelog::ConfigBuilder::new();

@@ -5,7 +5,6 @@
 
 #![warn(clippy::all)]
 
-use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{error::ReadlineError, Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
@@ -17,37 +16,30 @@ use toydb::Client;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opts = app_from_crate!()
-        .arg(clap::Arg::with_name("command"))
-        .arg(clap::Arg::with_name("headers").short("H").long("headers").help("Show column headers"))
-        .arg(
-            clap::Arg::with_name("host")
-                .short("h")
+    let opts = clap::command!()
+        .name("toysql")
+        .about("A ToyDB client.")
+        .args([
+            clap::Arg::new("command"),
+            clap::Arg::new("host")
+                .short('H')
                 .long("host")
                 .help("Host to connect to")
-                .takes_value(true)
-                .required(true)
                 .default_value("127.0.0.1"),
-        )
-        .arg(
-            clap::Arg::with_name("port")
-                .short("p")
+            clap::Arg::new("port")
+                .short('p')
                 .long("port")
                 .help("Port number to connect to")
-                .takes_value(true)
-                .required(true)
+                .value_parser(clap::value_parser!(u16))
                 .default_value("9605"),
-        )
+        ])
         .get_matches();
 
     let mut toysql =
-        ToySQL::new(opts.value_of("host").unwrap(), opts.value_of("port").unwrap().parse()?)
+        ToySQL::new(opts.get_one::<String>("host").unwrap(), *opts.get_one("port").unwrap())
             .await?;
-    if opts.is_present("headers") {
-        toysql.show_headers = true
-    }
 
-    if let Some(command) = opts.value_of("command") {
+    if let Some(command) = opts.get_one::<&str>("command") {
         toysql.execute(command).await
     } else {
         toysql.run().await

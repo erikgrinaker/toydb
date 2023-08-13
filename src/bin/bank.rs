@@ -1,7 +1,7 @@
 /*
  * Simulates a bank, by creating a set of accounts and making concurrent transfers between them:
  *
- * - Connect to the given toyDB hosts (-h default 127.0.0.1:9605, can give multiple)
+ * - Connect to the given toyDB hosts (-H default 127.0.0.1:9605, can give multiple)
  * - Create C customers (-C default 100)
  * - Create a accounts per customer with initial balance 100 (-a default 10)
  * - Spawn c concurrent workers (-c default 8)
@@ -17,7 +17,6 @@
 
 #![warn(clippy::all)]
 
-use clap::{app_from_crate, crate_authors, crate_description, crate_name, crate_version};
 use futures::stream::TryStreamExt as _;
 use rand::distributions::Distribution;
 use rand::Rng as _;
@@ -29,71 +28,57 @@ use toydb::error::{Error, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opts = app_from_crate!()
-        .arg(
-            clap::Arg::with_name("host")
-                .short("h")
+    let args = clap::command!()
+        .about("A bank workload, which makes concurrent transfers between accounts.")
+        .args([
+            clap::Arg::new("host")
+                .short('H')
                 .long("host")
                 .help("Host to connect to, optionally with port number")
-                .takes_value(true)
-                .number_of_values(1)
-                .multiple(true)
-                .required(true)
+                .num_args(1..)
                 .default_value("127.0.0.1:9605"),
-        )
-        .arg(
-            clap::Arg::with_name("concurrency")
-                .short("c")
+            clap::Arg::new("concurrency")
+                .short('c')
                 .long("concurrency")
                 .help("Concurrent workers to spawn")
-                .takes_value(true)
-                .required(true)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("8"),
-        )
-        .arg(
-            clap::Arg::with_name("customers")
-                .short("C")
+            clap::Arg::new("customers")
+                .short('C')
                 .long("customers")
                 .help("Number of customers to create")
-                .takes_value(true)
-                .required(true)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("100"),
-        )
-        .arg(
-            clap::Arg::with_name("accounts")
-                .short("a")
+            clap::Arg::new("accounts")
+                .short('a')
                 .long("accounts")
                 .help("Number of accounts to create per customer")
-                .takes_value(true)
-                .required(true)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("10"),
-        )
-        .arg(
-            clap::Arg::with_name("transactions")
-                .short("t")
+            clap::Arg::new("transactions")
+                .short('t')
                 .long("transactions")
                 .help("Number of account transfers to execute")
-                .takes_value(true)
-                .required(true)
+                .value_parser(clap::value_parser!(u64))
                 .default_value("1000"),
-        )
+        ])
         .get_matches();
 
     Bank::new(
-        opts.values_of("host").unwrap().map(String::from).collect(),
-        opts.value_of("concurrency").unwrap().parse()?,
-        opts.value_of("customers").unwrap().parse()?,
-        opts.value_of("accounts").unwrap().parse()?,
+        args.get_many::<String>("host").unwrap().collect(),
+        *args.get_one::<u64>("concurrency").unwrap(),
+        *args.get_one("customers").unwrap(),
+        *args.get_one("accounts").unwrap(),
     )
     .await?
-    .run(opts.value_of("transactions").unwrap().parse()?)
+    .run(*args.get_one("transactions").unwrap())
     .await
 }
 
 struct Bank {
     clients: Pool,
-    customers: i64,
-    customer_accounts: i64,
+    customers: u64,
+    customer_accounts: u64,
 }
 
 impl Bank {
@@ -103,8 +88,8 @@ impl Bank {
     async fn new<A: ToSocketAddrs + Clone>(
         addrs: Vec<A>,
         concurrency: u64,
-        customers: i64,
-        accounts: i64,
+        customers: u64,
+        accounts: u64,
     ) -> Result<Self> {
         Ok(Self {
             clients: Pool::new(addrs, concurrency).await?,
@@ -203,9 +188,10 @@ impl Bank {
     /// Verifies that all invariants hold (same total balance, no negative balances).
     async fn verify(&self) -> Result<()> {
         let client = self.clients.get().await;
-        let expect = self.customers * self.customer_accounts * Self::INITIAL_BALANCE as i64;
+        let expect = self.customers * self.customer_accounts * Self::INITIAL_BALANCE;
         let balance =
-            client.execute("SELECT SUM(balance) FROM account").await?.into_value()?.integer()?;
+            client.execute("SELECT SUM(balance) FROM account").await?.into_value()?.integer()?
+                as u64;
         if balance != expect {
             return Err(Error::Value(format!(
                 "Expected total balance {}, found {}",
@@ -225,7 +211,7 @@ impl Bank {
     }
 
     /// Transfers a random amount between two customers, retrying serialization failures.
-    async fn transfer(&self, from: i64, to: i64) -> Result<()> {
+    async fn transfer(&self, from: u64, to: u64) -> Result<()> {
         let client = self.clients.get().await;
         let attempts = Rc::new(Cell::new(0_u8));
         let start = std::time::Instant::now();
