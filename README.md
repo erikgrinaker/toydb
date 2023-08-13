@@ -1,6 +1,6 @@
 # <a><img src="./docs/images/toydb.svg" height="40" valign="top" /></a> toyDB
 
-[![Build Status](https://cloud.drone.io/api/badges/erikgrinaker/toydb/status.svg)](https://cloud.drone.io/erikgrinaker/toydb)
+[![CI](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml/badge.svg)](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml)
 
 Distributed SQL database in Rust, written as a learning project. Most components are built from
 scratch, including:
