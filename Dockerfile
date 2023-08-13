@@ -24,4 +24,5 @@ RUN cargo install --bin toydb --locked --offline --path . --target=$TARGET
 FROM alpine:3.18
 COPY --from=build /usr/local/cargo/bin/toydb /usr/local/bin/toydb
 COPY --from=build /usr/src/toydb/config/toydb.yaml /etc/toydb.yaml
-CMD ["toydb"]
+RUN sed -i -e 's|data_dir:.*|data_dir: /var/lib/toydb|g' /etc/toydb.yaml
+CMD ["toydb", "-c", "/etc/toydb.yaml"]

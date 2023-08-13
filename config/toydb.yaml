@@ -11,7 +11,7 @@ listen_raft: 0.0.0.0:9705
 # persisted to disk, but has a high performance penalty. Disabling fsync and relying on cluster
 # redundancy for data durability may be a reasonable trade-off, although this can compromise Raft
 # linearizability guarantees in rare edge cases where committed entries lose majority.
-data_dir: /var/lib/toydb
+data_dir: data
 sync: true
 
 # Raft log storage engine

@@ -143,13 +143,7 @@ The debug configuration is included under `.vscode/launch.json`. Follow these st
 
 2. Go to "Run and Debug" tab and select e.g. "Debug unit tests in library 'toydb'".
 
-3. To debug the binary, create a data directory:
-
-    ```
-    $ sudo mkdir /var/lib/toydb && sudo chown $(whoami) /var/lib/toydb
-    ```
-
-   And then selet "Debug executable 'toydb'" under "Run and Debug".
+3. To debug the binary, select "Debug executable 'toydb'" under "Run and Debug".
 
 ## Credits
 

@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
                 .short('c')
                 .long("config")
                 .help("Configuration file path")
-                .default_value("/etc/toydb.yaml"),
+                .default_value("config/toydb.yaml"),
         )
         .get_matches();
     let cfg = Config::new(args.get_one::<String>("config").unwrap().as_ref())?;
@@ -73,7 +73,7 @@ impl Config {
             .set_default("listen_sql", "0.0.0.0:9605")?
             .set_default("listen_raft", "0.0.0.0:9705")?
             .set_default("log_level", "info")?
-            .set_default("data_dir", "/var/lib/toydb")?
+            .set_default("data_dir", "data")?
             .set_default("sync", true)?
             .set_default("storage_raft", "hybrid")?
             .set_default("storage_sql", "memory")?
