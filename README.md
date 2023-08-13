@@ -71,7 +71,7 @@ basic set of end-to-end cluster tests under
 desirable but not yet implemented.
 
 Execute `cargo test` to run all tests, or check out the latest
-[CI run](https://cloud.drone.io/erikgrinaker/toydb).
+[CI run](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml).
 
 ## Performance
 
