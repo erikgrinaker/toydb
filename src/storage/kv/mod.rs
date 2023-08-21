@@ -1,3 +1,4 @@
+mod bitcask;
 pub mod encoding;
 mod memory;
 pub mod mvcc;
@@ -5,6 +6,7 @@ mod std_memory;
 #[cfg(test)]
 mod test;
 
+pub use bitcask::BitCask;
 pub use memory::Memory;
 pub use mvcc::MVCC;
 pub use std_memory::StdMemory;

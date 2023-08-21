@@ -39,6 +39,9 @@ async fn main() -> Result<()> {
         name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
     };
     let sql_store: Box<dyn storage::kv::Store> = match cfg.storage_sql.as_str() {
+        "bitcask" => {
+            Box::new(storage::kv::BitCask::new_compact(path.join("state"), cfg.compact_threshold)?)
+        }
         "memory" | "" => Box::new(storage::kv::Memory::new()),
         "stdmemory" => Box::new(storage::kv::StdMemory::new()),
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
@@ -60,6 +63,7 @@ struct Config {
     listen_raft: String,
     log_level: String,
     data_dir: String,
+    compact_threshold: f64,
     sync: bool,
     storage_raft: String,
     storage_sql: String,
@@ -74,6 +78,7 @@ impl Config {
             .set_default("listen_raft", "0.0.0.0:9705")?
             .set_default("log_level", "info")?
             .set_default("data_dir", "data")?
+            .set_default("compact_threshold", 0.2)?
             .set_default("sync", true)?
             .set_default("storage_raft", "hybrid")?
             .set_default("storage_sql", "memory")?
