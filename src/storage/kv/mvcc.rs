@@ -70,6 +70,7 @@ impl MVCC {
     pub fn status(&self) -> Result<Status> {
         let mut store = self.store.lock()?;
         return Ok(Status {
+            storage: store.to_string(),
             txns: match store.get(&Key::TxnNext.encode())? {
                 Some(ref v) => deserialize(v)?,
                 None => 1,
@@ -79,7 +80,6 @@ impl MVCC {
                     Key::TxnActive(0).encode()..Key::TxnActive(std::u64::MAX).encode(),
                 ))
                 .try_fold(0, |count, r| r.map(|_| count + 1))?,
-            storage: store.to_string(),
         });
     }
 }
@@ -224,7 +224,10 @@ impl Transaction {
             Bound::Included(k) => Bound::Included(Key::Record(k.into(), std::u64::MAX).encode()),
             Bound::Unbounded => Bound::Unbounded,
         };
-        let scan = self.store.lock()?.scan(Range::from((start, end)));
+        // TODO: For now, collect results from the store to not have to deal with lifetimes.
+        let scan = Box::new(
+            self.store.lock()?.scan(Range::from((start, end))).collect::<Vec<_>>().into_iter(),
+        );
         Ok(Box::new(Scan::new(scan, self.snapshot.clone())))
     }
 
@@ -427,17 +430,17 @@ impl<'a> Key<'a> {
 }
 
 /// A key range scan.
-pub struct Scan {
+pub struct Scan<'a> {
     /// The augmented KV store iterator, with key (decoded) and value. Note that we don't retain
     /// the decoded version, so there will be multiple keys (for each version). We want the last.
-    scan: Peekable<super::Scan>,
+    scan: Peekable<super::Scan<'a>>,
     /// Keeps track of next_back() seen key, whose previous versions should be ignored.
     next_back_seen: Option<Vec<u8>>,
 }
 
-impl Scan {
+impl<'a> Scan<'a> {
     /// Creates a new scan.
-    fn new(mut scan: super::Scan, snapshot: Snapshot) -> Self {
+    fn new(mut scan: super::Scan<'a>, snapshot: Snapshot) -> Self {
         // Augment the underlying scan to decode the key and filter invisible versions. We don't
         // return the version, since we don't need it, but beware that all versions of the key
         // will still be returned - we usually only need the last, which is what the next() and
@@ -493,14 +496,14 @@ impl Scan {
     }
 }
 
-impl Iterator for Scan {
+impl<'a> Iterator for Scan<'a> {
     type Item = Result<(Vec<u8>, Vec<u8>)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
     }
 }
 
-impl DoubleEndedIterator for Scan {
+impl<'a> DoubleEndedIterator for Scan<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.try_next_back().transpose()
     }

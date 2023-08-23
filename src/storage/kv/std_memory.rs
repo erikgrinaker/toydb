@@ -37,13 +37,7 @@ impl Store for StdMemory {
     }
 
     fn scan(&mut self, range: Range) -> Scan {
-        Box::new(
-            self.data
-                .range(range)
-                .map(|(k, v)| Ok((k.clone(), v.clone())))
-                .collect::<Vec<_>>()
-                .into_iter(),
-        )
+        Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {

@@ -208,7 +208,9 @@ impl super::Transaction for Transaction {
                         None => Some(Ok(row)),
                     },
                     err => Some(err),
-                }),
+                })
+                .collect::<Vec<_>>()
+                .into_iter(),
         ))
     }
 
@@ -230,7 +232,9 @@ impl super::Transaction for Transaction {
                         _ => return Err(Error::Internal("Invalid index key".into())),
                     };
                     Ok((value, deserialize(&v)?))
-                }),
+                })
+                .collect::<Vec<_>>()
+                .into_iter(),
         ))
     }
 
