@@ -56,11 +56,11 @@ impl Store for Memory {
         Ok(())
     }
 
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.root.read()?.get(key))
     }
 
-    fn scan(&self, range: Range) -> Scan {
+    fn scan(&mut self, range: Range) -> Scan {
         Box::new(Iter::new(self.root.clone(), range))
     }
 

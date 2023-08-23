@@ -32,15 +32,11 @@ impl Store for StdMemory {
         Ok(())
     }
 
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.data.get(key).cloned())
     }
 
-    fn scan(&self, range: Range) -> Scan {
-        // FIXME Since the range iterator returns borrowed items it would require a read-lock for
-        // the duration of the iteration. This is too coarse, so we buffer the entire iteration
-        // here. An iterator with an arc-mutex should be used instead, which is able to resume
-        // iteration by grabbing the lock again.
+    fn scan(&mut self, range: Range) -> Scan {
         Box::new(
             self.data
                 .range(range)

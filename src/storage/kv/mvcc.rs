@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::iter::Peekable;
 use std::ops::{Bound, RangeBounds};
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 /// MVCC status
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -19,7 +19,7 @@ pub struct Status {
 /// An MVCC-based transactional key-value store.
 pub struct MVCC {
     /// The underlying KV store. It is protected by a mutex so it can be shared between txns.
-    store: Arc<RwLock<Box<dyn Store>>>,
+    store: Arc<Mutex<Box<dyn Store>>>,
 }
 
 impl Clone for MVCC {
@@ -31,7 +31,7 @@ impl Clone for MVCC {
 impl MVCC {
     /// Creates a new MVCC key-value store with the given key-value store for storage.
     pub fn new(store: Box<dyn Store>) -> Self {
-        Self { store: Arc::new(RwLock::new(store)) }
+        Self { store: Arc::new(Mutex::new(store)) }
     }
 
     /// Begins a new transaction in read-write mode.
@@ -52,13 +52,13 @@ impl MVCC {
 
     /// Fetches an unversioned metadata value
     pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let session = self.store.read()?;
+        let mut session = self.store.lock()?;
         session.get(&Key::Metadata(key.into()).encode())
     }
 
     /// Sets an unversioned metadata value
     pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        let mut session = self.store.write()?;
+        let mut session = self.store.lock()?;
         session.set(&Key::Metadata(key.into()).encode(), value)
     }
 
@@ -68,7 +68,7 @@ impl MVCC {
     // https://github.com/rust-lang/reference/issues/452
     #[allow(clippy::needless_return)]
     pub fn status(&self) -> Result<Status> {
-        let store = self.store.read()?;
+        let mut store = self.store.lock()?;
         return Ok(Status {
             txns: match store.get(&Key::TxnNext.encode())? {
                 Some(ref v) => deserialize(v)?,
@@ -97,7 +97,7 @@ fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
 /// An MVCC transaction.
 pub struct Transaction {
     /// The underlying store for the transaction. Shared between transactions using a mutex.
-    store: Arc<RwLock<Box<dyn Store>>>,
+    store: Arc<Mutex<Box<dyn Store>>>,
     /// The unique transaction ID.
     id: u64,
     /// The transaction mode.
@@ -108,8 +108,8 @@ pub struct Transaction {
 
 impl Transaction {
     /// Begins a new transaction in the given mode.
-    fn begin(store: Arc<RwLock<Box<dyn Store>>>, mode: Mode) -> Result<Self> {
-        let mut session = store.write()?;
+    fn begin(store: Arc<Mutex<Box<dyn Store>>>, mode: Mode) -> Result<Self> {
+        let mut session = store.lock()?;
 
         let id = match session.get(&Key::TxnNext.encode())? {
             Some(ref v) => deserialize(v)?,
@@ -122,24 +122,24 @@ impl Transaction {
         // increment the transaction ID and we need to properly record currently active transactions
         // for any future snapshot transactions looking at this one.
         let mut snapshot = Snapshot::take(&mut session, id)?;
-        std::mem::drop(session);
         if let Mode::Snapshot { version } = &mode {
-            snapshot = Snapshot::restore(&store.read()?, *version)?
+            snapshot = Snapshot::restore(&mut session, *version)?
         }
+        drop(session);
 
         Ok(Self { store, id, mode, snapshot })
     }
 
     /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
-    fn resume(store: Arc<RwLock<Box<dyn Store>>>, id: u64) -> Result<Self> {
-        let session = store.read()?;
+    fn resume(store: Arc<Mutex<Box<dyn Store>>>, id: u64) -> Result<Self> {
+        let mut session = store.lock()?;
         let mode = match session.get(&Key::TxnActive(id).encode())? {
             Some(v) => deserialize(&v)?,
             None => return Err(Error::Value(format!("No active transaction {}", id))),
         };
         let snapshot = match &mode {
-            Mode::Snapshot { version } => Snapshot::restore(&session, *version)?,
-            _ => Snapshot::restore(&session, id)?,
+            Mode::Snapshot { version } => Snapshot::restore(&mut session, *version)?,
+            _ => Snapshot::restore(&mut session, id)?,
         };
         std::mem::drop(session);
         Ok(Self { store, id, mode, snapshot })
@@ -157,14 +157,14 @@ impl Transaction {
 
     /// Commits the transaction, by removing the txn from the active set.
     pub fn commit(self) -> Result<()> {
-        let mut session = self.store.write()?;
+        let mut session = self.store.lock()?;
         session.delete(&Key::TxnActive(self.id).encode())?;
         session.flush()
     }
 
     /// Rolls back the transaction, by removing all updated entries.
     pub fn rollback(self) -> Result<()> {
-        let mut session = self.store.write()?;
+        let mut session = self.store.lock()?;
         if self.mode.mutable() {
             let mut rollback = Vec::new();
             let mut scan = session.scan(Range::from(
@@ -193,7 +193,7 @@ impl Transaction {
 
     /// Fetches a key.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let session = self.store.read()?;
+        let mut session = self.store.lock()?;
         let mut scan = session
             .scan(Range::from(
                 Key::Record(key.into(), 0).encode()..=Key::Record(key.into(), self.id).encode(),
@@ -224,7 +224,7 @@ impl Transaction {
             Bound::Included(k) => Bound::Included(Key::Record(k.into(), std::u64::MAX).encode()),
             Bound::Unbounded => Bound::Unbounded,
         };
-        let scan = self.store.read()?.scan(Range::from((start, end)));
+        let scan = self.store.lock()?.scan(Range::from((start, end)));
         Ok(Box::new(Scan::new(scan, self.snapshot.clone())))
     }
 
@@ -262,7 +262,7 @@ impl Transaction {
         if !self.mode.mutable() {
             return Err(Error::ReadOnly);
         }
-        let mut session = self.store.write()?;
+        let mut session = self.store.lock()?;
 
         // Check if the key is dirty, i.e. if it has any uncommitted changes, by scanning for any
         // versions that aren't visible to us.
@@ -341,7 +341,7 @@ struct Snapshot {
 
 impl Snapshot {
     /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
-    fn take(session: &mut RwLockWriteGuard<Box<dyn Store>>, version: u64) -> Result<Self> {
+    fn take(session: &mut MutexGuard<Box<dyn Store>>, version: u64) -> Result<Self> {
         let mut snapshot = Self { version, invisible: HashSet::new() };
         let mut scan =
             session.scan(Range::from(Key::TxnActive(0).encode()..Key::TxnActive(version).encode()));
@@ -357,7 +357,7 @@ impl Snapshot {
     }
 
     /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn restore(session: &RwLockReadGuard<Box<dyn Store>>, version: u64) -> Result<Self> {
+    fn restore(session: &mut MutexGuard<Box<dyn Store>>, version: u64) -> Result<Self> {
         match session.get(&Key::TxnSnapshot(version).encode())? {
             Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
             None => Err(Error::Value(format!("Snapshot not found for version {}", version))),

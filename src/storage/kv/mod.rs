@@ -24,10 +24,10 @@ pub trait Store: Display + Send + Sync {
     fn flush(&mut self) -> Result<()>;
 
     /// Gets a value for a key, if it exists.
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Iterates over an ordered range of key/value pairs.
-    fn scan(&self, range: Range) -> Scan;
+    fn scan(&mut self, range: Range) -> Scan;
 
     /// Sets a value for a key, replacing the existing value if any.
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;

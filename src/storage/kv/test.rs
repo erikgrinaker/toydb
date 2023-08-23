@@ -2,19 +2,19 @@ use super::{Memory, Range, Scan, Store};
 use crate::error::Result;
 
 use std::fmt::Display;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 /// Key-value storage backend for testing. Protects an inner Memory backend using a mutex, so it can
 /// be cloned and inspected.
 #[derive(Clone)]
 pub struct Test {
-    kv: Arc<RwLock<Memory>>,
+    kv: Arc<Mutex<Memory>>,
 }
 
 impl Test {
     /// Creates a new Test key-value storage engine.
     pub fn new() -> Self {
-        Self { kv: Arc::new(RwLock::new(Memory::new())) }
+        Self { kv: Arc::new(Mutex::new(Memory::new())) }
     }
 }
 
@@ -26,24 +26,24 @@ impl Display for Test {
 
 impl Store for Test {
     fn delete(&mut self, key: &[u8]) -> Result<()> {
-        self.kv.write()?.delete(key)
+        self.kv.lock()?.delete(key)
     }
 
     fn flush(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.kv.read()?.get(key)
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        self.kv.lock()?.get(key)
     }
 
-    fn scan(&self, range: Range) -> Scan {
+    fn scan(&mut self, range: Range) -> Scan {
         // Since the mutex guard is scoped to this method, we simply buffer the result.
-        Box::new(self.kv.read().unwrap().scan(range).collect::<Vec<Result<_>>>().into_iter())
+        Box::new(self.kv.lock().unwrap().scan(range).collect::<Vec<Result<_>>>().into_iter())
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.kv.write()?.set(key, value)
+        self.kv.lock()?.set(key, value)
     }
 }
 
