@@ -700,17 +700,7 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    impl super::super::TestSuite<Memory> for Memory {
-        fn setup() -> Result<Self> {
-            Ok(Memory::new())
-        }
-    }
-
-    #[test]
-    fn tests() -> Result<()> {
-        use super::super::TestSuite;
-        Memory::test()
-    }
+    super::super::tests::test_store!(Memory::new());
 
     #[test]
     fn set_split() -> Result<()> {

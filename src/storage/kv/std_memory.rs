@@ -47,14 +47,8 @@ impl Store for StdMemory {
 }
 
 #[cfg(test)]
-impl super::TestSuite<StdMemory> for StdMemory {
-    fn setup() -> Result<Self> {
-        Ok(StdMemory::new())
-    }
-}
+mod tests {
+    use super::*;
 
-#[test]
-fn tests() -> Result<()> {
-    use super::TestSuite;
-    StdMemory::test()
+    super::super::tests::test_store!(StdMemory::new());
 }

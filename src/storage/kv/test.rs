@@ -48,14 +48,8 @@ impl Store for Test {
 }
 
 #[cfg(test)]
-impl super::TestSuite<Test> for Test {
-    fn setup() -> Result<Self> {
-        Ok(Test::new())
-    }
-}
+mod tests {
+    use super::*;
 
-#[test]
-fn tests() -> Result<()> {
-    use super::TestSuite;
-    Test::test()
+    super::super::tests::test_store!(Test::new());
 }
