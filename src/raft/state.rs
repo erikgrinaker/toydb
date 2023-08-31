@@ -75,7 +75,8 @@ impl Driver {
 
     /// Drives a state machine.
     pub async fn drive(mut self, mut state: Box<dyn State>) -> Result<()> {
-        debug!("Starting state machine driver");
+        self.applied_index = state.applied_index();
+        debug!("Starting state machine driver at applied index {}", self.applied_index);
         while let Some(instruction) = self.state_rx.next().await {
             if let Err(error) = self.execute(instruction, &mut *state).await {
                 error!("Halting state machine due to error: {}", error);
