@@ -1,13 +1,11 @@
 mod bitcask;
 pub mod encoding;
-mod memory;
 pub mod mvcc;
 mod std_memory;
 #[cfg(test)]
 mod test;
 
 pub use bitcask::BitCask;
-pub use memory::Memory;
 pub use mvcc::MVCC;
 pub use std_memory::StdMemory;
 #[cfg(test)]
@@ -58,19 +56,6 @@ impl Range {
                 Bound::Unbounded => Bound::Unbounded,
             },
         }
-    }
-
-    /// Checks if the given value is contained in the range.
-    fn contains(&self, v: &[u8]) -> bool {
-        (match &self.start {
-            Bound::Included(start) => &**start <= v,
-            Bound::Excluded(start) => &**start < v,
-            Bound::Unbounded => true,
-        }) && (match &self.end {
-            Bound::Included(end) => v <= &**end,
-            Bound::Excluded(end) => v < &**end,
-            Bound::Unbounded => true,
-        })
     }
 }
 

@@ -1,4 +1,4 @@
-use super::{Memory, Range, Scan, Store};
+use super::{Range, Scan, StdMemory, Store};
 use crate::error::Result;
 
 use std::fmt::Display;
@@ -8,13 +8,13 @@ use std::sync::{Arc, Mutex};
 /// be cloned and inspected.
 #[derive(Clone)]
 pub struct Test {
-    kv: Arc<Mutex<Memory>>,
+    kv: Arc<Mutex<StdMemory>>,
 }
 
 impl Test {
     /// Creates a new Test key-value storage engine.
     pub fn new() -> Self {
-        Self { kv: Arc::new(Mutex::new(Memory::new())) }
+        Self { kv: Arc::new(Mutex::new(StdMemory::new())) }
     }
 }
 

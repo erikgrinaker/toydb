@@ -26,6 +26,5 @@ storage_raft: hybrid
 
 # SQL key-value storage engine
 # - bitcask (default): uses BitCask, an append-only log-structure store.
-# - memory: uses an in-memory B+tree. Durability is provided by the Raft log.
 # - stdmemory: uses the Rust standard library BTreeMap.
 storage_sql: bitcask

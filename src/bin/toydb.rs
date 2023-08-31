@@ -42,7 +42,6 @@ async fn main() -> Result<()> {
         "bitcask" | "" => {
             Box::new(storage::kv::BitCask::new_compact(path.join("state"), cfg.compact_threshold)?)
         }
-        "memory" => Box::new(storage::kv::Memory::new()),
         "stdmemory" => Box::new(storage::kv::StdMemory::new()),
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };

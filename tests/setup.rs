@@ -79,7 +79,7 @@ pub async fn server(
         id,
         peers,
         Box::new(storage::log::Hybrid::new(dir.path(), false)?),
-        Box::new(storage::kv::Memory::new()),
+        Box::new(storage::kv::StdMemory::new()),
     )
     .await?;
 
