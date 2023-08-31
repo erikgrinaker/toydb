@@ -7,7 +7,7 @@ use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
 use crate::storage::{kv, log};
 
-use ::log::{error, info};
+use ::log::{debug, error, info};
 use futures::sink::SinkExt as _;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -158,7 +158,8 @@ impl Session {
 
     /// Executes a request.
     pub fn request(&mut self, request: Request) -> Result<Response> {
-        Ok(match request {
+        debug!("Processing request {:?}", request);
+        let response = match request {
             Request::Execute(query) => Response::Execute(self.sql.execute(&query)?),
             Request::GetTable(table) => Response::GetTable(
                 self.sql.with_txn(Mode::ReadOnly, |txn| txn.must_read_table(&table))?,
@@ -169,7 +170,9 @@ impl Session {
                 })?)
             }
             Request::Status => Response::Status(self.engine.status()?),
-        })
+        };
+        debug!("Returning response {:?}", response);
+        Ok(response)
     }
 }
 
