@@ -39,10 +39,10 @@ async fn main() -> Result<()> {
         name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
     };
     let sql_store: Box<dyn storage::kv::Store> = match cfg.storage_sql.as_str() {
-        "bitcask" => {
+        "bitcask" | "" => {
             Box::new(storage::kv::BitCask::new_compact(path.join("state"), cfg.compact_threshold)?)
         }
-        "memory" | "" => Box::new(storage::kv::Memory::new()),
+        "memory" => Box::new(storage::kv::Memory::new()),
         "stdmemory" => Box::new(storage::kv::StdMemory::new()),
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
@@ -81,7 +81,7 @@ impl Config {
             .set_default("compact_threshold", 0.2)?
             .set_default("sync", true)?
             .set_default("storage_raft", "hybrid")?
-            .set_default("storage_sql", "memory")?
+            .set_default("storage_sql", "bitcask")?
             .add_source(config::File::with_name(file))
             .add_source(config::Environment::with_prefix("TOYDB"))
             .build()?

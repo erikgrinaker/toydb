@@ -40,7 +40,7 @@ toydb> !status
 Server:    toydb-e (leader toydb-d in term 1 with 5 nodes)
 Raft log:  1 committed, 0 applied, 0.000 MB (hybrid storage)
 Node logs: toydb-a:1 toydb-b:1 toydb-c:1 toydb-d:1 toydb-e:1
-SQL txns:  0 active, 0 total (memory storage)
+SQL txns:  0 active, 0 total (bitcask storage)
 ```
 
 The cluster is shut down by pressing Ctrl-C. Data is saved under `clusters/local/toydb-?/data/`,

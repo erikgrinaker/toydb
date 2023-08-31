@@ -9,7 +9,7 @@ scratch, including:
 
 * ACID-compliant transaction engine with MVCC-based snapshot isolation.
 
-* Pluggable storage engine with B+tree and log-structured backends.
+* Pluggable storage engine with BitCask and in-memory backends.
 
 * Iterator-based query engine with heuristic optimization and time-travel support.
 

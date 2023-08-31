@@ -129,33 +129,21 @@ encoding:
 * `sql::Value`: As above, with type prefix `0x00`=`Null`, `0x01`=`Boolean`, `0x02`=`Float`,
   `0x03`=`Integer`, `0x04`=`String`
 
-The default key/value store is
-[`storage::kv::Memory`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/memory.rs).
-This is an in-memory [B+tree](https://en.wikipedia.org/wiki/B%2B_tree), a search tree
-variant with multiple keys per node (to make use of cache locality) and values only in leaf nodes.
-As key/value pairs are added and removed, tree nodes are split, merged, and rotated to keep them 
-balanced and at least half-full.
-
-Although key/value data is stored in memory, toyDB provides durability via the Raft log which
-is persisted to disk. On startup, the Raft log is replayed to populate the in-memory store.
+The default key/value store is a simple variant of
+[`storage::kv::BitCask`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/bitcask.rs),
+an append-only log-structured storage engine. All writes are appended to a log
+file, with an index mapping live keys to file positions maintained in memory.
+When the amount of garbage (replaced or deleted keys) in the file exceeds 20%, a
+new log file is written containing only live keys, replacing the old log file.
 
 #### Key/Value Tradeoffs
 
-**In-memory storage:** storing key/value data in memory has much better performance and is
-simpler to implement than on-disk storage, but requires that the data set fits in memory.
-Replaying the Raft log on startup can also take considerable time for large data sets. However,
-as toyDB datasets are expected to be small, this is mostly advantageous.
+**Keyset in memory:** BitCask requires the entire key set to fit in memory, and must also scan
+the log file on startup to construct the key index.
 
-**Byte serialization:** since the primary storage is in memory, (de)serializing key/value
-pairs adds significant unnecessary overhead. However, at the outset it was not clear that toyDB
-would use in-memory storage, and byte slices is a simple interface that can be used regardless
-of storage medium.
-
-**B+tree scans:** B+trees often have pointers between neighboring leaf nodes for more efficient
-range scans, but toyDB's implementation does not. This would complicate the implementation, and
-the performance benefits are usually not as great in memory where random access latency is low.
-However, this along with other implementation details cause range scans to be O(log n) rather
-than O(1) per step.
+**Compaction volume:** unlike an LSM tree, this single-file BitCask
+implementation requires rewriting the entire dataset during compactions, which
+can produce significant write amplification over time.
 
 **Key encoding:** does not make use of any compression, e.g. variable-length integers, preferring
 simplicity and correctness.
@@ -294,8 +282,7 @@ problem, and it avoid having to do additional (possibly random) disk IO, greatly
 performance.
 
 **Garbage collection:** there is no garbage collection of old log entries, so the log will grow
-without bound. However, this is a necessity since the the default toyDB configuration uses
-in-memory key/value storage by default and there is no other durable storage.
+without bound.
 
 ## Raft Consensus Engine
 
