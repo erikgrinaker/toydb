@@ -5,24 +5,24 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 
 /// In-memory key-value store using the Rust standard library B-tree implementation.
-pub struct StdMemory {
+pub struct Memory {
     data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
-impl StdMemory {
+impl Memory {
     /// Creates a new Memory key-value storage engine.
     pub fn new() -> Self {
         Self { data: BTreeMap::new() }
     }
 }
 
-impl Display for StdMemory {
+impl Display for Memory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "stdmemory")
+        write!(f, "memory")
     }
 }
 
-impl Store for StdMemory {
+impl Store for Memory {
     fn flush(&mut self) -> Result<()> {
         Ok(())
     }
@@ -50,5 +50,5 @@ impl Store for StdMemory {
 mod tests {
     use super::*;
 
-    super::super::tests::test_store!(StdMemory::new());
+    super::super::tests::test_store!(Memory::new());
 }
