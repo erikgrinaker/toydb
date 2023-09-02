@@ -2,14 +2,10 @@ mod bitcask;
 pub mod encoding;
 mod memory;
 pub mod mvcc;
-#[cfg(test)]
-mod test;
 
 pub use bitcask::BitCask;
 pub use memory::Memory;
 pub use mvcc::MVCC;
-#[cfg(test)]
-pub use test::Test;
 
 use crate::error::Result;
 use std::fmt::Display;

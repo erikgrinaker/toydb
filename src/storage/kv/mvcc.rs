@@ -511,11 +511,11 @@ impl<'a> DoubleEndedIterator for Scan<'a> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::Test;
+    use super::super::Memory;
     use super::*;
 
     fn setup() -> MVCC {
-        MVCC::new(Box::new(Test::new()))
+        MVCC::new(Box::new(Memory::new()))
     }
 
     #[test]
