@@ -1,30 +1,30 @@
 entry = 0, offset 0
-klen  = 0 [0, 0, 0, 0, 0, 0, 0, 0]
-vlen  = 0 [0, 0, 0, 0, 0, 0, 0, 0]
+klen  = 0 [0, 0, 0, 0]
+vlen  = 0 [0, 0, 0, 0]
 key   = "" []
 value = "" []
 
-entry = 1, offset 16
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 1, offset 8
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "a" [61]
 value = [1]
 
-entry = 2, offset 34
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 2, offset 18
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "b" [62]
 value = [2]
 
-entry = 3, offset 52
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 3, offset 28
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "c" [63]
 value = [3]
 
-entry = 4, offset 70
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 4, offset 38
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "d" [64]
 value = [4]
 

@@ -1,72 +1,72 @@
 entry = 0, offset 0
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "b" [62]
 value = [1]
 
-entry = 1, offset 18
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 1, offset 10
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "b" [62]
 value = [2]
 
-entry = 2, offset 36
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 2, offset 20
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "e" [65]
 value = [5]
 
-entry = 3, offset 54
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = -1 [ff, ff, ff, ff, ff, ff, ff, ff]
+entry = 3, offset 30
+klen  = 1 [0, 0, 0, 1]
+vlen  = -1 [ff, ff, ff, ff]
 key   = "e" [65]
 value = tombstone []
 
-entry = 4, offset 71
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 4, offset 39
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "c" [63]
 value = [0]
 
-entry = 5, offset 89
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = -1 [ff, ff, ff, ff, ff, ff, ff, ff]
+entry = 5, offset 49
+klen  = 1 [0, 0, 0, 1]
+vlen  = -1 [ff, ff, ff, ff]
 key   = "c" [63]
 value = tombstone []
 
-entry = 6, offset 106
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 6, offset 58
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "c" [63]
 value = [3]
 
-entry = 7, offset 124
-klen  = 0 [0, 0, 0, 0, 0, 0, 0, 0]
-vlen  = 0 [0, 0, 0, 0, 0, 0, 0, 0]
+entry = 7, offset 68
+klen  = 0 [0, 0, 0, 0]
+vlen  = 0 [0, 0, 0, 0]
 key   = "" []
 value = "" []
 
-entry = 8, offset 140
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 8, offset 76
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "a" [61]
 value = [1]
 
-entry = 9, offset 158
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = -1 [ff, ff, ff, ff, ff, ff, ff, ff]
+entry = 9, offset 86
+klen  = 1 [0, 0, 0, 1]
+vlen  = -1 [ff, ff, ff, ff]
 key   = "f" [66]
 value = tombstone []
 
-entry = 10, offset 175
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = -1 [ff, ff, ff, ff, ff, ff, ff, ff]
+entry = 10, offset 95
+klen  = 1 [0, 0, 0, 1]
+vlen  = -1 [ff, ff, ff, ff]
 key   = "d" [64]
 value = tombstone []
 
-entry = 11, offset 192
-klen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
-vlen  = 1 [0, 0, 0, 0, 0, 0, 0, 1]
+entry = 11, offset 104
+klen  = 1 [0, 0, 0, 1]
+vlen  = 1 [0, 0, 0, 1]
 key   = "d" [64]
 value = [4]
 

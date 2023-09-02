@@ -37,10 +37,10 @@ use std::path::PathBuf;
 ///
 /// The structure of a log entry is:
 ///
-/// - Key length as big-endian u64 (8 bytes)
-/// - Value length as big-endian i64, or -1 for tombstones (8 bytes)
-/// - Key as raw bytes
-/// - Value as raw bytes
+/// - Key length as big-endian u32
+/// - Value length as big-endian i32, or -1 for tombstones
+/// - Key as raw bytes (max 2 GB)
+/// - Value as raw bytes (max 2 GB)
 pub struct BitCask {
     /// The active append-only log file.
     log: Log,
@@ -49,7 +49,7 @@ pub struct BitCask {
 }
 
 /// Maps keys to a value position and length in the log file.
-type KeyDir = std::collections::BTreeMap<Vec<u8>, (u64, u64)>;
+type KeyDir = std::collections::BTreeMap<Vec<u8>, (u64, u32)>;
 
 impl BitCask {
     /// Opens or creates a BitCask database in the given file.
@@ -120,8 +120,8 @@ impl Store for BitCask {
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         let (pos, len) = self.log.write_entry(key, Some(&*value))?;
-        let value_len = value.len() as u64;
-        self.keydir.insert(key.to_vec(), (pos + len - value_len, value_len));
+        let value_len = value.len() as u32;
+        self.keydir.insert(key.to_vec(), (pos + len as u64 - value_len as u64, value_len));
         Ok(())
     }
 }
@@ -153,10 +153,9 @@ impl BitCask {
     /// same computations anyway.
     pub fn compute_sizes(&mut self) -> Result<(u64, u64)> {
         let total_size = self.log.file.metadata()?.len();
-        let live_size = self
-            .keydir
-            .iter()
-            .fold(0, |size, (key, (_, value_len))| size + 8 + 8 + key.len() as u64 + value_len);
+        let live_size = self.keydir.iter().fold(0, |size, (key, (_, value_len))| {
+            size + 4 + 4 + key.len() as u64 + *value_len as u64
+        });
         Ok((live_size, total_size))
     }
 
@@ -169,7 +168,7 @@ impl BitCask {
         for (key, (value_pos, value_len)) in self.keydir.iter() {
             let value = self.log.read_value(*value_pos, *value_len)?;
             let (pos, len) = new_log.write_entry(key, Some(&value))?;
-            new_keydir.insert(key.clone(), (pos + len - value_len, *value_len));
+            new_keydir.insert(key.clone(), (pos + len as u64 - *value_len as u64, *value_len));
         }
         Ok((new_log, new_keydir))
     }
@@ -215,7 +214,7 @@ impl Log {
     /// encountered, it is assumed to be caused by an incomplete write operation
     /// and the remainder of the file is truncated.
     fn build_keydir(&mut self) -> Result<KeyDir> {
-        let mut len_buf = [0u8; 8];
+        let mut len_buf = [0u8; 4];
         let mut keydir = KeyDir::new();
         let file_len = self.file.metadata()?.len();
         let mut r = BufReader::new(&mut self.file);
@@ -224,21 +223,21 @@ impl Log {
         while pos < file_len {
             // Read the next entry from the file, returning the key, value
             // position, and value length or None for tombstones.
-            let result = || -> std::result::Result<(Vec<u8>, u64, Option<u64>), std::io::Error> {
+            let result = || -> std::result::Result<(Vec<u8>, u64, Option<u32>), std::io::Error> {
                 r.read_exact(&mut len_buf)?;
-                let key_len = u64::from_be_bytes(len_buf);
+                let key_len = u32::from_be_bytes(len_buf);
                 r.read_exact(&mut len_buf)?;
-                let value_len_or_tombstone = match i64::from_be_bytes(len_buf) {
-                    l if l >= 0 => Some(l as u64),
+                let value_len_or_tombstone = match i32::from_be_bytes(len_buf) {
+                    l if l >= 0 => Some(l as u32),
                     _ => None, // -1 for tombstones
                 };
-                let value_pos = pos + 8 + 8 + key_len;
+                let value_pos = pos + 4 + 4 + key_len as u64;
 
                 let mut key = vec![0; key_len as usize];
                 r.read_exact(&mut key)?;
 
                 if let Some(value_len) = value_len_or_tombstone {
-                    if value_pos + value_len > file_len {
+                    if value_pos + value_len as u64 > file_len {
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::UnexpectedEof,
                             "value extends beyond end of file",
@@ -254,7 +253,7 @@ impl Log {
                 // Populate the keydir with the entry, or remove it on tombstones.
                 Ok((key, value_pos, Some(value_len))) => {
                     keydir.insert(key, (value_pos, value_len));
-                    pos = value_pos + value_len;
+                    pos = value_pos + value_len as u64;
                 }
                 Ok((key, value_pos, None)) => {
                     keydir.remove(&key);
@@ -275,7 +274,7 @@ impl Log {
     }
 
     /// Reads a value from the log file.
-    fn read_value(&mut self, value_pos: u64, value_len: u64) -> Result<Vec<u8>> {
+    fn read_value(&mut self, value_pos: u64, value_len: u32) -> Result<Vec<u8>> {
         let mut value = vec![0; value_len as usize];
         self.file.seek(SeekFrom::Start(value_pos))?;
         self.file.read_exact(&mut value)?;
@@ -284,11 +283,11 @@ impl Log {
 
     /// Appends a key/value entry to the log file, using a None value for
     /// tombstones. It returns the position and length of the entry.
-    fn write_entry(&mut self, key: &[u8], value: Option<&[u8]>) -> Result<(u64, u64)> {
-        let key_len = key.len() as u64;
-        let value_len = value.map_or(0, |v| v.len() as u64);
-        let value_len_or_tombstone = value.map_or(-1, |v| v.len() as i64);
-        let len = 8 + 8 + key_len + value_len;
+    fn write_entry(&mut self, key: &[u8], value: Option<&[u8]>) -> Result<(u64, u32)> {
+        let key_len = key.len() as u32;
+        let value_len = value.map_or(0, |v| v.len() as u32);
+        let value_len_or_tombstone = value.map_or(-1, |v| v.len() as i32);
+        let len = 4 + 4 + key_len + value_len;
 
         let pos = self.file.seek(SeekFrom::End(0))?;
         let mut w = BufWriter::with_capacity(len as usize, &mut self.file);
@@ -306,7 +305,7 @@ impl Log {
     #[cfg(test)]
     /// Prints the entire log file to the given writer in human-readable form.
     fn print<W: Write>(&mut self, w: &mut W) -> Result<()> {
-        let mut len_buf = [0u8; 8];
+        let mut len_buf = [0u8; 4];
         let file_len = self.file.metadata()?.len();
         let mut r = BufReader::new(&mut self.file);
         let mut pos = r.seek(SeekFrom::Start(0))?;
@@ -316,12 +315,12 @@ impl Log {
             writeln!(w, "entry = {}, offset {}", idx, pos)?;
 
             r.read_exact(&mut len_buf)?;
-            let key_len = u64::from_be_bytes(len_buf);
+            let key_len = u32::from_be_bytes(len_buf);
             writeln!(w, "klen  = {} {:x?}", key_len, len_buf)?;
 
             r.read_exact(&mut len_buf)?;
-            let value_len_or_tombstone = i64::from_be_bytes(len_buf); // NB: -1 for tombstones
-            let value_len = value_len_or_tombstone.max(0) as u64;
+            let value_len_or_tombstone = i32::from_be_bytes(len_buf); // NB: -1 for tombstones
+            let value_len = value_len_or_tombstone.max(0) as u32;
             writeln!(w, "vlen  = {} {:x?}", value_len_or_tombstone, len_buf)?;
 
             let mut key = vec![0; key_len as usize];
@@ -344,7 +343,7 @@ impl Log {
             }
             write!(w, "{:x?}\n\n", value)?;
 
-            pos += 8 + 8 + key_len + value_len;
+            pos += 4 + 4 + key_len as u64 + value_len as u64;
             idx += 1;
         }
         Ok(())
@@ -536,16 +535,16 @@ mod tests {
         let mut ends = vec![];
 
         let (pos, len) = log.write_entry("deleted".as_bytes(), Some(&[1, 2, 3]))?;
-        ends.push(pos + len);
+        ends.push(pos + len as u64);
 
         let (pos, len) = log.write_entry("deleted".as_bytes(), None)?;
-        ends.push(pos + len);
+        ends.push(pos + len as u64);
 
         let (pos, len) = log.write_entry(&[], Some(&[]))?;
-        ends.push(pos + len);
+        ends.push(pos + len as u64);
 
         let (pos, len) = log.write_entry("key".as_bytes(), Some(&[1, 2, 3, 4, 5]))?;
-        ends.push(pos + len);
+        ends.push(pos + len as u64);
 
         drop(log);
 
