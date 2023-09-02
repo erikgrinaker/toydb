@@ -1,4 +1,4 @@
-use super::{Scan, Store};
+use super::Store;
 use crate::error::Result;
 
 use fs4::FileExt;
@@ -94,6 +94,8 @@ impl std::fmt::Display for BitCask {
 }
 
 impl Store for BitCask {
+    type ScanIterator<'a> = ScanIterator<'a>;
+
     fn delete(&mut self, key: &[u8]) -> Result<()> {
         self.log.write_entry(key, None)?;
         self.keydir.remove(key);
@@ -112,10 +114,8 @@ impl Store for BitCask {
         }
     }
 
-    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Scan {
-        Box::new(self.keydir.range(range).map(|(key, (value_pos, value_len))| {
-            Ok((key.clone(), self.log.read_value(*value_pos, *value_len)?))
-        }))
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_> {
+        ScanIterator { inner: self.keydir.range(range), log: &mut self.log }
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
@@ -123,6 +123,32 @@ impl Store for BitCask {
         let value_len = value.len() as u32;
         self.keydir.insert(key.to_vec(), (pos + len as u64 - value_len as u64, value_len));
         Ok(())
+    }
+}
+
+pub struct ScanIterator<'a> {
+    inner: std::collections::btree_map::Range<'a, Vec<u8>, (u64, u32)>,
+    log: &'a mut Log,
+}
+
+impl<'a> ScanIterator<'a> {
+    fn map(&mut self, item: (&Vec<u8>, &(u64, u32))) -> <Self as Iterator>::Item {
+        let (key, (value_pos, value_len)) = item;
+        Ok((key.clone(), self.log.read_value(*value_pos, *value_len)?))
+    }
+}
+
+impl<'a> Iterator for ScanIterator<'a> {
+    type Item = Result<(Vec<u8>, Vec<u8>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|item| self.map(item))
+    }
+}
+
+impl<'a> DoubleEndedIterator for ScanIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner.next_back().map(|item| self.map(item))
     }
 }
 

@@ -209,7 +209,7 @@ impl<S: Store> Transaction<S> {
     }
 
     /// Scans a key range.
-    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<super::Scan> {
+    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<ScanIterator> {
         let start = match range.start_bound() {
             Bound::Excluded(k) => Bound::Excluded(Key::Record(k.into(), std::u64::MAX).encode()),
             Bound::Included(k) => Bound::Included(Key::Record(k.into(), 0).encode()),
@@ -226,7 +226,7 @@ impl<S: Store> Transaction<S> {
     }
 
     /// Scans keys under a given prefix.
-    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<super::Scan> {
+    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<ScanIterator> {
         if prefix.is_empty() {
             return Err(Error::Internal("Scan prefix cannot be empty".into()));
         }
@@ -422,18 +422,21 @@ impl<'a> Key<'a> {
     }
 }
 
+pub type ScanIterator<'a> =
+    Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + Send + 'a>;
+
 /// A key range scan.
 pub struct Scan<'a> {
     /// The augmented KV store iterator, with key (decoded) and value. Note that we don't retain
     /// the decoded version, so there will be multiple keys (for each version). We want the last.
-    scan: Peekable<super::Scan<'a>>,
+    scan: Peekable<ScanIterator<'a>>,
     /// Keeps track of next_back() seen key, whose previous versions should be ignored.
     next_back_seen: Option<Vec<u8>>,
 }
 
 impl<'a> Scan<'a> {
     /// Creates a new scan.
-    fn new(mut scan: super::Scan<'a>, snapshot: Snapshot) -> Self {
+    fn new(mut scan: ScanIterator<'a>, snapshot: Snapshot) -> Self {
         // Augment the underlying scan to decode the key and filter invisible versions. We don't
         // return the version, since we don't need it, but beware that all versions of the key
         // will still be returned - we usually only need the last, which is what the next() and

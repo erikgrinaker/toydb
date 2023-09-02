@@ -1,4 +1,4 @@
-use super::{Scan, Store};
+use super::Store;
 use crate::error::Result;
 
 /// In-memory key-value store using the Rust standard library B-tree implementation.
@@ -20,6 +20,8 @@ impl std::fmt::Display for Memory {
 }
 
 impl Store for Memory {
+    type ScanIterator<'a> = ScanIterator<'a>;
+
     fn flush(&mut self) -> Result<()> {
         Ok(())
     }
@@ -33,13 +35,38 @@ impl Store for Memory {
         Ok(self.data.get(key).cloned())
     }
 
-    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Scan {
-        Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_> {
+        ScanIterator { inner: self.data.range(range) }
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.data.insert(key.to_vec(), value);
         Ok(())
+    }
+}
+
+pub struct ScanIterator<'a> {
+    inner: std::collections::btree_map::Range<'a, Vec<u8>, Vec<u8>>,
+}
+
+impl<'a> ScanIterator<'a> {
+    fn map(item: (&Vec<u8>, &Vec<u8>)) -> <Self as Iterator>::Item {
+        let (key, value) = item;
+        Ok((key.clone(), value.clone()))
+    }
+}
+
+impl<'a> Iterator for ScanIterator<'a> {
+    type Item = Result<(Vec<u8>, Vec<u8>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(Self::map)
+    }
+}
+
+impl<'a> DoubleEndedIterator for ScanIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner.next_back().map(Self::map)
     }
 }
 

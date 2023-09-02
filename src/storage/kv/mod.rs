@@ -11,6 +11,12 @@ use crate::error::Result;
 
 /// A key/value store.
 pub trait Store: std::fmt::Display + Send + Sync {
+    /// The iterator returned by scan(). Traits can't return "impl Trait", and
+    /// we don't want to use trait objects, so the type must be specified.
+    type ScanIterator<'a>: DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a
+    where
+        Self: 'a;
+
     /// Deletes a key, or does nothing if it does not exist.
     fn delete(&mut self, key: &[u8]) -> Result<()>;
 
@@ -21,14 +27,11 @@ pub trait Store: std::fmt::Display + Send + Sync {
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Iterates over an ordered range of key/value pairs.
-    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Scan;
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_>;
 
     /// Sets a value for a key, replacing the existing value if any.
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
 }
-
-/// Iterator over a key/value range.
-pub type Scan<'a> = Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + Send + 'a>;
 
 #[cfg(test)]
 mod tests {
