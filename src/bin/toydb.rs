@@ -9,6 +9,8 @@
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use toydb::error::{Error, Result};
+use toydb::raft;
+use toydb::sql;
 use toydb::storage;
 use toydb::Server;
 
@@ -38,15 +40,19 @@ async fn main() -> Result<()> {
         "memory" => Box::new(storage::log::Memory::new()),
         name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
     };
-    let sql_store: Box<dyn storage::kv::Store> = match cfg.storage_sql.as_str() {
+    let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
         "bitcask" | "" => {
-            Box::new(storage::kv::BitCask::new_compact(path.join("state"), cfg.compact_threshold)?)
+            let db = storage::kv::BitCask::new_compact(path.join("state"), cfg.compact_threshold)?;
+            Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(Box::new(db)))?)
         }
-        "memory" => Box::new(storage::kv::Memory::new()),
+        "memory" => {
+            let db = storage::kv::Memory::new();
+            Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(Box::new(db)))?)
+        }
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
 
-    Server::new(&cfg.id, cfg.peers, raft_store, sql_store)
+    Server::new(&cfg.id, cfg.peers, raft_store, raft_state)
         .await?
         .listen(&cfg.listen_sql, &cfg.listen_raft)
         .await?

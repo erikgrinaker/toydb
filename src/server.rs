@@ -5,7 +5,7 @@ use crate::sql::engine::{Engine as _, Mode};
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
-use crate::storage::{kv, log};
+use crate::storage::log;
 
 use ::log::{debug, error, info};
 use futures::sink::SinkExt as _;
@@ -30,16 +30,10 @@ impl Server {
         id: &str,
         peers: HashMap<String, String>,
         raft_store: Box<dyn log::Store>,
-        sql_store: Box<dyn kv::Store>,
+        raft_state: Box<dyn raft::State>,
     ) -> Result<Self> {
         Ok(Server {
-            raft: raft::Server::new(
-                id,
-                peers,
-                raft::Log::new(raft_store)?,
-                Box::new(sql::engine::Raft::new_state(kv::MVCC::new(sql_store))?),
-            )
-            .await?,
+            raft: raft::Server::new(id, peers, raft::Log::new(raft_store)?, raft_state).await?,
             raft_listener: None,
             sql_listener: None,
         })

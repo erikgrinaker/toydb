@@ -3,7 +3,7 @@
 use toydb::client::{Client, Pool};
 use toydb::error::Result;
 use toydb::server::Server;
-use toydb::storage;
+use toydb::{sql, storage};
 
 use futures_util::future::FutureExt as _;
 use pretty_assertions::assert_eq;
@@ -79,7 +79,9 @@ pub async fn server(
         id,
         peers,
         Box::new(storage::log::Hybrid::new(dir.path(), false)?),
-        Box::new(storage::kv::Memory::new()),
+        Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(Box::new(
+            storage::kv::Memory::new(),
+        )))?),
     )
     .await?;
 
