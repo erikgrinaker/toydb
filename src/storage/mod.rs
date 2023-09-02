@@ -1,3 +1,6 @@
+pub mod encoding;
 pub mod engine;
-pub mod kv;
 pub mod log;
+pub mod mvcc;
+
+pub use engine::Engine;

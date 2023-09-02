@@ -8,7 +8,7 @@ use toydb::sql::engine::{Mode, Status};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Value};
-use toydb::storage::kv;
+use toydb::storage::mvcc;
 use toydb::Client;
 
 use pretty_assertions::assert_eq;
@@ -131,7 +131,7 @@ async fn status() -> Result<()> {
                 storage: "hybrid".into(),
                 storage_size: 3239,
             },
-            mvcc: kv::mvcc::Status { txns: 1, txns_active: 0, storage: "memory".into() },
+            mvcc: mvcc::Status { txns: 1, txns_active: 0, storage: "memory".into() },
         }
     );
     Ok(())

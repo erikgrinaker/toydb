@@ -507,7 +507,7 @@ impl<'a> DoubleEndedIterator for Scan<'a> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::Memory;
+    use super::super::engine::Memory;
     use super::*;
 
     fn setup() -> MVCC<Memory> {

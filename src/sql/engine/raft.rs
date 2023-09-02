@@ -3,7 +3,7 @@ use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, IndexScan, Mode, Scan, Transaction as _};
 use crate::error::{Error, Result};
 use crate::raft;
-use crate::storage::kv;
+use crate::storage;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -58,7 +58,7 @@ enum Query {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
     pub raft: raft::Status,
-    pub mvcc: kv::mvcc::Status,
+    pub mvcc: storage::mvcc::Status,
 }
 
 /// An SQL engine that wraps a Raft cluster.
@@ -74,8 +74,8 @@ impl Raft {
     }
 
     /// Creates an underlying state machine for a Raft engine.
-    pub fn new_state<E: kv::Engine>(kv: kv::MVCC<E>) -> Result<State<E>> {
-        State::new(kv)
+    pub fn new_state<E: storage::Engine>(engine: E) -> Result<State<E>> {
+        State::new(engine)
     }
 
     /// Returns Raft SQL engine status.
@@ -260,16 +260,16 @@ impl Catalog for Transaction {
 }
 
 /// The Raft state machine for the Raft-based SQL engine, using a KV SQL engine
-pub struct State<E: kv::Engine> {
+pub struct State<E: storage::Engine> {
     /// The underlying KV SQL engine
     engine: super::KV<E>,
     /// The last applied index
     applied_index: u64,
 }
 
-impl<E: kv::Engine> State<E> {
-    /// Creates a new Raft state maching using the given MVCC key/value store
-    pub fn new(engine: kv::MVCC<E>) -> Result<Self> {
+impl<E: storage::Engine> State<E> {
+    /// Creates a new Raft state maching using the given storage engine.
+    pub fn new(engine: E) -> Result<Self> {
         let engine = super::KV::new(engine);
         let applied_index = engine
             .get_metadata(b"applied_index")?
@@ -305,7 +305,7 @@ impl<E: kv::Engine> State<E> {
     }
 }
 
-impl<E: kv::Engine> raft::State for State<E> {
+impl<E: storage::Engine> raft::State for State<E> {
     fn applied_index(&self) -> u64 {
         self.applied_index
     }

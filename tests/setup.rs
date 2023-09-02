@@ -79,7 +79,7 @@ pub async fn server(
         id,
         peers,
         Box::new(storage::log::Hybrid::new(dir.path(), false)?),
-        Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(storage::kv::Memory::new()))?),
+        Box::new(sql::engine::Raft::new_state(storage::engine::Memory::new())?),
     )
     .await?;
 

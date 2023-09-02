@@ -2,7 +2,7 @@ use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
 use crate::error::{Error, Result};
-use crate::storage::kv;
+use crate::storage;
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -10,22 +10,22 @@ use std::clone::Clone;
 use std::collections::HashSet;
 
 /// A SQL engine based on an underlying MVCC key/value store.
-pub struct KV<E: kv::Engine> {
+pub struct KV<E: storage::Engine> {
     /// The underlying key/value store.
-    pub(super) kv: kv::MVCC<E>,
+    pub(super) kv: storage::mvcc::MVCC<E>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl<E: kv::Engine> Clone for KV<E> {
+impl<E: storage::Engine> Clone for KV<E> {
     fn clone(&self) -> Self {
-        KV::new(self.kv.clone())
+        KV { kv: self.kv.clone() }
     }
 }
 
-impl<E: kv::Engine> KV<E> {
+impl<E: storage::Engine> KV<E> {
     /// Creates a new key/value-based SQL engine
-    pub fn new(kv: kv::MVCC<E>) -> Self {
-        Self { kv }
+    pub fn new(engine: E) -> Self {
+        Self { kv: storage::mvcc::MVCC::new(engine) }
     }
 
     /// Fetches an unversioned metadata value
@@ -39,7 +39,7 @@ impl<E: kv::Engine> KV<E> {
     }
 }
 
-impl<E: kv::Engine> super::Engine for KV<E> {
+impl<E: storage::Engine> super::Engine for KV<E> {
     type Transaction = Transaction<E>;
 
     fn begin(&self, mode: super::Mode) -> Result<Self::Transaction> {
@@ -62,13 +62,13 @@ fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
 }
 
 /// An SQL transaction based on an MVCC key/value transaction
-pub struct Transaction<E: kv::Engine> {
-    txn: kv::mvcc::Transaction<E>,
+pub struct Transaction<E: storage::Engine> {
+    txn: storage::mvcc::Transaction<E>,
 }
 
-impl<E: kv::Engine> Transaction<E> {
+impl<E: storage::Engine> Transaction<E> {
     /// Creates a new SQL transaction from an MVCC transaction
-    fn new(txn: kv::mvcc::Transaction<E>) -> Self {
+    fn new(txn: storage::mvcc::Transaction<E>) -> Self {
         Self { txn }
     }
 
@@ -99,7 +99,7 @@ impl<E: kv::Engine> Transaction<E> {
     }
 }
 
-impl<E: kv::Engine> super::Transaction for Transaction<E> {
+impl<E: storage::Engine> super::Transaction for Transaction<E> {
     fn id(&self) -> u64 {
         self.txn.id()
     }
@@ -270,7 +270,7 @@ impl<E: kv::Engine> super::Transaction for Transaction<E> {
     }
 }
 
-impl<E: kv::Engine> Catalog for Transaction<E> {
+impl<E: storage::Engine> Catalog for Transaction<E> {
     fn create_table(&mut self, table: Table) -> Result<()> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
@@ -325,7 +325,7 @@ enum Key<'a> {
 impl<'a> Key<'a> {
     /// Encodes the key as a byte vector
     fn encode(self) -> Vec<u8> {
-        use kv::encoding::*;
+        use storage::encoding::*;
         match self {
             Self::Table(None) => vec![0x01],
             Self::Table(Some(name)) => [&[0x01][..], &encode_string(&name)].concat(),
@@ -348,7 +348,7 @@ impl<'a> Key<'a> {
 
     /// Decodes a key from a byte vector
     fn decode(mut bytes: &[u8]) -> Result<Self> {
-        use kv::encoding::*;
+        use storage::encoding::*;
         let bytes = &mut bytes;
         let key = match take_byte(bytes)? {
             0x01 => Self::Table(Some(take_string(bytes)?.into())),
