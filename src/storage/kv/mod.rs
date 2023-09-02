@@ -9,7 +9,13 @@ pub use mvcc::MVCC;
 
 use crate::error::Result;
 
-/// A key/value store.
+/// A key/value storage engine, where both keys and values are arbitrary byte
+/// strings between 0 B and 2 GB, stored in lexicographical key order. Writes
+/// are only guaranteed durable after calling flush().
+///
+/// Only supports single-threaded use since all methods (including reads) take a
+/// mutable reference -- serialized access can't be avoided anyway, since both
+/// Raft execution and file access is serial.
 pub trait Store: std::fmt::Display + Send + Sync {
     /// The iterator returned by scan(). Traits can't return "impl Trait", and
     /// we don't want to use trait objects, so the type must be specified.

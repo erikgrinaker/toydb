@@ -1,7 +1,8 @@
 use super::Store;
 use crate::error::Result;
 
-/// In-memory key-value store using the Rust standard library B-tree implementation.
+/// An in-memory key/value store using the Rust standard library B-tree
+/// implementation. Data is not persisted.
 pub struct Memory {
     data: std::collections::BTreeMap<Vec<u8>, Vec<u8>>,
 }
