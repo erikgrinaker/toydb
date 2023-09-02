@@ -74,7 +74,7 @@ impl Raft {
     }
 
     /// Creates an underlying state machine for a Raft engine.
-    pub fn new_state<S: kv::Store>(kv: kv::MVCC<S>) -> Result<State<S>> {
+    pub fn new_state<E: kv::Engine>(kv: kv::MVCC<E>) -> Result<State<E>> {
         State::new(kv)
     }
 
@@ -260,17 +260,17 @@ impl Catalog for Transaction {
 }
 
 /// The Raft state machine for the Raft-based SQL engine, using a KV SQL engine
-pub struct State<S: kv::Store> {
+pub struct State<E: kv::Engine> {
     /// The underlying KV SQL engine
-    engine: super::KV<S>,
+    engine: super::KV<E>,
     /// The last applied index
     applied_index: u64,
 }
 
-impl<S: kv::Store> State<S> {
+impl<E: kv::Engine> State<E> {
     /// Creates a new Raft state maching using the given MVCC key/value store
-    pub fn new(store: kv::MVCC<S>) -> Result<Self> {
-        let engine = super::KV::new(store);
+    pub fn new(engine: kv::MVCC<E>) -> Result<Self> {
+        let engine = super::KV::new(engine);
         let applied_index = engine
             .get_metadata(b"applied_index")?
             .map(|b| Raft::deserialize(&b))
@@ -305,7 +305,7 @@ impl<S: kv::Store> State<S> {
     }
 }
 
-impl<S: kv::Store> raft::State for State<S> {
+impl<E: kv::Engine> raft::State for State<E> {
     fn applied_index(&self) -> u64 {
         self.applied_index
     }

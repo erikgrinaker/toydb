@@ -1,4 +1,4 @@
-use super::{encoding, Store};
+use super::{encoding, Engine};
 use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
@@ -16,49 +16,49 @@ pub struct Status {
     pub storage: String,
 }
 
-/// An MVCC-based transactional key-value store.
-pub struct MVCC<S: Store> {
-    /// The underlying KV store. It is protected by a mutex so it can be shared between txns.
-    store: Arc<Mutex<S>>,
+/// An MVCC-based transactional key-value engine.
+pub struct MVCC<E: Engine> {
+    /// The underlying KV engine. It is protected by a mutex so it can be shared between txns.
+    engine: Arc<Mutex<E>>,
 }
 
-impl<S: Store> Clone for MVCC<S> {
+impl<E: Engine> Clone for MVCC<E> {
     fn clone(&self) -> Self {
-        MVCC { store: self.store.clone() }
+        MVCC { engine: self.engine.clone() }
     }
 }
 
-impl<S: Store> MVCC<S> {
-    /// Creates a new MVCC key-value store with the given key-value store for storage.
-    pub fn new(store: S) -> Self {
-        Self { store: Arc::new(Mutex::new(store)) }
+impl<E: Engine> MVCC<E> {
+    /// Creates a new MVCC engine with the given storage engine.
+    pub fn new(engine: E) -> Self {
+        Self { engine: Arc::new(Mutex::new(engine)) }
     }
 
     /// Begins a new transaction in read-write mode.
     #[allow(dead_code)]
-    pub fn begin(&self) -> Result<Transaction<S>> {
-        Transaction::begin(self.store.clone(), Mode::ReadWrite)
+    pub fn begin(&self) -> Result<Transaction<E>> {
+        Transaction::begin(self.engine.clone(), Mode::ReadWrite)
     }
 
     /// Begins a new transaction in the given mode.
-    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<S>> {
-        Transaction::begin(self.store.clone(), mode)
+    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<E>> {
+        Transaction::begin(self.engine.clone(), mode)
     }
 
     /// Resumes a transaction with the given ID.
-    pub fn resume(&self, id: u64) -> Result<Transaction<S>> {
-        Transaction::resume(self.store.clone(), id)
+    pub fn resume(&self, id: u64) -> Result<Transaction<E>> {
+        Transaction::resume(self.engine.clone(), id)
     }
 
     /// Fetches an unversioned metadata value
     pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let mut session = self.store.lock()?;
+        let mut session = self.engine.lock()?;
         session.get(&Key::Metadata(key.into()).encode())
     }
 
     /// Sets an unversioned metadata value
     pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        let mut session = self.store.lock()?;
+        let mut session = self.engine.lock()?;
         session.set(&Key::Metadata(key.into()).encode(), value)
     }
 
@@ -68,14 +68,14 @@ impl<S: Store> MVCC<S> {
     // https://github.com/rust-lang/reference/issues/452
     #[allow(clippy::needless_return)]
     pub fn status(&self) -> Result<Status> {
-        let mut store = self.store.lock()?;
+        let mut engine = self.engine.lock()?;
         return Ok(Status {
-            storage: store.to_string(),
-            txns: match store.get(&Key::TxnNext.encode())? {
+            storage: engine.to_string(),
+            txns: match engine.get(&Key::TxnNext.encode())? {
                 Some(ref v) => deserialize(v)?,
                 None => 1,
             } - 1,
-            txns_active: store
+            txns_active: engine
                 .scan(Key::TxnActive(0).encode()..Key::TxnActive(std::u64::MAX).encode())
                 .try_fold(0, |count, r| r.map(|_| count + 1))?,
         });
@@ -93,9 +93,9 @@ fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
 }
 
 /// An MVCC transaction.
-pub struct Transaction<S: Store> {
-    /// The underlying store for the transaction. Shared between transactions using a mutex.
-    store: Arc<Mutex<S>>,
+pub struct Transaction<E: Engine> {
+    /// The underlying engine for the transaction. Shared between transactions using a mutex.
+    engine: Arc<Mutex<E>>,
     /// The unique transaction ID.
     id: u64,
     /// The transaction mode.
@@ -104,10 +104,10 @@ pub struct Transaction<S: Store> {
     snapshot: Snapshot,
 }
 
-impl<S: Store> Transaction<S> {
+impl<E: Engine> Transaction<E> {
     /// Begins a new transaction in the given mode.
-    fn begin(store: Arc<Mutex<S>>, mode: Mode) -> Result<Self> {
-        let mut session = store.lock()?;
+    fn begin(engine: Arc<Mutex<E>>, mode: Mode) -> Result<Self> {
+        let mut session = engine.lock()?;
 
         let id = match session.get(&Key::TxnNext.encode())? {
             Some(ref v) => deserialize(v)?,
@@ -121,26 +121,26 @@ impl<S: Store> Transaction<S> {
         // for any future snapshot transactions looking at this one.
         let mut snapshot = Snapshot::take(&mut session, id)?;
         if let Mode::Snapshot { version } = &mode {
-            snapshot = Snapshot::restore(&mut session, *version)?
+            snapshot = Snapshot::reengine(&mut session, *version)?
         }
         drop(session);
 
-        Ok(Self { store, id, mode, snapshot })
+        Ok(Self { engine, id, mode, snapshot })
     }
 
     /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
-    fn resume(store: Arc<Mutex<S>>, id: u64) -> Result<Self> {
-        let mut session = store.lock()?;
+    fn resume(engine: Arc<Mutex<E>>, id: u64) -> Result<Self> {
+        let mut session = engine.lock()?;
         let mode = match session.get(&Key::TxnActive(id).encode())? {
             Some(v) => deserialize(&v)?,
             None => return Err(Error::Value(format!("No active transaction {}", id))),
         };
         let snapshot = match &mode {
-            Mode::Snapshot { version } => Snapshot::restore(&mut session, *version)?,
-            _ => Snapshot::restore(&mut session, id)?,
+            Mode::Snapshot { version } => Snapshot::reengine(&mut session, *version)?,
+            _ => Snapshot::reengine(&mut session, id)?,
         };
         std::mem::drop(session);
-        Ok(Self { store, id, mode, snapshot })
+        Ok(Self { engine, id, mode, snapshot })
     }
 
     /// Returns the transaction ID.
@@ -155,14 +155,14 @@ impl<S: Store> Transaction<S> {
 
     /// Commits the transaction, by removing the txn from the active set.
     pub fn commit(self) -> Result<()> {
-        let mut session = self.store.lock()?;
+        let mut session = self.engine.lock()?;
         session.delete(&Key::TxnActive(self.id).encode())?;
         session.flush()
     }
 
     /// Rolls back the transaction, by removing all updated entries.
     pub fn rollback(self) -> Result<()> {
-        let mut session = self.store.lock()?;
+        let mut session = self.engine.lock()?;
         if self.mode.mutable() {
             let mut rollback = Vec::new();
             let mut scan = session.scan(
@@ -191,7 +191,7 @@ impl<S: Store> Transaction<S> {
 
     /// Fetches a key.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let mut session = self.store.lock()?;
+        let mut session = self.engine.lock()?;
         let mut scan = session
             .scan(Key::Record(key.into(), 0).encode()..=Key::Record(key.into(), self.id).encode())
             .rev();
@@ -220,8 +220,8 @@ impl<S: Store> Transaction<S> {
             Bound::Included(k) => Bound::Included(Key::Record(k.into(), std::u64::MAX).encode()),
             Bound::Unbounded => Bound::Unbounded,
         };
-        // TODO: For now, collect results from the store to not have to deal with lifetimes.
-        let scan = Box::new(self.store.lock()?.scan((start, end)).collect::<Vec<_>>().into_iter());
+        // TODO: For now, collect results from the engine to not have to deal with lifetimes.
+        let scan = Box::new(self.engine.lock()?.scan((start, end)).collect::<Vec<_>>().into_iter());
         Ok(Box::new(Scan::new(scan, self.snapshot.clone())))
     }
 
@@ -259,7 +259,7 @@ impl<S: Store> Transaction<S> {
         if !self.mode.mutable() {
             return Err(Error::ReadOnly);
         }
-        let mut session = self.store.lock()?;
+        let mut session = self.engine.lock()?;
 
         // Check if the key is dirty, i.e. if it has any uncommitted changes, by scanning for any
         // versions that aren't visible to us.
@@ -338,7 +338,7 @@ struct Snapshot {
 
 impl Snapshot {
     /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
-    fn take<S: Store>(session: &mut MutexGuard<S>, version: u64) -> Result<Self> {
+    fn take<E: Engine>(session: &mut MutexGuard<E>, version: u64) -> Result<Self> {
         let mut snapshot = Self { version, invisible: HashSet::new() };
         let mut scan = session.scan(Key::TxnActive(0).encode()..Key::TxnActive(version).encode());
         while let Some((key, _)) = scan.next().transpose()? {
@@ -352,8 +352,8 @@ impl Snapshot {
         Ok(snapshot)
     }
 
-    /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn restore<S: Store>(session: &mut MutexGuard<S>, version: u64) -> Result<Self> {
+    /// Reengines an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
+    fn reengine<E: Engine>(session: &mut MutexGuard<E>, version: u64) -> Result<Self> {
         match session.get(&Key::TxnSnapshot(version).encode())? {
             Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
             None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
@@ -427,7 +427,7 @@ pub type ScanIterator<'a> =
 
 /// A key range scan.
 pub struct Scan<'a> {
-    /// The augmented KV store iterator, with key (decoded) and value. Note that we don't retain
+    /// The augmented KV engine iterator, with key (decoded) and value. Note that we don't retain
     /// the decoded version, so there will be multiple keys (for each version). We want the last.
     scan: Peekable<ScanIterator<'a>>,
     /// Keeps track of next_back() seen key, whose previous versions should be ignored.

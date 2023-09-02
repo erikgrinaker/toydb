@@ -9,22 +9,22 @@ use std::borrow::Cow;
 use std::clone::Clone;
 use std::collections::HashSet;
 
-/// A SQL engine based on an underlying MVCC key/value store
-pub struct KV<S: kv::Store> {
-    /// The underlying key/value store
-    pub(super) kv: kv::MVCC<S>,
+/// A SQL engine based on an underlying MVCC key/value store.
+pub struct KV<E: kv::Engine> {
+    /// The underlying key/value store.
+    pub(super) kv: kv::MVCC<E>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl<S: kv::Store> Clone for KV<S> {
+impl<E: kv::Engine> Clone for KV<E> {
     fn clone(&self) -> Self {
         KV::new(self.kv.clone())
     }
 }
 
-impl<S: kv::Store> KV<S> {
+impl<E: kv::Engine> KV<E> {
     /// Creates a new key/value-based SQL engine
-    pub fn new(kv: kv::MVCC<S>) -> Self {
+    pub fn new(kv: kv::MVCC<E>) -> Self {
         Self { kv }
     }
 
@@ -39,8 +39,8 @@ impl<S: kv::Store> KV<S> {
     }
 }
 
-impl<S: kv::Store> super::Engine for KV<S> {
-    type Transaction = Transaction<S>;
+impl<E: kv::Engine> super::Engine for KV<E> {
+    type Transaction = Transaction<E>;
 
     fn begin(&self, mode: super::Mode) -> Result<Self::Transaction> {
         Ok(Self::Transaction::new(self.kv.begin_with_mode(mode)?))
@@ -62,13 +62,13 @@ fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
 }
 
 /// An SQL transaction based on an MVCC key/value transaction
-pub struct Transaction<S: kv::Store> {
-    txn: kv::mvcc::Transaction<S>,
+pub struct Transaction<E: kv::Engine> {
+    txn: kv::mvcc::Transaction<E>,
 }
 
-impl<S: kv::Store> Transaction<S> {
+impl<E: kv::Engine> Transaction<E> {
     /// Creates a new SQL transaction from an MVCC transaction
-    fn new(txn: kv::mvcc::Transaction<S>) -> Self {
+    fn new(txn: kv::mvcc::Transaction<E>) -> Self {
         Self { txn }
     }
 
@@ -99,7 +99,7 @@ impl<S: kv::Store> Transaction<S> {
     }
 }
 
-impl<S: kv::Store> super::Transaction for Transaction<S> {
+impl<E: kv::Engine> super::Transaction for Transaction<E> {
     fn id(&self) -> u64 {
         self.txn.id()
     }
@@ -270,7 +270,7 @@ impl<S: kv::Store> super::Transaction for Transaction<S> {
     }
 }
 
-impl<S: kv::Store> Catalog for Transaction<S> {
+impl<E: kv::Engine> Catalog for Transaction<E> {
     fn create_table(&mut self, table: Table) -> Result<()> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));

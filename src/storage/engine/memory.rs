@@ -1,7 +1,7 @@
-use super::Store;
+use super::Engine;
 use crate::error::Result;
 
-/// An in-memory key/value store using the Rust standard library B-tree
+/// An in-memory key/value storage engine using the Rust standard library B-tree
 /// implementation. Data is not persisted.
 pub struct Memory {
     data: std::collections::BTreeMap<Vec<u8>, Vec<u8>>,
@@ -20,7 +20,7 @@ impl std::fmt::Display for Memory {
     }
 }
 
-impl Store for Memory {
+impl Engine for Memory {
     type ScanIterator<'a> = ScanIterator<'a>;
 
     fn flush(&mut self) -> Result<()> {
@@ -75,5 +75,5 @@ impl<'a> DoubleEndedIterator for ScanIterator<'a> {
 mod tests {
     use super::*;
 
-    super::super::tests::test_store!(Memory::new());
+    super::super::tests::test_engine!(Memory::new());
 }
