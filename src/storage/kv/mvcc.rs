@@ -1,4 +1,4 @@
-use super::{encoding, Range, Store};
+use super::{encoding, Store};
 use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
@@ -76,9 +76,7 @@ impl<S: Store> MVCC<S> {
                 None => 1,
             } - 1,
             txns_active: store
-                .scan(Range::from(
-                    Key::TxnActive(0).encode()..Key::TxnActive(std::u64::MAX).encode(),
-                ))
+                .scan(Key::TxnActive(0).encode()..Key::TxnActive(std::u64::MAX).encode())
                 .try_fold(0, |count, r| r.map(|_| count + 1))?,
         });
     }
@@ -167,10 +165,10 @@ impl<S: Store> Transaction<S> {
         let mut session = self.store.lock()?;
         if self.mode.mutable() {
             let mut rollback = Vec::new();
-            let mut scan = session.scan(Range::from(
+            let mut scan = session.scan(
                 Key::TxnUpdate(self.id, vec![].into()).encode()
                     ..Key::TxnUpdate(self.id + 1, vec![].into()).encode(),
-            ));
+            );
             while let Some((key, _)) = scan.next().transpose()? {
                 match Key::decode(&key)? {
                     Key::TxnUpdate(_, updated_key) => rollback.push(updated_key.into_owned()),
@@ -195,9 +193,7 @@ impl<S: Store> Transaction<S> {
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         let mut session = self.store.lock()?;
         let mut scan = session
-            .scan(Range::from(
-                Key::Record(key.into(), 0).encode()..=Key::Record(key.into(), self.id).encode(),
-            ))
+            .scan(Key::Record(key.into(), 0).encode()..=Key::Record(key.into(), self.id).encode())
             .rev();
         while let Some((k, v)) = scan.next().transpose()? {
             match Key::decode(&k)? {
@@ -225,9 +221,7 @@ impl<S: Store> Transaction<S> {
             Bound::Unbounded => Bound::Unbounded,
         };
         // TODO: For now, collect results from the store to not have to deal with lifetimes.
-        let scan = Box::new(
-            self.store.lock()?.scan(Range::from((start, end))).collect::<Vec<_>>().into_iter(),
-        );
+        let scan = Box::new(self.store.lock()?.scan((start, end)).collect::<Vec<_>>().into_iter());
         Ok(Box::new(Scan::new(scan, self.snapshot.clone())))
     }
 
@@ -271,10 +265,10 @@ impl<S: Store> Transaction<S> {
         // versions that aren't visible to us.
         let min = self.snapshot.invisible.iter().min().cloned().unwrap_or(self.id + 1);
         let mut scan = session
-            .scan(Range::from(
+            .scan(
                 Key::Record(key.into(), min).encode()
                     ..=Key::Record(key.into(), std::u64::MAX).encode(),
-            ))
+            )
             .rev();
         while let Some((k, _)) = scan.next().transpose()? {
             match Key::decode(&k)? {
@@ -346,8 +340,7 @@ impl Snapshot {
     /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
     fn take<S: Store>(session: &mut MutexGuard<S>, version: u64) -> Result<Self> {
         let mut snapshot = Self { version, invisible: HashSet::new() };
-        let mut scan =
-            session.scan(Range::from(Key::TxnActive(0).encode()..Key::TxnActive(version).encode()));
+        let mut scan = session.scan(Key::TxnActive(0).encode()..Key::TxnActive(version).encode());
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnActive(id) => snapshot.invisible.insert(id),

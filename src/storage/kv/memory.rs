@@ -1,22 +1,19 @@
-use super::{Range, Scan, Store};
+use super::{Scan, Store};
 use crate::error::Result;
-
-use std::collections::BTreeMap;
-use std::fmt::Display;
 
 /// In-memory key-value store using the Rust standard library B-tree implementation.
 pub struct Memory {
-    data: BTreeMap<Vec<u8>, Vec<u8>>,
+    data: std::collections::BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 impl Memory {
     /// Creates a new Memory key-value storage engine.
     pub fn new() -> Self {
-        Self { data: BTreeMap::new() }
+        Self { data: std::collections::BTreeMap::new() }
     }
 }
 
-impl Display for Memory {
+impl std::fmt::Display for Memory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "memory")
     }
@@ -36,7 +33,7 @@ impl Store for Memory {
         Ok(self.data.get(key).cloned())
     }
 
-    fn scan(&mut self, range: Range) -> Scan {
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Scan {
         Box::new(self.data.range(range).map(|(k, v)| Ok((k.clone(), v.clone()))))
     }
 

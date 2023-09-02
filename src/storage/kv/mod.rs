@@ -8,11 +8,9 @@ pub use memory::Memory;
 pub use mvcc::MVCC;
 
 use crate::error::Result;
-use std::fmt::Display;
-use std::ops::{Bound, RangeBounds};
 
 /// A key/value store.
-pub trait Store: Display + Send + Sync {
+pub trait Store: std::fmt::Display + Send + Sync {
     /// Deletes a key, or does nothing if it does not exist.
     fn delete(&mut self, key: &[u8]) -> Result<()>;
 
@@ -23,54 +21,10 @@ pub trait Store: Display + Send + Sync {
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Iterates over an ordered range of key/value pairs.
-    fn scan(&mut self, range: Range) -> Scan;
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Scan;
 
     /// Sets a value for a key, replacing the existing value if any.
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
-}
-
-/// A scan range.
-pub struct Range {
-    start: Bound<Vec<u8>>,
-    end: Bound<Vec<u8>>,
-}
-
-impl Range {
-    /// Creates a new range from the given Rust range. We can't use the RangeBounds directly in
-    /// scan() since that prevents us from using Store as a trait object. Also, we can't take
-    /// AsRef<[u8]> or other convenient types, since that won't work with e.g. .. ranges.
-    pub fn from<R: RangeBounds<Vec<u8>>>(range: R) -> Self {
-        Self {
-            start: match range.start_bound() {
-                Bound::Included(v) => Bound::Included(v.to_vec()),
-                Bound::Excluded(v) => Bound::Excluded(v.to_vec()),
-                Bound::Unbounded => Bound::Unbounded,
-            },
-            end: match range.end_bound() {
-                Bound::Included(v) => Bound::Included(v.to_vec()),
-                Bound::Excluded(v) => Bound::Excluded(v.to_vec()),
-                Bound::Unbounded => Bound::Unbounded,
-            },
-        }
-    }
-}
-
-impl RangeBounds<Vec<u8>> for Range {
-    fn start_bound(&self) -> Bound<&Vec<u8>> {
-        match &self.start {
-            Bound::Included(v) => Bound::Included(v),
-            Bound::Excluded(v) => Bound::Excluded(v),
-            Bound::Unbounded => Bound::Unbounded,
-        }
-    }
-
-    fn end_bound(&self) -> Bound<&Vec<u8>> {
-        match &self.end {
-            Bound::Included(v) => Bound::Included(v),
-            Bound::Excluded(v) => Bound::Excluded(v),
-            Bound::Unbounded => Bound::Unbounded,
-        }
-    }
 }
 
 /// Iterator over a key/value range.
@@ -173,8 +127,7 @@ mod tests {
                         (b"ba".to_vec(), vec![0x02, 0x01]),
                         (b"bb".to_vec(), vec![0x02, 0x02]),
                     ],
-                    s.scan(Range::from(b"b".to_vec()..b"bz".to_vec()))
-                        .collect::<Result<Vec<_>>>()?
+                    s.scan(b"b".to_vec()..b"bz".to_vec()).collect::<Result<Vec<_>>>()?
                 );
                 assert_eq!(
                     vec![
@@ -182,16 +135,13 @@ mod tests {
                         (b"ba".to_vec(), vec![0x02, 0x01]),
                         (b"b".to_vec(), vec![0x02]),
                     ],
-                    s.scan(Range::from(b"b".to_vec()..b"bz".to_vec()))
-                        .rev()
-                        .collect::<Result<Vec<_>>>()?
+                    s.scan(b"b".to_vec()..b"bz".to_vec()).rev().collect::<Result<Vec<_>>>()?
                 );
 
                 // Inclusive/exclusive ranges
                 assert_eq!(
                     vec![(b"b".to_vec(), vec![0x02]), (b"ba".to_vec(), vec![0x02, 0x01]),],
-                    s.scan(Range::from(b"b".to_vec()..b"bb".to_vec()))
-                        .collect::<Result<Vec<_>>>()?
+                    s.scan(b"b".to_vec()..b"bb".to_vec()).collect::<Result<Vec<_>>>()?
                 );
                 assert_eq!(
                     vec![
@@ -199,18 +149,17 @@ mod tests {
                         (b"ba".to_vec(), vec![0x02, 0x01]),
                         (b"bb".to_vec(), vec![0x02, 0x02]),
                     ],
-                    s.scan(Range::from(b"b".to_vec()..=b"bb".to_vec()))
-                        .collect::<Result<Vec<_>>>()?
+                    s.scan(b"b".to_vec()..=b"bb".to_vec()).collect::<Result<Vec<_>>>()?
                 );
 
                 // Open ranges
                 assert_eq!(
                     vec![(b"bb".to_vec(), vec![0x02, 0x02]), (b"c".to_vec(), vec![0x03]),],
-                    s.scan(Range::from(b"bb".to_vec()..)).collect::<Result<Vec<_>>>()?
+                    s.scan(b"bb".to_vec()..).collect::<Result<Vec<_>>>()?
                 );
                 assert_eq!(
                     vec![(b"a".to_vec(), vec![0x01]), (b"b".to_vec(), vec![0x02]),],
-                    s.scan(Range::from(..=b"b".to_vec())).collect::<Result<Vec<_>>>()?
+                    s.scan(..=b"b".to_vec()).collect::<Result<Vec<_>>>()?
                 );
 
                 // Full range
@@ -222,7 +171,7 @@ mod tests {
                         (b"bb".to_vec(), vec![0x02, 0x02]),
                         (b"c".to_vec(), vec![0x03]),
                     ],
-                    s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?
+                    s.scan(..).collect::<Result<Vec<_>>>()?
                 );
                 Ok(())
             }
@@ -248,16 +197,16 @@ mod tests {
                 }
                 let mut expect = items.clone();
                 expect.sort_by(|a, b| a.0.cmp(&b.0));
-                assert_eq!(expect, s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?);
+                assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?);
                 expect.reverse();
-                assert_eq!(expect, s.scan(Range::from(..)).rev().collect::<Result<Vec<_>>>()?);
+                assert_eq!(expect, s.scan(..).rev().collect::<Result<Vec<_>>>()?);
 
                 // Remove the items
                 for (key, _) in items {
                     s.delete(&key)?;
                     assert_eq!(None, s.get(&key)?);
                 }
-                assert!(s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?.is_empty());
+                assert!(s.scan(..).collect::<Result<Vec<_>>>()?.is_empty());
 
                 Ok(())
             }

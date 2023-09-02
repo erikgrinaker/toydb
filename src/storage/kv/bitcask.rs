@@ -1,4 +1,4 @@
-use super::{Range, Scan, Store};
+use super::{Scan, Store};
 use crate::error::Result;
 
 use fs4::FileExt;
@@ -112,7 +112,7 @@ impl Store for BitCask {
         }
     }
 
-    fn scan(&mut self, range: Range) -> Scan {
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Scan {
         Box::new(self.keydir.range(range).map(|(key, (value_pos, value_len))| {
             Ok((key.clone(), self.log.read_value(*value_pos, *value_len)?))
         }))
@@ -404,7 +404,7 @@ mod tests {
                 (b"c".to_vec(), vec![0x03]),
                 (b"d".to_vec(), vec![0x04]),
             ],
-            s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?,
+            s.scan(..).collect::<Result<Vec<_>>>()?,
         );
 
         Ok(())
@@ -430,10 +430,10 @@ mod tests {
         let mut s = BitCask::new(path.clone())?;
         setup_log(&mut s)?;
 
-        let expect = s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?;
+        let expect = s.scan(..).collect::<Result<Vec<_>>>()?;
         drop(s);
         let mut s = BitCask::new(path)?;
-        assert_eq!(expect, s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?,);
+        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?,);
 
         Ok(())
     }
@@ -452,18 +452,18 @@ mod tests {
         // Dump the initial log file.
         let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
         s.log.print(&mut mint.new_goldenfile("compact-before")?)?;
-        let expect = s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?;
+        let expect = s.scan(..).collect::<Result<Vec<_>>>()?;
 
         // Compact the log file and assert the new log file contents.
         s.compact()?;
         assert_eq!(path, s.log.path);
-        assert_eq!(expect, s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?,);
+        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?,);
         s.log.print(&mut mint.new_goldenfile("compact-after")?)?;
 
         // Reopen the log file and assert that the contents are the same.
         drop(s);
         let mut s = BitCask::new(path)?;
-        assert_eq!(expect, s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?,);
+        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?,);
 
         Ok(())
     }
@@ -572,7 +572,7 @@ mod tests {
             }
 
             let mut s = BitCask::new(truncpath.clone())?;
-            assert_eq!(expect, s.scan(Range::from(..)).collect::<Result<Vec<_>>>()?);
+            assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?);
         }
 
         Ok(())
