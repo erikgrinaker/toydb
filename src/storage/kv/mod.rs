@@ -50,56 +50,54 @@ mod tests {
                 let mut s = $setup;
 
                 // Getting a missing key should return None.
-                assert_eq!(None, s.get(b"a")?);
+                assert_eq!(s.get(b"a")?, None);
 
                 // Setting and getting a key should return its value.
-                s.set(b"a", vec![0x01])?;
-                assert_eq!(Some(vec![0x01]), s.get(b"a")?);
+                s.set(b"a", vec![1])?;
+                assert_eq!(s.get(b"a")?, Some(vec![1]));
 
                 // Setting a different key should not affect the first.
-                s.set(b"b", vec![0x02])?;
-                assert_eq!(Some(vec![0x02]), s.get(b"b")?);
-                assert_eq!(Some(vec![0x01]), s.get(b"a")?);
+                s.set(b"b", vec![2])?;
+                assert_eq!(s.get(b"b")?, Some(vec![2]));
+                assert_eq!(s.get(b"a")?, Some(vec![1]));
 
                 // Getting a different missing key should return None. The
                 // comparison is case-insensitive for strings.
-                assert_eq!(None, s.get(b"c")?);
-                assert_eq!(None, s.get(b"A")?);
+                assert_eq!(s.get(b"c")?, None);
+                assert_eq!(s.get(b"A")?, None);
 
                 // Setting an existing key should replace its value.
-                s.set(b"a", vec![0x00])?;
-                assert_eq!(Some(vec![0x00]), s.get(b"a")?);
+                s.set(b"a", vec![0])?;
+                assert_eq!(s.get(b"a")?, Some(vec![0]));
 
                 // Deleting a key should remove it, but not affect others.
                 s.delete(b"a")?;
-                assert_eq!(None, s.get(b"a")?);
-                assert_eq!(Some(vec![0x02]), s.get(b"b")?);
+                assert_eq!(s.get(b"a")?, None);
+                assert_eq!(s.get(b"b")?, Some(vec![2]));
 
                 // Deletes are idempotent.
                 s.delete(b"a")?;
-                assert_eq!(None, s.get(b"a")?);
+                assert_eq!(s.get(b"a")?, None);
 
                 Ok(())
             }
 
             #[test]
-            /// Tests Store point operations on empty keys and values.
-            /// These are as valid as any other key/value.
+            /// Tests Store point operations on empty keys and values. These
+            /// are as valid as any other key/value.
             fn point_ops_empty() -> Result<()> {
                 let mut s = $setup;
-
-                assert_eq!(None, s.get(b"")?);
+                assert_eq!(s.get(b"")?, None);
                 s.set(b"", vec![])?;
-                assert_eq!(Some(vec![]), s.get(b"")?);
+                assert_eq!(s.get(b"")?, Some(vec![]));
                 s.delete(b"")?;
-                assert_eq!(None, s.get(b"")?);
-
+                assert_eq!(s.get(b"")?, None);
                 Ok(())
             }
 
             #[test]
-            /// Tests Store point operations on keys and values of
-            /// increasing sizes, up to 16 MB.
+            /// Tests Store point operations on keys and values of increasing
+            /// sizes, up to 16 MB.
             fn point_ops_sizes() -> Result<()> {
                 let mut s = $setup;
 
@@ -109,11 +107,11 @@ mod tests {
                     let key = bytes.as_bytes();
                     let value = bytes.clone().into_bytes();
 
-                    assert_eq!(None, s.get(key)?);
+                    assert_eq!(s.get(key)?, None);
                     s.set(key, value.clone())?;
-                    assert_eq!(Some(value), s.get(key)?);
+                    assert_eq!(s.get(key)?, Some(value));
                     s.delete(key)?;
-                    assert_eq!(None, s.get(key)?);
+                    assert_eq!(s.get(key)?, None);
                 }
 
                 Ok(())
@@ -123,104 +121,177 @@ mod tests {
             /// Tests various Store scans.
             fn scan() -> Result<()> {
                 let mut s = $setup;
-                s.set(b"a", vec![0x01])?;
-                s.set(b"b", vec![0x02])?;
-                s.set(b"ba", vec![0x02, 0x01])?;
-                s.set(b"bb", vec![0x02, 0x02])?;
-                s.set(b"c", vec![0x03])?;
+                s.set(b"a", vec![1])?;
+                s.set(b"b", vec![2])?;
+                s.set(b"ba", vec![2, 1])?;
+                s.set(b"bb", vec![2, 2])?;
+                s.set(b"c", vec![3])?;
+                s.set(b"C", vec![3])?;
 
-                // Forward/backward ranges
-                assert_eq!(
-                    vec![
-                        (b"b".to_vec(), vec![0x02]),
-                        (b"ba".to_vec(), vec![0x02, 0x01]),
-                        (b"bb".to_vec(), vec![0x02, 0x02]),
-                    ],
-                    s.scan(b"b".to_vec()..b"bz".to_vec()).collect::<Result<Vec<_>>>()?
-                );
-                assert_eq!(
-                    vec![
-                        (b"bb".to_vec(), vec![0x02, 0x02]),
-                        (b"ba".to_vec(), vec![0x02, 0x01]),
-                        (b"b".to_vec(), vec![0x02]),
-                    ],
-                    s.scan(b"b".to_vec()..b"bz".to_vec()).rev().collect::<Result<Vec<_>>>()?
-                );
+                #[track_caller]
+                fn assert_scan<I>(iter: I, expect: Vec<(&[u8], Vec<u8>)>) -> Result<()>
+                where
+                    I: Iterator<Item = Result<(Vec<u8>, Vec<u8>)>>,
+                {
+                    assert_eq!(
+                        iter.collect::<Result<Vec<_>>>()?,
+                        expect.into_iter().map(|(k, v)| (k.to_vec(), v)).collect::<Vec<_>>()
+                    );
+                    Ok(())
+                }
 
-                // Inclusive/exclusive ranges
-                assert_eq!(
-                    vec![(b"b".to_vec(), vec![0x02]), (b"ba".to_vec(), vec![0x02, 0x01]),],
-                    s.scan(b"b".to_vec()..b"bb".to_vec()).collect::<Result<Vec<_>>>()?
-                );
-                assert_eq!(
-                    vec![
-                        (b"b".to_vec(), vec![0x02]),
-                        (b"ba".to_vec(), vec![0x02, 0x01]),
-                        (b"bb".to_vec(), vec![0x02, 0x02]),
-                    ],
-                    s.scan(b"b".to_vec()..=b"bb".to_vec()).collect::<Result<Vec<_>>>()?
-                );
+                // Forward/reverse scans.
+                assert_scan(
+                    s.scan(b"b".to_vec()..b"bz".to_vec()),
+                    vec![(b"b", vec![2]), (b"ba", vec![2, 1]), (b"bb", vec![2, 2])],
+                )?;
+                assert_scan(
+                    s.scan(b"b".to_vec()..b"bz".to_vec()).rev(),
+                    vec![(b"bb", vec![2, 2]), (b"ba", vec![2, 1]), (b"b", vec![2])],
+                )?;
 
-                // Open ranges
-                assert_eq!(
-                    vec![(b"bb".to_vec(), vec![0x02, 0x02]), (b"c".to_vec(), vec![0x03]),],
-                    s.scan(b"bb".to_vec()..).collect::<Result<Vec<_>>>()?
-                );
-                assert_eq!(
-                    vec![(b"a".to_vec(), vec![0x01]), (b"b".to_vec(), vec![0x02]),],
-                    s.scan(..=b"b".to_vec()).collect::<Result<Vec<_>>>()?
-                );
+                // Inclusive/exclusive ranges.
+                assert_scan(
+                    s.scan(b"b".to_vec()..b"bb".to_vec()),
+                    vec![(b"b", vec![2]), (b"ba", vec![2, 1])],
+                )?;
+                assert_scan(
+                    s.scan(b"b".to_vec()..=b"bb".to_vec()),
+                    vec![(b"b", vec![2]), (b"ba", vec![2, 1]), (b"bb", vec![2, 2])],
+                )?;
 
-                // Full range
-                assert_eq!(
+                // Open ranges.
+                assert_scan(s.scan(b"bb".to_vec()..), vec![(b"bb", vec![2, 2]), (b"c", vec![3])])?;
+                assert_scan(
+                    s.scan(..=b"b".to_vec()),
+                    vec![(b"C", vec![3]), (b"a", vec![1]), (b"b", vec![2])],
+                )?;
+
+                // Full range.
+                assert_scan(
+                    s.scan(..),
                     vec![
-                        (b"a".to_vec(), vec![0x01]),
-                        (b"b".to_vec(), vec![0x02]),
-                        (b"ba".to_vec(), vec![0x02, 0x01]),
-                        (b"bb".to_vec(), vec![0x02, 0x02]),
-                        (b"c".to_vec(), vec![0x03]),
+                        (b"C", vec![3]),
+                        (b"a", vec![1]),
+                        (b"b", vec![2]),
+                        (b"ba", vec![2, 1]),
+                        (b"bb", vec![2, 2]),
+                        (b"c", vec![3]),
                     ],
-                    s.scan(..).collect::<Result<Vec<_>>>()?
-                );
+                )?;
                 Ok(())
             }
 
             #[test]
-            fn random() -> Result<()> {
-                use rand::Rng;
+            /// Runs random operations both on a Store and a known-good
+            /// BTreeMap, comparing the results of each operation as well as the
+            /// final state.
+            fn random_ops() -> Result<()> {
+                const NUM_OPS: u64 = 1000;
+
+                use rand::{seq::SliceRandom, Rng, RngCore};
+                let seed: u64 = rand::thread_rng().gen();
+                let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(seed);
+                println!("seed = {}", seed);
+
+                #[derive(Debug)]
+                enum Op {
+                    Set,
+                    Delete,
+                    Get,
+                    Scan,
+                }
+
+                impl rand::distributions::Distribution<Op> for rand::distributions::Standard {
+                    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Op {
+                        match rng.gen_range(0..=3) {
+                            0 => Op::Set,
+                            1 => Op::Delete,
+                            2 => Op::Get,
+                            3 => Op::Scan,
+                            _ => panic!("unexpected value"),
+                        }
+                    }
+                }
+
                 let mut s = $setup;
-                let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(397_427_893);
+                let mut keys: Vec<Vec<u8>> = Vec::new();
+                let mut m = std::collections::BTreeMap::new();
 
-                // Create a bunch of random items and insert them
-                let mut items: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
-                for i in 0..1000_u64 {
-                    items.push((rng.gen::<[u8; 32]>().to_vec(), i.to_be_bytes().to_vec()))
-                }
-                for (key, value) in items.iter() {
-                    s.set(key, value.clone())?;
+                // Pick an already-used key with 80% probability, or generate a
+                // new key.
+                let mut random_key = |mut rng: &mut rand::rngs::StdRng| -> Vec<u8> {
+                    if rng.gen::<f64>() < 0.8 && !keys.is_empty() {
+                        keys.choose(&mut rng).unwrap().clone()
+                    } else {
+                        let mut key = vec![0; rng.gen_range(0..=16)];
+                        rng.fill_bytes(&mut key);
+                        keys.push(key.clone());
+                        key
+                    }
+                };
+
+                let random_value = |rng: &mut rand::rngs::StdRng| -> Vec<u8> {
+                    let mut value = vec![0; rng.gen_range(0..=16)];
+                    rng.fill_bytes(&mut value);
+                    value
+                };
+
+                // Run random operations.
+                for _ in 0..NUM_OPS {
+                    match rng.gen::<Op>() {
+                        Op::Set => {
+                            let key = random_key(&mut rng);
+                            let value = random_value(&mut rng);
+                            println!("set {:?} = {:?}", key, value);
+                            s.set(&key, value.clone())?;
+                            m.insert(key, value);
+                        }
+                        Op::Delete => {
+                            let key = random_key(&mut rng);
+                            println!("delete {:?}", key);
+                            s.delete(&key)?;
+                            m.remove(&key);
+                        }
+                        Op::Get => {
+                            let key = random_key(&mut rng);
+                            let value = s.get(&key)?;
+                            let expect = m.get(&key).cloned();
+                            println!("get {:?} => {:?}", key, value);
+                            assert_eq!(value, expect);
+                        }
+                        Op::Scan => {
+                            let mut from = random_key(&mut rng);
+                            let mut to = random_key(&mut rng);
+                            if (to < from) {
+                                (from, to) = (to, from)
+                            }
+                            println!("scan {:?} .. {:?}", from, to);
+                            let result =
+                                s.scan(from.clone()..to.clone()).collect::<Result<Vec<_>>>()?;
+                            let expect = m
+                                .range(from..to)
+                                .map(|(k, v)| (k.clone(), v.clone()))
+                                .collect::<Vec<_>>();
+                            assert_eq!(result, expect);
+                        }
+                    }
                 }
 
-                // Fetch the random items, both via get() and scan()
-                for (key, value) in items.iter() {
-                    assert_eq!(s.get(key)?, Some(value.clone()))
-                }
-                let mut expect = items.clone();
-                expect.sort_by(|a, b| a.0.cmp(&b.0));
-                assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?);
-                expect.reverse();
-                assert_eq!(expect, s.scan(..).rev().collect::<Result<Vec<_>>>()?);
+                // Compare the final states.
+                println!("comparing final state");
 
-                // Remove the items
-                for (key, _) in items {
-                    s.delete(&key)?;
-                    assert_eq!(None, s.get(&key)?);
-                }
-                assert!(s.scan(..).collect::<Result<Vec<_>>>()?.is_empty());
+                let state = s.scan(..).collect::<Result<Vec<_>>>()?;
+                let expect = m
+                    .range::<Vec<u8>, _>(..)
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>();
+                assert_eq!(state, expect);
 
                 Ok(())
             }
         };
     }
 
-    pub(super) use test_store; // Export for use in submodules.
+    pub(super) use test_store; // export for use in submodules
 }
