@@ -43,11 +43,11 @@ async fn main() -> Result<()> {
     let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
         "bitcask" | "" => {
             let db = storage::kv::BitCask::new_compact(path.join("state"), cfg.compact_threshold)?;
-            Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(Box::new(db)))?)
+            Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(db))?)
         }
         "memory" => {
             let db = storage::kv::Memory::new();
-            Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(Box::new(db)))?)
+            Box::new(sql::engine::Raft::new_state(storage::kv::MVCC::new(db))?)
         }
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };

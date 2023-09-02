@@ -10,21 +10,21 @@ use std::clone::Clone;
 use std::collections::HashSet;
 
 /// A SQL engine based on an underlying MVCC key/value store
-pub struct KV {
+pub struct KV<S: kv::Store> {
     /// The underlying key/value store
-    pub(super) kv: kv::MVCC,
+    pub(super) kv: kv::MVCC<S>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl Clone for KV {
+impl<S: kv::Store> Clone for KV<S> {
     fn clone(&self) -> Self {
         KV::new(self.kv.clone())
     }
 }
 
-impl KV {
+impl<S: kv::Store> KV<S> {
     /// Creates a new key/value-based SQL engine
-    pub fn new(kv: kv::MVCC) -> Self {
+    pub fn new(kv: kv::MVCC<S>) -> Self {
         Self { kv }
     }
 
@@ -39,8 +39,8 @@ impl KV {
     }
 }
 
-impl super::Engine for KV {
-    type Transaction = Transaction;
+impl<S: kv::Store> super::Engine for KV<S> {
+    type Transaction = Transaction<S>;
 
     fn begin(&self, mode: super::Mode) -> Result<Self::Transaction> {
         Ok(Self::Transaction::new(self.kv.begin_with_mode(mode)?))
@@ -62,13 +62,13 @@ fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
 }
 
 /// An SQL transaction based on an MVCC key/value transaction
-pub struct Transaction {
-    txn: kv::mvcc::Transaction,
+pub struct Transaction<S: kv::Store> {
+    txn: kv::mvcc::Transaction<S>,
 }
 
-impl Transaction {
+impl<S: kv::Store> Transaction<S> {
     /// Creates a new SQL transaction from an MVCC transaction
-    fn new(txn: kv::mvcc::Transaction) -> Self {
+    fn new(txn: kv::mvcc::Transaction<S>) -> Self {
         Self { txn }
     }
 
@@ -99,7 +99,7 @@ impl Transaction {
     }
 }
 
-impl super::Transaction for Transaction {
+impl<S: kv::Store> super::Transaction for Transaction<S> {
     fn id(&self) -> u64 {
         self.txn.id()
     }
@@ -270,7 +270,7 @@ impl super::Transaction for Transaction {
     }
 }
 
-impl Catalog for Transaction {
+impl<S: kv::Store> Catalog for Transaction<S> {
     fn create_table(&mut self, table: Table) -> Result<()> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));

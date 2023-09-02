@@ -17,36 +17,36 @@ pub struct Status {
 }
 
 /// An MVCC-based transactional key-value store.
-pub struct MVCC {
+pub struct MVCC<S: Store> {
     /// The underlying KV store. It is protected by a mutex so it can be shared between txns.
-    store: Arc<Mutex<Box<dyn Store>>>,
+    store: Arc<Mutex<S>>,
 }
 
-impl Clone for MVCC {
+impl<S: Store> Clone for MVCC<S> {
     fn clone(&self) -> Self {
         MVCC { store: self.store.clone() }
     }
 }
 
-impl MVCC {
+impl<S: Store> MVCC<S> {
     /// Creates a new MVCC key-value store with the given key-value store for storage.
-    pub fn new(store: Box<dyn Store>) -> Self {
+    pub fn new(store: S) -> Self {
         Self { store: Arc::new(Mutex::new(store)) }
     }
 
     /// Begins a new transaction in read-write mode.
     #[allow(dead_code)]
-    pub fn begin(&self) -> Result<Transaction> {
+    pub fn begin(&self) -> Result<Transaction<S>> {
         Transaction::begin(self.store.clone(), Mode::ReadWrite)
     }
 
     /// Begins a new transaction in the given mode.
-    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction> {
+    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<S>> {
         Transaction::begin(self.store.clone(), mode)
     }
 
     /// Resumes a transaction with the given ID.
-    pub fn resume(&self, id: u64) -> Result<Transaction> {
+    pub fn resume(&self, id: u64) -> Result<Transaction<S>> {
         Transaction::resume(self.store.clone(), id)
     }
 
@@ -95,9 +95,9 @@ fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
 }
 
 /// An MVCC transaction.
-pub struct Transaction {
+pub struct Transaction<S: Store> {
     /// The underlying store for the transaction. Shared between transactions using a mutex.
-    store: Arc<Mutex<Box<dyn Store>>>,
+    store: Arc<Mutex<S>>,
     /// The unique transaction ID.
     id: u64,
     /// The transaction mode.
@@ -106,9 +106,9 @@ pub struct Transaction {
     snapshot: Snapshot,
 }
 
-impl Transaction {
+impl<S: Store> Transaction<S> {
     /// Begins a new transaction in the given mode.
-    fn begin(store: Arc<Mutex<Box<dyn Store>>>, mode: Mode) -> Result<Self> {
+    fn begin(store: Arc<Mutex<S>>, mode: Mode) -> Result<Self> {
         let mut session = store.lock()?;
 
         let id = match session.get(&Key::TxnNext.encode())? {
@@ -131,7 +131,7 @@ impl Transaction {
     }
 
     /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
-    fn resume(store: Arc<Mutex<Box<dyn Store>>>, id: u64) -> Result<Self> {
+    fn resume(store: Arc<Mutex<S>>, id: u64) -> Result<Self> {
         let mut session = store.lock()?;
         let mode = match session.get(&Key::TxnActive(id).encode())? {
             Some(v) => deserialize(&v)?,
@@ -344,7 +344,7 @@ struct Snapshot {
 
 impl Snapshot {
     /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
-    fn take(session: &mut MutexGuard<Box<dyn Store>>, version: u64) -> Result<Self> {
+    fn take<S: Store>(session: &mut MutexGuard<S>, version: u64) -> Result<Self> {
         let mut snapshot = Self { version, invisible: HashSet::new() };
         let mut scan =
             session.scan(Range::from(Key::TxnActive(0).encode()..Key::TxnActive(version).encode()));
@@ -360,7 +360,7 @@ impl Snapshot {
     }
 
     /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn restore(session: &mut MutexGuard<Box<dyn Store>>, version: u64) -> Result<Self> {
+    fn restore<S: Store>(session: &mut MutexGuard<S>, version: u64) -> Result<Self> {
         match session.get(&Key::TxnSnapshot(version).encode())? {
             Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
             None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
@@ -514,8 +514,8 @@ pub mod tests {
     use super::super::Memory;
     use super::*;
 
-    fn setup() -> MVCC {
-        MVCC::new(Box::new(Memory::new()))
+    fn setup() -> MVCC<Memory> {
+        MVCC::new(Memory::new())
     }
 
     #[test]
