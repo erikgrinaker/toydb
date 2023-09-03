@@ -164,7 +164,7 @@ impl<E: Engine> Transaction<E> {
         // for any future snapshot transactions looking at this one.
         let mut snapshot = Snapshot::take(&mut session, id)?;
         if let Mode::Snapshot { version } = &mode {
-            snapshot = Snapshot::reengine(&mut session, *version)?
+            snapshot = Snapshot::restore(&mut session, *version)?
         }
         drop(session);
 
@@ -179,8 +179,8 @@ impl<E: Engine> Transaction<E> {
             None => return Err(Error::Value(format!("No active transaction {}", id))),
         };
         let snapshot = match &mode {
-            Mode::Snapshot { version } => Snapshot::reengine(&mut session, *version)?,
-            _ => Snapshot::reengine(&mut session, id)?,
+            Mode::Snapshot { version } => Snapshot::restore(&mut session, *version)?,
+            _ => Snapshot::restore(&mut session, id)?,
         };
         std::mem::drop(session);
         Ok(Self { engine, id, mode, snapshot })
@@ -395,8 +395,8 @@ impl Snapshot {
         Ok(snapshot)
     }
 
-    /// Reengines an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn reengine<E: Engine>(session: &mut MutexGuard<E>, version: u64) -> Result<Self> {
+    /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
+    fn restore<E: Engine>(session: &mut MutexGuard<E>, version: u64) -> Result<Self> {
         match session.get(&Key::TxnSnapshot(version).encode()?)? {
             Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
             None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
