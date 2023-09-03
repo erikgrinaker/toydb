@@ -37,10 +37,10 @@ use std::path::PathBuf;
 ///
 /// The structure of a log entry is:
 ///
-/// - Key length as big-endian u32
-/// - Value length as big-endian i32, or -1 for tombstones
-/// - Key as raw bytes (max 2 GB)
-/// - Value as raw bytes (max 2 GB)
+/// - Key length as big-endian u32.
+/// - Value length as big-endian i32, or -1 for tombstones.
+/// - Key as raw bytes (max 2 GB).
+/// - Value as raw bytes (max 2 GB).
 pub struct BitCask {
     /// The active append-only log file.
     log: Log,
@@ -212,10 +212,10 @@ impl Drop for BitCask {
 /// A BitCask append-only log file, containing a sequence of key/value
 /// entries encoded as follows;
 ///
-/// - Key length as big-endian u64 (8 bytes)
-/// - Value length as big-endian i64, or -1 for tombstones (8 bytes)
-/// - Key as raw bytes
-/// - Value as raw bytes
+/// - Key length as big-endian u32.
+/// - Value length as big-endian i32, or -1 for tombstones.
+/// - Key as raw bytes (max 2 GB).
+/// - Value as raw bytes (max 2 GB).
 struct Log {
     /// Path to the log file.
     path: PathBuf,
