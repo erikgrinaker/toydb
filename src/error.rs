@@ -31,6 +31,18 @@ impl Display for Error {
     }
 }
 
+impl serde::ser::Error for Error {
+    fn custom<T: Display>(msg: T) -> Self {
+        Error::Internal(msg.to_string())
+    }
+}
+
+impl serde::de::Error for Error {
+    fn custom<T: Display>(msg: T) -> Self {
+        Error::Internal(msg.to_string())
+    }
+}
+
 impl From<Box<bincode::ErrorKind>> for Error {
     fn from(err: Box<bincode::ErrorKind>) -> Self {
         Error::Internal(err.to_string())
@@ -40,6 +52,12 @@ impl From<Box<bincode::ErrorKind>> for Error {
 impl From<config::ConfigError> for Error {
     fn from(err: config::ConfigError) -> Self {
         Error::Config(err.to_string())
+    }
+}
+
+impl From<hex::FromHexError> for Error {
+    fn from(err: hex::FromHexError) -> Self {
+        Error::Internal(err.to_string())
     }
 }
 
@@ -70,6 +88,12 @@ impl From<rustyline::error::ReadlineError> for Error {
 impl From<std::array::TryFromSliceError> for Error {
     fn from(err: std::array::TryFromSliceError) -> Self {
         Error::Internal(err.to_string())
+    }
+}
+
+impl From<std::num::TryFromIntError> for Error {
+    fn from(err: std::num::TryFromIntError) -> Self {
+        Error::Value(err.to_string())
     }
 }
 
