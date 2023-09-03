@@ -83,11 +83,24 @@ The SQL storage engine will be discussed separately in the [SQL section](#sql-en
 
 A key/value storage engine stores arbitrary key/value pairs as binary byte slices, and implements
 the
-[`storage::kv::Store`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/mod.rs) 
+[`storage::Engine`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/engine/mod.rs) 
 trait:
 
 ```rust
-pub trait Store: Display + Send + Sync {
+/// A key/value storage engine, where both keys and values are arbitrary byte
+/// strings between 0 B and 2 GB, stored in lexicographical key order. Writes
+/// are only guaranteed durable after calling flush().
+///
+/// Only supports single-threaded use since all methods (including reads) take a
+/// mutable reference -- serialized access can't be avoided anyway, since both
+/// Raft execution and file access is serial.
+pub trait Engine: std::fmt::Display + Send + Sync {
+    /// The iterator returned by scan(). Traits can't return "impl Trait", and
+    /// we don't want to use trait objects, so the type must be specified.
+    type ScanIterator<'a>: DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a
+    where
+        Self: 'a;
+
     /// Deletes a key, or does nothing if it does not exist.
     fn delete(&mut self, key: &[u8]) -> Result<()>;
 
@@ -95,10 +108,10 @@ pub trait Store: Display + Send + Sync {
     fn flush(&mut self) -> Result<()>;
 
     /// Gets a value for a key, if it exists.
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Iterates over an ordered range of key/value pairs.
-    fn scan(&self, range: Range) -> Scan;
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_>;
 
     /// Sets a value for a key, replacing the existing value if any.
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
@@ -129,12 +142,13 @@ encoding:
 * `sql::Value`: As above, with type prefix `0x00`=`Null`, `0x01`=`Boolean`, `0x02`=`Float`,
   `0x03`=`Integer`, `0x04`=`String`
 
-The default key/value store is a simple variant of
-[`storage::kv::BitCask`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/bitcask.rs),
-an append-only log-structured storage engine. All writes are appended to a log
-file, with an index mapping live keys to file positions maintained in memory.
-When the amount of garbage (replaced or deleted keys) in the file exceeds 20%, a
-new log file is written containing only live keys, replacing the old log file.
+The default key/value engine is
+[`storage::engine::BitCask`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/bitcask.rs),
+a very simple variant of Bitcask, an append-only log-structured storage engine.
+All writes are appended to a log file, with an index mapping live keys to file
+positions maintained in memory.  When the amount of garbage (replaced or deleted
+keys) in the file exceeds 20%, a new log file is written containing only live
+keys, replacing the old log file.
 
 #### Key/Value Tradeoffs
 
@@ -156,9 +170,9 @@ is a relatively simple concurrency control mechanism that provides
 [snapshot isolation](https://en.wikipedia.org/wiki/Snapshot_isolation) without taking out locks or 
 having writes block reads. It also versions all data, allowing querying of historical data.
 
-toyDB implements MVCC at the key/value layer as
-[`storage::kv::MVCC`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/mvcc.rs),
-using any `storage::kv::Store` implementation for underlying storage. `begin` returns a new
+toyDB implements MVCC at the storage layer as
+[`storage::mvcc::MVCC`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/mvcc.rs),
+using any `storage::Engine` implementation for underlying storage. `begin` returns a new
 transaction, which provides the usual key/value operations such as `get`, `set`, and `scan`.
 Additionally, it has a `commit` method which persists the changes and makes them visible to
 other transactions, and a `rollback` method which discards them.
