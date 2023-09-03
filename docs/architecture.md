@@ -127,20 +127,27 @@ SQL table scans) and has a couple of important implications:
 
 * Keys should use an order-preserving byte encoding, to allow range scans.
 
-The store itself does not care what keys contain, but the module offers an order-preserving key
-encoding for use by higher layers. These storage layers often use composite keys made up of
-several possibly variable-length values (e.g. an index key consists of table, column, and
-value), and the natural ordering of each segment must be preserved, a property satisfied by this
-encoding:
+The engine itself does not care what keys contain, but the storage module offers
+an order-preserving key encoding called [KeyCode](https://github.com/erikgrinaker/toydb/blob/master/src/storage/keycode.rs)
+for use by higher layers. These storage layers often use composite keys made up
+of several possibly variable-length values (e.g. an index key consists of table,
+column, and value), and the natural ordering of each segment must be preserved,
+a property satisfied by this encoding:
 
 * `bool`: `0x00` for `false`, `0x01` for `true`.
-* `Vec<u8>`: terminated with `0x0000`, `0x00` escaped as `0x00ff`.
+* `u64`: big-endian binary representation.
+* `i64`: big-endian binary representation, with sign bit flipped.
+* `f64`: big-endian binary representation, with sign bit flipped, and rest if negative.
+* `Vec<u8>`: `0x00` is escaped as `0x00ff`, terminated with `0x0000`.
 * `String`:  like `Vec<u8>`.
-* `u64`: Big-endian binary encoding.
-* `i64`: Big-endian binary encoding, sign bit flipped.
-* `f64`: Big-endian binary encoding, sign bit flipped if `+`, all flipped if `-`.
-* `sql::Value`: As above, with type prefix `0x00`=`Null`, `0x01`=`Boolean`, `0x02`=`Float`,
-  `0x03`=`Integer`, `0x04`=`String`
+
+Additionally, several container types are supported:
+
+* Tuple: concatenation of elements, with no surrounding structure.
+* Array: like tuple.
+* Vec: like tuple.
+* Enum: the variant's enum index as a single `u8` byte, then contents.
+* Value: like enum.
 
 The default key/value engine is
 [`storage::engine::BitCask`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/bitcask.rs),

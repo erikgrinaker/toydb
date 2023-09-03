@@ -1,4 +1,3 @@
-pub mod encoding;
 pub mod engine;
 pub mod keycode;
 pub mod log;
