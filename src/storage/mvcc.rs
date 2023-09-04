@@ -26,8 +26,8 @@ enum Key<'a> {
         #[serde(borrow)]
         Cow<'a, [u8]>,
     ),
-    /// A record for a key/version pair.
-    Record(
+    /// A versioned key/value pair.
+    Version(
         #[serde(with = "serde_bytes")]
         #[serde(borrow)]
         Cow<'a, [u8]>,
@@ -226,11 +226,14 @@ impl<E: Engine> Transaction<E> {
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         let mut session = self.engine.lock()?;
         let mut scan = session
-            .scan(Key::Record(key.into(), 0).encode()?..=Key::Record(key.into(), self.id).encode()?)
+            .scan(
+                Key::Version(key.into(), 0).encode()?
+                    ..=Key::Version(key.into(), self.id).encode()?,
+            )
             .rev();
         while let Some((k, v)) = scan.next().transpose()? {
             match Key::decode(&k)? {
-                Key::Record(_, version) => {
+                Key::Version(_, version) => {
                     if self.snapshot.is_visible(version) {
                         return Ok(bincode::deserialize(&v)?);
                     }
@@ -244,13 +247,13 @@ impl<E: Engine> Transaction<E> {
     /// Scans a key range.
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<ScanIterator> {
         let start = match range.start_bound() {
-            Bound::Excluded(k) => Bound::Excluded(Key::Record(k.into(), std::u64::MAX).encode()?),
-            Bound::Included(k) => Bound::Included(Key::Record(k.into(), 0).encode()?),
-            Bound::Unbounded => Bound::Included(Key::Record(vec![].into(), 0).encode()?),
+            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), std::u64::MAX).encode()?),
+            Bound::Included(k) => Bound::Included(Key::Version(k.into(), 0).encode()?),
+            Bound::Unbounded => Bound::Included(Key::Version(vec![].into(), 0).encode()?),
         };
         let end = match range.end_bound() {
-            Bound::Excluded(k) => Bound::Excluded(Key::Record(k.into(), 0).encode()?),
-            Bound::Included(k) => Bound::Included(Key::Record(k.into(), std::u64::MAX).encode()?),
+            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), 0).encode()?),
+            Bound::Included(k) => Bound::Included(Key::Version(k.into(), std::u64::MAX).encode()?),
             Bound::Unbounded => Bound::Unbounded,
         };
         // TODO: For now, collect results from the engine to not have to deal with lifetimes.
@@ -299,13 +302,13 @@ impl<E: Engine> Transaction<E> {
         let min = self.snapshot.invisible.iter().min().cloned().unwrap_or(self.id + 1);
         let mut scan = session
             .scan(
-                Key::Record(key.into(), min).encode()?
-                    ..=Key::Record(key.into(), std::u64::MAX).encode()?,
+                Key::Version(key.into(), min).encode()?
+                    ..=Key::Version(key.into(), std::u64::MAX).encode()?,
             )
             .rev();
         while let Some((k, _)) = scan.next().transpose()? {
             match Key::decode(&k)? {
-                Key::Record(_, version) => {
+                Key::Version(_, version) => {
                     if !self.snapshot.is_visible(version) {
                         return Err(Error::Serialization);
                     }
@@ -316,7 +319,7 @@ impl<E: Engine> Transaction<E> {
         std::mem::drop(scan);
 
         // Write the key and its update record.
-        let key = Key::Record(key.into(), self.id).encode()?;
+        let key = Key::Version(key.into(), self.id).encode()?;
         let update = Key::TxnUpdate(self.id, (&key).into()).encode()?;
         session.set(&update, vec![])?;
         session.set(&key, bincode::serialize(&value)?)
@@ -422,8 +425,8 @@ impl<'a> Scan<'a> {
         // to decode the last version.
         scan = Box::new(scan.filter_map(move |r| {
             r.and_then(|(k, v)| match Key::decode(&k)? {
-                Key::Record(_, version) if !snapshot.is_visible(version) => Ok(None),
-                Key::Record(key, _) => Ok(Some((key.into_owned(), v))),
+                Key::Version(_, version) if !snapshot.is_visible(version) => Ok(None),
+                Key::Version(key, _) => Ok(Some((key.into_owned(), v))),
                 k => Err(Error::Internal(format!("Expected Record, got {:?}", k))),
             })
             .transpose()
