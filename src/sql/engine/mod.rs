@@ -25,9 +25,6 @@ pub trait Engine: Clone {
     fn session(&self) -> Result<Session<Self>> {
         Ok(Session { engine: self.clone(), txn: None })
     }
-
-    /// Resumes an active transaction with the given ID
-    fn resume(&self, id: u64) -> Result<Self::Transaction>;
 }
 
 /// An SQL transaction
@@ -102,25 +99,13 @@ impl<E: Engine + 'static> Session<E> {
             ast::Statement::Commit => {
                 let txn = self.txn.take().unwrap();
                 let id = txn.id();
-                if let Err(err) = txn.commit() {
-                    // If the commit fails, we try to recover the transaction.
-                    if let Ok(t) = self.engine.resume(id) {
-                        self.txn = Some(t);
-                    }
-                    return Err(err);
-                }
+                txn.commit()?;
                 Ok(ResultSet::Commit { id })
             }
             ast::Statement::Rollback => {
                 let txn = self.txn.take().unwrap();
                 let id = txn.id();
-                if let Err(err) = txn.rollback() {
-                    // If the rollback fails, we try to recover the transaction.
-                    if let Ok(t) = self.engine.resume(id) {
-                        self.txn = Some(t);
-                    }
-                    return Err(err);
-                }
+                txn.rollback()?;
                 Ok(ResultSet::Rollback { id })
             }
             ast::Statement::Explain(statement) => self.with_txn(Mode::ReadOnly, |txn| {

@@ -28,6 +28,11 @@ impl<E: storage::Engine> KV<E> {
         Self { kv: storage::mvcc::MVCC::new(engine) }
     }
 
+    /// Resumes a transaction with the given ID
+    pub fn resume(&self, id: u64) -> Result<<Self as super::Engine>::Transaction> {
+        Ok(<Self as super::Engine>::Transaction::new(self.kv.resume(id)?))
+    }
+
     /// Fetches an unversioned metadata value
     pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.kv.get_unversioned(key)
@@ -44,10 +49,6 @@ impl<E: storage::Engine> super::Engine for KV<E> {
 
     fn begin(&self, mode: super::Mode) -> Result<Self::Transaction> {
         Ok(Self::Transaction::new(self.kv.begin_with_mode(mode)?))
-    }
-
-    fn resume(&self, id: u64) -> Result<Self::Transaction> {
-        Ok(Self::Transaction::new(self.kv.resume(id)?))
     }
 }
 

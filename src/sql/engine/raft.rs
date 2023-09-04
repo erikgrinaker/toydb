@@ -36,8 +36,6 @@ enum Mutation {
 enum Query {
     /// Fetches engine status
     Status,
-    /// Resumes the active transaction with the given ID
-    Resume(u64),
 
     /// Reads a row
     Read { txn_id: u64, table: String, id: Value },
@@ -105,10 +103,6 @@ impl super::Engine for Raft {
     fn begin(&self, mode: Mode) -> Result<Self::Transaction> {
         Transaction::begin(self.client.clone(), mode)
     }
-
-    fn resume(&self, id: u64) -> Result<Self::Transaction> {
-        Transaction::resume(self.client.clone(), id)
-    }
 }
 
 /// A Raft-based SQL transaction
@@ -127,14 +121,6 @@ impl Transaction {
     fn begin(client: raft::Client, mode: Mode) -> Result<Self> {
         let id = Raft::deserialize(&futures::executor::block_on(
             client.mutate(Raft::serialize(&Mutation::Begin(mode))?),
-        )?)?;
-        Ok(Self { client, id, mode })
-    }
-
-    /// Resumes an active transaction
-    fn resume(client: raft::Client, id: u64) -> Result<Self> {
-        let (id, mode) = Raft::deserialize(&futures::executor::block_on(
-            client.query(Raft::serialize(&Query::Resume(id))?),
         )?)?;
         Ok(Self { client, id, mode })
     }
@@ -325,11 +311,6 @@ impl<E: storage::Engine> raft::State for State<E> {
 
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
         match Raft::deserialize(&command)? {
-            Query::Resume(id) => {
-                let txn = self.engine.resume(id)?;
-                Raft::serialize(&(txn.id(), txn.mode()))
-            }
-
             Query::Read { txn_id, table, id } => {
                 Raft::serialize(&self.engine.resume(txn_id)?.read(&table, &id)?)
             }
