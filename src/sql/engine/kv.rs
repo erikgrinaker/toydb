@@ -28,9 +28,12 @@ impl<E: storage::Engine> KV<E> {
         Self { kv: storage::mvcc::MVCC::new(engine) }
     }
 
-    /// Resumes a transaction with the given ID
-    pub fn resume(&self, id: u64) -> Result<<Self as super::Engine>::Transaction> {
-        Ok(<Self as super::Engine>::Transaction::new(self.kv.resume(id)?))
+    /// Resumes a transaction from the given state
+    pub fn resume(
+        &self,
+        state: storage::mvcc::TransactionState,
+    ) -> Result<<Self as super::Engine>::Transaction> {
+        Ok(<Self as super::Engine>::Transaction::new(self.kv.resume(state)?))
     }
 
     /// Fetches an unversioned metadata value
@@ -71,6 +74,11 @@ impl<E: storage::Engine> Transaction<E> {
     /// Creates a new SQL transaction from an MVCC transaction
     fn new(txn: storage::mvcc::Transaction<E>) -> Self {
         Self { txn }
+    }
+
+    /// Returns the transaction's serialized state.
+    pub(super) fn state(&self) -> storage::mvcc::TransactionState {
+        self.txn.state()
     }
 
     /// Loads an index entry

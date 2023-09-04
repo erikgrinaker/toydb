@@ -129,7 +129,7 @@ async fn status() -> Result<()> {
                 commit_index: 26,
                 apply_index: 26,
                 storage: "hybrid".into(),
-                storage_size: 3239,
+                storage_size: 3739,
             },
             mvcc: mvcc::Status { txns: 1, txns_active: 0, storage: "memory".into() },
         }

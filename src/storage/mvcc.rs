@@ -8,6 +8,12 @@ use std::iter::Peekable;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+// TODO: for read-only transactions, don't allocate a transaction ID. Instead,
+// keep the snapshot in the transaction object, and retain it in the SQL engine
+// session to synthesize a new transaction from it (in particular, in the Raft
+// engine). This removes the need to persist transaction IDs and snapshots for
+// read-only transactions (including AOST transactions).
+
 /// MVCC keys, using the KeyCode encoding which preserves the ordering and
 /// grouping of keys. Cow byte slices allow encoding borrowed values and
 /// decoding into owned values.
@@ -90,9 +96,9 @@ impl<E: Engine> MVCC<E> {
         Transaction::begin(self.engine.clone(), mode)
     }
 
-    /// Resumes a transaction with the given ID.
-    pub fn resume(&self, id: u64) -> Result<Transaction<E>> {
-        Transaction::resume(self.engine.clone(), id)
+    /// Resumes a transaction from the given state.
+    pub fn resume(&self, state: TransactionState) -> Result<Transaction<E>> {
+        Transaction::resume(self.engine.clone(), state)
     }
 
     /// Fetches the value of an unversioned key.
@@ -137,6 +143,18 @@ pub struct Transaction<E: Engine> {
     snapshot: Snapshot,
 }
 
+/// A serializable representation of a Transaction's state. It can be exported
+/// from a Transaction and later used to instantiate a new Transaction that's
+/// functionally equivalent via Transaction::resume(). In particular, this
+/// allows passing the transaction between the SQL engine and storage engine
+/// across the Raft state machine boundary.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct TransactionState {
+    pub id: u64,
+    pub mode: Mode,
+    pub snapshot: Snapshot,
+}
+
 impl<E: Engine> Transaction<E> {
     /// Begins a new transaction in the given mode.
     fn begin(engine: Arc<Mutex<E>>, mode: Mode) -> Result<Self> {
@@ -161,19 +179,16 @@ impl<E: Engine> Transaction<E> {
         Ok(Self { engine, id, mode, snapshot })
     }
 
-    /// Resumes an active transaction with the given ID. Errors if the transaction is not active.
-    fn resume(engine: Arc<Mutex<E>>, id: u64) -> Result<Self> {
-        let mut session = engine.lock()?;
-        let mode = match session.get(&Key::TxnActive(id).encode()?)? {
-            Some(v) => bincode::deserialize(&v)?,
-            None => return Err(Error::Value(format!("No active transaction {}", id))),
-        };
-        let snapshot = match &mode {
-            Mode::Snapshot { version } => Snapshot::restore(&mut session, *version)?,
-            _ => Snapshot::restore(&mut session, id)?,
-        };
-        std::mem::drop(session);
-        Ok(Self { engine, id, mode, snapshot })
+    /// Resumes a transaction from the given state.
+    fn resume(engine: Arc<Mutex<E>>, state: TransactionState) -> Result<Self> {
+        // For read-write transactions, verify that the transaction is still
+        // active before making further writes.
+        if state.mode == Mode::ReadWrite
+            && engine.lock()?.get(&Key::TxnActive(state.id).encode()?)?.is_none()
+        {
+            return Err(Error::Internal(format!("No active transaction with ID {}", state.id)));
+        }
+        Ok(Self { engine, id: state.id, mode: state.mode, snapshot: state.snapshot })
     }
 
     /// Returns the transaction ID.
@@ -184,6 +199,12 @@ impl<E: Engine> Transaction<E> {
     /// Returns the transaction mode.
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    /// Returns the transaction's state. This can be used to instantiate a
+    /// functionally equivalent transaction via resume().
+    pub fn state(&self) -> TransactionState {
+        TransactionState { id: self.id, mode: self.mode, snapshot: self.snapshot.clone() }
     }
 
     /// Commits the transaction, by removing the txn from the active set.
@@ -363,13 +384,13 @@ impl Mode {
 }
 
 /// A versioned snapshot, containing visibility information about concurrent transactions.
-#[derive(Clone)]
-struct Snapshot {
+#[derive(Clone, Deserialize, Serialize)]
+pub struct Snapshot {
     /// The version (i.e. transaction ID) that the snapshot belongs to.
-    version: u64,
+    pub version: u64,
     /// The set of transaction IDs that were active at the start of the transactions,
     /// and thus should be invisible to the snapshot.
-    invisible: HashSet<u64>,
+    pub invisible: HashSet<u64>,
 }
 
 impl Snapshot {
@@ -620,9 +641,9 @@ pub mod tests {
 
         // We now resume t3, who should see it's own changes but none
         // of the others'
-        let id = t3.id();
+        let state = t3.state();
         std::mem::drop(t3);
-        let tr = mvcc.resume(id)?;
+        let tr = mvcc.resume(state.clone())?;
         assert_eq!(3, tr.id());
         assert_eq!(Mode::ReadWrite, tr.mode());
 
@@ -640,6 +661,12 @@ pub mod tests {
         // Once tr commits, a separate transaction should see t3's changes
         tr.commit()?;
 
+        // Resuming an inactive transaction should error.
+        assert_eq!(
+            mvcc.resume(state).err(),
+            Some(Error::Internal("No active transaction with ID 3".into()))
+        );
+
         let t = mvcc.begin()?;
         assert_eq!(Some(b"t2".to_vec()), t.get(b"a")?);
         assert_eq!(Some(b"t3".to_vec()), t.get(b"b")?);
@@ -651,16 +678,13 @@ pub mod tests {
         assert_eq!(7, ts.id());
         assert_eq!(Some(b"t1".to_vec()), ts.get(b"a")?);
 
-        let id = ts.id();
+        let state = ts.state();
         std::mem::drop(ts);
-        let ts = mvcc.resume(id)?;
+        let ts = mvcc.resume(state)?;
         assert_eq!(7, ts.id());
         assert_eq!(Mode::Snapshot { version: 1 }, ts.mode());
         assert_eq!(Some(b"t1".to_vec()), ts.get(b"a")?);
         ts.commit()?;
-
-        // Resuming an inactive transaction should error.
-        assert_eq!(mvcc.resume(7).err(), Some(Error::Value("No active transaction 7".into())));
 
         Ok(())
     }
