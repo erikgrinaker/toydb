@@ -348,7 +348,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
-                Ok(ast::Statement::Begin { readonly, version })
+                Ok(ast::Statement::Begin { read_only: readonly, as_of: version })
             }
             Token::Keyword(Keyword::Commit) => Ok(ast::Statement::Commit),
             Token::Keyword(Keyword::Rollback) => Ok(ast::Statement::Rollback),

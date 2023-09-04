@@ -10,7 +10,6 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{error::ReadlineError, Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 use toydb::error::{Error, Result};
-use toydb::sql::engine::Mode;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::parser::{Lexer, Token};
 use toydb::Client;
@@ -165,16 +164,12 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
     /// Runs a query and displays the results
     async fn execute_query(&mut self, query: &str) -> Result<()> {
         match self.client.execute(query).await? {
-            ResultSet::Begin { id, mode } => match mode {
-                Mode::ReadWrite => println!("Began transaction {}", id),
-                Mode::ReadOnly => println!("Began read-only transaction {}", id),
-                Mode::Snapshot { version, .. } => println!(
-                    "Began read-only transaction {} in snapshot at version {}",
-                    id, version
-                ),
+            ResultSet::Begin { version, read_only } => match read_only {
+                false => println!("Began transaction at new version {}", version),
+                true => println!("Began read-only transaction at version {}", version),
             },
-            ResultSet::Commit { id } => println!("Committed transaction {}", id),
-            ResultSet::Rollback { id } => println!("Rolled back transaction {}", id),
+            ResultSet::Commit { version: id } => println!("Committed transaction {}", id),
+            ResultSet::Rollback { version: id } => println!("Rolled back transaction {}", id),
             ResultSet::Create { count } => println!("Created {} rows", count),
             ResultSet::Delete { count } => println!("Deleted {} rows", count),
             ResultSet::Update { count } => println!("Updated {} rows", count),
@@ -206,9 +201,8 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>> {
         let prompt = match self.client.txn() {
-            Some((id, Mode::ReadWrite)) => format!("toydb:{}> ", id),
-            Some((id, Mode::ReadOnly)) => format!("toydb:{}> ", id),
-            Some((_, Mode::Snapshot { version })) => format!("toydb@{}> ", version),
+            Some((version, false)) => format!("toydb:{}> ", version),
+            Some((version, true)) => format!("toydb@{}> ", version),
             None => "toydb> ".into(),
         };
         match self.editor.readline(&prompt) {

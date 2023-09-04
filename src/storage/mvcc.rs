@@ -8,24 +8,18 @@ use std::iter::Peekable;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-// TODO: for read-only transactions, don't allocate a transaction ID. Instead,
-// keep the snapshot in the transaction object, and retain it in the SQL engine
-// session to synthesize a new transaction from it (in particular, in the Raft
-// engine). This removes the need to persist transaction IDs and snapshots for
-// read-only transactions (including AOST transactions).
-
 /// MVCC keys, using the KeyCode encoding which preserves the ordering and
 /// grouping of keys. Cow byte slices allow encoding borrowed values and
 /// decoding into owned values.
 #[derive(Debug, Deserialize, Serialize)]
 enum Key<'a> {
-    /// The next available transaction ID.
+    /// The next available transaction version.
     TxnNext,
-    /// Markers for active (uncommitted) transactions by ID, storing the mode.
+    /// Active (uncommitted) transactions by version.
     TxnActive(u64),
-    /// Transaction snapshot by ID, storing concurrent active transaction IDs.
-    TxnSnapshot(u64),
-    /// Update marker for a txn ID and key, used for rollback.
+    /// Active set snapshots by version.
+    TxnActiveSnapshot(u64),
+    /// Update marker for a version and key, used for rollback.
     TxnUpdate(
         u64,
         #[serde(with = "serde_bytes")]
@@ -85,18 +79,22 @@ impl<E: Engine> MVCC<E> {
         Self { engine: Arc::new(Mutex::new(engine)) }
     }
 
-    /// Begins a new transaction in read-write mode.
-    #[allow(dead_code)]
+    /// Begins a new read-write transaction.
     pub fn begin(&self) -> Result<Transaction<E>> {
-        Transaction::begin(self.engine.clone(), Mode::ReadWrite)
+        Transaction::begin(self.engine.clone())
     }
 
-    /// Begins a new transaction in the given mode.
-    pub fn begin_with_mode(&self, mode: Mode) -> Result<Transaction<E>> {
-        Transaction::begin(self.engine.clone(), mode)
+    /// Begins a new read-only transaction at the latest version.
+    pub fn begin_read_only(&self) -> Result<Transaction<E>> {
+        Transaction::begin_read_only(self.engine.clone(), None)
     }
 
-    /// Resumes a transaction from the given state.
+    /// Begins a new read-only transaction as of the given version.
+    pub fn begin_as_of(&self, version: u64) -> Result<Transaction<E>> {
+        Transaction::begin_read_only(self.engine.clone(), Some(version))
+    }
+
+    /// Resumes a transaction from the given transaction state.
     pub fn resume(&self, state: TransactionState) -> Result<Transaction<E>> {
         Transaction::resume(self.engine.clone(), state)
     }
@@ -135,12 +133,16 @@ impl<E: Engine> MVCC<E> {
 pub struct Transaction<E: Engine> {
     /// The underlying engine for the transaction. Shared between transactions using a mutex.
     engine: Arc<Mutex<E>>,
-    /// The unique transaction ID.
-    id: u64,
-    /// The transaction mode.
-    mode: Mode,
-    /// The snapshot that the transaction is running in.
-    snapshot: Snapshot,
+    /// The version this transaction is running at. Only one read-write
+    /// transaction can run at a given version, since this identifies its
+    /// writes.
+    version: u64,
+    /// If true, the transaction is read only.
+    read_only: bool,
+    /// The set of concurrent active (uncommitted) transactions. Their writes
+    /// should be invisible to this transaction even if they're writing at a
+    /// lower version, since they're not committed yet.
+    active: HashSet<u64>,
 }
 
 /// A serializable representation of a Transaction's state. It can be exported
@@ -150,92 +152,157 @@ pub struct Transaction<E: Engine> {
 /// across the Raft state machine boundary.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TransactionState {
-    pub id: u64,
-    pub mode: Mode,
-    pub snapshot: Snapshot,
+    pub version: u64,
+    pub read_only: bool,
+    pub active: HashSet<u64>,
 }
 
 impl<E: Engine> Transaction<E> {
-    /// Begins a new transaction in the given mode.
-    fn begin(engine: Arc<Mutex<E>>, mode: Mode) -> Result<Self> {
+    /// Begins a new transaction in read-write mode. This will allocate a new
+    /// version that the transaction can write at, add it to the active set, and
+    /// record its active snapshot for time-travel queries.
+    fn begin(engine: Arc<Mutex<E>>) -> Result<Self> {
         let mut session = engine.lock()?;
 
-        let id = match session.get(&Key::TxnNext.encode()?)? {
+        // Allocate a new version to write at.
+        let version = match session.get(&Key::TxnNext.encode()?)? {
             Some(ref v) => bincode::deserialize(v)?,
             None => 1,
         };
-        session.set(&Key::TxnNext.encode()?, bincode::serialize(&(id + 1))?)?;
-        session.set(&Key::TxnActive(id).encode()?, bincode::serialize(&mode)?)?;
+        session.set(&Key::TxnNext.encode()?, bincode::serialize(&(version + 1))?)?;
 
-        // We always take a new snapshot, even for snapshot transactions, because all transactions
-        // increment the transaction ID and we need to properly record currently active transactions
-        // for any future snapshot transactions looking at this one.
-        let mut snapshot = Snapshot::take(&mut session, id)?;
-        if let Mode::Snapshot { version } = &mode {
-            snapshot = Snapshot::restore(&mut session, *version)?
+        // Fetch the current set of active transactions, persist it for
+        // time-travel queries if non-empty, then add this txn to it.
+        let active = Self::scan_active(&mut session)?;
+        if !active.is_empty() {
+            session.set(&Key::TxnActiveSnapshot(version).encode()?, bincode::serialize(&active)?)?
         }
+        session.set(&Key::TxnActive(version).encode()?, vec![])?;
         drop(session);
 
-        Ok(Self { engine, id, mode, snapshot })
+        Ok(Self { engine, version, read_only: false, active })
+    }
+
+    /// Begins a new read-only transaction. If version is given it will see the
+    /// state as of the beginning of that version (ignoring writes at that
+    /// version). In other words, it sees the same state as the read-write
+    /// transaction at that version saw when it began.
+    fn begin_read_only(engine: Arc<Mutex<E>>, as_of: Option<u64>) -> Result<Self> {
+        let mut session = engine.lock()?;
+
+        // Fetch the latest version.
+        let mut version = match session.get(&Key::TxnNext.encode()?)? {
+            Some(ref v) => bincode::deserialize(v)?,
+            None => 1,
+        };
+
+        // If requested, create the transaction as of a past version, restoring
+        // the active snapshot as of the beginning of that version. Otherwise,
+        // use the latest version and get the current, real-time snapshot.
+        let mut active = HashSet::new();
+        if let Some(as_of) = as_of {
+            if as_of >= version {
+                return Err(Error::Value(format!("Version {} does not exist", as_of)));
+            }
+            version = as_of;
+            if let Some(value) = session.get(&Key::TxnActiveSnapshot(version).encode()?)? {
+                active = bincode::deserialize(&value)?;
+            }
+        } else {
+            active = Self::scan_active(&mut session)?;
+        }
+
+        drop(session);
+
+        Ok(Self { engine, version, read_only: true, active })
     }
 
     /// Resumes a transaction from the given state.
-    fn resume(engine: Arc<Mutex<E>>, state: TransactionState) -> Result<Self> {
+    fn resume(engine: Arc<Mutex<E>>, s: TransactionState) -> Result<Self> {
         // For read-write transactions, verify that the transaction is still
         // active before making further writes.
-        if state.mode == Mode::ReadWrite
-            && engine.lock()?.get(&Key::TxnActive(state.id).encode()?)?.is_none()
-        {
-            return Err(Error::Internal(format!("No active transaction with ID {}", state.id)));
+        if !s.read_only && engine.lock()?.get(&Key::TxnActive(s.version).encode()?)?.is_none() {
+            return Err(Error::Internal(format!("No active transaction at version {}", s.version)));
         }
-        Ok(Self { engine, id: state.id, mode: state.mode, snapshot: state.snapshot })
+        Ok(Self { engine, version: s.version, read_only: s.read_only, active: s.active })
     }
 
-    /// Returns the transaction ID.
-    pub fn id(&self) -> u64 {
-        self.id
+    /// Scans the set of currently active transactions.
+    fn scan_active(session: &mut MutexGuard<E>) -> Result<HashSet<u64>> {
+        let mut active = HashSet::new();
+        // TODO: Add Engine.scan_prefix() trait method.
+        let mut scan =
+            session.scan(Key::TxnActive(0).encode()?..=Key::TxnActive(u64::MAX).encode()?);
+        while let Some((key, _)) = scan.next().transpose()? {
+            match Key::decode(&key)? {
+                Key::TxnActive(version) => active.insert(version),
+                _ => return Err(Error::Internal(format!("Expected TxnActive key, got {:?}", key))),
+            };
+        }
+        Ok(active)
     }
 
-    /// Returns the transaction mode.
-    pub fn mode(&self) -> Mode {
-        self.mode
+    /// Returns the version the transaction is running at.
+    pub fn version(&self) -> u64 {
+        self.version
+    }
+
+    /// Returns whether the transaction is read-only.
+    pub fn read_only(&self) -> bool {
+        self.read_only
     }
 
     /// Returns the transaction's state. This can be used to instantiate a
     /// functionally equivalent transaction via resume().
     pub fn state(&self) -> TransactionState {
-        TransactionState { id: self.id, mode: self.mode, snapshot: self.snapshot.clone() }
+        TransactionState {
+            version: self.version,
+            read_only: self.read_only,
+            active: self.active.clone(), // TODO: avoid cloning
+        }
     }
 
     /// Commits the transaction, by removing the txn from the active set.
     pub fn commit(self) -> Result<()> {
         let mut session = self.engine.lock()?;
-        session.delete(&Key::TxnActive(self.id).encode()?)?;
+        session.delete(&Key::TxnActive(self.version).encode()?)?;
         session.flush()
     }
 
     /// Rolls back the transaction, by removing all updated entries.
     pub fn rollback(self) -> Result<()> {
-        let mut session = self.engine.lock()?;
-        if self.mode.mutable() {
-            let mut rollback = Vec::new();
-            let mut scan = session.scan(
-                Key::TxnUpdate(self.id, vec![].into()).encode()?
-                    ..Key::TxnUpdate(self.id + 1, vec![].into()).encode()?,
-            );
-            while let Some((key, _)) = scan.next().transpose()? {
-                match Key::decode(&key)? {
-                    Key::TxnUpdate(_, updated_key) => rollback.push(updated_key.into_owned()),
-                    k => return Err(Error::Internal(format!("Expected TxnUpdate, got {:?}", k))),
-                };
-                rollback.push(key);
-            }
-            std::mem::drop(scan);
-            for key in rollback.into_iter() {
-                session.delete(&key)?;
-            }
+        if self.read_only {
+            return Ok(());
         }
-        session.delete(&Key::TxnActive(self.id).encode()?)
+        let mut session = self.engine.lock()?;
+        let mut rollback = Vec::new();
+        let mut scan = session.scan(
+            Key::TxnUpdate(self.version, vec![].into()).encode()?
+                ..Key::TxnUpdate(self.version + 1, vec![].into()).encode()?,
+        );
+        while let Some((key, _)) = scan.next().transpose()? {
+            match Key::decode(&key)? {
+                Key::TxnUpdate(_, updated_key) => rollback.push(updated_key.into_owned()),
+                k => return Err(Error::Internal(format!("Expected TxnUpdate, got {:?}", k))),
+            };
+            rollback.push(key);
+        }
+        std::mem::drop(scan);
+        for key in rollback.into_iter() {
+            session.delete(&key)?;
+        }
+        session.delete(&Key::TxnActive(self.version).encode()?)
+    }
+
+    /// Checks whether the given version is visible to this transaction.
+    fn is_visible(&self, version: u64) -> bool {
+        if self.active.get(&version).is_some() {
+            false
+        } else if self.read_only {
+            version < self.version
+        } else {
+            version <= self.version
+        }
     }
 
     /// Deletes a key.
@@ -249,13 +316,13 @@ impl<E: Engine> Transaction<E> {
         let mut scan = session
             .scan(
                 Key::Version(key.into(), 0).encode()?
-                    ..=Key::Version(key.into(), self.id).encode()?,
+                    ..=Key::Version(key.into(), self.version).encode()?,
             )
             .rev();
         while let Some((k, v)) = scan.next().transpose()? {
             match Key::decode(&k)? {
                 Key::Version(_, version) => {
-                    if self.snapshot.is_visible(version) {
+                    if self.is_visible(version) {
                         return Ok(bincode::deserialize(&v)?);
                     }
                 }
@@ -279,7 +346,7 @@ impl<E: Engine> Transaction<E> {
         };
         // TODO: For now, collect results from the engine to not have to deal with lifetimes.
         let scan = Box::new(self.engine.lock()?.scan((start, end)).collect::<Vec<_>>().into_iter());
-        Ok(Box::new(Scan::new(scan, self.snapshot.clone())))
+        Ok(Box::new(Scan::new(scan, self.version, self.read_only, self.active.clone())))
     }
 
     /// Scans keys under a given prefix.
@@ -313,14 +380,14 @@ impl<E: Engine> Transaction<E> {
 
     /// Writes a value for a key. None is used for deletion.
     fn write(&self, key: &[u8], value: Option<Vec<u8>>) -> Result<()> {
-        if !self.mode.mutable() {
+        if self.read_only {
             return Err(Error::ReadOnly);
         }
         let mut session = self.engine.lock()?;
 
         // Check if the key is dirty, i.e. if it has any uncommitted changes, by scanning for any
         // versions that aren't visible to us.
-        let min = self.snapshot.invisible.iter().min().cloned().unwrap_or(self.id + 1);
+        let min = self.active.iter().min().cloned().unwrap_or(self.version + 1);
         let mut scan = session
             .scan(
                 Key::Version(key.into(), min).encode()?
@@ -330,7 +397,7 @@ impl<E: Engine> Transaction<E> {
         while let Some((k, _)) = scan.next().transpose()? {
             match Key::decode(&k)? {
                 Key::Version(_, version) => {
-                    if !self.snapshot.is_visible(version) {
+                    if !self.is_visible(version) {
                         return Err(Error::Serialization);
                     }
                 }
@@ -340,8 +407,8 @@ impl<E: Engine> Transaction<E> {
         std::mem::drop(scan);
 
         // Write the key and its update record.
-        let key = Key::Version(key.into(), self.id).encode()?;
-        let update = Key::TxnUpdate(self.id, (&key).into()).encode()?;
+        let key = Key::Version(key.into(), self.version).encode()?;
+        let update = Key::TxnUpdate(self.version, (&key).into()).encode()?;
         session.set(&update, vec![])?;
         session.set(&key, bincode::serialize(&value)?)
     }
@@ -383,47 +450,6 @@ impl Mode {
     }
 }
 
-/// A versioned snapshot, containing visibility information about concurrent transactions.
-#[derive(Clone, Deserialize, Serialize)]
-pub struct Snapshot {
-    /// The version (i.e. transaction ID) that the snapshot belongs to.
-    pub version: u64,
-    /// The set of transaction IDs that were active at the start of the transactions,
-    /// and thus should be invisible to the snapshot.
-    pub invisible: HashSet<u64>,
-}
-
-impl Snapshot {
-    /// Takes a new snapshot, persisting it as `Key::TxnSnapshot(version)`.
-    fn take<E: Engine>(session: &mut MutexGuard<E>, version: u64) -> Result<Self> {
-        let mut snapshot = Self { version, invisible: HashSet::new() };
-        let mut scan = session.scan(Key::TxnActive(0).encode()?..Key::TxnActive(version).encode()?);
-        while let Some((key, _)) = scan.next().transpose()? {
-            match Key::decode(&key)? {
-                Key::TxnActive(id) => snapshot.invisible.insert(id),
-                k => return Err(Error::Internal(format!("Expected TxnActive, got {:?}", k))),
-            };
-        }
-        std::mem::drop(scan);
-        session
-            .set(&Key::TxnSnapshot(version).encode()?, bincode::serialize(&snapshot.invisible)?)?;
-        Ok(snapshot)
-    }
-
-    /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
-    fn restore<E: Engine>(session: &mut MutexGuard<E>, version: u64) -> Result<Self> {
-        match session.get(&Key::TxnSnapshot(version).encode()?)? {
-            Some(ref v) => Ok(Self { version, invisible: bincode::deserialize(v)? }),
-            None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
-        }
-    }
-
-    /// Checks whether the given version is visible in this snapshot.
-    fn is_visible(&self, version: u64) -> bool {
-        version <= self.version && self.invisible.get(&version).is_none()
-    }
-}
-
 pub type ScanIterator<'a> =
     Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + Send + 'a>;
 
@@ -438,7 +464,28 @@ pub struct Scan<'a> {
 
 impl<'a> Scan<'a> {
     /// Creates a new scan.
-    fn new(mut scan: ScanIterator<'a>, snapshot: Snapshot) -> Self {
+    fn new(
+        mut scan: ScanIterator<'a>,
+        txn_version: u64,
+        read_only: bool,
+        snapshot: HashSet<u64>,
+    ) -> Self {
+        /// Checks whether the given version is visible to this transaction.
+        fn is_visible(
+            txn_version: u64,
+            read_only: bool,
+            snapshot: &HashSet<u64>,
+            version: u64,
+        ) -> bool {
+            if snapshot.get(&version).is_some() {
+                false
+            } else if read_only {
+                version < txn_version
+            } else {
+                version <= txn_version
+            }
+        }
+
         // Augment the underlying scan to decode the key and filter invisible versions. We don't
         // return the version, since we don't need it, but beware that all versions of the key
         // will still be returned - we usually only need the last, which is what the next() and
@@ -446,7 +493,11 @@ impl<'a> Scan<'a> {
         // to decode the last version.
         scan = Box::new(scan.filter_map(move |r| {
             r.and_then(|(k, v)| match Key::decode(&k)? {
-                Key::Version(_, version) if !snapshot.is_visible(version) => Ok(None),
+                Key::Version(_, version)
+                    if !is_visible(txn_version, read_only, &snapshot, version) =>
+                {
+                    Ok(None)
+                }
                 Key::Version(key, _) => Ok(Some((key.into_owned(), v))),
                 k => Err(Error::Internal(format!("Expected Record, got {:?}", k))),
             })
@@ -521,96 +572,76 @@ pub mod tests {
         let mvcc = setup();
 
         let txn = mvcc.begin()?;
-        assert_eq!(1, txn.id());
-        assert_eq!(Mode::ReadWrite, txn.mode());
+        assert_eq!(1, txn.version());
+        assert!(!txn.read_only());
         txn.commit()?;
 
         let txn = mvcc.begin()?;
-        assert_eq!(2, txn.id());
+        assert_eq!(2, txn.version());
         txn.rollback()?;
 
         let txn = mvcc.begin()?;
-        assert_eq!(3, txn.id());
+        assert_eq!(3, txn.version());
         txn.commit()?;
 
         Ok(())
     }
 
     #[test]
-    fn test_begin_with_mode_readonly() -> Result<()> {
+    fn test_begin_read_only() -> Result<()> {
         let mvcc = setup();
-        let txn = mvcc.begin_with_mode(Mode::ReadOnly)?;
-        assert_eq!(1, txn.id());
-        assert_eq!(Mode::ReadOnly, txn.mode());
+        let txn = mvcc.begin_read_only()?;
+        assert_eq!(txn.version(), 1);
+        assert!(txn.read_only());
         txn.commit()?;
         Ok(())
     }
 
     #[test]
-    fn test_begin_with_mode_readwrite() -> Result<()> {
-        let mvcc = setup();
-        let txn = mvcc.begin_with_mode(Mode::ReadWrite)?;
-        assert_eq!(1, txn.id());
-        assert_eq!(Mode::ReadWrite, txn.mode());
-        txn.commit()?;
-        Ok(())
-    }
-
-    #[test]
-    fn test_begin_with_mode_snapshot() -> Result<()> {
+    fn test_begin_as_of() -> Result<()> {
         let mvcc = setup();
 
-        // Write a couple of versions for a key
-        let mut txn = mvcc.begin_with_mode(Mode::ReadWrite)?;
-        txn.set(b"key", vec![0x01])?;
-        txn.commit()?;
-        let mut txn = mvcc.begin_with_mode(Mode::ReadWrite)?;
-        txn.set(b"key", vec![0x02])?;
+        // Start a concurrent transaction that should be invisible.
+        let mut t1 = mvcc.begin()?;
+        t1.set(b"other", vec![1])?;
+
+        // Write a couple of versions for a key. Commit the concurrent one in between.
+        let mut t2 = mvcc.begin()?;
+        t2.set(b"key", vec![2])?;
+        t2.commit()?;
+
+        let mut t3 = mvcc.begin()?;
+        t3.set(b"key", vec![3])?;
+        t3.commit()?;
+
+        t1.commit()?;
+
+        let mut t4 = mvcc.begin()?;
+        t4.set(b"key", vec![4])?;
+        t4.commit()?;
+
+        // Check that we can start a snapshot as of version 3. It should see
+        // key=2 and other=None (because it hadn't committed yet).
+        let txn = mvcc.begin_as_of(3)?;
+        assert_eq!(txn.version(), 3);
+        assert!(txn.read_only());
+        assert_eq!(txn.get(b"key")?, Some(vec![2]));
+        assert_eq!(txn.get(b"other")?, None);
         txn.commit()?;
 
-        // Check that we can start a snapshot in version 1
-        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 1 })?;
-        assert_eq!(3, txn.id());
-        assert_eq!(Mode::Snapshot { version: 1 }, txn.mode());
-        assert_eq!(Some(vec![0x01]), txn.get(b"key")?);
-        txn.commit()?;
-
-        // Check that we can start a snapshot in a past snapshot transaction
-        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 3 })?;
-        assert_eq!(4, txn.id());
-        assert_eq!(Mode::Snapshot { version: 3 }, txn.mode());
-        assert_eq!(Some(vec![0x02]), txn.get(b"key")?);
-        txn.commit()?;
-
-        // Check that the current transaction ID is valid as a snapshot version
-        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 5 })?;
-        assert_eq!(5, txn.id());
-        assert_eq!(Mode::Snapshot { version: 5 }, txn.mode());
+        // A snapshot as of version 4 should see key=3 and Other=2.
+        let txn = mvcc.begin_as_of(4)?;
+        assert_eq!(txn.version(), 4);
+        assert!(txn.read_only());
+        assert_eq!(txn.get(b"key")?, Some(vec![3]));
+        assert_eq!(txn.get(b"other")?, Some(vec![1]));
         txn.commit()?;
 
         // Check that any future transaction IDs are invalid
         assert_eq!(
-            mvcc.begin_with_mode(Mode::Snapshot { version: 9 }).err(),
-            Some(Error::Value("Snapshot not found for version 9".into()))
+            mvcc.begin_as_of(9).err(),
+            Some(Error::Value("Version 9 does not exist".into()))
         );
-
-        // Check that concurrent transactions are hidden from snapshots of snapshot transactions.
-        // This is because any transaction, including a snapshot transaction, allocates a new
-        // transaction ID, and we need to make sure concurrent transaction at the time the
-        // transaction began are hidden from future snapshot transactions.
-        let mut txn_active = mvcc.begin()?;
-        let txn_snapshot = mvcc.begin_with_mode(Mode::Snapshot { version: 1 })?;
-        assert_eq!(7, txn_active.id());
-        assert_eq!(8, txn_snapshot.id());
-        txn_active.set(b"key", vec![0x07])?;
-        assert_eq!(Some(vec![0x01]), txn_snapshot.get(b"key")?);
-        txn_active.commit()?;
-        txn_snapshot.commit()?;
-
-        let txn = mvcc.begin_with_mode(Mode::Snapshot { version: 8 })?;
-        assert_eq!(9, txn.id());
-        assert_eq!(Some(vec![0x02]), txn.get(b"key")?);
-        txn.commit()?;
 
         Ok(())
     }
@@ -644,8 +675,8 @@ pub mod tests {
         let state = t3.state();
         std::mem::drop(t3);
         let tr = mvcc.resume(state.clone())?;
-        assert_eq!(3, tr.id());
-        assert_eq!(Mode::ReadWrite, tr.mode());
+        assert_eq!(3, tr.version());
+        assert!(!tr.read_only());
 
         assert_eq!(Some(b"t1".to_vec()), tr.get(b"a")?);
         assert_eq!(Some(b"t3".to_vec()), tr.get(b"b")?);
@@ -664,7 +695,7 @@ pub mod tests {
         // Resuming an inactive transaction should error.
         assert_eq!(
             mvcc.resume(state).err(),
-            Some(Error::Internal("No active transaction with ID 3".into()))
+            Some(Error::Internal("No active transaction at version 3".into()))
         );
 
         let t = mvcc.begin()?;
@@ -674,15 +705,15 @@ pub mod tests {
         t.rollback()?;
 
         // It should also be possible to start a snapshot transaction and resume it.
-        let ts = mvcc.begin_with_mode(Mode::Snapshot { version: 1 })?;
-        assert_eq!(7, ts.id());
+        let ts = mvcc.begin_as_of(2)?;
+        assert_eq!(2, ts.version());
         assert_eq!(Some(b"t1".to_vec()), ts.get(b"a")?);
 
         let state = ts.state();
         std::mem::drop(ts);
         let ts = mvcc.resume(state)?;
-        assert_eq!(7, ts.id());
-        assert_eq!(Mode::Snapshot { version: 1 }, ts.mode());
+        assert_eq!(2, ts.version());
+        assert!(ts.read_only());
         assert_eq!(Some(b"t1".to_vec()), ts.get(b"a")?);
         ts.commit()?;
 
@@ -804,7 +835,7 @@ pub mod tests {
         txn.set(b"c", vec![0x03])?;
         txn.commit()?;
 
-        let tr = mvcc.begin_with_mode(Mode::Snapshot { version: 2 })?;
+        let tr = mvcc.begin_as_of(3)?;
         assert_eq!(Some(vec![0x01]), tr.get(b"a")?);
         assert_eq!(Some(vec![0x02]), tr.get(b"b")?);
         assert_eq!(None, tr.get(b"c")?);
@@ -1184,7 +1215,7 @@ pub mod tests {
         assert_eq!(m.get_unversioned(b"foo")?, Some(b"baz".to_vec()));
 
         // The versioned key should remain unaffected.
-        let txn = m.begin_with_mode(Mode::ReadOnly)?;
+        let txn = m.begin_read_only()?;
         assert_eq!(txn.get(b"foo")?, Some(b"bar".to_vec()));
 
         Ok(())

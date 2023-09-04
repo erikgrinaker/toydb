@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::server::{Request, Response};
-use crate::sql::engine::{Mode, Status};
+use crate::sql::engine::Status;
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::Table;
 
@@ -30,7 +30,7 @@ const WITH_TXN_RETRIES: u8 = 8;
 #[derive(Clone)]
 pub struct Client {
     conn: Arc<Mutex<Connection>>,
-    txn: Cell<Option<(u64, Mode)>>,
+    txn: Cell<Option<(u64, bool)>>,
 }
 
 impl Client {
@@ -87,7 +87,7 @@ impl Client {
             resultset = ResultSet::Query { columns, rows: Box::new(rows.into_iter().map(Ok)) }
         };
         match &resultset {
-            ResultSet::Begin { id, mode } => self.txn.set(Some((*id, *mode))),
+            ResultSet::Begin { version, read_only } => self.txn.set(Some((*version, *read_only))),
             ResultSet::Commit { .. } => self.txn.set(None),
             ResultSet::Rollback { .. } => self.txn.set(None),
             _ => {}
@@ -119,8 +119,8 @@ impl Client {
         }
     }
 
-    /// Returns the transaction status of the client
-    pub fn txn(&self) -> Option<(u64, Mode)> {
+    /// Returns the version and read-only state of the txn
+    pub fn txn(&self) -> Option<(u64, bool)> {
         self.txn.get()
     }
 

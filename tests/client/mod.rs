@@ -4,7 +4,7 @@ use super::{assert_row, assert_rows, setup};
 
 use toydb::error::{Error, Result};
 use toydb::raft;
-use toydb::sql::engine::{Mode, Status};
+use toydb::sql::engine::Status;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Value};
@@ -129,7 +129,7 @@ async fn status() -> Result<()> {
                 commit_index: 26,
                 apply_index: 26,
                 storage: "hybrid".into(),
-                storage_size: 3739,
+                storage_size: 3462,
             },
             mvcc: mvcc::Status { txns: 1, txns_active: 0, storage: "memory".into() },
         }
@@ -228,10 +228,11 @@ async fn execute_txn() -> Result<()> {
     assert_eq!(c.txn(), None);
 
     // Committing a change in a txn should work
-    assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { id: 2, mode: Mode::ReadWrite });
-    assert_eq!(c.txn(), Some((2, Mode::ReadWrite)));
+    assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { version: 2, read_only: false });
+    assert_eq!(c.txn(), Some((2, false)));
     c.execute("INSERT INTO genres VALUES (4, 'Drama')").await?;
-    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { id: 2 });
+    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { version: 2 });
+    assert_eq!(c.txn(), None);
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 4").await?,
         vec![Value::Integer(4), Value::String("Drama".into())],
@@ -239,23 +240,23 @@ async fn execute_txn() -> Result<()> {
     assert_eq!(c.txn(), None);
 
     // Rolling back a change in a txn should also work
-    assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { id: 4, mode: Mode::ReadWrite });
-    assert_eq!(c.txn(), Some((4, Mode::ReadWrite)));
+    assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { version: 3, read_only: false });
+    assert_eq!(c.txn(), Some((3, false)));
     c.execute("INSERT INTO genres VALUES (5, 'Musical')").await?;
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 5").await?,
         vec![Value::Integer(5), Value::String("Musical".into())],
     );
-    assert_eq!(c.execute("ROLLBACK").await?, ResultSet::Rollback { id: 4 });
+    assert_eq!(c.execute("ROLLBACK").await?, ResultSet::Rollback { version: 3 });
     assert_rows(c.execute("SELECT * FROM genres WHERE id = 5").await?, Vec::new());
     assert_eq!(c.txn(), None);
 
     // Starting a read-only txn should block writes
     assert_eq!(
         c.execute("BEGIN READ ONLY").await?,
-        ResultSet::Begin { id: 6, mode: Mode::ReadOnly }
+        ResultSet::Begin { version: 4, read_only: true }
     );
-    assert_eq!(c.txn(), Some((6, Mode::ReadOnly)));
+    assert_eq!(c.txn(), Some((4, true)));
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 4").await?,
         vec![Value::Integer(4), Value::String("Drama".into())],
@@ -265,15 +266,15 @@ async fn execute_txn() -> Result<()> {
         c.execute("SELECT * FROM genres WHERE id = 4").await?,
         vec![Value::Integer(4), Value::String("Drama".into())],
     );
-    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { id: 6 });
+    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { version: 4 });
 
     // Starting a time-travel txn should work, it shouldn't see recent changes, and it should
     // block writes
     assert_eq!(
-        c.execute("BEGIN READ ONLY AS OF SYSTEM TIME 1").await?,
-        ResultSet::Begin { id: 7, mode: Mode::Snapshot { version: 1 } }
+        c.execute("BEGIN READ ONLY AS OF SYSTEM TIME 2").await?,
+        ResultSet::Begin { version: 2, read_only: true },
     );
-    assert_eq!(c.txn(), Some((7, Mode::Snapshot { version: 1 })));
+    assert_eq!(c.txn(), Some((2, true)));
     assert_rows(
         c.execute("SELECT * FROM genres").await?,
         vec![
@@ -283,18 +284,18 @@ async fn execute_txn() -> Result<()> {
         ],
     );
     assert_eq!(c.execute("INSERT INTO genres VALUES (5, 'Musical')").await, Err(Error::ReadOnly));
-    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { id: 7 });
+    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { version: 2 });
 
     // A txn should still be usable after an error occurs
-    assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { id: 8, mode: Mode::ReadWrite });
+    assert_eq!(c.execute("BEGIN").await?, ResultSet::Begin { version: 4, read_only: false });
     c.execute("INSERT INTO genres VALUES (5, 'Horror')").await?;
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (5, 'Musical')").await,
         Err(Error::Value("Primary key 5 already exists for table genres".into()))
     );
-    assert_eq!(c.txn(), Some((8, Mode::ReadWrite)));
+    assert_eq!(c.txn(), Some((4, false)));
     c.execute("INSERT INTO genres VALUES (6, 'Western')").await?;
-    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { id: 8 });
+    assert_eq!(c.execute("COMMIT").await?, ResultSet::Commit { version: 4 });
     assert_rows(
         c.execute("SELECT * FROM genres").await?,
         vec![
@@ -317,8 +318,8 @@ async fn execute_txn_concurrent() -> Result<()> {
     let b = Client::new("127.0.0.1:9605").await?;
 
     // Concurrent updates should throw a serialization failure on conflict.
-    assert_eq!(a.execute("BEGIN").await?, ResultSet::Begin { id: 2, mode: Mode::ReadWrite });
-    assert_eq!(b.execute("BEGIN").await?, ResultSet::Begin { id: 3, mode: Mode::ReadWrite });
+    assert_eq!(a.execute("BEGIN").await?, ResultSet::Begin { version: 2, read_only: false });
+    assert_eq!(b.execute("BEGIN").await?, ResultSet::Begin { version: 3, read_only: false });
 
     assert_row(
         a.execute("SELECT * FROM genres WHERE id = 1").await?,
@@ -338,8 +339,8 @@ async fn execute_txn_concurrent() -> Result<()> {
         Err(Error::Serialization)
     );
 
-    assert_eq!(a.execute("COMMIT").await, Ok(ResultSet::Commit { id: 2 }));
-    assert_eq!(b.execute("ROLLBACK").await, Ok(ResultSet::Rollback { id: 3 }));
+    assert_eq!(a.execute("COMMIT").await, Ok(ResultSet::Commit { version: 2 }));
+    assert_eq!(b.execute("ROLLBACK").await, Ok(ResultSet::Rollback { version: 3 }));
 
     assert_row(
         a.execute("SELECT * FROM genres WHERE id = 1").await?,

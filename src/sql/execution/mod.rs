@@ -12,7 +12,7 @@ use query::{Filter, Limit, Offset, Order, Projection};
 use schema::{CreateTable, DropTable};
 use source::{IndexLookup, KeyLookup, Nothing, Scan};
 
-use super::engine::{Mode, Transaction};
+use super::engine::Transaction;
 use super::plan::Node;
 use super::types::{Columns, Row, Rows, Value};
 use crate::error::{Error, Result};
@@ -77,16 +77,16 @@ impl<T: Transaction + 'static> dyn Executor<T> {
 pub enum ResultSet {
     // Transaction started
     Begin {
-        id: u64,
-        mode: Mode,
+        version: u64,
+        read_only: bool,
     },
     // Transaction committed
     Commit {
-        id: u64,
+        version: u64,
     },
     // Transaction rolled back
     Rollback {
-        id: u64,
+        version: u64,
     },
     // Rows created
     Create {

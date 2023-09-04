@@ -1,6 +1,6 @@
 //! Mutation tests, using an in-memory database against golden files in tests/sql/mutation/
 use toydb::error::Result;
-use toydb::sql::engine::{Engine as _, Mode, Transaction as _};
+use toydb::sql::engine::{Engine as _, Transaction as _};
 use toydb::sql::schema::Catalog as _;
 
 use goldenfile::Mint;
@@ -30,7 +30,7 @@ macro_rules! test_mutation {
                 };
 
                 write!(f, "Storage:")?;
-                let txn = engine.begin(Mode::ReadWrite)?;
+                let txn = engine.begin()?;
                 for table in txn.scan_tables()? {
                     write!(f, "\n{}\n", table)?;
                     for row in txn.scan(&table.name, None)? {

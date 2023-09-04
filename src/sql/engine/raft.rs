@@ -1,6 +1,6 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
-use super::{Engine as _, IndexScan, Mode, Scan, Transaction as _};
+use super::{Engine as _, IndexScan, Scan, Transaction as _};
 use crate::error::{Error, Result};
 use crate::raft;
 use crate::storage::{self, mvcc::TransactionState};
@@ -13,8 +13,8 @@ use std::collections::HashSet;
 /// TODO: use Cows for these.
 #[derive(Clone, Serialize, Deserialize)]
 enum Mutation {
-    /// Begins a transaction in the given mode
-    Begin(Mode),
+    /// Begins a transaction
+    Begin { read_only: bool, as_of: Option<u64> },
     /// Commits the given transaction
     Commit(TransactionState),
     /// Rolls back the given transaction
@@ -104,8 +104,16 @@ impl Raft {
 impl super::Engine for Raft {
     type Transaction = Transaction;
 
-    fn begin(&self, mode: Mode) -> Result<Self::Transaction> {
-        Transaction::begin(self.client.clone(), mode)
+    fn begin(&self) -> Result<Self::Transaction> {
+        Transaction::begin(self.client.clone(), false, None)
+    }
+
+    fn begin_read_only(&self) -> Result<Self::Transaction> {
+        Transaction::begin(self.client.clone(), true, None)
+    }
+
+    fn begin_as_of(&self, version: u64) -> Result<Self::Transaction> {
+        Transaction::begin(self.client.clone(), true, Some(version))
     }
 }
 
@@ -120,9 +128,9 @@ pub struct Transaction {
 
 impl Transaction {
     /// Starts a transaction in the given mode
-    fn begin(client: raft::Client, mode: Mode) -> Result<Self> {
+    fn begin(client: raft::Client, read_only: bool, as_of: Option<u64>) -> Result<Self> {
         let state = Raft::deserialize(&futures::executor::block_on(
-            client.mutate(Raft::serialize(&Mutation::Begin(mode))?),
+            client.mutate(Raft::serialize(&Mutation::Begin { read_only, as_of })?),
         )?)?;
         Ok(Self { client, state })
     }
@@ -139,12 +147,12 @@ impl Transaction {
 }
 
 impl super::Transaction for Transaction {
-    fn id(&self) -> u64 {
-        self.state.id
+    fn version(&self) -> u64 {
+        self.state.version
     }
 
-    fn mode(&self) -> Mode {
-        self.state.mode
+    fn read_only(&self) -> bool {
+        self.state.read_only
     }
 
     fn commit(self) -> Result<()> {
@@ -276,8 +284,14 @@ impl<E: storage::Engine> State<E> {
     /// Applies a state machine mutation
     fn apply(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
         match mutation {
-            Mutation::Begin(mode) => {
-                let txn = self.engine.begin(mode)?;
+            Mutation::Begin { read_only, as_of } => {
+                let txn = if !read_only {
+                    self.engine.begin()?
+                } else if let Some(version) = as_of {
+                    self.engine.begin_as_of(version)?
+                } else {
+                    self.engine.begin_read_only()?
+                };
                 Raft::serialize(&txn.state())
             }
             Mutation::Commit(txn) => Raft::serialize(&self.engine.resume(txn)?.commit()?),

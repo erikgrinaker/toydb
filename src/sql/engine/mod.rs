@@ -18,8 +18,14 @@ pub trait Engine: Clone {
     /// The transaction type
     type Transaction: Transaction;
 
-    /// Begins a transaction in the given mode
-    fn begin(&self, mode: Mode) -> Result<Self::Transaction>;
+    /// Begins a read-write transaction.
+    fn begin(&self) -> Result<Self::Transaction>;
+
+    /// Begins a read-only transaction.
+    fn begin_read_only(&self) -> Result<Self::Transaction>;
+
+    /// Begins a read-only transaction as of a historical version.
+    fn begin_as_of(&self, version: u64) -> Result<Self::Transaction>;
 
     /// Begins a session for executing individual statements
     fn session(&self) -> Result<Session<Self>> {
@@ -29,10 +35,11 @@ pub trait Engine: Clone {
 
 /// An SQL transaction
 pub trait Transaction: Catalog {
-    /// The transaction ID
-    fn id(&self) -> u64;
-    /// The transaction mode
-    fn mode(&self) -> Mode;
+    /// The transaction's version
+    fn version(&self) -> u64;
+    /// Whether the transaction is read-only
+    fn read_only(&self) -> bool;
+
     /// Commits the transaction
     fn commit(self) -> Result<()>;
     /// Rolls back the transaction
@@ -72,24 +79,24 @@ impl<E: Engine + 'static> Session<E> {
             ast::Statement::Begin { .. } if self.txn.is_some() => {
                 Err(Error::Value("Already in a transaction".into()))
             }
-            ast::Statement::Begin { readonly: true, version: None } => {
-                let txn = self.engine.begin(Mode::ReadOnly)?;
-                let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
+            ast::Statement::Begin { read_only: true, as_of: None } => {
+                let txn = self.engine.begin_read_only()?;
+                let result = ResultSet::Begin { version: txn.version(), read_only: true };
                 self.txn = Some(txn);
                 Ok(result)
             }
-            ast::Statement::Begin { readonly: true, version: Some(version) } => {
-                let txn = self.engine.begin(Mode::Snapshot { version })?;
-                let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
+            ast::Statement::Begin { read_only: true, as_of: Some(version) } => {
+                let txn = self.engine.begin_as_of(version)?;
+                let result = ResultSet::Begin { version, read_only: true };
                 self.txn = Some(txn);
                 Ok(result)
             }
-            ast::Statement::Begin { readonly: false, version: Some(_) } => {
+            ast::Statement::Begin { read_only: false, as_of: Some(_) } => {
                 Err(Error::Value("Can't start read-write transaction in a given version".into()))
             }
-            ast::Statement::Begin { readonly: false, version: None } => {
-                let txn = self.engine.begin(Mode::ReadWrite)?;
-                let result = ResultSet::Begin { id: txn.id(), mode: txn.mode() };
+            ast::Statement::Begin { read_only: false, as_of: None } => {
+                let txn = self.engine.begin()?;
+                let result = ResultSet::Begin { version: txn.version(), read_only: false };
                 self.txn = Some(txn);
                 Ok(result)
             }
@@ -98,31 +105,31 @@ impl<E: Engine + 'static> Session<E> {
             }
             ast::Statement::Commit => {
                 let txn = self.txn.take().unwrap();
-                let id = txn.id();
+                let version = txn.version();
                 txn.commit()?;
-                Ok(ResultSet::Commit { id })
+                Ok(ResultSet::Commit { version })
             }
             ast::Statement::Rollback => {
                 let txn = self.txn.take().unwrap();
-                let id = txn.id();
+                let version = txn.version();
                 txn.rollback()?;
-                Ok(ResultSet::Rollback { id })
+                Ok(ResultSet::Rollback { version })
             }
-            ast::Statement::Explain(statement) => self.with_txn(Mode::ReadOnly, |txn| {
+            ast::Statement::Explain(statement) => self.read_with_txn(|txn| {
                 Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?.0))
             }),
             statement if self.txn.is_some() => Plan::build(statement, self.txn.as_mut().unwrap())?
                 .optimize(self.txn.as_mut().unwrap())?
                 .execute(self.txn.as_mut().unwrap()),
             statement @ ast::Statement::Select { .. } => {
-                let mut txn = self.engine.begin(Mode::ReadOnly)?;
+                let mut txn = self.engine.begin_read_only()?;
                 let result =
                     Plan::build(statement, &mut txn)?.optimize(&mut txn)?.execute(&mut txn);
                 txn.rollback()?;
                 result
             }
             statement => {
-                let mut txn = self.engine.begin(Mode::ReadWrite)?;
+                let mut txn = self.engine.begin()?;
                 match Plan::build(statement, &mut txn)?.optimize(&mut txn)?.execute(&mut txn) {
                     Ok(result) => {
                         txn.commit()?;
@@ -137,28 +144,23 @@ impl<E: Engine + 'static> Session<E> {
         }
     }
 
-    /// Runs a closure in the session's transaction, or a new transaction if none is active.
-    pub fn with_txn<R, F>(&mut self, mode: Mode, f: F) -> Result<R>
+    /// Runs a read-only closure in the session's transaction, or a new
+    /// transaction if none is active.
+    ///
+    /// TODO: reconsider this
+    pub fn read_with_txn<R, F>(&mut self, f: F) -> Result<R>
     where
         F: FnOnce(&mut E::Transaction) -> Result<R>,
     {
         if let Some(ref mut txn) = self.txn {
-            if !txn.mode().satisfies(&mode) {
-                return Err(Error::Value(
-                    "The operation cannot run in the current transaction".into(),
-                ));
-            }
             return f(txn);
         }
-        let mut txn = self.engine.begin(mode)?;
+        let mut txn = self.engine.begin_read_only()?;
         let result = f(&mut txn);
         txn.rollback()?;
         result
     }
 }
-
-/// The transaction mode
-pub type Mode = crate::storage::mvcc::Mode;
 
 /// A row scan iterator
 pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row>> + Send>;

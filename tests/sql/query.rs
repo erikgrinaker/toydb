@@ -1,7 +1,7 @@
 //! Tests for the SQL query engine. Runs SQL queries against an in-memory database,
 //! and compares the results with golden files stored under tests/sql/query/
 use toydb::error::{Error, Result};
-use toydb::sql::engine::{Engine, Mode, Transaction};
+use toydb::sql::engine::{Engine, Transaction};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::parser::Parser;
 use toydb::sql::plan::Plan;
@@ -76,7 +76,7 @@ macro_rules! test_query {
 
             write!(f, "Query: {}\n\n", $query)?;
 
-            let mut txn = engine.begin(Mode::ReadWrite)?;
+            let mut txn = engine.begin()?;
 
             // First, just try to generate a plan and execute it
             let result = Parser::new($query).parse()

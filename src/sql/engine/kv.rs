@@ -50,8 +50,16 @@ impl<E: storage::Engine> KV<E> {
 impl<E: storage::Engine> super::Engine for KV<E> {
     type Transaction = Transaction<E>;
 
-    fn begin(&self, mode: super::Mode) -> Result<Self::Transaction> {
-        Ok(Self::Transaction::new(self.kv.begin_with_mode(mode)?))
+    fn begin(&self) -> Result<Self::Transaction> {
+        Ok(Self::Transaction::new(self.kv.begin()?))
+    }
+
+    fn begin_read_only(&self) -> Result<Self::Transaction> {
+        Ok(Self::Transaction::new(self.kv.begin_read_only()?))
+    }
+
+    fn begin_as_of(&self, version: u64) -> Result<Self::Transaction> {
+        Ok(Self::Transaction::new(self.kv.begin_as_of(version)?))
     }
 }
 
@@ -109,12 +117,12 @@ impl<E: storage::Engine> Transaction<E> {
 }
 
 impl<E: storage::Engine> super::Transaction for Transaction<E> {
-    fn id(&self) -> u64 {
-        self.txn.id()
+    fn version(&self) -> u64 {
+        self.txn.version()
     }
 
-    fn mode(&self) -> super::Mode {
-        self.txn.mode()
+    fn read_only(&self) -> bool {
+        self.txn.read_only()
     }
 
     fn commit(self) -> Result<()> {

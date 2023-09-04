@@ -9,8 +9,8 @@ use std::mem::replace;
 #[allow(clippy::large_enum_variant)]
 pub enum Statement {
     Begin {
-        readonly: bool,
-        version: Option<u64>,
+        read_only: bool,
+        as_of: Option<u64>,
     },
     Commit,
     Rollback,

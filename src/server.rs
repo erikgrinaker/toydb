@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::raft;
 use crate::sql;
-use crate::sql::engine::{Engine as _, Mode};
+use crate::sql::engine::Engine as _;
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
@@ -155,14 +155,12 @@ impl Session {
         debug!("Processing request {:?}", request);
         let response = match request {
             Request::Execute(query) => Response::Execute(self.sql.execute(&query)?),
-            Request::GetTable(table) => Response::GetTable(
-                self.sql.with_txn(Mode::ReadOnly, |txn| txn.must_read_table(&table))?,
-            ),
-            Request::ListTables => {
-                Response::ListTables(self.sql.with_txn(Mode::ReadOnly, |txn| {
-                    Ok(txn.scan_tables()?.map(|t| t.name).collect())
-                })?)
+            Request::GetTable(table) => {
+                Response::GetTable(self.sql.read_with_txn(|txn| txn.must_read_table(&table))?)
             }
+            Request::ListTables => Response::ListTables(
+                self.sql.read_with_txn(|txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))?,
+            ),
             Request::Status => Response::Status(self.engine.status()?),
         };
         debug!("Returning response {:?}", response);
