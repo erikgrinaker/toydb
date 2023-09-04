@@ -115,7 +115,7 @@ impl<E: Engine> MVCC<E> {
         return Ok(Status {
             storage: engine.to_string(),
             txns: match engine.get(&Key::TxnNext.encode()?)? {
-                Some(ref v) => deserialize(v)?,
+                Some(ref v) => bincode::deserialize(v)?,
                 None => 1,
             } - 1,
             txns_active: engine
@@ -123,16 +123,6 @@ impl<E: Engine> MVCC<E> {
                 .try_fold(0, |count, r| r.map(|_| count + 1))?,
         });
     }
-}
-
-/// Serializes MVCC metadata.
-fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
-    Ok(bincode::serialize(value)?)
-}
-
-/// Deserializes MVCC metadata.
-fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
-    Ok(bincode::deserialize(bytes)?)
 }
 
 /// An MVCC transaction.
@@ -153,11 +143,11 @@ impl<E: Engine> Transaction<E> {
         let mut session = engine.lock()?;
 
         let id = match session.get(&Key::TxnNext.encode()?)? {
-            Some(ref v) => deserialize(v)?,
+            Some(ref v) => bincode::deserialize(v)?,
             None => 1,
         };
-        session.set(&Key::TxnNext.encode()?, serialize(&(id + 1))?)?;
-        session.set(&Key::TxnActive(id).encode()?, serialize(&mode)?)?;
+        session.set(&Key::TxnNext.encode()?, bincode::serialize(&(id + 1))?)?;
+        session.set(&Key::TxnActive(id).encode()?, bincode::serialize(&mode)?)?;
 
         // We always take a new snapshot, even for snapshot transactions, because all transactions
         // increment the transaction ID and we need to properly record currently active transactions
@@ -175,7 +165,7 @@ impl<E: Engine> Transaction<E> {
     fn resume(engine: Arc<Mutex<E>>, id: u64) -> Result<Self> {
         let mut session = engine.lock()?;
         let mode = match session.get(&Key::TxnActive(id).encode()?)? {
-            Some(v) => deserialize(&v)?,
+            Some(v) => bincode::deserialize(&v)?,
             None => return Err(Error::Value(format!("No active transaction {}", id))),
         };
         let snapshot = match &mode {
@@ -242,7 +232,7 @@ impl<E: Engine> Transaction<E> {
             match Key::decode(&k)? {
                 Key::Record(_, version) => {
                     if self.snapshot.is_visible(version) {
-                        return deserialize(&v);
+                        return Ok(bincode::deserialize(&v)?);
                     }
                 }
                 k => return Err(Error::Internal(format!("Expected Txn::Record, got {:?}", k))),
@@ -329,7 +319,7 @@ impl<E: Engine> Transaction<E> {
         let key = Key::Record(key.into(), self.id).encode()?;
         let update = Key::TxnUpdate(self.id, (&key).into()).encode()?;
         session.set(&update, vec![])?;
-        session.set(&key, serialize(&value)?)
+        session.set(&key, bincode::serialize(&value)?)
     }
 }
 
@@ -391,14 +381,15 @@ impl Snapshot {
             };
         }
         std::mem::drop(scan);
-        session.set(&Key::TxnSnapshot(version).encode()?, serialize(&snapshot.invisible)?)?;
+        session
+            .set(&Key::TxnSnapshot(version).encode()?, bincode::serialize(&snapshot.invisible)?)?;
         Ok(snapshot)
     }
 
     /// Restores an existing snapshot from `Key::TxnSnapshot(version)`, or errors if not found.
     fn restore<E: Engine>(session: &mut MutexGuard<E>, version: u64) -> Result<Self> {
         match session.get(&Key::TxnSnapshot(version).encode()?)? {
-            Some(ref v) => Ok(Self { version, invisible: deserialize(v)? }),
+            Some(ref v) => Ok(Self { version, invisible: bincode::deserialize(v)? }),
             None => Err(Error::Value(format!("Snapshot not found for version {}", version))),
         }
     }
@@ -451,7 +442,7 @@ impl<'a> Scan<'a> {
                 None => true,
             } {
                 // Only return non-deleted items.
-                if let Some(value) = deserialize(&value)? {
+                if let Some(value) = bincode::deserialize(&value)? {
                     return Ok(Some((key, value)));
                 }
             }
@@ -470,7 +461,7 @@ impl<'a> Scan<'a> {
             } {
                 self.next_back_seen = Some(key.clone());
                 // Only return non-deleted items.
-                if let Some(value) = deserialize(&value)? {
+                if let Some(value) = bincode::deserialize(&value)? {
                     return Ok(Some((key, value)));
                 }
             }
