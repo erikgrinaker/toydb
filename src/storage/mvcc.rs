@@ -33,8 +33,10 @@ enum Key<'a> {
         Cow<'a, [u8]>,
         u64,
     ),
-    /// Arbitrary unversioned metadata.
-    Metadata(
+    /// Unversioned non-transactional key/value pairs. These exist separately
+    /// from versioned keys, i.e. the unversioned key "foo" is entirely
+    /// independent of the versioned key "foo@7".
+    Unversioned(
         #[serde(with = "serde_bytes")]
         #[serde(borrow)]
         Cow<'a, [u8]>,
@@ -93,16 +95,14 @@ impl<E: Engine> MVCC<E> {
         Transaction::resume(self.engine.clone(), id)
     }
 
-    /// Fetches an unversioned metadata value
-    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let mut session = self.engine.lock()?;
-        session.get(&Key::Metadata(key.into()).encode()?)
+    /// Fetches the value of an unversioned key.
+    pub fn get_unversioned(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        self.engine.lock()?.get(&Key::Unversioned(key.into()).encode()?)
     }
 
-    /// Sets an unversioned metadata value
-    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        let mut session = self.engine.lock()?;
-        session.set(&Key::Metadata(key.into()).encode()?, value)
+    /// Sets the value of an unversioned key.
+    pub fn set_unversioned(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
+        self.engine.lock()?.set(&Key::Unversioned(key.into()).encode()?, value)
     }
 
     /// Returns engine status
@@ -1136,16 +1136,30 @@ pub mod tests {
     }*/
 
     #[test]
-    fn test_metadata() -> Result<()> {
-        let mvcc = setup();
+    /// Tests unversioned key/value pairs, via set/get_unversioned().
+    fn test_unversioned() -> Result<()> {
+        let m = setup();
 
-        mvcc.set_metadata(b"foo", b"bar".to_vec())?;
-        assert_eq!(Some(b"bar".to_vec()), mvcc.get_metadata(b"foo")?);
+        // Unversioned keys should not interact with versioned keys.
+        let mut txn = m.begin()?;
+        txn.set(b"foo", b"bar".to_vec())?;
+        txn.commit()?;
 
-        assert_eq!(None, mvcc.get_metadata(b"x")?);
+        // The unversioned key should return None.
+        assert_eq!(m.get_unversioned(b"foo")?, None);
 
-        mvcc.set_metadata(b"foo", b"baz".to_vec())?;
-        assert_eq!(Some(b"baz".to_vec()), mvcc.get_metadata(b"foo")?);
+        // Setting and then fetching the unversioned key should return its value.
+        m.set_unversioned(b"foo", b"bar".to_vec())?;
+        assert_eq!(m.get_unversioned(b"foo")?, Some(b"bar".to_vec()));
+
+        // Replacing it should return the new value.
+        m.set_unversioned(b"foo", b"baz".to_vec())?;
+        assert_eq!(m.get_unversioned(b"foo")?, Some(b"baz".to_vec()));
+
+        // The versioned key should remain unaffected.
+        let txn = m.begin_with_mode(Mode::ReadOnly)?;
+        assert_eq!(txn.get(b"foo")?, Some(b"bar".to_vec()));
+
         Ok(())
     }
 }

@@ -30,12 +30,12 @@ impl<E: storage::Engine> KV<E> {
 
     /// Fetches an unversioned metadata value
     pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.kv.get_metadata(key)
+        self.kv.get_unversioned(key)
     }
 
     /// Sets an unversioned metadata value
     pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.kv.set_metadata(key, value)
+        self.kv.set_unversioned(key, value)
     }
 }
 
