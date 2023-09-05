@@ -8,20 +8,25 @@ use std::iter::Peekable;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+/// An MVCC version represents a logical timestamp. The latest version
+/// is incremented when beginning each read-write transaction.
+type Version = u64;
+
 /// MVCC keys, using the KeyCode encoding which preserves the ordering and
 /// grouping of keys. Cow byte slices allow encoding borrowed values and
 /// decoding into owned values.
 #[derive(Debug, Deserialize, Serialize)]
 enum Key<'a> {
-    /// The next available transaction version.
-    TxnNext,
+    /// The next available version.
+    NextVersion,
     /// Active (uncommitted) transactions by version.
-    TxnActive(u64),
-    /// Active set snapshots by version.
-    TxnActiveSnapshot(u64),
+    TxnActive(Version),
+    /// A snapshot of the active set at each version. Only written for
+    /// versions where the active set is non-empty (excluding itself).
+    TxnActiveSnapshot(Version),
     /// Update marker for a version and key, used for rollback.
     TxnUpdate(
-        u64,
+        Version,
         #[serde(with = "serde_bytes")]
         #[serde(borrow)]
         Cow<'a, [u8]>,
@@ -31,7 +36,7 @@ enum Key<'a> {
         #[serde(with = "serde_bytes")]
         #[serde(borrow)]
         Cow<'a, [u8]>,
-        u64,
+        Version,
     ),
     /// Unversioned non-transactional key/value pairs. These exist separately
     /// from versioned keys, i.e. the unversioned key "foo" is entirely
@@ -90,7 +95,7 @@ impl<E: Engine> MVCC<E> {
     }
 
     /// Begins a new read-only transaction as of the given version.
-    pub fn begin_as_of(&self, version: u64) -> Result<Transaction<E>> {
+    pub fn begin_as_of(&self, version: Version) -> Result<Transaction<E>> {
         Transaction::begin_read_only(self.engine.clone(), Some(version))
     }
 
@@ -118,7 +123,7 @@ impl<E: Engine> MVCC<E> {
         let mut engine = self.engine.lock()?;
         return Ok(Status {
             storage: engine.to_string(),
-            txns: match engine.get(&Key::TxnNext.encode()?)? {
+            txns: match engine.get(&Key::NextVersion.encode()?)? {
                 Some(ref v) => bincode::deserialize(v)?,
                 None => 1,
             } - 1,
@@ -136,13 +141,13 @@ pub struct Transaction<E: Engine> {
     /// The version this transaction is running at. Only one read-write
     /// transaction can run at a given version, since this identifies its
     /// writes.
-    version: u64,
+    version: Version,
     /// If true, the transaction is read only.
     read_only: bool,
     /// The set of concurrent active (uncommitted) transactions. Their writes
     /// should be invisible to this transaction even if they're writing at a
     /// lower version, since they're not committed yet.
-    active: HashSet<u64>,
+    active: HashSet<Version>,
 }
 
 /// A serializable representation of a Transaction's state. It can be exported
@@ -165,11 +170,11 @@ impl<E: Engine> Transaction<E> {
         let mut session = engine.lock()?;
 
         // Allocate a new version to write at.
-        let version = match session.get(&Key::TxnNext.encode()?)? {
+        let version = match session.get(&Key::NextVersion.encode()?)? {
             Some(ref v) => bincode::deserialize(v)?,
             None => 1,
         };
-        session.set(&Key::TxnNext.encode()?, bincode::serialize(&(version + 1))?)?;
+        session.set(&Key::NextVersion.encode()?, bincode::serialize(&(version + 1))?)?;
 
         // Fetch the current set of active transactions, persist it for
         // time-travel queries if non-empty, then add this txn to it.
@@ -187,11 +192,11 @@ impl<E: Engine> Transaction<E> {
     /// state as of the beginning of that version (ignoring writes at that
     /// version). In other words, it sees the same state as the read-write
     /// transaction at that version saw when it began.
-    fn begin_read_only(engine: Arc<Mutex<E>>, as_of: Option<u64>) -> Result<Self> {
+    fn begin_read_only(engine: Arc<Mutex<E>>, as_of: Option<Version>) -> Result<Self> {
         let mut session = engine.lock()?;
 
         // Fetch the latest version.
-        let mut version = match session.get(&Key::TxnNext.encode()?)? {
+        let mut version = match session.get(&Key::NextVersion.encode()?)? {
             Some(ref v) => bincode::deserialize(v)?,
             None => 1,
         };
@@ -228,7 +233,7 @@ impl<E: Engine> Transaction<E> {
     }
 
     /// Scans the set of currently active transactions.
-    fn scan_active(session: &mut MutexGuard<E>) -> Result<HashSet<u64>> {
+    fn scan_active(session: &mut MutexGuard<E>) -> Result<HashSet<Version>> {
         let mut active = HashSet::new();
         // TODO: Add Engine.scan_prefix() trait method.
         let mut scan =
@@ -243,7 +248,7 @@ impl<E: Engine> Transaction<E> {
     }
 
     /// Returns the version the transaction is running at.
-    pub fn version(&self) -> u64 {
+    pub fn version(&self) -> Version {
         self.version
     }
 
@@ -295,7 +300,7 @@ impl<E: Engine> Transaction<E> {
     }
 
     /// Checks whether the given version is visible to this transaction.
-    fn is_visible(&self, version: u64) -> bool {
+    fn is_visible(&self, version: Version) -> bool {
         if self.active.get(&version).is_some() {
             false
         } else if self.read_only {
@@ -335,13 +340,13 @@ impl<E: Engine> Transaction<E> {
     /// Scans a key range.
     pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<ScanIterator> {
         let start = match range.start_bound() {
-            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), std::u64::MAX).encode()?),
+            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), u64::MAX).encode()?),
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), 0).encode()?),
             Bound::Unbounded => Bound::Included(Key::Version(vec![].into(), 0).encode()?),
         };
         let end = match range.end_bound() {
             Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), 0).encode()?),
-            Bound::Included(k) => Bound::Included(Key::Version(k.into(), std::u64::MAX).encode()?),
+            Bound::Included(k) => Bound::Included(Key::Version(k.into(), u64::MAX).encode()?),
             Bound::Unbounded => Bound::Unbounded,
         };
         // TODO: For now, collect results from the engine to not have to deal with lifetimes.
@@ -391,7 +396,7 @@ impl<E: Engine> Transaction<E> {
         let mut scan = session
             .scan(
                 Key::Version(key.into(), min).encode()?
-                    ..=Key::Version(key.into(), std::u64::MAX).encode()?,
+                    ..=Key::Version(key.into(), u64::MAX).encode()?,
             )
             .rev();
         while let Some((k, _)) = scan.next().transpose()? {
@@ -414,42 +419,6 @@ impl<E: Engine> Transaction<E> {
     }
 }
 
-/// An MVCC transaction mode.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Mode {
-    /// A read-write transaction.
-    ReadWrite,
-    /// A read-only transaction.
-    ReadOnly,
-    /// A read-only transaction running in a snapshot of a given version.
-    ///
-    /// The version must refer to a committed transaction ID. Any changes visible to the original
-    /// transaction will be visible in the snapshot (i.e. transactions that had not committed before
-    /// the snapshot transaction started will not be visible, even though they have a lower version).
-    Snapshot { version: u64 },
-}
-
-impl Mode {
-    /// Checks whether the transaction mode can mutate data.
-    pub fn mutable(&self) -> bool {
-        match self {
-            Self::ReadWrite => true,
-            Self::ReadOnly => false,
-            Self::Snapshot { .. } => false,
-        }
-    }
-
-    /// Checks whether a mode satisfies a mode (i.e. ReadWrite satisfies ReadOnly).
-    pub fn satisfies(&self, other: &Mode) -> bool {
-        match (self, other) {
-            (Mode::ReadWrite, Mode::ReadOnly) => true,
-            (Mode::Snapshot { .. }, Mode::ReadOnly) => true,
-            (_, _) if self == other => true,
-            (_, _) => false,
-        }
-    }
-}
-
 pub type ScanIterator<'a> =
     Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + Send + 'a>;
 
@@ -466,18 +435,18 @@ impl<'a> Scan<'a> {
     /// Creates a new scan.
     fn new(
         mut scan: ScanIterator<'a>,
-        txn_version: u64,
+        txn_version: Version,
         read_only: bool,
-        snapshot: HashSet<u64>,
+        active: HashSet<Version>,
     ) -> Self {
         /// Checks whether the given version is visible to this transaction.
         fn is_visible(
-            txn_version: u64,
+            txn_version: Version,
             read_only: bool,
-            snapshot: &HashSet<u64>,
-            version: u64,
+            active: &HashSet<Version>,
+            version: Version,
         ) -> bool {
-            if snapshot.get(&version).is_some() {
+            if active.get(&version).is_some() {
                 false
             } else if read_only {
                 version < txn_version
@@ -494,7 +463,7 @@ impl<'a> Scan<'a> {
         scan = Box::new(scan.filter_map(move |r| {
             r.and_then(|(k, v)| match Key::decode(&k)? {
                 Key::Version(_, version)
-                    if !is_visible(txn_version, read_only, &snapshot, version) =>
+                    if !is_visible(txn_version, read_only, &active, version) =>
                 {
                     Ok(None)
                 }
@@ -637,7 +606,7 @@ pub mod tests {
         assert_eq!(txn.get(b"other")?, Some(vec![1]));
         txn.commit()?;
 
-        // Check that any future transaction IDs are invalid
+        // Check that any future versions are invalid.
         assert_eq!(
             mvcc.begin_as_of(9).err(),
             Some(Error::Value("Version 9 does not exist".into()))
