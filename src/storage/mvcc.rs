@@ -58,6 +58,28 @@ impl<'a> Key<'a> {
     }
 }
 
+/// MVCC key prefixes, for prefix scans. These must match the keys above,
+/// including the enum variant index.
+#[derive(Debug, Deserialize, Serialize)]
+enum KeyPrefix<'a> {
+    NextVersion,
+    TxnActive,
+    TxnActiveSnapshot,
+    TxnUpdate(Version),
+    Version(
+        #[serde(with = "serde_bytes")]
+        #[serde(borrow)]
+        Cow<'a, [u8]>,
+    ),
+    Unversioned,
+}
+
+impl<'a> KeyPrefix<'a> {
+    fn encode(&self) -> Result<Vec<u8>> {
+        keycode::serialize(&self)
+    }
+}
+
 /// MVCC status
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
@@ -128,7 +150,7 @@ impl<E: Engine> MVCC<E> {
                 None => 1,
             } - 1,
             txns_active: engine
-                .scan(Key::TxnActive(0).encode()?..Key::TxnActive(std::u64::MAX).encode()?)
+                .scan_prefix(&KeyPrefix::TxnActive.encode()?)
                 .try_fold(0, |count, r| r.map(|_| count + 1))?,
         });
     }
@@ -235,9 +257,7 @@ impl<E: Engine> Transaction<E> {
     /// Scans the set of currently active transactions.
     fn scan_active(session: &mut MutexGuard<E>) -> Result<HashSet<Version>> {
         let mut active = HashSet::new();
-        // TODO: Add Engine.scan_prefix() trait method.
-        let mut scan =
-            session.scan(Key::TxnActive(0).encode()?..=Key::TxnActive(u64::MAX).encode()?);
+        let mut scan = session.scan_prefix(&KeyPrefix::TxnActive.encode()?);
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnActive(version) => active.insert(version),
@@ -281,10 +301,7 @@ impl<E: Engine> Transaction<E> {
         }
         let mut session = self.engine.lock()?;
         let mut rollback = Vec::new();
-        let mut scan = session.scan(
-            Key::TxnUpdate(self.version, vec![].into()).encode()?
-                ..Key::TxnUpdate(self.version + 1, vec![].into()).encode()?,
-        );
+        let mut scan = session.scan_prefix(&KeyPrefix::TxnUpdate(self.version).encode()?);
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnUpdate(_, updated_key) => rollback.push(updated_key.into_owned()),
@@ -356,26 +373,15 @@ impl<E: Engine> Transaction<E> {
 
     /// Scans keys under a given prefix.
     pub fn scan_prefix(&self, prefix: &[u8]) -> Result<ScanIterator> {
-        if prefix.is_empty() {
-            return Err(Error::Internal("Scan prefix cannot be empty".into()));
-        }
-        let start = prefix.to_vec();
-        let mut end = start.clone();
-        for i in (0..end.len()).rev() {
-            match end[i] {
-                // If all 0xff we could in principle use Range::Unbounded, but it won't happen
-                0xff if i == 0 => return Err(Error::Internal("Invalid prefix scan range".into())),
-                0xff => {
-                    end[i] = 0x00;
-                    continue;
-                }
-                v => {
-                    end[i] = v + 1;
-                    break;
-                }
-            }
-        }
-        self.scan(start..end)
+        // Normally, KeyPrefix::Version will only match all versions of the
+        // exact given key. We want all keys maching the prefix, so we chop off
+        // the KeyCode byte slice terminator 0x0000 at the end.
+        let prefix = KeyPrefix::Version(prefix.into()).encode()?;
+        let prefix = &prefix[..prefix.len() - 2];
+        // TODO: For now, collect results from the engine to not have to deal with lifetimes.
+        let scan =
+            Box::new(self.engine.lock()?.scan_prefix(prefix).collect::<Vec<_>>().into_iter());
+        Ok(Box::new(Scan::new(scan, self.version, self.read_only, self.active.clone())))
     }
 
     /// Sets a key.
@@ -534,6 +540,29 @@ pub mod tests {
 
     fn setup() -> MVCC<Memory> {
         MVCC::new(Memory::new())
+    }
+
+    #[test]
+    /// Tests that key prefixes are actually prefixes of keys.
+    fn test_key_prefix() -> Result<()> {
+        let cases = vec![
+            (KeyPrefix::NextVersion, Key::NextVersion),
+            (KeyPrefix::TxnActive, Key::TxnActive(1)),
+            (KeyPrefix::TxnActiveSnapshot, Key::TxnActiveSnapshot(1)),
+            (KeyPrefix::TxnUpdate(1), Key::TxnUpdate(1, b"foo".as_slice().into())),
+            (
+                KeyPrefix::Version(b"foo".as_slice().into()),
+                Key::Version(b"foo".as_slice().into(), 1),
+            ),
+            (KeyPrefix::Unversioned, Key::Unversioned(b"foo".as_slice().into())),
+        ];
+
+        for (prefix, key) in cases {
+            let prefix = prefix.encode()?;
+            let key = key.encode()?;
+            assert_eq!(prefix, key[..prefix.len()])
+        }
+        Ok(())
     }
 
     #[test]
