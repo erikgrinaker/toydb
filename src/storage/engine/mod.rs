@@ -34,6 +34,18 @@ pub trait Engine: std::fmt::Display + Send + Sync {
 
     /// Sets a value for a key, replacing the existing value if any.
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
+
+    /// Iterates over all key/value pairs starting with prefix.
+    fn scan_prefix(&mut self, prefix: &[u8]) -> Self::ScanIterator<'_> {
+        let start = std::ops::Bound::Included(prefix.to_vec());
+        let end = match prefix.iter().rposition(|b| *b != 0xff) {
+            Some(i) => std::ops::Bound::Excluded(
+                prefix.iter().take(i).copied().chain(std::iter::once(prefix[i] + 1)).collect(),
+            ),
+            None => std::ops::Bound::Unbounded,
+        };
+        self.scan((start, end))
+    }
 }
 
 #[cfg(test)]
@@ -41,6 +53,19 @@ mod tests {
     /// Generates common tests for any Engine implementation.
     macro_rules! test_engine {
         ($setup:expr) => {
+            #[track_caller]
+            /// Asserts that a scan yields the expected items.
+            fn assert_scan<I>(iter: I, expect: Vec<(&[u8], Vec<u8>)>) -> Result<()>
+            where
+                I: Iterator<Item = Result<(Vec<u8>, Vec<u8>)>>,
+            {
+                assert_eq!(
+                    iter.collect::<Result<Vec<_>>>()?,
+                    expect.into_iter().map(|(k, v)| (k.to_vec(), v)).collect::<Vec<_>>()
+                );
+                Ok(())
+            }
+
             /// Tests Engine point operations, i.e. set, get, and delete.
             #[test]
             fn point_ops() -> Result<()> {
@@ -125,18 +150,6 @@ mod tests {
                 s.set(b"c", vec![3])?;
                 s.set(b"C", vec![3])?;
 
-                #[track_caller]
-                fn assert_scan<I>(iter: I, expect: Vec<(&[u8], Vec<u8>)>) -> Result<()>
-                where
-                    I: Iterator<Item = Result<(Vec<u8>, Vec<u8>)>>,
-                {
-                    assert_eq!(
-                        iter.collect::<Result<Vec<_>>>()?,
-                        expect.into_iter().map(|(k, v)| (k.to_vec(), v)).collect::<Vec<_>>()
-                    );
-                    Ok(())
-                }
-
                 // Forward/reverse scans.
                 assert_scan(
                     s.scan(b"b".to_vec()..b"bz".to_vec()),
@@ -176,6 +189,117 @@ mod tests {
                         (b"c", vec![3]),
                     ],
                 )?;
+                Ok(())
+            }
+
+            #[test]
+            /// Tests prefix scans.
+            fn scan_prefix() -> Result<()> {
+                let mut s = $setup;
+                s.set(b"a", vec![1])?;
+                s.set(b"b", vec![2])?;
+                s.set(b"ba", vec![2, 1])?;
+                s.set(b"bb", vec![2, 2])?;
+                s.set(b"b\xff", vec![2, 0xff])?;
+                s.set(b"b\xff\x00", vec![2, 0xff, 0x00])?;
+                s.set(b"b\xffb", vec![2, 0xff, 2])?;
+                s.set(b"b\xff\xff", vec![2, 0xff, 0xff])?;
+                s.set(b"c", vec![3])?;
+                s.set(b"\xff", vec![0xff])?;
+                s.set(b"\xff\xff", vec![0xff, 0xff])?;
+                s.set(b"\xff\xff\xff", vec![0xff, 0xff, 0xff])?;
+                s.set(b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff])?;
+
+                assert_scan(
+                    s.scan_prefix(b""),
+                    vec![
+                        (b"a", vec![1]),
+                        (b"b", vec![2]),
+                        (b"ba", vec![2, 1]),
+                        (b"bb", vec![2, 2]),
+                        (b"b\xff", vec![2, 0xff]),
+                        (b"b\xff\x00", vec![2, 0xff, 0x00]),
+                        (b"b\xffb", vec![2, 0xff, 2]),
+                        (b"b\xff\xff", vec![2, 0xff, 0xff]),
+                        (b"c", vec![3]),
+                        (b"\xff", vec![0xff]),
+                        (b"\xff\xff", vec![0xff, 0xff]),
+                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
+                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
+                    ],
+                )?;
+
+                assert_scan(
+                    s.scan_prefix(b"b"),
+                    vec![
+                        (b"b", vec![2]),
+                        (b"ba", vec![2, 1]),
+                        (b"bb", vec![2, 2]),
+                        (b"b\xff", vec![2, 0xff]),
+                        (b"b\xff\x00", vec![2, 0xff, 0x00]),
+                        (b"b\xffb", vec![2, 0xff, 2]),
+                        (b"b\xff\xff", vec![2, 0xff, 0xff]),
+                    ],
+                )?;
+
+                assert_scan(s.scan_prefix(b"bb"), vec![(b"bb", vec![2, 2])])?;
+
+                assert_scan(s.scan_prefix(b"bq"), vec![])?;
+
+                assert_scan(
+                    s.scan_prefix(b"b\xff"),
+                    vec![
+                        (b"b\xff", vec![2, 0xff]),
+                        (b"b\xff\x00", vec![2, 0xff, 0x00]),
+                        (b"b\xffb", vec![2, 0xff, 2]),
+                        (b"b\xff\xff", vec![2, 0xff, 0xff]),
+                    ],
+                )?;
+
+                assert_scan(
+                    s.scan_prefix(b"b\xff\x00"),
+                    vec![(b"b\xff\x00", vec![2, 0xff, 0x00])],
+                )?;
+
+                assert_scan(
+                    s.scan_prefix(b"b\xff\xff"),
+                    vec![(b"b\xff\xff", vec![2, 0xff, 0xff])],
+                )?;
+
+                assert_scan(
+                    s.scan_prefix(b"\xff"),
+                    vec![
+                        (b"\xff", vec![0xff]),
+                        (b"\xff\xff", vec![0xff, 0xff]),
+                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
+                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
+                    ],
+                )?;
+
+                assert_scan(
+                    s.scan_prefix(b"\xff\xff"),
+                    vec![
+                        (b"\xff\xff", vec![0xff, 0xff]),
+                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
+                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
+                    ],
+                )?;
+
+                assert_scan(
+                    s.scan_prefix(b"\xff\xff\xff"),
+                    vec![
+                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
+                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
+                    ],
+                )?;
+
+                assert_scan(
+                    s.scan_prefix(b"\xff\xff\xff\xff"),
+                    vec![(b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff])],
+                )?;
+
+                assert_scan(s.scan_prefix(b"\xff\xff\xff\xff\xff"), vec![])?;
+
                 Ok(())
             }
 
