@@ -24,8 +24,9 @@ enum Key<'a> {
     /// A snapshot of the active set at each version. Only written for
     /// versions where the active set is non-empty (excluding itself).
     TxnActiveSnapshot(Version),
-    /// Update marker for a version and key, used for rollback.
-    TxnUpdate(
+    /// Keeps track of all keys written to by an active transaction (identified
+    /// by its version), in case it needs to roll back.
+    TxnWrite(
         Version,
         #[serde(with = "serde_bytes")]
         #[serde(borrow)]
@@ -65,7 +66,7 @@ enum KeyPrefix<'a> {
     NextVersion,
     TxnActive,
     TxnActiveSnapshot,
-    TxnUpdate(Version),
+    TxnWrite(Version),
     Version(
         #[serde(with = "serde_bytes")]
         #[serde(borrow)]
@@ -166,9 +167,10 @@ pub struct Transaction<E: Engine> {
     version: Version,
     /// If true, the transaction is read only.
     read_only: bool,
-    /// The set of concurrent active (uncommitted) transactions. Their writes
-    /// should be invisible to this transaction even if they're writing at a
-    /// lower version, since they're not committed yet.
+    /// The set of concurrent active (uncommitted) transactions, as of the start
+    /// of this transaction. Their writes should be invisible to this
+    /// transaction even if they're writing at a lower version, since they're
+    /// not committed yet.
     active: HashSet<Version>,
 }
 
@@ -287,33 +289,86 @@ impl<E: Engine> Transaction<E> {
         }
     }
 
-    /// Commits the transaction, by removing the txn from the active set.
+    /// Commits the transaction, by removing it from the active set. This will
+    /// immediately make its writes visible to subsequent transactions.
     pub fn commit(self) -> Result<()> {
-        let mut session = self.engine.lock()?;
-        session.delete(&Key::TxnActive(self.version).encode()?)?;
-        session.flush()
+        if self.read_only {
+            return Ok(());
+        }
+        self.engine.lock()?.delete(&Key::TxnActive(self.version).encode()?)
     }
 
-    /// Rolls back the transaction, by removing all updated entries.
+    /// Rolls back the transaction, by undoing all written versions and removing
+    /// it from the active set. The active set snapshot is left behind, since
+    /// this is needed for time travel queries at this version.
     pub fn rollback(self) -> Result<()> {
         if self.read_only {
             return Ok(());
         }
         let mut session = self.engine.lock()?;
         let mut rollback = Vec::new();
-        let mut scan = session.scan_prefix(&KeyPrefix::TxnUpdate(self.version).encode()?);
+        let mut scan = session.scan_prefix(&KeyPrefix::TxnWrite(self.version).encode()?);
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
-                Key::TxnUpdate(_, updated_key) => rollback.push(updated_key.into_owned()),
-                k => return Err(Error::Internal(format!("Expected TxnUpdate, got {:?}", k))),
+                Key::TxnWrite(_, key) => {
+                    rollback.push(Key::Version(key, self.version).encode()?); // the written version
+                }
+                key => return Err(Error::Internal(format!("Expected TxnWrite, got {:?}", key))),
             };
-            rollback.push(key);
+            rollback.push(key); // the TxnWrite record
         }
-        std::mem::drop(scan);
+        drop(scan);
         for key in rollback.into_iter() {
             session.delete(&key)?;
         }
-        session.delete(&Key::TxnActive(self.version).encode()?)
+        session.delete(&Key::TxnActive(self.version).encode()?) // remove from active set
+    }
+
+    /// Deletes a key.
+    pub fn delete(&mut self, key: &[u8]) -> Result<()> {
+        self.write_version(key, None)
+    }
+
+    /// Sets a value for a key.
+    pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
+        self.write_version(key, Some(value))
+    }
+
+    /// Writes a new version for a key at the transaction's version. None writes
+    /// a deletion tombstone. If a write conflict is found (either a newer or
+    /// uncommitted version), a serialization error is returned.  Replacing our
+    /// own uncommitted write is fine.
+    fn write_version(&self, key: &[u8], value: Option<Vec<u8>>) -> Result<()> {
+        if self.read_only {
+            return Err(Error::ReadOnly);
+        }
+        let mut session = self.engine.lock()?;
+
+        // Check for write conflicts, i.e. if the latest key is invisible to us
+        // (either a newer version, or an uncommitted version in our past). We
+        // can only conflict with the latest key, since all transactions enforce
+        // the same invariant.
+        let from =
+            Key::Version(key.into(), self.active.iter().min().copied().unwrap_or(self.version + 1))
+                .encode()?;
+        let to = Key::Version(key.into(), u64::MAX).encode()?;
+        if let Some((k, _)) = session.scan(from..=to).last().transpose()? {
+            match Key::decode(&k)? {
+                Key::Version(_, version) => {
+                    if !self.is_visible(version) {
+                        return Err(Error::Serialization);
+                    }
+                }
+                k => return Err(Error::Internal(format!("Expected Key::Version, got {:?}", k))),
+            }
+        }
+
+        // Write the new version and its write record.
+        //
+        // NB: TxnWrite contains the provided user key, not the encoded engine
+        // key, since we can construct the engine key using the version.
+        session.set(&Key::TxnWrite(self.version, key.into()).encode()?, vec![])?;
+        session.set(&Key::Version(key.into(), self.version).encode()?, bincode::serialize(&value)?)
     }
 
     /// Checks whether the given version is visible to this transaction.
@@ -325,11 +380,6 @@ impl<E: Engine> Transaction<E> {
         } else {
             version <= self.version
         }
-    }
-
-    /// Deletes a key.
-    pub fn delete(&mut self, key: &[u8]) -> Result<()> {
-        self.write(key, None)
     }
 
     /// Fetches a key.
@@ -382,46 +432,6 @@ impl<E: Engine> Transaction<E> {
         let scan =
             Box::new(self.engine.lock()?.scan_prefix(prefix).collect::<Vec<_>>().into_iter());
         Ok(Box::new(Scan::new(scan, self.version, self.read_only, self.active.clone())))
-    }
-
-    /// Sets a key.
-    pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.write(key, Some(value))
-    }
-
-    /// Writes a value for a key. None is used for deletion.
-    fn write(&self, key: &[u8], value: Option<Vec<u8>>) -> Result<()> {
-        if self.read_only {
-            return Err(Error::ReadOnly);
-        }
-        let mut session = self.engine.lock()?;
-
-        // Check if the key is dirty, i.e. if it has any uncommitted changes, by scanning for any
-        // versions that aren't visible to us.
-        let min = self.active.iter().min().cloned().unwrap_or(self.version + 1);
-        let mut scan = session
-            .scan(
-                Key::Version(key.into(), min).encode()?
-                    ..=Key::Version(key.into(), u64::MAX).encode()?,
-            )
-            .rev();
-        while let Some((k, _)) = scan.next().transpose()? {
-            match Key::decode(&k)? {
-                Key::Version(_, version) => {
-                    if !self.is_visible(version) {
-                        return Err(Error::Serialization);
-                    }
-                }
-                k => return Err(Error::Internal(format!("Expected Txn::Record, got {:?}", k))),
-            };
-        }
-        std::mem::drop(scan);
-
-        // Write the key and its update record.
-        let key = Key::Version(key.into(), self.version).encode()?;
-        let update = Key::TxnUpdate(self.version, (&key).into()).encode()?;
-        session.set(&update, vec![])?;
-        session.set(&key, bincode::serialize(&value)?)
     }
 }
 
@@ -549,7 +559,7 @@ pub mod tests {
             (KeyPrefix::NextVersion, Key::NextVersion),
             (KeyPrefix::TxnActive, Key::TxnActive(1)),
             (KeyPrefix::TxnActiveSnapshot, Key::TxnActiveSnapshot(1)),
-            (KeyPrefix::TxnUpdate(1), Key::TxnUpdate(1, b"foo".as_slice().into())),
+            (KeyPrefix::TxnWrite(1), Key::TxnWrite(1, b"foo".as_slice().into())),
             (
                 KeyPrefix::Version(b"foo".as_slice().into()),
                 Key::Version(b"foo".as_slice().into(), 1),
