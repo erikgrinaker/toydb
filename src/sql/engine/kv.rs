@@ -207,6 +207,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         Ok(Box::new(
             self.txn
                 .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode()?)?
+                .iter()
                 .map(|r| r.and_then(|(_, v)| deserialize(&v)))
                 .filter_map(move |r| match r {
                     Ok(row) => match &filter {
@@ -239,6 +240,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                 .scan_prefix(
                     &KeyPrefix::Index((&table.name).into(), (&column.name).into()).encode()?,
                 )?
+                .iter()
                 .map(|r| -> Result<(Value, HashSet<Value>)> {
                     let (k, v) = r?;
                     let value = match Key::decode(&k)? {
@@ -316,6 +318,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         Ok(Box::new(
             self.txn
                 .scan_prefix(&KeyPrefix::Table.encode()?)?
+                .iter()
                 .map(|r| r.and_then(|(_, v)| deserialize(&v)))
                 .collect::<Result<Vec<_>>>()?
                 .into_iter(),

@@ -4,7 +4,6 @@ use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::iter::Peekable;
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -256,7 +255,7 @@ impl<E: Engine> Transaction<E> {
         Ok(Self { engine, version: s.version, read_only: s.read_only, active: s.active })
     }
 
-    /// Scans the set of currently active transactions.
+    /// Fetches the set of currently active transactions.
     fn scan_active(session: &mut MutexGuard<E>) -> Result<HashSet<Version>> {
         let mut active = HashSet::new();
         let mut scan = session.scan_prefix(&KeyPrefix::TxnActive.encode()?);
@@ -285,7 +284,7 @@ impl<E: Engine> Transaction<E> {
         TransactionState {
             version: self.version,
             read_only: self.read_only,
-            active: self.active.clone(), // TODO: avoid cloning
+            active: self.active.clone(),
         }
     }
 
@@ -382,7 +381,7 @@ impl<E: Engine> Transaction<E> {
         }
     }
 
-    /// Fetches a key.
+    /// Fetches a key's value, or None if it does not exist.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         let mut session = self.engine.lock()?;
         let mut scan = session
@@ -398,14 +397,15 @@ impl<E: Engine> Transaction<E> {
                         return Ok(bincode::deserialize(&v)?);
                     }
                 }
-                k => return Err(Error::Internal(format!("Expected Txn::Record, got {:?}", k))),
+                k => return Err(Error::Internal(format!("Expected Key::Version, got {:?}", k))),
             };
         }
         Ok(None)
     }
 
-    /// Scans a key range.
-    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> Result<ScanIterator> {
+    /// Returns an iterator over the latest visible key/value pairs at the
+    /// transaction's version.
+    pub fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Result<Scan<E>> {
         let start = match range.start_bound() {
             Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), u64::MAX).encode()?),
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), 0).encode()?),
@@ -414,130 +414,211 @@ impl<E: Engine> Transaction<E> {
         let end = match range.end_bound() {
             Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), 0).encode()?),
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), u64::MAX).encode()?),
-            Bound::Unbounded => Bound::Unbounded,
+            Bound::Unbounded => Bound::Excluded(KeyPrefix::Unversioned.encode()?),
         };
-        // TODO: For now, collect results from the engine to not have to deal with lifetimes.
-        let scan = Box::new(self.engine.lock()?.scan((start, end)).collect::<Vec<_>>().into_iter());
-        Ok(Box::new(Scan::new(scan, self.version, self.read_only, self.active.clone())))
+        Ok(Scan::from_range(self.engine.lock()?, self.state(), start, end))
     }
 
     /// Scans keys under a given prefix.
-    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<ScanIterator> {
+    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<Scan<E>> {
         // Normally, KeyPrefix::Version will only match all versions of the
         // exact given key. We want all keys maching the prefix, so we chop off
         // the KeyCode byte slice terminator 0x0000 at the end.
-        let prefix = KeyPrefix::Version(prefix.into()).encode()?;
-        let prefix = &prefix[..prefix.len() - 2];
-        // TODO: For now, collect results from the engine to not have to deal with lifetimes.
-        let scan =
-            Box::new(self.engine.lock()?.scan_prefix(prefix).collect::<Vec<_>>().into_iter());
-        Ok(Box::new(Scan::new(scan, self.version, self.read_only, self.active.clone())))
+        let mut prefix = KeyPrefix::Version(prefix.into()).encode()?;
+        prefix.truncate(prefix.len() - 2);
+        Ok(Scan::from_prefix(self.engine.lock()?, self.state(), prefix))
     }
 }
 
-pub type ScanIterator<'a> =
-    Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + Send + 'a>;
-
-/// A key range scan.
-pub struct Scan<'a> {
-    /// The augmented KV engine iterator, with key (decoded) and value. Note that we don't retain
-    /// the decoded version, so there will be multiple keys (for each version). We want the last.
-    scan: Peekable<ScanIterator<'a>>,
-    /// Keeps track of next_back() seen key, whose previous versions should be ignored.
-    next_back_seen: Option<Vec<u8>>,
+/// A scan result. Can produce an iterator or collect an owned Vec.
+///
+/// This intermediate struct is unfortunately needed to hold the MutexGuard for
+/// the scan() caller, since placing it in ScanIterator along with the inner
+/// iterator borrowing from it would create a self-referential struct.
+///
+/// TODO: is there a better way?
+pub struct Scan<'a, E: Engine + 'a> {
+    /// Access to the locked engine.
+    engine: MutexGuard<'a, E>,
+    /// The transaction state.
+    txn: TransactionState,
+    /// The scan type and parameter.
+    param: ScanType,
 }
 
-impl<'a> Scan<'a> {
-    /// Creates a new scan.
-    fn new(
-        mut scan: ScanIterator<'a>,
-        txn_version: Version,
-        read_only: bool,
-        active: HashSet<Version>,
+enum ScanType {
+    Range((Bound<Vec<u8>>, Bound<Vec<u8>>)),
+    Prefix(Vec<u8>),
+}
+
+impl<'a, E: Engine + 'a> Scan<'a, E> {
+    /// Runs a normal range scan.
+    fn from_range(
+        engine: MutexGuard<'a, E>,
+        txn: TransactionState,
+        start: Bound<Vec<u8>>,
+        end: Bound<Vec<u8>>,
     ) -> Self {
-        /// Checks whether the given version is visible to this transaction.
-        fn is_visible(
-            txn_version: Version,
-            read_only: bool,
-            active: &HashSet<Version>,
-            version: Version,
-        ) -> bool {
-            if active.get(&version).is_some() {
-                false
-            } else if read_only {
-                version < txn_version
-            } else {
-                version <= txn_version
-            }
-        }
-
-        // Augment the underlying scan to decode the key and filter invisible versions. We don't
-        // return the version, since we don't need it, but beware that all versions of the key
-        // will still be returned - we usually only need the last, which is what the next() and
-        // next_back() methods need to handle. We also don't decode the value, since we only need
-        // to decode the last version.
-        scan = Box::new(scan.filter_map(move |r| {
-            r.and_then(|(k, v)| match Key::decode(&k)? {
-                Key::Version(_, version)
-                    if !is_visible(txn_version, read_only, &active, version) =>
-                {
-                    Ok(None)
-                }
-                Key::Version(key, _) => Ok(Some((key.into_owned(), v))),
-                k => Err(Error::Internal(format!("Expected Record, got {:?}", k))),
-            })
-            .transpose()
-        }));
-        Self { scan: scan.peekable(), next_back_seen: None }
+        Self { engine, txn, param: ScanType::Range((start, end)) }
     }
 
-    // next() with error handling.
+    /// Runs a prefix scan.
+    fn from_prefix(engine: MutexGuard<'a, E>, txn: TransactionState, prefix: Vec<u8>) -> Self {
+        Self { engine, txn, param: ScanType::Prefix(prefix) }
+    }
+
+    /// Returns an iterator over the result.
+    pub fn iter(&mut self) -> ScanIterator<'_, E> {
+        let inner = match &self.param {
+            ScanType::Range(range) => self.engine.scan(range.clone()),
+            ScanType::Prefix(prefix) => self.engine.scan_prefix(prefix),
+        };
+        ScanIterator::new(&self.txn, inner)
+    }
+
+    /// Collects the result to a vector.
+    pub fn to_vec(&mut self) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        self.iter().collect::<Result<Vec<_>>>()
+    }
+}
+
+/// An iterator over key/value pairs at a specific version, returned by scan().
+pub struct ScanIterator<'a, E: Engine + 'a> {
+    /// Decodes and filters visible MVCC versions from the inner engine iterator.
+    inner: std::iter::Peekable<VersionIterator<'a, E>>,
+    /// The previous key emitted by try_next_back(). Note that try_next() does
+    /// not affect reverse positioning: double-ended iterators consume from each
+    /// end independently.
+    last_back: Option<Vec<u8>>,
+}
+
+impl<'a, E: Engine + 'a> ScanIterator<'a, E> {
+    /// Creates a new scan iterator.
+    fn new(txn: &'a TransactionState, inner: E::ScanIterator<'a>) -> Self {
+        Self { inner: VersionIterator::new(txn, inner).peekable(), last_back: None }
+    }
+
+    /// Fallible next(), emitting the next item, or None if exhausted.
     fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        while let Some((key, value)) = self.scan.next().transpose()? {
-            // Only return the item if it is the last version of the key.
-            if match self.scan.peek() {
-                Some(Ok((peek_key, _))) if *peek_key != key => true,
-                Some(Ok(_)) => false,
+        while let Some((key, _version, value)) = self.inner.next().transpose()? {
+            // If the next key equals this one, we're not at the latest version.
+            match self.inner.peek() {
+                Some(Ok((next, _, _))) if next == &key => continue,
                 Some(Err(err)) => return Err(err.clone()),
-                None => true,
-            } {
-                // Only return non-deleted items.
-                if let Some(value) = bincode::deserialize(&value)? {
-                    return Ok(Some((key, value)));
-                }
+                Some(Ok(_)) | None => {}
+            }
+            // If the key is live (not a tombstone), emit it.
+            if let Some(value) = bincode::deserialize(&value)? {
+                return Ok(Some((key, value)));
             }
         }
         Ok(None)
     }
 
-    /// next_back() with error handling.
+    /// Fallible next_back(), emitting the next item from the back, or None if
+    /// exhausted.
     fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        while let Some((key, value)) = self.scan.next_back().transpose()? {
-            // Only return the last version of the key (so skip if seen).
-            if match &self.next_back_seen {
-                Some(seen_key) if *seen_key != key => true,
-                Some(_) => false,
-                None => true,
-            } {
-                self.next_back_seen = Some(key.clone());
-                // Only return non-deleted items.
-                if let Some(value) = bincode::deserialize(&value)? {
-                    return Ok(Some((key, value)));
+        while let Some((key, _version, value)) = self.inner.next_back().transpose()? {
+            // If this key is the same as the last emitted key from the back,
+            // this must be an older version, so skip it.
+            if let Some(last) = &self.last_back {
+                if last == &key {
+                    continue;
                 }
+            }
+            self.last_back = Some(key.clone());
+
+            // If the key is live (not a tombstone), emit it.
+            if let Some(value) = bincode::deserialize(&value)? {
+                return Ok(Some((key, value)));
             }
         }
         Ok(None)
     }
 }
 
-impl<'a> Iterator for Scan<'a> {
+impl<'a, E: Engine> Iterator for ScanIterator<'a, E> {
     type Item = Result<(Vec<u8>, Vec<u8>)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
     }
 }
 
-impl<'a> DoubleEndedIterator for Scan<'a> {
+impl<'a, E: Engine> DoubleEndedIterator for ScanIterator<'a, E> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.try_next_back().transpose()
+    }
+}
+
+/// An iterator that decodes raw engine key/value pairs into MVCC key/value
+/// versions, and skips invisible versions. Helper for ScanIterator.
+struct VersionIterator<'a, E: Engine + 'a> {
+    /// The transaction the scan is running in.
+    txn: &'a TransactionState,
+    /// The inner engine scan iterator.
+    inner: E::ScanIterator<'a>,
+}
+
+impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
+    /// Creates a new MVCC version iterator for the given engine iterator.
+    fn new(txn: &'a TransactionState, inner: E::ScanIterator<'a>) -> Self {
+        Self { txn, inner }
+    }
+
+    /// Decodes a raw engine key into an MVCC key and version, returning None if
+    /// the version is not visible.
+    fn decode_visible(&self, key: &[u8]) -> Result<Option<(Vec<u8>, Version)>> {
+        let (key, version) = match Key::decode(key)? {
+            Key::Version(key, version) => (key.into_owned(), version),
+            key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
+        };
+        if self.is_visible(version) {
+            Ok(Some((key, version)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Checks whether the given version is visible to this scan's transaction.
+    fn is_visible(&self, version: Version) -> bool {
+        if self.txn.active.get(&version).is_some() {
+            false
+        } else if self.txn.read_only {
+            version < self.txn.version
+        } else {
+            version <= self.txn.version
+        }
+    }
+
+    // Fallible next(), emitting the next item, or None if exhausted.
+    fn try_next(&mut self) -> Result<Option<(Vec<u8>, Version, Vec<u8>)>> {
+        while let Some((key, value)) = self.inner.next().transpose()? {
+            if let Some((key, version)) = self.decode_visible(&key)? {
+                return Ok(Some((key, version, value)));
+            }
+        }
+        Ok(None)
+    }
+
+    // Fallible next_back(), emitting the previous item, or None if exhausted.
+    fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Version, Vec<u8>)>> {
+        while let Some((key, value)) = self.inner.next_back().transpose()? {
+            if let Some((key, version)) = self.decode_visible(&key)? {
+                return Ok(Some((key, version, value)));
+            }
+        }
+        Ok(None)
+    }
+}
+
+impl<'a, E: Engine> Iterator for VersionIterator<'a, E> {
+    type Item = Result<(Vec<u8>, Version, Vec<u8>)>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.try_next().transpose()
+    }
+}
+
+impl<'a, E: Engine> DoubleEndedIterator for VersionIterator<'a, E> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.try_next_back().transpose()
     }
@@ -868,28 +949,35 @@ pub mod tests {
     #[test]
     fn test_txn_scan() -> Result<()> {
         let mvcc = setup();
+
         let mut txn = mvcc.begin()?;
-
         txn.set(b"a", vec![0x01])?;
-
         txn.delete(b"b")?;
-
         txn.set(b"c", vec![0x01])?;
-        txn.set(b"c", vec![0x02])?;
-        txn.delete(b"c")?;
-        txn.set(b"c", vec![0x03])?;
-
         txn.set(b"d", vec![0x01])?;
-        txn.set(b"d", vec![0x02])?;
-        txn.set(b"d", vec![0x03])?;
-        txn.set(b"d", vec![0x04])?;
-        txn.delete(b"d")?;
-
         txn.set(b"e", vec![0x01])?;
+        txn.commit()?;
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"c", vec![0x02])?;
+        txn.set(b"d", vec![0x02])?;
         txn.set(b"e", vec![0x02])?;
+        txn.commit()?;
+
+        let mut txn = mvcc.begin()?;
+        txn.delete(b"c")?;
+        txn.set(b"d", vec![0x03])?;
         txn.set(b"e", vec![0x03])?;
+        txn.commit()?;
+
+        let mut txn = mvcc.begin()?;
+        txn.set(b"c", vec![0x04])?;
+        txn.set(b"d", vec![0x04])?;
         txn.delete(b"e")?;
-        txn.set(b"e", vec![0x04])?;
+        txn.commit()?;
+
+        let mut txn = mvcc.begin()?;
+        txn.delete(b"d")?;
         txn.set(b"e", vec![0x05])?;
         txn.commit()?;
 
@@ -898,29 +986,30 @@ pub mod tests {
         assert_eq!(
             vec![
                 (b"a".to_vec(), vec![0x01]),
-                (b"c".to_vec(), vec![0x03]),
+                (b"c".to_vec(), vec![0x04]),
                 (b"e".to_vec(), vec![0x05]),
             ],
-            txn.scan(..)?.collect::<Result<Vec<_>>>()?
+            txn.scan(..)?.to_vec()?
         );
 
         // Reverse scan
         assert_eq!(
             vec![
                 (b"e".to_vec(), vec![0x05]),
-                (b"c".to_vec(), vec![0x03]),
+                (b"c".to_vec(), vec![0x04]),
                 (b"a".to_vec(), vec![0x01]),
             ],
-            txn.scan(..)?.rev().collect::<Result<Vec<_>>>()?
+            txn.scan(..)?.iter().rev().collect::<Result<Vec<_>>>()?
         );
 
         // Alternate forward/backward scan
         let mut scan = txn.scan(..)?;
-        assert_eq!(Some((b"a".to_vec(), vec![0x01])), scan.next().transpose()?);
-        assert_eq!(Some((b"e".to_vec(), vec![0x05])), scan.next_back().transpose()?);
-        assert_eq!(Some((b"c".to_vec(), vec![0x03])), scan.next_back().transpose()?);
-        assert_eq!(None, scan.next().transpose()?);
-        std::mem::drop(scan);
+        let mut iter = scan.iter();
+        assert_eq!(Some((b"a".to_vec(), vec![0x01])), iter.next().transpose()?);
+        assert_eq!(Some((b"e".to_vec(), vec![0x05])), iter.next_back().transpose()?);
+        assert_eq!(Some((b"c".to_vec(), vec![0x04])), iter.next_back().transpose()?);
+        assert_eq!(None, iter.next().transpose()?);
+        drop(scan);
 
         txn.commit()?;
         Ok(())
@@ -948,7 +1037,7 @@ pub mod tests {
         let txn = mvcc.begin()?;
         assert_eq!(
             vec![(vec![0].to_vec(), vec![3]), (vec![0, 0, 0, 0, 0, 0, 0, 0, 2].to_vec(), vec![2]),],
-            txn.scan(..)?.collect::<Result<Vec<_>>>()?
+            txn.scan(..)?.to_vec()?,
         );
         Ok(())
     }
@@ -976,7 +1065,7 @@ pub mod tests {
                 (b"bb".to_vec(), vec![0x02, 0x02]),
                 (b"bc".to_vec(), vec![0x02, 0x03]),
             ],
-            txn.scan_prefix(b"b")?.collect::<Result<Vec<_>>>()?
+            txn.scan_prefix(b"b")?.to_vec()?,
         );
 
         // Reverse scan
@@ -987,17 +1076,18 @@ pub mod tests {
                 (b"ba".to_vec(), vec![0x02, 0x01]),
                 (b"b".to_vec(), vec![0x02]),
             ],
-            txn.scan_prefix(b"b")?.rev().collect::<Result<Vec<_>>>()?
+            txn.scan_prefix(b"b")?.iter().rev().collect::<Result<Vec<_>>>()?
         );
 
         // Alternate forward/backward scan
         let mut scan = txn.scan_prefix(b"b")?;
-        assert_eq!(Some((b"b".to_vec(), vec![0x02])), scan.next().transpose()?);
-        assert_eq!(Some((b"bc".to_vec(), vec![0x02, 0x03])), scan.next_back().transpose()?);
-        assert_eq!(Some((b"bb".to_vec(), vec![0x02, 0x02])), scan.next_back().transpose()?);
-        assert_eq!(Some((b"ba".to_vec(), vec![0x02, 0x01])), scan.next().transpose()?);
-        assert_eq!(None, scan.next_back().transpose()?);
-        std::mem::drop(scan);
+        let mut iter = scan.iter();
+        assert_eq!(Some((b"b".to_vec(), vec![0x02])), iter.next().transpose()?);
+        assert_eq!(Some((b"bc".to_vec(), vec![0x02, 0x03])), iter.next_back().transpose()?);
+        assert_eq!(Some((b"bb".to_vec(), vec![0x02, 0x02])), iter.next_back().transpose()?);
+        assert_eq!(Some((b"ba".to_vec(), vec![0x02, 0x01])), iter.next().transpose()?);
+        assert_eq!(None, iter.next().transpose()?);
+        drop(scan);
 
         txn.commit()?;
         Ok(())
