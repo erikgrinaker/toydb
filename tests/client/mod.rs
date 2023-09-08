@@ -131,7 +131,7 @@ async fn status() -> Result<()> {
                 storage: "hybrid".into(),
                 storage_size: 3462,
             },
-            mvcc: mvcc::Status { txns: 1, txns_active: 0, storage: "memory".into() },
+            mvcc: mvcc::Status { versions: 1, active_txns: 0, storage: "memory".into() },
         }
     );
     Ok(())

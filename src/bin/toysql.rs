@@ -129,7 +129,7 @@ The following commands are also available:
 Server:    {server} (leader {leader} in term {term} with {nodes} nodes)
 Raft log:  {committed} committed, {applied} applied, {raft_size} MB ({raft_storage} storage)
 Node logs: {logs}
-SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
+SQL txns:  {active_txns} active, {versions} total ({sql_storage} storage)
 "#,
                     server = status.raft.server,
                     leader = status.raft.leader,
@@ -141,8 +141,8 @@ SQL txns:  {txns_active} active, {txns} total ({sql_storage} storage)
                     raft_size =
                         format_args!("{:.3}", status.raft.storage_size as f64 / 1000.0 / 1000.0),
                     logs = node_logs.join(" "),
-                    txns = status.mvcc.txns,
-                    txns_active = status.mvcc.txns_active,
+                    versions = status.mvcc.versions,
+                    active_txns = status.mvcc.active_txns,
                     sql_storage = status.mvcc.storage
                 )
             }

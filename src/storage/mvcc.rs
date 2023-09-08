@@ -80,14 +80,6 @@ impl<'a> KeyPrefix<'a> {
     }
 }
 
-/// MVCC status
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Status {
-    pub txns: u64,
-    pub txns_active: u64,
-    pub storage: String,
-}
-
 /// An MVCC-based transactional key-value engine.
 pub struct MVCC<E: Engine> {
     /// The underlying KV engine. It is protected by a mutex so it can be shared between txns.
@@ -136,24 +128,29 @@ impl<E: Engine> MVCC<E> {
         self.engine.lock()?.set(&Key::Unversioned(key.into()).encode()?, value)
     }
 
-    /// Returns engine status
-    //
-    // Bizarrely, the return statement is in fact necessary - see:
-    // https://github.com/rust-lang/reference/issues/452
-    #[allow(clippy::needless_return)]
+    /// Returns the status of the MVCC and storage engines.
     pub fn status(&self) -> Result<Status> {
         let mut engine = self.engine.lock()?;
-        return Ok(Status {
-            storage: engine.to_string(),
-            txns: match engine.get(&Key::NextVersion.encode()?)? {
-                Some(ref v) => bincode::deserialize(v)?,
-                None => 1,
-            } - 1,
-            txns_active: engine
-                .scan_prefix(&KeyPrefix::TxnActive.encode()?)
-                .try_fold(0, |count, r| r.map(|_| count + 1))?,
-        });
+        let storage = engine.to_string();
+        let versions = match engine.get(&Key::NextVersion.encode()?)? {
+            Some(ref v) => bincode::deserialize::<u64>(v)? - 1,
+            None => 0,
+        };
+        let active_txns = engine.scan_prefix(&KeyPrefix::TxnActive.encode()?).count() as u64;
+        Ok(Status { storage, versions, active_txns })
     }
+}
+
+/// MVCC engine status.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    /// The total number of MVCC versions (i.e. read-write transactions).
+    pub versions: u64,
+    /// Number of currently active transactions.
+    pub active_txns: u64,
+    /// The storage engine.
+    /// TODO: export engine status instead.
+    pub storage: String,
 }
 
 /// An MVCC transaction.
@@ -368,14 +365,14 @@ impl<E: Engine> Transaction<E> {
         )
         .encode()?;
         let to = Key::Version(key.into(), u64::MAX).encode()?;
-        if let Some((k, _)) = session.scan(from..=to).last().transpose()? {
-            match Key::decode(&k)? {
+        if let Some((key, _)) = session.scan(from..=to).last().transpose()? {
+            match Key::decode(&key)? {
                 Key::Version(_, version) => {
                     if !self.st.is_visible(version) {
                         return Err(Error::Serialization);
                     }
                 }
-                k => return Err(Error::Internal(format!("Expected Key::Version, got {:?}", k))),
+                key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
             }
         }
 
@@ -391,20 +388,17 @@ impl<E: Engine> Transaction<E> {
     /// Fetches a key's value, or None if it does not exist.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         let mut session = self.engine.lock()?;
-        let mut scan = session
-            .scan(
-                Key::Version(key.into(), 0).encode()?
-                    ..=Key::Version(key.into(), self.st.version).encode()?,
-            )
-            .rev();
-        while let Some((k, v)) = scan.next().transpose()? {
-            match Key::decode(&k)? {
+        let from = Key::Version(key.into(), 0).encode()?;
+        let to = Key::Version(key.into(), self.st.version).encode()?;
+        let mut scan = session.scan(from..=to).rev();
+        while let Some((key, value)) = scan.next().transpose()? {
+            match Key::decode(&key)? {
                 Key::Version(_, version) => {
                     if self.st.is_visible(version) {
-                        return Ok(bincode::deserialize(&v)?);
+                        return Ok(bincode::deserialize(&value)?);
                     }
                 }
-                k => return Err(Error::Internal(format!("Expected Key::Version, got {:?}", k))),
+                key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
             };
         }
         Ok(None)
@@ -485,11 +479,12 @@ impl<'a, E: Engine + 'a> Scan<'a, E> {
 
     /// Collects the result to a vector.
     pub fn to_vec(&mut self) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        self.iter().collect::<Result<Vec<_>>>()
+        self.iter().collect()
     }
 }
 
-/// An iterator over key/value pairs at a specific version, returned by scan().
+/// An iterator over the latest live and visible key/value pairs at the txn
+/// version.
 pub struct ScanIterator<'a, E: Engine + 'a> {
     /// Decodes and filters visible MVCC versions from the inner engine iterator.
     inner: std::iter::Peekable<VersionIterator<'a, E>>,
