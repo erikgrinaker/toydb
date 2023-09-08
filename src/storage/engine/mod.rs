@@ -6,6 +6,8 @@ pub use memory::Memory;
 
 use crate::error::Result;
 
+use serde::{Deserialize, Serialize};
+
 /// A key/value storage engine, where both keys and values are arbitrary byte
 /// strings between 0 B and 2 GB, stored in lexicographical key order. Writes
 /// are only guaranteed durable after calling flush().
@@ -35,6 +37,9 @@ pub trait Engine: std::fmt::Display + Send + Sync {
     /// Sets a value for a key, replacing the existing value if any.
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
 
+    /// Returns engine status.
+    fn status(&mut self) -> Result<Status>;
+
     /// Iterates over all key/value pairs starting with prefix.
     fn scan_prefix(&mut self, prefix: &[u8]) -> Self::ScanIterator<'_> {
         let start = std::ops::Bound::Included(prefix.to_vec());
@@ -46,6 +51,23 @@ pub trait Engine: std::fmt::Display + Send + Sync {
         };
         self.scan((start, end))
     }
+}
+
+/// Engine status.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    /// The name of the storage engine.
+    pub name: String,
+    /// The number of live keys in the engine.
+    pub keys: u64,
+    /// The logical size of live key/value pairs.
+    pub size: u64,
+    /// The on-disk size of all data, live and garbage.
+    pub total_disk_size: u64,
+    /// The on-disk size of live data.
+    pub live_disk_size: u64,
+    /// The on-disk size of garbage data.
+    pub garbage_disk_size: u64,
 }
 
 #[cfg(test)]
@@ -408,6 +430,26 @@ mod tests {
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect::<Vec<_>>();
                 assert_eq!(state, expect);
+
+                Ok(())
+            }
+
+            #[test]
+            /// Tests implementation-independent aspects of Status.
+            fn status() -> Result<()> {
+                let mut s = $setup;
+                s.set(b"foo", vec![1, 2, 3])?;
+                s.set(b"bar", vec![1])?;
+                s.delete(b"bar")?;
+                s.set(b"baz", vec![1])?;
+                s.set(b"baz", vec![2])?;
+                s.set(b"baz", vec![3])?;
+                s.delete(b"qux")?;
+
+                let status = s.status()?;
+                assert!(status.name.len() > 0);
+                assert_eq!(status.keys, 2);
+                assert_eq!(status.size, 10);
 
                 Ok(())
             }

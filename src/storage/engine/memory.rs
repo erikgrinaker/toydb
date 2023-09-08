@@ -1,4 +1,4 @@
-use super::Engine;
+use super::{Engine, Status};
 use crate::error::Result;
 
 /// An in-memory key/value storage engine using the Rust standard library B-tree
@@ -43,6 +43,17 @@ impl Engine for Memory {
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.data.insert(key.to_vec(), value);
         Ok(())
+    }
+
+    fn status(&mut self) -> Result<Status> {
+        Ok(Status {
+            name: self.to_string(),
+            keys: self.data.len() as u64,
+            size: self.data.iter().fold(0, |size, (k, v)| size + k.len() as u64 + v.len() as u64),
+            total_disk_size: 0,
+            live_disk_size: 0,
+            garbage_disk_size: 0,
+        })
     }
 }
 

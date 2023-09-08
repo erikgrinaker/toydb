@@ -1,4 +1,4 @@
-use super::Engine;
+use super::{Engine, Status};
 use crate::error::Result;
 
 use fs4::FileExt;
@@ -64,22 +64,21 @@ impl BitCask {
     pub fn new_compact(path: PathBuf, garbage_ratio_threshold: f64) -> Result<Self> {
         let mut s = Self::new(path)?;
 
-        let (live_bytes, total_bytes) = s.compute_sizes()?;
-        let garbage_bytes = total_bytes - live_bytes;
-        let garbage_ratio = garbage_bytes as f64 / total_bytes as f64;
-        if garbage_bytes > 0 && garbage_ratio >= garbage_ratio_threshold {
+        let status = s.status()?;
+        let garbage_ratio = status.garbage_disk_size as f64 / status.total_disk_size as f64;
+        if status.garbage_disk_size > 0 && garbage_ratio >= garbage_ratio_threshold {
             log::info!(
-                "Compacting {} to remove {:.1}MB garbage ({:.0}% of {:.1}MB)",
+                "Compacting {} to remove {:.3}MB garbage ({:.0}% of {:.3}MB)",
                 s.log.path.display(),
-                garbage_bytes / 1024 / 1024,
+                status.garbage_disk_size / 1024 / 1024,
                 garbage_ratio * 100.0,
-                total_bytes / 1024 / 1024
+                status.total_disk_size / 1024 / 1024
             );
             s.compact()?;
             log::info!(
-                "Compacted {} to size {:.1}MB",
+                "Compacted {} to size {:.3}MB",
                 s.log.path.display(),
-                live_bytes / 1024 / 1024
+                (status.total_disk_size - status.garbage_disk_size) / 1024 / 1024
             );
         }
 
@@ -124,6 +123,25 @@ impl Engine for BitCask {
         self.keydir.insert(key.to_vec(), (pos + len as u64 - value_len as u64, value_len));
         Ok(())
     }
+
+    fn status(&mut self) -> Result<Status> {
+        let keys = self.keydir.len() as u64;
+        let size = self
+            .keydir
+            .iter()
+            .fold(0, |size, (key, (_, value_len))| size + key.len() as u64 + *value_len as u64);
+        let total_disk_size = self.log.file.metadata()?.len();
+        let live_disk_size = size + 8 * keys; // account for length prefixes
+        let garbage_disk_size = total_disk_size - live_disk_size;
+        Ok(Status {
+            name: self.to_string(),
+            keys,
+            size,
+            total_disk_size,
+            live_disk_size,
+            garbage_disk_size,
+        })
+    }
 }
 
 pub struct ScanIterator<'a> {
@@ -166,23 +184,6 @@ impl BitCask {
         self.log = new_log;
         self.keydir = new_keydir;
         Ok(())
-    }
-
-    /// Computes the live and total sizes of the log file, by iterating over the
-    /// keydir and fetching the file's size from the filesystem metadata. The
-    /// garbage size (i.e. old, replaced entries and tombstones) is the
-    /// difference between these values.
-    ///
-    /// We could keep track of these values during mutations, but it's not
-    /// currently needed -- we only use this to determine whether to compact the
-    /// database when it's initially opened, so we'd need to run basically the
-    /// same computations anyway.
-    pub fn compute_sizes(&mut self) -> Result<(u64, u64)> {
-        let total_size = self.log.file.metadata()?.len();
-        let live_size = self.keydir.iter().fold(0, |size, (key, (_, value_len))| {
-            size + 4 + 4 + key.len() as u64 + *value_len as u64
-        });
-        Ok((live_size, total_size))
     }
 
     /// Writes out a new log file with the live entries of the current log file
@@ -504,8 +505,8 @@ mod tests {
 
         let mut s = BitCask::new_compact(path.clone(), 0.2)?;
         setup_log(&mut s)?;
-        let (live_bytes, total_bytes) = s.compute_sizes()?;
-        let garbage_ratio = (total_bytes - live_bytes) as f64 / total_bytes as f64;
+        let status = s.status()?;
+        let garbage_ratio = status.garbage_disk_size as f64 / status.total_disk_size as f64;
         drop(s);
 
         // Test a few threshold value and assert whether it should trigger compaction.
@@ -521,12 +522,13 @@ mod tests {
         for (threshold, expect_compact) in cases.into_iter() {
             std::fs::copy(&path, &compactpath)?;
             let mut s = BitCask::new_compact(compactpath.clone(), threshold)?;
-            let (new_live, new_total) = s.compute_sizes()?;
-            assert_eq!(new_live, live_bytes);
+            let new_status = s.status()?;
+            assert_eq!(new_status.live_disk_size, status.live_disk_size);
             if expect_compact {
-                assert_eq!(new_total, live_bytes);
+                assert_eq!(new_status.total_disk_size, status.live_disk_size);
+                assert_eq!(new_status.garbage_disk_size, 0);
             } else {
-                assert_eq!(new_total, total_bytes);
+                assert_eq!(new_status, status);
             }
         }
 
@@ -605,23 +607,39 @@ mod tests {
     }
 
     #[test]
-    /// Tests compute_sizes(), both for a log file with known garbage, and
+    /// Tests status(), both for a log file with known garbage, and
     /// after compacting it when the live size must equal the file size.
-    fn compute_sizes() -> Result<()> {
+    fn status_full() -> Result<()> {
         let mut s = setup()?;
         setup_log(&mut s)?;
 
-        // Before compaction, the log contains garbage, so the live size must be
-        // less than the log size.
-        let (live_size, total_size) = s.compute_sizes()?;
-        assert_eq!(total_size, s.log.file.metadata()?.len());
-        assert!(live_size < total_size);
+        // Before compaction.
+        assert_eq!(
+            s.status()?,
+            Status {
+                name: "bitcask".to_string(),
+                keys: 5,
+                size: 8,
+                total_disk_size: 114,
+                live_disk_size: 48,
+                garbage_disk_size: 66
+            }
+        );
 
-        // After compaction, the live size should not have changed. Furthermore,
-        // the log now only contains live data, so the live size must equal the
-        // log file size.
+        // After compaction.
         s.compact()?;
-        assert_eq!((live_size, live_size), s.compute_sizes()?);
+        assert_eq!(
+            s.status()?,
+            Status {
+                name: "bitcask".to_string(),
+                keys: 5,
+                size: 8,
+                total_disk_size: 48,
+                live_disk_size: 48,
+                garbage_disk_size: 0,
+            }
+        );
+
         Ok(())
     }
 }

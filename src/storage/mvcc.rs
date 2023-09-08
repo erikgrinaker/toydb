@@ -280,13 +280,12 @@ impl<E: Engine> MVCC<E> {
     /// Returns the status of the MVCC and storage engines.
     pub fn status(&self) -> Result<Status> {
         let mut engine = self.engine.lock()?;
-        let storage = engine.to_string();
         let versions = match engine.get(&Key::NextVersion.encode()?)? {
             Some(ref v) => bincode::deserialize::<u64>(v)? - 1,
             None => 0,
         };
         let active_txns = engine.scan_prefix(&KeyPrefix::TxnActive.encode()?).count() as u64;
-        Ok(Status { storage, versions, active_txns })
+        Ok(Status { versions, active_txns, storage: engine.status()? })
     }
 }
 
@@ -298,8 +297,7 @@ pub struct Status {
     /// Number of currently active transactions.
     pub active_txns: u64,
     /// The storage engine.
-    /// TODO: export engine status instead.
-    pub storage: String,
+    pub storage: super::engine::Status,
 }
 
 /// An MVCC transaction.

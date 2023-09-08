@@ -129,7 +129,8 @@ The following commands are also available:
 Server:    {server} (leader {leader} in term {term} with {nodes} nodes)
 Raft log:  {committed} committed, {applied} applied, {raft_size} MB ({raft_storage} storage)
 Node logs: {logs}
-SQL txns:  {active_txns} active, {versions} total ({sql_storage} storage)
+MVCC:      {active_txns} active txns, {versions} versions
+Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk, {garbage_percent}% garbage ({sql_storage} engine)
 "#,
                     server = status.raft.server,
                     leader = status.raft.leader,
@@ -143,7 +144,24 @@ SQL txns:  {active_txns} active, {versions} total ({sql_storage} storage)
                     logs = node_logs.join(" "),
                     versions = status.mvcc.versions,
                     active_txns = status.mvcc.active_txns,
-                    sql_storage = status.mvcc.storage
+                    keys = status.mvcc.storage.keys,
+                    logical_size =
+                        format_args!("{:.3}", status.mvcc.storage.size as f64 / 1000.0 / 1000.0),
+                    garbage_percent = format_args!(
+                        "{:.0}",
+                        if status.mvcc.storage.total_disk_size > 0 {
+                            status.mvcc.storage.garbage_disk_size as f64
+                                / status.mvcc.storage.total_disk_size as f64
+                                * 100.0
+                        } else {
+                            0.0
+                        }
+                    ),
+                    disk_size = format_args!(
+                        "{:.3}",
+                        status.mvcc.storage.total_disk_size as f64 / 1000.0 / 1000.0
+                    ),
+                    sql_storage = status.mvcc.storage.name,
                 )
             }
             "!table" => {
