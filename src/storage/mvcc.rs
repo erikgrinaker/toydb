@@ -160,29 +160,48 @@ impl<E: Engine> MVCC<E> {
 pub struct Transaction<E: Engine> {
     /// The underlying engine for the transaction. Shared between transactions using a mutex.
     engine: Arc<Mutex<E>>,
+    /// The transaction state.
+    st: TransactionState,
+}
+
+/// A Transaction's state, which determines its write version and isolation. It
+/// is separate from Transaction to allow it to be passed around independently
+/// of the engine. There are two main motivations for this:
+///
+/// - It can be exported via Transaction.state(), (de)serialied, and later used
+///   to instantiate a new functionally equivalent Transaction via
+///   Transaction::resume(). This allows passing the transaction between the
+///   storage engine and SQL engine (potentially running on a different node)
+///   across the Raft state machine boundary.
+///
+/// - It can be borrowed independently of Engine, allowing references to it
+///   in VisibleIterator, which would otherwise result in self-references.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct TransactionState {
     /// The version this transaction is running at. Only one read-write
     /// transaction can run at a given version, since this identifies its
     /// writes.
-    version: Version,
+    pub version: Version,
     /// If true, the transaction is read only.
-    read_only: bool,
+    pub read_only: bool,
     /// The set of concurrent active (uncommitted) transactions, as of the start
     /// of this transaction. Their writes should be invisible to this
     /// transaction even if they're writing at a lower version, since they're
     /// not committed yet.
-    active: HashSet<Version>,
+    pub active: HashSet<Version>,
 }
 
-/// A serializable representation of a Transaction's state. It can be exported
-/// from a Transaction and later used to instantiate a new Transaction that's
-/// functionally equivalent via Transaction::resume(). In particular, this
-/// allows passing the transaction between the SQL engine and storage engine
-/// across the Raft state machine boundary.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct TransactionState {
-    pub version: u64,
-    pub read_only: bool,
-    pub active: HashSet<u64>,
+impl TransactionState {
+    /// Checks whether the given version is visible to this transaction.
+    fn is_visible(&self, version: Version) -> bool {
+        if self.active.get(&version).is_some() {
+            false
+        } else if self.read_only {
+            version < self.version
+        } else {
+            version <= self.version
+        }
+    }
 }
 
 impl<E: Engine> Transaction<E> {
@@ -208,7 +227,7 @@ impl<E: Engine> Transaction<E> {
         session.set(&Key::TxnActive(version).encode()?, vec![])?;
         drop(session);
 
-        Ok(Self { engine, version, read_only: false, active })
+        Ok(Self { engine, st: TransactionState { version, read_only: false, active } })
     }
 
     /// Begins a new read-only transaction. If version is given it will see the
@@ -242,7 +261,7 @@ impl<E: Engine> Transaction<E> {
 
         drop(session);
 
-        Ok(Self { engine, version, read_only: true, active })
+        Ok(Self { engine, st: TransactionState { version, read_only: true, active } })
     }
 
     /// Resumes a transaction from the given state.
@@ -252,7 +271,7 @@ impl<E: Engine> Transaction<E> {
         if !s.read_only && engine.lock()?.get(&Key::TxnActive(s.version).encode()?)?.is_none() {
             return Err(Error::Internal(format!("No active transaction at version {}", s.version)));
         }
-        Ok(Self { engine, version: s.version, read_only: s.read_only, active: s.active })
+        Ok(Self { engine, st: s })
     }
 
     /// Fetches the set of currently active transactions.
@@ -270,47 +289,43 @@ impl<E: Engine> Transaction<E> {
 
     /// Returns the version the transaction is running at.
     pub fn version(&self) -> Version {
-        self.version
+        self.st.version
     }
 
     /// Returns whether the transaction is read-only.
     pub fn read_only(&self) -> bool {
-        self.read_only
+        self.st.read_only
     }
 
     /// Returns the transaction's state. This can be used to instantiate a
     /// functionally equivalent transaction via resume().
-    pub fn state(&self) -> TransactionState {
-        TransactionState {
-            version: self.version,
-            read_only: self.read_only,
-            active: self.active.clone(),
-        }
+    pub fn state(&self) -> &TransactionState {
+        &self.st
     }
 
     /// Commits the transaction, by removing it from the active set. This will
     /// immediately make its writes visible to subsequent transactions.
     pub fn commit(self) -> Result<()> {
-        if self.read_only {
+        if self.st.read_only {
             return Ok(());
         }
-        self.engine.lock()?.delete(&Key::TxnActive(self.version).encode()?)
+        self.engine.lock()?.delete(&Key::TxnActive(self.st.version).encode()?)
     }
 
     /// Rolls back the transaction, by undoing all written versions and removing
     /// it from the active set. The active set snapshot is left behind, since
     /// this is needed for time travel queries at this version.
     pub fn rollback(self) -> Result<()> {
-        if self.read_only {
+        if self.st.read_only {
             return Ok(());
         }
         let mut session = self.engine.lock()?;
         let mut rollback = Vec::new();
-        let mut scan = session.scan_prefix(&KeyPrefix::TxnWrite(self.version).encode()?);
+        let mut scan = session.scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode()?);
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnWrite(_, key) => {
-                    rollback.push(Key::Version(key, self.version).encode()?); // the written version
+                    rollback.push(Key::Version(key, self.st.version).encode()?) // the version
                 }
                 key => return Err(Error::Internal(format!("Expected TxnWrite, got {:?}", key))),
             };
@@ -320,7 +335,7 @@ impl<E: Engine> Transaction<E> {
         for key in rollback.into_iter() {
             session.delete(&key)?;
         }
-        session.delete(&Key::TxnActive(self.version).encode()?) // remove from active set
+        session.delete(&Key::TxnActive(self.st.version).encode()?) // remove from active set
     }
 
     /// Deletes a key.
@@ -338,7 +353,7 @@ impl<E: Engine> Transaction<E> {
     /// uncommitted version), a serialization error is returned.  Replacing our
     /// own uncommitted write is fine.
     fn write_version(&self, key: &[u8], value: Option<Vec<u8>>) -> Result<()> {
-        if self.read_only {
+        if self.st.read_only {
             return Err(Error::ReadOnly);
         }
         let mut session = self.engine.lock()?;
@@ -347,14 +362,16 @@ impl<E: Engine> Transaction<E> {
         // (either a newer version, or an uncommitted version in our past). We
         // can only conflict with the latest key, since all transactions enforce
         // the same invariant.
-        let from =
-            Key::Version(key.into(), self.active.iter().min().copied().unwrap_or(self.version + 1))
-                .encode()?;
+        let from = Key::Version(
+            key.into(),
+            self.st.active.iter().min().copied().unwrap_or(self.st.version + 1),
+        )
+        .encode()?;
         let to = Key::Version(key.into(), u64::MAX).encode()?;
         if let Some((k, _)) = session.scan(from..=to).last().transpose()? {
             match Key::decode(&k)? {
                 Key::Version(_, version) => {
-                    if !self.is_visible(version) {
+                    if !self.st.is_visible(version) {
                         return Err(Error::Serialization);
                     }
                 }
@@ -366,19 +383,9 @@ impl<E: Engine> Transaction<E> {
         //
         // NB: TxnWrite contains the provided user key, not the encoded engine
         // key, since we can construct the engine key using the version.
-        session.set(&Key::TxnWrite(self.version, key.into()).encode()?, vec![])?;
-        session.set(&Key::Version(key.into(), self.version).encode()?, bincode::serialize(&value)?)
-    }
-
-    /// Checks whether the given version is visible to this transaction.
-    fn is_visible(&self, version: Version) -> bool {
-        if self.active.get(&version).is_some() {
-            false
-        } else if self.read_only {
-            version < self.version
-        } else {
-            version <= self.version
-        }
+        session.set(&Key::TxnWrite(self.st.version, key.into()).encode()?, vec![])?;
+        session
+            .set(&Key::Version(key.into(), self.st.version).encode()?, bincode::serialize(&value)?)
     }
 
     /// Fetches a key's value, or None if it does not exist.
@@ -387,13 +394,13 @@ impl<E: Engine> Transaction<E> {
         let mut scan = session
             .scan(
                 Key::Version(key.into(), 0).encode()?
-                    ..=Key::Version(key.into(), self.version).encode()?,
+                    ..=Key::Version(key.into(), self.st.version).encode()?,
             )
             .rev();
         while let Some((k, v)) = scan.next().transpose()? {
             match Key::decode(&k)? {
                 Key::Version(_, version) => {
-                    if self.is_visible(version) {
+                    if self.st.is_visible(version) {
                         return Ok(bincode::deserialize(&v)?);
                     }
                 }
@@ -441,7 +448,7 @@ pub struct Scan<'a, E: Engine + 'a> {
     /// Access to the locked engine.
     engine: MutexGuard<'a, E>,
     /// The transaction state.
-    txn: TransactionState,
+    txn: &'a TransactionState,
     /// The scan type and parameter.
     param: ScanType,
 }
@@ -455,7 +462,7 @@ impl<'a, E: Engine + 'a> Scan<'a, E> {
     /// Runs a normal range scan.
     fn from_range(
         engine: MutexGuard<'a, E>,
-        txn: TransactionState,
+        txn: &'a TransactionState,
         start: Bound<Vec<u8>>,
         end: Bound<Vec<u8>>,
     ) -> Self {
@@ -463,7 +470,7 @@ impl<'a, E: Engine + 'a> Scan<'a, E> {
     }
 
     /// Runs a prefix scan.
-    fn from_prefix(engine: MutexGuard<'a, E>, txn: TransactionState, prefix: Vec<u8>) -> Self {
+    fn from_prefix(engine: MutexGuard<'a, E>, txn: &'a TransactionState, prefix: Vec<u8>) -> Self {
         Self { engine, txn, param: ScanType::Prefix(prefix) }
     }
 
@@ -473,7 +480,7 @@ impl<'a, E: Engine + 'a> Scan<'a, E> {
             ScanType::Range(range) => self.engine.scan(range.clone()),
             ScanType::Prefix(prefix) => self.engine.scan_prefix(prefix),
         };
-        ScanIterator::new(&self.txn, inner)
+        ScanIterator::new(self.txn, inner)
     }
 
     /// Collects the result to a vector.
@@ -559,6 +566,7 @@ struct VersionIterator<'a, E: Engine + 'a> {
     inner: E::ScanIterator<'a>,
 }
 
+#[allow(clippy::type_complexity)]
 impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
     /// Creates a new MVCC version iterator for the given engine iterator.
     fn new(txn: &'a TransactionState, inner: E::ScanIterator<'a>) -> Self {
@@ -572,21 +580,10 @@ impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
             Key::Version(key, version) => (key.into_owned(), version),
             key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
         };
-        if self.is_visible(version) {
+        if self.txn.is_visible(version) {
             Ok(Some((key, version)))
         } else {
             Ok(None)
-        }
-    }
-
-    /// Checks whether the given version is visible to this scan's transaction.
-    fn is_visible(&self, version: Version) -> bool {
-        if self.txn.active.get(&version).is_some() {
-            false
-        } else if self.txn.read_only {
-            version < self.txn.version
-        } else {
-            version <= self.txn.version
         }
     }
 
@@ -761,7 +758,7 @@ pub mod tests {
 
         // We now resume t3, who should see it's own changes but none
         // of the others'
-        let state = t3.state();
+        let state = t3.state().clone();
         std::mem::drop(t3);
         let tr = mvcc.resume(state.clone())?;
         assert_eq!(3, tr.version());
@@ -798,7 +795,7 @@ pub mod tests {
         assert_eq!(2, ts.version());
         assert_eq!(Some(b"t1".to_vec()), ts.get(b"a")?);
 
-        let state = ts.state();
+        let state = ts.state().clone();
         std::mem::drop(ts);
         let ts = mvcc.resume(state)?;
         assert_eq!(2, ts.version());

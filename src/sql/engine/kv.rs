@@ -85,7 +85,7 @@ impl<E: storage::Engine> Transaction<E> {
     }
 
     /// Returns the transaction's serialized state.
-    pub(super) fn state(&self) -> storage::mvcc::TransactionState {
+    pub(super) fn state(&self) -> &storage::mvcc::TransactionState {
         self.txn.state()
     }
 
