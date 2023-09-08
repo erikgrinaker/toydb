@@ -136,8 +136,8 @@ async fn status() -> Result<()> {
                 active_txns: 0,
                 storage: engine::Status {
                     name: "memory".to_string(),
-                    keys: 50,
-                    size: 3783,
+                    keys: 26,
+                    size: 2958,
                     total_disk_size: 0,
                     live_disk_size: 0,
                     garbage_disk_size: 0

@@ -459,12 +459,21 @@ impl<E: Engine> Transaction<E> {
     }
 
     /// Commits the transaction, by removing it from the active set. This will
-    /// immediately make its writes visible to subsequent transactions.
+    /// immediately make its writes visible to subsequent transactions. Also
+    /// removes its TxnWrite records, which are no longer needed.
     pub fn commit(self) -> Result<()> {
         if self.st.read_only {
             return Ok(());
         }
-        self.engine.lock()?.delete(&Key::TxnActive(self.st.version).encode()?)
+        let mut session = self.engine.lock()?;
+        let remove = session
+            .scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode()?)
+            .map(|r| r.map(|(k, _)| k))
+            .collect::<Result<Vec<_>>>()?;
+        for key in remove {
+            session.delete(&key)?
+        }
+        session.delete(&Key::TxnActive(self.st.version).encode()?)
     }
 
     /// Rolls back the transaction, by undoing all written versions and removing
