@@ -10,19 +10,19 @@ use std::clone::Clone;
 use std::collections::HashSet;
 
 /// A SQL engine based on an underlying MVCC key/value store.
-pub struct KV<E: storage::Engine> {
+pub struct KV<E: storage::engine::Engine> {
     /// The underlying key/value store.
     pub(super) kv: storage::mvcc::MVCC<E>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl<E: storage::Engine> Clone for KV<E> {
+impl<E: storage::engine::Engine> Clone for KV<E> {
     fn clone(&self) -> Self {
         KV { kv: self.kv.clone() }
     }
 }
 
-impl<E: storage::Engine> KV<E> {
+impl<E: storage::engine::Engine> KV<E> {
     /// Creates a new key/value-based SQL engine
     pub fn new(engine: E) -> Self {
         Self { kv: storage::mvcc::MVCC::new(engine) }
@@ -47,7 +47,7 @@ impl<E: storage::Engine> KV<E> {
     }
 }
 
-impl<E: storage::Engine> super::Engine for KV<E> {
+impl<E: storage::engine::Engine> super::Engine for KV<E> {
     type Transaction = Transaction<E>;
 
     fn begin(&self) -> Result<Self::Transaction> {
@@ -74,11 +74,11 @@ fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
 }
 
 /// An SQL transaction based on an MVCC key/value transaction
-pub struct Transaction<E: storage::Engine> {
+pub struct Transaction<E: storage::engine::Engine> {
     txn: storage::mvcc::Transaction<E>,
 }
 
-impl<E: storage::Engine> Transaction<E> {
+impl<E: storage::engine::Engine> Transaction<E> {
     /// Creates a new SQL transaction from an MVCC transaction
     fn new(txn: storage::mvcc::Transaction<E>) -> Self {
         Self { txn }
@@ -116,7 +116,7 @@ impl<E: storage::Engine> Transaction<E> {
     }
 }
 
-impl<E: storage::Engine> super::Transaction for Transaction<E> {
+impl<E: storage::engine::Engine> super::Transaction for Transaction<E> {
     fn version(&self) -> u64 {
         self.txn.version()
     }
@@ -286,7 +286,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     }
 }
 
-impl<E: storage::Engine> Catalog for Transaction<E> {
+impl<E: storage::engine::Engine> Catalog for Transaction<E> {
     fn create_table(&mut self, table: Table) -> Result<()> {
         if self.read_table(&table.name)?.is_some() {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
