@@ -673,7 +673,7 @@ mod tests {
                     commit_index: 2,
                     apply_index: 0,
                     storage: "test".into(),
-                    storage_size: 130,
+                    storage_size: 25,
                 }),
             }],
         );

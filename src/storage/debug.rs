@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use super::bincode;
 use super::mvcc::{self, TransactionState};
 
 /// Formats a raw byte string, either as a UTF-8 string (if valid and

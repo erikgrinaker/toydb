@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
-use crate::storage::log;
 use crate::storage::log::Range;
+use crate::storage::{bincode, log};
 
 use ::log::debug;
 use serde::{Deserialize, Serialize};
@@ -175,12 +175,12 @@ impl Log {
 
     /// Serializes a value for the log store.
     fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
-        Ok(bincode::serialize(value)?)
+        bincode::serialize(value)
     }
 
     /// Deserializes a value from the log store.
     fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
-        Ok(bincode::deserialize(bytes)?)
+        bincode::deserialize(bytes)
     }
 }
 

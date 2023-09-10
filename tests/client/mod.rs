@@ -129,7 +129,7 @@ async fn status() -> Result<()> {
                 commit_index: 26,
                 apply_index: 26,
                 storage: "hybrid".into(),
-                storage_size: 3462,
+                storage_size: 1202,
             },
             mvcc: mvcc::Status {
                 versions: 1,
@@ -137,7 +137,7 @@ async fn status() -> Result<()> {
                 storage: engine::Status {
                     name: "memory".to_string(),
                     keys: 26,
-                    size: 2958,
+                    size: 1630,
                     total_disk_size: 0,
                     live_disk_size: 0,
                     garbage_disk_size: 0

@@ -3,7 +3,7 @@ use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, IndexScan, Scan, Transaction as _};
 use crate::error::{Error, Result};
 use crate::raft;
-use crate::storage::{self, mvcc::TransactionState};
+use crate::storage::{self, bincode, mvcc::TransactionState};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -92,12 +92,12 @@ impl Raft {
 
     /// Serializes a command for the Raft SQL state machine.
     fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
-        Ok(bincode::serialize(value)?)
+        bincode::serialize(value)
     }
 
     /// Deserializes a command for the Raft SQL state machine.
     fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
-        Ok(bincode::deserialize(bytes)?)
+        bincode::deserialize(bytes)
     }
 }
 

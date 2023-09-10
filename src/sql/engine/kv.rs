@@ -2,7 +2,7 @@ use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
 use crate::error::{Error, Result};
-use crate::storage::{self, keycode};
+use crate::storage::{self, bincode, keycode};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -65,12 +65,12 @@ impl<E: storage::engine::Engine> super::Engine for KV<E> {
 
 /// Serializes SQL metadata.
 fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
-    Ok(bincode::serialize(value)?)
+    bincode::serialize(value)
 }
 
 /// Deserializes SQL metadata.
 fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
-    Ok(bincode::deserialize(bytes)?)
+    bincode::deserialize(bytes)
 }
 
 /// An SQL transaction based on an MVCC key/value transaction

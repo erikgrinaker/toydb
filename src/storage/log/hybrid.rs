@@ -21,6 +21,8 @@ use std::sync::{Mutex, MutexGuard};
 /// scanning the file, since maintaining the index in a separate file requires additional fsyncing
 /// which is expensive. Since datasets are expected to be small, scanning the file on startup is
 /// reasonably cheap.
+///
+/// TODO: Should use crate::storage::bincode instead of ::bincode.
 pub struct Hybrid {
     /// The append-only log file. Protected by a mutex for interior mutability (i.e. read seeks).
     file: Mutex<File>,

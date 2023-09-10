@@ -139,7 +139,7 @@
 //! forever, both out of laziness and also because it allows unlimited time
 //! travel queries (it's a feature, not a bug!).
 
-use super::{engine::Engine, keycode};
+use super::{bincode, engine::Engine, keycode};
 use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
@@ -562,7 +562,7 @@ impl<E: Engine> Transaction<E> {
             match Key::decode(&key)? {
                 Key::Version(_, version) => {
                     if self.st.is_visible(version) {
-                        return Ok(bincode::deserialize(&value)?);
+                        return bincode::deserialize(&value);
                     }
                 }
                 key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
