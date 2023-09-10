@@ -184,31 +184,31 @@ transaction, which provides the usual key/value operations such as `get`, `set`,
 Additionally, it has a `commit` method which persists the changes and makes them visible to
 other transactions, and a `rollback` method which discards them.
 
-When a transaction begins, it fetches the next available transaction ID from `Key::TxnNext` and
-increments it, then records itself as an active transaction via `Key::TxnActive(id)`. It also
-takes a `Snapshot`, containing the IDs of all other active transactions as of the transaction start,
-and saves it as `Key::TxnSnapshot(id)`.
+When a transaction begins, it fetches the next available version from `Key::NextVersion` and
+increments it, then records itself as an active transaction via `Key::TxnActive(version)`. It also
+takes a snapshot of the active set, containing the versions of all other active transactions as of
+the transaction start, and saves it as `Key::TxnActiveSnapshot(id)`.
 
-Key/value pairs are saved as `Key::Record(key, version)`, where `key` is the user-provided key
-and `version` is the transaction ID which created the record. The visibility of key/value pairs
-for a transaction is given as follows:
+Key/value pairs are saved as `Key::Version(key, version)`, where `key` is the user-provided key
+and `version` is the transaction's version. The visibility of key/value pairs for a transaction is 
+given as follows:
 
-* For a given user key, do a reverse scan of `Key::Record(key, version)` starting at the current 
-  transaction's ID.
+* For a given user key, do a reverse scan of `Key::Version(key, version)` starting at the current 
+  transaction's version.
 
-* Skip any records whose version is in the list of active transaction IDs in the `Snapshot`.
+* Skip any records whose version is in the transaction's snapshot of the active set.
 
 * Return the first matching record, if any. This record may be either a `Some(value)` or a `None`
   if the key was deleted.
 
 When writing a key/value pair, the transaction first checks for any conflicts by scanning for a
-`Key::Record(key, version)` which is not visible to it. If one is found, a serialization error
+`Key::Version(key, version)` which is not visible to it. If one is found, a serialization error
 is returned and the client must retry the transaction. Otherwise, the transaction writes the new
-record and keeps track of the change as `Key::Update(id, key)` in case it must roll back later.
+record and keeps track of the change as `Key::TxnWrite(version, key)` in case it must roll back.
 
 When the transaction commits, it simply deletes its `Txn::Active(id)` record, thus making its
 changes visible to any subsequent transactions. If the transaction instead rolls back, it
-iterates over all `Key::Update(id, key)` entries and removes the written key/value records before
+iterates over all `Key::TxnWrite(id, key)` entries and removes the written key/value records before
 removing its `Txn::Active(id)` entry.
 
 This simple scheme is sufficient to provide ACID transaction guarantees with snapshot isolation:
@@ -216,14 +216,10 @@ commits are atomic, a transaction sees a consistent snapshot of the key/value st
 start of the transaction, and any write conflicts result in serialization errors which must be
 retried.
 
-To satisfy time travel queries, a read-only transaction simply loads the `Snapshot` entry of a
-past transaction and applies the same visibility rules as for normal transactions.
+To satisfy time travel queries, a read-only transaction simply loads the `Key::TxnActiveSnapshot`
+entry of a past transaction and applies the same visibility rules as for normal transactions.
 
 #### MVCC Tradeoffs
-
-**Read-only transaction IDs:** all transactions, even read-only transactions, are allocated a
-unique transaction ID. This means that a single standalone `SELECT` query will result in a write
-operation to increment the transaction ID counter, which can be expensive.
 
 **Serializability:** snapshot isolation is not fully serializable, since it exhibits
 [write skew anomalies](http://justinjaffray.com/what-does-write-skew-look-like/). This would
