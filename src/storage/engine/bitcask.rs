@@ -381,7 +381,7 @@ impl Log {
 mod tests {
     use super::*;
 
-    const GOLDEN_DIR: &str = "src/storage/engine/golden/bitcask";
+    const GOLDEN_DIR: &str = "src/storage/golden/bitcask";
 
     super::super::tests::test_engine!({
         let path = tempdir::TempDir::new("toydb")?.path().join("toydb");
