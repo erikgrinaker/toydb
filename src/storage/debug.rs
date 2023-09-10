@@ -38,6 +38,8 @@ pub fn format_hashset<T: Copy + Ord + std::fmt::Display>(set: &HashSet<T>) -> St
 
 /// Formats a raw engine key/value pair, or just the key if the value is None.
 /// Attempts to decode known MVCC key formats and values.
+///
+/// TODO: decode Raft and SQL keys/values too.
 pub fn format_key_value(key: &[u8], value: &Option<Vec<u8>>) -> (String, Option<String>) {
     // Default to string/hex formatting of the raw key and value.
     let mut fkey = format_raw(key);
