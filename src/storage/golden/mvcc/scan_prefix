@@ -1,0 +1,117 @@
+Engine state:
+NextVersion = 5
+Version("B", 1) = 0x0001
+Version("B", 3) = None
+Version("a", 1) = 0x0a01
+Version("a", 2) = None
+Version("a", 3) = 0x0a03
+Version("b", 1) = None
+Version("b", 3) = 0x0b03
+Version("b", 4) = None
+Version("ba", 2) = 0xba02
+Version("ba", 4) = 0xba04
+Version("bb", 2) = 0xbb02
+Version("bb", 3) = None
+Version("bc", 2) = 0xbc02
+Version("c", 1) = 0x0c01
+
+T1: begin as of 1 → v1 read-only active={}
+
+T1: scan prefix []
+
+T2: begin as of 2 → v2 read-only active={}
+
+T2: scan prefix []
+    "B" = 0x0001
+    "a" = 0x0a01
+    "c" = 0x0c01
+
+T3: begin as of 3 → v3 read-only active={}
+
+T3: scan prefix []
+    "B" = 0x0001
+    "ba" = 0xba02
+    "bb" = 0xbb02
+    "bc" = 0xbc02
+    "c" = 0x0c01
+
+T4: begin as of 4 → v4 read-only active={}
+
+T4: scan prefix []
+    "a" = 0x0a03
+    "b" = 0x0b03
+    "ba" = 0xba02
+    "bc" = 0xbc02
+    "c" = 0x0c01
+
+T5: begin as of 3 → v3 read-only active={}
+
+T5: scan prefix "B"
+    "B" = 0x0001
+
+T5: scan prefix "a"
+
+T5: scan prefix "b"
+    "ba" = 0xba02
+    "bb" = 0xbb02
+    "bc" = 0xbc02
+
+T5: scan prefix "ba"
+    "ba" = 0xba02
+
+T5: scan prefix "bb"
+    "bb" = 0xbb02
+
+T5: scan prefix "bbb"
+
+T5: scan prefix "bc"
+    "bc" = 0xbc02
+
+T5: scan prefix "c"
+    "c" = 0x0c01
+
+T5: scan prefix "d"
+
+T6: begin as of 4 → v4 read-only active={}
+
+T6: scan prefix "B"
+
+T6: scan prefix "a"
+    "a" = 0x0a03
+
+T6: scan prefix "b"
+    "b" = 0x0b03
+    "ba" = 0xba02
+    "bc" = 0xbc02
+
+T6: scan prefix "ba"
+    "ba" = 0xba02
+
+T6: scan prefix "bb"
+
+T6: scan prefix "bbb"
+
+T6: scan prefix "bc"
+    "bc" = 0xbc02
+
+T6: scan prefix "c"
+    "c" = 0x0c01
+
+T6: scan prefix "d"
+
+Engine state:
+NextVersion = 5
+Version("B", 1) = 0x0001
+Version("B", 3) = None
+Version("a", 1) = 0x0a01
+Version("a", 2) = None
+Version("a", 3) = 0x0a03
+Version("b", 1) = None
+Version("b", 3) = 0x0b03
+Version("b", 4) = None
+Version("ba", 2) = 0xba02
+Version("ba", 4) = 0xba04
+Version("bb", 2) = 0xbb02
+Version("bb", 3) = None
+Version("bc", 2) = 0xbc02
+Version("c", 1) = 0x0c01

@@ -1,0 +1,59 @@
+T_: set unversioned "a" = 0x00
+    set Unversioned("a") = 0x00
+
+T1: begin → v1 read-write active={}
+    set NextVersion = 2
+    set TxnActive(1) = []
+
+T1: set "a" = 0x01
+    set TxnWrite(1, "a") = []
+    set Version("a", 1) = 0x01
+
+T1: set "b" = 0x01
+    set TxnWrite(1, "b") = []
+    set Version("b", 1) = 0x01
+
+T1: set "c" = 0x01
+    set TxnWrite(1, "c") = []
+    set Version("c", 1) = 0x01
+
+T1: commit
+    del TxnWrite(1, "a")
+    del TxnWrite(1, "b")
+    del TxnWrite(1, "c")
+    del TxnActive(1)
+
+T_: set unversioned "b" = 0x00
+    set Unversioned("b") = 0x00
+
+T_: set unversioned "d" = 0x00
+    set Unversioned("d") = 0x00
+
+T2: begin read-only → v2 read-only active={}
+
+T2: scan ..
+    "a" = 0x01
+    "b" = 0x01
+    "c" = 0x01
+
+T_: get unversioned "a" → 0x00
+
+T_: get unversioned "b" → 0x00
+
+T_: get unversioned "c" → None
+
+T_: get unversioned "d" → 0x00
+
+T_: set unversioned "a" = 0x01
+    set Unversioned("a") = 0x01
+
+T_: get unversioned "a" → 0x01
+
+Engine state:
+NextVersion = 2
+Version("a", 1) = 0x01
+Version("b", 1) = 0x01
+Version("c", 1) = 0x01
+Unversioned("a") = 0x01
+Unversioned("b") = 0x00
+Unversioned("d") = 0x00

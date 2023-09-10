@@ -1,0 +1,27 @@
+Engine state:
+NextVersion = 3
+Version("deleted", 1) = 0x01
+Version("deleted", 2) = None
+Version("key", 1) = 0x01
+Version("tombstone", 1) = None
+Version("updated", 1) = 0x01
+Version("updated", 2) = 0x02
+
+T1: begin read-only → v3 read-only active={}
+
+T1: get "key" → 0x01
+
+T1: get "updated" → 0x02
+
+T1: get "deleted" → None
+
+T1: get "tombstone" → None
+
+Engine state:
+NextVersion = 3
+Version("deleted", 1) = 0x01
+Version("deleted", 2) = None
+Version("key", 1) = 0x01
+Version("tombstone", 1) = None
+Version("updated", 1) = 0x01
+Version("updated", 2) = 0x02

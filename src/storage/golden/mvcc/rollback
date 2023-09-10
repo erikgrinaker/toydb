@@ -1,0 +1,94 @@
+Engine state:
+NextVersion = 2
+Version("a", 1) = 0x00
+Version("b", 1) = 0x00
+Version("c", 1) = 0x00
+Version("d", 1) = 0x00
+
+T1: begin → v2 read-write active={}
+    set NextVersion = 3
+    set TxnActive(2) = []
+
+T2: begin → v3 read-write active={2}
+    set NextVersion = 4
+    set TxnActiveSnapshot(3) = {2}
+    set TxnActive(3) = []
+
+T3: begin → v4 read-write active={2,3}
+    set NextVersion = 5
+    set TxnActiveSnapshot(4) = {2,3}
+    set TxnActive(4) = []
+
+T1: set "a" = 0x01
+    set TxnWrite(2, "a") = []
+    set Version("a", 2) = 0x01
+
+T2: set "b" = 0x02
+    set TxnWrite(3, "b") = []
+    set Version("b", 3) = 0x02
+
+T2: del "c"
+    set TxnWrite(3, "c") = []
+    set Version("c", 3) = None
+
+T3: set "d" = 0x03
+    set TxnWrite(4, "d") = []
+    set Version("d", 4) = 0x03
+
+T1: set "b" = 0x01 → Error::Serialization
+
+T3: set "c" = 0x03 → Error::Serialization
+
+T2: rollback
+    del Version("b", 3)
+    del TxnWrite(3, "b")
+    del Version("c", 3)
+    del TxnWrite(3, "c")
+    del TxnActive(3)
+
+T4: begin read-only → v5 read-only active={2,4}
+
+T4: scan ..
+    "a" = 0x00
+    "b" = 0x00
+    "c" = 0x00
+    "d" = 0x00
+
+T1: set "b" = 0x01
+    set TxnWrite(2, "b") = []
+    set Version("b", 2) = 0x01
+
+T3: set "c" = 0x03
+    set TxnWrite(4, "c") = []
+    set Version("c", 4) = 0x03
+
+T1: commit
+    del TxnWrite(2, "a")
+    del TxnWrite(2, "b")
+    del TxnActive(2)
+
+T3: commit
+    del TxnWrite(4, "c")
+    del TxnWrite(4, "d")
+    del TxnActive(4)
+
+T5: begin read-only → v5 read-only active={}
+
+T5: scan ..
+    "a" = 0x01
+    "b" = 0x01
+    "c" = 0x03
+    "d" = 0x03
+
+Engine state:
+NextVersion = 5
+TxnActiveSnapshot(3) = {2}
+TxnActiveSnapshot(4) = {2,3}
+Version("a", 1) = 0x00
+Version("a", 2) = 0x01
+Version("b", 1) = 0x00
+Version("b", 2) = 0x01
+Version("c", 1) = 0x00
+Version("c", 4) = 0x03
+Version("d", 1) = 0x00
+Version("d", 4) = 0x03

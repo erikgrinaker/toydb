@@ -1,0 +1,22 @@
+T1: begin → v1 read-write active={}
+    set NextVersion = 2
+    set TxnActive(1) = []
+
+T1: set "key" = 0x01
+    set TxnWrite(1, "key") = []
+    set Version("key", 1) = 0x01
+
+T2: begin → v2 read-write active={1}
+    set NextVersion = 3
+    set TxnActiveSnapshot(2) = {1}
+    set TxnActive(2) = []
+
+T2: get "key" → None
+
+Engine state:
+NextVersion = 3
+TxnActive(1) = []
+TxnActive(2) = []
+TxnActiveSnapshot(2) = {1}
+TxnWrite(1, "key") = []
+Version("key", 1) = 0x01

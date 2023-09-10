@@ -1,0 +1,89 @@
+T1: begin → v1 read-write active={}
+    set NextVersion = 2
+    set TxnActive(1) = []
+
+T1: set "other" = 0x01
+    set TxnWrite(1, "other") = []
+    set Version("other", 1) = 0x01
+
+T2: begin → v2 read-write active={1}
+    set NextVersion = 3
+    set TxnActiveSnapshot(2) = {1}
+    set TxnActive(2) = []
+
+T2: set "key" = 0x02
+    set TxnWrite(2, "key") = []
+    set Version("key", 2) = 0x02
+
+T2: commit
+    del TxnWrite(2, "key")
+    del TxnActive(2)
+
+T3: begin → v3 read-write active={1}
+    set NextVersion = 4
+    set TxnActiveSnapshot(3) = {1}
+    set TxnActive(3) = []
+
+T3: set "key" = 0x03
+    set TxnWrite(3, "key") = []
+    set Version("key", 3) = 0x03
+
+T4: begin as of 3 → v3 read-only active={1}
+
+T4: scan ..
+    "key" = 0x02
+
+T4: set "foo" = 0x01 → Error::ReadOnly
+
+T4: del "foo" → Error::ReadOnly
+
+T1: commit
+    del TxnWrite(1, "other")
+    del TxnActive(1)
+
+T3: commit
+    del TxnWrite(3, "key")
+    del TxnActive(3)
+
+T4: scan ..
+    "key" = 0x02
+
+T5: begin as of 3 → v3 read-only active={1}
+
+T5: scan ..
+    "key" = 0x02
+
+T4: rollback
+
+T5: commit
+
+T6: begin → v4 read-write active={}
+    set NextVersion = 5
+    set TxnActive(4) = []
+
+T6: set "key" = 0x04
+    set TxnWrite(4, "key") = []
+    set Version("key", 4) = 0x04
+
+T6: commit
+    del TxnWrite(4, "key")
+    del TxnActive(4)
+
+T7: begin as of 4 → v4 read-only active={}
+
+T7: scan ..
+    "key" = 0x03
+    "other" = 0x01
+
+T8: begin as of 5 → Error::Value("Version 5 does not exist")
+
+T9: begin as of 9 → Error::Value("Version 9 does not exist")
+
+Engine state:
+NextVersion = 5
+TxnActiveSnapshot(2) = {1}
+TxnActiveSnapshot(3) = {1}
+Version("key", 2) = 0x02
+Version("key", 3) = 0x03
+Version("key", 4) = 0x04
+Version("other", 1) = 0x01

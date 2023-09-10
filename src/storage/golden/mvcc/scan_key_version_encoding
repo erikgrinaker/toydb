@@ -1,0 +1,53 @@
+T1: begin → v1 read-write active={}
+    set NextVersion = 2
+    set TxnActive(1) = []
+
+T1: set 0x00 = 0x01
+    set TxnWrite(1, 0x00) = []
+    set Version(0x00, 1) = 0x01
+
+T1: commit
+    del TxnWrite(1, 0x00)
+    del TxnActive(1)
+
+T2: begin → v2 read-write active={}
+    set NextVersion = 3
+    set TxnActive(2) = []
+
+T2: set 0x00 = 0x02
+    set TxnWrite(2, 0x00) = []
+    set Version(0x00, 2) = 0x02
+
+T2: set 0x000000000000000002 = 0x02
+    set TxnWrite(2, 0x000000000000000002) = []
+    set Version(0x000000000000000002, 2) = 0x02
+
+T2: commit
+    del TxnWrite(2, 0x00)
+    del TxnWrite(2, 0x000000000000000002)
+    del TxnActive(2)
+
+T3: begin → v3 read-write active={}
+    set NextVersion = 4
+    set TxnActive(3) = []
+
+T3: set 0x00 = 0x03
+    set TxnWrite(3, 0x00) = []
+    set Version(0x00, 3) = 0x03
+
+T3: commit
+    del TxnWrite(3, 0x00)
+    del TxnActive(3)
+
+T4: begin read-only → v4 read-only active={}
+
+T4: scan ..
+    0x00 = 0x03
+    0x000000000000000002 = 0x02
+
+Engine state:
+NextVersion = 4
+Version(0x00, 1) = 0x01
+Version(0x00, 2) = 0x02
+Version(0x00, 3) = 0x03
+Version(0x000000000000000002, 2) = 0x02

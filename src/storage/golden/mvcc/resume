@@ -1,0 +1,110 @@
+T1: begin → v1 read-write active={}
+    set NextVersion = 2
+    set TxnActive(1) = []
+
+T1: set "a" = 0x01
+    set TxnWrite(1, "a") = []
+    set Version("a", 1) = 0x01
+
+T1: set "b" = 0x01
+    set TxnWrite(1, "b") = []
+    set Version("b", 1) = 0x01
+
+T1: commit
+    del TxnWrite(1, "a")
+    del TxnWrite(1, "b")
+    del TxnActive(1)
+
+T2: begin → v2 read-write active={}
+    set NextVersion = 3
+    set TxnActive(2) = []
+
+T3: begin → v3 read-write active={2}
+    set NextVersion = 4
+    set TxnActiveSnapshot(3) = {2}
+    set TxnActive(3) = []
+
+T4: begin → v4 read-write active={2,3}
+    set NextVersion = 5
+    set TxnActiveSnapshot(4) = {2,3}
+    set TxnActive(4) = []
+
+T2: set "a" = 0x02
+    set TxnWrite(2, "a") = []
+    set Version("a", 2) = 0x02
+
+T3: set "b" = 0x03
+    set TxnWrite(3, "b") = []
+    set Version("b", 3) = 0x03
+
+T4: set "c" = 0x04
+    set TxnWrite(4, "c") = []
+    set Version("c", 4) = 0x04
+
+T2: commit
+    del TxnWrite(2, "a")
+    del TxnActive(2)
+
+T4: commit
+    del TxnWrite(4, "c")
+    del TxnActive(4)
+
+T5: resume → v3 read-write active={2}
+
+T5: scan ..
+    "a" = 0x01
+    "b" = 0x03
+
+T6: begin → v5 read-write active={3}
+    set NextVersion = 6
+    set TxnActiveSnapshot(5) = {3}
+    set TxnActive(5) = []
+
+T6: scan ..
+    "a" = 0x02
+    "b" = 0x01
+    "c" = 0x04
+
+T6: rollback
+    del TxnActive(5)
+
+T5: commit
+    del TxnWrite(3, "b")
+    del TxnActive(3)
+
+T7: begin → v6 read-write active={}
+    set NextVersion = 7
+    set TxnActive(6) = []
+
+T7: scan ..
+    "a" = 0x02
+    "b" = 0x03
+    "c" = 0x04
+
+T7: rollback
+    del TxnActive(6)
+
+T8: resume → Error::Internal("No active transaction at version 3")
+
+T9: begin as of 3 → v3 read-only active={2}
+
+T9: scan ..
+    "a" = 0x01
+    "b" = 0x01
+
+T10: resume → v3 read-only active={2}
+
+T10: scan ..
+    "a" = 0x01
+    "b" = 0x01
+
+Engine state:
+NextVersion = 7
+TxnActiveSnapshot(3) = {2}
+TxnActiveSnapshot(4) = {2,3}
+TxnActiveSnapshot(5) = {3}
+Version("a", 1) = 0x01
+Version("a", 2) = 0x02
+Version("b", 1) = 0x01
+Version("b", 3) = 0x03
+Version("c", 4) = 0x04

@@ -1,0 +1,42 @@
+Engine state:
+NextVersion = 2
+Version("key", 1) = 0x01
+Version("tombstone", 1) = None
+
+T1: begin → v2 read-write active={}
+    set NextVersion = 3
+    set TxnActive(2) = []
+
+T1: set "key" = 0x02
+    set TxnWrite(2, "key") = []
+    set Version("key", 2) = 0x02
+
+T1: set "tombstone" = 0x02
+    set TxnWrite(2, "tombstone") = []
+    set Version("tombstone", 2) = 0x02
+
+T1: set "new" = 0x01
+    set TxnWrite(2, "new") = []
+    set Version("new", 2) = 0x01
+
+T1: set "new" = 0x01
+    set TxnWrite(2, "new") = []
+    set Version("new", 2) = 0x01
+
+T1: set "new" = 0x02
+    set TxnWrite(2, "new") = []
+    set Version("new", 2) = 0x02
+
+T1: commit
+    del TxnWrite(2, "key")
+    del TxnWrite(2, "new")
+    del TxnWrite(2, "tombstone")
+    del TxnActive(2)
+
+Engine state:
+NextVersion = 3
+Version("key", 1) = 0x01
+Version("key", 2) = 0x02
+Version("new", 2) = 0x02
+Version("tombstone", 1) = None
+Version("tombstone", 2) = 0x02

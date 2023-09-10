@@ -1,0 +1,30 @@
+T1: begin → v1 read-write active={}
+    set NextVersion = 2
+    set TxnActive(1) = []
+
+T2: begin → v2 read-write active={1}
+    set NextVersion = 3
+    set TxnActiveSnapshot(2) = {1}
+    set TxnActive(2) = []
+
+T3: begin → v3 read-write active={1,2}
+    set NextVersion = 4
+    set TxnActiveSnapshot(3) = {1,2}
+    set TxnActive(3) = []
+
+T2: commit
+    del TxnActive(2)
+
+T4: begin → v4 read-write active={1,3}
+    set NextVersion = 5
+    set TxnActiveSnapshot(4) = {1,3}
+    set TxnActive(4) = []
+
+Engine state:
+NextVersion = 5
+TxnActive(1) = []
+TxnActive(3) = []
+TxnActive(4) = []
+TxnActiveSnapshot(2) = {1}
+TxnActiveSnapshot(3) = {1,2}
+TxnActiveSnapshot(4) = {1,3}

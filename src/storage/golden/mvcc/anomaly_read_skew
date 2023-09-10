@@ -1,0 +1,39 @@
+Engine state:
+NextVersion = 2
+Version("a", 1) = 0x00
+Version("b", 1) = 0x00
+
+T1: begin → v2 read-write active={}
+    set NextVersion = 3
+    set TxnActive(2) = []
+
+T2: begin → v3 read-write active={2}
+    set NextVersion = 4
+    set TxnActiveSnapshot(3) = {2}
+    set TxnActive(3) = []
+
+T1: get "a" → 0x00
+
+T2: set "a" = 0x02
+    set TxnWrite(3, "a") = []
+    set Version("a", 3) = 0x02
+
+T2: set "b" = 0x02
+    set TxnWrite(3, "b") = []
+    set Version("b", 3) = 0x02
+
+T2: commit
+    del TxnWrite(3, "a")
+    del TxnWrite(3, "b")
+    del TxnActive(3)
+
+T1: get "a" → 0x00
+
+Engine state:
+NextVersion = 4
+TxnActive(2) = []
+TxnActiveSnapshot(3) = {2}
+Version("a", 1) = 0x00
+Version("a", 3) = 0x02
+Version("b", 1) = 0x00
+Version("b", 3) = 0x02

@@ -1,0 +1,15 @@
+T1: begin read-only → v1 read-only active={}
+
+T1: set "foo" = 0x01 → Error::ReadOnly
+
+T1: del "foo" → Error::ReadOnly
+
+T2: begin → v1 read-write active={}
+    set NextVersion = 2
+    set TxnActive(1) = []
+
+T3: begin read-only → v2 read-only active={1}
+
+Engine state:
+NextVersion = 2
+TxnActive(1) = []
