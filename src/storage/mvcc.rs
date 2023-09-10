@@ -503,12 +503,12 @@ impl<E: Engine> Transaction<E> {
     }
 
     /// Deletes a key.
-    pub fn delete(&mut self, key: &[u8]) -> Result<()> {
+    pub fn delete(&self, key: &[u8]) -> Result<()> {
         self.write_version(key, None)
     }
 
     /// Sets a value for a key.
-    pub fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
+    pub fn set(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.write_version(key, Some(value))
     }
 
@@ -850,21 +850,21 @@ pub mod tests {
         let mvcc = setup();
 
         // Start a concurrent transaction that should be invisible.
-        let mut t1 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
         t1.set(b"other", vec![1])?;
 
         // Write a couple of versions for a key. Commit the concurrent one in between.
-        let mut t2 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
         t2.set(b"key", vec![2])?;
         t2.commit()?;
 
-        let mut t3 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
         t3.set(b"key", vec![3])?;
         t3.commit()?;
 
         t1.commit()?;
 
-        let mut t4 = mvcc.begin()?;
+        let t4 = mvcc.begin()?;
         t4.set(b"key", vec![4])?;
         t4.commit()?;
 
@@ -899,7 +899,7 @@ pub mod tests {
         let mvcc = setup();
 
         // We first write a set of values that should be visible
-        let mut t1 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
         t1.set(b"a", b"t1".to_vec())?;
         t1.set(b"b", b"t1".to_vec())?;
         t1.commit()?;
@@ -907,9 +907,9 @@ pub mod tests {
         // We then start three transactions, of which we will resume t3.
         // We commit t2 and t4's changes, which should not be visible,
         // and write a change for t3 which should be visible.
-        let mut t2 = mvcc.begin()?;
-        let mut t3 = mvcc.begin()?;
-        let mut t4 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
+        let t4 = mvcc.begin()?;
 
         t2.set(b"a", b"t2".to_vec())?;
         t3.set(b"b", b"t3".to_vec())?;
@@ -972,13 +972,13 @@ pub mod tests {
     fn test_txn_delete_conflict() -> Result<()> {
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"key", vec![0x00])?;
         txn.commit()?;
 
-        let mut t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
-        let mut t3 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
 
         t2.delete(b"key")?;
         assert_eq!(Err(Error::Serialization), t1.delete(b"key"));
@@ -992,7 +992,7 @@ pub mod tests {
     fn test_txn_delete_idempotent() -> Result<()> {
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.delete(b"key")?;
         txn.commit()?;
 
@@ -1003,7 +1003,7 @@ pub mod tests {
     fn test_txn_get() -> Result<()> {
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         assert_eq!(None, txn.get(b"a")?);
         txn.set(b"a", vec![0x01])?;
         assert_eq!(Some(vec![0x01]), txn.get(b"a")?);
@@ -1017,11 +1017,11 @@ pub mod tests {
     #[test]
     fn test_txn_get_deleted() -> Result<()> {
         let mvcc = setup();
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"a", vec![0x01])?;
         txn.commit()?;
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.delete(b"a")?;
         txn.commit()?;
 
@@ -1036,9 +1036,9 @@ pub mod tests {
     fn test_txn_get_hides_newer() -> Result<()> {
         let mvcc = setup();
 
-        let mut t1 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
         let t2 = mvcc.begin()?;
-        let mut t3 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
 
         t1.set(b"a", vec![0x01])?;
         t1.commit()?;
@@ -1055,10 +1055,10 @@ pub mod tests {
     fn test_txn_get_hides_uncommitted() -> Result<()> {
         let mvcc = setup();
 
-        let mut t1 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
         t1.set(b"a", vec![0x01])?;
         let t2 = mvcc.begin()?;
-        let mut t3 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
         t3.set(b"c", vec![0x03])?;
 
         assert_eq!(None, t2.get(b"a")?);
@@ -1071,15 +1071,15 @@ pub mod tests {
     fn test_txn_get_readonly_historical() -> Result<()> {
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"a", vec![0x01])?;
         txn.commit()?;
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"b", vec![0x02])?;
         txn.commit()?;
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"c", vec![0x03])?;
         txn.commit()?;
 
@@ -1095,7 +1095,7 @@ pub mod tests {
     fn test_txn_get_serial() -> Result<()> {
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"a", vec![0x01])?;
         txn.commit()?;
 
@@ -1109,7 +1109,7 @@ pub mod tests {
     fn test_txn_scan() -> Result<()> {
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"a", vec![0x01])?;
         txn.delete(b"b")?;
         txn.set(b"c", vec![0x01])?;
@@ -1117,25 +1117,25 @@ pub mod tests {
         txn.set(b"e", vec![0x01])?;
         txn.commit()?;
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"c", vec![0x02])?;
         txn.set(b"d", vec![0x02])?;
         txn.set(b"e", vec![0x02])?;
         txn.commit()?;
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.delete(b"c")?;
         txn.set(b"d", vec![0x03])?;
         txn.set(b"e", vec![0x03])?;
         txn.commit()?;
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"c", vec![0x04])?;
         txn.set(b"d", vec![0x04])?;
         txn.delete(b"e")?;
         txn.commit()?;
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.delete(b"d")?;
         txn.set(b"e", vec![0x05])?;
         txn.commit()?;
@@ -1186,7 +1186,7 @@ pub mod tests {
         // The key encoding should be resistant to this.
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(&[0], vec![0])?; // v0
         txn.set(&[0], vec![1])?; // v1
         txn.set(&[0, 0, 0, 0, 0, 0, 0, 0, 2], vec![2])?; // v2
@@ -1204,7 +1204,7 @@ pub mod tests {
     #[test]
     fn test_txn_scan_prefix() -> Result<()> {
         let mvcc = setup();
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
 
         txn.set(b"a", vec![0x01])?;
         txn.set(b"az", vec![0x01, 0x1a])?;
@@ -1256,9 +1256,9 @@ pub mod tests {
     fn test_txn_set_conflict() -> Result<()> {
         let mvcc = setup();
 
-        let mut t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
-        let mut t3 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
 
         t2.set(b"key", vec![0x02])?;
         assert_eq!(Err(Error::Serialization), t1.set(b"key", vec![0x01]));
@@ -1272,9 +1272,9 @@ pub mod tests {
     fn test_txn_set_conflict_committed() -> Result<()> {
         let mvcc = setup();
 
-        let mut t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
-        let mut t3 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
 
         t2.set(b"key", vec![0x02])?;
         t2.commit()?;
@@ -1288,13 +1288,13 @@ pub mod tests {
     fn test_txn_set_rollback() -> Result<()> {
         let mvcc = setup();
 
-        let mut txn = mvcc.begin()?;
+        let txn = mvcc.begin()?;
         txn.set(b"key", vec![0x00])?;
         txn.commit()?;
 
         let t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
-        let mut t3 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
+        let t3 = mvcc.begin()?;
 
         t2.set(b"key", vec![0x02])?;
         t2.rollback()?;
@@ -1311,8 +1311,8 @@ pub mod tests {
     fn test_txn_anomaly_dirty_write() -> Result<()> {
         let mvcc = setup();
 
-        let mut t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
 
         t1.set(b"key", b"t1".to_vec())?;
         assert_eq!(t2.set(b"key", b"t2".to_vec()), Err(Error::Serialization));
@@ -1325,7 +1325,7 @@ pub mod tests {
     fn test_txn_anomaly_dirty_read() -> Result<()> {
         let mvcc = setup();
 
-        let mut t1 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
         let t2 = mvcc.begin()?;
 
         t1.set(b"key", b"t1".to_vec())?;
@@ -1339,12 +1339,12 @@ pub mod tests {
     fn test_txn_anomaly_lost_update() -> Result<()> {
         let mvcc = setup();
 
-        let mut t0 = mvcc.begin()?;
+        let t0 = mvcc.begin()?;
         t0.set(b"key", b"t0".to_vec())?;
         t0.commit()?;
 
-        let mut t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
 
         t1.get(b"key")?;
         t2.get(b"key")?;
@@ -1360,11 +1360,11 @@ pub mod tests {
     fn test_txn_anomaly_fuzzy_read() -> Result<()> {
         let mvcc = setup();
 
-        let mut t0 = mvcc.begin()?;
+        let t0 = mvcc.begin()?;
         t0.set(b"key", b"t0".to_vec())?;
         t0.commit()?;
 
-        let mut t1 = mvcc.begin()?;
+        let t1 = mvcc.begin()?;
         let t2 = mvcc.begin()?;
 
         assert_eq!(Some(b"t0".to_vec()), t2.get(b"key")?);
@@ -1380,13 +1380,13 @@ pub mod tests {
     fn test_txn_anomaly_read_skew() -> Result<()> {
         let mvcc = setup();
 
-        let mut t0 = mvcc.begin()?;
+        let t0 = mvcc.begin()?;
         t0.set(b"a", b"t0".to_vec())?;
         t0.set(b"b", b"t0".to_vec())?;
         t0.commit()?;
 
         let t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
 
         assert_eq!(Some(b"t0".to_vec()), t1.get(b"a")?);
         t2.set(b"a", b"t2".to_vec())?;
@@ -1403,13 +1403,13 @@ pub mod tests {
     fn test_txn_anomaly_phantom_read() -> Result<()> {
         let mvcc = setup();
 
-        let mut t0 = mvcc.begin()?;
+        let t0 = mvcc.begin()?;
         t0.set(b"a", b"true".to_vec())?;
         t0.set(b"b", b"false".to_vec())?;
         t0.commit()?;
 
         let t1 = mvcc.begin()?;
-        let mut t2 = mvcc.begin()?;
+        let t2 = mvcc.begin()?;
 
         assert_eq!(Some(b"true".to_vec()), t1.get(b"a")?);
         assert_eq!(Some(b"false".to_vec()), t1.get(b"b")?);
@@ -1456,7 +1456,7 @@ pub mod tests {
         let m = setup();
 
         // Unversioned keys should not interact with versioned keys.
-        let mut txn = m.begin()?;
+        let txn = m.begin()?;
         txn.set(b"foo", b"bar".to_vec())?;
         txn.commit()?;
 
