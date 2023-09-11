@@ -6,11 +6,11 @@ networks:
     ipam:
       driver: default
       config:
-      - subnet: 172.20.0.0/24
+      - subnet: 192.168.0.0/24
 
 services:
   toydb-a: &toydb
-    build: ..
+    build: ../..
     environment:
     - TOYDB_LOG_LEVEL
     volumes:
@@ -18,7 +18,7 @@ services:
     - ./toydb-a/data:/var/lib/toydb
     networks:
       toydb:
-        ipv4_address: 172.20.0.101
+        ipv4_address: 192.168.0.101
     ports:
     - 9601:9605
 
@@ -29,7 +29,7 @@ services:
     - ./toydb-b/data:/var/lib/toydb
     networks:
       toydb:
-        ipv4_address: 172.20.0.102
+        ipv4_address: 192.168.0.102
     ports:
     - 9602:9605
 
@@ -40,7 +40,7 @@ services:
     - ./toydb-c/data:/var/lib/toydb
     networks:
       toydb:
-        ipv4_address: 172.20.0.103
+        ipv4_address: 192.168.0.103
     ports:
     - 9603:9605
 
@@ -51,7 +51,7 @@ services:
     - ./toydb-d/data:/var/lib/toydb
     networks:
       toydb:
-        ipv4_address: 172.20.0.104
+        ipv4_address: 192.168.0.104
     ports:
     - 9604:9605
 
@@ -62,6 +62,6 @@ services:
     - ./toydb-e/data:/var/lib/toydb
     networks:
       toydb:
-        ipv4_address: 172.20.0.105
+        ipv4_address: 192.168.0.105
     ports:
     - 9605:9605
