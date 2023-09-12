@@ -55,7 +55,7 @@ impl Log {
             0 => (0, 0),
             index => store
                 .get(index)?
-                .map(|v| Self::deserialize::<Entry>(&v))
+                .map(|v| bincode::deserialize::<Entry>(&v))
                 .transpose()?
                 .map(|e| (e.index, e.term))
                 .ok_or_else(|| Error::Internal("Committed entry not found".into()))?,
@@ -64,7 +64,7 @@ impl Log {
             0 => (0, 0),
             index => store
                 .get(index)?
-                .map(|v| Self::deserialize::<Entry>(&v))
+                .map(|v| bincode::deserialize::<Entry>(&v))
                 .transpose()?
                 .map(|e| (e.index, e.term))
                 .ok_or_else(|| Error::Internal("Last entry not found".into()))?,
@@ -76,7 +76,7 @@ impl Log {
     pub fn append(&mut self, term: u64, command: Option<Vec<u8>>) -> Result<Entry> {
         let entry = Entry { index: self.last_index + 1, term, command };
         debug!("Appending log entry {}: {:?}", entry.index, entry);
-        self.store.append(Self::serialize(&entry)?)?;
+        self.store.append(bincode::serialize(&entry)?)?;
         self.last_index = entry.index;
         self.last_term = entry.term;
         Ok(entry)
@@ -95,7 +95,7 @@ impl Log {
 
     /// Fetches an entry at an index
     pub fn get(&self, index: u64) -> Result<Option<Entry>> {
-        self.store.get(index)?.map(|v| Self::deserialize(&v)).transpose()
+        self.store.get(index)?.map(|v| bincode::deserialize(&v)).transpose()
     }
 
     /// Checks if the log contains an entry
@@ -109,7 +109,9 @@ impl Log {
 
     /// Iterates over log entries
     pub fn scan(&self, range: impl RangeBounds<u64>) -> Scan {
-        Box::new(self.store.scan(Range::from(range)).map(|r| r.and_then(|v| Self::deserialize(&v))))
+        Box::new(
+            self.store.scan(Range::from(range)).map(|r| r.and_then(|v| bincode::deserialize(&v))),
+        )
     }
 
     /// Splices a set of entries onto an offset. The entries must be contiguous, and the first entry
@@ -145,7 +147,7 @@ impl Log {
             i => self
                 .store
                 .get(i)?
-                .map(|v| Self::deserialize::<Entry>(&v))
+                .map(|v| bincode::deserialize::<Entry>(&v))
                 .transpose()?
                 .map(|e| (e.index, e.term))
                 .ok_or_else(|| Error::Internal(format!("Entry {} not found", index)))?,
@@ -161,7 +163,7 @@ impl Log {
         let (term, voted_for) = self
             .store
             .get_metadata(&Key::TermVote.encode())?
-            .map(|v| Self::deserialize(&v))
+            .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, None));
         debug!("Loaded term {} and voted_for {:?} from log", term, voted_for);
@@ -170,17 +172,7 @@ impl Log {
 
     /// Saves information about the most recent term.
     pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<()> {
-        self.store.set_metadata(&Key::TermVote.encode(), Self::serialize(&(term, voted_for))?)
-    }
-
-    /// Serializes a value for the log store.
-    fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
-        bincode::serialize(value)
-    }
-
-    /// Deserializes a value from the log store.
-    fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
-        bincode::deserialize(bytes)
+        self.store.set_metadata(&Key::TermVote.encode(), bincode::serialize(&(term, voted_for))?)
     }
 }
 
