@@ -6,13 +6,20 @@ use ::log::debug;
 use serde::{Deserialize, Serialize};
 use std::ops::RangeBounds;
 
+/// A log index.
+pub type Index = u64;
+
+/// A Raft leadership term.
+/// TODO: Consider moving this to the module root.
+pub type Term = u64;
+
 /// A replicated log entry
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
     /// The index of the entry.
-    pub index: u64,
+    pub index: Index,
     /// The term in which the entry was added.
-    pub term: u64,
+    pub term: Term,
     /// The state machine command. None is used to commit noops during leader election.
     pub command: Option<Vec<u8>>,
 }
@@ -39,13 +46,13 @@ pub struct Log {
     /// The underlying log store.
     pub(super) store: Box<dyn log::Store>,
     /// The index of the last stored entry.
-    pub(super) last_index: u64,
+    last_index: Index,
     /// The term of the last stored entry.
-    pub(super) last_term: u64,
-    /// The last entry known to be committed.
-    pub(super) commit_index: u64,
+    last_term: Term,
+    /// The index of the last committed entry.
+    commit_index: Index,
     /// The term of the last committed entry.
-    pub(super) commit_term: u64,
+    commit_term: Term,
 }
 
 impl Log {
@@ -72,8 +79,18 @@ impl Log {
         Ok(Self { store, last_index, last_term, commit_index, commit_term })
     }
 
+    /// Returns the commit index and term.
+    pub fn get_commit_index(&self) -> (Index, Term) {
+        (self.commit_index, self.commit_term)
+    }
+
+    /// Returns the last log index and term.
+    pub fn get_last_index(&self) -> (Index, Term) {
+        (self.last_index, self.last_term)
+    }
+
     /// Appends a command to the log, returning the entry.
-    pub fn append(&mut self, term: u64, command: Option<Vec<u8>>) -> Result<Entry> {
+    pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Entry> {
         let entry = Entry { index: self.last_index + 1, term, command };
         debug!("Appending log entry {}: {:?}", entry.index, entry);
         self.store.append(bincode::serialize(&entry)?)?;
@@ -83,7 +100,7 @@ impl Log {
     }
 
     /// Commits entries up to and including an index.
-    pub fn commit(&mut self, index: u64) -> Result<u64> {
+    pub fn commit(&mut self, index: Index) -> Result<u64> {
         let entry = self
             .get(index)?
             .ok_or_else(|| Error::Internal(format!("Entry {} not found", index)))?;
@@ -94,12 +111,12 @@ impl Log {
     }
 
     /// Fetches an entry at an index
-    pub fn get(&self, index: u64) -> Result<Option<Entry>> {
+    pub fn get(&self, index: Index) -> Result<Option<Entry>> {
         self.store.get(index)?.map(|v| bincode::deserialize(&v)).transpose()
     }
 
     /// Checks if the log contains an entry
-    pub fn has(&self, index: u64, term: u64) -> Result<bool> {
+    pub fn has(&self, index: Index, term: Term) -> Result<bool> {
         match self.get(index)? {
             Some(entry) => Ok(entry.term == term),
             None if index == 0 && term == 0 => Ok(true),
@@ -108,7 +125,7 @@ impl Log {
     }
 
     /// Iterates over log entries
-    pub fn scan(&self, range: impl RangeBounds<u64>) -> Scan {
+    pub fn scan(&self, range: impl RangeBounds<Index>) -> Scan {
         Box::new(
             self.store.scan(Range::from(range)).map(|r| r.and_then(|v| bincode::deserialize(&v))),
         )
@@ -140,7 +157,7 @@ impl Log {
 
     /// Truncates the log such that its last item is at most index.
     /// Refuses to remove entries that have been applied or committed.
-    pub fn truncate(&mut self, index: u64) -> Result<u64> {
+    pub fn truncate(&mut self, index: Index) -> Result<u64> {
         debug!("Truncating log from entry {}", index);
         let (index, term) = match self.store.truncate(index)? {
             0 => (0, 0),
@@ -159,7 +176,7 @@ impl Log {
 
     /// Loads information about the most recent term known by the log, containing the term number (0
     /// if none) and candidate voted for in current term (if any).
-    pub fn load_term(&self) -> Result<(u64, Option<String>)> {
+    pub fn load_term(&self) -> Result<(Term, Option<String>)> {
         let (term, voted_for) = self
             .store
             .get_metadata(&Key::TermVote.encode())?
@@ -171,7 +188,7 @@ impl Log {
     }
 
     /// Saves information about the most recent term.
-    pub fn save_term(&mut self, term: u64, voted_for: Option<&str>) -> Result<()> {
+    pub fn save_term(&mut self, term: Term, voted_for: Option<&str>) -> Result<()> {
         self.store.set_metadata(&Key::TermVote.encode(), bincode::serialize(&(term, voted_for))?)
     }
 }

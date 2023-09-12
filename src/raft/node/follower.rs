@@ -35,13 +35,11 @@ impl RoleNode<Follower> {
     /// Transforms the node into a candidate.
     fn become_candidate(self) -> Result<RoleNode<Candidate>> {
         info!("Starting election for term {}", self.term + 1);
+        let (last_index, last_term) = self.log.get_last_index();
         let mut node = self.become_role(Candidate::new())?;
         node.term += 1;
         node.log.save_term(node.term, None)?;
-        node.send(
-            Address::Peers,
-            Event::SolicitVote { last_index: node.log.last_index, last_term: node.log.last_term },
-        )?;
+        node.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
         Ok(node)
     }
 
@@ -86,8 +84,8 @@ impl RoleNode<Follower> {
             Event::Heartbeat { commit_index, commit_term } => {
                 if self.is_leader(&msg.from) {
                     let has_committed = self.log.has(commit_index, commit_term)?;
-                    if has_committed && commit_index > self.log.commit_index {
-                        let old_commit_index = self.log.commit_index;
+                    let (old_commit_index, _) = self.log.get_commit_index();
+                    if has_committed && commit_index > old_commit_index {
                         self.log.commit(commit_index)?;
                         let mut scan = self.log.scan((old_commit_index + 1)..=commit_index);
                         while let Some(entry) = scan.next().transpose()? {
@@ -104,10 +102,11 @@ impl RoleNode<Follower> {
                         return Ok(self.into());
                     }
                 }
-                if last_term < self.log.last_term {
+                let (log_last_index, log_last_term) = self.log.get_last_index();
+                if last_term < log_last_term {
                     return Ok(self.into());
                 }
-                if last_term == self.log.last_term && last_index < self.log.last_index {
+                if last_term == log_last_term && last_index < log_last_index {
                     return Ok(self.into());
                 }
                 if let Address::Peer(from) = msg.from {

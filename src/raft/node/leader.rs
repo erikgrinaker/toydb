@@ -53,26 +53,26 @@ impl RoleNode<Leader> {
 
     /// Commits any pending log entries.
     fn commit(&mut self) -> Result<u64> {
-        let mut last_indexes = vec![self.log.last_index];
+        let mut last_indexes = vec![self.log.get_last_index().0];
         last_indexes.extend(self.role.peer_last_index.values());
         last_indexes.sort_unstable();
         last_indexes.reverse();
         let quorum_index = last_indexes[self.quorum() as usize - 1];
 
         // We can only safely commit up to an entry from our own term, see figure 8 in Raft paper.
-        if quorum_index > self.log.commit_index {
+        let (commit_index, _) = self.log.get_commit_index();
+        if quorum_index > commit_index {
             if let Some(entry) = self.log.get(quorum_index)? {
                 if entry.term == self.term {
-                    let old_commit_index = self.log.commit_index;
                     self.log.commit(quorum_index)?;
-                    let mut scan = self.log.scan((old_commit_index + 1)..=self.log.commit_index);
+                    let mut scan = self.log.scan((commit_index + 1)..=quorum_index);
                     while let Some(entry) = scan.next().transpose()? {
                         self.state_tx.send(Instruction::Apply { entry })?;
                     }
                 }
             }
         }
-        Ok(self.log.commit_index)
+        Ok(quorum_index)
     }
 
     /// Replicates the log to a peer.
@@ -144,27 +144,22 @@ impl RoleNode<Leader> {
             }
 
             Event::ClientRequest { id, request: Request::Query(command) } => {
+                let (commit_index, commit_term) = self.log.get_commit_index();
                 self.state_tx.send(Instruction::Query {
                     id,
                     address: msg.from,
                     command,
                     term: self.term,
-                    index: self.log.commit_index,
+                    index: commit_index,
                     quorum: self.quorum(),
                 })?;
                 self.state_tx.send(Instruction::Vote {
                     term: self.term,
-                    index: self.log.commit_index,
+                    index: commit_index,
                     address: Address::Local,
                 })?;
                 if !self.peers.is_empty() {
-                    self.send(
-                        Address::Peers,
-                        Event::Heartbeat {
-                            commit_index: self.log.commit_index,
-                            commit_term: self.log.commit_term,
-                        },
-                    )?;
+                    self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
                 }
             }
 
@@ -182,12 +177,12 @@ impl RoleNode<Leader> {
                     leader: self.id.clone(),
                     term: self.term,
                     node_last_index: self.role.peer_last_index.clone(),
-                    commit_index: self.log.commit_index,
+                    commit_index: self.log.get_commit_index().0,
                     apply_index: 0,
                     storage: self.log.store.to_string(),
                     storage_size: self.log.store.size(),
                 });
-                status.node_last_index.insert(self.id.clone(), self.log.last_index);
+                status.node_last_index.insert(self.id.clone(), self.log.get_last_index().0);
                 self.state_tx.send(Instruction::Status { id, address: msg.from, status })?
             }
 
@@ -216,13 +211,8 @@ impl RoleNode<Leader> {
             self.role.heartbeat_ticks += 1;
             if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
                 self.role.heartbeat_ticks = 0;
-                self.send(
-                    Address::Peers,
-                    Event::Heartbeat {
-                        commit_index: self.log.commit_index,
-                        commit_term: self.log.commit_term,
-                    },
-                )?;
+                let (commit_index, commit_term) = self.log.get_commit_index();
+                self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
             }
         }
         Ok(self.into())
@@ -260,7 +250,7 @@ mod tests {
             id: "a".into(),
             peers: peers.clone(),
             term: 3,
-            role: Leader::new(peers, log.last_index),
+            role: Leader::new(peers, log.get_last_index().0),
             log,
             node_tx,
             state_tx,

@@ -52,18 +52,19 @@ impl Node {
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self> {
         let applied_index = state.applied_index();
-        if applied_index > log.commit_index {
+        let (commit_index, _) = log.get_commit_index();
+        if applied_index > commit_index {
             return Err(Error::Internal(format!(
                 "State machine applied index {} greater than log committed index {}",
-                applied_index, log.commit_index
+                applied_index, commit_index
             )));
         }
 
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let mut driver = Driver::new(state_rx, node_tx.clone());
-        if log.commit_index > applied_index {
-            info!("Replaying log entries {} to {}", applied_index + 1, log.commit_index);
-            driver.replay(&mut *state, log.scan((applied_index + 1)..=log.commit_index))?;
+        if commit_index > applied_index {
+            info!("Replaying log entries {} to {}", applied_index + 1, commit_index);
+            driver.replay(&mut *state, log.scan((applied_index + 1)..=commit_index))?;
         };
         tokio::spawn(driver.drive(state));
 
@@ -81,7 +82,7 @@ impl Node {
         };
         if node.peers.is_empty() {
             info!("No peers specified, starting as leader");
-            let last_index = node.log.last_index;
+            let (last_index, _) = node.log.get_last_index();
             Ok(node.become_role(Leader::new(vec![], last_index))?.into())
         } else {
             Ok(node.into())
@@ -274,17 +275,17 @@ mod tests {
         }
 
         pub fn committed(self, index: u64) -> Self {
-            assert_eq!(index, self.log().commit_index, "Unexpected committed index");
+            assert_eq!(index, self.log().get_commit_index().0, "Unexpected committed index");
             self
         }
 
         pub fn last(self, index: u64) -> Self {
-            assert_eq!(index, self.log().last_index, "Unexpected last index");
+            assert_eq!(index, self.log().get_last_index().0, "Unexpected last index");
             self
         }
 
         pub fn entry(self, entry: Entry) -> Self {
-            assert!(entry.index <= self.log().last_index, "Index beyond last entry");
+            assert!(entry.index <= self.log().get_last_index().0, "Index beyond last entry");
             assert_eq!(entry, self.log().get(entry.index).unwrap().unwrap());
             self
         }

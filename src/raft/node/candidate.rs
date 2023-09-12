@@ -44,15 +44,10 @@ impl RoleNode<Candidate> {
     fn become_leader(self) -> Result<RoleNode<Leader>> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
-        let last_index = self.log.last_index;
+        let (last_index, _) = self.log.get_last_index();
+        let (commit_index, commit_term) = self.log.get_commit_index();
         let mut node = self.become_role(Leader::new(peers, last_index))?;
-        node.send(
-            Address::Peers,
-            Event::Heartbeat {
-                commit_index: node.log.commit_index,
-                commit_term: node.log.commit_term,
-            },
-        )?;
+        node.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
         node.append(None)?;
         node.abort_proxied()?;
         Ok(node)
@@ -117,16 +112,11 @@ impl RoleNode<Candidate> {
         self.role.election_ticks += 1;
         if self.role.election_ticks >= self.role.election_timeout {
             info!("Election timed out, starting new election for term {}", self.term + 1);
+            let (last_index, last_term) = self.log.get_last_index();
             self.term += 1;
             self.log.save_term(self.term, None)?;
             self.role = Candidate::new();
-            self.send(
-                Address::Peers,
-                Event::SolicitVote {
-                    last_index: self.log.last_index,
-                    last_term: self.log.last_term,
-                },
-            )?;
+            self.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
         }
         Ok(self.into())
     }
