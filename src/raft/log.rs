@@ -106,14 +106,14 @@ impl Log {
         self.store.set_metadata(&Key::TermVote.encode(), bincode::serialize(&(term, voted_for))?)
     }
 
-    /// Appends a command to the log, returning the entry.
-    pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Entry> {
+    /// Appends a command to the log, returning the log index.
+    pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
         let entry = Entry { index: self.last_index + 1, term, command };
         debug!("Appending log entry {}: {:?}", entry.index, entry);
         self.store.append(bincode::serialize(&entry)?)?;
         self.last_index = entry.index;
         self.last_term = entry.term;
-        Ok(entry)
+        Ok(entry.index)
     }
 
     /// Commits entries up to and including an index.
@@ -219,10 +219,7 @@ mod tests {
         let (mut l, _) = setup()?;
         assert_eq!(Ok(None), l.get(1));
 
-        assert_eq!(
-            Entry { index: 1, term: 3, command: Some(vec![0x01]) },
-            l.append(3, Some(vec![0x01]))?
-        );
+        assert_eq!(1, l.append(3, Some(vec![0x01]))?);
         assert_eq!(Some(Entry { index: 1, term: 3, command: Some(vec![0x01]) }), l.get(1)?);
         assert_eq!(None, l.get(2)?);
 
@@ -236,7 +233,7 @@ mod tests {
     #[test]
     fn append_none() -> Result<()> {
         let (mut l, _) = setup()?;
-        assert_eq!(Entry { index: 1, term: 3, command: None }, l.append(3, None)?);
+        assert_eq!(1, l.append(3, None)?);
         assert_eq!(Some(Entry { index: 1, term: 3, command: None }), l.get(1)?);
         Ok(())
     }

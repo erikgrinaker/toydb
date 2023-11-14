@@ -44,11 +44,11 @@ impl RoleNode<Leader> {
 
     /// Appends an entry to the log and replicates it to peers.
     pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<u64> {
-        let entry = self.log.append(self.term, command)?;
+        let index = self.log.append(self.term, command)?;
         for peer in self.peers.iter() {
             self.replicate(peer)?;
         }
-        Ok(entry.index)
+        Ok(index)
     }
 
     /// Commits any pending log entries.
