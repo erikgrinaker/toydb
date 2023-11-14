@@ -37,7 +37,7 @@ impl RoleNode<Leader> {
     fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower>> {
         info!("Discovered new leader {} for term {}, following", leader, term);
         self.term = term;
-        self.log.save_term(term, None)?;
+        self.log.set_term(term, None)?;
         self.state_tx.send(Instruction::Abort)?;
         self.become_role(Follower::new(Some(leader), None))
     }
@@ -244,7 +244,7 @@ mod tests {
         log.append(3, Some(vec![0x04]))?;
         log.append(3, Some(vec![0x05]))?;
         log.commit(2)?;
-        log.save_term(3, None)?;
+        log.set_term(3, None)?;
 
         let node = RoleNode {
             id: "a".into(),

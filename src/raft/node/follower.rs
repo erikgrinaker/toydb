@@ -38,7 +38,7 @@ impl RoleNode<Follower> {
         let (last_index, last_term) = self.log.get_last_index();
         let mut node = self.become_role(Candidate::new())?;
         node.term += 1;
-        node.log.save_term(node.term, None)?;
+        node.log.set_term(node.term, None)?;
         node.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
         Ok(node)
     }
@@ -49,7 +49,7 @@ impl RoleNode<Follower> {
         if term > self.term {
             info!("Discovered new term {}, following leader {}", term, leader);
             self.term = term;
-            self.log.save_term(term, None)?;
+            self.log.set_term(term, None)?;
         } else {
             info!("Discovered leader {}, following", leader);
             voted_for = self.role.voted_for;
@@ -112,7 +112,7 @@ impl RoleNode<Follower> {
                 if let Address::Peer(from) = msg.from {
                     info!("Voting for {} in term {} election", from, self.term);
                     self.send(Address::Peer(from.clone()), Event::GrantVote)?;
-                    self.log.save_term(self.term, Some(&from))?;
+                    self.log.set_term(self.term, Some(&from))?;
                     self.role.voted_for = Some(from);
                 }
             }
@@ -198,7 +198,7 @@ pub mod tests {
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
         log.commit(2)?;
-        log.save_term(3, None)?;
+        log.set_term(3, None)?;
 
         let node = RoleNode {
             id: "a".into(),

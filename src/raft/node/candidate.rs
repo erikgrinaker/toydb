@@ -33,7 +33,7 @@ impl RoleNode<Candidate> {
     fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower>> {
         info!("Discovered leader {} for term {}, following", leader, term);
         self.term = term;
-        self.log.save_term(term, None)?;
+        self.log.set_term(term, None)?;
         let mut node = self.become_role(Follower::new(Some(leader), None))?;
         node.abort_proxied()?;
         node.forward_queued(Address::Peer(leader.to_string()))?;
@@ -114,7 +114,7 @@ impl RoleNode<Candidate> {
             info!("Election timed out, starting new election for term {}", self.term + 1);
             let (last_index, last_term) = self.log.get_last_index();
             self.term += 1;
-            self.log.save_term(self.term, None)?;
+            self.log.set_term(self.term, None)?;
             self.role = Candidate::new();
             self.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
         }
@@ -144,7 +144,7 @@ mod tests {
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
         log.commit(2)?;
-        log.save_term(3, None)?;
+        log.set_term(3, None)?;
 
         let mut node = RoleNode {
             id: "a".into(),

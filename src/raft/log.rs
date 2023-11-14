@@ -89,6 +89,23 @@ impl Log {
         (self.last_index, self.last_term)
     }
 
+    /// Returns the last known term (0 if none), and cast vote (if any).
+    pub fn get_term(&self) -> Result<(Term, Option<String>)> {
+        let (term, voted_for) = self
+            .store
+            .get_metadata(&Key::TermVote.encode())?
+            .map(|v| bincode::deserialize(&v))
+            .transpose()?
+            .unwrap_or((0, None));
+        debug!("Loaded term {} and voted_for {:?} from log", term, voted_for);
+        Ok((term, voted_for))
+    }
+
+    /// Sets the most recent term, and cast vote (if any).
+    pub fn set_term(&mut self, term: Term, voted_for: Option<&str>) -> Result<()> {
+        self.store.set_metadata(&Key::TermVote.encode(), bincode::serialize(&(term, voted_for))?)
+    }
+
     /// Appends a command to the log, returning the entry.
     pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Entry> {
         let entry = Entry { index: self.last_index + 1, term, command };
@@ -172,24 +189,6 @@ impl Log {
         self.last_index = index;
         self.last_term = term;
         Ok(index)
-    }
-
-    /// Loads information about the most recent term known by the log, containing the term number (0
-    /// if none) and candidate voted for in current term (if any).
-    pub fn load_term(&self) -> Result<(Term, Option<String>)> {
-        let (term, voted_for) = self
-            .store
-            .get_metadata(&Key::TermVote.encode())?
-            .map(|v| bincode::deserialize(&v))
-            .transpose()?
-            .unwrap_or((0, None));
-        debug!("Loaded term {} and voted_for {:?} from log", term, voted_for);
-        Ok((term, voted_for))
-    }
-
-    /// Saves information about the most recent term.
-    pub fn save_term(&mut self, term: Term, voted_for: Option<&str>) -> Result<()> {
-        self.store.set_metadata(&Key::TermVote.encode(), bincode::serialize(&(term, voted_for))?)
     }
 }
 
@@ -352,20 +351,20 @@ mod tests {
     fn load_save_term() -> Result<()> {
         // Test loading empty term
         let (l, _) = setup()?;
-        assert_eq!((0, None), l.load_term()?);
+        assert_eq!((0, None), l.get_term()?);
 
         // Test loading saved term
         let (mut l, store) = setup()?;
-        l.save_term(1, Some("a"))?;
+        l.set_term(1, Some("a"))?;
         let l = Log::new(store)?;
-        assert_eq!((1, Some("a".into())), l.load_term()?);
+        assert_eq!((1, Some("a".into())), l.get_term()?);
 
         // Test replacing saved term with none
         let (mut l, _) = setup()?;
-        l.save_term(1, Some("a"))?;
-        assert_eq!((1, Some("a".into())), l.load_term()?);
-        l.save_term(0, None)?;
-        assert_eq!((0, None), l.load_term()?);
+        l.set_term(1, Some("a"))?;
+        assert_eq!((1, Some("a".into())), l.get_term()?);
+        l.set_term(0, None)?;
+        assert_eq!((0, None), l.get_term()?);
         Ok(())
     }
 

@@ -68,7 +68,7 @@ impl Node {
         };
         tokio::spawn(driver.drive(state));
 
-        let (term, voted_for) = log.load_term()?;
+        let (term, voted_for) = log.get_term()?;
         let node = RoleNode {
             id: id.to_owned(),
             peers,
@@ -369,7 +369,7 @@ mod tests {
                 },
                 "Unexpected node term",
             );
-            let (saved_term, saved_voted_for) = self.log().load_term().unwrap();
+            let (saved_term, saved_voted_for) = self.log().get_term().unwrap();
             assert_eq!(saved_term, term, "Incorrect term stored in log");
             assert_eq!(
                 saved_voted_for,
@@ -393,7 +393,7 @@ mod tests {
                 },
                 "Unexpected voted_for"
             );
-            let (_, saved_voted_for) = self.log().load_term().unwrap();
+            let (_, saved_voted_for) = self.log().get_term().unwrap();
             assert_eq!(saved_voted_for.as_deref(), voted_for, "Unexpected voted_for saved in log");
             self
         }
@@ -452,7 +452,7 @@ mod tests {
     async fn new_loads_term() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let store = Box::new(log::Test::new());
-        Log::new(store.clone())?.save_term(3, Some("c"))?;
+        Log::new(store.clone())?.set_term(3, Some("c"))?;
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
