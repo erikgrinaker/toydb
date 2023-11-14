@@ -5,7 +5,6 @@ use crate::sql::engine::Engine as _;
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
-use crate::storage::log;
 
 use ::log::{debug, error, info};
 use futures::sink::SinkExt as _;
@@ -29,11 +28,11 @@ impl Server {
     pub async fn new(
         id: &str,
         peers: HashMap<String, String>,
-        raft_store: Box<dyn log::Store>,
+        raft_log: raft::Log,
         raft_state: Box<dyn raft::State>,
     ) -> Result<Self> {
         Ok(Server {
-            raft: raft::Server::new(id, peers, raft::Log::new(raft_store)?, raft_state).await?,
+            raft: raft::Server::new(id, peers, raft_log, raft_state).await?,
             raft_listener: None,
             sql_listener: None,
         })

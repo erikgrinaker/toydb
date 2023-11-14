@@ -1,10 +1,8 @@
 use crate::error::{Error, Result};
-use crate::storage::log::Range;
-use crate::storage::{self, bincode, log};
+use crate::storage::{self, bincode, keycode};
 
 use ::log::debug;
 use serde::{Deserialize, Serialize};
-use std::ops::RangeBounds;
 
 /// A log index.
 pub type Index = u64;
@@ -13,10 +11,10 @@ pub type Index = u64;
 /// TODO: Consider moving this to the module root.
 pub type Term = u64;
 
-/// A replicated log entry
+/// A log entry.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
-    /// The index of the entry.
+    /// The entry index.
     pub index: Index,
     /// The term in which the entry was added.
     pub term: Term,
@@ -24,27 +22,47 @@ pub struct Entry {
     pub command: Option<Vec<u8>>,
 }
 
-/// A metadata key
-#[derive(Clone, Debug, PartialEq)]
+/// A log key, encoded using KeyCode.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Key {
+    /// A log entry, storing the term and command.
+    Entry(Index),
+    /// Stores the current term and vote (if any).
     TermVote,
+    /// Stores the current commit index (if any).
+    CommitIndex,
 }
 
 impl Key {
-    fn encode(&self) -> Vec<u8> {
-        match self {
-            Self::TermVote => vec![0x00],
-        }
+    fn decode(bytes: &[u8]) -> Result<Self> {
+        keycode::deserialize(bytes)
+    }
+
+    fn encode(&self) -> Result<Vec<u8>> {
+        keycode::serialize(self)
     }
 }
 
+/// Log key prefixes, used for prefix scans.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+enum KeyPrefix {
+    Entry,
+    TermVote,
+    CommitIndex,
+}
+
+impl KeyPrefix {
+    fn encode(&self) -> Result<Vec<u8>> {
+        keycode::serialize(self)
+    }
+}
 /// A log scan
 pub type Scan<'a> = Box<dyn Iterator<Item = Result<Entry>> + 'a>;
 
-/// The replicated Raft log
+/// A Raft log.
 pub struct Log {
-    /// The underlying log store.
-    pub(super) store: Box<dyn log::Store>,
+    /// The underlying storage engine.
+    engine: Box<dyn Engine>,
     /// The index of the last stored entry.
     last_index: Index,
     /// The term of the last stored entry.
@@ -53,30 +71,47 @@ pub struct Log {
     commit_index: Index,
     /// The term of the last committed entry.
     commit_term: Term,
+    /// Whether to sync writes to disk.
+    sync: bool,
 }
 
 impl Log {
-    /// Creates a new log, using a log::Store for storage.
-    pub fn new(store: Box<dyn log::Store>) -> Result<Self> {
-        let (commit_index, commit_term) = match store.committed() {
-            0 => (0, 0),
-            index => store
-                .get(index)?
-                .map(|v| bincode::deserialize::<Entry>(&v))
-                .transpose()?
-                .map(|e| (e.index, e.term))
-                .ok_or_else(|| Error::Internal("Committed entry not found".into()))?,
-        };
-        let (last_index, last_term) = match store.len() {
-            0 => (0, 0),
-            index => store
-                .get(index)?
-                .map(|v| bincode::deserialize::<Entry>(&v))
-                .transpose()?
-                .map(|e| (e.index, e.term))
-                .ok_or_else(|| Error::Internal("Last entry not found".into()))?,
-        };
-        Ok(Self { store, last_index, last_term, commit_index, commit_term })
+    /// Creates a new log, using the given storage engine.
+    pub fn new(mut engine: Box<dyn Engine>, sync: bool) -> Result<Self> {
+        let (last_index, last_term) = engine
+            .scan_prefix(&KeyPrefix::Entry.encode()?)
+            .last()
+            .transpose()?
+            .map(|(k, v)| Self::decode_entry(&k, &v))
+            .transpose()?
+            .map(|e| (e.index, e.term))
+            .unwrap_or((0, 0));
+        let (commit_index, commit_term) = engine
+            .get(&Key::CommitIndex.encode()?)?
+            .map(|v| bincode::deserialize(&v))
+            .transpose()?
+            .unwrap_or((0, 0));
+        Ok(Self { engine, last_index, last_term, commit_index, commit_term, sync })
+    }
+
+    /// Decodes an entry from a log key/value pair.
+    fn decode_entry(key: &[u8], value: &[u8]) -> Result<Entry> {
+        if let Key::Entry(index) = Key::decode(key)? {
+            Self::decode_entry_value(index, value)
+        } else {
+            Err(Error::Internal(format!("Invalid key {:x?}", key)))
+        }
+    }
+
+    /// Decodes an entry from a value at a given index.
+    fn decode_entry_value(index: Index, value: &[u8]) -> Result<Entry> {
+        let (term, command) = bincode::deserialize(value)?;
+        Ok(Entry { index, term, command })
+    }
+
+    /// Returns log engine name and status.
+    pub fn status(&mut self) -> Result<storage::engine::Status> {
+        self.engine.status()
     }
 
     /// Returns the commit index and term.
@@ -90,10 +125,10 @@ impl Log {
     }
 
     /// Returns the last known term (0 if none), and cast vote (if any).
-    pub fn get_term(&self) -> Result<(Term, Option<String>)> {
+    pub fn get_term(&mut self) -> Result<(Term, Option<String>)> {
         let (term, voted_for) = self
-            .store
-            .get_metadata(&Key::TermVote.encode())?
+            .engine
+            .get(&Key::TermVote.encode()?)?
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, None));
@@ -103,37 +138,59 @@ impl Log {
 
     /// Sets the most recent term, and cast vote (if any).
     pub fn set_term(&mut self, term: Term, voted_for: Option<&str>) -> Result<()> {
-        self.store.set_metadata(&Key::TermVote.encode(), bincode::serialize(&(term, voted_for))?)
+        self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, voted_for))?)?;
+        self.maybe_flush()
     }
 
-    /// Appends a command to the log, returning the log index.
+    /// Flushes the log to stable storage, if enabled.
+    fn maybe_flush(&mut self) -> Result<()> {
+        if self.sync {
+            self.engine.flush()?;
+        }
+        Ok(())
+    }
+
+    /// Appends a command to the log, returning its index. None implies a noop
+    /// command, typically after Raft leader changes.
     pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
-        let entry = Entry { index: self.last_index + 1, term, command };
-        debug!("Appending log entry {}: {:?}", entry.index, entry);
-        self.store.append(bincode::serialize(&entry)?)?;
-        self.last_index = entry.index;
-        self.last_term = entry.term;
-        Ok(entry.index)
+        let index = self.last_index + 1;
+        self.engine.set(&Key::Entry(index).encode()?, bincode::serialize(&(term, command))?)?;
+        self.maybe_flush()?;
+        self.last_index = index;
+        self.last_term = term;
+        Ok(index)
     }
 
-    /// Commits entries up to and including an index.
+    /// Commits entries up to and including the given index. The index must
+    /// exist, and must be at or after the current commit index.
     pub fn commit(&mut self, index: Index) -> Result<u64> {
-        let entry = self
-            .get(index)?
-            .ok_or_else(|| Error::Internal(format!("Entry {} not found", index)))?;
-        self.store.commit(index)?;
+        if index < self.commit_index {
+            return Err(Error::Internal(format!(
+                "Commit index regression {} -> {}",
+                self.commit_index, index
+            )));
+        }
+        let Some(entry) = self.get(index)? else {
+            return Err(Error::Internal(format!("Can't commit non-existant index {}", index)));
+        };
+        self.engine
+            .set(&Key::CommitIndex.encode()?, bincode::serialize(&(entry.index, entry.term))?)?;
+        self.maybe_flush()?;
         self.commit_index = entry.index;
         self.commit_term = entry.term;
         Ok(index)
     }
 
-    /// Fetches an entry at an index
-    pub fn get(&self, index: Index) -> Result<Option<Entry>> {
-        self.store.get(index)?.map(|v| bincode::deserialize(&v)).transpose()
+    /// Fetches an entry at an index, or None if it does not exist.
+    pub fn get(&mut self, index: Index) -> Result<Option<Entry>> {
+        self.engine
+            .get(&Key::Entry(index).encode()?)?
+            .map(|v| Self::decode_entry_value(index, &v))
+            .transpose()
     }
 
-    /// Checks if the log contains an entry
-    pub fn has(&self, index: Index, term: Term) -> Result<bool> {
+    /// Checks if the log contains an entry with the given term.
+    pub fn has(&mut self, index: Index, term: Term) -> Result<bool> {
         match self.get(index)? {
             Some(entry) => Ok(entry.term == term),
             None if index == 0 && term == 0 => Ok(true),
@@ -141,54 +198,69 @@ impl Log {
         }
     }
 
-    /// Iterates over log entries
-    pub fn scan(&self, range: impl RangeBounds<Index>) -> Scan {
-        Box::new(
-            self.store.scan(Range::from(range)).map(|r| r.and_then(|v| bincode::deserialize(&v))),
-        )
-    }
-
-    /// Splices a set of entries onto an offset. The entries must be contiguous, and the first entry
-    /// must be at most last_index+1. If an entry does not exist, append it. If an existing entry
-    /// has a term mismatch, replace it and all following entries.
-    pub fn splice(&mut self, entries: Vec<Entry>) -> Result<u64> {
-        for i in 0..entries.len() {
-            if i == 0 && entries.get(i).unwrap().index > self.last_index + 1 {
-                return Err(Error::Internal("Spliced entries cannot begin past last index".into()));
-            }
-            if entries.get(i).unwrap().index != entries.get(0).unwrap().index + i as u64 {
-                return Err(Error::Internal("Spliced entries must be contiguous".into()));
-            }
-        }
-        for entry in entries {
-            if let Some(ref current) = self.get(entry.index)? {
-                if current.term == entry.term {
-                    continue;
-                }
-                self.truncate(entry.index - 1)?;
-            }
-            self.append(entry.term, entry.command)?;
-        }
-        Ok(self.last_index)
-    }
-
-    /// Truncates the log such that its last item is at most index.
-    /// Refuses to remove entries that have been applied or committed.
-    pub fn truncate(&mut self, index: Index) -> Result<u64> {
-        debug!("Truncating log from entry {}", index);
-        let (index, term) = match self.store.truncate(index)? {
-            0 => (0, 0),
-            i => self
-                .store
-                .get(i)?
-                .map(|v| bincode::deserialize::<Entry>(&v))
-                .transpose()?
-                .map(|e| (e.index, e.term))
-                .ok_or_else(|| Error::Internal(format!("Entry {} not found", index)))?,
+    /// Iterates over log entries in the given index range.
+    pub fn scan(&mut self, range: impl std::ops::RangeBounds<Index>) -> Result<Scan> {
+        let from = match range.start_bound() {
+            std::ops::Bound::Excluded(i) => std::ops::Bound::Excluded(Key::Entry(*i).encode()?),
+            std::ops::Bound::Included(i) => std::ops::Bound::Included(Key::Entry(*i).encode()?),
+            std::ops::Bound::Unbounded => std::ops::Bound::Included(Key::Entry(0).encode()?),
         };
-        self.last_index = index;
-        self.last_term = term;
-        Ok(index)
+        let to = match range.end_bound() {
+            std::ops::Bound::Excluded(i) => std::ops::Bound::Excluded(Key::Entry(*i).encode()?),
+            std::ops::Bound::Included(i) => std::ops::Bound::Included(Key::Entry(*i).encode()?),
+            std::ops::Bound::Unbounded => {
+                std::ops::Bound::Included(Key::Entry(Index::MAX).encode()?)
+            }
+        };
+        Ok(Box::new(
+            self.engine.scan(from, to).map(|r| r.and_then(|(k, v)| Self::decode_entry(&k, &v))),
+        ))
+    }
+
+    /// Splices a set of entries into the log. The entries must be contiguous,
+    /// and the first entry must be at most last_index+1. If an entry does not
+    /// exist, append it. If an existing entry has a term mismatch, replace it
+    /// and all following entries.
+    pub fn splice(&mut self, entries: Vec<Entry>) -> Result<u64> {
+        if entries.is_empty() {
+            return Ok(self.last_index);
+        }
+        if entries[0].index == 0 || entries[0].index > self.last_index + 1 {
+            return Err(Error::Internal("Spliced entries must begin before last index".into()));
+        }
+        if entries[0].index <= self.commit_index {
+            return Err(Error::Internal("Spliced entries must begin after commit index".into()));
+        }
+        if !entries.windows(2).all(|w| w[0].index + 1 == w[1].index) {
+            return Err(Error::Internal("Spliced entries must be contiguous".into()));
+        }
+        let (last_index, last_term) = entries.last().map(|e| (e.index, e.term)).unwrap();
+
+        // Skip entries that are already in the log (identified by index and term).
+        let mut entries = entries.as_slice();
+        let mut scan = self.scan(entries[0].index..=entries.last().unwrap().index)?;
+        while let Some(e) = scan.next().transpose()? {
+            if e.term != entries[0].term {
+                break;
+            }
+            entries = &entries[1..];
+        }
+        drop(scan);
+
+        // Write any entries not already in the log.
+        for e in entries {
+            self.engine
+                .set(&Key::Entry(e.index).encode()?, bincode::serialize(&(&e.term, &e.command))?)?;
+        }
+
+        // Remove the remaining tail of the old log, if any, and update the index.
+        for index in (last_index + 1)..=self.last_index {
+            self.engine.delete(&Key::Entry(index).encode()?)?;
+        }
+        self.maybe_flush()?;
+        self.last_index = last_index;
+        self.last_term = last_term;
+        Ok(self.last_index)
     }
 }
 
@@ -264,117 +336,88 @@ impl<E: storage::engine::Engine> Engine for E {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::engine::Memory;
     use pretty_assertions::assert_eq;
 
-    fn setup() -> Result<(Log, Box<log::Test>)> {
-        let store = Box::new(log::Test::new());
-        let log = Log::new(store.clone())?;
-        Ok((log, store))
+    fn setup() -> Log {
+        Log::new(Box::new(Memory::new()), false).expect("empty engine should never fail to open")
     }
 
     #[test]
     fn new() -> Result<()> {
-        let (l, _) = setup()?;
-        assert_eq!(0, l.last_index);
-        assert_eq!(0, l.last_term);
-        assert_eq!(0, l.commit_index);
-        assert_eq!(0, l.commit_term);
+        let mut l = setup();
+        assert_eq!((0, 0), l.get_commit_index());
+        assert_eq!((0, 0), l.get_last_index());
         assert_eq!(None, l.get(1)?);
         Ok(())
     }
 
     #[test]
     fn append() -> Result<()> {
-        let (mut l, _) = setup()?;
-        assert_eq!(Ok(None), l.get(1));
+        let mut l = setup();
+        assert_eq!(l.get(1), Ok(None));
 
-        assert_eq!(1, l.append(3, Some(vec![0x01]))?);
-        assert_eq!(Some(Entry { index: 1, term: 3, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(None, l.get(2)?);
+        assert_eq!(l.append(3, Some(vec![0x01]))?, 1,);
+        assert_eq!(l.get(1)?, Some(Entry { index: 1, term: 3, command: Some(vec![0x01]) }));
+        assert_eq!(l.get(2)?, None);
 
-        assert_eq!(1, l.last_index);
-        assert_eq!(3, l.last_term);
-        assert_eq!(0, l.commit_index);
-        assert_eq!(0, l.commit_term);
-        Ok(())
-    }
+        assert_eq!(l.get_last_index(), (1, 3));
+        assert_eq!(l.get_commit_index(), (0, 0));
 
-    #[test]
-    fn append_none() -> Result<()> {
-        let (mut l, _) = setup()?;
-        assert_eq!(1, l.append(3, None)?);
-        assert_eq!(Some(Entry { index: 1, term: 3, command: None }), l.get(1)?);
-        Ok(())
-    }
-
-    #[test]
-    fn append_persistence() -> Result<()> {
-        let (mut l, store) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, None)?;
-        l.append(2, Some(vec![0x03]))?;
-
-        let l = Log::new(store)?;
-        assert_eq!(Some(Entry { index: 1, term: 1, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(Some(Entry { index: 2, term: 2, command: None }), l.get(2)?);
-        assert_eq!(Some(Entry { index: 3, term: 2, command: Some(vec![0x03]) }), l.get(3)?);
+        assert_eq!(l.append(3, None)?, 2);
+        assert_eq!(l.get(2)?, Some(Entry { index: 2, term: 3, command: None }));
+        assert_eq!(l.get_last_index(), (2, 3));
+        assert_eq!(l.get_commit_index(), (0, 0));
         Ok(())
     }
 
     #[test]
     fn commit() -> Result<()> {
-        let (mut l, store) = setup()?;
+        let mut l = setup();
         l.append(1, Some(vec![0x01]))?;
         l.append(2, None)?;
         l.append(2, Some(vec![0x03]))?;
-        assert_eq!(3, l.commit(3)?);
-        assert_eq!(3, l.commit_index);
-        assert_eq!(2, l.commit_term);
 
-        // The last committed entry must be persisted, to sync with state machine
-        let l = Log::new(store)?;
-        assert_eq!(3, l.commit_index);
-        assert_eq!(2, l.commit_term);
-        Ok(())
-    }
+        // Committing a missing entry should error.
+        assert_eq!(
+            l.commit(0),
+            Err(Error::Internal("Can't commit non-existant index 0".to_string()))
+        );
+        assert_eq!(
+            l.commit(4),
+            Err(Error::Internal("Can't commit non-existant index 4".to_string()))
+        );
 
-    #[test]
-    fn commit_beyond() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, None)?;
-        l.append(2, Some(vec![0x03]))?;
-        assert_eq!(Err(Error::Internal("Entry 4 not found".into())), l.commit(4));
+        // Committing an existing index works, and is idempotent.
+        l.commit(2)?;
+        assert_eq!(l.get_commit_index(), (2, 2));
+        l.commit(2)?;
+        assert_eq!(l.get_commit_index(), (2, 2));
 
-        Ok(())
-    }
+        // Regressing the commit index should error.
+        assert_eq!(l.commit(1), Err(Error::Internal("Commit index regression 2 -> 1".to_string())));
 
-    #[test]
-    fn commit_partial() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, None)?;
-        l.append(2, Some(vec![0x03]))?;
-        assert_eq!(2, l.commit(2)?);
-        assert_eq!(2, l.commit_index);
-        assert_eq!(2, l.commit_term);
+        // Committing a later index works.
+        l.commit(3)?;
+        assert_eq!(l.get_commit_index(), (3, 2));
+
         Ok(())
     }
 
     #[test]
     fn get() -> Result<()> {
-        let (mut l, _) = setup()?;
-        assert_eq!(None, l.get(1)?);
+        let mut l = setup();
+        assert_eq!(l.get(1)?, None);
 
         l.append(3, Some(vec![0x01]))?;
-        assert_eq!(Some(Entry { index: 1, term: 3, command: Some(vec![0x01]) }), l.get(1)?);
-        assert_eq!(None, l.get(2)?);
+        assert_eq!(l.get(1)?, Some(Entry { index: 1, term: 3, command: Some(vec![0x01]) }));
+        assert_eq!(l.get(2)?, None);
         Ok(())
     }
 
     #[test]
     fn has() -> Result<()> {
-        let (mut l, _) = setup()?;
+        let mut l = setup();
         l.append(2, Some(vec![0x01]))?;
 
         assert!(l.has(1, 2)?);
@@ -389,291 +432,231 @@ mod tests {
 
     #[test]
     fn scan() -> Result<()> {
-        let (mut l, _) = setup()?;
+        let mut l = setup();
         l.append(1, Some(vec![0x01]))?;
         l.append(1, Some(vec![0x02]))?;
         l.append(1, Some(vec![0x03]))?;
 
         assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
             vec![
                 Entry { index: 1, term: 1, command: Some(vec![0x01]) },
                 Entry { index: 2, term: 1, command: Some(vec![0x02]) },
                 Entry { index: 3, term: 1, command: Some(vec![0x03]) },
             ],
-            l.scan(0..).collect::<Result<Vec<_>>>()?
         );
         assert_eq!(
-            vec![
-                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
-                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
-            ],
-            l.scan(2..).collect::<Result<Vec<_>>>()?
+            l.scan(2..=2)?.collect::<Result<Vec<_>>>()?,
+            vec![Entry { index: 2, term: 1, command: Some(vec![0x02]) },],
         );
-        assert!(l.scan(4..).collect::<Result<Vec<_>>>()?.is_empty());
+        assert!(l.scan(4..)?.collect::<Result<Vec<_>>>()?.is_empty());
         Ok(())
     }
 
     #[test]
-    fn load_save_term() -> Result<()> {
-        // Test loading empty term
-        let (l, _) = setup()?;
-        assert_eq!((0, None), l.get_term()?);
+    fn set_get_term() -> Result<()> {
+        let mut l = setup();
+        assert_eq!(l.get_term()?, (0, None));
 
-        // Test loading saved term
-        let (mut l, store) = setup()?;
         l.set_term(1, Some("a"))?;
-        let l = Log::new(store)?;
-        assert_eq!((1, Some("a".into())), l.get_term()?);
+        assert_eq!(l.get_term()?, (1, Some("a".into())));
 
-        // Test replacing saved term with none
-        let (mut l, _) = setup()?;
-        l.set_term(1, Some("a"))?;
-        assert_eq!((1, Some("a".into())), l.get_term()?);
         l.set_term(0, None)?;
-        assert_eq!((0, None), l.get_term()?);
+        assert_eq!(l.get_term()?, (0, None));
         Ok(())
     }
 
     #[test]
     fn splice() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
+        let mut l = setup();
 
-        assert_eq!(
-            4,
-            l.splice(vec![
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-                Entry { index: 4, term: 4, command: Some(vec![0x04]) },
-            ])?
-        );
-        assert_eq!(
-            vec![
+        // Splicing an empty vec should return the current last_index.
+        assert_eq!(l.splice(vec![])?, 0);
+
+        // It should error if the first index is not 1.
+        assert!(l.splice(vec![Entry { index: 0, term: 1, command: None }]).is_err());
+        assert!(l.splice(vec![Entry { index: 2, term: 1, command: None }]).is_err());
+
+        // ...or the entries are not contiguous.
+        assert!(l
+            .splice(vec![
                 Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-                Entry { index: 4, term: 4, command: Some(vec![0x04]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
-        );
-        assert_eq!(4, l.last_index);
-        assert_eq!(4, l.last_term);
-        Ok(())
-    }
-
-    #[test]
-    fn splice_all() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-
-        assert_eq!(
-            2,
-            l.splice(vec![
-                Entry { index: 1, term: 4, command: Some(vec![0x0a]) },
-                Entry { index: 2, term: 4, command: Some(vec![0x0b]) },
-            ])?
-        );
-        assert_eq!(
-            vec![
-                Entry { index: 1, term: 4, command: Some(vec![0x0a]) },
-                Entry { index: 2, term: 4, command: Some(vec![0x0b]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
-        );
-        assert_eq!(2, l.last_index);
-        assert_eq!(4, l.last_term);
-        Ok(())
-    }
-
-    #[test]
-    fn splice_append() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-
-        assert_eq!(
-            4,
-            l.splice(vec![
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-                Entry { index: 4, term: 4, command: Some(vec![0x04]) },
-            ])?
-        );
-        assert_eq!(
-            vec![
-                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-                Entry { index: 4, term: 4, command: Some(vec![0x04]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
-        );
-        assert_eq!(4, l.last_index);
-        assert_eq!(4, l.last_term);
-        Ok(())
-    }
-
-    #[test]
-    fn splice_conflict_term() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-        l.append(4, Some(vec![0x04]))?;
-
-        assert_eq!(
-            3,
-            l.splice(vec![
-                Entry { index: 2, term: 3, command: Some(vec![0x0b]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x0c]) }
-            ])?
-        );
-        assert_eq!(
-            vec![
-                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 3, command: Some(vec![0x0b]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x0c]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
-        );
-        assert_eq!(3, l.last_index);
-        assert_eq!(3, l.last_term);
-        Ok(())
-    }
-
-    #[test]
-    fn splice_error_noncontiguous() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-
-        assert_eq!(
-            Err(Error::Internal("Spliced entries must be contiguous".into())),
-            l.splice(vec![
-                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
+                Entry { index: 3, term: 2, command: Some(vec![0x03]) },
             ])
-        );
-        assert_eq!(
-            vec![
-                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
-        );
-        Ok(())
-    }
+            .is_err());
 
-    #[test]
-    fn splice_error_beyond_last() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-
+        // Splicing into an empty log should be fine.
         assert_eq!(
-            Err(Error::Internal("Spliced entries cannot begin past last index".into())),
             l.splice(vec![
-                Entry { index: 5, term: 3, command: Some(vec![0x05]) },
-                Entry { index: 6, term: 3, command: Some(vec![0x06]) },
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+            ])?,
+            2
+        );
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+            ]
+        );
+
+        // Splicing an empty vec should be fine, and return the last index
+        // without affecting data.
+        assert_eq!(l.splice(vec![])?, 2);
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+            ]
+        );
+
+        // Splicing with a gap after the last_index should error.
+        assert!(l
+            .splice(vec![
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+                Entry { index: 5, term: 1, command: Some(vec![0x05]) },
             ])
+            .is_err());
+
+        // Splicing after the last index should be fine.
+        assert_eq!(
+            l.splice(vec![
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ])?,
+            4
         );
         assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
             vec![
                 Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ]
         );
-        Ok(())
-    }
 
-    #[test]
-    fn splice_overlap_inside() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-
-        assert_eq!(3, l.splice(vec![Entry { index: 2, term: 2, command: Some(vec![0x02]) },])?);
+        // Splicing with overlap should be a noop.
         assert_eq!(
+            l.splice(vec![
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ])?,
+            4
+        );
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
             vec![
                 Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ]
         );
-        Ok(())
-    }
 
-    #[test]
-    fn truncate() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-
-        assert_eq!(2, l.truncate(2)?);
         assert_eq!(
+            l.splice(vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ])?,
+            4
+        );
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
             vec![
                 Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ]
         );
-        Ok(())
-    }
 
-    #[test]
-    fn truncate_beyond() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-
-        assert_eq!(3, l.truncate(4)?);
+        // Splicing in the middle should truncate the rest, even if the
+        // entries match.
         assert_eq!(
+            l.splice(vec![
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+            ])?,
+            3
+        );
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
             vec![
                 Entry { index: 1, term: 1, command: Some(vec![0x01]) },
-                Entry { index: 2, term: 2, command: Some(vec![0x02]) },
-                Entry { index: 3, term: 3, command: Some(vec![0x03]) },
-            ],
-            l.scan(..).collect::<Result<Vec<_>>>()?
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+            ]
         );
-        Ok(())
-    }
 
-    #[test]
-    fn truncate_committed() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
-        l.commit(2)?;
-
+        // Splicing at the start should truncate the rest, even if the
+        // entries match.
         assert_eq!(
-            l.truncate(1),
-            Err(Error::Internal("Cannot truncate below committed index 2".into()))
+            l.splice(vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+            ])?,
+            2
         );
-        assert_eq!(l.truncate(2)?, 2);
-        Ok(())
-    }
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+            ]
+        );
 
-    #[test]
-    fn truncate_zero() -> Result<()> {
-        let (mut l, _) = setup()?;
-        l.append(1, Some(vec![0x01]))?;
-        l.append(2, Some(vec![0x02]))?;
-        l.append(3, Some(vec![0x03]))?;
+        // Splicing a different command does nothing.
+        assert_eq!(l.splice(vec![Entry { index: 2, term: 1, command: Some(vec![0x00]) },])?, 2);
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+            ]
+        );
 
-        assert_eq!(0, l.truncate(0)?);
-        assert!(l.scan(..).collect::<Result<Vec<_>>>()?.is_empty());
+        // Splicing with overlap beyond the end works.
+        assert_eq!(
+            l.splice(vec![
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ])?,
+            4
+        );
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 1, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 1, command: Some(vec![0x04]) },
+            ]
+        );
+
+        // Splicing with a different term replaces.
+        assert_eq!(
+            l.splice(vec![
+                Entry { index: 3, term: 2, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 2, command: Some(vec![0x04]) },
+            ])?,
+            4
+        );
+        assert_eq!(
+            l.scan(..)?.collect::<Result<Vec<_>>>()?,
+            vec![
+                Entry { index: 1, term: 1, command: Some(vec![0x01]) },
+                Entry { index: 2, term: 1, command: Some(vec![0x02]) },
+                Entry { index: 3, term: 2, command: Some(vec![0x03]) },
+                Entry { index: 4, term: 2, command: Some(vec![0x04]) },
+            ]
+        );
+
         Ok(())
     }
 }

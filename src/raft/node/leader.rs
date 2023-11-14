@@ -45,8 +45,8 @@ impl RoleNode<Leader> {
     /// Appends an entry to the log and replicates it to peers.
     pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<u64> {
         let index = self.log.append(self.term, command)?;
-        for peer in self.peers.iter() {
-            self.replicate(peer)?;
+        for peer in self.peers.clone() {
+            self.replicate(&peer)?;
         }
         Ok(index)
     }
@@ -65,7 +65,7 @@ impl RoleNode<Leader> {
             if let Some(entry) = self.log.get(quorum_index)? {
                 if entry.term == self.term {
                     self.log.commit(quorum_index)?;
-                    let mut scan = self.log.scan((commit_index + 1)..=quorum_index);
+                    let mut scan = self.log.scan((commit_index + 1)..=quorum_index)?;
                     while let Some(entry) = scan.next().transpose()? {
                         self.state_tx.send(Instruction::Apply { entry })?;
                     }
@@ -76,7 +76,7 @@ impl RoleNode<Leader> {
     }
 
     /// Replicates the log to a peer.
-    fn replicate(&self, peer: &str) -> Result<()> {
+    fn replicate(&mut self, peer: &str) -> Result<()> {
         let peer_next = self
             .role
             .peer_next_index
@@ -89,7 +89,7 @@ impl RoleNode<Leader> {
             None if base_index == 0 => 0,
             None => return Err(Error::Internal(format!("Missing base entry {}", base_index))),
         };
-        let entries = self.log.scan(peer_next..).collect::<Result<Vec<_>>>()?;
+        let entries = self.log.scan(peer_next..)?.collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
         self.send(
             Address::Peer(peer.to_string()),
@@ -172,6 +172,7 @@ impl RoleNode<Leader> {
             }
 
             Event::ClientRequest { id, request: Request::Status } => {
+                let engine_status = self.log.status()?;
                 let mut status = Box::new(Status {
                     server: self.id.clone(),
                     leader: self.id.clone(),
@@ -179,8 +180,8 @@ impl RoleNode<Leader> {
                     node_last_index: self.role.peer_last_index.clone(),
                     commit_index: self.log.get_commit_index().0,
                     apply_index: 0,
-                    storage: self.log.store.to_string(),
-                    storage_size: self.log.store.size(),
+                    storage: engine_status.name.clone(),
+                    storage_size: engine_status.size,
                 });
                 status.node_last_index.insert(self.id.clone(), self.log.get_last_index().0);
                 self.state_tx.send(Instruction::Status { id, address: msg.from, status })?
@@ -224,7 +225,7 @@ mod tests {
     use super::super::super::{Entry, Log};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
-    use crate::storage::log;
+    use crate::storage;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
@@ -237,7 +238,7 @@ mod tests {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let peers = vec!["b".into(), "c".into(), "d".into(), "e".into()];
-        let mut log = Log::new(Box::new(log::Test::new()))?;
+        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
@@ -272,7 +273,7 @@ mod tests {
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2);
+        assert_node(&mut node).is_leader().term(3).committed(2);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(
             &mut state_rx,
@@ -293,7 +294,7 @@ mod tests {
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: false },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2);
+        assert_node(&mut node).is_leader().term(3).committed(2);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -322,7 +323,7 @@ mod tests {
             term: 3,
             event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2);
+        assert_node(&mut node).is_leader().term(3).committed(2);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -340,7 +341,7 @@ mod tests {
             term: 4,
             event: Event::Heartbeat { commit_index: 7, commit_term: 4 },
         })?;
-        assert_node(&node).is_follower().term(4).leader(Some("b")).committed(2);
+        assert_node(&mut node).is_follower().term(4).leader(Some("b")).committed(2);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -366,7 +367,7 @@ mod tests {
             term: 2,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2);
+        assert_node(&mut node).is_leader().term(3).committed(2);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -383,7 +384,7 @@ mod tests {
             term: 3,
             event: Event::AcceptEntries { last_index: 4 },
         })?;
-        assert_node(&node).committed(2);
+        assert_node(&mut node).committed(2);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
 
@@ -393,7 +394,7 @@ mod tests {
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
-        assert_node(&node).committed(4);
+        assert_node(&mut node).committed(4);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(
             &mut state_rx,
@@ -413,7 +414,7 @@ mod tests {
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
-        assert_node(&node).committed(5);
+        assert_node(&mut node).committed(5);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(
             &mut state_rx,
@@ -422,7 +423,7 @@ mod tests {
             }],
         );
 
-        assert_node(&node).is_leader().term(3);
+        assert_node(&mut node).is_leader().term(3);
         Ok(())
     }
 
@@ -439,7 +440,7 @@ mod tests {
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
             })?;
-            assert_node(&node).is_leader().term(3).committed(2);
+            assert_node(&mut node).is_leader().term(3).committed(2);
             assert_messages(&mut node_rx, vec![]);
             assert_messages(&mut state_rx, vec![]);
         }
@@ -460,7 +461,7 @@ mod tests {
                 term: 3,
                 event: Event::AcceptEntries { last_index: 3 },
             })?;
-            assert_node(&node).is_leader().term(3).committed(2);
+            assert_node(&mut node).is_leader().term(3).committed(2);
             assert_messages(&mut node_rx, vec![]);
             assert_messages(&mut state_rx, vec![]);
         }
@@ -484,7 +485,7 @@ mod tests {
             // The local leader will cast a vote to commit 5, thus when we have votes 2x7, 1x5, 2x0
             // we will commit index 5. However, we will correctly ignore the following votes for7.
             let c = if i == 0 { 2 } else { 5 };
-            assert_node(&node).is_leader().term(3).committed(c).last(5);
+            assert_node(&mut node).is_leader().term(3).committed(c).last(5);
             assert_messages(&mut node_rx, vec![]);
             if i == 1 {
                 assert_messages(
@@ -510,8 +511,8 @@ mod tests {
 
     #[test]
     fn step_rejectentries() -> Result<()> {
-        let (leader, mut node_rx, mut state_rx) = setup()?;
-        let entries = leader.log.scan(0..).collect::<Result<Vec<_>>>()?;
+        let (mut leader, mut node_rx, mut state_rx) = setup()?;
+        let entries = leader.log.scan(0..)?.collect::<Result<Vec<_>>>()?;
         let mut node: Node = leader.into();
 
         for i in 0..(entries.len() + 3) {
@@ -521,7 +522,7 @@ mod tests {
                 term: 3,
                 event: Event::RejectEntries,
             })?;
-            assert_node(&node).is_leader().term(3).committed(2);
+            assert_node(&mut node).is_leader().term(3).committed(2);
             let index = if i >= entries.len() { 0 } else { entries.len() - i - 1 };
             let replicate = entries.get(index..).unwrap().to_vec();
             assert_messages(
@@ -558,7 +559,7 @@ mod tests {
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Query(vec![0xaf]) },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2).last(5);
+        assert_node(&mut node).is_leader().term(3).committed(2).last(5);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -598,7 +599,7 @@ mod tests {
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2).last(6).entry(Entry {
+        assert_node(&mut node).is_leader().term(3).committed(2).last(6).entry(Entry {
             index: 6,
             term: 3,
             command: Some(vec![0xaf]),
@@ -640,7 +641,7 @@ mod tests {
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Status },
         })?;
-        assert_node(&node).is_leader().term(3).committed(2).last(5);
+        assert_node(&mut node).is_leader().term(3).committed(2).last(5);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(
             &mut state_rx,
@@ -662,8 +663,8 @@ mod tests {
                     .collect(),
                     commit_index: 2,
                     apply_index: 0,
-                    storage: "test".into(),
-                    storage_size: 25,
+                    storage: "memory".into(),
+                    storage_size: 71,
                 }),
             }],
         );
@@ -680,7 +681,7 @@ mod tests {
                 assert_messages(&mut node_rx, vec![]);
                 assert_messages(&mut state_rx, vec![]);
                 node = node.tick()?;
-                assert_node(&node).is_leader().term(3).committed(2);
+                assert_node(&mut node).is_leader().term(3).committed(2);
             }
 
             assert_eq!(

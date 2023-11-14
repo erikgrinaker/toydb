@@ -127,7 +127,7 @@ mod tests {
     use super::super::super::{Entry, Instruction, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
-    use crate::storage::log;
+    use crate::storage;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
@@ -139,7 +139,7 @@ mod tests {
     )> {
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(log::Test::new()))?;
+        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
@@ -175,13 +175,13 @@ mod tests {
     // and emits ConfirmLeader.
     fn step_heartbeat_current_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
-        let node = candidate.step(Message {
+        let mut node = candidate.step(Message {
             from: Address::Peer("b".into()),
             to: Address::Peer("a".into()),
             term: 3,
             event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
         })?;
-        assert_node(&node).is_follower().term(3);
+        assert_node(&mut node).is_follower().term(3);
         assert_messages(
             &mut node_rx,
             vec![
@@ -211,13 +211,13 @@ mod tests {
     // ConfirmLeader event
     fn step_heartbeat_future_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
-        let node = candidate.step(Message {
+        let mut node = candidate.step(Message {
             from: Address::Peer("b".into()),
             to: Address::Peer("a".into()),
             term: 4,
             event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
         })?;
-        assert_node(&node).is_follower().term(4);
+        assert_node(&mut node).is_follower().term(4);
         assert_messages(
             &mut node_rx,
             vec![
@@ -246,13 +246,13 @@ mod tests {
     // Heartbeat for past term is ignored
     fn step_heartbeat_past_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
-        let node = candidate.step(Message {
+        let mut node = candidate.step(Message {
             from: Address::Peer("b".into()),
             to: Address::Peer("a".into()),
             term: 2,
             event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
         })?;
-        assert_node(&node).is_candidate().term(3);
+        assert_node(&mut node).is_candidate().term(3);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -271,7 +271,7 @@ mod tests {
             term: 3,
             event: Event::GrantVote,
         })?;
-        assert_node(&node).is_candidate().term(3);
+        assert_node(&mut node).is_candidate().term(3);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
 
@@ -282,7 +282,7 @@ mod tests {
             term: 3,
             event: Event::GrantVote,
         })?;
-        assert_node(&node).is_leader().term(3);
+        assert_node(&mut node).is_leader().term(3);
 
         assert_eq!(
             node_rx.try_recv()?,
@@ -345,10 +345,10 @@ mod tests {
 
         assert!(timeout > 0);
         for _ in 0..timeout {
-            assert_node(&node).is_candidate().term(3);
+            assert_node(&mut node).is_candidate().term(3);
             node = node.tick()?;
         }
-        assert_node(&node).is_candidate().term(4);
+        assert_node(&mut node).is_candidate().term(4);
 
         assert_messages(
             &mut node_rx,

@@ -47,7 +47,7 @@ impl Node {
     pub async fn new(
         id: &str,
         peers: Vec<String>,
-        log: Log,
+        mut log: Log,
         mut state: Box<dyn State>,
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self> {
@@ -64,7 +64,7 @@ impl Node {
         let mut driver = Driver::new(state_rx, node_tx.clone());
         if commit_index > applied_index {
             info!("Replaying log entries {} to {}", applied_index + 1, commit_index);
-            driver.replay(&mut *state, log.scan((applied_index + 1)..=commit_index))?;
+            driver.replay(&mut *state, log.scan((applied_index + 1)..=commit_index)?)?;
         };
         tokio::spawn(driver.drive(state));
 
@@ -242,7 +242,7 @@ mod tests {
     use super::super::Entry;
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
-    use crate::storage::log;
+    use crate::storage;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
 
@@ -258,40 +258,40 @@ mod tests {
     }
 
     pub struct NodeAsserter<'a> {
-        node: &'a Node,
+        node: &'a mut Node,
     }
 
     impl<'a> NodeAsserter<'a> {
-        pub fn new(node: &'a Node) -> Self {
+        pub fn new(node: &'a mut Node) -> Self {
             Self { node }
         }
 
-        fn log(&self) -> &'a Log {
+        fn log(&mut self) -> &'_ mut Log {
             match self.node {
-                Node::Candidate(n) => &n.log,
-                Node::Follower(n) => &n.log,
-                Node::Leader(n) => &n.log,
+                Node::Candidate(n) => &mut n.log,
+                Node::Follower(n) => &mut n.log,
+                Node::Leader(n) => &mut n.log,
             }
         }
 
-        pub fn committed(self, index: u64) -> Self {
+        pub fn committed(mut self, index: u64) -> Self {
             assert_eq!(index, self.log().get_commit_index().0, "Unexpected committed index");
             self
         }
 
-        pub fn last(self, index: u64) -> Self {
+        pub fn last(mut self, index: u64) -> Self {
             assert_eq!(index, self.log().get_last_index().0, "Unexpected last index");
             self
         }
 
-        pub fn entry(self, entry: Entry) -> Self {
+        pub fn entry(mut self, entry: Entry) -> Self {
             assert!(entry.index <= self.log().get_last_index().0, "Index beyond last entry");
             assert_eq!(entry, self.log().get(entry.index).unwrap().unwrap());
             self
         }
 
-        pub fn entries(self, entries: Vec<Entry>) -> Self {
-            assert_eq!(entries, self.log().scan(0..).collect::<Result<Vec<_>>>().unwrap());
+        pub fn entries(mut self, entries: Vec<Entry>) -> Self {
+            assert_eq!(entries, self.log().scan(0..).unwrap().collect::<Result<Vec<_>>>().unwrap());
             self
         }
 
@@ -359,7 +359,7 @@ mod tests {
             self
         }
 
-        pub fn term(self, term: u64) -> Self {
+        pub fn term(mut self, term: u64) -> Self {
             assert_eq!(
                 term,
                 match self.node {
@@ -383,7 +383,7 @@ mod tests {
             self
         }
 
-        pub fn voted_for(self, voted_for: Option<&str>) -> Self {
+        pub fn voted_for(mut self, voted_for: Option<&str>) -> Self {
             assert_eq!(
                 voted_for.map(str::to_owned),
                 match self.node {
@@ -399,7 +399,7 @@ mod tests {
         }
     }
 
-    pub fn assert_node(node: &Node) -> NodeAsserter {
+    pub fn assert_node(node: &mut Node) -> NodeAsserter {
         NodeAsserter::new(node)
     }
 
@@ -417,7 +417,7 @@ mod tests {
             id: "a".into(),
             peers,
             term: 1,
-            log: Log::new(Box::new(log::Test::new()))?,
+            log: Log::new(Box::new(storage::engine::Memory::new()), false)?,
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
@@ -432,7 +432,7 @@ mod tests {
         let node = Node::new(
             "a",
             vec!["b".into(), "c".into()],
-            Log::new(Box::new(log::Test::new()))?,
+            Log::new(Box::new(storage::engine::Memory::new()), false)?,
             Box::new(TestState::new(0)),
             node_tx,
         )
@@ -448,30 +448,10 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn new_loads_term() -> Result<()> {
-        let (node_tx, _) = mpsc::unbounded_channel();
-        let store = Box::new(log::Test::new());
-        Log::new(store.clone())?.set_term(3, Some("c"))?;
-        let node = Node::new(
-            "a",
-            vec!["b".into(), "c".into()],
-            Log::new(store)?,
-            Box::new(TestState::new(0)),
-            node_tx,
-        )
-        .await?;
-        match node {
-            Node::Follower(rolenode) => assert_eq!(rolenode.term, 3),
-            _ => panic!("Expected node to start as follower"),
-        }
-        Ok(())
-    }
-
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_all() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(log::Test::new()))?;
+        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -489,7 +469,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_partial() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(log::Test::new()))?;
+        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -507,7 +487,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_missing() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(log::Test::new()))?;
+        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -530,7 +510,7 @@ mod tests {
         let node = Node::new(
             "a",
             vec![],
-            Log::new(Box::new(log::Test::new()))?,
+            Log::new(Box::new(storage::engine::Memory::new()), false)?,
             Box::new(TestState::new(0)),
             node_tx,
         )

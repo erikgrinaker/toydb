@@ -35,9 +35,15 @@ async fn main() -> Result<()> {
     simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
     let path = std::path::Path::new(&cfg.data_dir);
-    let raft_store: Box<dyn storage::log::Store> = match cfg.storage_raft.as_str() {
-        "hybrid" | "" => Box::new(storage::log::Hybrid::new(path, cfg.sync)?),
-        "memory" => Box::new(storage::log::Memory::new()),
+    let raft_log = match cfg.storage_raft.as_str() {
+        "bitcask" | "" => raft::Log::new(
+            Box::new(storage::engine::BitCask::new_compact(
+                path.join("log"),
+                cfg.compact_threshold,
+            )?),
+            cfg.sync,
+        )?,
+        "memory" => raft::Log::new(Box::new(storage::engine::Memory::new()), false)?,
         name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
     };
     let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
@@ -53,7 +59,7 @@ async fn main() -> Result<()> {
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
 
-    Server::new(&cfg.id, cfg.peers, raft_store, raft_state)
+    Server::new(&cfg.id, cfg.peers, raft_log, raft_state)
         .await?
         .listen(&cfg.listen_sql, &cfg.listen_raft)
         .await?
@@ -86,7 +92,7 @@ impl Config {
             .set_default("data_dir", "data")?
             .set_default("compact_threshold", 0.2)?
             .set_default("sync", true)?
-            .set_default("storage_raft", "hybrid")?
+            .set_default("storage_raft", "bitcask")?
             .set_default("storage_sql", "bitcask")?
             .add_source(config::File::with_name(file))
             .add_source(config::Environment::with_prefix("TOYDB"))

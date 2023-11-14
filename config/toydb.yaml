@@ -20,9 +20,9 @@ compact_threshold: 0.2
 sync: true
 
 # Raft log storage engine
-# - hybrid: (default) stores committed entries in an indexed append-only file, the rest in memory.
-# - memory: stores all entries in memory.
-storage_raft: hybrid
+# - bitcask (default): an append-only log-structured store.
+# - memory: an in-memory store using the Rust standard library's BTreeMap.
+storage_raft: bitcask
 
 # SQL key-value storage engine
 # - bitcask (default): an append-only log-structured store.

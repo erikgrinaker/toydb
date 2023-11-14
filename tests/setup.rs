@@ -3,7 +3,7 @@
 use toydb::client::{Client, Pool};
 use toydb::error::Result;
 use toydb::server::Server;
-use toydb::{sql, storage};
+use toydb::{raft, sql, storage};
 
 use futures_util::future::FutureExt as _;
 use pretty_assertions::assert_eq;
@@ -78,7 +78,7 @@ pub async fn server(
     let mut srv = Server::new(
         id,
         peers,
-        Box::new(storage::log::Hybrid::new(dir.path(), false)?),
+        raft::Log::new(Box::new(storage::engine::BitCask::new(dir.path().join("log"))?), false)?,
         Box::new(sql::engine::Raft::new_state(storage::engine::Memory::new())?),
     )
     .await?;
