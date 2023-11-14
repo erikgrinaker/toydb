@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::storage::log::Range;
-use crate::storage::{bincode, log};
+use crate::storage::{self, bincode, log};
 
 use ::log::debug;
 use serde::{Deserialize, Serialize};
@@ -189,6 +189,75 @@ impl Log {
         self.last_index = index;
         self.last_term = term;
         Ok(index)
+    }
+}
+
+/// A Raft log storage engine. This is a wrapper trait around storage::Engine
+/// with a blanket implementation, to make it object-safe (this is otherwise
+/// prevented by the generic scan() method). This wrapper allows Log to use a
+/// trait object for the engine, which prevents leaking generics throughout the
+/// Raft implementation.
+///
+/// TODO: Consider getting rid of this and using generics throughout.
+pub trait Engine: std::fmt::Display + Send + Sync {
+    fn delete(&mut self, key: &[u8]) -> Result<()>;
+
+    fn flush(&mut self) -> Result<()>;
+
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+
+    #[allow(clippy::type_complexity)]
+    fn scan(
+        &mut self,
+        from: std::ops::Bound<Vec<u8>>,
+        to: std::ops::Bound<Vec<u8>>,
+    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_>;
+
+    #[allow(clippy::type_complexity)]
+    fn scan_prefix(
+        &mut self,
+        prefix: &[u8],
+    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_>;
+
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
+
+    fn status(&mut self) -> Result<storage::engine::Status>;
+}
+
+impl<E: storage::engine::Engine> Engine for E {
+    fn delete(&mut self, key: &[u8]) -> Result<()> {
+        self.delete(key)
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        self.flush()
+    }
+
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        self.get(key)
+    }
+
+    fn scan(
+        &mut self,
+        from: std::ops::Bound<Vec<u8>>,
+        to: std::ops::Bound<Vec<u8>>,
+    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_> {
+        Box::new(self.scan((from, to)))
+    }
+
+    fn scan_prefix(
+        &mut self,
+        prefix: &[u8],
+    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_> {
+        Box::new(self.scan_prefix(prefix))
+    }
+
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
+        self.set(key, value)
+    }
+
+    fn status(&mut self) -> Result<storage::engine::Status> {
+        self.status()
     }
 }
 
