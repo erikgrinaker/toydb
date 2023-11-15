@@ -322,7 +322,7 @@ methods are synchronous and may cause state transitions, e.g. changing a candida
 when it receives the winning vote.
 
 Nodes have a command log [`raft::Log`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/log.rs),
-using a `storage::log::Store` for storage. Leaders receive client commands via request messages,
+using a `storage::Engine` for storage. Leaders receive client commands via request messages,
 replicate them to peers, and commit the commands to the log subject to consensus. Once a command is
 committed, is it applied to the state machine asynchronously.
 
