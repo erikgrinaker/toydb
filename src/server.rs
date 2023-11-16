@@ -57,7 +57,7 @@ impl Server {
             .raft_listener
             .ok_or_else(|| Error::Internal("Must listen before serving".into()))?;
         let (raft_tx, raft_rx) = mpsc::unbounded_channel();
-        let sql_engine = sql::engine::Raft::new(raft::Client::new(raft_tx));
+        let sql_engine = sql::engine::Raft::new(raft_tx);
 
         tokio::try_join!(
             self.raft.serve(raft_listener, raft_rx),

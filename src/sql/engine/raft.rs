@@ -7,8 +7,9 @@ use crate::storage::{self, bincode, mvcc::TransactionState};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use tokio::sync::{mpsc, oneshot};
 
-/// A Raft state machine mutation
+/// A Raft state machine mutation.
 ///
 /// TODO: use Cows for these.
 #[derive(Clone, Serialize, Deserialize)]
@@ -33,7 +34,7 @@ enum Mutation {
     DeleteTable { txn: TransactionState, table: String },
 }
 
-/// A Raft state machine query
+/// A Raft state machine query.
 ///
 /// TODO: use Cows for these.
 #[derive(Clone, Serialize, Deserialize)]
@@ -63,16 +64,64 @@ pub struct Status {
     pub mvcc: storage::mvcc::Status,
 }
 
-/// An SQL engine that wraps a Raft cluster.
+/// A client for the local Raft node.
+#[derive(Clone)]
+struct Client {
+    tx: mpsc::UnboundedSender<(raft::Request, oneshot::Sender<Result<raft::Response>>)>,
+}
+
+impl Client {
+    /// Creates a new Raft client.
+    fn new(
+        tx: mpsc::UnboundedSender<(raft::Request, oneshot::Sender<Result<raft::Response>>)>,
+    ) -> Self {
+        Self { tx }
+    }
+
+    /// Executes a request against the Raft cluster.
+    async fn execute(&self, request: raft::Request) -> Result<raft::Response> {
+        let (response_tx, response_rx) = oneshot::channel();
+        self.tx.send((request, response_tx))?;
+        response_rx.await?
+    }
+
+    /// Mutates the Raft state machine.
+    pub async fn mutate(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+        match self.execute(raft::Request::Mutate(command)).await? {
+            raft::Response::State(response) => Ok(response),
+            resp => Err(Error::Internal(format!("Unexpected Raft mutation response {:?}", resp))),
+        }
+    }
+
+    /// Queries the Raft state machine.
+    pub async fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+        match self.execute(raft::Request::Query(command)).await? {
+            raft::Response::State(response) => Ok(response),
+            resp => Err(Error::Internal(format!("Unexpected Raft query response {:?}", resp))),
+        }
+    }
+
+    /// Fetches Raft node status.
+    pub async fn status(&self) -> Result<raft::Status> {
+        match self.execute(raft::Request::Status).await? {
+            raft::Response::Status(status) => Ok(status),
+            resp => Err(Error::Internal(format!("Unexpected Raft status response {:?}", resp))),
+        }
+    }
+}
+
+/// A SQL engine using a Raft state machine.
 #[derive(Clone)]
 pub struct Raft {
-    client: raft::Client,
+    client: Client,
 }
 
 impl Raft {
-    /// Creates a new Raft SQL engine.
-    pub fn new(client: raft::Client) -> Self {
-        Self { client }
+    /// Creates a new Raft-based SQL engine.
+    pub fn new(
+        tx: mpsc::UnboundedSender<(raft::Request, oneshot::Sender<Result<raft::Response>>)>,
+    ) -> Self {
+        Self { client: Client::new(tx) }
     }
 
     /// Creates an underlying state machine for a Raft engine.
@@ -117,30 +166,28 @@ impl super::Engine for Raft {
     }
 }
 
-/// A Raft-based SQL transaction
+/// A Raft-based SQL transaction.
 #[derive(Clone)]
 pub struct Transaction {
-    /// The underlying Raft cluster
-    client: raft::Client,
-    // Transaction state
+    client: Client,
     state: TransactionState,
 }
 
 impl Transaction {
-    /// Starts a transaction in the given mode
-    fn begin(client: raft::Client, read_only: bool, as_of: Option<u64>) -> Result<Self> {
+    /// Starts a transaction in the given mode.
+    fn begin(client: Client, read_only: bool, as_of: Option<u64>) -> Result<Self> {
         let state = Raft::deserialize(&futures::executor::block_on(
             client.mutate(Raft::serialize(&Mutation::Begin { read_only, as_of })?),
         )?)?;
         Ok(Self { client, state })
     }
 
-    /// Executes a mutation
+    /// Executes a mutation.
     fn mutate(&self, mutation: Mutation) -> Result<Vec<u8>> {
         futures::executor::block_on(self.client.mutate(Raft::serialize(&mutation)?))
     }
 
-    /// Executes a query
+    /// Executes a query.
     fn query(&self, query: Query) -> Result<Vec<u8>> {
         futures::executor::block_on(self.client.query(Raft::serialize(&query)?))
     }
