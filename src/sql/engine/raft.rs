@@ -79,31 +79,31 @@ impl Client {
     }
 
     /// Executes a request against the Raft cluster.
-    async fn execute(&self, request: raft::Request) -> Result<raft::Response> {
+    fn execute(&self, request: raft::Request) -> Result<raft::Response> {
         let (response_tx, response_rx) = oneshot::channel();
         self.tx.send((request, response_tx))?;
-        response_rx.await?
+        futures::executor::block_on(response_rx)?
     }
 
     /// Mutates the Raft state machine.
-    pub async fn mutate(&self, command: Vec<u8>) -> Result<Vec<u8>> {
-        match self.execute(raft::Request::Mutate(command)).await? {
+    fn mutate(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+        match self.execute(raft::Request::Mutate(command))? {
             raft::Response::State(response) => Ok(response),
             resp => Err(Error::Internal(format!("Unexpected Raft mutation response {:?}", resp))),
         }
     }
 
     /// Queries the Raft state machine.
-    pub async fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
-        match self.execute(raft::Request::Query(command)).await? {
+    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+        match self.execute(raft::Request::Query(command))? {
             raft::Response::State(response) => Ok(response),
             resp => Err(Error::Internal(format!("Unexpected Raft query response {:?}", resp))),
         }
     }
 
     /// Fetches Raft node status.
-    pub async fn status(&self) -> Result<raft::Status> {
-        match self.execute(raft::Request::Status).await? {
+    fn status(&self) -> Result<raft::Status> {
+        match self.execute(raft::Request::Status)? {
             raft::Response::Status(status) => Ok(status),
             resp => Err(Error::Internal(format!("Unexpected Raft status response {:?}", resp))),
         }
@@ -132,10 +132,8 @@ impl Raft {
     /// Returns Raft SQL engine status.
     pub fn status(&self) -> Result<Status> {
         Ok(Status {
-            raft: futures::executor::block_on(self.client.status())?,
-            mvcc: Raft::deserialize(&futures::executor::block_on(
-                self.client.query(Raft::serialize(&Query::Status)?),
-            )?)?,
+            raft: self.client.status()?,
+            mvcc: Raft::deserialize(&self.client.query(Raft::serialize(&Query::Status)?)?)?,
         })
     }
 
@@ -176,20 +174,20 @@ pub struct Transaction {
 impl Transaction {
     /// Starts a transaction in the given mode.
     fn begin(client: Client, read_only: bool, as_of: Option<u64>) -> Result<Self> {
-        let state = Raft::deserialize(&futures::executor::block_on(
-            client.mutate(Raft::serialize(&Mutation::Begin { read_only, as_of })?),
-        )?)?;
+        let state = Raft::deserialize(
+            &client.mutate(Raft::serialize(&Mutation::Begin { read_only, as_of })?)?,
+        )?;
         Ok(Self { client, state })
     }
 
     /// Executes a mutation.
     fn mutate(&self, mutation: Mutation) -> Result<Vec<u8>> {
-        futures::executor::block_on(self.client.mutate(Raft::serialize(&mutation)?))
+        self.client.mutate(Raft::serialize(&mutation)?)
     }
 
     /// Executes a query.
     fn query(&self, query: Query) -> Result<Vec<u8>> {
-        futures::executor::block_on(self.client.query(Raft::serialize(&query)?))
+        self.client.query(Raft::serialize(&query)?)
     }
 }
 
