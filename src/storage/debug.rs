@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use super::bincode;
 use super::mvcc::{self, TransactionState};
+use crate::error::Result;
 
 /// Formats a raw byte string, either as a UTF-8 string (if valid and
 /// printable), otherwise hex-encoded.
@@ -87,4 +88,63 @@ pub fn format_key_value(key: &[u8], value: &Option<Vec<u8>>) -> (String, Option<
     }
 
     (fkey, fvalue)
+}
+
+/// A debug storage engine, which wraps another engine and logs mutations.
+pub struct Engine<E: super::engine::Engine> {
+    /// The wrapped engine.
+    inner: E,
+    /// Write log as key/value tuples. Value is None for deletes.
+    write_log: Vec<(Vec<u8>, Option<Vec<u8>>)>,
+}
+
+impl<E: super::engine::Engine> std::fmt::Display for Engine<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "debug:{}", self.inner)
+    }
+}
+
+impl<E: super::engine::Engine> Engine<E> {
+    pub fn new(inner: E) -> Self {
+        Self { inner, write_log: Vec::new() }
+    }
+
+    /// Returns and resets the write log. The next call only returns new writes.
+    pub fn take_write_log(&mut self) -> Vec<(Vec<u8>, Option<Vec<u8>>)> {
+        let mut write_log = Vec::new();
+        std::mem::swap(&mut write_log, &mut self.write_log);
+        write_log
+    }
+}
+
+impl<E: super::engine::Engine> super::engine::Engine for Engine<E> {
+    type ScanIterator<'a> = E::ScanIterator<'a> where E: 'a;
+
+    fn flush(&mut self) -> Result<()> {
+        self.inner.flush()
+    }
+
+    fn delete(&mut self, key: &[u8]) -> Result<()> {
+        self.inner.delete(key)?;
+        self.write_log.push((key.to_vec(), None));
+        Ok(())
+    }
+
+    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        self.inner.get(key)
+    }
+
+    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_> {
+        self.inner.scan(range)
+    }
+
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
+        self.inner.set(key, value.clone())?;
+        self.write_log.push((key.to_vec(), Some(value)));
+        Ok(())
+    }
+
+    fn status(&mut self) -> Result<super::engine::Status> {
+        self.inner.status()
+    }
 }

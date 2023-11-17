@@ -1,11 +1,9 @@
 mod bitcask;
-#[cfg(test)]
-mod debug;
 mod memory;
 
-pub use bitcask::BitCask;
 #[cfg(test)]
-pub use debug::Debug;
+pub use super::debug::Engine as Debug;
+pub use bitcask::BitCask;
 pub use memory::Memory;
 
 use crate::error::Result;
