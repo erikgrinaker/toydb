@@ -1,4 +1,4 @@
-use super::{Address, Entry, Event, Message, Response, Scan, Status};
+use super::{Address, Entry, Event, Index, Message, Response, Scan, Status, Term};
 use crate::error::{Error, Result};
 
 use log::{debug, error};
@@ -10,11 +10,11 @@ use tokio_stream::StreamExt as _;
 /// A Raft-managed state machine.
 pub trait State: Send {
     /// Returns the last applied index from the state machine, used when initializing the driver.
-    fn applied_index(&self) -> u64;
+    fn applied_index(&self) -> Index;
 
     /// Mutates the state machine. If the state machine returns Error::Internal, the Raft node
     /// halts. For any other error, the state is applied and the error propagated to the caller.
-    fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>>;
+    fn mutate(&mut self, index: Index, command: Vec<u8>) -> Result<Vec<u8>>;
 
     /// Queries the state machine. All errors are propagated to the caller.
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>>;
@@ -28,19 +28,19 @@ pub enum Instruction {
     /// Apply a log entry.
     Apply { entry: Entry },
     /// Notify the given address with the result of applying the entry at the given index.
-    Notify { id: Vec<u8>, address: Address, index: u64 },
+    Notify { id: Vec<u8>, address: Address, index: Index },
     /// Query the state machine when the given term and index has been confirmed by vote.
-    Query { id: Vec<u8>, address: Address, command: Vec<u8>, term: u64, index: u64, quorum: u64 },
+    Query { id: Vec<u8>, address: Address, command: Vec<u8>, term: Term, index: Index, quorum: u64 },
     /// Extend the given server status and return it to the given address.
     Status { id: Vec<u8>, address: Address, status: Box<Status> },
     /// Votes for queries at the given term and commit index.
-    Vote { term: u64, index: u64, address: Address },
+    Vote { term: Term, index: Index, address: Address },
 }
 
 /// A driver query.
 struct Query {
     id: Vec<u8>,
-    term: u64,
+    term: Term,
     address: Address,
     command: Vec<u8>,
     quorum: u64,
@@ -51,11 +51,11 @@ struct Query {
 pub struct Driver {
     state_rx: UnboundedReceiverStream<Instruction>,
     node_tx: mpsc::UnboundedSender<Message>,
-    applied_index: u64,
+    applied_index: Index,
     /// Notify clients when their mutation is applied. <index, (client, id)>
-    notify: HashMap<u64, (Address, Vec<u8>)>,
+    notify: HashMap<Index, (Address, Vec<u8>)>,
     /// Execute client queries when they receive a quorum. <index, <id, query>>
-    queries: BTreeMap<u64, BTreeMap<Vec<u8>, Query>>,
+    queries: BTreeMap<Index, BTreeMap<Vec<u8>, Query>>,
 }
 
 impl Driver {
@@ -166,7 +166,7 @@ impl Driver {
     }
 
     /// Notifies a client about an applied log entry, if any.
-    fn notify_applied(&mut self, index: u64, result: Result<Vec<u8>>) -> Result<()> {
+    fn notify_applied(&mut self, index: Index, result: Result<Vec<u8>>) -> Result<()> {
         if let Some((to, id)) = self.notify.remove(&index) {
             self.send(to, Event::ClientResponse { id, response: result.map(Response::State) })?;
         }
@@ -203,7 +203,7 @@ impl Driver {
     }
 
     /// Fetches and removes any ready queries, where index <= applied_index.
-    fn query_ready(&mut self, applied_index: u64) -> Vec<Query> {
+    fn query_ready(&mut self, applied_index: Index) -> Vec<Query> {
         let mut ready = Vec::new();
         let mut empty = Vec::new();
         for (index, queries) in self.queries.range_mut(..=applied_index) {
@@ -229,7 +229,7 @@ impl Driver {
     }
 
     /// Votes for queries up to and including a given commit index for a term by an address.
-    fn query_vote(&mut self, term: u64, commit_index: u64, address: Address) {
+    fn query_vote(&mut self, term: Term, commit_index: Index, address: Address) {
         for (_, queries) in self.queries.range_mut(..=commit_index) {
             for (_, query) in queries.iter_mut() {
                 if term >= query.term {
@@ -256,11 +256,11 @@ pub mod tests {
     #[derive(Clone, Debug)]
     pub struct TestState {
         commands: Arc<Mutex<Vec<Vec<u8>>>>,
-        applied_index: Arc<Mutex<u64>>,
+        applied_index: Arc<Mutex<Index>>,
     }
 
     impl TestState {
-        pub fn new(applied_index: u64) -> Self {
+        pub fn new(applied_index: Index) -> Self {
             Self {
                 commands: Arc::new(Mutex::new(Vec::new())),
                 applied_index: Arc::new(Mutex::new(applied_index)),
@@ -273,12 +273,12 @@ pub mod tests {
     }
 
     impl State for TestState {
-        fn applied_index(&self) -> u64 {
+        fn applied_index(&self) -> Index {
             *self.applied_index.lock().unwrap()
         }
 
         // Appends the command to the internal commands list.
-        fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>> {
+        fn mutate(&mut self, index: Index, command: Vec<u8>) -> Result<Vec<u8>> {
             self.commands.lock()?.push(command.clone());
             *self.applied_index.lock()? = index;
             Ok(command)

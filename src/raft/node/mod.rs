@@ -2,7 +2,7 @@ mod candidate;
 mod follower;
 mod leader;
 
-use super::{Address, Driver, Event, Instruction, Log, Message, State};
+use super::{Address, Driver, Event, Index, Instruction, Log, Message, State};
 use crate::error::{Error, Result};
 use candidate::Candidate;
 use follower::Follower;
@@ -15,6 +15,9 @@ use tokio::sync::mpsc;
 
 /// A node ID.
 pub type NodeID = u8;
+
+/// A leader term.
+pub type Term = u64;
 
 /// The interval between leader heartbeats, in ticks.
 const HEARTBEAT_INTERVAL: u64 = 1;
@@ -30,10 +33,10 @@ const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
 pub struct Status {
     pub server: NodeID,
     pub leader: NodeID,
-    pub term: u64,
-    pub node_last_index: HashMap<NodeID, u64>,
-    pub commit_index: u64,
-    pub apply_index: u64,
+    pub term: Term,
+    pub node_last_index: HashMap<NodeID, Index>,
+    pub commit_index: Index,
+    pub apply_index: Index,
     pub storage: String,
     pub storage_size: u64,
 }
@@ -143,7 +146,7 @@ impl From<RoleNode<Leader>> for Node {
 pub struct RoleNode<R> {
     id: NodeID,
     peers: Vec<NodeID>,
-    term: u64,
+    term: Term,
     log: Log,
     node_tx: mpsc::UnboundedSender<Message>,
     state_tx: mpsc::UnboundedSender<Instruction>,
@@ -277,12 +280,12 @@ mod tests {
             }
         }
 
-        pub fn committed(mut self, index: u64) -> Self {
+        pub fn committed(mut self, index: Index) -> Self {
             assert_eq!(index, self.log().get_commit_index().0, "Unexpected committed index");
             self
         }
 
-        pub fn last(mut self, index: u64) -> Self {
+        pub fn last(mut self, index: Index) -> Self {
             assert_eq!(index, self.log().get_last_index().0, "Unexpected last index");
             self
         }
@@ -362,7 +365,7 @@ mod tests {
             self
         }
 
-        pub fn term(mut self, term: u64) -> Self {
+        pub fn term(mut self, term: Term) -> Self {
             assert_eq!(
                 term,
                 match self.node {

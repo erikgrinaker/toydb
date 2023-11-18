@@ -1,5 +1,7 @@
 use super::super::{Address, Event, Message, Response};
-use super::{Follower, Leader, Node, NodeID, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use super::{
+    Follower, Leader, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN,
+};
 use crate::error::Result;
 
 use ::log::{debug, info, warn};
@@ -30,7 +32,7 @@ impl Candidate {
 
 impl RoleNode<Candidate> {
     /// Transition to follower role.
-    fn become_follower(mut self, term: u64, leader: NodeID) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, term: Term, leader: NodeID) -> Result<RoleNode<Follower>> {
         info!("Discovered leader {} for term {}, following", leader, term);
         self.term = term;
         self.log.set_term(term, None)?;

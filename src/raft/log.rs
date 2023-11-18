@@ -4,14 +4,10 @@ use crate::storage::{self, bincode, keycode};
 use ::log::debug;
 use serde::{Deserialize, Serialize};
 
-use super::NodeID;
+use super::{NodeID, Term};
 
 /// A log index.
 pub type Index = u64;
-
-/// A Raft leadership term.
-/// TODO: Consider moving this to the module root.
-pub type Term = u64;
 
 /// A log entry.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -165,7 +161,7 @@ impl Log {
 
     /// Commits entries up to and including the given index. The index must
     /// exist, and must be at or after the current commit index.
-    pub fn commit(&mut self, index: Index) -> Result<u64> {
+    pub fn commit(&mut self, index: Index) -> Result<Index> {
         if index < self.commit_index {
             return Err(Error::Internal(format!(
                 "Commit index regression {} -> {}",
@@ -223,7 +219,7 @@ impl Log {
     /// and the first entry must be at most last_index+1. If an entry does not
     /// exist, append it. If an existing entry has a term mismatch, replace it
     /// and all following entries.
-    pub fn splice(&mut self, entries: Vec<Entry>) -> Result<u64> {
+    pub fn splice(&mut self, entries: Vec<Entry>) -> Result<Index> {
         if entries.is_empty() {
             return Ok(self.last_index);
         }

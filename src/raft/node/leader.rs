@@ -1,5 +1,5 @@
-use super::super::{Address, Event, Instruction, Message, Request, Response, Status};
-use super::{Follower, Node, NodeID, RoleNode, HEARTBEAT_INTERVAL};
+use super::super::{Address, Event, Index, Instruction, Message, Request, Response, Status};
+use super::{Follower, Node, NodeID, RoleNode, Term, HEARTBEAT_INTERVAL};
 use crate::error::{Error, Result};
 
 use ::log::{debug, info, warn};
@@ -11,14 +11,14 @@ pub struct Leader {
     /// Number of ticks since last heartbeat.
     heartbeat_ticks: u64,
     /// The next index to replicate to a peer.
-    peer_next_index: HashMap<NodeID, u64>,
+    peer_next_index: HashMap<NodeID, Index>,
     /// The last index known to be replicated on a peer.
-    peer_last_index: HashMap<NodeID, u64>,
+    peer_last_index: HashMap<NodeID, Index>,
 }
 
 impl Leader {
     /// Creates a new leader role.
-    pub fn new(peers: Vec<NodeID>, last_index: u64) -> Self {
+    pub fn new(peers: Vec<NodeID>, last_index: Index) -> Self {
         let mut leader = Self {
             heartbeat_ticks: 0,
             peer_next_index: HashMap::new(),
@@ -34,7 +34,7 @@ impl Leader {
 
 impl RoleNode<Leader> {
     /// Transforms the leader into a follower
-    fn become_follower(mut self, term: u64, leader: NodeID) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, term: Term, leader: NodeID) -> Result<RoleNode<Follower>> {
         info!("Discovered new leader {} for term {}, following", leader, term);
         self.term = term;
         self.log.set_term(term, None)?;
@@ -43,7 +43,7 @@ impl RoleNode<Leader> {
     }
 
     /// Appends an entry to the log and replicates it to peers.
-    pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<u64> {
+    pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<Index> {
         let index = self.log.append(self.term, command)?;
         for peer in self.peers.clone() {
             self.replicate(peer)?;
@@ -52,7 +52,7 @@ impl RoleNode<Leader> {
     }
 
     /// Commits any pending log entries.
-    fn commit(&mut self) -> Result<u64> {
+    fn commit(&mut self) -> Result<Index> {
         let mut last_indexes = vec![self.log.get_last_index().0];
         last_indexes.extend(self.role.peer_last_index.values());
         last_indexes.sort_unstable();
@@ -529,7 +529,7 @@ mod tests {
                     to: Address::Peer(2),
                     term: 3,
                     event: Event::ReplicateEntries {
-                        base_index: index as u64,
+                        base_index: index as Index,
                         base_term: if index > 0 {
                             entries.get(index - 1).map(|e| e.term).unwrap()
                         } else {

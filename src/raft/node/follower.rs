@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Instruction, Message, Response};
-use super::{Candidate, Node, NodeID, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use super::{Candidate, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
 use crate::error::Result;
 
 use ::log::{debug, info, warn};
@@ -44,7 +44,7 @@ impl RoleNode<Follower> {
     }
 
     /// Transforms the node into a follower for a new leader.
-    fn become_follower(mut self, leader: NodeID, term: u64) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, leader: NodeID, term: Term) -> Result<RoleNode<Follower>> {
         let mut voted_for = None;
         if term > self.term {
             info!("Discovered new term {}, following leader {}", term, leader);

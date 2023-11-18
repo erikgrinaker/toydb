@@ -1,4 +1,4 @@
-use super::{Entry, NodeID, Status};
+use super::{Entry, Index, NodeID, Status, Term};
 use crate::error::Result;
 
 use serde_derive::{Deserialize, Serialize};
@@ -20,7 +20,7 @@ pub enum Address {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     /// The current term of the sender.
-    pub term: u64,
+    pub term: Term,
     /// The sender address.
     pub from: Address,
     /// The recipient address.
@@ -35,15 +35,15 @@ pub enum Event {
     /// Leaders send periodic heartbeats to its followers.
     Heartbeat {
         /// The index of the leader's last committed log entry.
-        commit_index: u64,
+        commit_index: Index,
         /// The term of the leader's last committed log entry.
-        commit_term: u64,
+        commit_term: Term,
     },
     /// Followers confirm loyalty to leader after heartbeats.
     ConfirmLeader {
         /// The commit_index of the original leader heartbeat, to confirm
         /// read requests.
-        commit_index: u64,
+        commit_index: Index,
         /// If false, the follower does not have the entry at commit_index
         /// and would like the leader to replicate it.
         has_committed: bool,
@@ -51,25 +51,25 @@ pub enum Event {
     /// Candidates solicit votes from all peers.
     SolicitVote {
         // The index of the candidate's last stored log entry
-        last_index: u64,
+        last_index: Index,
         // The term of the candidate's last stored log entry
-        last_term: u64,
+        last_term: Term,
     },
     /// Followers may grant votes to candidates.
     GrantVote,
     /// Leaders replicate a set of log entries to followers.
     ReplicateEntries {
         /// The index of the log entry immediately preceding the submitted commands.
-        base_index: u64,
+        base_index: Index,
         /// The term of the log entry immediately preceding the submitted commands.
-        base_term: u64,
+        base_term: Term,
         /// Commands to replicate.
         entries: Vec<Entry>,
     },
     /// Followers may accept a set of log entries from a leader.
     AcceptEntries {
         /// The index of the last log entry.
-        last_index: u64,
+        last_index: Index,
     },
     /// Followers may also reject a set of log entries from a leader.
     RejectEntries,
