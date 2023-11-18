@@ -69,10 +69,10 @@ pub fn simple() -> Vec<&'static str> {
 
 /// Sets up a test server
 pub async fn server(
-    id: &str,
+    id: raft::NodeID,
     addr_sql: &str,
     addr_raft: &str,
-    peers: HashMap<String, String>,
+    peers: HashMap<raft::NodeID, String>,
 ) -> Result<Teardown> {
     let dir = TempDir::new("toydb")?;
     let mut srv = Server::new(
@@ -95,7 +95,7 @@ pub async fn server(
 
 /// Sets up a server with a client
 pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown)> {
-    let teardown = server("test", "127.0.0.1:9605", "127.0.0.1:9705", HashMap::new()).await?;
+    let teardown = server(1, "127.0.0.1:9605", "127.0.0.1:9705", HashMap::new()).await?;
     let client = Client::new("127.0.0.1:9605").await?;
     if !queries.is_empty() {
         client.execute("BEGIN").await?;
@@ -108,29 +108,26 @@ pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown)
 }
 
 /// Sets up a server cluster
-pub async fn cluster(nodes: HashMap<String, (String, String)>) -> Result<Teardown> {
+pub async fn cluster(nodes: HashMap<raft::NodeID, (String, String)>) -> Result<Teardown> {
     let mut teardown = Teardown::empty();
     for (id, (addr_sql, addr_raft)) in nodes.iter() {
         let peers = nodes
             .iter()
             .filter(|(i, _)| i != &id)
-            .map(|(id, (_, raft))| (id.clone(), raft.clone()))
+            .map(|(id, (_, raft))| (*id, raft.clone()))
             .collect();
-        teardown.merge(server(id, addr_sql, addr_raft, peers).await?);
+        teardown.merge(server(*id, addr_sql, addr_raft, peers).await?);
     }
     Ok(teardown)
 }
 
 /// Sets up a server cluster with clients
-pub async fn cluster_with_clients(
-    size: u64,
-    queries: Vec<&str>,
-) -> Result<(Vec<Client>, Teardown)> {
+pub async fn cluster_with_clients(size: u8, queries: Vec<&str>) -> Result<(Vec<Client>, Teardown)> {
     let mut nodes = HashMap::new();
-    for i in 0..size {
+    for i in 1..=size {
         nodes.insert(
-            format!("toydb{}", i),
-            (format!("127.0.0.1:{}", 9605 + i), format!("127.0.0.1:{}", 9705 + i)),
+            i,
+            (format!("127.0.0.1:{}", 9605 + i as u64), format!("127.0.0.1:{}", 9705 + i as u64)),
         );
     }
     let teardown = cluster(nodes.clone()).await?;
@@ -156,15 +153,15 @@ pub async fn cluster_with_clients(
 
 /// Sets up a server cluster with a client pool
 pub async fn cluster_with_pool(
-    cluster_size: u64,
+    cluster_size: u8,
     pool_size: u64,
     queries: Vec<&str>,
 ) -> Result<(Pool, Teardown)> {
     let mut nodes = HashMap::new();
-    for i in 0..cluster_size {
+    for i in 1..=cluster_size {
         nodes.insert(
-            format!("toydb{}", i),
-            (format!("127.0.0.1:{}", 9605 + i), format!("127.0.0.1:{}", 9705 + i)),
+            i,
+            (format!("127.0.0.1:{}", 9605 + i as u64), format!("127.0.0.1:{}", 9705 + i as u64)),
         );
     }
     let teardown = cluster(nodes.clone()).await?;

@@ -4,6 +4,8 @@ use crate::storage::{self, bincode, keycode};
 use ::log::debug;
 use serde::{Deserialize, Serialize};
 
+use super::NodeID;
+
 /// A log index.
 pub type Index = u64;
 
@@ -125,7 +127,7 @@ impl Log {
     }
 
     /// Returns the last known term (0 if none), and cast vote (if any).
-    pub fn get_term(&mut self) -> Result<(Term, Option<String>)> {
+    pub fn get_term(&mut self) -> Result<(Term, Option<NodeID>)> {
         let (term, voted_for) = self
             .engine
             .get(&Key::TermVote.encode()?)?
@@ -137,7 +139,7 @@ impl Log {
     }
 
     /// Sets the most recent term, and cast vote (if any).
-    pub fn set_term(&mut self, term: Term, voted_for: Option<&str>) -> Result<()> {
+    pub fn set_term(&mut self, term: Term, voted_for: Option<NodeID>) -> Result<()> {
         self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, voted_for))?)?;
         self.maybe_flush()
     }
@@ -458,8 +460,8 @@ mod tests {
         let mut l = setup();
         assert_eq!(l.get_term()?, (0, None));
 
-        l.set_term(1, Some("a"))?;
-        assert_eq!(l.get_term()?, (1, Some("a".into())));
+        l.set_term(1, Some(1))?;
+        assert_eq!(l.get_term()?, (1, Some(1)));
 
         l.set_term(0, None)?;
         assert_eq!(l.get_term()?, (0, None));

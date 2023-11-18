@@ -26,8 +26,8 @@ pub struct Server {
 impl Server {
     /// Creates a new toyDB server.
     pub async fn new(
-        id: &str,
-        peers: HashMap<String, String>,
+        id: raft::NodeID,
+        peers: HashMap<raft::NodeID, String>,
         raft_log: raft::Log,
         raft_state: Box<dyn raft::State>,
     ) -> Result<Self> {

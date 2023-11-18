@@ -28,10 +28,7 @@ async fn get() -> Result<()> {
         servers.insert(client.status().await?.raft.server);
         ids.insert(client.id());
     }
-    assert_eq!(
-        servers,
-        HashSet::from_iter(vec!["toydb0".into(), "toydb1".into(), "toydb2".into()])
-    );
+    assert_eq!(servers, HashSet::from_iter(vec![1, 2, 3]));
     assert_eq!(ids, HashSet::from_iter(vec![0, 1, 2, 3, 4]));
 
     // Further clients won't be ready

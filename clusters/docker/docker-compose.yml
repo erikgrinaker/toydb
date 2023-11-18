@@ -6,62 +6,62 @@ networks:
     ipam:
       driver: default
       config:
-      - subnet: 172.20.0.0/24
+        - subnet: 172.20.0.0/24
 
 services:
-  toydb-a: &toydb
+  toydb1: &toydb
     build: ..
     environment:
-    - TOYDB_LOG_LEVEL
+      - TOYDB_LOG_LEVEL
     volumes:
-    - ./toydb-a/toydb.yaml:/etc/toydb.yaml
-    - ./toydb-a/data:/var/lib/toydb
+      - ./toydb1/toydb.yaml:/etc/toydb.yaml
+      - ./toydb1/data:/var/lib/toydb
     networks:
       toydb:
         ipv4_address: 172.20.0.101
     ports:
-    - 9601:9605
+      - 9601:9605
 
-  toydb-b:
+  toydb2:
     <<: *toydb
     volumes:
-    - ./toydb-b/toydb.yaml:/etc/toydb.yaml
-    - ./toydb-b/data:/var/lib/toydb
+      - ./toydb2/toydb.yaml:/etc/toydb.yaml
+      - ./toydb2/data:/var/lib/toydb
     networks:
       toydb:
         ipv4_address: 172.20.0.102
     ports:
-    - 9602:9605
+      - 9602:9605
 
-  toydb-c:
+  toydb3:
     <<: *toydb
     volumes:
-    - ./toydb-c/toydb.yaml:/etc/toydb.yaml
-    - ./toydb-c/data:/var/lib/toydb
+      - ./toydb3/toydb.yaml:/etc/toydb.yaml
+      - ./toydb3/data:/var/lib/toydb
     networks:
       toydb:
         ipv4_address: 172.20.0.103
     ports:
-    - 9603:9605
+      - 9603:9605
 
-  toydb-d:
+  toydb4:
     <<: *toydb
     volumes:
-    - ./toydb-d/toydb.yaml:/etc/toydb.yaml
-    - ./toydb-d/data:/var/lib/toydb
+      - ./toydb4/toydb.yaml:/etc/toydb.yaml
+      - ./toydb4/data:/var/lib/toydb
     networks:
       toydb:
         ipv4_address: 172.20.0.104
     ports:
-    - 9604:9605
+      - 9604:9605
 
-  toydb-e:
+  toydb5:
     <<: *toydb
     volumes:
-    - ./toydb-e/toydb.yaml:/etc/toydb.yaml
-    - ./toydb-e/data:/var/lib/toydb
+      - ./toydb5/toydb.yaml:/etc/toydb.yaml
+      - ./toydb5/data:/var/lib/toydb
     networks:
       toydb:
         ipv4_address: 172.20.0.105
     ports:
-    - 9605:9605
+      - 9605:9605

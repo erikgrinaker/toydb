@@ -310,7 +310,7 @@ pub mod tests {
         state_tx.send(Instruction::Notify {
             id: vec![0x01],
             index: 1,
-            address: Address::Peer("a".into()),
+            address: Address::Peer(1),
         })?;
         state_tx.send(Instruction::Query {
             id: vec![0x02],
@@ -330,7 +330,7 @@ pub mod tests {
             vec![
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("a".into()),
+                    to: Address::Peer(1),
                     term: 0,
                     event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) }
                 },
@@ -398,11 +398,7 @@ pub mod tests {
             entry: Entry { index: 1, term: 2, command: Some(vec![0xaf]) },
         })?;
         state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Local })?;
-        state_tx.send(Instruction::Vote {
-            term: 2,
-            index: 1,
-            address: Address::Peer("a".into()),
-        })?;
+        state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Peer(1) })?;
         std::mem::drop(state_tx);
 
         let node_rx = UnboundedReceiverStream::new(node_rx);
@@ -439,11 +435,7 @@ pub mod tests {
             entry: Entry { index: 1, term: 1, command: Some(vec![0xaf]) },
         })?;
         state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Local })?;
-        state_tx.send(Instruction::Vote {
-            term: 1,
-            index: 1,
-            address: Address::Peer("a".into()),
-        })?;
+        state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Peer(1) })?;
         std::mem::drop(state_tx);
 
         let node_rx = UnboundedReceiverStream::new(node_rx);

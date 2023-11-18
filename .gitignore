@@ -1,4 +1,4 @@
-/clusters/*/toydb-?/data
+/clusters/*/toydb*/data
 /data
 /target
 .vscode/

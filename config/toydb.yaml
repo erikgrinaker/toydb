@@ -1,5 +1,5 @@
 # The node ID, peer ID/address map (empty for single node), and log level.
-id: toydb
+id: 1
 peers: {}
 log_level: INFO
 

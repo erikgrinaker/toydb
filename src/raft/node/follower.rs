@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Instruction, Message, Response};
-use super::{Candidate, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use super::{Candidate, Node, NodeID, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
 use crate::error::Result;
 
 use ::log::{debug, info, warn};
@@ -9,21 +9,21 @@ use rand::Rng as _;
 #[derive(Debug)]
 pub struct Follower {
     /// The leader, or None if just initialized.
-    leader: Option<String>,
+    leader: Option<NodeID>,
     /// The number of ticks since the last message from the leader.
     leader_seen_ticks: u64,
     /// The timeout before triggering an election.
     leader_seen_timeout: u64,
     /// The node we voted for in the current term, if any.
-    voted_for: Option<String>,
+    voted_for: Option<NodeID>,
 }
 
 impl Follower {
     /// Creates a new follower role.
-    pub fn new(leader: Option<&str>, voted_for: Option<&str>) -> Self {
+    pub fn new(leader: Option<NodeID>, voted_for: Option<NodeID>) -> Self {
         Self {
-            leader: leader.map(String::from),
-            voted_for: voted_for.map(String::from),
+            leader,
+            voted_for,
             leader_seen_ticks: 0,
             leader_seen_timeout: rand::thread_rng()
                 .gen_range(ELECTION_TIMEOUT_MIN..=ELECTION_TIMEOUT_MAX),
@@ -44,7 +44,7 @@ impl RoleNode<Follower> {
     }
 
     /// Transforms the node into a follower for a new leader.
-    fn become_follower(mut self, leader: &str, term: u64) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, leader: NodeID, term: u64) -> Result<RoleNode<Follower>> {
         let mut voted_for = None;
         if term > self.term {
             info!("Discovered new term {}, following leader {}", term, leader);
@@ -54,9 +54,9 @@ impl RoleNode<Follower> {
             info!("Discovered leader {}, following", leader);
             voted_for = self.role.voted_for;
         };
-        self.role = Follower::new(Some(leader), voted_for.as_deref());
+        self.role = Follower::new(Some(leader), voted_for);
         self.abort_proxied()?;
-        self.forward_queued(Address::Peer(leader.to_string()))?;
+        self.forward_queued(Address::Peer(leader))?;
         Ok(self)
     }
 
@@ -71,7 +71,7 @@ impl RoleNode<Follower> {
             warn!("Ignoring invalid message: {}", err);
             return Ok(self.into());
         }
-        if let Address::Peer(from) = &msg.from {
+        if let Address::Peer(from) = msg.from {
             if msg.term > self.term || self.role.leader.is_none() {
                 return self.become_follower(from, msg.term)?.step(msg);
             }
@@ -97,8 +97,8 @@ impl RoleNode<Follower> {
             }
 
             Event::SolicitVote { last_index, last_term } => {
-                if let Some(voted_for) = &self.role.voted_for {
-                    if msg.from != Address::Peer(voted_for.clone()) {
+                if let Some(voted_for) = self.role.voted_for {
+                    if msg.from != Address::Peer(voted_for) {
                         return Ok(self.into());
                     }
                 }
@@ -111,8 +111,8 @@ impl RoleNode<Follower> {
                 }
                 if let Address::Peer(from) = msg.from {
                     info!("Voting for {} in term {} election", from, self.term);
-                    self.send(Address::Peer(from.clone()), Event::GrantVote)?;
-                    self.log.set_term(self.term, Some(&from))?;
+                    self.send(Address::Peer(from), Event::GrantVote)?;
+                    self.log.set_term(self.term, Some(from))?;
                     self.role.voted_for = Some(from);
                 }
             }
@@ -130,9 +130,9 @@ impl RoleNode<Follower> {
             }
 
             Event::ClientRequest { ref id, .. } => {
-                if let Some(leader) = self.role.leader.as_deref() {
+                if let Some(leader) = self.role.leader {
                     self.proxied_reqs.insert(id.clone(), msg.from);
-                    self.send(Address::Peer(leader.to_string()), msg.event)?
+                    self.send(Address::Peer(leader), msg.event)?
                 } else {
                     self.queued_reqs.push((msg.from, msg.event));
                 }
@@ -140,7 +140,7 @@ impl RoleNode<Follower> {
 
             Event::ClientResponse { id, mut response } => {
                 if let Ok(Response::Status(ref mut status)) = response {
-                    status.server = self.id.clone();
+                    status.server = self.id;
                 }
                 self.proxied_reqs.remove(&id);
                 self.send(Address::Client, Event::ClientResponse { id, response })?;
@@ -177,12 +177,12 @@ pub mod tests {
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 
-    pub fn follower_leader(node: &RoleNode<Follower>) -> Option<String> {
-        node.role.leader.clone()
+    pub fn follower_leader(node: &RoleNode<Follower>) -> Option<NodeID> {
+        node.role.leader
     }
 
-    pub fn follower_voted_for(node: &RoleNode<Follower>) -> Option<String> {
-        node.role.voted_for.clone()
+    pub fn follower_voted_for(node: &RoleNode<Follower>) -> Option<NodeID> {
+        node.role.voted_for
     }
 
     #[allow(clippy::type_complexity)]
@@ -201,15 +201,15 @@ pub mod tests {
         log.set_term(3, None)?;
 
         let node = RoleNode {
-            id: "a".into(),
-            peers: vec!["b".into(), "c".into(), "d".into(), "e".into()],
+            id: 1,
+            peers: vec![2, 3, 4, 5],
             term: 3,
             log,
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
             queued_reqs: Vec::new(),
-            role: Follower::new(Some("b"), None),
+            role: Follower::new(Some(2), None),
         };
         Ok((node, node_rx, state_rx))
     }
@@ -219,17 +219,17 @@ pub mod tests {
     fn step_heartbeat() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None).committed(3);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(3);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
             }],
@@ -248,17 +248,17 @@ pub mod tests {
     fn step_heartbeat_conflict_commit_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 3, commit_term: 3 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None).committed(2);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: false },
             }],
@@ -272,17 +272,17 @@ pub mod tests {
     fn step_heartbeat_missing_commit_entry() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None).committed(2);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 5, has_committed: false },
             }],
@@ -296,12 +296,12 @@ pub mod tests {
     fn step_heartbeat_fake_leader() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None).committed(2);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -313,17 +313,17 @@ pub mod tests {
         let (mut follower, mut node_rx, mut state_rx) = setup()?;
         follower.role = Follower::new(None, None);
         let mut node = follower.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("c")).voted_for(None).committed(3);
+        assert_node(&mut node).is_follower().term(3).leader(Some(3)).voted_for(None).committed(3);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("c".into()),
+                to: Address::Peer(3),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
             }],
@@ -342,17 +342,17 @@ pub mod tests {
     fn step_heartbeat_old_commit_index() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None).committed(2);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 1, has_committed: true },
             }],
@@ -366,17 +366,17 @@ pub mod tests {
     fn step_heartbeat_future_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 4,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(4).leader(Some("c")).voted_for(None);
+        assert_node(&mut node).is_follower().term(4).leader(Some(3)).voted_for(None);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("c".into()),
+                to: Address::Peer(3),
                 term: 4,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
             }],
@@ -395,12 +395,12 @@ pub mod tests {
     fn step_heartbeat_past_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 2,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None).committed(2);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -413,17 +413,17 @@ pub mod tests {
 
         // The first vote request in this term yields a vote response.
         let mut node = follower.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(Some("c"));
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("c".into()),
+                to: Address::Peer(3),
                 term: 3,
                 event: Event::GrantVote,
             }],
@@ -432,17 +432,17 @@ pub mod tests {
 
         // Another vote request from the same sender is granted.
         node = node.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(Some("c"));
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("c".into()),
+                to: Address::Peer(3),
                 term: 3,
                 event: Event::GrantVote,
             }],
@@ -451,12 +451,12 @@ pub mod tests {
 
         // But a vote request from a different node is ignored.
         node = node.step(Message {
-            from: Address::Peer("d".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(4),
+            to: Address::Peer(1),
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(Some("c"));
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -467,12 +467,12 @@ pub mod tests {
     fn step_grantvote_noop() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::GrantVote,
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b"));
+        assert_node(&mut node).is_follower().term(3).leader(Some(2));
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -483,12 +483,12 @@ pub mod tests {
     fn step_solicitvote_last_index_outdated() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::SolicitVote { last_index: 2, last_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -499,12 +499,12 @@ pub mod tests {
     fn step_solicitvote_last_term_outdated() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 1 },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some("b")).voted_for(None);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None);
         assert_messages(&mut node_rx, vec![]);
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -522,20 +522,20 @@ pub mod tests {
         log.append(2, Some(vec![0x03]))?;
 
         let follower = RoleNode {
-            id: "a".into(),
-            peers: vec!["b".into(), "c".into(), "d".into(), "e".into()],
+            id: 1,
+            peers: vec![2, 3, 4, 5],
             term: 0,
             log,
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
             queued_reqs: Vec::new(),
-            role: Follower::new(Some("b"), None),
+            role: Follower::new(Some(2), None),
         };
 
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ReplicateEntries {
                 base_index: 0,
@@ -554,7 +554,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 2 },
             }],
@@ -568,8 +568,8 @@ pub mod tests {
     fn step_replicateentries_append() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ReplicateEntries {
                 base_index: 3,
@@ -591,7 +591,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
             }],
@@ -605,8 +605,8 @@ pub mod tests {
     fn step_replicateentries_partial_overlap() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ReplicateEntries {
                 base_index: 1,
@@ -627,7 +627,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
             }],
@@ -641,8 +641,8 @@ pub mod tests {
     fn step_replicateentries_replace() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ReplicateEntries {
                 base_index: 2,
@@ -663,7 +663,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
             }],
@@ -677,8 +677,8 @@ pub mod tests {
     fn step_replicateentries_replace_partial() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ReplicateEntries {
                 base_index: 2,
@@ -699,7 +699,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
             }],
@@ -713,8 +713,8 @@ pub mod tests {
     fn step_replicateentries_reject_missing_base_index() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ReplicateEntries {
                 base_index: 5,
@@ -731,7 +731,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::RejectEntries,
             }],
@@ -745,8 +745,8 @@ pub mod tests {
     fn step_replicateentries_reject_missing_base_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ReplicateEntries {
                 base_index: 1,
@@ -763,7 +763,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::RejectEntries,
             }],
@@ -787,14 +787,14 @@ pub mod tests {
         assert_node(&mut node)
             .is_follower()
             .term(3)
-            .leader(Some("b"))
+            .leader(Some(2))
             .proxied(vec![(vec![0x01], Address::Client)])
             .queued(vec![]);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::ClientRequest {
                     id: vec![0x01],
@@ -805,20 +805,15 @@ pub mod tests {
         assert_messages(&mut state_rx, vec![]);
 
         node = node.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ClientResponse {
                 id: vec![0x01],
                 response: Ok(Response::State(vec![0xaf])),
             },
         })?;
-        assert_node(&mut node)
-            .is_follower()
-            .term(3)
-            .leader(Some("b"))
-            .proxied(vec![])
-            .queued(vec![]);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).proxied(vec![]).queued(vec![]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -857,15 +852,15 @@ pub mod tests {
 
         // When a leader appears, we will proxy the queued request to them.
         node = node.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
         assert_node(&mut node)
             .is_follower()
             .term(3)
-            .leader(Some("c"))
+            .leader(Some(3))
             .proxied(vec![(vec![0x01], Address::Client)])
             .queued(vec![]);
         assert_messages(
@@ -873,7 +868,7 @@ pub mod tests {
             vec![
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("c".into()),
+                    to: Address::Peer(3),
                     term: 0,
                     event: Event::ClientRequest {
                         id: vec![0x01],
@@ -882,7 +877,7 @@ pub mod tests {
                 },
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("c".into()),
+                    to: Address::Peer(3),
                     term: 3,
                     event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
                 },
@@ -912,14 +907,14 @@ pub mod tests {
         assert_node(&mut node)
             .is_follower()
             .term(3)
-            .leader(Some("b"))
+            .leader(Some(2))
             .proxied(vec![(vec![0x01], Address::Client)])
             .queued(vec![]);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::ClientRequest {
                     id: vec![0x01],
@@ -931,17 +926,12 @@ pub mod tests {
 
         // When a new leader appears, the proxied request is aborted.
         node = node.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 4,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&mut node)
-            .is_follower()
-            .term(4)
-            .leader(Some("c"))
-            .proxied(vec![])
-            .queued(vec![]);
+        assert_node(&mut node).is_follower().term(4).leader(Some(3)).proxied(vec![]).queued(vec![]);
         assert_messages(
             &mut node_rx,
             vec![
@@ -953,7 +943,7 @@ pub mod tests {
                 },
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("c".into()),
+                    to: Address::Peer(3),
                     term: 4,
                     event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
                 },
@@ -977,11 +967,11 @@ pub mod tests {
         // Make sure heartbeats reset election timeout
         assert!(timeout > 0);
         for _ in 0..(3 * timeout) {
-            assert_node(&mut node).is_follower().term(3).leader(Some("b"));
+            assert_node(&mut node).is_follower().term(3).leader(Some(2));
             node = node.tick()?;
             node = node.step(Message {
-                from: Address::Peer("b".into()),
-                to: Address::Peer("a".into()),
+                from: Address::Peer(2),
+                to: Address::Peer(1),
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
             })?;
@@ -989,7 +979,7 @@ pub mod tests {
                 &mut node_rx,
                 vec![Message {
                     from: Address::Local,
-                    to: Address::Peer("b".into()),
+                    to: Address::Peer(2),
                     term: 3,
                     event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
                 }],
@@ -997,7 +987,7 @@ pub mod tests {
         }
 
         for _ in 0..timeout {
-            assert_node(&mut node).is_follower().term(3).leader(Some("b"));
+            assert_node(&mut node).is_follower().term(3).leader(Some(2));
             node = node.tick()?;
         }
         assert_node(&mut node).is_candidate().term(4);

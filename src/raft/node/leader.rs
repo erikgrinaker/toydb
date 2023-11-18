@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Instruction, Message, Request, Response, Status};
-use super::{Follower, Node, RoleNode, HEARTBEAT_INTERVAL};
+use super::{Follower, Node, NodeID, RoleNode, HEARTBEAT_INTERVAL};
 use crate::error::{Error, Result};
 
 use ::log::{debug, info, warn};
@@ -11,22 +11,22 @@ pub struct Leader {
     /// Number of ticks since last heartbeat.
     heartbeat_ticks: u64,
     /// The next index to replicate to a peer.
-    peer_next_index: HashMap<String, u64>,
+    peer_next_index: HashMap<NodeID, u64>,
     /// The last index known to be replicated on a peer.
-    peer_last_index: HashMap<String, u64>,
+    peer_last_index: HashMap<NodeID, u64>,
 }
 
 impl Leader {
     /// Creates a new leader role.
-    pub fn new(peers: Vec<String>, last_index: u64) -> Self {
+    pub fn new(peers: Vec<NodeID>, last_index: u64) -> Self {
         let mut leader = Self {
             heartbeat_ticks: 0,
             peer_next_index: HashMap::new(),
             peer_last_index: HashMap::new(),
         };
         for peer in peers {
-            leader.peer_next_index.insert(peer.clone(), last_index + 1);
-            leader.peer_last_index.insert(peer.clone(), 0);
+            leader.peer_next_index.insert(peer, last_index + 1);
+            leader.peer_last_index.insert(peer, 0);
         }
         leader
     }
@@ -34,7 +34,7 @@ impl Leader {
 
 impl RoleNode<Leader> {
     /// Transforms the leader into a follower
-    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, term: u64, leader: NodeID) -> Result<RoleNode<Follower>> {
         info!("Discovered new leader {} for term {}, following", leader, term);
         self.term = term;
         self.log.set_term(term, None)?;
@@ -46,7 +46,7 @@ impl RoleNode<Leader> {
     pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<u64> {
         let index = self.log.append(self.term, command)?;
         for peer in self.peers.clone() {
-            self.replicate(&peer)?;
+            self.replicate(peer)?;
         }
         Ok(index)
     }
@@ -76,11 +76,11 @@ impl RoleNode<Leader> {
     }
 
     /// Replicates the log to a peer.
-    fn replicate(&mut self, peer: &str) -> Result<()> {
+    fn replicate(&mut self, peer: NodeID) -> Result<()> {
         let peer_next = self
             .role
             .peer_next_index
-            .get(peer)
+            .get(&peer)
             .cloned()
             .ok_or_else(|| Error::Internal(format!("Unknown peer {}", peer)))?;
         let base_index = if peer_next > 0 { peer_next - 1 } else { 0 };
@@ -91,10 +91,7 @@ impl RoleNode<Leader> {
         };
         let entries = self.log.scan(peer_next..)?.collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
-        self.send(
-            Address::Peer(peer.to_string()),
-            Event::ReplicateEntries { base_index, base_term, entries },
-        )?;
+        self.send(Address::Peer(peer), Event::ReplicateEntries { base_index, base_term, entries })?;
         Ok(())
     }
 
@@ -105,28 +102,28 @@ impl RoleNode<Leader> {
             return Ok(self.into());
         }
         if msg.term > self.term {
-            if let Address::Peer(from) = &msg.from {
+            if let Address::Peer(from) = msg.from {
                 return self.become_follower(msg.term, from)?.step(msg);
             }
         }
 
         match msg.event {
             Event::ConfirmLeader { commit_index, has_committed } => {
-                if let Address::Peer(from) = msg.from.clone() {
+                if let Address::Peer(from) = msg.from {
                     self.state_tx.send(Instruction::Vote {
                         term: msg.term,
                         index: commit_index,
                         address: msg.from,
                     })?;
                     if !has_committed {
-                        self.replicate(&from)?;
+                        self.replicate(from)?;
                     }
                 }
             }
 
             Event::AcceptEntries { last_index } => {
                 if let Address::Peer(from) = msg.from {
-                    self.role.peer_last_index.insert(from.clone(), last_index);
+                    self.role.peer_last_index.insert(from, last_index);
                     self.role.peer_next_index.insert(from, last_index + 1);
                 }
                 self.commit()?;
@@ -134,12 +131,12 @@ impl RoleNode<Leader> {
 
             Event::RejectEntries => {
                 if let Address::Peer(from) = msg.from {
-                    self.role.peer_next_index.entry(from.clone()).and_modify(|i| {
+                    self.role.peer_next_index.entry(from).and_modify(|i| {
                         if *i > 1 {
                             *i -= 1
                         }
                     });
-                    self.replicate(&from)?;
+                    self.replicate(from)?;
                 }
             }
 
@@ -174,8 +171,8 @@ impl RoleNode<Leader> {
             Event::ClientRequest { id, request: Request::Status } => {
                 let engine_status = self.log.status()?;
                 let mut status = Box::new(Status {
-                    server: self.id.clone(),
-                    leader: self.id.clone(),
+                    server: self.id,
+                    leader: self.id,
                     term: self.term,
                     node_last_index: self.role.peer_last_index.clone(),
                     commit_index: self.log.get_commit_index().0,
@@ -183,13 +180,13 @@ impl RoleNode<Leader> {
                     storage: engine_status.name.clone(),
                     storage_size: engine_status.size,
                 });
-                status.node_last_index.insert(self.id.clone(), self.log.get_last_index().0);
+                status.node_last_index.insert(self.id, self.log.get_last_index().0);
                 self.state_tx.send(Instruction::Status { id, address: msg.from, status })?
             }
 
             Event::ClientResponse { id, mut response } => {
                 if let Ok(Response::Status(ref mut status)) = response {
-                    status.server = self.id.clone();
+                    status.server = self.id;
                 }
                 self.send(Address::Client, Event::ClientResponse { id, response })?;
             }
@@ -237,7 +234,7 @@ mod tests {
     )> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let peers = vec!["b".into(), "c".into(), "d".into(), "e".into()];
+        let peers = vec![2, 3, 4, 5];
         let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
@@ -248,7 +245,7 @@ mod tests {
         log.set_term(3, None)?;
 
         let node = RoleNode {
-            id: "a".into(),
+            id: 1,
             peers: peers.clone(),
             term: 3,
             role: Leader::new(peers, log.get_last_index().0),
@@ -268,8 +265,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
         })?;
@@ -277,7 +274,7 @@ mod tests {
         assert_messages(&mut node_rx, vec![]);
         assert_messages(
             &mut state_rx,
-            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer("b".into()) }],
+            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer(2) }],
         );
         Ok(())
     }
@@ -289,8 +286,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: false },
         })?;
@@ -299,14 +296,14 @@ mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 3,
                 event: Event::ReplicateEntries { base_index: 5, base_term: 3, entries: vec![] },
             }],
         );
         assert_messages(
             &mut state_rx,
-            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer("b".into()) }],
+            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer(2) }],
         );
         Ok(())
     }
@@ -318,8 +315,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
         })?;
@@ -336,17 +333,17 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 4,
             event: Event::Heartbeat { commit_index: 7, commit_term: 4 },
         })?;
-        assert_node(&mut node).is_follower().term(4).leader(Some("b")).committed(2);
+        assert_node(&mut node).is_follower().term(4).leader(Some(2)).committed(2);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 4,
                 event: Event::ConfirmLeader { commit_index: 7, has_committed: false },
             }],
@@ -362,8 +359,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 2,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
@@ -379,8 +376,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::AcceptEntries { last_index: 4 },
         })?;
@@ -389,8 +386,8 @@ mod tests {
         assert_messages(&mut state_rx, vec![]);
 
         node = node.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
@@ -409,8 +406,8 @@ mod tests {
         );
 
         node = node.step(Message {
-            from: Address::Peer("d".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(4),
+            to: Address::Peer(1),
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
@@ -435,8 +432,8 @@ mod tests {
 
         for _ in 0..5 {
             node = node.step(Message {
-                from: Address::Peer("b".into()),
-                to: Address::Peer("a".into()),
+                from: Address::Peer(2),
+                to: Address::Peer(1),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
             })?;
@@ -457,7 +454,7 @@ mod tests {
         for peer in peers.into_iter() {
             node = node.step(Message {
                 from: Address::Peer(peer),
-                to: Address::Peer("a".into()),
+                to: Address::Peer(1),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 3 },
             })?;
@@ -478,7 +475,7 @@ mod tests {
         for (i, peer) in peers.into_iter().enumerate() {
             node = node.step(Message {
                 from: Address::Peer(peer),
-                to: Address::Peer("a".into()),
+                to: Address::Peer(1),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 7 },
             })?;
@@ -517,8 +514,8 @@ mod tests {
 
         for i in 0..(entries.len() + 3) {
             node = node.step(Message {
-                from: Address::Peer("b".into()),
-                to: Address::Peer("a".into()),
+                from: Address::Peer(2),
+                to: Address::Peer(1),
                 term: 3,
                 event: Event::RejectEntries,
             })?;
@@ -529,7 +526,7 @@ mod tests {
                 &mut node_rx,
                 vec![Message {
                     from: Address::Local,
-                    to: Address::Peer("b".into()),
+                    to: Address::Peer(2),
                     term: 3,
                     event: Event::ReplicateEntries {
                         base_index: index as u64,
@@ -649,18 +646,12 @@ mod tests {
                 id: vec![0x01],
                 address: Address::Client,
                 status: Box::new(Status {
-                    server: "a".into(),
-                    leader: "a".into(),
+                    server: 1,
+                    leader: 1,
                     term: 3,
-                    node_last_index: vec![
-                        ("a".into(), 5),
-                        ("b".into(), 0),
-                        ("c".into(), 0),
-                        ("d".into(), 0),
-                        ("e".into(), 0),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    node_last_index: vec![(1, 5), (2, 0), (3, 0), (4, 0), (5, 0)]
+                        .into_iter()
+                        .collect(),
                     commit_index: 2,
                     apply_index: 0,
                     storage: "memory".into(),

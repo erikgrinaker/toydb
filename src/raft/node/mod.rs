@@ -13,6 +13,9 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 
+/// A node ID.
+pub type NodeID = u8;
+
 /// The interval between leader heartbeats, in ticks.
 const HEARTBEAT_INTERVAL: u64 = 1;
 
@@ -25,10 +28,10 @@ const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
 /// Node status
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
-    pub server: String,
-    pub leader: String,
+    pub server: NodeID,
+    pub leader: NodeID,
     pub term: u64,
-    pub node_last_index: HashMap<String, u64>,
+    pub node_last_index: HashMap<NodeID, u64>,
     pub commit_index: u64,
     pub apply_index: u64,
     pub storage: String,
@@ -45,8 +48,8 @@ pub enum Node {
 impl Node {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
     pub async fn new(
-        id: &str,
-        peers: Vec<String>,
+        id: NodeID,
+        peers: Vec<NodeID>,
         mut log: Log,
         mut state: Box<dyn State>,
         node_tx: mpsc::UnboundedSender<Message>,
@@ -70,7 +73,7 @@ impl Node {
 
         let (term, voted_for) = log.get_term()?;
         let node = RoleNode {
-            id: id.to_owned(),
+            id,
             peers,
             term,
             log,
@@ -78,7 +81,7 @@ impl Node {
             state_tx,
             queued_reqs: Vec::new(),
             proxied_reqs: HashMap::new(),
-            role: Follower::new(None, voted_for.as_deref()),
+            role: Follower::new(None, voted_for),
         };
         if node.peers.is_empty() {
             info!("No peers specified, starting as leader");
@@ -90,11 +93,11 @@ impl Node {
     }
 
     /// Returns the node ID.
-    pub fn id(&self) -> String {
+    pub fn id(&self) -> NodeID {
         match self {
-            Node::Candidate(n) => n.id.clone(),
-            Node::Follower(n) => n.id.clone(),
-            Node::Leader(n) => n.id.clone(),
+            Node::Candidate(n) => n.id,
+            Node::Follower(n) => n.id,
+            Node::Leader(n) => n.id,
         }
     }
 
@@ -138,8 +141,8 @@ impl From<RoleNode<Leader>> for Node {
 
 // A Raft node with role R
 pub struct RoleNode<R> {
-    id: String,
-    peers: Vec<String>,
+    id: NodeID,
+    peers: Vec<NodeID>,
     term: u64,
     log: Log,
     node_tx: mpsc::UnboundedSender<Message>,
@@ -224,8 +227,8 @@ impl<R> RoleNode<R> {
             return Err(Error::Internal(format!("Message from past term {}", msg.term)));
         }
 
-        match &msg.to {
-            Address::Peer(id) if id == &self.id => Ok(()),
+        match msg.to {
+            Address::Peer(id) if id == self.id => Ok(()),
             Address::Local => Ok(()),
             Address::Peers => Ok(()),
             Address::Peer(id) => {
@@ -322,9 +325,9 @@ mod tests {
             }
         }
 
-        pub fn leader(self, leader: Option<&str>) -> Self {
+        pub fn leader(self, leader: Option<NodeID>) -> Self {
             assert_eq!(
-                leader.map(str::to_owned),
+                leader,
                 match self.node {
                     Node::Candidate(_) => None,
                     Node::Follower(n) => follower_leader(n),
@@ -383,9 +386,9 @@ mod tests {
             self
         }
 
-        pub fn voted_for(mut self, voted_for: Option<&str>) -> Self {
+        pub fn voted_for(mut self, voted_for: Option<NodeID>) -> Self {
             assert_eq!(
-                voted_for.map(str::to_owned),
+                voted_for,
                 match self.node {
                     Node::Candidate(_) => None,
                     Node::Follower(n) => follower_voted_for(n),
@@ -394,7 +397,7 @@ mod tests {
                 "Unexpected voted_for"
             );
             let (_, saved_voted_for) = self.log().get_term().unwrap();
-            assert_eq!(saved_voted_for.as_deref(), voted_for, "Unexpected voted_for saved in log");
+            assert_eq!(saved_voted_for, voted_for, "Unexpected voted_for saved in log");
             self
         }
     }
@@ -404,17 +407,17 @@ mod tests {
     }
 
     fn setup_rolenode() -> Result<(RoleNode<()>, mpsc::UnboundedReceiver<Message>)> {
-        setup_rolenode_peers(vec!["b".into(), "c".into()])
+        setup_rolenode_peers(vec![2, 3])
     }
 
     fn setup_rolenode_peers(
-        peers: Vec<String>,
+        peers: Vec<NodeID>,
     ) -> Result<(RoleNode<()>, mpsc::UnboundedReceiver<Message>)> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, _) = mpsc::unbounded_channel();
         let node = RoleNode {
             role: (),
-            id: "a".into(),
+            id: 1,
             peers,
             term: 1,
             log: Log::new(Box::new(storage::engine::Memory::new()), false)?,
@@ -430,8 +433,8 @@ mod tests {
     async fn new() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let node = Node::new(
-            "a",
-            vec!["b".into(), "c".into()],
+            1,
+            vec![2, 3],
             Log::new(Box::new(storage::engine::Memory::new()), false)?,
             Box::new(TestState::new(0)),
             node_tx,
@@ -439,9 +442,9 @@ mod tests {
         .await?;
         match node {
             Node::Follower(rolenode) => {
-                assert_eq!(rolenode.id, "a".to_owned());
+                assert_eq!(rolenode.id, 1);
                 assert_eq!(rolenode.term, 0);
-                assert_eq!(rolenode.peers, vec!["b".to_owned(), "c".to_owned()]);
+                assert_eq!(rolenode.peers, vec![2, 3]);
             }
             _ => panic!("Expected node to start as follower"),
         }
@@ -459,7 +462,7 @@ mod tests {
         log.append(2, Some(vec![0x03]))?;
         let state = Box::new(TestState::new(0));
 
-        Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
+        Node::new(1, vec![2, 3], log, state.clone(), node_tx).await?;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x01], vec![0x02]]);
         assert_eq!(state.applied_index(), 3);
@@ -477,7 +480,7 @@ mod tests {
         log.append(2, Some(vec![0x03]))?;
         let state = Box::new(TestState::new(2));
 
-        Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await?;
+        Node::new(1, vec![2, 3], log, state.clone(), node_tx).await?;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x02]]);
         assert_eq!(state.applied_index(), 3);
@@ -496,7 +499,7 @@ mod tests {
         let state = Box::new(TestState::new(4));
 
         assert_eq!(
-            Node::new("a", vec!["b".into(), "c".into()], log, state.clone(), node_tx).await.err(),
+            Node::new(1, vec![2, 3], log, state.clone(), node_tx).await.err(),
             Some(Error::Internal(
                 "State machine applied index 4 greater than log committed index 3".into()
             ))
@@ -508,7 +511,7 @@ mod tests {
     async fn new_single() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
         let node = Node::new(
-            "a",
+            1,
             vec![],
             Log::new(Box::new(storage::engine::Memory::new()), false)?,
             Box::new(TestState::new(0)),
@@ -517,7 +520,7 @@ mod tests {
         .await?;
         match node {
             Node::Leader(rolenode) => {
-                assert_eq!(rolenode.id, "a".to_owned());
+                assert_eq!(rolenode.id, 1);
                 assert_eq!(rolenode.term, 0);
                 assert!(rolenode.peers.is_empty());
             }
@@ -530,9 +533,9 @@ mod tests {
     fn become_role() -> Result<()> {
         let (node, _) = setup_rolenode()?;
         let new = node.become_role("role")?;
-        assert_eq!(new.id, "a".to_owned());
+        assert_eq!(new.id, 1);
         assert_eq!(new.term, 1);
-        assert_eq!(new.peers, vec!["b".to_owned(), "c".to_owned()]);
+        assert_eq!(new.peers, vec![2, 3]);
         assert_eq!(new.role, "role");
         Ok(())
     }
@@ -541,8 +544,7 @@ mod tests {
     fn quorum() -> Result<()> {
         let quorums = vec![(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)];
         for (size, quorum) in quorums.into_iter() {
-            let peers: Vec<String> =
-                (0..(size as u8 - 1)).map(|i| (i as char).to_string()).collect();
+            let peers: Vec<NodeID> = (1..(size as u8)).collect();
             assert_eq!(peers.len(), size as usize - 1);
             let (node, _) = setup_rolenode_peers(peers)?;
             assert_eq!(node.quorum(), quorum);
@@ -553,12 +555,12 @@ mod tests {
     #[test]
     fn send() -> Result<()> {
         let (node, mut rx) = setup_rolenode()?;
-        node.send(Address::Peer("b".into()), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
+        node.send(Address::Peer(2), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
         assert_messages(
             &mut rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer("b".into()),
+                to: Address::Peer(2),
                 term: 1,
                 event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
             }],

@@ -59,7 +59,7 @@ async fn main() -> Result<()> {
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
 
-    Server::new(&cfg.id, cfg.peers, raft_log, raft_state)
+    Server::new(cfg.id, cfg.peers, raft_log, raft_state)
         .await?
         .listen(&cfg.listen_sql, &cfg.listen_raft)
         .await?
@@ -69,8 +69,8 @@ async fn main() -> Result<()> {
 
 #[derive(Debug, Deserialize)]
 struct Config {
-    id: String,
-    peers: HashMap<String, String>,
+    id: raft::NodeID,
+    peers: HashMap<raft::NodeID, String>,
     listen_sql: String,
     listen_raft: String,
     log_level: String,

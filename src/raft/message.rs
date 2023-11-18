@@ -1,4 +1,4 @@
-use super::{Entry, Status};
+use super::{Entry, NodeID, Status};
 use crate::error::Result;
 
 use serde_derive::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ pub enum Address {
     /// Broadcast to all peers.
     Peers,
     /// A remote peer.
-    Peer(String),
+    Peer(NodeID),
     /// The local node.
     Local,
     /// A local client.

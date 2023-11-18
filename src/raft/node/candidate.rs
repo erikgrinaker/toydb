@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Message, Response};
-use super::{Follower, Leader, Node, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use super::{Follower, Leader, Node, NodeID, RoleNode, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
 use crate::error::Result;
 
 use ::log::{debug, info, warn};
@@ -30,13 +30,13 @@ impl Candidate {
 
 impl RoleNode<Candidate> {
     /// Transition to follower role.
-    fn become_follower(mut self, term: u64, leader: &str) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, term: u64, leader: NodeID) -> Result<RoleNode<Follower>> {
         info!("Discovered leader {} for term {}, following", leader, term);
         self.term = term;
         self.log.set_term(term, None)?;
         let mut node = self.become_role(Follower::new(Some(leader), None))?;
         node.abort_proxied()?;
-        node.forward_queued(Address::Peer(leader.to_string()))?;
+        node.forward_queued(Address::Peer(leader))?;
         Ok(node)
     }
 
@@ -60,14 +60,14 @@ impl RoleNode<Candidate> {
             return Ok(self.into());
         }
         if msg.term > self.term {
-            if let Address::Peer(from) = &msg.from {
+            if let Address::Peer(from) = msg.from {
                 return self.become_follower(msg.term, from)?.step(msg);
             }
         }
 
         match msg.event {
             Event::Heartbeat { .. } => {
-                if let Address::Peer(from) = &msg.from {
+                if let Address::Peer(from) = msg.from {
                     return self.become_follower(msg.term, from)?.step(msg);
                 }
             }
@@ -89,7 +89,7 @@ impl RoleNode<Candidate> {
 
             Event::ClientResponse { id, mut response } => {
                 if let Ok(Response::Status(ref mut status)) = response {
-                    status.server = self.id.clone();
+                    status.server = self.id;
                 }
                 self.proxied_reqs.remove(&id);
                 self.send(Address::Client, Event::ClientResponse { id, response })?;
@@ -147,8 +147,8 @@ mod tests {
         log.set_term(3, None)?;
 
         let mut node = RoleNode {
-            id: "a".into(),
-            peers: vec!["b".into(), "c".into(), "d".into(), "e".into()],
+            id: 1,
+            peers: vec![2, 3, 4, 5],
             term: 3,
             log,
             node_tx,
@@ -176,8 +176,8 @@ mod tests {
     fn step_heartbeat_current_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let mut node = candidate.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
         })?;
@@ -187,7 +187,7 @@ mod tests {
             vec![
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("b".into()),
+                    to: Address::Peer(2),
                     term: 0,
                     event: Event::ClientRequest {
                         id: vec![0xaf],
@@ -196,7 +196,7 @@ mod tests {
                 },
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("b".into()),
+                    to: Address::Peer(2),
                     term: 3,
                     event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
                 },
@@ -212,8 +212,8 @@ mod tests {
     fn step_heartbeat_future_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let mut node = candidate.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 4,
             event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
         })?;
@@ -223,7 +223,7 @@ mod tests {
             vec![
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("b".into()),
+                    to: Address::Peer(2),
                     term: 0,
                     event: Event::ClientRequest {
                         id: vec![0xaf],
@@ -232,7 +232,7 @@ mod tests {
                 },
                 Message {
                     from: Address::Local,
-                    to: Address::Peer("b".into()),
+                    to: Address::Peer(2),
                     term: 4,
                     event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
                 },
@@ -247,8 +247,8 @@ mod tests {
     fn step_heartbeat_past_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let mut node = candidate.step(Message {
-            from: Address::Peer("b".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(2),
+            to: Address::Peer(1),
             term: 2,
             event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
         })?;
@@ -266,8 +266,8 @@ mod tests {
 
         // The first vote is not sufficient for a quorum (3 votes including self)
         node = node.step(Message {
-            from: Address::Peer("c".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(3),
+            to: Address::Peer(1),
             term: 3,
             event: Event::GrantVote,
         })?;
@@ -277,8 +277,8 @@ mod tests {
 
         // However, the second external vote makes us leader
         node = node.step(Message {
-            from: Address::Peer("e".into()),
-            to: Address::Peer("a".into()),
+            from: Address::Peer(5),
+            to: Address::Peer(1),
             term: 3,
             event: Event::GrantVote,
         })?;

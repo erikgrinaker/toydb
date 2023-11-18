@@ -1,4 +1,4 @@
-use super::{Address, Event, Log, Message, Node, Request, Response, State};
+use super::{Address, Event, Log, Message, Node, NodeID, Request, Response, State};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error};
@@ -18,22 +18,21 @@ const TICK: Duration = Duration::from_millis(100);
 /// A Raft server.
 pub struct Server {
     node: Node,
-    peers: HashMap<String, String>,
+    peers: HashMap<NodeID, String>,
     node_rx: mpsc::UnboundedReceiver<Message>,
 }
 
 impl Server {
     /// Creates a new Raft cluster
     pub async fn new(
-        id: &str,
-        peers: HashMap<String, String>,
+        id: NodeID,
+        peers: HashMap<NodeID, String>,
         log: Log,
         state: Box<dyn State>,
     ) -> Result<Self> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         Ok(Self {
-            node: Node::new(id, peers.keys().map(|k| k.to_string()).collect(), log, state, node_tx)
-                .await?,
+            node: Node::new(id, peers.keys().copied().collect(), log, state, node_tx).await?,
             peers,
             node_rx,
         })
@@ -147,12 +146,12 @@ impl Server {
 
     /// Sends outbound messages to peers via TCP.
     async fn tcp_send(
-        node_id: String,
-        peers: HashMap<String, String>,
+        node_id: NodeID,
+        peers: HashMap<NodeID, String>,
         out_rx: mpsc::UnboundedReceiver<Message>,
     ) -> Result<()> {
         let mut out_rx = UnboundedReceiverStream::new(out_rx);
-        let mut peer_txs: HashMap<String, mpsc::Sender<Message>> = HashMap::new();
+        let mut peer_txs: HashMap<NodeID, mpsc::Sender<Message>> = HashMap::new();
 
         for (id, addr) in peers.into_iter() {
             let (tx, rx) = mpsc::channel::<Message>(1000);
@@ -162,11 +161,11 @@ impl Server {
 
         while let Some(mut message) = out_rx.next().await {
             if message.from == Address::Local {
-                message.from = Address::Peer(node_id.clone())
+                message.from = Address::Peer(node_id)
             }
-            let to = match &message.to {
-                Address::Peers => peer_txs.keys().cloned().collect(),
-                Address::Peer(peer) => vec![peer.to_string()],
+            let to = match message.to {
+                Address::Peers => peer_txs.keys().copied().collect(),
+                Address::Peer(peer) => vec![peer],
                 addr => {
                     error!("Received outbound message for non-TCP address {:?}", addr);
                     continue;

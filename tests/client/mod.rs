@@ -122,10 +122,10 @@ async fn status() -> Result<()> {
         c.status().await?,
         Status {
             raft: raft::Status {
-                server: "test".into(),
-                leader: "test".into(),
+                server: 1,
+                leader: 1,
                 term: 0,
-                node_last_index: vec![("test".to_string(), 26)].into_iter().collect(),
+                node_last_index: vec![(1, 26)].into_iter().collect(),
                 commit_index: 26,
                 apply_index: 26,
                 storage: "bitcask".into(),

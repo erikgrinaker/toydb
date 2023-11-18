@@ -21,13 +21,13 @@ To start a five-node cluster on the local machine (requires a working
 
 ```
 $ (cd clusters/local && ./run.sh)
-toydb-b 19:06:28 [ INFO] Listening on 0.0.0.0:9602 (SQL) and 0.0.0.0:9702 (Raft)
-toydb-b 19:06:28 [ERROR] Failed connecting to Raft peer 127.0.0.1:9705: Connection refused
-toydb-e 19:06:28 [ INFO] Listening on 0.0.0.0:9605 (SQL) and 0.0.0.0:9705 (Raft)
+toydb2 19:06:28 [ INFO] Listening on 0.0.0.0:9602 (SQL) and 0.0.0.0:9702 (Raft)
+toydb2 19:06:28 [ERROR] Failed connecting to Raft peer 127.0.0.1:9705: Connection refused
+toydb5 19:06:28 [ INFO] Listening on 0.0.0.0:9605 (SQL) and 0.0.0.0:9705 (Raft)
 [...]
-toydb-e 19:06:29 [ INFO] Voting for toydb-d in term 1 election
-toydb-c 19:06:29 [ INFO] Voting for toydb-d in term 1 election
-toydb-d 19:06:29 [ INFO] Won election for term 1, becoming leader
+toydb5 19:06:29 [ INFO] Voting for toydb-d in term 1 election
+toydb3 19:06:29 [ INFO] Voting for toydb-d in term 1 election
+toydb4 19:06:29 [ INFO] Won election for term 1, becoming leader
 ```
 
 In a separate terminal, start a `toysql` client and check the server status:
@@ -37,9 +37,9 @@ $ cargo run --release --bin toysql
 Connected to toyDB node "toydb-e". Enter !help for instructions.
 toydb> !status
 
-Server:    toydb-e (leader toydb-d in term 1 with 5 nodes)
+Server:    5 (leader 4 in term 1 with 5 nodes)
 Raft log:  1 committed, 0 applied, 0.000 MB (hybrid storage)
-Node logs: toydb-a:1 toydb-b:1 toydb-c:1 toydb-d:1 toydb-e:1
+Node logs: 1:1 2:1 3:1 4:1 5:1
 SQL txns:  0 active, 0 total (bitcask storage)
 ```
 

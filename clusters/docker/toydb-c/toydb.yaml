@@ -1,7 +1,0 @@
-id: toydb-c
-data_dir: /var/lib/toydb
-peers:
-  toydb-a: 172.20.0.101
-  toydb-b: 172.20.0.102
-  toydb-d: 172.20.0.104
-  toydb-e: 172.20.0.105
