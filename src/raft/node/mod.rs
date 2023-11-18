@@ -57,21 +57,9 @@ impl Node {
         mut state: Box<dyn State>,
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self> {
-        let applied_index = state.applied_index();
-        let (commit_index, _) = log.get_commit_index();
-        if applied_index > commit_index {
-            return Err(Error::Internal(format!(
-                "State machine applied index {} greater than log committed index {}",
-                applied_index, commit_index
-            )));
-        }
-
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let mut driver = Driver::new(state_rx, node_tx.clone());
-        if commit_index > applied_index {
-            info!("Replaying log entries {} to {}", applied_index + 1, commit_index);
-            driver.replay(&mut *state, log.scan((applied_index + 1)..=commit_index)?)?;
-        };
+        driver.apply_log(&mut *state, &mut log)?;
         tokio::spawn(driver.drive(state));
 
         let (term, voted_for) = log.get_term()?;
@@ -504,7 +492,7 @@ mod tests {
         assert_eq!(
             Node::new(1, vec![2, 3], log, state.clone(), node_tx).await.err(),
             Some(Error::Internal(
-                "State machine applied index 4 greater than log committed index 3".into()
+                "State machine applied index 4 greater than log commit index 3".into()
             ))
         );
         Ok(())

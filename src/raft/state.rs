@@ -1,4 +1,4 @@
-use super::{Address, Entry, Event, Index, Message, Response, Scan, Status, Term};
+use super::{Address, Entry, Event, Index, Log, Message, Response, Status, Term};
 use crate::error::{Error, Result};
 
 use log::{debug, error};
@@ -87,18 +87,44 @@ impl Driver {
         Ok(())
     }
 
-    /// Synchronously (re)plays a set of log entries, for initial sync.
-    pub fn replay(&mut self, state: &mut dyn State, mut scan: Scan) -> Result<()> {
-        while let Some(entry) = scan.next().transpose()? {
-            debug!("Replaying {:?}", entry);
-            if let Some(command) = entry.command {
-                match state.mutate(entry.index, command) {
-                    Err(error @ Error::Internal(_)) => return Err(error),
-                    _ => self.applied_index = entry.index,
-                }
+    /// Applies committed log entries to the state machine.
+    pub fn apply_log(&mut self, state: &mut dyn State, log: &mut Log) -> Result<Index> {
+        let applied_index = state.applied_index();
+        let (commit_index, _) = log.get_commit_index();
+        if applied_index > commit_index {
+            return Err(Error::Internal(format!(
+                "State machine applied index {} greater than log commit index {}",
+                applied_index, commit_index
+            )));
+        }
+        if applied_index < commit_index {
+            let mut scan = log.scan((applied_index + 1)..=commit_index)?;
+            while let Some(entry) = scan.next().transpose()? {
+                self.apply(state, entry)?;
             }
         }
-        Ok(())
+        Ok(self.applied_index)
+    }
+
+    /// Applies an entry to the state machine.
+    pub fn apply(&mut self, state: &mut dyn State, entry: Entry) -> Result<Index> {
+        // Apply the command, unless it's a noop.
+        debug!("Applying {:?}", entry);
+        if let Some(command) = entry.command {
+            match state.mutate(entry.index, command) {
+                Err(error @ Error::Internal(_)) => return Err(error),
+                result => self.notify_applied(entry.index, result)?,
+            };
+        }
+        // We have to track applied_index here, separately from the state machine, because
+        // no-op log entries are significant for whether a query should be executed.
+        //
+        // TODO: track noop commands in the state machine.
+        self.applied_index = entry.index;
+        // Try to execute any pending queries, since they may have been submitted for a
+        // commit_index which hadn't been applied yet.
+        self.query_execute(state)?;
+        Ok(self.applied_index)
     }
 
     /// Executes a state machine instruction.
@@ -110,20 +136,8 @@ impl Driver {
                 self.query_abort()?;
             }
 
-            Instruction::Apply { entry: Entry { index, command, .. } } => {
-                if let Some(command) = command {
-                    debug!("Applying state machine command {}: {:?}", index, command);
-                    match tokio::task::block_in_place(|| state.mutate(index, command)) {
-                        Err(error @ Error::Internal(_)) => return Err(error),
-                        result => self.notify_applied(index, result)?,
-                    };
-                }
-                // We have to track applied_index here, separately from the state machine, because
-                // no-op log entries are significant for whether a query should be executed.
-                self.applied_index = index;
-                // Try to execute any pending queries, since they may have been submitted for a
-                // commit_index which hadn't been applied yet.
-                self.query_execute(state)?;
+            Instruction::Apply { entry } => {
+                self.apply(state, entry)?;
             }
 
             Instruction::Notify { id, address, index } => {

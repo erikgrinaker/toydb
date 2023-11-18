@@ -54,9 +54,6 @@ impl KeyPrefix {
         keycode::serialize(self)
     }
 }
-/// A log scan
-pub type Scan<'a> = Box<dyn Iterator<Item = Result<Entry>> + 'a>;
-
 /// A Raft log.
 pub struct Log {
     /// The underlying storage engine.
@@ -197,7 +194,10 @@ impl Log {
     }
 
     /// Iterates over log entries in the given index range.
-    pub fn scan(&mut self, range: impl std::ops::RangeBounds<Index>) -> Result<Scan> {
+    pub fn scan(
+        &mut self,
+        range: impl std::ops::RangeBounds<Index>,
+    ) -> Result<Box<dyn Iterator<Item = Result<Entry>> + '_>> {
         let from = match range.start_bound() {
             std::ops::Bound::Excluded(i) => std::ops::Bound::Excluded(Key::Entry(*i).encode()?),
             std::ops::Bound::Included(i) => std::ops::Bound::Included(Key::Entry(*i).encode()?),
