@@ -172,7 +172,7 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
@@ -197,7 +197,7 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 4,
                 event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
@@ -252,7 +252,7 @@ mod tests {
         assert_eq!(
             node_rx.try_recv()?,
             Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Broadcast,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
@@ -263,7 +263,7 @@ mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Node(to),
                     term: 3,
                     event: Event::ReplicateEntries {
@@ -288,7 +288,7 @@ mod tests {
 
         node = node.step(Message {
             from: Address::Client,
-            to: Address::Local,
+            to: Address::Node(1),
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
@@ -296,7 +296,7 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Client,
                 term: 3,
                 event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
@@ -322,7 +322,7 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Broadcast,
                 term: 4,
                 event: Event::SolicitVote { last_index: 3, last_term: 2 },

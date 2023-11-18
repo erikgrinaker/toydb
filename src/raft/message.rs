@@ -11,8 +11,6 @@ pub enum Address {
     /// A node with the specified node ID (local or remote). Valid both as
     /// sender and recipient.
     Node(NodeID),
-    /// The local node.
-    Local,
     /// A local client.
     Client,
 }

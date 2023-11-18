@@ -153,7 +153,7 @@ impl RoleNode<Leader> {
                 self.state_tx.send(Instruction::Vote {
                     term: self.term,
                     index: commit_index,
-                    address: Address::Local,
+                    address: Address::Node(self.id),
                 })?;
                 if !self.peers.is_empty() {
                     self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
@@ -294,7 +294,7 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ReplicateEntries { base_index: 5, base_term: 3, entries: vec![] },
@@ -341,7 +341,7 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 4,
                 event: Event::ConfirmLeader { commit_index: 7, has_committed: false },
@@ -524,7 +524,7 @@ mod tests {
             assert_messages(
                 &mut node_rx,
                 vec![Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Node(2),
                     term: 3,
                     event: Event::ReplicateEntries {
@@ -551,7 +551,7 @@ mod tests {
         let mut node: Node = leader.into();
         node = node.step(Message {
             from: Address::Client,
-            to: Address::Local,
+            to: Address::Node(1),
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Query(vec![0xaf]) },
         })?;
@@ -559,7 +559,7 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Broadcast,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
@@ -576,7 +576,7 @@ mod tests {
                     index: 2,
                     quorum,
                 },
-                Instruction::Vote { term: 3, index: 2, address: Address::Local },
+                Instruction::Vote { term: 3, index: 2, address: Address::Node(1) },
             ],
         );
         Ok(())
@@ -591,7 +591,7 @@ mod tests {
 
         node = node.step(Message {
             from: Address::Client,
-            to: Address::Local,
+            to: Address::Node(1),
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
@@ -605,7 +605,7 @@ mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Node(peer),
                     term: 3,
                     event: Event::ReplicateEntries {
@@ -633,7 +633,7 @@ mod tests {
 
         node = node.step(Message {
             from: Address::Client,
-            to: Address::Local,
+            to: Address::Node(1),
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Status },
         })?;
@@ -677,7 +677,7 @@ mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Broadcast,
                     term: 3,
                     event: Event::Heartbeat { commit_index: 2, commit_term: 1 },

@@ -1,4 +1,4 @@
-use super::{Address, Entry, Event, Index, Log, Message, Response, Status, Term};
+use super::{Address, Entry, Event, Index, Log, Message, NodeID, Response, Status, Term};
 use crate::error::{Error, Result};
 
 use log::{debug, error};
@@ -56,6 +56,7 @@ struct Query {
 
 /// Drives a state machine, taking operations from state_rx and sending results via node_tx.
 pub struct Driver {
+    node_id: NodeID,
     state_rx: UnboundedReceiverStream<Instruction>,
     node_tx: mpsc::UnboundedSender<Message>,
     /// Notify clients when their mutation is applied. <index, (client, id)>
@@ -67,10 +68,12 @@ pub struct Driver {
 impl Driver {
     /// Creates a new state machine driver.
     pub fn new(
+        node_id: NodeID,
         state_rx: mpsc::UnboundedReceiver<Instruction>,
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Self {
         Self {
+            node_id,
             state_rx: UnboundedReceiverStream::new(state_rx),
             node_tx,
             notify: HashMap::new(),
@@ -248,7 +251,7 @@ impl Driver {
 
     /// Sends a message.
     fn send(&self, to: Address, event: Event) -> Result<()> {
-        let msg = Message { from: Address::Local, to, term: 0, event };
+        let msg = Message { from: Address::Node(self.node_id), to, term: 0, event };
         debug!("Sending {:?}", msg);
         Ok(self.node_tx.send(msg)?)
     }
@@ -308,7 +311,7 @@ pub mod tests {
         let state = Box::new(TestState::new(0));
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let (node_tx, node_rx) = mpsc::unbounded_channel();
-        tokio::spawn(Driver::new(state_rx, node_tx).drive(state.clone()));
+        tokio::spawn(Driver::new(1, state_rx, node_tx).drive(state.clone()));
         Ok((state, state_tx, node_rx))
     }
 
@@ -329,7 +332,7 @@ pub mod tests {
             index: 1,
             quorum: 2,
         })?;
-        state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Local })?;
+        state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Node(1) })?;
         state_tx.send(Instruction::Abort)?;
         std::mem::drop(state_tx);
 
@@ -338,13 +341,13 @@ pub mod tests {
             node_rx.collect::<Vec<_>>().await,
             vec![
                 Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Node(1),
                     term: 0,
                     event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) }
                 },
                 Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Client,
                     term: 0,
                     event: Event::ClientResponse { id: vec![0x02], response: Err(Error::Abort) }
@@ -376,7 +379,7 @@ pub mod tests {
         assert_eq!(
             node_rx.collect::<Vec<_>>().await,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Client,
                 term: 0,
                 event: Event::ClientResponse {
@@ -406,15 +409,15 @@ pub mod tests {
         state_tx.send(Instruction::Apply {
             entry: Entry { index: 1, term: 2, command: Some(vec![0xaf]) },
         })?;
-        state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Local })?;
         state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Node(1) })?;
+        state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Node(2) })?;
         std::mem::drop(state_tx);
 
         let node_rx = UnboundedReceiverStream::new(node_rx);
         assert_eq!(
             node_rx.collect::<Vec<_>>().await,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Client,
                 term: 0,
                 event: Event::ClientResponse {
@@ -443,7 +446,7 @@ pub mod tests {
         state_tx.send(Instruction::Apply {
             entry: Entry { index: 1, term: 1, command: Some(vec![0xaf]) },
         })?;
-        state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Local })?;
+        state_tx.send(Instruction::Vote { term: 2, index: 1, address: Address::Node(1) })?;
         state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Node(1) })?;
         std::mem::drop(state_tx);
 
@@ -467,7 +470,7 @@ pub mod tests {
         state_tx.send(Instruction::Apply {
             entry: Entry { index: 1, term: 1, command: Some(vec![0xaf]) },
         })?;
-        state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Local })?;
+        state_tx.send(Instruction::Vote { term: 1, index: 1, address: Address::Node(1) })?;
         std::mem::drop(state_tx);
 
         let node_rx = UnboundedReceiverStream::new(node_rx);

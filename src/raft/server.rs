@@ -48,8 +48,7 @@ impl Server {
         let (tcp_out_tx, tcp_out_rx) = mpsc::unbounded_channel::<Message>();
         let (task, tcp_receiver) = Self::tcp_receive(listener, tcp_in_tx).remote_handle();
         tokio::spawn(task);
-        let (task, tcp_sender) =
-            Self::tcp_send(self.node.id(), self.peers, tcp_out_rx).remote_handle();
+        let (task, tcp_sender) = Self::tcp_send(self.peers, tcp_out_rx).remote_handle();
         tokio::spawn(task);
         let (task, eventloop) =
             Self::eventloop(self.node, self.node_rx, client_rx, tcp_in_rx, tcp_out_tx)
@@ -97,13 +96,14 @@ impl Server {
 
                 Some((request, response_tx)) = client_rx.next() => {
                     let id = Uuid::new_v4().as_bytes().to_vec();
-                    requests.insert(id.clone(), response_tx);
-                    node = node.step(Message{
+                    let msg = Message{
                         from: Address::Client,
-                        to: Address::Local,
+                        to: Address::Node(node.id()),
                         term: 0,
-                        event: Event::ClientRequest{id, request},
-                    })?;
+                        event: Event::ClientRequest{id: id.clone(), request},
+                    };
+                    node = node.step(msg)?;
+                    requests.insert(id, response_tx);
                 }
             }
         }
@@ -146,7 +146,6 @@ impl Server {
 
     /// Sends outbound messages to peers via TCP.
     async fn tcp_send(
-        node_id: NodeID,
         peers: HashMap<NodeID, String>,
         out_rx: mpsc::UnboundedReceiver<Message>,
     ) -> Result<()> {
@@ -159,10 +158,7 @@ impl Server {
             tokio::spawn(Self::tcp_send_peer(addr, rx));
         }
 
-        while let Some(mut message) = out_rx.next().await {
-            if message.from == Address::Local {
-                message.from = Address::Node(node_id)
-            }
+        while let Some(message) = out_rx.next().await {
             let to = match message.to {
                 Address::Broadcast => peer_txs.keys().copied().collect(),
                 Address::Node(peer) => vec![peer],

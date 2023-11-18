@@ -58,7 +58,7 @@ impl Node {
         node_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<Self> {
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut driver = Driver::new(state_rx, node_tx.clone());
+        let mut driver = Driver::new(id, state_rx, node_tx.clone());
         driver.apply_log(&mut *state, &mut log)?;
         tokio::spawn(driver.drive(state));
 
@@ -172,7 +172,7 @@ impl<R> RoleNode<R> {
 
     /// Sends an event
     fn send(&self, to: Address, event: Event) -> Result<()> {
-        let msg = Message { term: self.term, from: Address::Local, to, event };
+        let msg = Message { term: self.term, from: Address::Node(self.id), to, event };
         debug!("Sending {:?}", msg);
         Ok(self.node_tx.send(msg)?)
     }
@@ -183,7 +183,6 @@ impl<R> RoleNode<R> {
             Address::Broadcast => {
                 return Err(Error::Internal("Message from broadcast address".into()))
             }
-            Address::Local => return Err(Error::Internal("Message from local node".into())),
             Address::Client if !matches!(msg.event, Event::ClientRequest { .. }) => {
                 return Err(Error::Internal("Non-request message from client".into()));
             }
@@ -199,7 +198,6 @@ impl<R> RoleNode<R> {
 
         match msg.to {
             Address::Node(id) if id == self.id => Ok(()),
-            Address::Local => Ok(()),
             Address::Broadcast => Ok(()),
             Address::Node(id) => {
                 Err(Error::Internal(format!("Received message for other node {}", id)))
@@ -511,7 +509,7 @@ mod tests {
         assert_messages(
             &mut rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 1,
                 event: Event::Heartbeat { commit_index: 1, commit_term: 1 },

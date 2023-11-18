@@ -228,7 +228,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
@@ -257,7 +257,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: false },
@@ -281,7 +281,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 5, has_committed: false },
@@ -322,7 +322,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(3),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
@@ -351,7 +351,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ConfirmLeader { commit_index: 1, has_committed: true },
@@ -375,7 +375,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(3),
                 term: 4,
                 event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
@@ -422,7 +422,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(3),
                 term: 3,
                 event: Event::GrantVote,
@@ -441,7 +441,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(3),
                 term: 3,
                 event: Event::GrantVote,
@@ -552,7 +552,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 2 },
@@ -589,7 +589,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
@@ -625,7 +625,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
@@ -661,7 +661,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
@@ -697,7 +697,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
@@ -729,7 +729,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::RejectEntries,
@@ -761,7 +761,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::RejectEntries,
@@ -779,7 +779,7 @@ pub mod tests {
 
         node = node.step(Message {
             from: Address::Client,
-            to: Address::Local,
+            to: Address::Node(1),
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
@@ -791,7 +791,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ClientRequest {
@@ -815,7 +815,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Client,
                 term: 3,
                 event: Event::ClientResponse {
@@ -837,7 +837,7 @@ pub mod tests {
 
         node = node.step(Message {
             from: Address::Client,
-            to: Address::Local,
+            to: Address::Node(1),
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
@@ -845,7 +845,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Client,
                 term: 3,
                 event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
@@ -863,7 +863,7 @@ pub mod tests {
 
         node = node.step(Message {
             from: Address::Client,
-            to: Address::Local,
+            to: Address::Node(1),
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
@@ -875,7 +875,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
                 event: Event::ClientRequest {
@@ -898,13 +898,13 @@ pub mod tests {
             &mut node_rx,
             vec![
                 Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Client,
                     term: 4,
                     event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
                 },
                 Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Node(3),
                     term: 4,
                     event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
@@ -940,7 +940,7 @@ pub mod tests {
             assert_messages(
                 &mut node_rx,
                 vec![Message {
-                    from: Address::Local,
+                    from: Address::Node(1),
                     to: Address::Node(2),
                     term: 3,
                     event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
@@ -957,7 +957,7 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Local,
+                from: Address::Node(1),
                 to: Address::Broadcast,
                 term: 4,
                 event: Event::SolicitVote { last_index: 3, last_term: 2 },
