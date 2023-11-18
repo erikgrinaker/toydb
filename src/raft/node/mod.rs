@@ -479,23 +479,18 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn new_state_apply_missing() -> Result<()> {
+    #[should_panic(expected = "applied index above commit index")]
+    async fn new_state_apply_missing() {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
-        log.append(1, Some(vec![0x01]))?;
-        log.append(2, None)?;
-        log.append(2, Some(vec![0x02]))?;
-        log.commit(3)?;
-        log.append(2, Some(vec![0x03]))?;
+        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false).unwrap();
+        log.append(1, Some(vec![0x01])).unwrap();
+        log.append(2, None).unwrap();
+        log.append(2, Some(vec![0x02])).unwrap();
+        log.commit(3).unwrap();
+        log.append(2, Some(vec![0x03])).unwrap();
         let state = Box::new(TestState::new(4));
 
-        assert_eq!(
-            Node::new(1, vec![2, 3], log, state.clone(), node_tx).await.err(),
-            Some(Error::Internal(
-                "State machine applied index 4 greater than log commit index 3".into()
-            ))
-        );
-        Ok(())
+        Node::new(1, vec![2, 3], log, state.clone(), node_tx).await.unwrap();
     }
 
     #[tokio::test]

@@ -12,9 +12,16 @@ pub trait State: Send {
     /// Returns the last applied index from the state machine.
     fn get_applied_index(&self) -> Index;
 
-    /// Mutates the state machine. If the state machine returns Error::Internal, the Raft node
-    /// halts. For any other error, the state is applied and the error propagated to the caller.
-    fn mutate(&mut self, index: Index, command: Vec<u8>) -> Result<Vec<u8>>;
+    /// Applies a log entry to the state machine. If it returns Error::Internal,
+    /// the Raft node halts. Any other error is considered applied and returned
+    /// to the caller.
+    ///
+    /// The entry may contain a noop command, which is committed by Raft during
+    /// leader changes. This still needs to be applied to the state machine to
+    /// properly track the applied index, and returns an empty result.
+    ///
+    /// TODO: consider using runtime assertions instead of Error::Internal.
+    fn apply(&mut self, entry: Entry) -> Result<Vec<u8>>;
 
     /// Queries the state machine. All errors are propagated to the caller.
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>>;
@@ -51,7 +58,6 @@ struct Query {
 pub struct Driver {
     state_rx: UnboundedReceiverStream<Instruction>,
     node_tx: mpsc::UnboundedSender<Message>,
-    applied_index: Index,
     /// Notify clients when their mutation is applied. <index, (client, id)>
     notify: HashMap<Index, (Address, Vec<u8>)>,
     /// Execute client queries when they receive a quorum. <index, <id, query>>
@@ -67,7 +73,6 @@ impl Driver {
         Self {
             state_rx: UnboundedReceiverStream::new(state_rx),
             node_tx,
-            applied_index: 0,
             notify: HashMap::new(),
             queries: BTreeMap::new(),
         }
@@ -75,8 +80,7 @@ impl Driver {
 
     /// Drives a state machine.
     pub async fn drive(mut self, mut state: Box<dyn State>) -> Result<()> {
-        self.applied_index = state.get_applied_index();
-        debug!("Starting state machine driver at applied index {}", self.applied_index);
+        debug!("Starting state machine driver at applied index {}", state.get_applied_index());
         while let Some(instruction) = self.state_rx.next().await {
             if let Err(error) = self.execute(instruction, &mut *state).await {
                 error!("Halting state machine due to error: {}", error);
@@ -91,40 +95,29 @@ impl Driver {
     pub fn apply_log(&mut self, state: &mut dyn State, log: &mut Log) -> Result<Index> {
         let applied_index = state.get_applied_index();
         let (commit_index, _) = log.get_commit_index();
-        if applied_index > commit_index {
-            return Err(Error::Internal(format!(
-                "State machine applied index {} greater than log commit index {}",
-                applied_index, commit_index
-            )));
-        }
+        assert!(applied_index <= commit_index, "applied index above commit index");
+
         if applied_index < commit_index {
             let mut scan = log.scan((applied_index + 1)..=commit_index)?;
             while let Some(entry) = scan.next().transpose()? {
                 self.apply(state, entry)?;
             }
         }
-        Ok(self.applied_index)
+        Ok(state.get_applied_index())
     }
 
     /// Applies an entry to the state machine.
     pub fn apply(&mut self, state: &mut dyn State, entry: Entry) -> Result<Index> {
-        // Apply the command, unless it's a noop.
+        // Apply the command.
         debug!("Applying {:?}", entry);
-        if let Some(command) = entry.command {
-            match state.mutate(entry.index, command) {
-                Err(error @ Error::Internal(_)) => return Err(error),
-                result => self.notify_applied(entry.index, result)?,
-            };
-        }
-        // We have to track applied_index here, separately from the state machine, because
-        // no-op log entries are significant for whether a query should be executed.
-        //
-        // TODO: track noop commands in the state machine.
-        self.applied_index = entry.index;
+        match state.apply(entry) {
+            Err(error @ Error::Internal(_)) => return Err(error),
+            result => self.notify_applied(state.get_applied_index(), result)?,
+        };
         // Try to execute any pending queries, since they may have been submitted for a
         // commit_index which hadn't been applied yet.
         self.query_execute(state)?;
-        Ok(self.applied_index)
+        Ok(state.get_applied_index())
     }
 
     /// Executes a state machine instruction.
@@ -202,7 +195,7 @@ impl Driver {
 
     /// Executes any queries that are ready.
     fn query_execute(&mut self, state: &mut dyn State) -> Result<()> {
-        for query in self.query_ready(self.applied_index) {
+        for query in self.query_ready(state.get_applied_index()) {
             debug!("Executing query {:?}", query.command);
             let result = state.query(query.command);
             if let Err(error @ Error::Internal(_)) = result {
@@ -291,11 +284,13 @@ pub mod tests {
             *self.applied_index.lock().unwrap()
         }
 
-        // Appends the command to the internal commands list.
-        fn mutate(&mut self, index: Index, command: Vec<u8>) -> Result<Vec<u8>> {
-            self.commands.lock()?.push(command.clone());
-            *self.applied_index.lock()? = index;
-            Ok(command)
+        // Appends the entry to the internal command list.
+        fn apply(&mut self, entry: Entry) -> Result<Vec<u8>> {
+            if let Some(command) = &entry.command {
+                self.commands.lock()?.push(command.clone());
+            }
+            *self.applied_index.lock()? = entry.index;
+            Ok(entry.command.unwrap_or_default())
         }
 
         // Appends the command to the internal commands list.

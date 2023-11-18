@@ -2,7 +2,7 @@ use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, IndexScan, Scan, Transaction as _};
 use crate::error::{Error, Result};
-use crate::raft;
+use crate::raft::{self, Entry};
 use crate::storage::{self, bincode, mvcc::TransactionState};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -294,8 +294,8 @@ impl<E: storage::engine::Engine> State<E> {
         Ok(State { engine, applied_index })
     }
 
-    /// Applies a state machine mutation
-    fn apply(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
+    /// Mutates the state machine.
+    fn mutate(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
         match mutation {
             Mutation::Begin { read_only, as_of } => {
                 let txn = if !read_only {
@@ -335,17 +335,19 @@ impl<E: storage::engine::Engine> raft::State for State<E> {
         self.applied_index
     }
 
-    fn mutate(&mut self, index: u64, command: Vec<u8>) -> Result<Vec<u8>> {
-        // We don't check that index == applied_index + 1, since the Raft log commits no-op
-        // entries during leader election which we need to ignore.
-        match self.apply(bincode::deserialize(&command)?) {
-            error @ Err(Error::Internal(_)) => error,
-            result => {
-                self.engine.set_metadata(b"applied_index", bincode::serialize(&(index))?)?;
-                self.applied_index = index;
-                result
-            }
-        }
+    fn apply(&mut self, entry: Entry) -> Result<Vec<u8>> {
+        assert_eq!(entry.index, self.applied_index + 1, "entry index not after applied index");
+
+        let result = match &entry.command {
+            Some(command) => match self.mutate(bincode::deserialize(command)?) {
+                error @ Err(Error::Internal(_)) => return error, // don't record as applied
+                result => result,
+            },
+            None => Ok(Vec::new()),
+        };
+        self.applied_index = entry.index;
+        self.engine.set_metadata(b"applied_index", bincode::serialize(&entry.index)?)?;
+        result
     }
 
     fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
