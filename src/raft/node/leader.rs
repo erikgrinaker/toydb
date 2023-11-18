@@ -156,7 +156,7 @@ impl RoleNode<Leader> {
                     address: Address::Local,
                 })?;
                 if !self.peers.is_empty() {
-                    self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
+                    self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
                 }
             }
 
@@ -210,7 +210,7 @@ impl RoleNode<Leader> {
             if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
                 self.role.heartbeat_ticks = 0;
                 let (commit_index, commit_term) = self.log.get_commit_index();
-                self.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
+                self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
             }
         }
         Ok(self.into())
@@ -561,7 +561,7 @@ mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peers,
+                to: Address::Broadcast,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
             }],
@@ -679,7 +679,7 @@ mod tests {
                 node_rx.try_recv()?,
                 Message {
                     from: Address::Local,
-                    to: Address::Peers,
+                    to: Address::Broadcast,
                     term: 3,
                     event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
                 }

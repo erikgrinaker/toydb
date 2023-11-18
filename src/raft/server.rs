@@ -83,7 +83,7 @@ impl Server {
                 Some(msg) = node_rx.next() => {
                     match msg {
                         Message{to: Address::Peer(_), ..} => tcp_tx.send(msg)?,
-                        Message{to: Address::Peers, ..} => tcp_tx.send(msg)?,
+                        Message{to: Address::Broadcast, ..} => tcp_tx.send(msg)?,
                         Message{to: Address::Client, event: Event::ClientResponse{ id, response }, ..} => {
                             if let Some(response_tx) = requests.remove(&id) {
                                 response_tx
@@ -164,7 +164,7 @@ impl Server {
                 message.from = Address::Peer(node_id)
             }
             let to = match message.to {
-                Address::Peers => peer_txs.keys().copied().collect(),
+                Address::Broadcast => peer_txs.keys().copied().collect(),
                 Address::Peer(peer) => vec![peer],
                 addr => {
                     error!("Received outbound message for non-TCP address {:?}", addr);

@@ -6,8 +6,8 @@ use serde_derive::{Deserialize, Serialize};
 /// A message address.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Address {
-    /// Broadcast to all peers.
-    Peers,
+    /// Broadcast to all peers. Only valid as an outbound recipient (to).
+    Broadcast,
     /// A remote peer.
     Peer(NodeID),
     /// The local node.

@@ -49,7 +49,7 @@ impl RoleNode<Candidate> {
         let (last_index, _) = self.log.get_last_index();
         let (commit_index, commit_term) = self.log.get_commit_index();
         let mut node = self.become_role(Leader::new(peers, last_index))?;
-        node.send(Address::Peers, Event::Heartbeat { commit_index, commit_term })?;
+        node.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
         node.append(None)?;
         node.abort_proxied()?;
         Ok(node)
@@ -118,7 +118,7 @@ impl RoleNode<Candidate> {
             self.term += 1;
             self.log.set_term(self.term, None)?;
             self.role = Candidate::new();
-            self.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
+            self.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
         }
         Ok(self.into())
     }
@@ -290,7 +290,7 @@ mod tests {
             node_rx.try_recv()?,
             Message {
                 from: Address::Local,
-                to: Address::Peers,
+                to: Address::Broadcast,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
             },
@@ -317,7 +317,7 @@ mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peers,
+                to: Address::Broadcast,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
             }],
@@ -356,7 +356,7 @@ mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peers,
+                to: Address::Broadcast,
                 term: 4,
                 event: Event::SolicitVote { last_index: 3, last_term: 2 },
             }],

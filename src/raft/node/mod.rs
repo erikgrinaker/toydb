@@ -203,7 +203,9 @@ impl<R> RoleNode<R> {
     /// Validates a message
     fn validate(&self, msg: &Message) -> Result<()> {
         match msg.from {
-            Address::Peers => return Err(Error::Internal("Message from broadcast address".into())),
+            Address::Broadcast => {
+                return Err(Error::Internal("Message from broadcast address".into()))
+            }
             Address::Local => return Err(Error::Internal("Message from local node".into())),
             Address::Client if !matches!(msg.event, Event::ClientRequest { .. }) => {
                 return Err(Error::Internal("Non-request message from client".into()));
@@ -221,7 +223,7 @@ impl<R> RoleNode<R> {
         match msg.to {
             Address::Peer(id) if id == self.id => Ok(()),
             Address::Local => Ok(()),
-            Address::Peers => Ok(()),
+            Address::Broadcast => Ok(()),
             Address::Peer(id) => {
                 Err(Error::Internal(format!("Received message for other node {}", id)))
             }

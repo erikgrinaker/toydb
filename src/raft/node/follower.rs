@@ -39,7 +39,7 @@ impl RoleNode<Follower> {
         let mut node = self.become_role(Candidate::new())?;
         node.term += 1;
         node.log.set_term(node.term, None)?;
-        node.send(Address::Peers, Event::SolicitVote { last_index, last_term })?;
+        node.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
         Ok(node)
     }
 
@@ -996,7 +996,7 @@ pub mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peers,
+                to: Address::Broadcast,
                 term: 4,
                 event: Event::SolicitVote { last_index: 3, last_term: 2 },
             }],
