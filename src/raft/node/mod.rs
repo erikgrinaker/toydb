@@ -70,7 +70,6 @@ impl Node {
             log,
             node_tx,
             state_tx,
-            queued_reqs: Vec::new(),
             proxied_reqs: HashMap::new(),
             role: Follower::new(None, voted_for),
         };
@@ -138,8 +137,6 @@ pub struct RoleNode<R> {
     log: Log,
     node_tx: mpsc::UnboundedSender<Message>,
     state_tx: mpsc::UnboundedSender<Instruction>,
-    /// Keeps track of queued client requests received e.g. during elections.
-    queued_reqs: Vec<(Address, Event)>,
     /// Keeps track of proxied client requests, to abort on new leader election.
     proxied_reqs: HashMap<Vec<u8>, Address>,
     role: R,
@@ -155,7 +152,6 @@ impl<R> RoleNode<R> {
             log: self.log,
             node_tx: self.node_tx,
             state_tx: self.state_tx,
-            queued_reqs: self.queued_reqs,
             proxied_reqs: self.proxied_reqs,
             role,
         })
@@ -165,25 +161,6 @@ impl<R> RoleNode<R> {
     fn abort_proxied(&mut self) -> Result<()> {
         for (id, address) in std::mem::take(&mut self.proxied_reqs) {
             self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
-        }
-        Ok(())
-    }
-
-    /// Sends any queued requests to the given leader.
-    fn forward_queued(&mut self, leader: Address) -> Result<()> {
-        for (from, event) in std::mem::take(&mut self.queued_reqs) {
-            if let Event::ClientRequest { id, .. } = &event {
-                self.proxied_reqs.insert(id.clone(), from.clone());
-                self.node_tx.send(Message {
-                    from: match from {
-                        Address::Client => Address::Local,
-                        address => address,
-                    },
-                    to: leader.clone(),
-                    term: 0,
-                    event,
-                })?;
-            }
         }
         Ok(())
     }
@@ -343,18 +320,6 @@ mod tests {
             self
         }
 
-        pub fn queued(self, queued: Vec<(Address, Event)>) -> Self {
-            assert_eq!(
-                &queued,
-                match self.node {
-                    Node::Candidate(n) => &n.queued_reqs,
-                    Node::Follower(n) => &n.queued_reqs,
-                    Node::Leader(n) => &n.queued_reqs,
-                }
-            );
-            self
-        }
-
         pub fn term(mut self, term: Term) -> Self {
             assert_eq!(
                 term,
@@ -417,7 +382,6 @@ mod tests {
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
-            queued_reqs: Vec::new(),
         };
         Ok((node, node_rx))
     }

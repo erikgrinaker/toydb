@@ -1,6 +1,6 @@
 use super::super::{Address, Event, Instruction, Message, Response};
 use super::{Candidate, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 use ::log::{debug, info, warn};
 use rand::Rng as _;
@@ -56,7 +56,6 @@ impl RoleNode<Follower> {
         };
         self.role = Follower::new(Some(leader), voted_for);
         self.abort_proxied()?;
-        self.forward_queued(Address::Node(leader))?;
         Ok(self)
     }
 
@@ -129,12 +128,14 @@ impl RoleNode<Follower> {
                 }
             }
 
+            // Forward requests to the leader, or abort them if there is none.
             Event::ClientRequest { ref id, .. } => {
+                let id = id.clone();
                 if let Some(leader) = self.role.leader {
-                    self.proxied_reqs.insert(id.clone(), msg.from);
+                    self.proxied_reqs.insert(id, msg.from);
                     self.send(Address::Node(leader), msg.event)?
                 } else {
-                    self.queued_reqs.push((msg.from, msg.event));
+                    self.send(msg.from, Event::ClientResponse { id, response: Err(Error::Abort) })?
                 }
             }
 
@@ -208,7 +209,6 @@ pub mod tests {
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
-            queued_reqs: Vec::new(),
             role: Follower::new(Some(2), None),
         };
         Ok((node, node_rx, state_rx))
@@ -529,7 +529,6 @@ pub mod tests {
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
-            queued_reqs: Vec::new(),
             role: Follower::new(Some(2), None),
         };
 
@@ -788,8 +787,7 @@ pub mod tests {
             .is_follower()
             .term(3)
             .leader(Some(2))
-            .proxied(vec![(vec![0x01], Address::Client)])
-            .queued(vec![]);
+            .proxied(vec![(vec![0x01], Address::Client)]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -813,7 +811,7 @@ pub mod tests {
                 response: Ok(Response::Mutate(vec![0xaf])),
             },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some(2)).proxied(vec![]).queued(vec![]);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).proxied(vec![]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -831,8 +829,8 @@ pub mod tests {
     }
 
     #[test]
-    // ClientRequest is queued when there is no leader, and forwarded when a leader appears.
-    fn step_clientrequest_queued() -> Result<()> {
+    // ClientRequest returns Error::Abort when there is no leader.
+    fn step_clientrequest_no_leader() -> Result<()> {
         let (mut follower, mut node_rx, mut state_rx) = setup()?;
         follower.role = Follower::new(None, None);
         let mut node = Node::Follower(follower);
@@ -843,52 +841,17 @@ pub mod tests {
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(None).proxied(vec![]).queued(vec![(
-            Address::Client,
-            Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
-        )]);
-        assert_messages(&mut node_rx, vec![]);
-        assert_messages(&mut state_rx, vec![]);
-
-        // When a leader appears, we will proxy the queued request to them.
-        node = node.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
-            term: 3,
-            event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
-        })?;
-        assert_node(&mut node)
-            .is_follower()
-            .term(3)
-            .leader(Some(3))
-            .proxied(vec![(vec![0x01], Address::Client)])
-            .queued(vec![]);
+        assert_node(&mut node).is_follower().term(3).leader(None).proxied(vec![]);
         assert_messages(
             &mut node_rx,
-            vec![
-                Message {
-                    from: Address::Local,
-                    to: Address::Node(3),
-                    term: 0,
-                    event: Event::ClientRequest {
-                        id: vec![0x01],
-                        request: Request::Mutate(vec![0xaf]),
-                    },
-                },
-                Message {
-                    from: Address::Local,
-                    to: Address::Node(3),
-                    term: 3,
-                    event: Event::ConfirmLeader { commit_index: 3, has_committed: true },
-                },
-            ],
-        );
-        assert_messages(
-            &mut state_rx,
-            vec![Instruction::Apply {
-                entry: Entry { index: 3, term: 2, command: Some(vec![0x03]) },
+            vec![Message {
+                from: Address::Local,
+                to: Address::Client,
+                term: 3,
+                event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
             }],
         );
+        assert_messages(&mut state_rx, vec![]);
         Ok(())
     }
 
@@ -908,8 +871,7 @@ pub mod tests {
             .is_follower()
             .term(3)
             .leader(Some(2))
-            .proxied(vec![(vec![0x01], Address::Client)])
-            .queued(vec![]);
+            .proxied(vec![(vec![0x01], Address::Client)]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -931,7 +893,7 @@ pub mod tests {
             term: 4,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(4).leader(Some(3)).proxied(vec![]).queued(vec![]);
+        assert_node(&mut node).is_follower().term(4).leader(Some(3)).proxied(vec![]);
         assert_messages(
             &mut node_rx,
             vec![

@@ -8,6 +8,7 @@ use toydb::{raft, sql, storage};
 use futures_util::future::FutureExt as _;
 use pretty_assertions::assert_eq;
 use std::collections::HashMap;
+use std::time::Duration;
 use tempdir::TempDir;
 
 // Movie data
@@ -107,7 +108,7 @@ pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown)
     Ok((client, teardown))
 }
 
-/// Sets up a server cluster
+/// Sets up a server cluster.
 pub async fn cluster(nodes: HashMap<raft::NodeID, (String, String)>) -> Result<Teardown> {
     let mut teardown = Teardown::empty();
     for (id, (addr_sql, addr_raft)) in nodes.iter() {
@@ -118,6 +119,22 @@ pub async fn cluster(nodes: HashMap<raft::NodeID, (String, String)>) -> Result<T
             .collect();
         teardown.merge(server(*id, addr_sql, addr_raft, peers).await?);
     }
+
+    // Wait for nodes to have a leader.
+    for (id, (addr_sql, _)) in nodes.iter() {
+        for _ in 0..10 {
+            match Client::new(addr_sql).await {
+                Ok(client) => match client.status().await {
+                    Ok(status) if status.raft.leader > 0 => break,
+                    Ok(_) => log::error!("no leader"),
+                    Err(err) => log::error!("Status failed for {}: {}", id, err),
+                },
+                Err(err) => log::error!("Client failed for {}: {}", id, err),
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await
+        }
+    }
+
     Ok(teardown)
 }
 

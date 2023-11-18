@@ -253,7 +253,6 @@ mod tests {
             node_tx,
             state_tx,
             proxied_reqs: HashMap::new(),
-            queued_reqs: Vec::new(),
         };
         Ok((node, node_rx, state_rx))
     }

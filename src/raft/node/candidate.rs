@@ -2,7 +2,7 @@ use super::super::{Address, Event, Message, Response};
 use super::{
     Follower, Leader, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN,
 };
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 use ::log::{debug, info, warn};
 use rand::Rng as _;
@@ -38,7 +38,6 @@ impl RoleNode<Candidate> {
         self.log.set_term(term, None)?;
         let mut node = self.become_role(Follower::new(Some(leader), None))?;
         node.abort_proxied()?;
-        node.forward_queued(Address::Node(leader))?;
         Ok(node)
     }
 
@@ -78,16 +77,14 @@ impl RoleNode<Candidate> {
                 debug!("Received term {} vote from {:?}", self.term, msg.from);
                 self.role.votes += 1;
                 if self.role.votes >= self.quorum() {
-                    let queued = std::mem::take(&mut self.queued_reqs);
-                    let mut node: Node = self.become_leader()?.into();
-                    for (from, event) in queued {
-                        node = node.step(Message { from, to: Address::Local, term: 0, event })?;
-                    }
-                    return Ok(node);
+                    return Ok(self.become_leader()?.into());
                 }
             }
 
-            Event::ClientRequest { .. } => self.queued_reqs.push((msg.from, msg.event)),
+            // Abort any inbound client requests while candidate.
+            Event::ClientRequest { id, .. } => {
+                self.send(msg.from, Event::ClientResponse { id, response: Err(Error::Abort) })?;
+            }
 
             Event::ClientResponse { id, mut response } => {
                 if let Ok(Response::Status(ref mut status)) = response {
@@ -139,7 +136,7 @@ mod tests {
         mpsc::UnboundedReceiver<Message>,
         mpsc::UnboundedReceiver<Instruction>,
     )> {
-        let (node_tx, mut node_rx) = mpsc::unbounded_channel();
+        let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
         let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
@@ -148,33 +145,21 @@ mod tests {
         log.commit(2)?;
         log.set_term(3, None)?;
 
-        let mut node = RoleNode {
+        let node = RoleNode {
             id: 1,
             peers: vec![2, 3, 4, 5],
             term: 3,
             log,
             node_tx,
             state_tx,
-            queued_reqs: Vec::new(),
             proxied_reqs: HashMap::new(),
             role: Candidate::new(),
         };
-        node = match node.step(Message {
-            from: Address::Client,
-            to: Address::Local,
-            term: 0,
-            event: Event::ClientRequest { id: vec![0xaf], request: Request::Query(vec![0xf0]) },
-        })? {
-            Node::Candidate(c) => c,
-            _ => panic!("Unexpected node type"),
-        };
-        assert_messages(&mut node_rx, vec![]);
         Ok((node, node_rx, state_rx))
     }
 
     #[test]
-    // Heartbeat for current term converts to follower, forwards the queued request from setup(),
-    // and emits ConfirmLeader.
+    // Heartbeat for current term converts to follower and emits ConfirmLeader.
     fn step_heartbeat_current_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let mut node = candidate.step(Message {
@@ -186,31 +171,20 @@ mod tests {
         assert_node(&mut node).is_follower().term(3);
         assert_messages(
             &mut node_rx,
-            vec![
-                Message {
-                    from: Address::Local,
-                    to: Address::Node(2),
-                    term: 0,
-                    event: Event::ClientRequest {
-                        id: vec![0xaf],
-                        request: Request::Query(vec![0xf0]),
-                    },
-                },
-                Message {
-                    from: Address::Local,
-                    to: Address::Node(2),
-                    term: 3,
-                    event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
-                },
-            ],
+            vec![Message {
+                from: Address::Local,
+                to: Address::Node(2),
+                term: 3,
+                event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
+            }],
         );
         assert_messages(&mut state_rx, vec![]);
         Ok(())
     }
 
     #[test]
-    // Heartbeat for future term converts to follower, forwards queued request, and emits
-    // ConfirmLeader event
+    // Heartbeat for future term converts to follower and emits ConfirmLeader
+    // event.
     fn step_heartbeat_future_term() -> Result<()> {
         let (candidate, mut node_rx, mut state_rx) = setup()?;
         let mut node = candidate.step(Message {
@@ -222,23 +196,12 @@ mod tests {
         assert_node(&mut node).is_follower().term(4);
         assert_messages(
             &mut node_rx,
-            vec![
-                Message {
-                    from: Address::Local,
-                    to: Address::Node(2),
-                    term: 0,
-                    event: Event::ClientRequest {
-                        id: vec![0xaf],
-                        request: Request::Query(vec![0xf0]),
-                    },
-                },
-                Message {
-                    from: Address::Local,
-                    to: Address::Node(2),
-                    term: 4,
-                    event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
-                },
-            ],
+            vec![Message {
+                from: Address::Local,
+                to: Address::Node(2),
+                term: 4,
+                event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
+            }],
         );
         assert_messages(&mut state_rx, vec![]);
         Ok(())
@@ -312,30 +275,34 @@ mod tests {
             )
         }
 
-        // Now that we're leader, we process the queued request
+        assert_messages(&mut node_rx, vec![]);
+        assert_messages(&mut state_rx, vec![]);
+        Ok(())
+    }
+
+    #[test]
+    // ClientRequest returns Error::Abort.
+    fn step_clientrequest() -> Result<()> {
+        let (candidate, mut node_rx, mut state_rx) = setup()?;
+        let mut node = Node::Candidate(candidate);
+
+        node = node.step(Message {
+            from: Address::Client,
+            to: Address::Local,
+            term: 0,
+            event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
+        })?;
+        assert_node(&mut node).is_candidate().term(3);
         assert_messages(
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Broadcast,
+                to: Address::Client,
                 term: 3,
-                event: Event::Heartbeat { commit_index: 2, commit_term: 1 },
+                event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
             }],
         );
-        assert_messages(
-            &mut state_rx,
-            vec![
-                Instruction::Query {
-                    id: vec![0xaf],
-                    address: Address::Client,
-                    command: vec![0xf0],
-                    term: 3,
-                    index: 2,
-                    quorum: 3,
-                },
-                Instruction::Vote { term: 3, index: 2, address: Address::Local },
-            ],
-        );
+        assert_messages(&mut state_rx, vec![]);
         Ok(())
     }
 
