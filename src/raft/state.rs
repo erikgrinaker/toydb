@@ -9,8 +9,8 @@ use tokio_stream::StreamExt as _;
 
 /// A Raft-managed state machine.
 pub trait State: Send {
-    /// Returns the last applied index from the state machine, used when initializing the driver.
-    fn applied_index(&self) -> Index;
+    /// Returns the last applied index from the state machine.
+    fn get_applied_index(&self) -> Index;
 
     /// Mutates the state machine. If the state machine returns Error::Internal, the Raft node
     /// halts. For any other error, the state is applied and the error propagated to the caller.
@@ -75,7 +75,7 @@ impl Driver {
 
     /// Drives a state machine.
     pub async fn drive(mut self, mut state: Box<dyn State>) -> Result<()> {
-        self.applied_index = state.applied_index();
+        self.applied_index = state.get_applied_index();
         debug!("Starting state machine driver at applied index {}", self.applied_index);
         while let Some(instruction) = self.state_rx.next().await {
             if let Err(error) = self.execute(instruction, &mut *state).await {
@@ -89,7 +89,7 @@ impl Driver {
 
     /// Applies committed log entries to the state machine.
     pub fn apply_log(&mut self, state: &mut dyn State, log: &mut Log) -> Result<Index> {
-        let applied_index = state.applied_index();
+        let applied_index = state.get_applied_index();
         let (commit_index, _) = log.get_commit_index();
         if applied_index > commit_index {
             return Err(Error::Internal(format!(
@@ -141,7 +141,7 @@ impl Driver {
             }
 
             Instruction::Notify { id, address, index } => {
-                if index > state.applied_index() {
+                if index > state.get_applied_index() {
                     self.notify.insert(index, (address, id));
                 } else {
                     self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
@@ -156,7 +156,7 @@ impl Driver {
             }
 
             Instruction::Status { id, address, mut status } => {
-                status.apply_index = state.applied_index();
+                status.apply_index = state.get_applied_index();
                 self.send(
                     address,
                     Event::ClientResponse { id, response: Ok(Response::Status(*status)) },
@@ -287,7 +287,7 @@ pub mod tests {
     }
 
     impl State for TestState {
-        fn applied_index(&self) -> Index {
+        fn get_applied_index(&self) -> Index {
             *self.applied_index.lock().unwrap()
         }
 
@@ -357,7 +357,7 @@ pub mod tests {
             ]
         );
         assert_eq!(state.list(), Vec::<Vec<u8>>::new());
-        assert_eq!(state.applied_index(), 0);
+        assert_eq!(state.get_applied_index(), 0);
 
         Ok(())
     }
@@ -391,7 +391,7 @@ pub mod tests {
             }]
         );
         assert_eq!(state.list(), vec![vec![0xaf]]);
-        assert_eq!(state.applied_index(), 2);
+        assert_eq!(state.get_applied_index(), 2);
 
         Ok(())
     }

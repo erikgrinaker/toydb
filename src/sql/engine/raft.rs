@@ -331,7 +331,7 @@ impl<E: storage::engine::Engine> State<E> {
 }
 
 impl<E: storage::engine::Engine> raft::State for State<E> {
-    fn applied_index(&self) -> u64 {
+    fn get_applied_index(&self) -> u64 {
         self.applied_index
     }
 

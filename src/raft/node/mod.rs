@@ -456,7 +456,7 @@ mod tests {
         Node::new(1, vec![2, 3], log, state.clone(), node_tx).await?;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x01], vec![0x02]]);
-        assert_eq!(state.applied_index(), 3);
+        assert_eq!(state.get_applied_index(), 3);
         Ok(())
     }
 
@@ -474,7 +474,7 @@ mod tests {
         Node::new(1, vec![2, 3], log, state.clone(), node_tx).await?;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x02]]);
-        assert_eq!(state.applied_index(), 3);
+        assert_eq!(state.get_applied_index(), 3);
         Ok(())
     }
 
