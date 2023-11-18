@@ -91,7 +91,7 @@ impl RoleNode<Leader> {
         };
         let entries = self.log.scan(peer_next..)?.collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
-        self.send(Address::Peer(peer), Event::ReplicateEntries { base_index, base_term, entries })?;
+        self.send(Address::Node(peer), Event::ReplicateEntries { base_index, base_term, entries })?;
         Ok(())
     }
 
@@ -102,14 +102,14 @@ impl RoleNode<Leader> {
             return Ok(self.into());
         }
         if msg.term > self.term {
-            if let Address::Peer(from) = msg.from {
+            if let Address::Node(from) = msg.from {
                 return self.become_follower(msg.term, from)?.step(msg);
             }
         }
 
         match msg.event {
             Event::ConfirmLeader { commit_index, has_committed } => {
-                if let Address::Peer(from) = msg.from {
+                if let Address::Node(from) = msg.from {
                     self.state_tx.send(Instruction::Vote {
                         term: msg.term,
                         index: commit_index,
@@ -122,7 +122,7 @@ impl RoleNode<Leader> {
             }
 
             Event::AcceptEntries { last_index } => {
-                if let Address::Peer(from) = msg.from {
+                if let Address::Node(from) = msg.from {
                     self.role.peer_last_index.insert(from, last_index);
                     self.role.peer_next_index.insert(from, last_index + 1);
                 }
@@ -130,7 +130,7 @@ impl RoleNode<Leader> {
             }
 
             Event::RejectEntries => {
-                if let Address::Peer(from) = msg.from {
+                if let Address::Node(from) = msg.from {
                     self.role.peer_next_index.entry(from).and_modify(|i| {
                         if *i > 1 {
                             *i -= 1
@@ -265,8 +265,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer(2),
-            to: Address::Peer(1),
+            from: Address::Node(2),
+            to: Address::Node(1),
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: true },
         })?;
@@ -274,7 +274,7 @@ mod tests {
         assert_messages(&mut node_rx, vec![]);
         assert_messages(
             &mut state_rx,
-            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer(2) }],
+            vec![Instruction::Vote { term: 3, index: 2, address: Address::Node(2) }],
         );
         Ok(())
     }
@@ -286,8 +286,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer(2),
-            to: Address::Peer(1),
+            from: Address::Node(2),
+            to: Address::Node(1),
             term: 3,
             event: Event::ConfirmLeader { commit_index: 2, has_committed: false },
         })?;
@@ -296,14 +296,14 @@ mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer(2),
+                to: Address::Node(2),
                 term: 3,
                 event: Event::ReplicateEntries { base_index: 5, base_term: 3, entries: vec![] },
             }],
         );
         assert_messages(
             &mut state_rx,
-            vec![Instruction::Vote { term: 3, index: 2, address: Address::Peer(2) }],
+            vec![Instruction::Vote { term: 3, index: 2, address: Address::Node(2) }],
         );
         Ok(())
     }
@@ -315,8 +315,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer(2),
-            to: Address::Peer(1),
+            from: Address::Node(2),
+            to: Address::Node(1),
             term: 3,
             event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
         })?;
@@ -333,8 +333,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer(2),
-            to: Address::Peer(1),
+            from: Address::Node(2),
+            to: Address::Node(1),
             term: 4,
             event: Event::Heartbeat { commit_index: 7, commit_term: 4 },
         })?;
@@ -343,7 +343,7 @@ mod tests {
             &mut node_rx,
             vec![Message {
                 from: Address::Local,
-                to: Address::Peer(2),
+                to: Address::Node(2),
                 term: 4,
                 event: Event::ConfirmLeader { commit_index: 7, has_committed: false },
             }],
@@ -359,8 +359,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer(2),
-            to: Address::Peer(1),
+            from: Address::Node(2),
+            to: Address::Node(1),
             term: 2,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
@@ -376,8 +376,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Peer(2),
-            to: Address::Peer(1),
+            from: Address::Node(2),
+            to: Address::Node(1),
             term: 3,
             event: Event::AcceptEntries { last_index: 4 },
         })?;
@@ -386,8 +386,8 @@ mod tests {
         assert_messages(&mut state_rx, vec![]);
 
         node = node.step(Message {
-            from: Address::Peer(3),
-            to: Address::Peer(1),
+            from: Address::Node(3),
+            to: Address::Node(1),
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
@@ -406,8 +406,8 @@ mod tests {
         );
 
         node = node.step(Message {
-            from: Address::Peer(4),
-            to: Address::Peer(1),
+            from: Address::Node(4),
+            to: Address::Node(1),
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
@@ -432,8 +432,8 @@ mod tests {
 
         for _ in 0..5 {
             node = node.step(Message {
-                from: Address::Peer(2),
-                to: Address::Peer(1),
+                from: Address::Node(2),
+                to: Address::Node(1),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
             })?;
@@ -453,8 +453,8 @@ mod tests {
 
         for peer in peers.into_iter() {
             node = node.step(Message {
-                from: Address::Peer(peer),
-                to: Address::Peer(1),
+                from: Address::Node(peer),
+                to: Address::Node(1),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 3 },
             })?;
@@ -474,8 +474,8 @@ mod tests {
 
         for (i, peer) in peers.into_iter().enumerate() {
             node = node.step(Message {
-                from: Address::Peer(peer),
-                to: Address::Peer(1),
+                from: Address::Node(peer),
+                to: Address::Node(1),
                 term: 3,
                 event: Event::AcceptEntries { last_index: 7 },
             })?;
@@ -514,8 +514,8 @@ mod tests {
 
         for i in 0..(entries.len() + 3) {
             node = node.step(Message {
-                from: Address::Peer(2),
-                to: Address::Peer(1),
+                from: Address::Node(2),
+                to: Address::Node(1),
                 term: 3,
                 event: Event::RejectEntries,
             })?;
@@ -526,7 +526,7 @@ mod tests {
                 &mut node_rx,
                 vec![Message {
                     from: Address::Local,
-                    to: Address::Peer(2),
+                    to: Address::Node(2),
                     term: 3,
                     event: Event::ReplicateEntries {
                         base_index: index as Index,
@@ -607,7 +607,7 @@ mod tests {
                 node_rx.try_recv()?,
                 Message {
                     from: Address::Local,
-                    to: Address::Peer(peer),
+                    to: Address::Node(peer),
                     term: 3,
                     event: Event::ReplicateEntries {
                         base_index: 5,

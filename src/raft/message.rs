@@ -8,8 +8,9 @@ use serde_derive::{Deserialize, Serialize};
 pub enum Address {
     /// Broadcast to all peers. Only valid as an outbound recipient (to).
     Broadcast,
-    /// A remote peer.
-    Peer(NodeID),
+    /// A node with the specified node ID (local or remote). Valid both as
+    /// sender and recipient.
+    Node(NodeID),
     /// The local node.
     Local,
     /// A local client.
