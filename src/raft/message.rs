@@ -101,6 +101,7 @@ pub enum Request {
 /// A client response.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Response {
-    State(Vec<u8>),
+    Query(Vec<u8>),
+    Mutate(Vec<u8>),
     Status(Status),
 }

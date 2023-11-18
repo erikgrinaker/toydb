@@ -810,7 +810,7 @@ pub mod tests {
             term: 3,
             event: Event::ClientResponse {
                 id: vec![0x01],
-                response: Ok(Response::State(vec![0xaf])),
+                response: Ok(Response::Mutate(vec![0xaf])),
             },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).proxied(vec![]).queued(vec![]);
@@ -822,7 +822,7 @@ pub mod tests {
                 term: 3,
                 event: Event::ClientResponse {
                     id: vec![0x01],
-                    response: Ok(Response::State(vec![0xaf])),
+                    response: Ok(Response::Mutate(vec![0xaf])),
                 },
             }],
         );

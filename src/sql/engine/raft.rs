@@ -89,7 +89,7 @@ impl Client {
     /// return type.
     fn mutate<V: DeserializeOwned>(&self, mutation: Mutation) -> Result<V> {
         match self.execute(raft::Request::Mutate(bincode::serialize(&mutation)?))? {
-            raft::Response::State(response) => Ok(bincode::deserialize(&response)?),
+            raft::Response::Mutate(response) => Ok(bincode::deserialize(&response)?),
             resp => Err(Error::Internal(format!("Unexpected Raft mutation response {:?}", resp))),
         }
     }
@@ -98,7 +98,7 @@ impl Client {
     /// return type.
     fn query<V: DeserializeOwned>(&self, query: Query) -> Result<V> {
         match self.execute(raft::Request::Query(bincode::serialize(&query)?))? {
-            raft::Response::State(response) => Ok(bincode::deserialize(&response)?),
+            raft::Response::Query(response) => Ok(bincode::deserialize(&response)?),
             resp => Err(Error::Internal(format!("Unexpected Raft query response {:?}", resp))),
         }
     }

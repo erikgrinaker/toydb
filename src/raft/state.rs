@@ -175,7 +175,7 @@ impl Driver {
     /// Notifies a client about an applied log entry, if any.
     fn notify_applied(&mut self, index: Index, result: Result<Vec<u8>>) -> Result<()> {
         if let Some((to, id)) = self.notify.remove(&index) {
-            self.send(to, Event::ClientResponse { id, response: result.map(Response::State) })?;
+            self.send(to, Event::ClientResponse { id, response: result.map(Response::Mutate) })?;
         }
         Ok(())
     }
@@ -203,7 +203,7 @@ impl Driver {
             }
             self.send(
                 query.address,
-                Event::ClientResponse { id: query.id, response: result.map(Response::State) },
+                Event::ClientResponse { id: query.id, response: result.map(Response::Query) },
             )?
         }
         Ok(())
@@ -381,7 +381,7 @@ pub mod tests {
                 term: 0,
                 event: Event::ClientResponse {
                     id: vec![0x01],
-                    response: Ok(Response::State(vec![0xaf]))
+                    response: Ok(Response::Mutate(vec![0xaf]))
                 }
             }]
         );
@@ -419,7 +419,7 @@ pub mod tests {
                 term: 0,
                 event: Event::ClientResponse {
                     id: vec![0x01],
-                    response: Ok(Response::State(vec![0xf0]))
+                    response: Ok(Response::Query(vec![0xf0]))
                 }
             }]
         );
