@@ -172,7 +172,7 @@ mod tests {
 
         let mut node = RoleNode {
             id: 1,
-            peers: vec![2, 3, 4, 5],
+            peers: HashSet::from([2, 3, 4, 5]),
             term: 3,
             log,
             node_tx,

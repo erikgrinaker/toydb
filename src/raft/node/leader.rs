@@ -3,7 +3,7 @@ use super::{Follower, Node, NodeID, RoleNode, Term, Ticks, HEARTBEAT_INTERVAL};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // A leader serves requests and replicates the log to followers.
 #[derive(Debug)]
@@ -18,7 +18,7 @@ pub struct Leader {
 
 impl Leader {
     /// Creates a new leader role.
-    pub fn new(peers: Vec<NodeID>, last_index: Index) -> Self {
+    pub fn new(peers: HashSet<NodeID>, last_index: Index) -> Self {
         let mut leader = Self {
             since_heartbeat: 0,
             peer_next_index: HashMap::new(),
@@ -259,7 +259,7 @@ mod tests {
     )> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let peers = vec![2, 3, 4, 5];
+        let peers = HashSet::from([2, 3, 4, 5]);
         let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;

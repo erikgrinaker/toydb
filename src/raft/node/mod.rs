@@ -11,7 +11,7 @@ use leader::Leader;
 use ::log::{debug, info};
 use rand::Rng as _;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::mpsc;
 
 /// A node ID.
@@ -59,7 +59,7 @@ impl Node {
     /// Creates a new Raft node, starting as a follower, or leader if no peers.
     pub async fn new(
         id: NodeID,
-        peers: Vec<NodeID>,
+        peers: HashSet<NodeID>,
         mut log: Log,
         mut state: Box<dyn State>,
         node_tx: mpsc::UnboundedSender<Message>,
@@ -85,7 +85,7 @@ impl Node {
                 node.log.set_term(term, Some(id))?;
             }
             let (last_index, _) = node.log.get_last_index();
-            Ok(node.become_role(Leader::new(vec![], last_index)).into())
+            Ok(node.become_role(Leader::new(HashSet::new(), last_index)).into())
         } else {
             Ok(node.into())
         }
@@ -141,7 +141,7 @@ impl From<RoleNode<Leader>> for Node {
 // A Raft node with role R
 pub struct RoleNode<R> {
     id: NodeID,
-    peers: Vec<NodeID>,
+    peers: HashSet<NodeID>,
     term: Term,
     log: Log,
     node_tx: mpsc::UnboundedSender<Message>,
@@ -382,7 +382,7 @@ mod tests {
         let node = RoleNode {
             role: (),
             id: 1,
-            peers,
+            peers: HashSet::from_iter(peers),
             term: 1,
             log: Log::new(Box::new(storage::engine::Memory::new()), false)?,
             node_tx,
@@ -396,7 +396,7 @@ mod tests {
         let (node_tx, _) = mpsc::unbounded_channel();
         let node = Node::new(
             1,
-            vec![2, 3],
+            HashSet::from([2, 3]),
             Log::new(Box::new(storage::engine::Memory::new()), false)?,
             Box::new(TestState::new(0)),
             node_tx,
@@ -406,7 +406,7 @@ mod tests {
             Node::Follower(rolenode) => {
                 assert_eq!(rolenode.id, 1);
                 assert_eq!(rolenode.term, 0);
-                assert_eq!(rolenode.peers, vec![2, 3]);
+                assert_eq!(rolenode.peers, HashSet::from([2, 3]));
             }
             _ => panic!("Expected node to start as follower"),
         }
@@ -424,7 +424,7 @@ mod tests {
         log.append(2, Some(vec![0x03]))?;
         let state = Box::new(TestState::new(0));
 
-        Node::new(1, vec![2, 3], log, state.clone(), node_tx).await?;
+        Node::new(1, HashSet::from([2, 3]), log, state.clone(), node_tx).await?;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x01], vec![0x02]]);
         assert_eq!(state.get_applied_index(), 3);
@@ -442,7 +442,7 @@ mod tests {
         log.append(2, Some(vec![0x03]))?;
         let state = Box::new(TestState::new(2));
 
-        Node::new(1, vec![2, 3], log, state.clone(), node_tx).await?;
+        Node::new(1, HashSet::from([2, 3]), log, state.clone(), node_tx).await?;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         assert_eq!(state.list(), vec![vec![0x02]]);
         assert_eq!(state.get_applied_index(), 3);
@@ -461,7 +461,7 @@ mod tests {
         log.append(2, Some(vec![0x03])).unwrap();
         let state = Box::new(TestState::new(4));
 
-        Node::new(1, vec![2, 3], log, state.clone(), node_tx).await.unwrap();
+        Node::new(1, HashSet::from([2, 3]), log, state.clone(), node_tx).await.unwrap();
     }
 
     #[tokio::test]
@@ -469,7 +469,7 @@ mod tests {
         let (node_tx, _) = mpsc::unbounded_channel();
         let node = Node::new(
             1,
-            vec![],
+            HashSet::new(),
             Log::new(Box::new(storage::engine::Memory::new()), false)?,
             Box::new(TestState::new(0)),
             node_tx,
@@ -492,7 +492,7 @@ mod tests {
         let new = node.become_role("role");
         assert_eq!(new.id, 1);
         assert_eq!(new.term, 1);
-        assert_eq!(new.peers, vec![2, 3]);
+        assert_eq!(new.peers, HashSet::from([2, 3]));
         assert_eq!(new.role, "role");
         Ok(())
     }
