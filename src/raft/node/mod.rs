@@ -3,7 +3,7 @@ mod follower;
 mod leader;
 
 use super::{Address, Driver, Event, Index, Instruction, Log, Message, State};
-use crate::error::{Error, Result};
+use crate::error::Result;
 use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
@@ -175,45 +175,46 @@ impl<R> RoleNode<R> {
         Ok(self.node_tx.send(msg)?)
     }
 
-    /// Validates a message, when stepping it.
-    fn validate(&self, msg: &Message) -> Result<()> {
+    /// Asserts invariants during state transitions (steps and ticks).
+    fn assert_invariants(&mut self) -> Result<()> {
+        debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
+        Ok(())
+    }
+
+    /// Asserts message invariants when stepping.
+    ///
+    /// In a real production database, these should be errors instead, since
+    /// external input from the network can't be trusted to uphold invariants.
+    fn assert_step(&self, msg: &Message) {
         // Messages must be addressed to the local node, or a broadcast.
         match msg.to {
             Address::Broadcast => {}
-            Address::Client => return Err(Error::Internal("Received message for client".into())),
-            Address::Node(id) if id == self.id => {}
-            Address::Node(_) => {
-                return Err(Error::Internal("Received message for other node".into()))
-            }
+            Address::Client => panic!("Message to client"),
+            Address::Node(id) => assert_eq!(id, self.id, "Message to other node"),
         }
 
         match msg.from {
             // The broadcast address can't send anything.
-            Address::Broadcast => {
-                return Err(Error::Internal("Message from broadcast address".into()))
-            }
+            Address::Broadcast => panic!("Message from broadcast address"),
             // Clients can only send ClientRequest without a term.
             Address::Client => {
-                if msg.term > 0 {
-                    return Err(Error::Internal("Client message with term".into()));
-                }
-                if !matches!(msg.event, Event::ClientRequest { .. }) {
-                    return Err(Error::Internal("Non-request message from client".into()));
-                }
+                assert_eq!(msg.term, 0, "Client message with term");
+                assert!(
+                    matches!(msg.event, Event::ClientRequest { .. }),
+                    "Non-request message from client"
+                );
             }
             // Nodes must be known, and must include their term.
             Address::Node(id) => {
-                if id != self.id && !self.peers.contains(&id) {
-                    return Err(Error::Internal(format!("Message from unknown node {}", id)));
-                }
+                assert!(id == self.id || self.peers.contains(&id), "Unknown sender {}", id);
                 // TODO: For now, accept ClientResponse without term, since the
                 // state driver does not have access to it.
-                if msg.term == 0 && !matches!(msg.event, Event::ClientResponse { .. }) {
-                    return Err(Error::Internal("Message without term".into()));
-                }
+                assert!(
+                    msg.term > 0 || matches!(msg.event, Event::ClientResponse { .. }),
+                    "Message without term"
+                );
             }
         }
-        Ok(())
     }
 }
 

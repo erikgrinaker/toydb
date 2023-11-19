@@ -1,8 +1,8 @@
 use super::super::{Address, Event, Index, Instruction, Message, Request, Response, Status};
 use super::{Follower, Node, NodeID, RoleNode, Term, Ticks, HEARTBEAT_INTERVAL};
-use crate::error::{Error, Result};
+use crate::error::Result;
 
-use ::log::{debug, error, info};
+use ::log::{debug, info};
 use std::collections::{HashMap, HashSet};
 
 /// Peer replication progress.
@@ -49,14 +49,11 @@ impl RoleNode<Leader> {
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
         // Assert invariants.
-        debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
+        self.assert_invariants()?;
+        self.assert_step(&msg);
         debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
 
-        // Drop invalid messages and messages from past terms.
-        if let Err(err) = self.validate(&msg) {
-            error!("Invalid message: {} ({:?})", err, msg);
-            return Ok(self.into());
-        }
+        // Drop messages from past terms.
         if msg.term < self.term && msg.term > 0 {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
@@ -185,6 +182,7 @@ impl RoleNode<Leader> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
+        self.assert_invariants()?;
         self.role.since_heartbeat += 1;
         if self.role.since_heartbeat >= HEARTBEAT_INTERVAL {
             self.heartbeat()?;
@@ -248,7 +246,7 @@ impl RoleNode<Leader> {
         match self.log.get(commit_index)? {
             Some(entry) if entry.term == self.term => {}
             Some(_) => return Ok(prev_commit_index),
-            None => return Err(Error::Internal(format!("Commit index {} missing", commit_index))),
+            None => panic!("Commit index {} missing", commit_index),
         };
 
         // Commit and apply the new entries.
@@ -268,10 +266,10 @@ impl RoleNode<Leader> {
         let (base_index, base_term) = match self.role.progress.get(&peer) {
             Some(Progress { next, .. }) if *next > 1 => match self.log.get(next - 1)? {
                 Some(entry) => (entry.index, entry.term),
-                None => return Err(Error::Internal(format!("Missing base entry {}", next - 1))),
+                None => panic!("Missing base entry {}", next - 1),
             },
             Some(_) => (0, 0),
-            None => return Err(Error::Internal(format!("Unknown peer {}", peer))),
+            None => panic!("Unknown peer {}", peer),
         };
 
         let entries = self.log.scan((base_index + 1)..)?.collect::<Result<Vec<_>>>()?;

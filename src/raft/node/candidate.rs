@@ -2,7 +2,7 @@ use super::super::{Address, Event, Message};
 use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RoleNode, Term, Ticks};
 use crate::error::{Error, Result};
 
-use ::log::{debug, error, info, warn};
+use ::log::{debug, info, warn};
 use std::collections::HashSet;
 
 /// A candidate is campaigning to become a leader.
@@ -68,14 +68,11 @@ impl RoleNode<Candidate> {
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
         // Assert invariants.
-        debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
+        self.assert_invariants()?;
+        self.assert_step(&msg);
         debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
 
-        // Drop invalid messages and messages from past terms.
-        if let Err(err) = self.validate(&msg) {
-            error!("Invalid message: {} ({:?})", err, msg);
-            return Ok(self.into());
-        }
+        // Drop messages from past terms.
         if msg.term < self.term && msg.term > 0 {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
@@ -124,6 +121,7 @@ impl RoleNode<Candidate> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
+        self.assert_invariants()?;
         self.role.election_duration += 1;
         if self.role.election_duration >= self.role.election_timeout {
             self.campaign()?;
