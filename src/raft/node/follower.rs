@@ -35,17 +35,14 @@ impl Follower {
 }
 
 impl RoleNode<Follower> {
-    /// Transforms the node into a candidate.
+    /// Transforms the node into a candidate, by campaigning for leadership in a
+    /// new term.
     fn become_candidate(mut self) -> Result<RoleNode<Candidate>> {
         // Abort any forwarded requests. These must be retried with new leader.
         self.abort_forwarded()?;
 
-        info!("Starting election for term {}", self.term + 1);
-        let (last_index, last_term) = self.log.get_last_index();
         let mut node = self.become_role(Candidate::new());
-        node.term += 1;
-        node.log.set_term(node.term, Some(node.id))?;
-        node.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
+        node.campaign()?;
         Ok(node)
     }
 
@@ -75,19 +72,11 @@ impl RoleNode<Follower> {
         Ok(self)
     }
 
-    /// Checks if an address is the current leader.
-    fn is_leader(&self, from: &Address) -> bool {
-        if let Some(leader) = &self.role.leader {
-            if let Address::Node(from) = from {
-                return leader == from;
-            }
-        }
-        false
-    }
-
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
         // Assert invariants.
+        debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
+        debug_assert_eq!(self.role.voted_for, self.log.get_term()?.1, "Vote does not match log");
         if self.role.leader.is_none() {
             assert!(self.role.forwarded.is_empty(), "Leaderless follower has forwarded requests");
         }
@@ -159,20 +148,21 @@ impl RoleNode<Follower> {
                 }
             }
 
+            // A candidate in this term is requesting our vote.
             Event::SolicitVote { last_index, last_term } => {
+                let from = msg.from.unwrap();
+
+                // If we already voted for someone else in this term, ignore it.
                 if let Some(voted_for) = self.role.voted_for {
-                    if msg.from != Address::Node(voted_for) {
+                    if from != voted_for {
                         return Ok(self.into());
                     }
                 }
-                let (log_last_index, log_last_term) = self.log.get_last_index();
-                if last_term < log_last_term {
-                    return Ok(self.into());
-                }
-                if last_term == log_last_term && last_index < log_last_index {
-                    return Ok(self.into());
-                }
-                if let Address::Node(from) = msg.from {
+
+                // Only vote if the candidate's log is at least as up-to-date as
+                // our log.
+                let (log_index, log_term) = self.log.get_last_index();
+                if last_term > log_term || last_term == log_term && last_index >= log_index {
                     info!("Voting for {} in term {} election", from, self.term);
                     self.send(Address::Node(from), Event::GrantVote)?;
                     self.log.set_term(self.term, Some(from))?;
@@ -215,13 +205,11 @@ impl RoleNode<Follower> {
                 }
             }
 
-            // Ignore votes which are usually strays from the previous election that we lost.
-            Event::GrantVote => {}
-
-            // We're not a leader in this term, so we shoudn't see these.
+            // We're not a leader nor candidate in this term, so we shoudn't see these.
             Event::ConfirmLeader { .. }
             | Event::AcceptEntries { .. }
-            | Event::RejectEntries { .. } => warn!("Received unexpected message {:?}", msg),
+            | Event::RejectEntries { .. }
+            | Event::GrantVote { .. } => warn!("Received unexpected message {:?}", msg),
         };
         Ok(self.into())
     }
@@ -230,10 +218,9 @@ impl RoleNode<Follower> {
     pub fn tick(mut self) -> Result<Node> {
         self.role.leader_seen += 1;
         if self.role.leader_seen >= self.role.election_timeout {
-            Ok(self.become_candidate()?.into())
-        } else {
-            Ok(self.into())
+            return Ok(self.become_candidate()?.into());
         }
+        Ok(self.into())
     }
 
     /// Aborts all forwarded requests.
@@ -243,6 +230,16 @@ impl RoleNode<Follower> {
             self.send(Address::Client, Event::ClientResponse { id, response: Err(Error::Abort) })?;
         }
         Ok(())
+    }
+
+    /// Checks if an address is the current leader.
+    fn is_leader(&self, from: &Address) -> bool {
+        if let Some(leader) = &self.role.leader {
+            if let Address::Node(from) = from {
+                return leader == from;
+            }
+        }
+        false
     }
 }
 

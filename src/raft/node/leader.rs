@@ -101,6 +101,10 @@ impl RoleNode<Leader> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
+        // Assert invariants.
+        debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
+        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+
         // Drop invalid messages and messages from past terms.
         if let Err(err) = self.validate(&msg) {
             error!("Invalid message: {} ({:?})", err, msg);

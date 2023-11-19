@@ -129,7 +129,7 @@ async fn status() -> Result<()> {
                 commit_index: 26,
                 apply_index: 26,
                 storage: "bitcask".into(),
-                storage_size: 1309,
+                storage_size: 1313,
             },
             mvcc: mvcc::Status {
                 versions: 1,

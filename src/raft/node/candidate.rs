@@ -3,23 +3,24 @@ use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RoleNode, Ter
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info, warn};
+use std::collections::HashSet;
 
 /// A candidate is campaigning to become a leader.
 #[derive(Debug)]
 pub struct Candidate {
+    /// Votes received (including ourself).
+    votes: HashSet<NodeID>,
     /// Ticks elapsed since election start.
     election_duration: Ticks,
     /// Election timeout, in ticks.
     election_timeout: Ticks,
-    /// Votes received (including ourself).
-    votes: u64,
 }
 
 impl Candidate {
     /// Creates a new candidate role.
     pub fn new() -> Self {
         Self {
-            votes: 1, // We always start with a vote for ourselves.
+            votes: HashSet::new(),
             election_duration: 0,
             election_timeout: rand_election_timeout(),
         }
@@ -63,6 +64,10 @@ impl RoleNode<Candidate> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
+        // Assert invariants.
+        debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
+        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+
         // Drop invalid messages and messages from past terms.
         if let Err(err) = self.validate(&msg) {
             error!("Invalid message: {} ({:?})", err, msg);
@@ -81,28 +86,28 @@ impl RoleNode<Candidate> {
         }
 
         match msg.event {
-            // If we receive a heartbeat or replicated entries in this term, we
-            // lost the election and have a new leader. Follow it and process
-            // the message.
-            Event::Heartbeat { .. } | Event::AppendEntries { .. } => {
-                return self.become_follower(msg.term, Some(msg.from.unwrap()))?.step(msg);
-            }
+            // Ignore other candidates when we're also campaigning.
+            Event::SolicitVote { .. } => {}
 
+            // We received a vote. Record it, and if we have quorum, assume
+            // leadership.
             Event::GrantVote => {
-                debug!("Received term {} vote from {:?}", self.term, msg.from);
-                self.role.votes += 1;
-                if self.role.votes >= self.quorum() {
+                self.role.votes.insert(msg.from.unwrap());
+                if self.role.votes.len() as u64 >= self.quorum() {
                     return Ok(self.become_leader()?.into());
                 }
+            }
+
+            // If we receive a heartbeat or entries in this term, we lost the
+            // election and have a new leader. Follow it and step the message.
+            Event::Heartbeat { .. } | Event::AppendEntries { .. } => {
+                return self.become_follower(msg.term, Some(msg.from.unwrap()))?.step(msg);
             }
 
             // Abort any inbound client requests while candidate.
             Event::ClientRequest { id, .. } => {
                 self.send(msg.from, Event::ClientResponse { id, response: Err(Error::Abort) })?;
             }
-
-            // Ignore other candidates when we're also campaigning
-            Event::SolicitVote { .. } => {}
 
             // We're not a leader in this term, nor are we forwarding requests,
             // so we shouldn't see these.
@@ -116,17 +121,26 @@ impl RoleNode<Candidate> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
-        // If the election times out, start a new one for the next term.
         self.role.election_duration += 1;
         if self.role.election_duration >= self.role.election_timeout {
-            info!("Election timed out, starting new election for term {}", self.term + 1);
-            let (last_index, last_term) = self.log.get_last_index();
-            self.term += 1;
-            self.log.set_term(self.term, Some(self.id))?;
-            self.role = Candidate::new();
-            self.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
+            self.campaign()?;
         }
         Ok(self.into())
+    }
+
+    /// Campaign for leadership by increasing the term, voting for ourself, and
+    /// soliciting votes from all peers.
+    pub(super) fn campaign(&mut self) -> Result<()> {
+        let term = self.term + 1;
+        info!("Starting new election for term {}", term);
+        self.role = Candidate::new();
+        self.role.votes.insert(self.id); // vote for ourself
+        self.term = term;
+        self.log.set_term(term, Some(self.id))?;
+
+        let (last_index, last_term) = self.log.get_last_index();
+        self.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
+        Ok(())
     }
 }
 
@@ -153,7 +167,7 @@ mod tests {
         log.commit(2)?;
         log.set_term(3, Some(1))?;
 
-        let node = RoleNode {
+        let mut node = RoleNode {
             id: 1,
             peers: vec![2, 3, 4, 5],
             term: 3,
@@ -162,6 +176,7 @@ mod tests {
             state_tx,
             role: Candidate::new(),
         };
+        node.role.votes.insert(1);
         Ok((node, node_rx, state_rx))
     }
 

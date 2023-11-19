@@ -70,7 +70,7 @@ impl Node {
         tokio::spawn(driver.drive(state));
 
         let (term, voted_for) = log.get_term()?;
-        let node = RoleNode {
+        let mut node = RoleNode {
             id,
             peers,
             term,
@@ -81,6 +81,9 @@ impl Node {
         };
         if node.peers.is_empty() {
             info!("No peers specified, starting as leader");
+            if voted_for != Some(id) {
+                node.log.set_term(term, Some(id))?;
+            }
             let (last_index, _) = node.log.get_last_index();
             Ok(node.become_role(Leader::new(vec![], last_index)).into())
         } else {

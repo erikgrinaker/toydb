@@ -59,15 +59,19 @@ pub enum Event {
         /// and would like the leader to replicate it.
         has_committed: bool,
     },
-    /// Candidates solicit votes from all peers.
+
+    /// Candidates solicit votes from all peers when campaigning for leadership.
     SolicitVote {
         // The index of the candidate's last stored log entry
         last_index: Index,
         // The term of the candidate's last stored log entry
         last_term: Term,
     },
-    /// Followers may grant votes to candidates.
+
+    /// Followers may grant a single vote to a candidate per term, on a
+    /// first-come basis. Candidates implicitly vote for themselves.
     GrantVote,
+
     /// Leaders replicate log entries to followers by appending it to their log.
     AppendEntries {
         /// The index of the log entry immediately preceding the submitted commands.
