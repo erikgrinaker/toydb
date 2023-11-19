@@ -201,8 +201,11 @@ impl<R> RoleNode<R> {
                     return Err(Error::Internal("Non-request message from client".into()));
                 }
             }
-            // Nodes must include their term.
-            Address::Node(_) => {
+            // Nodes must be known, and must include their term.
+            Address::Node(id) => {
+                if id != self.id && !self.peers.contains(&id) {
+                    return Err(Error::Internal(format!("Message from unknown node {}", id)));
+                }
                 // TODO: For now, accept ClientResponse without term, since the
                 // state driver does not have access to it.
                 if msg.term == 0 && !matches!(msg.event, Event::ClientResponse { .. }) {
