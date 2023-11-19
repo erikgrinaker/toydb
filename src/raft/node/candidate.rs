@@ -55,9 +55,8 @@ impl RoleNode<Candidate> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last_index();
-        let (commit_index, commit_term) = self.log.get_commit_index();
         let mut node = self.become_role(Leader::new(peers, last_index));
-        node.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
+        node.heartbeat()?;
         node.append(None)?;
         Ok(node)
     }

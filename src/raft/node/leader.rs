@@ -8,7 +8,7 @@ use std::collections::HashMap;
 // A leader serves requests and replicates the log to followers.
 #[derive(Debug)]
 pub struct Leader {
-    /// Number of ticks since last heartbeat.
+    /// Number of ticks since last periodic heartbeat.
     since_heartbeat: Ticks,
     /// The next index to replicate to a peer.
     peer_next_index: HashMap<NodeID, Index>,
@@ -157,7 +157,7 @@ impl RoleNode<Leader> {
             }
 
             Event::ClientRequest { id, request: Request::Query(command) } => {
-                let (commit_index, commit_term) = self.log.get_commit_index();
+                let (commit_index, _) = self.log.get_commit_index();
                 self.state_tx.send(Instruction::Query {
                     id,
                     address: msg.from,
@@ -171,9 +171,7 @@ impl RoleNode<Leader> {
                     index: commit_index,
                     address: Address::Node(self.id),
                 })?;
-                if !self.peers.is_empty() {
-                    self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
-                }
+                self.heartbeat()?;
             }
 
             Event::ClientRequest { id, request: Request::Mutate(command) } => {
@@ -216,15 +214,21 @@ impl RoleNode<Leader> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
-        if !self.peers.is_empty() {
-            self.role.since_heartbeat += 1;
-            if self.role.since_heartbeat >= HEARTBEAT_INTERVAL {
-                let (commit_index, commit_term) = self.log.get_commit_index();
-                self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
-                self.role.since_heartbeat = 0;
-            }
+        self.role.since_heartbeat += 1;
+        if self.role.since_heartbeat >= HEARTBEAT_INTERVAL {
+            self.heartbeat()?;
+            self.role.since_heartbeat = 0;
         }
         Ok(self.into())
+    }
+
+    /// Broadcasts a heartbeat to all peers.
+    pub(super) fn heartbeat(&mut self) -> Result<()> {
+        let (commit_index, commit_term) = self.log.get_commit_index();
+        self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
+        // NB: We don't reset self.since_heartbeat here, because we want to send
+        // periodic heartbeats regardless of any on-demand heartbeats.
+        Ok(())
     }
 }
 
