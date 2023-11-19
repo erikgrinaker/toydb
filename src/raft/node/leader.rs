@@ -1,6 +1,6 @@
-use super::super::{Address, Event, Index, Instruction, Message, Request, Status};
+use super::super::{Address, Event, Index, Instruction, Message, Request, RequestID, Status};
 use super::{Follower, Node, NodeID, RawNode, Role, Term, Ticks, HEARTBEAT_INTERVAL};
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 use ::log::{debug, info};
 use std::collections::{HashMap, HashSet};
@@ -14,11 +14,30 @@ struct Progress {
     last: Index,
 }
 
+/// A pending client write request.
+#[derive(Clone, Debug, PartialEq)]
+struct Write {
+    /// The client or node which submitted the write.
+    from: Address,
+    /// The write request ID.
+    id: RequestID,
+}
+
 // A leader serves requests and replicates the log to followers.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Leader {
     /// Peer replication progress.
     progress: HashMap<NodeID, Progress>,
+    /// Keeps track of pending write requests, keyed by log index. These are
+    /// added when the write is proposed and appended to the leader's log, and
+    /// removed when the command is applied to the state machine, sending the
+    /// command result to the waiting client.
+    ///
+    /// If the leader loses leadership, all pending write requests are aborted
+    /// by returning Error::Abort.
+    ///
+    /// TODO: Actually return responses when applied.
+    writes: HashMap<Index, Write>,
     /// Number of ticks since last periodic heartbeat.
     since_heartbeat: Ticks,
 }
@@ -28,7 +47,7 @@ impl Leader {
     pub fn new(peers: HashSet<NodeID>, last_index: Index) -> Self {
         let next = last_index + 1;
         let progress = peers.into_iter().map(|p| (p, Progress { next, last: 0 })).collect();
-        Self { progress, since_heartbeat: 0 }
+        Self { progress, writes: HashMap::new(), since_heartbeat: 0 }
     }
 }
 
@@ -53,9 +72,18 @@ impl RawNode<Leader> {
         assert!(term > self.term, "Can only become follower in later term");
 
         info!("Discovered new term {}", term);
+
+        // Cancel in-flight requests.
+        self.state_tx.send(Instruction::Abort)?;
+        for write in std::mem::take(&mut self.role.writes).into_values() {
+            self.send(
+                write.from,
+                Event::ClientResponse { id: write.id, response: Err(Error::Abort) },
+            )?;
+        }
+
         self.term = term;
         self.log.set_term(term, None)?;
-        self.state_tx.send(Instruction::Abort)?;
         Ok(self.into_role(Follower::new(None, None)))
     }
 
@@ -149,8 +177,11 @@ impl RawNode<Leader> {
                 self.heartbeat()?;
             }
 
+            // A client submitted a write command. Propose it, and track it
+            // until it's applied and the response is returned to the client.
             Event::ClientRequest { id, request: Request::Mutate(command) } => {
                 let index = self.propose(Some(command))?;
+                self.role.writes.insert(index, Write { from: msg.from, id: id.clone() });
                 self.state_tx.send(Instruction::Notify { id, address: msg.from, index })?;
                 if self.peers.is_empty() {
                     self.maybe_commit()?;
@@ -261,6 +292,8 @@ impl RawNode<Leader> {
             // TODO: Move application elsewhere, but needs access to applied index.
             let mut scan = self.log.scan((prev_commit_index + 1)..=commit_index)?;
             while let Some(entry) = scan.next().transpose()? {
+                // TODO: Send response.
+                self.role.writes.remove(&entry.index);
                 self.state_tx.send(Instruction::Apply { entry })?;
             }
         }
