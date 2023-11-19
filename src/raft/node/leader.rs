@@ -95,7 +95,7 @@ impl RoleNode<Leader> {
         };
         let entries = self.log.scan(peer_next..)?.collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
-        self.send(Address::Node(peer), Event::ReplicateEntries { base_index, base_term, entries })?;
+        self.send(Address::Node(peer), Event::AppendEntries { base_index, base_term, entries })?;
         Ok(())
     }
 
@@ -113,14 +113,14 @@ impl RoleNode<Leader> {
 
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
-        // ReplicateEntries from the leader, stepping it will follow the leader.
+        // AppendEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
             return self.become_follower(msg.term)?.step(msg);
         }
 
         match msg.event {
             // There can't be two leaders in the same term.
-            Event::Heartbeat { .. } | Event::ReplicateEntries { .. } => {
+            Event::Heartbeat { .. } | Event::AppendEntries { .. } => {
                 panic!("Saw other leader {} in term {}", msg.from.unwrap(), msg.term);
             }
 
@@ -308,7 +308,7 @@ mod tests {
                 from: Address::Node(1),
                 to: Address::Node(2),
                 term: 3,
-                event: Event::ReplicateEntries { base_index: 5, base_term: 3, entries: vec![] },
+                event: Event::AppendEntries { base_index: 5, base_term: 3, entries: vec![] },
             }],
         );
         assert_messages(
@@ -535,7 +535,7 @@ mod tests {
                     from: Address::Node(1),
                     to: Address::Node(2),
                     term: 3,
-                    event: Event::ReplicateEntries {
+                    event: Event::AppendEntries {
                         base_index: index as Index,
                         base_term: if index > 0 {
                             entries.get(index - 1).map(|e| e.term).unwrap()
@@ -616,7 +616,7 @@ mod tests {
                     from: Address::Node(1),
                     to: Address::Node(peer),
                     term: 3,
-                    event: Event::ReplicateEntries {
+                    event: Event::AppendEntries {
                         base_index: 5,
                         base_term: 3,
                         entries: vec![Entry { index: 6, term: 3, command: Some(vec![0xaf]) },]

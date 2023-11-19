@@ -86,7 +86,7 @@ impl RoleNode<Candidate> {
 
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
-        // ReplicateEntries from the leader, stepping it will follow the leader.
+        // AppendEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
             return self.become_follower(msg.term, None)?.step(msg);
         }
@@ -95,7 +95,7 @@ impl RoleNode<Candidate> {
             // If we receive a heartbeat or replicated entries in this term, we
             // lost the election and have a new leader. Follow it and process
             // the message.
-            Event::Heartbeat { .. } | Event::ReplicateEntries { .. } => {
+            Event::Heartbeat { .. } | Event::AppendEntries { .. } => {
                 return self.become_follower(msg.term, Some(msg.from.unwrap()))?.step(msg);
             }
 
@@ -292,7 +292,7 @@ mod tests {
                     from: Address::Node(1),
                     to: Address::Node(to),
                     term: 3,
-                    event: Event::ReplicateEntries {
+                    event: Event::AppendEntries {
                         base_index: 3,
                         base_term: 2,
                         entries: vec![Entry { index: 4, term: 3, command: None }],

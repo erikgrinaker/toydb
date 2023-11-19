@@ -67,8 +67,8 @@ pub enum Event {
     },
     /// Followers may grant votes to candidates.
     GrantVote,
-    /// Leaders replicate a set of log entries to followers.
-    ReplicateEntries {
+    /// Leaders replicate log entries to followers by appending it to their log.
+    AppendEntries {
         /// The index of the log entry immediately preceding the submitted commands.
         base_index: Index,
         /// The term of the log entry immediately preceding the submitted commands.

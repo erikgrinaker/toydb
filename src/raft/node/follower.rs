@@ -95,7 +95,7 @@ impl RoleNode<Follower> {
 
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
-        // ReplicateEntries from the leader, stepping it will follow the leader.
+        // AppendEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
             return self.become_follower(None, msg.term)?.step(msg);
         }
@@ -132,7 +132,7 @@ impl RoleNode<Follower> {
 
             // Replicate entries from the leader. If we don't have a leader in
             // this term yet, follow it.
-            Event::ReplicateEntries { base_index, base_term, entries } => {
+            Event::AppendEntries { base_index, base_term, entries } => {
                 // Check that the entries are from our leader.
                 let from = msg.from.unwrap();
                 match self.role.leader {
@@ -554,8 +554,8 @@ pub mod tests {
     }
 
     #[test]
-    // ReplicateEntries accepts some entries at base 0 without changes
-    fn step_replicateentries_base0() -> Result<()> {
+    // AppendEntries accepts some entries at base 0 without changes
+    fn step_appendentries_base0() -> Result<()> {
         // TODO: Move this into a setup function.
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
         let (state_tx, mut state_rx) = mpsc::unbounded_channel();
@@ -579,7 +579,7 @@ pub mod tests {
             from: Address::Node(2),
             to: Address::Node(1),
             term: 3,
-            event: Event::ReplicateEntries {
+            event: Event::AppendEntries {
                 base_index: 0,
                 base_term: 0,
                 entries: vec![
@@ -606,14 +606,14 @@ pub mod tests {
     }
 
     #[test]
-    // ReplicateEntries appends entries but does not commit them
-    fn step_replicateentries_append() -> Result<()> {
+    // AppendEntries appends entries but does not commit them
+    fn step_appendentries_append() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
             from: Address::Node(2),
             to: Address::Node(1),
             term: 3,
-            event: Event::ReplicateEntries {
+            event: Event::AppendEntries {
                 base_index: 3,
                 base_term: 2,
                 entries: vec![
@@ -643,14 +643,14 @@ pub mod tests {
     }
 
     #[test]
-    // ReplicateEntries accepts partially overlapping entries
-    fn step_replicateentries_partial_overlap() -> Result<()> {
+    // AppendEntries accepts partially overlapping entries
+    fn step_appendentries_partial_overlap() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
             from: Address::Node(2),
             to: Address::Node(1),
             term: 3,
-            event: Event::ReplicateEntries {
+            event: Event::AppendEntries {
                 base_index: 1,
                 base_term: 1,
                 entries: vec![
@@ -679,14 +679,14 @@ pub mod tests {
     }
 
     #[test]
-    // ReplicateEntries replaces conflicting entries
-    fn step_replicateentries_replace() -> Result<()> {
+    // AppendEntries replaces conflicting entries
+    fn step_appendentries_replace() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
             from: Address::Node(2),
             to: Address::Node(1),
             term: 3,
-            event: Event::ReplicateEntries {
+            event: Event::AppendEntries {
                 base_index: 2,
                 base_term: 1,
                 entries: vec![
@@ -715,14 +715,14 @@ pub mod tests {
     }
 
     #[test]
-    // ReplicateEntries replaces partially conflicting entries
-    fn step_replicateentries_replace_partial() -> Result<()> {
+    // AppendEntries replaces partially conflicting entries
+    fn step_appendentries_replace_partial() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
             from: Address::Node(2),
             to: Address::Node(1),
             term: 3,
-            event: Event::ReplicateEntries {
+            event: Event::AppendEntries {
                 base_index: 2,
                 base_term: 1,
                 entries: vec![
@@ -751,14 +751,14 @@ pub mod tests {
     }
 
     #[test]
-    // ReplicateEntries rejects missing base index
-    fn step_replicateentries_reject_missing_base_index() -> Result<()> {
+    // AppendEntries rejects missing base index
+    fn step_appendentries_reject_missing_base_index() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
             from: Address::Node(2),
             to: Address::Node(1),
             term: 3,
-            event: Event::ReplicateEntries {
+            event: Event::AppendEntries {
                 base_index: 5,
                 base_term: 2,
                 entries: vec![Entry { index: 6, term: 3, command: Some(vec![0x04]) }],
@@ -783,14 +783,14 @@ pub mod tests {
     }
 
     #[test]
-    // ReplicateEntries rejects conflicting base term
-    fn step_replicateentries_reject_missing_base_term() -> Result<()> {
+    // AppendEntries rejects conflicting base term
+    fn step_appendentries_reject_missing_base_term() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = follower.step(Message {
             from: Address::Node(2),
             to: Address::Node(1),
             term: 3,
-            event: Event::ReplicateEntries {
+            event: Event::AppendEntries {
                 base_index: 1,
                 base_term: 2,
                 entries: vec![Entry { index: 2, term: 3, command: Some(vec![0x04]) }],
