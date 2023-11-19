@@ -76,7 +76,7 @@ impl Node {
         if node.peers.is_empty() {
             info!("No peers specified, starting as leader");
             let (last_index, _) = node.log.get_last_index();
-            Ok(node.become_role(Leader::new(vec![], last_index))?.into())
+            Ok(node.become_role(Leader::new(vec![], last_index)).into())
         } else {
             Ok(node.into())
         }
@@ -144,8 +144,8 @@ pub struct RoleNode<R> {
 
 impl<R> RoleNode<R> {
     /// Transforms the node into another role.
-    fn become_role<T>(self, role: T) -> Result<RoleNode<T>> {
-        Ok(RoleNode {
+    fn become_role<T>(self, role: T) -> RoleNode<T> {
+        RoleNode {
             id: self.id,
             peers: self.peers,
             term: self.term,
@@ -154,7 +154,7 @@ impl<R> RoleNode<R> {
             state_tx: self.state_tx,
             proxied_reqs: self.proxied_reqs,
             role,
-        })
+        }
     }
 
     /// Aborts any proxied requests.
@@ -177,33 +177,42 @@ impl<R> RoleNode<R> {
         Ok(self.node_tx.send(msg)?)
     }
 
-    /// Validates a message
+    /// Validates a message, when stepping it.
     fn validate(&self, msg: &Message) -> Result<()> {
+        // Messages must be addressed to the local node, or a broadcast.
+        match msg.to {
+            Address::Broadcast => {}
+            Address::Client => return Err(Error::Internal("Received message for client".into())),
+            Address::Node(id) if id == self.id => {}
+            Address::Node(_) => {
+                return Err(Error::Internal("Received message for other node".into()))
+            }
+        }
+
         match msg.from {
+            // The broadcast address can't send anything.
             Address::Broadcast => {
                 return Err(Error::Internal("Message from broadcast address".into()))
             }
-            Address::Client if !matches!(msg.event, Event::ClientRequest { .. }) => {
-                return Err(Error::Internal("Non-request message from client".into()));
+            // Clients can only send ClientRequest without a term.
+            Address::Client => {
+                if msg.term > 0 {
+                    return Err(Error::Internal("Client message with term".into()));
+                }
+                if !matches!(msg.event, Event::ClientRequest { .. }) {
+                    return Err(Error::Internal("Non-request message from client".into()));
+                }
             }
-            _ => {}
-        }
-
-        // Allowing requests and responses form past terms is fine, since they don't rely on it
-        if msg.term < self.term
-            && !matches!(msg.event, Event::ClientRequest { .. } | Event::ClientResponse { .. })
-        {
-            return Err(Error::Internal(format!("Message from past term {}", msg.term)));
-        }
-
-        match msg.to {
-            Address::Node(id) if id == self.id => Ok(()),
-            Address::Broadcast => Ok(()),
-            Address::Node(id) => {
-                Err(Error::Internal(format!("Received message for other node {}", id)))
+            // Nodes must include their term.
+            Address::Node(_) => {
+                // TODO: For now, accept ClientResponse without term, since the
+                // state driver does not have access to it.
+                if msg.term == 0 && !matches!(msg.event, Event::ClientResponse { .. }) {
+                    return Err(Error::Internal("Message without term".into()));
+                }
             }
-            Address::Client => Err(Error::Internal("Received message for client".into())),
         }
+        Ok(())
     }
 }
 
@@ -333,9 +342,9 @@ mod tests {
             assert_eq!(
                 saved_voted_for,
                 match self.node {
-                    Node::Candidate(_) => None,
+                    Node::Candidate(n) => Some(n.id),
                     Node::Follower(n) => follower_voted_for(n),
-                    Node::Leader(_) => None,
+                    Node::Leader(n) => Some(n.id),
                 },
                 "Incorrect voted_for stored in log"
             );
@@ -482,7 +491,7 @@ mod tests {
     #[test]
     fn become_role() -> Result<()> {
         let (node, _) = setup_rolenode()?;
-        let new = node.become_role("role")?;
+        let new = node.become_role("role");
         assert_eq!(new.id, 1);
         assert_eq!(new.term, 1);
         assert_eq!(new.peers, vec![2, 3]);

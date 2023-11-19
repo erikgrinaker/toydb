@@ -2,7 +2,7 @@ use super::super::{Address, Event, Instruction, Message, Response};
 use super::{Candidate, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
 use crate::error::{Error, Result};
 
-use ::log::{debug, info, warn};
+use ::log::{debug, error, info, warn};
 use rand::Rng as _;
 
 // A follower replicates state from a leader.
@@ -36,62 +36,117 @@ impl RoleNode<Follower> {
     fn become_candidate(self) -> Result<RoleNode<Candidate>> {
         info!("Starting election for term {}", self.term + 1);
         let (last_index, last_term) = self.log.get_last_index();
-        let mut node = self.become_role(Candidate::new())?;
+        let mut node = self.become_role(Candidate::new());
         node.term += 1;
-        node.log.set_term(node.term, None)?;
+        node.log.set_term(node.term, Some(node.id))?;
         node.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
         Ok(node)
     }
 
-    /// Transforms the node into a follower for a new leader.
-    fn become_follower(mut self, leader: NodeID, term: Term) -> Result<RoleNode<Follower>> {
-        let mut voted_for = None;
-        if term > self.term {
-            info!("Discovered new term {}, following leader {}", term, leader);
+    /// Transforms the node into a follower, either a leaderless follower in a
+    /// new term or following a leader in the current term.
+    fn become_follower(mut self, leader: Option<NodeID>, term: Term) -> Result<RoleNode<Follower>> {
+        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+
+        if let Some(leader) = leader {
+            // We found a leader in the current term.
+            assert_eq!(self.role.leader, None, "Already have leader in term");
+            assert_eq!(term, self.term, "Can't follow leader in different term");
+            info!("Following leader {} in term {}", leader, term);
+            self.role = Follower::new(Some(leader), self.role.voted_for);
+        } else {
+            // We found a new term, but we don't necessarily know who the leader
+            // is yet. We'll find out when we step a message from it.
+            assert_ne!(term, self.term, "Can't become leaderless follower in current term");
+            info!("Discovered new term {}", term);
             self.term = term;
             self.log.set_term(term, None)?;
-        } else {
-            info!("Discovered leader {}, following", leader);
-            voted_for = self.role.voted_for;
-        };
-        self.role = Follower::new(Some(leader), voted_for);
+            self.role = Follower::new(None, None);
+        }
+        // Abort any proxied requests.
+        //
+        // TODO: Move this into the new term branch, and assert that there are
+        // no proxied requests in the new leader branch.
         self.abort_proxied()?;
         Ok(self)
     }
 
-    /// Checks if an address is the current leader
+    /// Checks if an address is the current leader.
     fn is_leader(&self, from: &Address) -> bool {
-        matches!((&self.role.leader, from), (Some(leader), Address::Node(from)) if leader == from)
+        if let Some(leader) = &self.role.leader {
+            if let Address::Node(from) = from {
+                return leader == from;
+            }
+        }
+        false
     }
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
+        // Drop invalid messages and messages from past terms.
         if let Err(err) = self.validate(&msg) {
-            warn!("Ignoring invalid message: {}", err);
+            error!("Invalid message: {} ({:?})", err, msg);
             return Ok(self.into());
         }
-        if let Address::Node(from) = msg.from {
-            if msg.term > self.term || self.role.leader.is_none() {
-                return self.become_follower(from, msg.term)?.step(msg);
-            }
+        if msg.term < self.term && msg.term > 0 {
+            debug!("Dropping message from past term ({:?})", msg);
+            return Ok(self.into());
         }
+
+        // If we receive a message for a future term, become a leaderless
+        // follower in it and step the message. If the message is a Heartbeat or
+        // ReplicateEntries from the leader, stepping it will follow the leader.
+        if msg.term > self.term {
+            return self.become_follower(None, msg.term)?.step(msg);
+        }
+
+        // Record when we last saw a message from the leader (if any).
         if self.is_leader(&msg.from) {
             self.role.leader_seen_ticks = 0
         }
 
         match msg.event {
+            // The leader will send periodic heartbeats. If we don't have a
+            // leader in this term yet, follow it. If the commit_index advances,
+            // apply state transitions.
             Event::Heartbeat { commit_index, commit_term } => {
-                if self.is_leader(&msg.from) {
-                    let has_committed = self.log.has(commit_index, commit_term)?;
-                    let (old_commit_index, _) = self.log.get_commit_index();
-                    if has_committed && commit_index > old_commit_index {
-                        self.log.commit(commit_index)?;
-                        let mut scan = self.log.scan((old_commit_index + 1)..=commit_index)?;
-                        while let Some(entry) = scan.next().transpose()? {
-                            self.state_tx.send(Instruction::Apply { entry })?;
-                        }
+                // Check that the heartbeat is from our leader.
+                let from = msg.from.unwrap();
+                match self.role.leader {
+                    Some(leader) => assert_eq!(from, leader, "Multiple leaders in term"),
+                    None => self = self.become_follower(Some(from), msg.term)?,
+                }
+
+                // Advance commit index and apply entries if possible.
+                let has_committed = self.log.has(commit_index, commit_term)?;
+                let (old_commit_index, _) = self.log.get_commit_index();
+                if has_committed && commit_index > old_commit_index {
+                    self.log.commit(commit_index)?;
+                    let mut scan = self.log.scan((old_commit_index + 1)..=commit_index)?;
+                    while let Some(entry) = scan.next().transpose()? {
+                        self.state_tx.send(Instruction::Apply { entry })?;
                     }
-                    self.send(msg.from, Event::ConfirmLeader { commit_index, has_committed })?;
+                }
+                self.send(msg.from, Event::ConfirmLeader { commit_index, has_committed })?;
+            }
+
+            // Replicate entries from the leader. If we don't have a leader in
+            // this term yet, follow it.
+            Event::ReplicateEntries { base_index, base_term, entries } => {
+                // Check that the entries are from our leader.
+                let from = msg.from.unwrap();
+                match self.role.leader {
+                    Some(leader) => assert_eq!(from, leader, "Multiple leaders in term"),
+                    None => self = self.become_follower(Some(from), msg.term)?,
+                }
+
+                // Append the entries, if possible.
+                if base_index > 0 && !self.log.has(base_index, base_term)? {
+                    debug!("Rejecting log entries at base {}", base_index);
+                    self.send(msg.from, Event::RejectEntries)?
+                } else {
+                    let last_index = self.log.splice(entries)?;
+                    self.send(msg.from, Event::AcceptEntries { last_index })?
                 }
             }
 
@@ -113,18 +168,6 @@ impl RoleNode<Follower> {
                     self.send(Address::Node(from), Event::GrantVote)?;
                     self.log.set_term(self.term, Some(from))?;
                     self.role.voted_for = Some(from);
-                }
-            }
-
-            Event::ReplicateEntries { base_index, base_term, entries } => {
-                if self.is_leader(&msg.from) {
-                    if base_index > 0 && !self.log.has(base_index, base_term)? {
-                        debug!("Rejecting log entries at base {}", base_index);
-                        self.send(msg.from, Event::RejectEntries)?
-                    } else {
-                        let last_index = self.log.splice(entries)?;
-                        self.send(msg.from, Event::AcceptEntries { last_index })?
-                    }
                 }
             }
 
@@ -150,6 +193,7 @@ impl RoleNode<Follower> {
             // Ignore votes which are usually strays from the previous election that we lost.
             Event::GrantVote => {}
 
+            // We're not a leader in this term, so we shoudn't see these.
             Event::ConfirmLeader { .. }
             | Event::AcceptEntries { .. }
             | Event::RejectEntries { .. } => warn!("Received unexpected message {:?}", msg),
@@ -292,19 +336,18 @@ pub mod tests {
     }
 
     #[test]
-    // Heartbeat from fake leader
-    fn step_heartbeat_fake_leader() -> Result<()> {
-        let (follower, mut node_rx, mut state_rx) = setup()?;
-        let mut node = follower.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
-            term: 3,
-            event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
-        })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
-        assert_messages(&mut node_rx, vec![]);
-        assert_messages(&mut state_rx, vec![]);
-        Ok(())
+    #[should_panic(expected = "Multiple leaders in term")]
+    // Heartbeat from other leader should panic.
+    fn step_heartbeat_fake_leader() {
+        let (follower, _, _) = setup().unwrap();
+        follower
+            .step(Message {
+                from: Address::Node(3),
+                to: Address::Node(1),
+                term: 3,
+                event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
+            })
+            .unwrap();
     }
 
     #[test]

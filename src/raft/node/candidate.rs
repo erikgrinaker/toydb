@@ -4,7 +4,7 @@ use super::{
 };
 use crate::error::{Error, Result};
 
-use ::log::{debug, info, warn};
+use ::log::{debug, error, info, warn};
 use rand::Rng as _;
 
 /// A candidate is campaigning to become a leader.
@@ -31,12 +31,30 @@ impl Candidate {
 }
 
 impl RoleNode<Candidate> {
-    /// Transition to follower role.
-    fn become_follower(mut self, term: Term, leader: NodeID) -> Result<RoleNode<Follower>> {
-        info!("Discovered leader {} for term {}, following", leader, term);
-        self.term = term;
-        self.log.set_term(term, None)?;
-        let mut node = self.become_role(Follower::new(Some(leader), None))?;
+    /// Transforms the node into a follower. We either lost the election
+    /// and follow the winner, or we discovered a new term in which case
+    /// we step into it as a leaderless follower.
+    fn become_follower(mut self, term: Term, leader: Option<NodeID>) -> Result<RoleNode<Follower>> {
+        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+
+        let mut node = if let Some(leader) = leader {
+            // We lost the election, follow the winner.
+            assert_eq!(term, self.term, "Can't follow leader in different term");
+            info!("Lost election, following leader {} in term {}", leader, term);
+            let voted_for = Some(self.id); // by definition
+            self.become_role(Follower::new(Some(leader), voted_for))
+        } else {
+            // We found a new term, but we don't necessarily know who the leader
+            // is yet. We'll find out when we step a message from it.
+            assert_ne!(term, self.term, "Can't become leaderless follower in current term");
+            info!("Discovered new term {}", term);
+            self.term = term;
+            self.log.set_term(term, None)?;
+            self.become_role(Follower::new(None, None))
+        };
+        // Abort any proxied requests.
+        //
+        // TODO: Candidates shouldn't proxy requests.
         node.abort_proxied()?;
         Ok(node)
     }
@@ -47,7 +65,7 @@ impl RoleNode<Candidate> {
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last_index();
         let (commit_index, commit_term) = self.log.get_commit_index();
-        let mut node = self.become_role(Leader::new(peers, last_index))?;
+        let mut node = self.become_role(Leader::new(peers, last_index));
         node.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
         node.append(None)?;
         node.abort_proxied()?;
@@ -56,21 +74,29 @@ impl RoleNode<Candidate> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
+        // Drop invalid messages and messages from past terms.
         if let Err(err) = self.validate(&msg) {
-            warn!("Ignoring invalid message: {}", err);
+            error!("Invalid message: {} ({:?})", err, msg);
             return Ok(self.into());
         }
+        if msg.term < self.term && msg.term > 0 {
+            debug!("Dropping message from past term ({:?})", msg);
+            return Ok(self.into());
+        }
+
+        // If we receive a message for a future term, become a leaderless
+        // follower in it and step the message. If the message is a Heartbeat or
+        // ReplicateEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
-            if let Address::Node(from) = msg.from {
-                return self.become_follower(msg.term, from)?.step(msg);
-            }
+            return self.become_follower(msg.term, None)?.step(msg);
         }
 
         match msg.event {
-            Event::Heartbeat { .. } => {
-                if let Address::Node(from) = msg.from {
-                    return self.become_follower(msg.term, from)?.step(msg);
-                }
+            // If we receive a heartbeat or replicated entries in this term, we
+            // lost the election and have a new leader. Follow it and process
+            // the message.
+            Event::Heartbeat { .. } | Event::ReplicateEntries { .. } => {
+                return self.become_follower(msg.term, Some(msg.from.unwrap()))?.step(msg);
             }
 
             Event::GrantVote => {
@@ -97,8 +123,8 @@ impl RoleNode<Candidate> {
             // Ignore other candidates when we're also campaigning
             Event::SolicitVote { .. } => {}
 
+            // We're not a leader in this term, so we shoudn't see these.
             Event::ConfirmLeader { .. }
-            | Event::ReplicateEntries { .. }
             | Event::AcceptEntries { .. }
             | Event::RejectEntries { .. } => warn!("Received unexpected message {:?}", msg),
         }
@@ -113,7 +139,7 @@ impl RoleNode<Candidate> {
             info!("Election timed out, starting new election for term {}", self.term + 1);
             let (last_index, last_term) = self.log.get_last_index();
             self.term += 1;
-            self.log.set_term(self.term, None)?;
+            self.log.set_term(self.term, Some(self.id))?;
             self.role = Candidate::new();
             self.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
         }
@@ -143,7 +169,7 @@ mod tests {
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
         log.commit(2)?;
-        log.set_term(3, None)?;
+        log.set_term(3, Some(1))?;
 
         let node = RoleNode {
             id: 1,

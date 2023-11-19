@@ -251,6 +251,7 @@ impl Driver {
 
     /// Sends a message.
     fn send(&self, to: Address, event: Event) -> Result<()> {
+        // TODO: This needs to use the correct term.
         let msg = Message { from: Address::Node(self.node_id), to, term: 0, event };
         debug!("Sending {:?}", msg);
         Ok(self.node_tx.send(msg)?)

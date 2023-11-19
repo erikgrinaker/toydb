@@ -2,7 +2,7 @@ use super::super::{Address, Event, Index, Instruction, Message, Request, Respons
 use super::{Follower, Node, NodeID, RoleNode, Term, HEARTBEAT_INTERVAL};
 use crate::error::{Error, Result};
 
-use ::log::{debug, info, warn};
+use ::log::{debug, error, info};
 use std::collections::HashMap;
 
 // A leader serves requests and replicates the log to followers.
@@ -33,13 +33,17 @@ impl Leader {
 }
 
 impl RoleNode<Leader> {
-    /// Transforms the leader into a follower
-    fn become_follower(mut self, term: Term, leader: NodeID) -> Result<RoleNode<Follower>> {
-        info!("Discovered new leader {} for term {}, following", leader, term);
+    /// Transforms the leader into a follower. This can only happen if we find a
+    /// new term, so we become a leaderless follower.
+    fn become_follower(mut self, term: Term) -> Result<RoleNode<Follower>> {
+        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+        assert!(term > self.term, "Can only become follower in later term");
+
+        info!("Discovered new term {}", term);
         self.term = term;
         self.log.set_term(term, None)?;
         self.state_tx.send(Instruction::Abort)?;
-        self.become_role(Follower::new(Some(leader), None))
+        Ok(self.become_role(Follower::new(None, None)))
     }
 
     /// Appends an entry to the log and replicates it to peers.
@@ -97,17 +101,29 @@ impl RoleNode<Leader> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
+        // Drop invalid messages and messages from past terms.
         if let Err(err) = self.validate(&msg) {
-            warn!("Ignoring invalid message: {}", err);
+            error!("Invalid message: {} ({:?})", err, msg);
             return Ok(self.into());
         }
+        if msg.term < self.term && msg.term > 0 {
+            debug!("Dropping message from past term ({:?})", msg);
+            return Ok(self.into());
+        }
+
+        // If we receive a message for a future term, become a leaderless
+        // follower in it and step the message. If the message is a Heartbeat or
+        // ReplicateEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
-            if let Address::Node(from) = msg.from {
-                return self.become_follower(msg.term, from)?.step(msg);
-            }
+            return self.become_follower(msg.term)?.step(msg);
         }
 
         match msg.event {
+            // There can't be two leaders in the same term.
+            Event::Heartbeat { .. } | Event::ReplicateEntries { .. } => {
+                panic!("Saw other leader {} in term {}", msg.from.unwrap(), msg.term);
+            }
+
             Event::ConfirmLeader { commit_index, has_committed } => {
                 if let Address::Node(from) = msg.from {
                     self.state_tx.send(Instruction::Vote {
@@ -191,13 +207,8 @@ impl RoleNode<Leader> {
                 self.send(Address::Client, Event::ClientResponse { id, response })?;
             }
 
-            // We ignore these messages, since they are typically additional votes from the previous
-            // election that we won after a quorum.
+            // Votes can come in after we won the election, ignore them.
             Event::SolicitVote { .. } | Event::GrantVote => {}
-
-            Event::Heartbeat { .. } | Event::ReplicateEntries { .. } => {
-                warn!("Received unexpected message {:?}", msg)
-            }
         }
 
         Ok(self.into())
@@ -242,7 +253,7 @@ mod tests {
         log.append(3, Some(vec![0x04]))?;
         log.append(3, Some(vec![0x05]))?;
         log.commit(2)?;
-        log.set_term(3, None)?;
+        log.set_term(3, Some(1))?;
 
         let node = RoleNode {
             id: 1,
@@ -308,21 +319,18 @@ mod tests {
     }
 
     #[test]
-    // Heartbeats from other leaders in current term are ignored.
-    fn step_heartbeat_current_term() -> Result<()> {
-        let (leader, mut node_rx, mut state_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        node = node.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
-            term: 3,
-            event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
-        })?;
-        assert_node(&mut node).is_leader().term(3).committed(2);
-        assert_messages(&mut node_rx, vec![]);
-        assert_messages(&mut state_rx, vec![]);
-        Ok(())
+    #[should_panic(expected = "Saw other leader 2 in term 3")]
+    // Heartbeats from other leaders in current term panics.
+    fn step_heartbeat_current_term() {
+        let (leader, _, _) = setup().unwrap();
+        leader
+            .step(Message {
+                from: Address::Node(2),
+                to: Address::Node(1),
+                term: 3,
+                event: Event::Heartbeat { commit_index: 5, commit_term: 3 },
+            })
+            .unwrap();
     }
 
     #[test]
@@ -654,7 +662,7 @@ mod tests {
                     commit_index: 2,
                     apply_index: 0,
                     storage: "memory".into(),
-                    storage_size: 71,
+                    storage_size: 72,
                 }),
             }],
         );

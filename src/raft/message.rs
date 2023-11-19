@@ -11,8 +11,19 @@ pub enum Address {
     /// A node with the specified node ID (local or remote). Valid both as
     /// sender and recipient.
     Node(NodeID),
-    /// A local client.
+    /// A local client. Can only send ClientRequest messages, and receive
+    /// ClientResponse messages.
     Client,
+}
+
+impl Address {
+    /// Unwraps the node ID, or panics if address is not of kind Node.
+    pub fn unwrap(&self) -> NodeID {
+        match self {
+            Self::Node(id) => *id,
+            _ => panic!("unwrap called on non-Node address {:?}", self),
+        }
+    }
 }
 
 /// A message passed between Raft nodes.
