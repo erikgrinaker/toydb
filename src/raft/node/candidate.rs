@@ -1,4 +1,4 @@
-use super::super::{Address, Event, Message, Response};
+use super::super::{Address, Event, Message};
 use super::{
     Follower, Leader, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN,
 };
@@ -37,12 +37,12 @@ impl RoleNode<Candidate> {
     fn become_follower(mut self, term: Term, leader: Option<NodeID>) -> Result<RoleNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
 
-        let mut node = if let Some(leader) = leader {
+        if let Some(leader) = leader {
             // We lost the election, follow the winner.
             assert_eq!(term, self.term, "Can't follow leader in different term");
             info!("Lost election, following leader {} in term {}", leader, term);
             let voted_for = Some(self.id); // by definition
-            self.become_role(Follower::new(Some(leader), voted_for))
+            Ok(self.become_role(Follower::new(Some(leader), voted_for)))
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
@@ -50,13 +50,8 @@ impl RoleNode<Candidate> {
             info!("Discovered new term {}", term);
             self.term = term;
             self.log.set_term(term, None)?;
-            self.become_role(Follower::new(None, None))
-        };
-        // Abort any proxied requests.
-        //
-        // TODO: Candidates shouldn't proxy requests.
-        node.abort_proxied()?;
-        Ok(node)
+            Ok(self.become_role(Follower::new(None, None)))
+        }
     }
 
     /// Transition to leader role.
@@ -68,7 +63,6 @@ impl RoleNode<Candidate> {
         let mut node = self.become_role(Leader::new(peers, last_index));
         node.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
         node.append(None)?;
-        node.abort_proxied()?;
         Ok(node)
     }
 
@@ -112,21 +106,15 @@ impl RoleNode<Candidate> {
                 self.send(msg.from, Event::ClientResponse { id, response: Err(Error::Abort) })?;
             }
 
-            Event::ClientResponse { id, mut response } => {
-                if let Ok(Response::Status(ref mut status)) = response {
-                    status.server = self.id;
-                }
-                self.proxied_reqs.remove(&id);
-                self.send(Address::Client, Event::ClientResponse { id, response })?;
-            }
-
             // Ignore other candidates when we're also campaigning
             Event::SolicitVote { .. } => {}
 
-            // We're not a leader in this term, so we shoudn't see these.
+            // We're not a leader in this term, nor are we forwarding requests,
+            // so we shouldn't see these.
             Event::ConfirmLeader { .. }
             | Event::AcceptEntries { .. }
-            | Event::RejectEntries { .. } => warn!("Received unexpected message {:?}", msg),
+            | Event::RejectEntries { .. }
+            | Event::ClientResponse { .. } => warn!("Received unexpected message {:?}", msg),
         }
         Ok(self.into())
     }
@@ -153,7 +141,6 @@ mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
-    use std::collections::HashMap;
     use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
@@ -178,7 +165,6 @@ mod tests {
             log,
             node_tx,
             state_tx,
-            proxied_reqs: HashMap::new(),
             role: Candidate::new(),
         };
         Ok((node, node_rx, state_rx))

@@ -29,13 +29,14 @@ impl Address {
 /// A message passed between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
-    /// The current term of the sender.
+    /// The current term of the sender. Must be set, unless the sender is
+    /// Address::Client, in which case it must be 0.
     pub term: Term,
     /// The sender address.
     pub from: Address,
     /// The recipient address.
     pub to: Address,
-    /// The message event.
+    /// The message payload.
     pub event: Event,
 }
 
@@ -83,21 +84,30 @@ pub enum Event {
     },
     /// Followers may also reject a set of log entries from a leader.
     RejectEntries,
-    /// A client request.
+
+    /// A client request. This can be submitted to the leader, or to a follower
+    /// which will forward it to its leader. If there is no leader, or the
+    /// leader or term changes, the request is aborted with an Error::Abort
+    /// ClientResponse and the client must retry.
     ClientRequest {
-        /// The request ID.
-        id: Vec<u8>,
+        /// The request ID. This is arbitrary, but must be globally unique for
+        /// the duration of the request.
+        id: RequestID,
         /// The request.
         request: Request,
     },
+
     /// A client response.
     ClientResponse {
-        /// The response ID.
-        id: Vec<u8>,
-        /// The response.
+        /// The response ID. This matches the ID of the ClientRequest.
+        id: RequestID,
+        /// The response, or an error.
         response: Result<Response>,
     },
 }
+
+/// A client request ID.
+pub type RequestID = Vec<u8>;
 
 /// A client request.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

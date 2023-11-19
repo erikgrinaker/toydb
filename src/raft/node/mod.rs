@@ -70,7 +70,6 @@ impl Node {
             log,
             node_tx,
             state_tx,
-            proxied_reqs: HashMap::new(),
             role: Follower::new(None, voted_for),
         };
         if node.peers.is_empty() {
@@ -137,8 +136,6 @@ pub struct RoleNode<R> {
     log: Log,
     node_tx: mpsc::UnboundedSender<Message>,
     state_tx: mpsc::UnboundedSender<Instruction>,
-    /// Keeps track of proxied client requests, to abort on new leader election.
-    proxied_reqs: HashMap<Vec<u8>, Address>,
     role: R,
 }
 
@@ -152,17 +149,8 @@ impl<R> RoleNode<R> {
             log: self.log,
             node_tx: self.node_tx,
             state_tx: self.state_tx,
-            proxied_reqs: self.proxied_reqs,
             role,
         }
-    }
-
-    /// Aborts any proxied requests.
-    fn abort_proxied(&mut self) -> Result<()> {
-        for (id, address) in std::mem::take(&mut self.proxied_reqs) {
-            self.send(address, Event::ClientResponse { id, response: Err(Error::Abort) })?;
-        }
-        Ok(())
     }
 
     /// Returns the quorum size of the cluster.
@@ -219,11 +207,12 @@ impl<R> RoleNode<R> {
 #[cfg(test)]
 mod tests {
     pub use super::super::state::tests::TestState;
-    use super::super::Entry;
+    use super::super::{Entry, RequestID};
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
     use crate::storage;
     use pretty_assertions::assert_eq;
+    use std::collections::HashSet;
     use tokio::sync::mpsc;
 
     pub fn assert_messages<T: std::fmt::Debug + PartialEq>(
@@ -315,13 +304,13 @@ mod tests {
             self
         }
 
-        pub fn proxied(self, proxied: Vec<(Vec<u8>, Address)>) -> Self {
+        pub fn forwarded(self, forwarded: Vec<RequestID>) -> Self {
             assert_eq!(
-                &proxied.into_iter().collect::<HashMap<Vec<u8>, Address>>(),
+                forwarded.into_iter().collect::<HashSet<RequestID>>(),
                 match self.node {
-                    Node::Candidate(n) => &n.proxied_reqs,
-                    Node::Follower(n) => &n.proxied_reqs,
-                    Node::Leader(n) => &n.proxied_reqs,
+                    Node::Candidate(_) => HashSet::new(),
+                    Node::Follower(n) => n.role.forwarded.clone(),
+                    Node::Leader(_) => HashSet::new(),
                 }
             );
             self
@@ -388,7 +377,6 @@ mod tests {
             log: Log::new(Box::new(storage::engine::Memory::new()), false)?,
             node_tx,
             state_tx,
-            proxied_reqs: HashMap::new(),
         };
         Ok((node, node_rx))
     }

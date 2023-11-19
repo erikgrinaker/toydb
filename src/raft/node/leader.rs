@@ -263,7 +263,6 @@ mod tests {
             log,
             node_tx,
             state_tx,
-            proxied_reqs: HashMap::new(),
         };
         Ok((node, node_rx, state_rx))
     }

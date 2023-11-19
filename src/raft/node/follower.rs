@@ -1,9 +1,10 @@
-use super::super::{Address, Event, Instruction, Message, Response};
+use super::super::{Address, Event, Instruction, Message, RequestID, Response};
 use super::{Candidate, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info, warn};
 use rand::Rng as _;
+use std::collections::HashSet;
 
 // A follower replicates state from a leader.
 #[derive(Debug)]
@@ -16,6 +17,9 @@ pub struct Follower {
     leader_seen_timeout: u64,
     /// The node we voted for in the current term, if any.
     voted_for: Option<NodeID>,
+    // Local client requests that have been forwarded to the leader. These are
+    // aborted on leader/term changes.
+    pub(super) forwarded: HashSet<RequestID>,
 }
 
 impl Follower {
@@ -27,13 +31,17 @@ impl Follower {
             leader_seen_ticks: 0,
             leader_seen_timeout: rand::thread_rng()
                 .gen_range(ELECTION_TIMEOUT_MIN..=ELECTION_TIMEOUT_MAX),
+            forwarded: HashSet::new(),
         }
     }
 }
 
 impl RoleNode<Follower> {
     /// Transforms the node into a candidate.
-    fn become_candidate(self) -> Result<RoleNode<Candidate>> {
+    fn become_candidate(mut self) -> Result<RoleNode<Candidate>> {
+        // Abort any forwarded requests. These must be retried with new leader.
+        self.abort_forwarded()?;
+
         info!("Starting election for term {}", self.term + 1);
         let (last_index, last_term) = self.log.get_last_index();
         let mut node = self.become_role(Candidate::new());
@@ -47,6 +55,9 @@ impl RoleNode<Follower> {
     /// new term or following a leader in the current term.
     fn become_follower(mut self, leader: Option<NodeID>, term: Term) -> Result<RoleNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+
+        // Abort any forwarded requests. These must be retried with new leader.
+        self.abort_forwarded()?;
 
         if let Some(leader) = leader {
             // We found a leader in the current term.
@@ -63,11 +74,6 @@ impl RoleNode<Follower> {
             self.log.set_term(term, None)?;
             self.role = Follower::new(None, None);
         }
-        // Abort any proxied requests.
-        //
-        // TODO: Move this into the new term branch, and assert that there are
-        // no proxied requests in the new leader branch.
-        self.abort_proxied()?;
         Ok(self)
     }
 
@@ -83,6 +89,11 @@ impl RoleNode<Follower> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
+        // Assert invariants.
+        if self.role.leader.is_none() {
+            assert!(self.role.forwarded.is_empty(), "Leaderless follower has forwarded requests");
+        }
+
         // Drop invalid messages and messages from past terms.
         if let Err(err) = self.validate(&msg) {
             error!("Invalid message: {} ({:?})", err, msg);
@@ -171,23 +182,39 @@ impl RoleNode<Follower> {
                 }
             }
 
-            // Forward requests to the leader, or abort them if there is none.
+            // Forward client requests to the leader, or abort them if there is
+            // none (the client must retry).
             Event::ClientRequest { ref id, .. } => {
+                if msg.from != Address::Client {
+                    error!("Received client request from non-client {:?}", msg.from);
+                    return Ok(self.into());
+                }
+
                 let id = id.clone();
                 if let Some(leader) = self.role.leader {
-                    self.proxied_reqs.insert(id, msg.from);
+                    debug!("Forwarding request to leader {}: {:?}", leader, msg);
+                    self.role.forwarded.insert(id);
                     self.send(Address::Node(leader), msg.event)?
                 } else {
                     self.send(msg.from, Event::ClientResponse { id, response: Err(Error::Abort) })?
                 }
             }
 
+            // Returns client responses for forwarded requests.
             Event::ClientResponse { id, mut response } => {
+                if !self.is_leader(&msg.from) {
+                    error!("Received client response from non-leader {:?}", msg.from);
+                    return Ok(self.into());
+                }
+
+                // TODO: Get rid of this field, it should be returned at the RPC
+                // server level instead.
                 if let Ok(Response::Status(ref mut status)) = response {
                     status.server = self.id;
                 }
-                self.proxied_reqs.remove(&id);
-                self.send(Address::Client, Event::ClientResponse { id, response })?;
+                if self.role.forwarded.remove(&id) {
+                    self.send(Address::Client, Event::ClientResponse { id, response })?;
+                }
             }
 
             // Ignore votes which are usually strays from the previous election that we lost.
@@ -210,6 +237,15 @@ impl RoleNode<Follower> {
             Ok(self.into())
         }
     }
+
+    /// Aborts all forwarded requests.
+    fn abort_forwarded(&mut self) -> Result<()> {
+        for id in std::mem::take(&mut self.role.forwarded) {
+            debug!("Aborting forwarded request {:x?}", id);
+            self.send(Address::Client, Event::ClientResponse { id, response: Err(Error::Abort) })?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -219,7 +255,6 @@ pub mod tests {
     use super::*;
     use crate::error::Error;
     use crate::storage;
-    use std::collections::HashMap;
     use tokio::sync::mpsc;
 
     pub fn follower_leader(node: &RoleNode<Follower>) -> Option<NodeID> {
@@ -252,7 +287,6 @@ pub mod tests {
             log,
             node_tx,
             state_tx,
-            proxied_reqs: HashMap::new(),
             role: Follower::new(Some(2), None),
         };
         Ok((node, node_rx, state_rx))
@@ -571,7 +605,6 @@ pub mod tests {
             log,
             node_tx,
             state_tx,
-            proxied_reqs: HashMap::new(),
             role: Follower::new(Some(2), None),
         };
 
@@ -815,7 +848,7 @@ pub mod tests {
     }
 
     #[test]
-    // ClientRequest is proxied, as is the response.
+    // ClientRequest is forwarded, as is the response.
     fn step_clientrequest_clientresponse() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
         let mut node = Node::Follower(follower);
@@ -826,11 +859,7 @@ pub mod tests {
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
-        assert_node(&mut node)
-            .is_follower()
-            .term(3)
-            .leader(Some(2))
-            .proxied(vec![(vec![0x01], Address::Client)]);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -854,7 +883,7 @@ pub mod tests {
                 response: Ok(Response::Mutate(vec![0xaf])),
             },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(Some(2)).proxied(vec![]);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -884,7 +913,7 @@ pub mod tests {
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
-        assert_node(&mut node).is_follower().term(3).leader(None).proxied(vec![]);
+        assert_node(&mut node).is_follower().term(3).leader(None).forwarded(vec![]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -898,7 +927,7 @@ pub mod tests {
         Ok(())
     }
 
-    // ClientRequest is proxied, but aborted when a new leader appears.
+    // ClientRequest is forwarded, but aborted when a new leader appears.
     #[test]
     fn step_clientrequest_aborted() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
@@ -910,11 +939,7 @@ pub mod tests {
             term: 0,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
-        assert_node(&mut node)
-            .is_follower()
-            .term(3)
-            .leader(Some(2))
-            .proxied(vec![(vec![0x01], Address::Client)]);
+        assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
             &mut node_rx,
             vec![Message {
@@ -936,14 +961,14 @@ pub mod tests {
             term: 4,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2 },
         })?;
-        assert_node(&mut node).is_follower().term(4).leader(Some(3)).proxied(vec![]);
+        assert_node(&mut node).is_follower().term(4).leader(Some(3)).forwarded(vec![]);
         assert_messages(
             &mut node_rx,
             vec![
                 Message {
                     from: Address::Node(1),
                     to: Address::Client,
-                    term: 4,
+                    term: 3,
                     event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
                 },
                 Message {
