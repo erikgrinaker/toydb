@@ -528,14 +528,17 @@ mod tests {
     #[test]
     fn send() -> Result<()> {
         let (node, mut rx) = setup_rolenode()?;
-        node.send(Address::Node(2), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
+        node.send(
+            Address::Node(2),
+            Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
+        )?;
         assert_messages(
             &mut rx,
             vec![Message {
                 from: Address::Node(1),
                 to: Address::Node(2),
                 term: 1,
-                event: Event::Heartbeat { commit_index: 1, commit_term: 1 },
+                event: Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
             }],
         );
         Ok(())

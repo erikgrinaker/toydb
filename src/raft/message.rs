@@ -51,15 +51,21 @@ pub enum Event {
         commit_index: Index,
         /// The term of the leader's last committed log entry.
         commit_term: Term,
+        /// The latest read sequence number of the leader.
+        read_seq: ReadSequence,
     },
     /// Followers confirm loyalty to leader after heartbeats.
     ConfirmLeader {
         /// The commit_index of the original leader heartbeat, to confirm
         /// read requests.
+        ///
+        /// TODO: remove this when migrated to read_seq.
         commit_index: Index,
         /// If false, the follower does not have the entry at commit_index
         /// and would like the leader to replicate it.
         has_committed: bool,
+        /// The read sequence number of the heartbeat we're responding to.
+        read_seq: ReadSequence,
     },
 
     /// Candidates solicit votes from all peers when campaigning for leadership.
@@ -114,6 +120,9 @@ pub enum Event {
 
 /// A client request ID.
 pub type RequestID = Vec<u8>;
+
+/// A read sequence number, used to confirm leadership for linearizable reads.
+pub type ReadSequence = u64;
 
 /// A client request.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
