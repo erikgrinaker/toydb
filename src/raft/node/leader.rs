@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Index, Instruction, Message, Request, Response, Status};
-use super::{Follower, Node, NodeID, RoleNode, Term, HEARTBEAT_INTERVAL};
+use super::{Follower, Node, NodeID, RoleNode, Term, Ticks, HEARTBEAT_INTERVAL};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info};
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Leader {
     /// Number of ticks since last heartbeat.
-    heartbeat_ticks: u64,
+    since_heartbeat: Ticks,
     /// The next index to replicate to a peer.
     peer_next_index: HashMap<NodeID, Index>,
     /// The last index known to be replicated on a peer.
@@ -20,7 +20,7 @@ impl Leader {
     /// Creates a new leader role.
     pub fn new(peers: Vec<NodeID>, last_index: Index) -> Self {
         let mut leader = Self {
-            heartbeat_ticks: 0,
+            since_heartbeat: 0,
             peer_next_index: HashMap::new(),
             peer_last_index: HashMap::new(),
         };
@@ -217,11 +217,11 @@ impl RoleNode<Leader> {
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
         if !self.peers.is_empty() {
-            self.role.heartbeat_ticks += 1;
-            if self.role.heartbeat_ticks >= HEARTBEAT_INTERVAL {
-                self.role.heartbeat_ticks = 0;
+            self.role.since_heartbeat += 1;
+            if self.role.since_heartbeat >= HEARTBEAT_INTERVAL {
                 let (commit_index, commit_term) = self.log.get_commit_index();
                 self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term })?;
+                self.role.since_heartbeat = 0;
             }
         }
         Ok(self.into())

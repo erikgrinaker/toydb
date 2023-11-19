@@ -12,8 +12,9 @@ use tokio_stream::StreamExt as _;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use uuid::Uuid;
 
-/// The duration of a Raft tick, the unit of time for e.g. heartbeats and elections.
-const TICK: Duration = Duration::from_millis(100);
+/// The interval between Raft ticks, the unit of time for e.g. heartbeats and
+/// elections.
+const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
 /// A Raft server.
 pub struct Server {
@@ -71,7 +72,7 @@ impl Server {
         let mut tcp_rx = UnboundedReceiverStream::new(tcp_rx);
         let mut client_rx = UnboundedReceiverStream::new(client_rx);
 
-        let mut ticker = tokio::time::interval(TICK);
+        let mut ticker = tokio::time::interval(TICK_INTERVAL);
         let mut requests = HashMap::<Vec<u8>, oneshot::Sender<Result<Response>>>::new();
         loop {
             tokio::select! {

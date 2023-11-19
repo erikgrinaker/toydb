@@ -1,9 +1,8 @@
 use super::super::{Address, Event, Instruction, Message, RequestID, Response};
-use super::{Candidate, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN};
+use super::{rand_election_timeout, Candidate, Node, NodeID, RoleNode, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info, warn};
-use rand::Rng as _;
 use std::collections::HashSet;
 
 // A follower replicates state from a leader.
@@ -12,9 +11,9 @@ pub struct Follower {
     /// The leader, or None if just initialized.
     leader: Option<NodeID>,
     /// The number of ticks since the last message from the leader.
-    leader_seen_ticks: u64,
-    /// The timeout before triggering an election.
-    leader_seen_timeout: u64,
+    leader_seen: Ticks,
+    /// The leader_seen timeout before triggering an election.
+    election_timeout: Ticks,
     /// The node we voted for in the current term, if any.
     voted_for: Option<NodeID>,
     // Local client requests that have been forwarded to the leader. These are
@@ -28,9 +27,8 @@ impl Follower {
         Self {
             leader,
             voted_for,
-            leader_seen_ticks: 0,
-            leader_seen_timeout: rand::thread_rng()
-                .gen_range(ELECTION_TIMEOUT_MIN..=ELECTION_TIMEOUT_MAX),
+            leader_seen: 0,
+            election_timeout: rand_election_timeout(),
             forwarded: HashSet::new(),
         }
     }
@@ -113,7 +111,7 @@ impl RoleNode<Follower> {
 
         // Record when we last saw a message from the leader (if any).
         if self.is_leader(&msg.from) {
-            self.role.leader_seen_ticks = 0
+            self.role.leader_seen = 0
         }
 
         match msg.event {
@@ -230,8 +228,8 @@ impl RoleNode<Follower> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
-        self.role.leader_seen_ticks += 1;
-        if self.role.leader_seen_ticks >= self.role.leader_seen_timeout {
+        self.role.leader_seen += 1;
+        if self.role.leader_seen >= self.role.election_timeout {
             Ok(self.become_candidate()?.into())
         } else {
             Ok(self.into())
@@ -991,7 +989,7 @@ pub mod tests {
     #[test]
     fn tick() -> Result<()> {
         let (follower, mut node_rx, mut state_rx) = setup()?;
-        let timeout = follower.role.leader_seen_timeout;
+        let timeout = follower.role.election_timeout;
         let mut node = Node::Follower(follower);
 
         // Make sure heartbeats reset election timeout

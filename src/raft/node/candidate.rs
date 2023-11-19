@@ -1,19 +1,16 @@
 use super::super::{Address, Event, Message};
-use super::{
-    Follower, Leader, Node, NodeID, RoleNode, Term, ELECTION_TIMEOUT_MAX, ELECTION_TIMEOUT_MIN,
-};
+use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RoleNode, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info, warn};
-use rand::Rng as _;
 
 /// A candidate is campaigning to become a leader.
 #[derive(Debug)]
 pub struct Candidate {
     /// Ticks elapsed since election start.
-    election_ticks: u64,
+    election_duration: Ticks,
     /// Election timeout, in ticks.
-    election_timeout: u64,
+    election_timeout: Ticks,
     /// Votes received (including ourself).
     votes: u64,
 }
@@ -23,9 +20,8 @@ impl Candidate {
     pub fn new() -> Self {
         Self {
             votes: 1, // We always start with a vote for ourselves.
-            election_ticks: 0,
-            election_timeout: rand::thread_rng()
-                .gen_range(ELECTION_TIMEOUT_MIN..=ELECTION_TIMEOUT_MAX),
+            election_duration: 0,
+            election_timeout: rand_election_timeout(),
         }
     }
 }
@@ -122,8 +118,8 @@ impl RoleNode<Candidate> {
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
         // If the election times out, start a new one for the next term.
-        self.role.election_ticks += 1;
-        if self.role.election_ticks >= self.role.election_timeout {
+        self.role.election_duration += 1;
+        if self.role.election_duration >= self.role.election_timeout {
             info!("Election timed out, starting new election for term {}", self.term + 1);
             let (last_index, last_term) = self.log.get_last_index();
             self.term += 1;

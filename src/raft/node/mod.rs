@@ -9,6 +9,7 @@ use follower::Follower;
 use leader::Leader;
 
 use ::log::{debug, info};
+use rand::Rng as _;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -19,14 +20,20 @@ pub type NodeID = u8;
 /// A leader term.
 pub type Term = u64;
 
+/// A logical clock interval as number of ticks.
+pub type Ticks = u8;
+
 /// The interval between leader heartbeats, in ticks.
-const HEARTBEAT_INTERVAL: u64 = 1;
+const HEARTBEAT_INTERVAL: Ticks = 3;
 
-/// The minimum election timeout, in ticks.
-const ELECTION_TIMEOUT_MIN: u64 = 8 * HEARTBEAT_INTERVAL;
+/// The randomized election timeout range (min-max), in ticks. This is
+/// randomized per node to avoid ties.
+const ELECTION_TIMEOUT_RANGE: std::ops::Range<u8> = 10..20;
 
-/// The maximum election timeout, in ticks.
-const ELECTION_TIMEOUT_MAX: u64 = 15 * HEARTBEAT_INTERVAL;
+/// Generates a randomized election timeout.
+fn rand_election_timeout() -> Ticks {
+    rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE)
+}
 
 /// Node status
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
