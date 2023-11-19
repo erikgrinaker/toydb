@@ -81,8 +81,11 @@ impl Node {
         };
         if node.peers.is_empty() {
             info!("No peers specified, starting as leader");
+            // If we didn't vote for ourself in the persisted term, bump the
+            // term and vote for ourself to ensure we have a valid leader term.
             if voted_for != Some(id) {
-                node.log.set_term(term, Some(id))?;
+                node.term += 1;
+                node.log.set_term(node.term, Some(id))?;
             }
             let (last_index, _) = node.log.get_last_index();
             Ok(node.become_role(Leader::new(HashSet::new(), last_index)).into())
@@ -175,8 +178,8 @@ impl<R> RoleNode<R> {
         Ok(self.node_tx.send(msg)?)
     }
 
-    /// Asserts invariants during state transitions (steps and ticks).
-    fn assert_invariants(&mut self) -> Result<()> {
+    /// Asserts common node invariants.
+    fn assert_node(&mut self) -> Result<()> {
         debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
         Ok(())
     }
@@ -482,7 +485,7 @@ mod tests {
         match node {
             Node::Leader(rolenode) => {
                 assert_eq!(rolenode.id, 1);
-                assert_eq!(rolenode.term, 0);
+                assert_eq!(rolenode.term, 1);
                 assert!(rolenode.peers.is_empty());
             }
             _ => panic!("Expected leader"),

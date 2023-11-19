@@ -28,6 +28,22 @@ impl Candidate {
 }
 
 impl RoleNode<Candidate> {
+    /// Asserts internal invariants.
+    fn assert(&mut self) -> Result<()> {
+        self.assert_node()?;
+
+        assert_ne!(self.term, 0, "Candidates can't have term 0");
+        assert!(self.role.votes.contains(&self.id), "Candidate did not vote for self");
+        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+
+        assert!(
+            self.role.election_duration < self.role.election_timeout,
+            "Election timeout passed"
+        );
+
+        Ok(())
+    }
+
     /// Transforms the node into a follower. We either lost the election
     /// and follow the winner, or we discovered a new term in which case
     /// we step into it as a leaderless follower.
@@ -67,10 +83,8 @@ impl RoleNode<Candidate> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
-        // Assert invariants.
-        self.assert_invariants()?;
+        self.assert()?;
         self.assert_step(&msg);
-        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
 
         // Drop messages from past terms.
         if msg.term < self.term && msg.term > 0 {
@@ -121,7 +135,8 @@ impl RoleNode<Candidate> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
-        self.assert_invariants()?;
+        self.assert()?;
+
         self.role.election_duration += 1;
         if self.role.election_duration >= self.role.election_timeout {
             self.campaign()?;

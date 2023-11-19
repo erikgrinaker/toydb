@@ -124,7 +124,7 @@ async fn status() -> Result<()> {
             raft: raft::Status {
                 server: 1,
                 leader: 1,
-                term: 0,
+                term: 1,
                 node_last_index: vec![(1, 26)].into_iter().collect(),
                 commit_index: 26,
                 apply_index: 26,

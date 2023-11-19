@@ -33,6 +33,16 @@ impl Leader {
 }
 
 impl RoleNode<Leader> {
+    /// Asserts internal invariants.
+    fn assert(&mut self) -> Result<()> {
+        self.assert_node()?;
+
+        assert_ne!(self.term, 0, "Leaders can't have term 0");
+        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+
+        Ok(())
+    }
+
     /// Transforms the leader into a follower. This can only happen if we find a
     /// new term, so we become a leaderless follower.
     fn become_follower(mut self, term: Term) -> Result<RoleNode<Follower>> {
@@ -48,10 +58,8 @@ impl RoleNode<Leader> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
-        // Assert invariants.
-        self.assert_invariants()?;
+        self.assert()?;
         self.assert_step(&msg);
-        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
 
         // Drop messages from past terms.
         if msg.term < self.term && msg.term > 0 {
@@ -182,7 +190,8 @@ impl RoleNode<Leader> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
-        self.assert_invariants()?;
+        self.assert()?;
+
         self.role.since_heartbeat += 1;
         if self.role.since_heartbeat >= HEARTBEAT_INTERVAL {
             self.heartbeat()?;

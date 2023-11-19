@@ -35,6 +35,28 @@ impl Follower {
 }
 
 impl RoleNode<Follower> {
+    /// Asserts internal invariants.
+    fn assert(&mut self) -> Result<()> {
+        self.assert_node()?;
+
+        if let Some(leader) = self.role.leader {
+            assert_ne!(leader, self.id, "Can't follow self");
+            assert!(self.peers.contains(&leader), "Leader not in peers");
+            assert_ne!(self.term, 0, "Followers with leaders can't have term 0");
+        } else {
+            assert!(self.role.forwarded.is_empty(), "Leaderless follower has forwarded requests");
+        }
+
+        // NB: We allow voted_for not in peers, since this can happen when
+        // removing nodes from the cluster via a cold restart. We also allow
+        // voted_for self, which can happen if we lose an election.
+
+        debug_assert_eq!(self.role.voted_for, self.log.get_term()?.1, "Vote does not match log");
+        assert!(self.role.leader_seen < self.role.election_timeout, "Election timeout passed");
+
+        Ok(())
+    }
+
     /// Transforms the node into a candidate, by campaigning for leadership in a
     /// new term.
     fn become_candidate(mut self) -> Result<RoleNode<Candidate>> {
@@ -74,13 +96,8 @@ impl RoleNode<Follower> {
 
     /// Processes a message.
     pub fn step(mut self, msg: Message) -> Result<Node> {
-        // Assert invariants.
-        self.assert_invariants()?;
+        self.assert()?;
         self.assert_step(&msg);
-        debug_assert_eq!(self.role.voted_for, self.log.get_term()?.1, "Vote does not match log");
-        if self.role.leader.is_none() {
-            assert!(self.role.forwarded.is_empty(), "Leaderless follower has forwarded requests");
-        }
 
         // Drop messages from past terms.
         if msg.term < self.term && msg.term > 0 {
@@ -213,7 +230,8 @@ impl RoleNode<Follower> {
 
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
-        self.assert_invariants()?;
+        self.assert()?;
+
         self.role.leader_seen += 1;
         if self.role.leader_seen >= self.role.election_timeout {
             return Ok(self.become_candidate()?.into());
@@ -590,11 +608,12 @@ pub mod tests {
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
+        log.set_term(1, None)?;
 
         let follower = RoleNode {
             id: 1,
             peers: HashSet::from([2, 3, 4, 5]),
-            term: 0,
+            term: 1,
             log,
             node_tx,
             state_tx,
