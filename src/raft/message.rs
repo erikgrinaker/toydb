@@ -4,7 +4,7 @@ use crate::error::Result;
 use serde_derive::{Deserialize, Serialize};
 
 /// A message address.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Address {
     /// Broadcast to all peers. Only valid as an outbound recipient (to).
     Broadcast,

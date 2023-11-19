@@ -243,7 +243,7 @@ impl Driver {
         for (_, queries) in self.queries.range_mut(..=commit_index) {
             for (_, query) in queries.iter_mut() {
                 if term >= query.term {
-                    query.votes.insert(address.clone());
+                    query.votes.insert(address);
                 }
             }
         }
