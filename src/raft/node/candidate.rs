@@ -58,7 +58,10 @@ impl RoleNode<Candidate> {
         let (last_index, _) = self.log.get_last_index();
         let mut node = self.become_role(Leader::new(peers, last_index));
         node.heartbeat()?;
-        node.append(None)?;
+
+        // Propose an empty command when assuming leadership, to disambiguate
+        // previous entries in the log. See section 8 in the Raft paper.
+        node.propose(None)?;
         Ok(node)
     }
 
