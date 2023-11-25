@@ -33,7 +33,7 @@ impl Server {
     ) -> Result<Self> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         Ok(Self {
-            node: Node::new(id, peers.keys().copied().collect(), log, state, node_tx).await?,
+            node: Node::new(id, peers.keys().copied().collect(), log, state, node_tx)?,
             peers,
             node_rx,
         })

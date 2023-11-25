@@ -59,7 +59,7 @@ on tables, rows, and indexes. This makes up the node's core storage engine.
 The SQL storage engine is wrapped in a Raft state machine interface, allowing it to be managed
 by the Raft consensus engine. The Raft node receives commands from clients and coordinates with
 other Raft nodes to reach consensus on an ordered command log. Once commands are committed to
-the log, they are sent to the state machine driver which applies them to the local state machine.
+the log, they are applied to the local state machine.
 
 On top of the Raft engine is a Raft-based SQL storage engine, which implements the SQL storage
 interface and submits commands to the Raft cluster. This allows the rest of the SQL layer to use
@@ -322,26 +322,15 @@ methods are synchronous and may cause state transitions, e.g. changing a candida
 when it receives the winning vote.
 
 Nodes have a command log [`raft::Log`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/log.rs),
-using a `storage::Engine` for storage. Leaders receive client commands via request messages,
-replicate them to peers, and commit the commands to the log subject to consensus. Once a command is
-committed, is it applied to the state machine asynchronously.
-
-The Raft-managed state machine (i.e. the SQL storage engine) implements the
-[`raft::State`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/state.rs) trait and
-is given to the node on initialization. The state machine driver
-[`raft::Driver`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/state.rs) has
-ownership of the state machine, and runs in a separate thread (or rather, a
-[Tokio](https://tokio.rs) task) receiving instructions via an `mpsc` channel - this avoids
-long-running commands blocking the main Raft node from responding to messages.
-
-In addition to applying state machine commands, the driver also responds to client requests via
-an outbound `mpsc` channel. When the leader receives a state _mutation_ request from a client,
-it not only appends the command to its log, but it also tells the driver that the client is to
-be notified with the result once the command is applied. When the leader receives a state
-_query_ request, the state driver is notified about the query before the leader asks all peers
-to confirm that it is still the leader (required to satisfy linearizability). The confirmations
-are passed to the state machine driver, and once a majority vote is received the query is
-executed against the state machine and the result returned to the client.
+using a `storage::Engine` for storage, and a [`raft::State`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/state.rs)
+state machine (the SQL engine). When the leader receives a write request, it appends the command
+to its local log and replicates it to followers. Once a quorum have replicated it, the command is
+committed and applied to the state machine, and the result returned the the client. When the leader
+receives a read request, it needs to ensure it is still the leader in order to satisfy 
+linearizability (a new leader could exist elsewhere resulting in a stale read). It increments a
+read sequence number and broadcasts it via a Raft heartbeat. Once a quorum have confirmed the
+leader at this sequence number, the read command is executed against the state machine and the
+result returned to the client.
 
 The actual network communication is handled by the server process, which will be described in a
 [separate section](#server).
@@ -351,6 +340,10 @@ The actual network communication is handled by the server process, which will be
 **Single-threaded state:** all state operations run in a single thread on the leader, preventing
 horizontal scalability. Improvements here would require running multiple sharded Raft clusters,
 which is out of scope for the project.
+
+**Synchronous application:** state machine application happens synchronously in the main Raft
+thread. This is significantly simpler than asynchronous application, but may cause delays in
+Raft processing.
 
 **Log replication:** only the simplest form of Raft log replication is implemented, without
 state snapshots or rapid log replay. Lagging nodes will be very slow to catch up.
@@ -720,10 +713,10 @@ length-prefixed [Bincode](https://github.com/servo/bincode)-encoded message pass
 
 The Raft server is split out to [`raft::Server`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/server.rs),
 which runs a main [event loop](https://en.wikipedia.org/wiki/Event_loop) routing Raft messages 
-between the local Raft node, state machine driver, TCP peers, and local state machine clients (i.e. 
-the Raft SQL engine wrapper), as well as ticking the Raft logical clock at regular intervals. It 
-spawns separate Tokio tasks that maintain outbound TCP connections to all Raft peers, while 
-internal communication happens via `mpsc` channels.
+between the local Raft node, TCP peers, and local state machine clients (i.e. the Raft SQL engine 
+wrapper), as well as ticking the Raft logical clock at regular intervals. It spawns separate Tokio 
+tasks that maintain outbound TCP connections to all Raft peers, while internal communication 
+happens via `mpsc`channels.
 
 The SQL server spawns a new Tokio task for each SQL client that connects, running a separate
 SQL session from the SQL storage engine on top of Raft. It communicates with the client by passing

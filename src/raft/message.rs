@@ -56,11 +56,6 @@ pub enum Event {
     },
     /// Followers confirm loyalty to leader after heartbeats.
     ConfirmLeader {
-        /// The commit_index of the original leader heartbeat, to confirm
-        /// read requests.
-        ///
-        /// TODO: remove this when migrated to read_seq.
-        commit_index: Index,
         /// If false, the follower does not have the entry at commit_index
         /// and would like the leader to replicate it.
         has_committed: bool,
