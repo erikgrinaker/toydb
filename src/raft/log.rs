@@ -197,7 +197,7 @@ impl Log {
     pub fn scan(
         &mut self,
         range: impl std::ops::RangeBounds<Index>,
-    ) -> Result<Box<dyn Iterator<Item = Result<Entry>> + '_>> {
+    ) -> Result<impl Iterator<Item = Result<Entry>> + '_> {
         let from = match range.start_bound() {
             std::ops::Bound::Excluded(i) => std::ops::Bound::Excluded(Key::Entry(*i).encode()?),
             std::ops::Bound::Included(i) => std::ops::Bound::Included(Key::Entry(*i).encode()?),
@@ -210,9 +210,7 @@ impl Log {
                 std::ops::Bound::Included(Key::Entry(Index::MAX).encode()?)
             }
         };
-        Ok(Box::new(
-            self.engine.scan(from, to).map(|r| r.and_then(|(k, v)| Self::decode_entry(&k, &v))),
-        ))
+        Ok(self.engine.scan(from, to).map(|r| r.and_then(|(k, v)| Self::decode_entry(&k, &v))))
     }
 
     /// Splices a set of entries into the log. The entries must be contiguous,
