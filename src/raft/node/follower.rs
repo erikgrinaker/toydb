@@ -59,7 +59,7 @@ impl RoleNode<Follower> {
 
     /// Transforms the node into a candidate, by campaigning for leadership in a
     /// new term.
-    fn become_candidate(mut self) -> Result<RoleNode<Candidate>> {
+    pub(super) fn become_candidate(mut self) -> Result<RoleNode<Candidate>> {
         // Abort any forwarded requests. These must be retried with new leader.
         self.abort_forwarded()?;
 
@@ -231,11 +231,6 @@ impl RoleNode<Follower> {
     /// Processes a logical clock tick.
     pub fn tick(mut self) -> Result<Node> {
         self.assert()?;
-
-        // If there are no peers, transition to leader immediately.
-        if self.peers.is_empty() {
-            return Ok(self.become_candidate()?.become_leader()?.into());
-        }
 
         self.role.leader_seen += 1;
         if self.role.leader_seen >= self.role.election_timeout {

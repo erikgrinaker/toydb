@@ -70,7 +70,7 @@ impl Node {
         tokio::spawn(driver.drive(state));
 
         let (term, voted_for) = log.get_term()?;
-        Ok(Node::Follower(RoleNode {
+        let node = RoleNode {
             id,
             peers,
             term,
@@ -78,7 +78,12 @@ impl Node {
             node_tx,
             state_tx,
             role: Follower::new(None, voted_for),
-        }))
+        };
+        if node.peers.is_empty() {
+            // If there are no peers, become leader immediately.
+            return Ok(node.become_candidate()?.become_leader()?.into());
+        }
+        Ok(node.into())
     }
 
     /// Returns the node ID.
@@ -460,7 +465,7 @@ mod tests {
 
     #[tokio::test]
     async fn new_single() -> Result<()> {
-        let (node_tx, _) = mpsc::unbounded_channel();
+        let (node_tx, _node_rx) = mpsc::unbounded_channel();
         let node = Node::new(
             1,
             HashSet::new(),
