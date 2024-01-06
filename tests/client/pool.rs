@@ -24,7 +24,7 @@ async fn get() -> Result<()> {
 
     let mut servers = HashSet::new();
     let mut ids = HashSet::new();
-    for client in vec![a, b, c, d, e] {
+    for client in [a, b, c, d, e] {
         servers.insert(client.status().await?.raft.server);
         ids.insert(client.id());
     }

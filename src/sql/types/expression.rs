@@ -140,7 +140,7 @@ impl Expression {
                 expr => return Err(Error::Value(format!("Can't take the positive of {}", expr))),
             },
             Self::Divide(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(_), Integer(rhs)) if rhs == 0 => {
+                (Integer(_), Integer(0)) => {
                     return Err(Error::Value("Can't divide by zero".into()))
                 }
                 (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
@@ -184,7 +184,7 @@ impl Expression {
             },
             Self::Modulo(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 // This uses remainder semantics, like Postgres.
-                (Integer(_), Integer(rhs)) if rhs == 0 => {
+                (Integer(_), Integer(0)) => {
                     return Err(Error::Value("Can't divide by zero".into()))
                 }
                 (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),

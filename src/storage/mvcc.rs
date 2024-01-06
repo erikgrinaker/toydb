@@ -1500,7 +1500,7 @@ pub mod tests {
         // Full scans at all timestamps.
         for version in 1..5 {
             let txn = match version {
-                v if v == 5 => mvcc.begin_read_only()?,
+                5 => mvcc.begin_read_only()?,
                 v => mvcc.begin_as_of(v)?,
             };
             let mut scan = txn.scan(..)?; // see golden master
@@ -1555,7 +1555,7 @@ pub mod tests {
         // Full scans at all timestamps.
         for version in 1..5 {
             let txn = match version {
-                v if v == 5 => mvcc.begin_read_only()?,
+                5 => mvcc.begin_read_only()?,
                 v => mvcc.begin_as_of(v)?,
             };
             let mut scan = txn.scan_prefix(&[])?; // see golden master
