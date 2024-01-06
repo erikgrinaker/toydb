@@ -232,6 +232,11 @@ impl RoleNode<Follower> {
     pub fn tick(mut self) -> Result<Node> {
         self.assert()?;
 
+        // If there are no peers, transition to leader immediately.
+        if self.peers.is_empty() {
+            return Ok(self.become_candidate()?.become_leader()?.into());
+        }
+
         self.role.leader_seen += 1;
         if self.role.leader_seen >= self.role.election_timeout {
             return Ok(self.become_candidate()?.into());

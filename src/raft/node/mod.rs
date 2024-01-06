@@ -8,7 +8,7 @@ use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
 
-use ::log::{debug, info};
+use ::log::debug;
 use rand::Rng as _;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -56,7 +56,7 @@ pub enum Node {
 }
 
 impl Node {
-    /// Creates a new Raft node, starting as a follower, or leader if no peers.
+    /// Creates a new Raft node, starting as a leaderless follower.
     pub async fn new(
         id: NodeID,
         peers: HashSet<NodeID>,
@@ -70,7 +70,7 @@ impl Node {
         tokio::spawn(driver.drive(state));
 
         let (term, voted_for) = log.get_term()?;
-        let mut node = RoleNode {
+        Ok(Node::Follower(RoleNode {
             id,
             peers,
             term,
@@ -78,20 +78,7 @@ impl Node {
             node_tx,
             state_tx,
             role: Follower::new(None, voted_for),
-        };
-        if node.peers.is_empty() {
-            info!("No peers specified, starting as leader");
-            // If we didn't vote for ourself in the persisted term, bump the
-            // term and vote for ourself to ensure we have a valid leader term.
-            if voted_for != Some(id) {
-                node.term += 1;
-                node.log.set_term(node.term, Some(id))?;
-            }
-            let (last_index, _) = node.log.get_last_index();
-            Ok(node.become_role(Leader::new(HashSet::new(), last_index)).into())
-        } else {
-            Ok(node.into())
-        }
+        }))
     }
 
     /// Returns the node ID.

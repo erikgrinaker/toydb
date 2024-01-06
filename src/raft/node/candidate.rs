@@ -68,7 +68,7 @@ impl RoleNode<Candidate> {
     }
 
     /// Transition to leader role.
-    fn become_leader(self) -> Result<RoleNode<Leader>> {
+    pub(super) fn become_leader(self) -> Result<RoleNode<Leader>> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last_index();
