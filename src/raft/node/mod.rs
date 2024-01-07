@@ -56,7 +56,8 @@ pub enum Node {
 }
 
 impl Node {
-    /// Creates a new Raft node, starting as a leaderless follower.
+    /// Creates a new Raft node, starting as a leaderless follower, or leader if
+    /// there are no peers.
     pub async fn new(
         id: NodeID,
         peers: HashSet<NodeID>,
@@ -69,16 +70,7 @@ impl Node {
         driver.apply_log(&mut *state, &mut log)?;
         tokio::spawn(driver.drive(state));
 
-        let (term, voted_for) = log.get_term()?;
-        let node = RawNode {
-            id,
-            peers,
-            term,
-            log,
-            node_tx,
-            state_tx,
-            role: Follower::new(None, voted_for),
-        };
+        let node = RawNode::new(id, peers, log, node_tx, state_tx)?;
         if node.peers.is_empty() {
             // If there are no peers, become leader immediately.
             return Ok(node.become_candidate()?.become_leader()?.into());
@@ -137,7 +129,7 @@ impl From<RawNode<Leader>> for Node {
 pub trait Role: Clone + std::fmt::Debug + PartialEq {}
 
 // A Raft node with role R
-pub struct RawNode<R: Role> {
+pub struct RawNode<R: Role = Follower> {
     id: NodeID,
     peers: HashSet<NodeID>,
     term: Term,

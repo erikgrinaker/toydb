@@ -1,9 +1,10 @@
-use super::super::{Address, Event, Instruction, Message, RequestID, Response};
+use super::super::{Address, Event, Instruction, Log, Message, RequestID, Response};
 use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info, warn};
 use std::collections::HashSet;
+use tokio::sync::mpsc;
 
 // A follower replicates state from a leader.
 #[derive(Clone, Debug, PartialEq)]
@@ -37,6 +38,19 @@ impl Follower {
 impl Role for Follower {}
 
 impl RawNode<Follower> {
+    /// Creates a new node as a leaderless follower.
+    pub fn new(
+        id: NodeID,
+        peers: HashSet<NodeID>,
+        mut log: Log,
+        node_tx: mpsc::UnboundedSender<Message>,
+        state_tx: mpsc::UnboundedSender<Instruction>,
+    ) -> Result<Self> {
+        let (term, voted_for) = log.get_term()?;
+        let role = Follower::new(None, voted_for);
+        Ok(Self { id, peers, term, log, node_tx, state_tx, role })
+    }
+
     /// Asserts internal invariants.
     fn assert(&mut self) -> Result<()> {
         self.assert_node()?;
