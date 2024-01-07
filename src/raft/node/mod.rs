@@ -383,7 +383,7 @@ mod tests {
             id: 1,
             peers: HashSet::from_iter(peers),
             term: 1,
-            log: Log::new(Box::new(storage::engine::Memory::new()), false)?,
+            log: Log::new(storage::engine::Memory::new(), false)?,
             node_tx,
             state_tx,
         };
@@ -396,7 +396,7 @@ mod tests {
         let node = Node::new(
             1,
             HashSet::from([2, 3]),
-            Log::new(Box::new(storage::engine::Memory::new()), false)?,
+            Log::new(storage::engine::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
         )
@@ -415,7 +415,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_all() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
+        let mut log = Log::new(storage::engine::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -433,7 +433,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn new_state_apply_partial() -> Result<()> {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
+        let mut log = Log::new(storage::engine::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(2, None)?;
         log.append(2, Some(vec![0x02]))?;
@@ -452,7 +452,7 @@ mod tests {
     #[should_panic(expected = "applied index above commit index")]
     async fn new_state_apply_missing() {
         let (node_tx, _) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false).unwrap();
+        let mut log = Log::new(storage::engine::Memory::new(), false).unwrap();
         log.append(1, Some(vec![0x01])).unwrap();
         log.append(2, None).unwrap();
         log.append(2, Some(vec![0x02])).unwrap();
@@ -469,7 +469,7 @@ mod tests {
         let node = Node::new(
             1,
             HashSet::new(),
-            Log::new(Box::new(storage::engine::Memory::new()), false)?,
+            Log::new(storage::engine::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
         )

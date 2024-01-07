@@ -56,8 +56,10 @@ impl KeyPrefix {
 }
 /// A Raft log.
 pub struct Log {
-    /// The underlying storage engine.
-    engine: Box<dyn Engine>,
+    /// The underlying storage engine. Uses a trait object instead of generics,
+    /// to allow runtime selection of the engine (based on the program config)
+    /// and avoid propagating the generic type parameters throughout.
+    engine: Box<dyn storage::engine::Engine>,
     /// The index of the last stored entry.
     last_index: Index,
     /// The term of the last stored entry.
@@ -72,7 +74,7 @@ pub struct Log {
 
 impl Log {
     /// Creates a new log, using the given storage engine.
-    pub fn new(mut engine: Box<dyn Engine>, sync: bool) -> Result<Self> {
+    pub fn new(mut engine: impl storage::engine::Engine + 'static, sync: bool) -> Result<Self> {
         let (last_index, last_term) = engine
             .scan_prefix(&KeyPrefix::Entry.encode()?)
             .last()
@@ -86,7 +88,14 @@ impl Log {
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, 0));
-        Ok(Self { engine, last_index, last_term, commit_index, commit_term, sync })
+        Ok(Self {
+            engine: Box::new(engine),
+            last_index,
+            last_term,
+            commit_index,
+            commit_term,
+            sync,
+        })
     }
 
     /// Decodes an entry from a log key/value pair.
@@ -210,7 +219,10 @@ impl Log {
                 std::ops::Bound::Included(Key::Entry(Index::MAX).encode()?)
             }
         };
-        Ok(self.engine.scan(from, to).map(|r| r.and_then(|(k, v)| Self::decode_entry(&k, &v))))
+        Ok(self
+            .engine
+            .scan_dyn((from, to))
+            .map(|r| r.and_then(|(k, v)| Self::decode_entry(&k, &v))))
     }
 
     /// Splices a set of entries into the log. The entries must be contiguous,
@@ -260,75 +272,6 @@ impl Log {
     }
 }
 
-/// A Raft log storage engine. This is a wrapper trait around storage::Engine
-/// with a blanket implementation, to make it object-safe (this is otherwise
-/// prevented by the generic scan() method). This wrapper allows Log to use a
-/// trait object for the engine, which prevents leaking generics throughout the
-/// Raft implementation.
-///
-/// TODO: Consider getting rid of this and using generics throughout.
-pub trait Engine: std::fmt::Display + Send + Sync {
-    fn delete(&mut self, key: &[u8]) -> Result<()>;
-
-    fn flush(&mut self) -> Result<()>;
-
-    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
-
-    #[allow(clippy::type_complexity)]
-    fn scan(
-        &mut self,
-        from: std::ops::Bound<Vec<u8>>,
-        to: std::ops::Bound<Vec<u8>>,
-    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_>;
-
-    #[allow(clippy::type_complexity)]
-    fn scan_prefix(
-        &mut self,
-        prefix: &[u8],
-    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_>;
-
-    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
-
-    fn status(&mut self) -> Result<storage::engine::Status>;
-}
-
-impl<E: storage::engine::Engine> Engine for E {
-    fn delete(&mut self, key: &[u8]) -> Result<()> {
-        self.delete(key)
-    }
-
-    fn flush(&mut self) -> Result<()> {
-        self.flush()
-    }
-
-    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.get(key)
-    }
-
-    fn scan(
-        &mut self,
-        from: std::ops::Bound<Vec<u8>>,
-        to: std::ops::Bound<Vec<u8>>,
-    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_> {
-        Box::new(self.scan((from, to)))
-    }
-
-    fn scan_prefix(
-        &mut self,
-        prefix: &[u8],
-    ) -> Box<dyn DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + '_> {
-        Box::new(self.scan_prefix(prefix))
-    }
-
-    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.set(key, value)
-    }
-
-    fn status(&mut self) -> Result<storage::engine::Status> {
-        self.status()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,7 +279,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn setup() -> Log {
-        Log::new(Box::new(Memory::new()), false).expect("empty engine should never fail to open")
+        Log::new(Memory::new(), false).expect("empty engine should never fail to open")
     }
 
     #[test]

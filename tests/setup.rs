@@ -79,7 +79,7 @@ pub async fn server(
     let mut srv = Server::new(
         id,
         peers,
-        raft::Log::new(Box::new(storage::engine::BitCask::new(dir.path().join("log"))?), false)?,
+        raft::Log::new(storage::engine::BitCask::new(dir.path().join("log"))?, false)?,
         Box::new(sql::engine::Raft::new_state(storage::engine::Memory::new())?),
     )
     .await?;

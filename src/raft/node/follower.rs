@@ -284,7 +284,7 @@ pub mod tests {
     )> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
+        let mut log = Log::new(storage::engine::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
@@ -604,7 +604,7 @@ pub mod tests {
         // TODO: Move this into a setup function.
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
         let (state_tx, mut state_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(Box::new(storage::engine::Memory::new()), false)?;
+        let mut log = Log::new(storage::engine::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
