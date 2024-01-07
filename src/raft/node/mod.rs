@@ -173,6 +173,13 @@ impl<R: Role> RawNode<R> {
         quorum_size(self.cluster_size())
     }
 
+    /// Returns the quorum value of the given unsorted slice, in descending
+    /// order. The slice must have the same size as the cluster.
+    fn quorum_value<T: Ord + Copy>(&self, values: Vec<T>) -> T {
+        assert!(values.len() == self.cluster_size() as usize, "values must match cluster size");
+        quorum_value(values)
+    }
+
     /// Sends an event
     fn send(&self, to: Address, event: Event) -> Result<()> {
         let msg = Message { term: self.term, from: Address::Node(self.id), to, event };
@@ -226,6 +233,14 @@ impl<R: Role> RawNode<R> {
 /// Returns the size of a quorum (strict majority), given a total size.
 fn quorum_size(size: u8) -> u8 {
     size / 2 + 1
+}
+
+/// Returns the quorum (median) value of the given unsorted slice, in descending
+/// order. The slice cannot be empty.
+fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
+    assert!(!values.is_empty(), "no values provided");
+    let index = quorum_size(values.len() as u8) as usize - 1;
+    *values.select_nth_unstable_by(index, |a, b: &T| a.cmp(b).reverse()).1
 }
 
 #[cfg(test)]
@@ -533,5 +548,14 @@ mod tests {
         for (size, quorum) in [(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)] {
             assert_eq!(super::quorum_size(size), quorum);
         }
+    }
+
+    #[test]
+    fn quorum_value() {
+        assert_eq!(super::quorum_value(vec![1]), 1);
+        assert_eq!(super::quorum_value(vec![1, 3, 2]), 2);
+        assert_eq!(super::quorum_value(vec![4, 1, 3, 2]), 2);
+        assert_eq!(super::quorum_value(vec![1, 1, 1, 2, 2]), 1);
+        assert_eq!(super::quorum_value(vec![1, 1, 2, 2, 2]), 2);
     }
 }

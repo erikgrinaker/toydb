@@ -107,11 +107,12 @@ impl RawNode<Leader> {
                 );
 
                 let from = msg.from.unwrap();
-                self.role.progress.entry(from).and_modify(|p| {
-                    p.last = last_index;
-                    p.next = last_index + 1;
-                });
-                self.maybe_commit()?;
+                let progress = self.role.progress.get_mut(&from).unwrap();
+                if last_index > progress.last {
+                    progress.last = last_index;
+                    progress.next = last_index + 1;
+                    self.maybe_commit()?;
+                }
             }
 
             // A follower rejected log entries we sent it, typically because it
@@ -225,16 +226,14 @@ impl RawNode<Leader> {
     fn maybe_commit(&mut self) -> Result<Index> {
         // Determine the new commit index, i.e. the last index replicated to a
         // quorum of peers.
-        let mut last_indexes = self
-            .role
-            .progress
-            .values()
-            .map(|p| p.last)
-            .chain(std::iter::once(self.log.get_last_index().0))
-            .collect::<Vec<_>>();
-        last_indexes.sort_unstable();
-        last_indexes.reverse();
-        let commit_index = last_indexes[self.quorum_size() as usize - 1];
+        let commit_index = self.quorum_value(
+            self.role
+                .progress
+                .values()
+                .map(|p| p.last)
+                .chain(std::iter::once(self.log.get_last_index().0))
+                .collect(),
+        );
 
         // A 0 commit index means we haven't committed anything yet.
         if commit_index == 0 {
