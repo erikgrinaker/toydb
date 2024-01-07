@@ -1,12 +1,12 @@
 use super::super::{Address, Event, Index, Instruction, Message, Request, Response, Status};
-use super::{Follower, Node, NodeID, RawNode, Term, Ticks, HEARTBEAT_INTERVAL};
+use super::{Follower, Node, NodeID, RawNode, Role, Term, Ticks, HEARTBEAT_INTERVAL};
 use crate::error::Result;
 
 use ::log::{debug, info};
 use std::collections::{HashMap, HashSet};
 
 /// Peer replication progress.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct Progress {
     /// The next index to replicate to the peer.
     next: Index,
@@ -15,7 +15,7 @@ struct Progress {
 }
 
 // A leader serves requests and replicates the log to followers.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Leader {
     /// Peer replication progress.
     progress: HashMap<NodeID, Progress>,
@@ -31,6 +31,8 @@ impl Leader {
         Self { progress, since_heartbeat: 0 }
     }
 }
+
+impl Role for Leader {}
 
 impl RawNode<Leader> {
     /// Asserts internal invariants.

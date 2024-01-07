@@ -1,12 +1,12 @@
 use super::super::{Address, Event, Instruction, Message, RequestID, Response};
-use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Term, Ticks};
+use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info, warn};
 use std::collections::HashSet;
 
 // A follower replicates state from a leader.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Follower {
     /// The leader, or None if just initialized.
     leader: Option<NodeID>,
@@ -33,6 +33,8 @@ impl Follower {
         }
     }
 }
+
+impl Role for Follower {}
 
 impl RawNode<Follower> {
     /// Asserts internal invariants.

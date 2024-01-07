@@ -133,8 +133,11 @@ impl From<RawNode<Leader>> for Node {
     }
 }
 
+/// A Raft role: leader, follower, or candidate.
+pub trait Role: Clone + std::fmt::Debug + PartialEq {}
+
 // A Raft node with role R
-pub struct RawNode<R> {
+pub struct RawNode<R: Role> {
     id: NodeID,
     peers: HashSet<NodeID>,
     term: Term,
@@ -144,9 +147,9 @@ pub struct RawNode<R> {
     role: R,
 }
 
-impl<R> RawNode<R> {
+impl<R: Role> RawNode<R> {
     /// Transforms the node into another role.
-    fn become_role<T>(self, role: T) -> RawNode<T> {
+    fn become_role<T: Role>(self, role: T) -> RawNode<T> {
         RawNode {
             id: self.id,
             peers: self.peers,
@@ -369,17 +372,17 @@ mod tests {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> Result<(RawNode<()>, mpsc::UnboundedReceiver<Message>)> {
+    fn setup_rolenode() -> Result<(RawNode<Follower>, mpsc::UnboundedReceiver<Message>)> {
         setup_rolenode_peers(vec![2, 3])
     }
 
     fn setup_rolenode_peers(
         peers: Vec<NodeID>,
-    ) -> Result<(RawNode<()>, mpsc::UnboundedReceiver<Message>)> {
+    ) -> Result<(RawNode<Follower>, mpsc::UnboundedReceiver<Message>)> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, _) = mpsc::unbounded_channel();
         let node = RawNode {
-            role: (),
+            role: Follower::new(None, None),
             id: 1,
             peers: HashSet::from_iter(peers),
             term: 1,
@@ -488,11 +491,12 @@ mod tests {
     #[test]
     fn become_role() -> Result<()> {
         let (node, _) = setup_rolenode()?;
-        let new = node.become_role("role");
+        let role = Candidate::new();
+        let new = node.become_role(role.clone());
         assert_eq!(new.id, 1);
         assert_eq!(new.term, 1);
         assert_eq!(new.peers, HashSet::from([2, 3]));
-        assert_eq!(new.role, "role");
+        assert_eq!(new.role, role);
         Ok(())
     }
 

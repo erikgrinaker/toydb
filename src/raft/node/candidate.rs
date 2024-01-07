@@ -1,12 +1,12 @@
 use super::super::{Address, Event, Message};
-use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RawNode, Term, Ticks};
+use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, info, warn};
 use std::collections::HashSet;
 
 /// A candidate is campaigning to become a leader.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Candidate {
     /// Votes received (including ourself).
     votes: HashSet<NodeID>,
@@ -26,6 +26,8 @@ impl Candidate {
         }
     }
 }
+
+impl Role for Candidate {}
 
 impl RawNode<Candidate> {
     /// Asserts internal invariants.
