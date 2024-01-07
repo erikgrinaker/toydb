@@ -36,12 +36,6 @@ pub trait Engine: std::fmt::Display + Send + Sync {
     /// Iterates over an ordered range of key/value pairs.
     fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_>;
 
-    /// Sets a value for a key, replacing the existing value if any.
-    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
-
-    /// Returns engine status.
-    fn status(&mut self) -> Result<Status>;
-
     /// Iterates over all key/value pairs starting with prefix.
     fn scan_prefix(&mut self, prefix: &[u8]) -> Self::ScanIterator<'_> {
         let start = std::ops::Bound::Included(prefix.to_vec());
@@ -53,6 +47,12 @@ pub trait Engine: std::fmt::Display + Send + Sync {
         };
         self.scan((start, end))
     }
+
+    /// Sets a value for a key, replacing the existing value if any.
+    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()>;
+
+    /// Returns engine status.
+    fn status(&mut self) -> Result<Status>;
 }
 
 /// Engine status.
