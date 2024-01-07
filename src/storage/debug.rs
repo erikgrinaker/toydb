@@ -134,7 +134,7 @@ impl<E: super::engine::Engine> super::engine::Engine for Engine<E> {
         self.inner.get(key)
     }
 
-    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_> {
+    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
         self.inner.scan(range)
     }
 

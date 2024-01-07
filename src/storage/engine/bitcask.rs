@@ -113,7 +113,7 @@ impl Engine for BitCask {
         }
     }
 
-    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_> {
+    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
         ScanIterator { inner: self.keydir.range(range), log: &mut self.log }
     }
 

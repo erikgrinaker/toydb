@@ -34,7 +34,7 @@ pub trait Engine: std::fmt::Display + Send + Sync {
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Iterates over an ordered range of key/value pairs.
-    fn scan<R: std::ops::RangeBounds<Vec<u8>>>(&mut self, range: R) -> Self::ScanIterator<'_>;
+    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>;
 
     /// Iterates over all key/value pairs starting with prefix.
     fn scan_prefix(&mut self, prefix: &[u8]) -> Self::ScanIterator<'_> {
