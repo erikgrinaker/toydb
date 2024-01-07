@@ -163,9 +163,14 @@ impl<R: Role> RawNode<R> {
         }
     }
 
+    /// Returns the size of the cluster.
+    fn cluster_size(&self) -> u8 {
+        self.peers.len() as u8 + 1
+    }
+
     /// Returns the quorum size of the cluster.
     fn quorum_size(&self) -> u8 {
-        quorum_size(self.peers.len() as u8 + 1)
+        quorum_size(self.cluster_size())
     }
 
     /// Sends an event
