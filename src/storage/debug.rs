@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 
 use super::bincode;
+use super::engine::{self, Status};
 use super::mvcc::{self, TransactionState};
 use crate::error::Result;
 
@@ -91,20 +92,20 @@ pub fn format_key_value(key: &[u8], value: &Option<Vec<u8>>) -> (String, Option<
 }
 
 /// A debug storage engine, which wraps another engine and logs mutations.
-pub struct Engine<E: super::engine::Engine> {
+pub struct Engine<E: engine::Engine> {
     /// The wrapped engine.
     inner: E,
     /// Write log as key/value tuples. Value is None for deletes.
     write_log: Vec<(Vec<u8>, Option<Vec<u8>>)>,
 }
 
-impl<E: super::engine::Engine> std::fmt::Display for Engine<E> {
+impl<E: engine::Engine> std::fmt::Display for Engine<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "debug:{}", self.inner)
     }
 }
 
-impl<E: super::engine::Engine> Engine<E> {
+impl<E: engine::Engine> Engine<E> {
     pub fn new(inner: E) -> Self {
         Self { inner, write_log: Vec::new() }
     }
@@ -117,7 +118,7 @@ impl<E: super::engine::Engine> Engine<E> {
     }
 }
 
-impl<E: super::engine::Engine> super::engine::Engine for Engine<E> {
+impl<E: engine::Engine> engine::Engine for Engine<E> {
     type ScanIterator<'a> = E::ScanIterator<'a> where E: 'a;
 
     fn flush(&mut self) -> Result<()> {
@@ -144,7 +145,7 @@ impl<E: super::engine::Engine> super::engine::Engine for Engine<E> {
         Ok(())
     }
 
-    fn status(&mut self) -> Result<super::engine::Status> {
+    fn status(&mut self) -> Result<Status> {
         self.inner.status()
     }
 }
