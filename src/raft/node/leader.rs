@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Index, Instruction, Message, Request, Response, Status};
-use super::{Follower, Node, NodeID, RoleNode, Term, Ticks, HEARTBEAT_INTERVAL};
+use super::{Follower, Node, NodeID, RawNode, Term, Ticks, HEARTBEAT_INTERVAL};
 use crate::error::Result;
 
 use ::log::{debug, info};
@@ -32,7 +32,7 @@ impl Leader {
     }
 }
 
-impl RoleNode<Leader> {
+impl RawNode<Leader> {
     /// Asserts internal invariants.
     fn assert(&mut self) -> Result<()> {
         self.assert_node()?;
@@ -45,7 +45,7 @@ impl RoleNode<Leader> {
 
     /// Transforms the leader into a follower. This can only happen if we find a
     /// new term, so we become a leaderless follower.
-    fn become_follower(mut self, term: Term) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, term: Term) -> Result<RawNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
         assert!(term > self.term, "Can only become follower in later term");
 
@@ -299,7 +299,7 @@ mod tests {
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(
-        RoleNode<Leader>,
+        RawNode<Leader>,
         mpsc::UnboundedReceiver<Message>,
         mpsc::UnboundedReceiver<Instruction>,
     )> {
@@ -315,7 +315,7 @@ mod tests {
         log.commit(2)?;
         log.set_term(3, Some(1))?;
 
-        let node = RoleNode {
+        let node = RawNode {
             id: 1,
             peers: peers.clone(),
             term: 3,

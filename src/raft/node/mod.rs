@@ -50,9 +50,9 @@ pub struct Status {
 
 /// The local Raft node state machine.
 pub enum Node {
-    Candidate(RoleNode<Candidate>),
-    Follower(RoleNode<Follower>),
-    Leader(RoleNode<Leader>),
+    Candidate(RawNode<Candidate>),
+    Follower(RawNode<Follower>),
+    Leader(RawNode<Leader>),
 }
 
 impl Node {
@@ -70,7 +70,7 @@ impl Node {
         tokio::spawn(driver.drive(state));
 
         let (term, voted_for) = log.get_term()?;
-        let node = RoleNode {
+        let node = RawNode {
             id,
             peers,
             term,
@@ -115,26 +115,26 @@ impl Node {
     }
 }
 
-impl From<RoleNode<Candidate>> for Node {
-    fn from(rn: RoleNode<Candidate>) -> Self {
-        Node::Candidate(rn)
+impl From<RawNode<Candidate>> for Node {
+    fn from(n: RawNode<Candidate>) -> Self {
+        Node::Candidate(n)
     }
 }
 
-impl From<RoleNode<Follower>> for Node {
-    fn from(rn: RoleNode<Follower>) -> Self {
-        Node::Follower(rn)
+impl From<RawNode<Follower>> for Node {
+    fn from(n: RawNode<Follower>) -> Self {
+        Node::Follower(n)
     }
 }
 
-impl From<RoleNode<Leader>> for Node {
-    fn from(rn: RoleNode<Leader>) -> Self {
-        Node::Leader(rn)
+impl From<RawNode<Leader>> for Node {
+    fn from(n: RawNode<Leader>) -> Self {
+        Node::Leader(n)
     }
 }
 
 // A Raft node with role R
-pub struct RoleNode<R> {
+pub struct RawNode<R> {
     id: NodeID,
     peers: HashSet<NodeID>,
     term: Term,
@@ -144,10 +144,10 @@ pub struct RoleNode<R> {
     role: R,
 }
 
-impl<R> RoleNode<R> {
+impl<R> RawNode<R> {
     /// Transforms the node into another role.
-    fn become_role<T>(self, role: T) -> RoleNode<T> {
-        RoleNode {
+    fn become_role<T>(self, role: T) -> RawNode<T> {
+        RawNode {
             id: self.id,
             peers: self.peers,
             term: self.term,
@@ -369,16 +369,16 @@ mod tests {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> Result<(RoleNode<()>, mpsc::UnboundedReceiver<Message>)> {
+    fn setup_rolenode() -> Result<(RawNode<()>, mpsc::UnboundedReceiver<Message>)> {
         setup_rolenode_peers(vec![2, 3])
     }
 
     fn setup_rolenode_peers(
         peers: Vec<NodeID>,
-    ) -> Result<(RoleNode<()>, mpsc::UnboundedReceiver<Message>)> {
+    ) -> Result<(RawNode<()>, mpsc::UnboundedReceiver<Message>)> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let (state_tx, _) = mpsc::unbounded_channel();
-        let node = RoleNode {
+        let node = RawNode {
             role: (),
             id: 1,
             peers: HashSet::from_iter(peers),

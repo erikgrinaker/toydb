@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Instruction, Message, RequestID, Response};
-use super::{rand_election_timeout, Candidate, Node, NodeID, RoleNode, Term, Ticks};
+use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, error, info, warn};
@@ -34,7 +34,7 @@ impl Follower {
     }
 }
 
-impl RoleNode<Follower> {
+impl RawNode<Follower> {
     /// Asserts internal invariants.
     fn assert(&mut self) -> Result<()> {
         self.assert_node()?;
@@ -59,7 +59,7 @@ impl RoleNode<Follower> {
 
     /// Transforms the node into a candidate, by campaigning for leadership in a
     /// new term.
-    pub(super) fn become_candidate(mut self) -> Result<RoleNode<Candidate>> {
+    pub(super) fn become_candidate(mut self) -> Result<RawNode<Candidate>> {
         // Abort any forwarded requests. These must be retried with new leader.
         self.abort_forwarded()?;
 
@@ -70,7 +70,7 @@ impl RoleNode<Follower> {
 
     /// Transforms the node into a follower, either a leaderless follower in a
     /// new term or following a leader in the current term.
-    fn become_follower(mut self, leader: Option<NodeID>, term: Term) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, leader: Option<NodeID>, term: Term) -> Result<RawNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
 
         // Abort any forwarded requests. These must be retried with new leader.
@@ -268,17 +268,17 @@ pub mod tests {
     use crate::storage;
     use tokio::sync::mpsc;
 
-    pub fn follower_leader(node: &RoleNode<Follower>) -> Option<NodeID> {
+    pub fn follower_leader(node: &RawNode<Follower>) -> Option<NodeID> {
         node.role.leader
     }
 
-    pub fn follower_voted_for(node: &RoleNode<Follower>) -> Option<NodeID> {
+    pub fn follower_voted_for(node: &RawNode<Follower>) -> Option<NodeID> {
         node.role.voted_for
     }
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(
-        RoleNode<Follower>,
+        RawNode<Follower>,
         mpsc::UnboundedReceiver<Message>,
         mpsc::UnboundedReceiver<Instruction>,
     )> {
@@ -291,7 +291,7 @@ pub mod tests {
         log.commit(2)?;
         log.set_term(3, None)?;
 
-        let node = RoleNode {
+        let node = RawNode {
             id: 1,
             peers: HashSet::from([2, 3, 4, 5]),
             term: 3,
@@ -610,7 +610,7 @@ pub mod tests {
         log.append(2, Some(vec![0x03]))?;
         log.set_term(1, None)?;
 
-        let follower = RoleNode {
+        let follower = RawNode {
             id: 1,
             peers: HashSet::from([2, 3, 4, 5]),
             term: 1,

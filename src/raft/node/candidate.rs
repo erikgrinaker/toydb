@@ -1,5 +1,5 @@
 use super::super::{Address, Event, Message};
-use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RoleNode, Term, Ticks};
+use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RawNode, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, info, warn};
@@ -27,7 +27,7 @@ impl Candidate {
     }
 }
 
-impl RoleNode<Candidate> {
+impl RawNode<Candidate> {
     /// Asserts internal invariants.
     fn assert(&mut self) -> Result<()> {
         self.assert_node()?;
@@ -47,7 +47,7 @@ impl RoleNode<Candidate> {
     /// Transforms the node into a follower. We either lost the election
     /// and follow the winner, or we discovered a new term in which case
     /// we step into it as a leaderless follower.
-    fn become_follower(mut self, term: Term, leader: Option<NodeID>) -> Result<RoleNode<Follower>> {
+    fn become_follower(mut self, term: Term, leader: Option<NodeID>) -> Result<RawNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
 
         if let Some(leader) = leader {
@@ -68,7 +68,7 @@ impl RoleNode<Candidate> {
     }
 
     /// Transition to leader role.
-    pub(super) fn become_leader(self) -> Result<RoleNode<Leader>> {
+    pub(super) fn become_leader(self) -> Result<RawNode<Leader>> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last_index();
@@ -170,7 +170,7 @@ mod tests {
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(
-        RoleNode<Candidate>,
+        RawNode<Candidate>,
         mpsc::UnboundedReceiver<Message>,
         mpsc::UnboundedReceiver<Instruction>,
     )> {
@@ -183,7 +183,7 @@ mod tests {
         log.commit(2)?;
         log.set_term(3, Some(1))?;
 
-        let mut node = RoleNode {
+        let mut node = RawNode {
             id: 1,
             peers: HashSet::from([2, 3, 4, 5]),
             term: 3,
