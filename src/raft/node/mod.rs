@@ -48,7 +48,14 @@ pub struct Status {
     pub storage_size: u64,
 }
 
-/// The local Raft node state machine.
+/// A Raft node, with a dynamic role. The node is driven synchronously by
+/// processing inbound messages via step() or by advancing time via tick().
+/// These methods consume the current node, and return a new one with a possibly
+/// different role. Outbound messages are sent via the given node_tx channel.
+///
+/// This enum wraps the RawNode<Role> types, which implement the actual
+/// node logic. It exists for ergonomic use across role transitions, i.e
+/// node = node.step()?.
 pub enum Node {
     Candidate(RawNode<Candidate>),
     Follower(RawNode<Follower>),
@@ -73,7 +80,7 @@ impl Node {
         let node = RawNode::new(id, peers, log, node_tx, state_tx)?;
         if node.peers.is_empty() {
             // If there are no peers, become leader immediately.
-            return Ok(node.become_candidate()?.become_leader()?.into());
+            return Ok(node.into_candidate()?.into_leader()?.into());
         }
         Ok(node.into())
     }
@@ -128,7 +135,10 @@ impl From<RawNode<Leader>> for Node {
 /// A Raft role: leader, follower, or candidate.
 pub trait Role: Clone + std::fmt::Debug + PartialEq {}
 
-// A Raft node with role R
+/// A Raft node with the concrete role R.
+///
+/// This implements the typestate pattern, where individual node states (roles)
+/// are encoded as RawNode<Role>. See: http://cliffle.com/blog/rust-typestate/
 pub struct RawNode<R: Role = Follower> {
     id: NodeID,
     peers: HashSet<NodeID>,
@@ -140,8 +150,8 @@ pub struct RawNode<R: Role = Follower> {
 }
 
 impl<R: Role> RawNode<R> {
-    /// Transforms the node into another role.
-    fn become_role<T: Role>(self, role: T) -> RawNode<T> {
+    /// Helper for role transitions.
+    fn into_role<T: Role>(self, role: T) -> RawNode<T> {
         RawNode {
             id: self.id,
             peers: self.peers,
@@ -481,10 +491,10 @@ mod tests {
     }
 
     #[test]
-    fn become_role() -> Result<()> {
+    fn into_role() -> Result<()> {
         let (node, _) = setup_rolenode()?;
         let role = Candidate::new();
-        let new = node.become_role(role.clone());
+        let new = node.into_role(role.clone());
         assert_eq!(new.id, 1);
         assert_eq!(new.term, 1);
         assert_eq!(new.peers, HashSet::from([2, 3]));

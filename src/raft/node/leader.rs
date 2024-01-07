@@ -45,9 +45,10 @@ impl RawNode<Leader> {
         Ok(())
     }
 
-    /// Transforms the leader into a follower. This can only happen if we find a
-    /// new term, so we become a leaderless follower.
-    fn become_follower(mut self, term: Term) -> Result<RawNode<Follower>> {
+    /// Transitions the leader into a follower. This can only happen if we
+    /// discover a new term, so we become a leaderless follower. Subsequently
+    /// stepping the received message may discover the leader, if there is one.
+    pub(super) fn into_follower(mut self, term: Term) -> Result<RawNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
         assert!(term > self.term, "Can only become follower in later term");
 
@@ -55,7 +56,7 @@ impl RawNode<Leader> {
         self.term = term;
         self.log.set_term(term, None)?;
         self.state_tx.send(Instruction::Abort)?;
-        Ok(self.become_role(Follower::new(None, None)))
+        Ok(self.into_role(Follower::new(None, None)))
     }
 
     /// Processes a message.
@@ -73,7 +74,7 @@ impl RawNode<Leader> {
         // follower in it and step the message. If the message is a Heartbeat or
         // AppendEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
-            return self.become_follower(msg.term)?.step(msg);
+            return self.into_follower(msg.term)?.step(msg);
         }
 
         match msg.event {

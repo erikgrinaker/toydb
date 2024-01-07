@@ -46,10 +46,14 @@ impl RawNode<Candidate> {
         Ok(())
     }
 
-    /// Transforms the node into a follower. We either lost the election
-    /// and follow the winner, or we discovered a new term in which case
-    /// we step into it as a leaderless follower.
-    fn become_follower(mut self, term: Term, leader: Option<NodeID>) -> Result<RawNode<Follower>> {
+    /// Transitions the candidate to a follower. We either lost the election and
+    /// follow the winner, or we discovered a new term in which case we step
+    /// into it as a leaderless follower.
+    pub(super) fn into_follower(
+        mut self,
+        term: Term,
+        leader: Option<NodeID>,
+    ) -> Result<RawNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
 
         if let Some(leader) = leader {
@@ -57,7 +61,7 @@ impl RawNode<Candidate> {
             assert_eq!(term, self.term, "Can't follow leader in different term");
             info!("Lost election, following leader {} in term {}", leader, term);
             let voted_for = Some(self.id); // by definition
-            Ok(self.become_role(Follower::new(Some(leader), voted_for)))
+            Ok(self.into_role(Follower::new(Some(leader), voted_for)))
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
@@ -65,16 +69,16 @@ impl RawNode<Candidate> {
             info!("Discovered new term {}", term);
             self.term = term;
             self.log.set_term(term, None)?;
-            Ok(self.become_role(Follower::new(None, None)))
+            Ok(self.into_role(Follower::new(None, None)))
         }
     }
 
-    /// Transition to leader role.
-    pub(super) fn become_leader(self) -> Result<RawNode<Leader>> {
+    /// Transitions the candidate to a leader. We won the election.
+    pub(super) fn into_leader(self) -> Result<RawNode<Leader>> {
         info!("Won election for term {}, becoming leader", self.term);
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last_index();
-        let mut node = self.become_role(Leader::new(peers, last_index));
+        let mut node = self.into_role(Leader::new(peers, last_index));
         node.heartbeat()?;
 
         // Propose an empty command when assuming leadership, to disambiguate
@@ -98,7 +102,7 @@ impl RawNode<Candidate> {
         // follower in it and step the message. If the message is a Heartbeat or
         // AppendEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
-            return self.become_follower(msg.term, None)?.step(msg);
+            return self.into_follower(msg.term, None)?.step(msg);
         }
 
         match msg.event {
@@ -110,14 +114,14 @@ impl RawNode<Candidate> {
             Event::GrantVote => {
                 self.role.votes.insert(msg.from.unwrap());
                 if self.role.votes.len() as u64 >= self.quorum() {
-                    return Ok(self.become_leader()?.into());
+                    return Ok(self.into_leader()?.into());
                 }
             }
 
             // If we receive a heartbeat or entries in this term, we lost the
             // election and have a new leader. Follow it and step the message.
             Event::Heartbeat { .. } | Event::AppendEntries { .. } => {
-                return self.become_follower(msg.term, Some(msg.from.unwrap()))?.step(msg);
+                return self.into_follower(msg.term, Some(msg.from.unwrap()))?.step(msg);
             }
 
             // Abort any inbound client requests while candidate.

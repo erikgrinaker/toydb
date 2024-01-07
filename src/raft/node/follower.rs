@@ -73,20 +73,25 @@ impl RawNode<Follower> {
         Ok(())
     }
 
-    /// Transforms the node into a candidate, by campaigning for leadership in a
-    /// new term.
-    pub(super) fn become_candidate(mut self) -> Result<RawNode<Candidate>> {
+    /// Transitions the follower into a candidate, by campaigning for
+    /// leadership in a new term.
+    pub(super) fn into_candidate(mut self) -> Result<RawNode<Candidate>> {
         // Abort any forwarded requests. These must be retried with new leader.
         self.abort_forwarded()?;
 
-        let mut node = self.become_role(Candidate::new());
+        let mut node = self.into_role(Candidate::new());
         node.campaign()?;
         Ok(node)
     }
 
-    /// Transforms the node into a follower, either a leaderless follower in a
-    /// new term or following a leader in the current term.
-    fn become_follower(mut self, leader: Option<NodeID>, term: Term) -> Result<RawNode<Follower>> {
+    /// Transitions the candidate into a follower, either a leaderless follower
+    /// in a new term (e.g. if someone holds a new election) or following a
+    /// leader in the current term once someone wins the election.
+    pub(super) fn into_follower(
+        mut self,
+        leader: Option<NodeID>,
+        term: Term,
+    ) -> Result<RawNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
 
         // Abort any forwarded requests. These must be retried with new leader.
@@ -125,7 +130,7 @@ impl RawNode<Follower> {
         // follower in it and step the message. If the message is a Heartbeat or
         // AppendEntries from the leader, stepping it will follow the leader.
         if msg.term > self.term {
-            return self.become_follower(None, msg.term)?.step(msg);
+            return self.into_follower(None, msg.term)?.step(msg);
         }
 
         // Record when we last saw a message from the leader (if any).
@@ -142,7 +147,7 @@ impl RawNode<Follower> {
                 let from = msg.from.unwrap();
                 match self.role.leader {
                     Some(leader) => assert_eq!(from, leader, "Multiple leaders in term"),
-                    None => self = self.become_follower(Some(from), msg.term)?,
+                    None => self = self.into_follower(Some(from), msg.term)?,
                 }
 
                 // Advance commit index and apply entries if possible.
@@ -165,7 +170,7 @@ impl RawNode<Follower> {
                 let from = msg.from.unwrap();
                 match self.role.leader {
                     Some(leader) => assert_eq!(from, leader, "Multiple leaders in term"),
-                    None => self = self.become_follower(Some(from), msg.term)?,
+                    None => self = self.into_follower(Some(from), msg.term)?,
                 }
 
                 // Append the entries, if possible.
@@ -250,7 +255,7 @@ impl RawNode<Follower> {
 
         self.role.leader_seen += 1;
         if self.role.leader_seen >= self.role.election_timeout {
-            return Ok(self.become_candidate()?.into());
+            return Ok(self.into_candidate()?.into());
         }
         Ok(self.into())
     }
