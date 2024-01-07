@@ -113,7 +113,7 @@ impl RawNode<Candidate> {
             // leadership.
             Event::GrantVote => {
                 self.role.votes.insert(msg.from.unwrap());
-                if self.role.votes.len() as u64 >= self.quorum() {
+                if self.role.votes.len() as u8 >= self.quorum_size() {
                     return Ok(self.into_leader()?.into());
                 }
             }

@@ -138,7 +138,7 @@ impl RawNode<Leader> {
                     command,
                     term: self.term,
                     index: commit_index,
-                    quorum: self.quorum(),
+                    quorum: self.quorum_size(),
                 })?;
                 self.state_tx.send(Instruction::Vote {
                     term: self.term,
@@ -234,7 +234,7 @@ impl RawNode<Leader> {
             .collect::<Vec<_>>();
         last_indexes.sort_unstable();
         last_indexes.reverse();
-        let commit_index = last_indexes[self.quorum() as usize - 1];
+        let commit_index = last_indexes[self.quorum_size() as usize - 1];
 
         // A 0 commit index means we haven't committed anything yet.
         if commit_index == 0 {
@@ -588,7 +588,7 @@ mod tests {
     // Sending a client query request will pass it to the state machine and trigger heartbeats.
     fn step_clientrequest_query() -> Result<()> {
         let (leader, mut node_rx, mut state_rx) = setup()?;
-        let quorum = leader.quorum();
+        let quorum = leader.quorum_size();
         let mut node: Node = leader.into();
         node = node.step(Message {
             from: Address::Client,

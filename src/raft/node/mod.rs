@@ -164,8 +164,8 @@ impl<R: Role> RawNode<R> {
     }
 
     /// Returns the quorum size of the cluster.
-    fn quorum(&self) -> u64 {
-        (self.peers.len() as u64 + 1) / 2 + 1
+    fn quorum_size(&self) -> u8 {
+        quorum_size(self.peers.len() as u8 + 1)
     }
 
     /// Sends an event
@@ -216,6 +216,11 @@ impl<R: Role> RawNode<R> {
             }
         }
     }
+}
+
+/// Returns the size of a quorum (strict majority), given a total size.
+fn quorum_size(size: u8) -> u8 {
+    size / 2 + 1
 }
 
 #[cfg(test)]
@@ -503,18 +508,6 @@ mod tests {
     }
 
     #[test]
-    fn quorum() -> Result<()> {
-        let quorums = vec![(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)];
-        for (size, quorum) in quorums.into_iter() {
-            let peers: Vec<NodeID> = (1..(size as u8)).collect();
-            assert_eq!(peers.len(), size as usize - 1);
-            let (node, _) = setup_rolenode_peers(peers)?;
-            assert_eq!(node.quorum(), quorum);
-        }
-        Ok(())
-    }
-
-    #[test]
     fn send() -> Result<()> {
         let (node, mut rx) = setup_rolenode()?;
         node.send(Address::Node(2), Event::Heartbeat { commit_index: 1, commit_term: 1 })?;
@@ -528,5 +521,12 @@ mod tests {
             }],
         );
         Ok(())
+    }
+
+    #[test]
+    fn quorum_size() {
+        for (size, quorum) in [(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)] {
+            assert_eq!(super::quorum_size(size), quorum);
+        }
     }
 }

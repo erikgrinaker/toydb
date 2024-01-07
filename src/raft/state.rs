@@ -37,7 +37,7 @@ pub enum Instruction {
     /// Notify the given address with the result of applying the entry at the given index.
     Notify { id: Vec<u8>, address: Address, index: Index },
     /// Query the state machine when the given term and index has been confirmed by vote.
-    Query { id: Vec<u8>, address: Address, command: Vec<u8>, term: Term, index: Index, quorum: u64 },
+    Query { id: Vec<u8>, address: Address, command: Vec<u8>, term: Term, index: Index, quorum: u8 },
     /// Extend the given server status and return it to the given address.
     Status { id: Vec<u8>, address: Address, status: Box<Status> },
     /// Votes for queries at the given term and commit index.
@@ -50,7 +50,7 @@ struct Query {
     term: Term,
     address: Address,
     command: Vec<u8>,
-    quorum: u64,
+    quorum: u8,
     votes: HashSet<Address>,
 }
 
@@ -219,7 +219,7 @@ impl Driver {
         for (index, queries) in self.queries.range_mut(..=applied_index) {
             let mut ready_ids = Vec::new();
             for (id, query) in queries.iter_mut() {
-                if query.votes.len() as u64 >= query.quorum {
+                if query.votes.len() as u8 >= query.quorum {
                     ready_ids.push(id.clone());
                 }
             }
