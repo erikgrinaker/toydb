@@ -117,6 +117,13 @@ impl Engine for BitCask {
         ScanIterator { inner: self.keydir.range(range), log: &mut self.log }
     }
 
+    fn scan_dyn(
+        &mut self,
+        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+    ) -> Box<dyn super::ScanIterator + '_> {
+        Box::new(self.scan(range))
+    }
+
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         let (pos, len) = self.log.write_entry(key, Some(&*value))?;
         let value_len = value.len() as u32;

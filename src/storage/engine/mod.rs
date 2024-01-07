@@ -18,11 +18,10 @@ use serde::{Deserialize, Serialize};
 /// mutable reference -- serialized access can't be avoided anyway, since both
 /// Raft execution and file access is serial.
 pub trait Engine: std::fmt::Display + Send + Sync {
-    /// The iterator returned by scan(). Traits can't return "impl Trait", and
-    /// we don't want to use trait objects, so the type must be specified.
+    /// The iterator returned by scan().
     type ScanIterator<'a>: ScanIterator + 'a
     where
-        Self: 'a;
+        Self: Sized + 'a; // omit in trait objects, for object safety
 
     /// Deletes a key, or does nothing if it does not exist.
     fn delete(&mut self, key: &[u8]) -> Result<()>;
@@ -34,10 +33,22 @@ pub trait Engine: std::fmt::Display + Send + Sync {
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Iterates over an ordered range of key/value pairs.
-    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>;
+    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>
+    where
+        Self: Sized; // omit in trait objects, for object safety
+
+    /// Like scan, but can be used from trait objects. The iterator will use
+    /// dynamic dispatch, which has a minor performance penalty.
+    fn scan_dyn(
+        &mut self,
+        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+    ) -> Box<dyn ScanIterator + '_>;
 
     /// Iterates over all key/value pairs starting with prefix.
-    fn scan_prefix(&mut self, prefix: &[u8]) -> Self::ScanIterator<'_> {
+    fn scan_prefix(&mut self, prefix: &[u8]) -> Self::ScanIterator<'_>
+    where
+        Self: Sized, // omit in trait objects, for object safety
+    {
         let start = std::ops::Bound::Included(prefix.to_vec());
         let end = match prefix.iter().rposition(|b| *b != 0xff) {
             Some(i) => std::ops::Bound::Excluded(

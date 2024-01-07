@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use super::bincode;
-use super::engine::{self, Status};
+use super::engine::{self, ScanIterator, Status};
 use super::mvcc::{self, TransactionState};
 use crate::error::Result;
 
@@ -137,6 +137,13 @@ impl<E: engine::Engine> engine::Engine for Engine<E> {
 
     fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
         self.inner.scan(range)
+    }
+
+    fn scan_dyn(
+        &mut self,
+        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+    ) -> Box<dyn ScanIterator + '_> {
+        Box::new(self.scan(range))
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {

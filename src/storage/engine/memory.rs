@@ -40,6 +40,13 @@ impl Engine for Memory {
         ScanIterator { inner: self.data.range(range) }
     }
 
+    fn scan_dyn(
+        &mut self,
+        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+    ) -> Box<dyn super::ScanIterator + '_> {
+        Box::new(self.scan(range))
+    }
+
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.data.insert(key.to_vec(), value);
         Ok(())
