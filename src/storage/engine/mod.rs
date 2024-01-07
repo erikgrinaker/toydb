@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub trait Engine: std::fmt::Display + Send + Sync {
     /// The iterator returned by scan(). Traits can't return "impl Trait", and
     /// we don't want to use trait objects, so the type must be specified.
-    type ScanIterator<'a>: DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> + 'a
+    type ScanIterator<'a>: ScanIterator + 'a
     where
         Self: 'a;
 
@@ -54,6 +54,11 @@ pub trait Engine: std::fmt::Display + Send + Sync {
     /// Returns engine status.
     fn status(&mut self) -> Result<Status>;
 }
+
+/// A scan iterator, with a blanket implementation (in lieu of trait aliases).
+pub trait ScanIterator: DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> {}
+
+impl<I: DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>>> ScanIterator for I {}
 
 /// Engine status.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
