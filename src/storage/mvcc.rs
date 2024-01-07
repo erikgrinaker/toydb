@@ -584,7 +584,7 @@ impl<E: Engine> Transaction<E> {
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), u64::MAX).encode()?),
             Bound::Unbounded => Bound::Excluded(KeyPrefix::Unversioned.encode()?),
         };
-        Ok(Scan::from_range(self.engine.lock()?, self.state(), start, end))
+        Ok(Scan::new(self.engine.lock()?, self.state(), start, end))
     }
 
     /// Scans keys under a given prefix.
@@ -594,7 +594,7 @@ impl<E: Engine> Transaction<E> {
         // the KeyCode byte slice terminator 0x0000 at the end.
         let mut prefix = KeyPrefix::Version(prefix.into()).encode()?;
         prefix.truncate(prefix.len() - 2);
-        Ok(Scan::from_prefix(self.engine.lock()?, self.state(), prefix))
+        Ok(Scan::new_prefix(self.engine.lock()?, self.state(), prefix))
     }
 }
 
@@ -620,8 +620,8 @@ enum ScanType {
 }
 
 impl<'a, E: Engine + 'a> Scan<'a, E> {
-    /// Runs a normal range scan.
-    fn from_range(
+    /// Creates a new range scan.
+    fn new(
         engine: MutexGuard<'a, E>,
         txn: &'a TransactionState,
         start: Bound<Vec<u8>>,
@@ -630,8 +630,8 @@ impl<'a, E: Engine + 'a> Scan<'a, E> {
         Self { engine, txn, param: ScanType::Range((start, end)) }
     }
 
-    /// Runs a prefix scan.
-    fn from_prefix(engine: MutexGuard<'a, E>, txn: &'a TransactionState, prefix: Vec<u8>) -> Self {
+    /// Creates a new prefix scan.
+    fn new_prefix(engine: MutexGuard<'a, E>, txn: &'a TransactionState, prefix: Vec<u8>) -> Self {
         Self { engine, txn, param: ScanType::Prefix(prefix) }
     }
 
