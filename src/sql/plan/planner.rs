@@ -456,7 +456,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         for (i, (sexpr, label)) in select.iter().enumerate() {
             if expr == sexpr {
                 *expr = ast::Expression::Column(i);
-                continue;
+                break;
             }
             if let Some(label) = label {
                 expr.transform_mut(
