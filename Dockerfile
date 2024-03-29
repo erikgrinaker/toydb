@@ -1,5 +1,5 @@
 # Initial build.
-FROM rust:1.75-slim AS build
+FROM rust:1.77-slim AS build
 
 # For Apple silicon Macs: --build-arg TARGET=aarch64-unknown-linux-musl
 ARG TARGET=x86_64-unknown-linux-musl

@@ -239,7 +239,12 @@ impl Log {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?
         }
-        let file = std::fs::OpenOptions::new().read(true).write(true).create(true).open(&path)?;
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)?;
         file.try_lock_exclusive()?;
         Ok(Self { path, file })
     }
