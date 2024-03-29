@@ -34,7 +34,7 @@ With a [Rust compiler](https://www.rust-lang.org/tools/install) installed, a loc
 cluster can be started on `localhost` ports `9601` to `9605`:
 
 ```
-$ (cd clusters/local && ./run.sh)
+$ ./cluster/run.sh
 ```
 
 A command-line client can be built and used with the node on `localhost` port `9605`:
