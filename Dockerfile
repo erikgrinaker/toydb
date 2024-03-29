@@ -1,6 +1,7 @@
-# Initial build
+# Initial build.
 FROM rust:1.75-slim AS build
 
+# For Apple silicon Macs: --build-arg TARGET=aarch64-unknown-linux-musl
 ARG TARGET=x86_64-unknown-linux-musl
 RUN apt-get -q update && apt-get -q install -y musl-dev
 RUN rustup target add $TARGET
@@ -21,7 +22,7 @@ RUN cargo build --release --target=$TARGET \
 COPY . .
 RUN cargo install --bin toydb --locked --offline --path . --target=$TARGET
 
-# Runtime image
+# Runtime image.
 FROM alpine:3.19
 COPY --from=build /usr/local/cargo/bin/toydb /usr/local/bin/toydb
 COPY --from=build /usr/src/toydb/config/toydb.yaml /etc/toydb.yaml
