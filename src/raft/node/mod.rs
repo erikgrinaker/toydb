@@ -2,7 +2,7 @@ mod candidate;
 mod follower;
 mod leader;
 
-use super::{Address, Driver, Event, Index, Instruction, Log, Message, State};
+use super::{Address, Driver, Event, Instruction, Log, Message, State};
 use crate::error::Result;
 use candidate::Candidate;
 use follower::Follower;
@@ -10,8 +10,7 @@ use leader::Leader;
 
 use ::log::debug;
 use rand::Rng as _;
-use serde_derive::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use tokio::sync::mpsc;
 
 /// A node ID.
@@ -33,19 +32,6 @@ const ELECTION_TIMEOUT_RANGE: std::ops::Range<u8> = 10..20;
 /// Generates a randomized election timeout.
 fn rand_election_timeout() -> Ticks {
     rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE)
-}
-
-/// Node status
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Status {
-    pub server: NodeID,
-    pub leader: NodeID,
-    pub term: Term,
-    pub node_last_index: HashMap<NodeID, Index>,
-    pub commit_index: Index,
-    pub apply_index: Index,
-    pub storage: String,
-    pub storage_size: u64,
 }
 
 /// A Raft node, with a dynamic role. The node is driven synchronously by
@@ -246,7 +232,7 @@ fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
 #[cfg(test)]
 mod tests {
     pub use super::super::state::tests::TestState;
-    use super::super::{Entry, RequestID};
+    use super::super::{Entry, Index, RequestID};
     use super::follower::tests::{follower_leader, follower_voted_for};
     use super::*;
     use crate::storage;

@@ -1,7 +1,9 @@
-use super::{Entry, Index, NodeID, Status, Term};
+use super::{Entry, Index, NodeID, Term};
 use crate::error::Result;
+use crate::storage;
 
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// A message address.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
@@ -127,4 +129,25 @@ pub enum Response {
     Query(Vec<u8>),
     Mutate(Vec<u8>),
     Status(Status),
+}
+
+/// Raft cluster status.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    /// The server handling this status request.
+    ///
+    /// TODO: this should be moved to the RPC server.
+    pub server: NodeID,
+    /// The current Raft leader, which generated this status.
+    pub leader: NodeID,
+    /// The current Raft term.
+    pub term: Term,
+    /// The last log indexes of all nodes.
+    pub last_index: HashMap<NodeID, Index>,
+    /// The current commit index.
+    pub commit_index: Index,
+    /// The current applied index.
+    pub apply_index: Index,
+    /// The log storage engine status.
+    pub storage: storage::engine::Status,
 }

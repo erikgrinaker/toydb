@@ -8,6 +8,7 @@ use toydb::sql::engine::Status;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Value};
+use toydb::storage;
 use toydb::storage::{engine, mvcc};
 use toydb::Client;
 
@@ -125,11 +126,17 @@ async fn status() -> Result<()> {
                 server: 1,
                 leader: 1,
                 term: 1,
-                node_last_index: [(1, 27)].into(),
+                last_index: [(1, 27)].into(),
                 commit_index: 27,
                 apply_index: 27,
-                storage: "bitcask".into(),
-                storage_size: 1324,
+                storage: storage::engine::Status {
+                    name: "bitcask".to_string(),
+                    keys: 29,
+                    size: 1324,
+                    total_disk_size: 1831,
+                    live_disk_size: 1556,
+                    garbage_disk_size: 275
+                },
             },
             mvcc: mvcc::Status {
                 versions: 1,

@@ -158,12 +158,11 @@ impl RawNode<Leader> {
             }
 
             Event::ClientRequest { id, request: Request::Status } => {
-                let engine_status = self.log.status()?;
                 let status = Box::new(Status {
                     server: self.id,
                     leader: self.id,
                     term: self.term,
-                    node_last_index: self
+                    last_index: self
                         .role
                         .progress
                         .iter()
@@ -172,8 +171,7 @@ impl RawNode<Leader> {
                         .collect(),
                     commit_index: self.log.get_commit_index().0,
                     apply_index: 0,
-                    storage: engine_status.name.clone(),
-                    storage_size: engine_status.size,
+                    storage: self.log.status()?,
                 });
                 self.state_tx.send(Instruction::Status { id, address: msg.from, status })?
             }
@@ -688,13 +686,17 @@ mod tests {
                     server: 1,
                     leader: 1,
                     term: 3,
-                    node_last_index: vec![(1, 5), (2, 0), (3, 0), (4, 0), (5, 0)]
-                        .into_iter()
-                        .collect(),
+                    last_index: vec![(1, 5), (2, 0), (3, 0), (4, 0), (5, 0)].into_iter().collect(),
                     commit_index: 2,
                     apply_index: 0,
-                    storage: "memory".into(),
-                    storage_size: 72,
+                    storage: storage::engine::Status {
+                        name: "memory".to_string(),
+                        keys: 7,
+                        size: 72,
+                        total_disk_size: 0,
+                        live_disk_size: 0,
+                        garbage_disk_size: 0,
+                    },
                 }),
             }],
         );

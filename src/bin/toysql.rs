@@ -119,7 +119,7 @@ The following commands are also available:
                 let status = self.client.status().await?;
                 let mut node_logs = status
                     .raft
-                    .node_last_index
+                    .last_index
                     .iter()
                     .map(|(id, index)| format!("{}:{}", id, index))
                     .collect::<Vec<_>>();
@@ -135,12 +135,12 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
                     server = status.raft.server,
                     leader = status.raft.leader,
                     term = status.raft.term,
-                    nodes = status.raft.node_last_index.len(),
+                    nodes = status.raft.last_index.len(),
                     committed = status.raft.commit_index,
                     applied = status.raft.apply_index,
-                    raft_storage = status.raft.storage,
+                    raft_storage = status.raft.storage.name,
                     raft_size =
-                        format_args!("{:.3}", status.raft.storage_size as f64 / 1000.0 / 1000.0),
+                        format_args!("{:.3}", status.raft.storage.size as f64 / 1000.0 / 1000.0),
                     logs = node_logs.join(" "),
                     versions = status.mvcc.versions,
                     active_txns = status.mvcc.active_txns,
