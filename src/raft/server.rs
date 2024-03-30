@@ -25,7 +25,7 @@ pub struct Server {
 
 impl Server {
     /// Creates a new Raft cluster
-    pub async fn new(
+    pub fn new(
         id: NodeID,
         peers: HashMap<NodeID, String>,
         log: Log,

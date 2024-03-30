@@ -25,14 +25,14 @@ pub struct Server {
 
 impl Server {
     /// Creates a new toyDB server.
-    pub async fn new(
+    pub fn new(
         id: raft::NodeID,
         peers: HashMap<raft::NodeID, String>,
         raft_log: raft::Log,
         raft_state: Box<dyn raft::State>,
     ) -> Result<Self> {
         Ok(Server {
-            raft: raft::Server::new(id, peers, raft_log, raft_state).await?,
+            raft: raft::Server::new(id, peers, raft_log, raft_state)?,
             raft_listener: None,
             sql_listener: None,
         })

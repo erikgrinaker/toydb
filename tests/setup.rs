@@ -81,8 +81,7 @@ pub async fn server(
         peers,
         raft::Log::new(storage::engine::BitCask::new(dir.path().join("log"))?, false)?,
         Box::new(sql::engine::Raft::new_state(storage::engine::Memory::new())?),
-    )
-    .await?;
+    )?;
 
     srv = srv.listen(addr_sql, addr_raft).await?;
     let (task, abort) = srv.serve().remote_handle();

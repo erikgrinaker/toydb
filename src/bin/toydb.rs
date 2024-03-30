@@ -56,8 +56,7 @@ async fn main() -> Result<()> {
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
 
-    Server::new(cfg.id, cfg.peers, raft_log, raft_state)
-        .await?
+    Server::new(cfg.id, cfg.peers, raft_log, raft_state)?
         .listen(&cfg.listen_sql, &cfg.listen_raft)
         .await?
         .serve()
