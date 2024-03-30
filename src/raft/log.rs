@@ -236,9 +236,6 @@ impl Log {
         if entries[0].index == 0 || entries[0].index > self.last_index + 1 {
             return Err(Error::Internal("Spliced entries must begin before last index".into()));
         }
-        if entries[0].index <= self.commit_index {
-            return Err(Error::Internal("Spliced entries must begin after commit index".into()));
-        }
         if !entries.windows(2).all(|w| w[0].index + 1 == w[1].index) {
             return Err(Error::Internal("Spliced entries must be contiguous".into()));
         }
@@ -254,6 +251,10 @@ impl Log {
             entries = &entries[1..];
         }
         drop(scan);
+
+        if !entries.is_empty() && entries[0].index <= self.commit_index {
+            return Err(Error::Internal("Spliced entries must begin after commit index".into()));
+        }
 
         // Write any entries not already in the log.
         for e in entries {
