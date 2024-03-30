@@ -254,6 +254,7 @@ mod tests {
     use std::collections::HashSet;
     use tokio::sync::mpsc;
 
+    #[track_caller]
     pub fn assert_messages<T: std::fmt::Debug + PartialEq>(
         rx: &mut mpsc::UnboundedReceiver<T>,
         msgs: Vec<T>,
@@ -282,28 +283,33 @@ mod tests {
             }
         }
 
+        #[track_caller]
         pub fn committed(mut self, index: Index) -> Self {
             assert_eq!(index, self.log().get_commit_index().0, "Unexpected committed index");
             self
         }
 
+        #[track_caller]
         pub fn last(mut self, index: Index) -> Self {
             assert_eq!(index, self.log().get_last_index().0, "Unexpected last index");
             self
         }
 
+        #[track_caller]
         pub fn entry(mut self, entry: Entry) -> Self {
             assert!(entry.index <= self.log().get_last_index().0, "Index beyond last entry");
             assert_eq!(entry, self.log().get(entry.index).unwrap().unwrap());
             self
         }
 
+        #[track_caller]
         pub fn entries(mut self, entries: Vec<Entry>) -> Self {
             assert_eq!(entries, self.log().scan(0..).unwrap().collect::<Result<Vec<_>>>().unwrap());
             self
         }
 
         #[allow(clippy::wrong_self_convention)]
+        #[track_caller]
         pub fn is_candidate(self) -> Self {
             match self.node {
                 Node::Candidate(_) => self,
@@ -313,6 +319,7 @@ mod tests {
         }
 
         #[allow(clippy::wrong_self_convention)]
+        #[track_caller]
         pub fn is_follower(self) -> Self {
             match self.node {
                 Node::Candidate(_) => panic!("Expected follower, got candidate"),
@@ -322,6 +329,7 @@ mod tests {
         }
 
         #[allow(clippy::wrong_self_convention)]
+        #[track_caller]
         pub fn is_leader(self) -> Self {
             match self.node {
                 Node::Candidate(_) => panic!("Expected leader, got candidate"),
@@ -330,6 +338,7 @@ mod tests {
             }
         }
 
+        #[track_caller]
         pub fn leader(self, leader: Option<NodeID>) -> Self {
             assert_eq!(
                 leader,
@@ -343,6 +352,7 @@ mod tests {
             self
         }
 
+        #[track_caller]
         pub fn forwarded(self, forwarded: Vec<RequestID>) -> Self {
             assert_eq!(
                 forwarded.into_iter().collect::<HashSet<RequestID>>(),
@@ -355,6 +365,7 @@ mod tests {
             self
         }
 
+        #[track_caller]
         pub fn term(mut self, term: Term) -> Self {
             assert_eq!(
                 term,
@@ -379,6 +390,7 @@ mod tests {
             self
         }
 
+        #[track_caller]
         pub fn voted_for(mut self, voted_for: Option<NodeID>) -> Self {
             assert_eq!(
                 voted_for,
