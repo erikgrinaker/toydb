@@ -10,6 +10,7 @@ use pretty_assertions::assert_eq;
 use std::collections::HashMap;
 use std::time::Duration;
 use tempdir::TempDir;
+use tokio::net::TcpListener;
 
 // Movie data
 pub fn movies() -> Vec<&'static str> {
@@ -76,15 +77,15 @@ pub async fn server(
     peers: HashMap<raft::NodeID, String>,
 ) -> Result<Teardown> {
     let dir = TempDir::new("toydb")?;
-    let mut srv = Server::new(
-        id,
-        peers,
-        raft::Log::new(storage::engine::BitCask::new(dir.path().join("log"))?, false)?,
-        Box::new(sql::engine::Raft::new_state(storage::engine::Memory::new())?),
-    )?;
+    let raft_log = raft::Log::new(storage::engine::BitCask::new(dir.path().join("log"))?, false)?;
+    let raft_state = Box::new(sql::engine::Raft::new_state(storage::engine::Memory::new())?);
+    let raft_listener = TcpListener::bind(addr_raft).await?;
+    let sql_listener = TcpListener::bind(addr_sql).await?;
 
-    srv = srv.listen(addr_sql, addr_raft).await?;
-    let (task, abort) = srv.serve().remote_handle();
+    let (task, abort) = Server::new(id, peers, raft_log, raft_state)?
+        .serve(raft_listener, sql_listener)
+        .remote_handle();
+
     tokio::spawn(task);
 
     Ok(Teardown::new(move || {

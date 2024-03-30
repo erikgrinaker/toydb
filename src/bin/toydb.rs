@@ -8,6 +8,7 @@
 
 use serde_derive::Deserialize;
 use std::collections::HashMap;
+use tokio::net::TcpListener;
 use toydb::error::{Error, Result};
 use toydb::raft;
 use toydb::sql;
@@ -56,11 +57,12 @@ async fn main() -> Result<()> {
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
 
-    Server::new(cfg.id, cfg.peers, raft_log, raft_state)?
-        .listen(&cfg.listen_sql, &cfg.listen_raft)
-        .await?
-        .serve()
-        .await
+    let srv = Server::new(cfg.id, cfg.peers, raft_log, raft_state)?;
+
+    let raft_listener = TcpListener::bind(&cfg.listen_raft).await?;
+    let sql_listener = TcpListener::bind(&cfg.listen_sql).await?;
+
+    srv.serve(raft_listener, sql_listener).await
 }
 
 #[derive(Debug, Deserialize)]

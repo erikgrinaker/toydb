@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::raft;
 use crate::sql;
 use crate::sql::engine::Engine as _;
@@ -19,8 +19,6 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
 /// A toyDB server.
 pub struct Server {
     raft: raft::Server,
-    raft_listener: Option<TcpListener>,
-    sql_listener: Option<TcpListener>,
 }
 
 impl Server {
@@ -31,31 +29,17 @@ impl Server {
         raft_log: raft::Log,
         raft_state: Box<dyn raft::State>,
     ) -> Result<Self> {
-        Ok(Server {
-            raft: raft::Server::new(id, peers, raft_log, raft_state)?,
-            raft_listener: None,
-            sql_listener: None,
-        })
-    }
-
-    /// Starts listening on the given ports. Must be called before serve.
-    pub async fn listen(mut self, sql_addr: &str, raft_addr: &str) -> Result<Self> {
-        let (sql, raft) =
-            tokio::try_join!(TcpListener::bind(sql_addr), TcpListener::bind(raft_addr),)?;
-        info!("Listening on {} (SQL) and {} (Raft)", sql.local_addr()?, raft.local_addr()?);
-        self.sql_listener = Some(sql);
-        self.raft_listener = Some(raft);
-        Ok(self)
+        Ok(Server { raft: raft::Server::new(id, peers, raft_log, raft_state)? })
     }
 
     /// Serves Raft and SQL requests until the returned future is dropped. Consumes the server.
-    pub async fn serve(self) -> Result<()> {
-        let sql_listener = self
-            .sql_listener
-            .ok_or_else(|| Error::Internal("Must listen before serving".into()))?;
-        let raft_listener = self
-            .raft_listener
-            .ok_or_else(|| Error::Internal("Must listen before serving".into()))?;
+    pub async fn serve(self, raft_listener: TcpListener, sql_listener: TcpListener) -> Result<()> {
+        info!(
+            "Listening on {} (SQL) and {} (Raft)",
+            sql_listener.local_addr()?,
+            raft_listener.local_addr()?
+        );
+
         let (raft_tx, raft_rx) = mpsc::unbounded_channel();
         let sql_engine = sql::engine::Raft::new(raft_tx);
 
