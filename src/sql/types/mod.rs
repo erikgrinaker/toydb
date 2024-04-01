@@ -177,8 +177,12 @@ impl From<&str> for Value {
 /// A row of values
 pub type Row = Vec<Value>;
 
-/// A row iterator
-pub type Rows = Box<dyn Iterator<Item = Result<Row>> + Send>;
+/// A set of rows.
+///
+/// For simplicitly, the SQL engine uses row vectors instead of streaming
+/// iterators, since the Raft and SQL network protocols don't support streaming
+/// reads anyway.
+pub type Rows = Vec<Row>;
 
 /// A column (in a result set, see schema::Column for table columns)
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

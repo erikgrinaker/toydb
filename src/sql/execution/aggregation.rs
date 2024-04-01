@@ -26,7 +26,7 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
         let agg_count = self.aggregates.len();
         match self.source.execute(txn)? {
             ResultSet::Query { columns, mut rows } => {
-                while let Some(mut row) = rows.next().transpose()? {
+                for mut row in rows {
                     self.accumulators
                         .entry(row.split_off(self.aggregates.len()))
                         .or_insert(self.aggregates.iter().map(<dyn Accumulator>::from).collect())
@@ -48,9 +48,13 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                         .enumerate()
                         .map(|(i, c)| if i < agg_count { Column { name: None } } else { c })
                         .collect(),
-                    rows: Box::new(self.accumulators.into_iter().map(|(bucket, accs)| {
-                        Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())
-                    })),
+                    rows: self
+                        .accumulators
+                        .into_iter()
+                        .map(|(bucket, accs)| {
+                            accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect()
+                        })
+                        .collect(),
                 })
             }
             r => Err(Error::Internal(format!("Unexpected result {:?}", r))),

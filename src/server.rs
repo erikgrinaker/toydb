@@ -4,7 +4,6 @@ use crate::sql;
 use crate::sql::engine::Engine as _;
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
-use crate::sql::types::Row;
 
 use ::log::{debug, error, info};
 use futures::sink::SinkExt as _;
@@ -81,7 +80,6 @@ pub enum Request {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
     Execute(ResultSet),
-    Row(Option<Row>),
     GetTable(Table),
     ListTables(Vec<String>),
     Status(sql::engine::Status),
@@ -106,29 +104,8 @@ impl Session {
             tokio_serde::formats::Bincode::default(),
         );
         while let Some(request) = stream.try_next().await? {
-            let mut response = tokio::task::block_in_place(|| self.request(request));
-            let mut rows: Box<dyn Iterator<Item = Result<Response>> + Send> =
-                Box::new(std::iter::empty());
-            if let Ok(Response::Execute(ResultSet::Query { rows: ref mut resultrows, .. })) =
-                &mut response
-            {
-                rows = Box::new(
-                    std::mem::replace(resultrows, Box::new(std::iter::empty()))
-                        .map(|result| result.map(|row| Response::Row(Some(row))))
-                        .chain(std::iter::once(Ok(Response::Row(None))))
-                        .scan(false, |err_sent, response| match (&err_sent, &response) {
-                            (true, _) => None,
-                            (_, Err(error)) => {
-                                *err_sent = true;
-                                Some(Err(error.clone()))
-                            }
-                            _ => Some(response),
-                        })
-                        .fuse(),
-                );
-            }
+            let response = tokio::task::block_in_place(|| self.request(request));
             stream.send(response).await?;
-            stream.send_all(&mut tokio_stream::iter(rows.map(Ok))).await?;
         }
         Ok(())
     }

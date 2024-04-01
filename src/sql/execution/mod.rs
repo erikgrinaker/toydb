@@ -76,60 +76,32 @@ impl<T: Transaction + 'static> dyn Executor<T> {
 #[derivative(Debug, PartialEq)]
 pub enum ResultSet {
     // Transaction started
-    Begin {
-        version: u64,
-        read_only: bool,
-    },
+    Begin { version: u64, read_only: bool },
     // Transaction committed
-    Commit {
-        version: u64,
-    },
+    Commit { version: u64 },
     // Transaction rolled back
-    Rollback {
-        version: u64,
-    },
+    Rollback { version: u64 },
     // Rows created
-    Create {
-        count: u64,
-    },
+    Create { count: u64 },
     // Rows deleted
-    Delete {
-        count: u64,
-    },
+    Delete { count: u64 },
     // Rows updated
-    Update {
-        count: u64,
-    },
+    Update { count: u64 },
     // Table created
-    CreateTable {
-        name: String,
-    },
+    CreateTable { name: String },
     // Table dropped
-    DropTable {
-        name: String,
-    },
+    DropTable { name: String },
     // Query result
-    Query {
-        columns: Columns,
-        #[derivative(Debug = "ignore")]
-        #[derivative(PartialEq = "ignore")]
-        #[serde(skip, default = "ResultSet::empty_rows")]
-        rows: Rows,
-    },
+    Query { columns: Columns, rows: Rows },
     // Explain result
     Explain(Node),
 }
 
 impl ResultSet {
-    /// Creates an empty row iterator, for use by serde(default).
-    fn empty_rows() -> Rows {
-        Box::new(std::iter::empty())
-    }
-
     /// Converts the ResultSet into a row, or errors if not a query result with rows.
     pub fn into_row(self) -> Result<Row> {
         if let ResultSet::Query { mut rows, .. } = self {
-            rows.next().transpose()?.ok_or_else(|| Error::Value("No rows returned".into()))
+            rows.into_iter().next().ok_or_else(|| Error::Value("No rows returned".into()))
         } else {
             Err(Error::Value(format!("Not a query result: {:?}", self)))
         }

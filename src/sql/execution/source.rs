@@ -1,5 +1,5 @@
 use super::super::engine::Transaction;
-use super::super::types::{Column, Expression, Row, Value};
+use super::super::types::{Column, Expression, Row, Rows, Value};
 use super::{Executor, ResultSet};
 use crate::error::Result;
 
@@ -21,8 +21,8 @@ impl<T: Transaction> Executor<T> for Scan {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
         let table = txn.must_read_table(&self.table)?;
         Ok(ResultSet::Query {
-            columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
-            rows: Box::new(txn.scan(&table.name, self.filter)?),
+            rows: txn.scan(&table.name, self.filter)?.collect::<Result<Rows>>()?,
+            columns: table.columns.into_iter().map(|c| Column { name: Some(c.name) }).collect(),
         })
     }
 }
@@ -42,17 +42,13 @@ impl KeyLookup {
 impl<T: Transaction> Executor<T> for KeyLookup {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
         let table = txn.must_read_table(&self.table)?;
-
-        // FIXME Is there a way to pass the txn into an iterator closure instead?
-        let rows = self
-            .keys
-            .into_iter()
-            .filter_map(|key| txn.read(&table.name, &key).transpose())
-            .collect::<Result<Vec<Row>>>()?;
-
         Ok(ResultSet::Query {
-            columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
-            rows: Box::new(rows.into_iter().map(Ok)),
+            rows: self
+                .keys
+                .into_iter()
+                .filter_map(|key| txn.read(&table.name, &key).transpose())
+                .collect::<Result<Rows>>()?,
+            columns: table.columns.into_iter().map(|c| Column { name: Some(c.name) }).collect(),
         })
     }
 }
@@ -79,15 +75,14 @@ impl<T: Transaction> Executor<T> for IndexLookup {
             pks.extend(txn.read_index(&self.table, &self.column, &value)?);
         }
 
-        // FIXME Is there a way to pass the txn into an iterator closure instead?
         let rows = pks
             .into_iter()
             .filter_map(|pk| txn.read(&table.name, &pk).transpose())
             .collect::<Result<Vec<Row>>>()?;
 
         Ok(ResultSet::Query {
-            columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
-            rows: Box::new(rows.into_iter().map(Ok)),
+            rows,
+            columns: table.columns.into_iter().map(|c| Column { name: Some(c.name) }).collect(),
         })
     }
 }
@@ -103,9 +98,6 @@ impl Nothing {
 
 impl<T: Transaction> Executor<T> for Nothing {
     fn execute(self: Box<Self>, _: &mut T) -> Result<ResultSet> {
-        Ok(ResultSet::Query {
-            columns: Vec::new(),
-            rows: Box::new(std::iter::once(Ok(Row::new()))),
-        })
+        Ok(ResultSet::Query { columns: Vec::new(), rows: Vec::new() })
     }
 }

@@ -67,24 +67,9 @@ impl Client {
     /// Executes a query
     pub async fn execute(&self, query: &str) -> Result<ResultSet> {
         let mut conn = self.conn.lock().await;
-        let mut resultset =
-            match self.call_locked(&mut conn, Request::Execute(query.into())).await? {
-                Response::Execute(rs) => rs,
-                resp => return Err(Error::Internal(format!("Unexpected response {:?}", resp))),
-            };
-        if let ResultSet::Query { columns, .. } = resultset {
-            // FIXME We buffer rows for now to avoid lifetime hassles
-            let mut rows = Vec::new();
-            while let Some(result) = conn.try_next().await? {
-                match result? {
-                    Response::Row(Some(row)) => rows.push(row),
-                    Response::Row(None) => break,
-                    response => {
-                        return Err(Error::Internal(format!("Unexpected response {:?}", response)))
-                    }
-                }
-            }
-            resultset = ResultSet::Query { columns, rows: Box::new(rows.into_iter().map(Ok)) }
+        let resultset = match self.call_locked(&mut conn, Request::Execute(query.into())).await? {
+            Response::Execute(rs) => rs,
+            resp => return Err(Error::Internal(format!("Unexpected response {:?}", resp))),
         };
         match &resultset {
             ResultSet::Begin { version, read_only } => self.txn.set(Some((*version, *read_only))),
