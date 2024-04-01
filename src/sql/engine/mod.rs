@@ -28,8 +28,8 @@ pub trait Engine: Clone {
     fn begin_as_of(&self, version: u64) -> Result<Self::Transaction>;
 
     /// Begins a session for executing individual statements
-    fn session(&self) -> Result<Session<Self>> {
-        Ok(Session { engine: self.clone(), txn: None })
+    fn session(&self) -> Session<Self> {
+        Session { engine: self.clone(), txn: None }
     }
 }
 

@@ -22,7 +22,7 @@ macro_rules! test_schema {
                 let mut f = mint.new_goldenfile(stringify!($name))?;
 
                 write!(f, "Query: {}\n", $query.trim())?;
-                match engine.session()?.execute($query) {
+                match engine.session().execute($query) {
                     Ok(result) => write!(f, "Result: {:?}\n\n", result)?,
                     Err(err) => write!(f, "Error: {:?}\n\n", err)?,
                 };

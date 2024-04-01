@@ -55,7 +55,7 @@ impl Server {
         let mut listener = TcpListenerStream::new(listener);
         while let Some(socket) = listener.try_next().await? {
             let peer = socket.peer_addr()?;
-            let session = Session::new(engine.clone())?;
+            let session = Session::new(engine.clone());
             tokio::spawn(async move {
                 info!("Client {} connected", peer);
                 match session.handle(socket).await {
@@ -95,8 +95,8 @@ pub struct Session {
 
 impl Session {
     /// Creates a new client session.
-    fn new(engine: sql::engine::Raft) -> Result<Self> {
-        Ok(Self { sql: engine.session()?, engine })
+    fn new(engine: sql::engine::Raft) -> Self {
+        Self { sql: engine.session(), engine }
     }
 
     /// Handles a client connection.
