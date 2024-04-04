@@ -9,7 +9,7 @@ use toydb::storage::engine::{BitCask, Engine};
 fn main() -> Result<()> {
     let args = clap::command!()
         .about("Prints toyDB BitCask contents in human-readable form.")
-        .args([clap::Arg::new("file")])
+        .args([clap::Arg::new("file").required(true)])
         .get_matches();
     let file: &String = args.get_one("file").unwrap();
 
