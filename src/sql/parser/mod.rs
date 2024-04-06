@@ -153,7 +153,13 @@ impl<'a> Parser<'a> {
     /// Parses a DROP TABLE DDL statement. The DROP TABLE prefix has
     /// already been consumed.
     fn parse_ddl_drop_table(&mut self) -> Result<ast::Statement> {
-        Ok(ast::Statement::DropTable(self.next_ident()?))
+        let mut if_exists = false;
+        if let Some(Token::Keyword(Keyword::If)) = self.next_if_keyword() {
+            self.next_expect(Some(Token::Keyword(Keyword::Exists)))?;
+            if_exists = true;
+        }
+        let name = self.next_ident()?;
+        Ok(ast::Statement::DropTable { name, if_exists })
     }
 
     /// Parses a column specification

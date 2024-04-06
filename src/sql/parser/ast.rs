@@ -20,7 +20,10 @@ pub enum Statement {
         name: String,
         columns: Vec<Column>,
     },
-    DropTable(String),
+    DropTable {
+        name: String,
+        if_exists: bool,
+    },
 
     Delete {
         table: String,

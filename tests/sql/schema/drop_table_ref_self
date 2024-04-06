@@ -1,5 +1,5 @@
 Query: DROP TABLE self
-Result: DropTable { name: "self" }
+Result: DropTable { name: "self", existed: true }
 
 Storage:
 CREATE TABLE source (

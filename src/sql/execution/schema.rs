@@ -25,17 +25,21 @@ impl<T: Transaction> Executor<T> for CreateTable {
 /// A DROP TABLE executor
 pub struct DropTable {
     table: String,
+    if_exists: bool,
 }
 
 impl DropTable {
-    pub fn new(table: String) -> Box<Self> {
-        Box::new(Self { table })
+    pub fn new(table: String, if_exists: bool) -> Box<Self> {
+        Box::new(Self { table, if_exists })
     }
 }
 
 impl<T: Transaction> Executor<T> for DropTable {
     fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+        if self.if_exists && txn.read_table(&self.table)?.is_none() {
+            return Ok(ResultSet::DropTable { name: self.table, existed: false });
+        }
         txn.delete_table(&self.table)?;
-        Ok(ResultSet::DropTable { name: self.table })
+        Ok(ResultSet::DropTable { name: self.table, existed: true })
     }
 }

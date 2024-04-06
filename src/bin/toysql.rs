@@ -192,7 +192,10 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
             ResultSet::Delete { count } => println!("Deleted {} rows", count),
             ResultSet::Update { count } => println!("Updated {} rows", count),
             ResultSet::CreateTable { name } => println!("Created table {}", name),
-            ResultSet::DropTable { name } => println!("Dropped table {}", name),
+            ResultSet::DropTable { name, existed } => match existed {
+                true => println!("Dropped table {}", name),
+                false => println!("Table {} did not exit", name),
+            },
             ResultSet::Explain(plan) => println!("{}", plan),
             ResultSet::Query { columns, mut rows } => {
                 if self.show_headers {

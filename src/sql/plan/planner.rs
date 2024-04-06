@@ -66,7 +66,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 )?,
             },
 
-            ast::Statement::DropTable(table) => Node::DropTable { table },
+            ast::Statement::DropTable { name, if_exists } => {
+                Node::DropTable { table: name, if_exists }
+            }
 
             // DML statements (mutations).
             ast::Statement::Delete { table, r#where } => {

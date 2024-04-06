@@ -35,7 +35,7 @@ impl<T: Transaction + 'static> dyn Executor<T> {
             }
             Node::CreateTable { schema } => CreateTable::new(schema),
             Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
-            Node::DropTable { table } => DropTable::new(table),
+            Node::DropTable { table, if_exists } => DropTable::new(table, if_exists),
             Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
             Node::HashJoin { left, left_field, right, right_field, outer } => HashJoin::new(
                 Self::build(*left),
@@ -107,6 +107,7 @@ pub enum ResultSet {
     // Table dropped
     DropTable {
         name: String,
+        existed: bool,
     },
     // Query result
     Query {

@@ -1,7 +1,14 @@
-Query: DROP TABLE a
-Result: DropTable { name: "a", existed: true }
+Query: DROP TABLE IF EXISTS name
+Result: DropTable { name: "name", existed: false }
 
 Storage:
+CREATE TABLE a (
+  id INTEGER PRIMARY KEY
+)
+[Integer(11)]
+[Integer(12)]
+[Integer(13)]
+
 CREATE TABLE b (
   id INTEGER PRIMARY KEY
 )

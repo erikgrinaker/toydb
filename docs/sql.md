@@ -19,7 +19,7 @@ Numeric types are not interchangable; a float value (even without a fractional p
 
 Keywords are reserved words with special meaning in SQL statements. They are case-insensitive, and must be quoted with `"` to be used as identifiers. The complete list is:
 
-`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `EXPLAIN`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `INDEX`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
+`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `EXISTS`, `EXPLAIN`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `IF`, `INDEX`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
@@ -74,19 +74,19 @@ Logical operators apply standard logic operations on boolean operands.
 The complete truth tables are:
 
 | `AND`       | `TRUE`  | `FALSE` | `NULL`  |
-| ----------- | ------- | ------- | ------- |
+|-------------|---------|---------|---------|
 | **`TRUE`**  | `TRUE`  | `FALSE` | `NULL`  |
 | **`FALSE`** | `FALSE` | `FALSE` | `FALSE` |
 | **`NULL`**  | `NULL`  | `FALSE` | `NULL`  |
 
 | `OR`        | `TRUE` | `FALSE` | `NULL` |
-| ----------- | ------ | ------- | ------ |
+|-------------|--------|---------|--------|
 | **`TRUE`**  | `TRUE` | `TRUE`  | `TRUE` |
 | **`FALSE`** | `TRUE` | `FALSE` | `NULL` |
 | **`NULL`**  | `TRUE` | `NULL`  | `NULL` |
 
 | `NOT`       |         |
-| ----------- | ------- |
+|-------------|---------|
 | **`TRUE`**  | `FALSE` |
 | **`FALSE`** | `TRUE`  |
 | **`NULL`**  | `NULL`  |
@@ -141,7 +141,7 @@ String operators operate on string operands.
 The operator precedence (order of operations) is as follows:
 
 | Precedence | Operator                 | Associativity |
-| ---------- | ------------------------ | ------------- |
+|------------|--------------------------|---------------|
 | 9          | `+`, `-`, `NOT` (prefix) | Right         |
 | 8          | `!`, `IS` (postfix)      | Left          |
 | 7          | `^`                      | Right         |
@@ -254,13 +254,14 @@ WHERE release_year < 2000 AND bluray = FALSE
 
 ### `DROP TABLE`
 
-Deletes a table and all contained data.
+Deletes a table and all contained data. Errors if the table does not
+exist, unless `IF EXISTS` is given.
 
 <pre>
-DROP TABLE <b><i>table_name</i></b>
+DROP TABLE [ IF EXISTS ] <b><i>table_name</i></b>
 </pre>
 
-* ***`table_name`***: the table to delete. Errors if it does not exist.
+* ***`table_name`***: the table to delete.
 
 ### `EXPLAIN`
 

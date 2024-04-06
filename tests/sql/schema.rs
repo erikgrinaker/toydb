@@ -149,6 +149,8 @@ test_schema! { with [
     drop_table_bare: "DROP TABLE",
     drop_table_missing: "DROP TABLE name",
     drop_table_multiple: "DROP TABLE a, c",
+    drop_table_if_exists: "DROP TABLE IF EXISTS a",
+    drop_table_if_exists_missing: "DROP TABLE IF EXISTS name",
 }
 test_schema! { with [
         "CREATE TABLE target (id INTEGER PRIMARY KEY)",

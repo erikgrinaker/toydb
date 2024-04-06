@@ -62,6 +62,7 @@ pub enum Node {
     },
     DropTable {
         table: String,
+        if_exists: bool,
     },
     Filter {
         source: Box<Node>,
@@ -280,7 +281,7 @@ impl Node {
                 s += &format!("Delete: {}\n", table);
                 s += &source.format(indent, false, true);
             }
-            Self::DropTable { table } => {
+            Self::DropTable { table, if_exists: _ } => {
                 s += &format!("DropTable: {}\n", table);
             }
             Self::Filter { source, predicate } => {

@@ -1,4 +1,4 @@
-Query: DROP TABLE a
+Query: DROP TABLE IF EXISTS a
 Result: DropTable { name: "a", existed: true }
 
 Storage:
