@@ -31,13 +31,13 @@ database internals.
 ## Usage
 
 With a [Rust compiler](https://www.rust-lang.org/tools/install) installed, a local five-node 
-cluster can be started on `localhost` ports `9601` to `9605`:
+cluster can be started on `localhost` ports `9601` to `9605`, with data under `cluster/*/data`:
 
 ```
 $ ./cluster/run.sh
 ```
 
-A command-line client can be built and used with the node on `localhost` port `9605`:
+A command-line client can be built and used with node 5 on `localhost:9605`:
 
 ```
 $ cargo run --release --bin toysql
@@ -73,64 +73,57 @@ desirable but not yet implemented.
 Execute `cargo test` to run all tests, or check out the latest
 [CI run](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml).
 
-## Performance
+## Benchmarks
 
-Performance is not a primary goal of toyDB, but it has a bank simulation as a basic gauge of
-throughput and correctness. This creates a set of customers and accounts, and spawns several
-concurrent workers that make random transfers between them, retrying serialization failures and
-verifying invariants:
+toyDB is not optimized for performance, but it comes with a `workload` benchmarking tool that can
+run various workloads against a toyDB cluster. For example:
 
 ```sh
-$ cargo run --release --bin bank
-Created 100 customers (1000 accounts) in 0.123s
-Verified that total balance is 100000 with no negative balances
-
-Thread 0 transferred   18 from  92 (0911) to 100 (0994) in 0.007s (1 attempts)
-Thread 1 transferred   84 from  61 (0601) to  85 (0843) in 0.007s (1 attempts)
-Thread 3 transferred   15 from  40 (0393) to  62 (0614) in 0.007s (1 attempts)
+# Start a 5-node toyDB cluster.
+$ ./cluster/run.sh
 [...]
-Thread 6 transferred   48 from  78 (0777) to  52 (0513) in 0.004s (1 attempts)
-Thread 3 transferred   57 from  93 (0921) to  19 (0188) in 0.065s (2 attempts)
-Thread 4 transferred   70 from  35 (0347) to  49 (0484) in 0.068s (2 attempts)
 
-Ran 1000 transactions in 0.937s (1067.691/s)
-Verified that total balance is 100000 with no negative balances
+# Run a read-only benchmark via all 5 nodes.
+$ cargo run --release --bin workload read
+Preparing initial dataset... done (0.096s)
+Spawning 16 workers... done (0.003s)
+Running workload read (rows=1000 size=64 batch=1)...
+
+Time   Progress     Txns      Rate       p50       p90       p99      pMax
+1.0s       7.2%     7186    7181/s     2.3ms     3.1ms     4.0ms     9.6ms
+2.0s      14.4%    14416    7205/s     2.3ms     3.1ms     4.2ms     9.6ms
+3.0s      22.5%    22518    7504/s     2.2ms     2.9ms     4.0ms     9.6ms
+4.0s      30.3%    30303    7574/s     2.2ms     2.9ms     3.8ms     9.6ms
+5.0s      38.2%    38200    7639/s     2.2ms     2.8ms     3.7ms     9.6ms
+6.0s      46.0%    45961    7659/s     2.2ms     2.8ms     3.7ms     9.6ms
+7.0s      53.3%    53343    7620/s     2.2ms     2.8ms     3.7ms     9.6ms
+8.0s      61.2%    61220    7651/s     2.2ms     2.8ms     3.6ms     9.6ms
+9.0s      68.2%    68194    7576/s     2.2ms     2.8ms     3.7ms     9.6ms
+10.0s     75.8%    75800    7579/s     2.2ms     2.8ms     3.7ms     9.6ms
+11.0s     82.9%    82864    7533/s     2.2ms     2.9ms     3.7ms    18.2ms
+12.0s     90.6%    90583    7548/s     2.2ms     2.9ms     3.7ms    18.2ms
+13.0s     98.3%    98311    7562/s     2.2ms     2.9ms     3.7ms    18.2ms
+13.2s    100.0%   100000    7569/s     2.2ms     2.9ms     3.7ms    18.2ms
+
+Verifying dataset... done (0.001s)
 ```
 
-The informal target was 100 transactions per second, and these results exceed that by an order
-of magnitude. For an unoptimized implementation, this is certainly "good enough". However, this
-is with a single node and fsync disabled - the table below shows results for other configurations,
-revealing clear potential for improvement:
+The available workloads are:
 
-|             | `sync: false` | `sync: true` |
-|-------------|---------------|--------------|
-| **1 node**  | 1067 txn/s    | 38 txn/s     |
-| **5 nodes** | 417 txn/s     | 19 txn/s     |
+* `read`: single-row primary key lookups.
+* `write`: single-row inserts to sequential primary keys.
+* `bank`: makes bank transfers between various customers and accounts. To make things interesting,
+  this includes joins, secondary indexes, sorting, and conflicts.
 
-Note that each transaction consists of six statements, including joins, not just a single update:
+For more information about workloads and parameters, run `cargo run --bin workload -- --help`.
 
-```sql
-BEGIN;
+Example workload results:
 
--- Find the sender account with the highest balance
-SELECT a.id, a.balance
-FROM account a JOIN customer c ON a.customer_id = c.id
-WHERE c.id = {sender}
-ORDER BY a.balance DESC
-LIMIT 1;
-
--- Find the receiver account with the lowest balance
-SELECT a.id, a.balance
-FROM account a JOIN customer c ON a.customer_id = c.id
-WHERE c.id = {receiver}
-ORDER BY a.balance ASC
-LIMIT 1;
-
--- Transfer a random amount within the sender's balance to the receiver
-UPDATE account SET balance = balance - {amount} WHERE id = {source};
-UPDATE account SET balance = balance + {amount} WHERE id = {destination};
-
-COMMIT;
+```
+Workload   Time       Txns      Rate       p50       p90       p99      pMax
+read       13.2s    100000    7569/s     2.2ms     2.9ms     3.7ms    18.2ms
+write      22.2s    100000    4502/s     3.9ms     4.5ms     4.9ms    15.7ms
+bank       155.0s   100000     645/s    16.9ms    41.7ms    95.0ms  1044.4ms
 ```
 
 ## Debugging

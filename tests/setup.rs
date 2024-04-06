@@ -1,6 +1,6 @@
 #![allow(clippy::implicit_hasher)]
 
-use toydb::client::{Client, Pool};
+use toydb::client::Client;
 use toydb::error::Result;
 use toydb::server::Server;
 use toydb::{raft, sql, storage};
@@ -97,7 +97,7 @@ pub async fn server(
 /// Sets up a server with a client
 pub async fn server_with_client(queries: Vec<&str>) -> Result<(Client, Teardown)> {
     let teardown = server(1, "127.0.0.1:9605", "127.0.0.1:9705", HashMap::new()).await?;
-    let client = Client::new("127.0.0.1:9605").await?;
+    let mut client = Client::new("127.0.0.1:9605").await?;
     if !queries.is_empty() {
         client.execute("BEGIN").await?;
         for query in queries {
@@ -124,7 +124,7 @@ pub async fn cluster(nodes: HashMap<raft::NodeID, (String, String)>) -> Result<T
     for (id, (addr_sql, _)) in nodes.iter() {
         for _ in 0..10 {
             match Client::new(addr_sql).await {
-                Ok(client) => match client.status().await {
+                Ok(mut client) => match client.status().await {
                     Ok(status) if status.raft.leader > 0 => break,
                     Ok(_) => log::error!("no leader"),
                     Err(err) => log::error!("Status failed for {}: {}", id, err),
@@ -151,7 +151,7 @@ pub async fn cluster_with_clients(size: u8, queries: Vec<&str>) -> Result<(Vec<C
 
     let mut clients = Vec::<Client>::new();
     for (id, (addr_sql, _)) in nodes {
-        let client = Client::new(addr_sql).await?;
+        let mut client = Client::new(addr_sql).await?;
         assert_eq!(id, client.status().await?.raft.server);
         clients.push(client);
     }
@@ -166,36 +166,6 @@ pub async fn cluster_with_clients(size: u8, queries: Vec<&str>) -> Result<(Vec<C
     }
 
     Ok((clients, teardown))
-}
-
-/// Sets up a server cluster with a client pool
-pub async fn cluster_with_pool(
-    cluster_size: u8,
-    pool_size: u64,
-    queries: Vec<&str>,
-) -> Result<(Pool, Teardown)> {
-    let mut nodes = HashMap::new();
-    for i in 1..=cluster_size {
-        nodes.insert(
-            i,
-            (format!("127.0.0.1:{}", 9605 + i as u64), format!("127.0.0.1:{}", 9705 + i as u64)),
-        );
-    }
-    let teardown = cluster(nodes.clone()).await?;
-
-    let pool = Pool::new(nodes.into_iter().map(|(_, (addr, _))| addr).collect(), pool_size).await?;
-    pool.get().await.status().await?;
-
-    if !queries.is_empty() {
-        let c = pool.get().await;
-        c.execute("BEGIN").await?;
-        for query in queries {
-            c.execute(query).await?;
-        }
-        c.execute("COMMIT").await?;
-    }
-
-    Ok((pool, teardown))
 }
 
 /// Sets up a simple cluster with 3 clients and a test table

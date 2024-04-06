@@ -735,13 +735,7 @@ out of scope for the project.
 
 The toyDB [`Client`](https://github.com/erikgrinaker/toydb/blob/master/src/client.rs) provides a 
 simple API for interacting with a server, mainly by executing SQL statements via `execute()` 
-returning `sql::ResultSet`. It also has the convenience method `with_txn()`, taking a closure 
-that executes a series of SQL statements while automatically catching and retrying serialization
-errors.
-
-There is also `client::Pool`, which manages a set of pre-connected clients that can be retrieved
-for running short-lived queries in a multi-threaded application without incurring connection
-setup costs.
+returning `sql::ResultSet`.
 
 The [`toysql`](https://github.com/erikgrinaker/toydb/blob/master/src/bin/toysql.rs) command-line
 client is a simple REPL client that connects to a server using the toyDB `Client` and continually 

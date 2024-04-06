@@ -43,6 +43,12 @@ impl serde::de::Error for Error {
     }
 }
 
+impl<T> From<async_channel::SendError<T>> for Error {
+    fn from(err: async_channel::SendError<T>) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
 impl From<Box<bincode::ErrorKind>> for Error {
     fn from(err: Box<bincode::ErrorKind>) -> Self {
         Error::Internal(err.to_string())
@@ -52,6 +58,18 @@ impl From<Box<bincode::ErrorKind>> for Error {
 impl From<config::ConfigError> for Error {
     fn from(err: config::ConfigError) -> Self {
         Error::Config(err.to_string())
+    }
+}
+
+impl From<hdrhistogram::CreationError> for Error {
+    fn from(err: hdrhistogram::CreationError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl From<hdrhistogram::RecordError> for Error {
+    fn from(err: hdrhistogram::RecordError) -> Self {
+        Error::Internal(err.to_string())
     }
 }
 

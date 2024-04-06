@@ -9,7 +9,7 @@ use serial_test::serial;
 #[serial]
 // A dirty write is when b overwrites an uncommitted value written by a.
 async fn anomaly_dirty_write() -> Result<()> {
-    let (a, b, _, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -29,7 +29,7 @@ async fn anomaly_dirty_write() -> Result<()> {
 #[serial]
 // A dirty read is when b can read an uncommitted value set by a.
 async fn anomaly_dirty_read() -> Result<()> {
-    let (a, b, _, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -43,7 +43,7 @@ async fn anomaly_dirty_read() -> Result<()> {
 #[serial]
 // A lost update is when a and b both read a value and update it, where b's update replaces a.
 async fn anomaly_lost_update() -> Result<()> {
-    let (a, b, c, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c')").await?;
 
@@ -69,7 +69,7 @@ async fn anomaly_lost_update() -> Result<()> {
 #[serial]
 // A fuzzy (or unrepeatable) read is when b sees a value change after a updates it.
 async fn anomaly_fuzzy_read() -> Result<()> {
-    let (a, b, c, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c')").await?;
 
@@ -94,7 +94,7 @@ async fn anomaly_fuzzy_read() -> Result<()> {
 #[serial]
 // Read skew is when a reads 1 and 2, but b modifies 2 in between the reads.
 async fn anomaly_read_skew() -> Result<()> {
-    let (a, b, c, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c'), (2, 'c')").await?;
 
@@ -120,7 +120,7 @@ async fn anomaly_read_skew() -> Result<()> {
 // A phantom read is when a reads entries matching some predicate, but a modification by
 // b changes the entries that match the predicate such that a later read by a returns them.
 async fn anomaly_phantom_read() -> Result<()> {
-    let (a, b, c, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'true'), (2, 'false')").await?;
 

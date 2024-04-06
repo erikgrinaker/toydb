@@ -9,7 +9,7 @@ use serial_test::serial;
 #[serial]
 // A client disconnect or termination should roll back its transaction.
 async fn client_disconnect_rollback() -> Result<()> {
-    let (a, b, _, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -28,7 +28,7 @@ async fn client_disconnect_rollback() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn client_commit_error() -> Result<()> {
-    let (a, b, _, _teardown) = setup::cluster_simple().await?;
+    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;

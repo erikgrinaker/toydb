@@ -129,8 +129,14 @@ impl ResultSet {
 
     /// Converts the ResultSet into a row, or errors if not a query result with rows.
     pub fn into_row(self) -> Result<Row> {
-        if let ResultSet::Query { mut rows, .. } = self {
-            rows.next().transpose()?.ok_or_else(|| Error::Value("No rows returned".into()))
+        self.into_rows()?.next().transpose()?.ok_or_else(|| Error::Value("No rows returned".into()))
+    }
+
+    /// Converts the ResultSet into a row iterator, or errors if not a query
+    /// result with rows.
+    pub fn into_rows(self) -> Result<Rows> {
+        if let ResultSet::Query { rows, .. } = self {
+            Ok(rows)
         } else {
             Err(Error::Value(format!("Not a query result: {:?}", self)))
         }
