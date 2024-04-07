@@ -10,10 +10,10 @@ default-run = "toydb"
 doctest = false
 
 [dependencies]
-async-channel = "~2.2.0"
 bincode = "~1.3.3"
 clap = { version = "~4.5.4", features = ["cargo", "derive"] }
 config = "~0.14.0"
+crossbeam = { version = "0.8.4", features = ["crossbeam-channel"] }
 derivative = "~2.2.0"
 fs4 = "~0.8.1"
 futures = "~0.3.15"

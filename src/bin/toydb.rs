@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
     let srv = Server::new(cfg.id, cfg.peers, raft_log, raft_state)?;
 
     let raft_listener = TcpListener::bind(&cfg.listen_raft).await?;
-    let sql_listener = TcpListener::bind(&cfg.listen_sql).await?;
+    let sql_listener = std::net::TcpListener::bind(&cfg.listen_sql)?;
 
     srv.serve(raft_listener, sql_listener).await
 }

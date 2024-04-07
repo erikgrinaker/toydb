@@ -1,3 +1,4 @@
+use crate::encoding::bincode;
 use crate::error::Result;
 use crate::raft;
 use crate::sql;
@@ -7,14 +8,10 @@ use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
 
 use ::log::{debug, error, info};
-use futures::sink::SinkExt as _;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::TcpListenerStream;
-use tokio_stream::StreamExt as _;
-use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 /// A toyDB server.
 pub struct Server {
@@ -33,7 +30,11 @@ impl Server {
     }
 
     /// Serves Raft and SQL requests until the returned future is dropped. Consumes the server.
-    pub async fn serve(self, raft_listener: TcpListener, sql_listener: TcpListener) -> Result<()> {
+    pub async fn serve(
+        self,
+        raft_listener: TcpListener,
+        sql_listener: std::net::TcpListener,
+    ) -> Result<()> {
         info!(
             "Listening on {} (SQL) and {} (Raft)",
             sql_listener.local_addr()?,
@@ -42,28 +43,32 @@ impl Server {
 
         let (raft_tx, raft_rx) = mpsc::unbounded_channel();
 
-        tokio::try_join!(
-            self.raft.serve(raft_listener, raft_rx),
-            Self::serve_sql(sql_listener, raft_tx),
-        )?;
+        tokio::task::spawn_blocking(move || Self::serve_sql(sql_listener, raft_tx));
+
+        tokio::try_join!(self.raft.serve(raft_listener, raft_rx))?;
         Ok(())
     }
 
     /// Serves SQL clients.
-    async fn serve_sql(listener: TcpListener, raft_tx: raft::ClientSender) -> Result<()> {
-        let mut listener = TcpListenerStream::new(listener);
-        while let Some(socket) = listener.try_next().await? {
-            let peer = socket.peer_addr()?;
-            let session = Session::new(sql::engine::Raft::new(raft_tx.clone()));
-            tokio::spawn(async move {
+    fn serve_sql(listener: std::net::TcpListener, raft_tx: raft::ClientSender) {
+        std::thread::scope(|s| loop {
+            let (socket, peer) = match listener.accept() {
+                Ok(r) => r,
+                Err(err) => {
+                    error!("Connection failed: {}", err);
+                    continue;
+                }
+            };
+            let raft_tx = raft_tx.clone();
+            s.spawn(move || {
+                let session = Session::new(sql::engine::Raft::new(raft_tx));
                 info!("Client {} connected", peer);
-                match session.handle(socket).await {
+                match session.handle(socket) {
                     Ok(()) => info!("Client {} disconnected", peer),
                     Err(err) => error!("Client {} error: {}", peer, err),
                 }
             });
-        }
-        Ok(())
+        })
     }
 }
 
@@ -99,18 +104,15 @@ impl Session {
     }
 
     /// Handles a client connection.
-    async fn handle(mut self, socket: TcpStream) -> Result<()> {
-        let mut stream = tokio_serde::Framed::new(
-            Framed::new(socket, LengthDelimitedCodec::new()),
-            tokio_serde::formats::Bincode::default(),
-        );
-        while let Some(request) = stream.try_next().await? {
-            let mut response = tokio::task::block_in_place(|| self.request(request));
+    fn handle(mut self, mut socket: std::net::TcpStream) -> Result<()> {
+        while let Some(request) = bincode::maybe_deserialize_from(&mut socket)? {
+            let mut response = self.request(request);
             let mut rows: Box<dyn Iterator<Item = Result<Response>> + Send> =
                 Box::new(std::iter::empty());
             if let Ok(Response::Execute(ResultSet::Query { rows: ref mut resultrows, .. })) =
                 &mut response
             {
+                // TODO: don't stream results, for simplicity.
                 rows = Box::new(
                     std::mem::replace(resultrows, Box::new(std::iter::empty()))
                         .map(|result| result.map(|row| Response::Row(Some(row))))
@@ -126,12 +128,15 @@ impl Session {
                         .fuse(),
                 );
             }
-            stream.send(response).await?;
-            stream.send_all(&mut tokio_stream::iter(rows.map(Ok))).await?;
+
+            bincode::serialize_into(&mut socket, &response)?;
+
+            for row in rows {
+                bincode::serialize_into(&mut socket, &row)?;
+            }
         }
         Ok(())
     }
-
     /// Executes a request.
     pub fn request(&mut self, request: Request) -> Result<Response> {
         debug!("Processing request {:?}", request);
@@ -152,6 +157,6 @@ impl Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        tokio::task::block_in_place(|| self.sql.execute("ROLLBACK").ok());
+        self.sql.execute("ROLLBACK").ok();
     }
 }

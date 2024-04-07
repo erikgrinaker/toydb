@@ -43,12 +43,6 @@ impl serde::de::Error for Error {
     }
 }
 
-impl<T> From<async_channel::SendError<T>> for Error {
-    fn from(err: async_channel::SendError<T>) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
 impl From<Box<bincode::ErrorKind>> for Error {
     fn from(err: Box<bincode::ErrorKind>) -> Self {
         Error::Internal(err.to_string())
@@ -58,6 +52,30 @@ impl From<Box<bincode::ErrorKind>> for Error {
 impl From<config::ConfigError> for Error {
     fn from(err: config::ConfigError) -> Self {
         Error::Config(err.to_string())
+    }
+}
+
+impl From<crossbeam::channel::RecvError> for Error {
+    fn from(err: crossbeam::channel::RecvError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl<T> From<crossbeam::channel::SendError<T>> for Error {
+    fn from(err: crossbeam::channel::SendError<T>) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl From<crossbeam::channel::TryRecvError> for Error {
+    fn from(err: crossbeam::channel::TryRecvError) -> Self {
+        Error::Internal(err.to_string())
+    }
+}
+
+impl<T> From<crossbeam::channel::TrySendError<T>> for Error {
+    fn from(err: crossbeam::channel::TrySendError<T>) -> Self {
+        Error::Internal(err.to_string())
     }
 }
 

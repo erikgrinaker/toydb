@@ -14,8 +14,7 @@ use toydb::sql::execution::ResultSet;
 use toydb::sql::parser::{Lexer, Token};
 use toydb::Client;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let opts = clap::command!()
         .name("toysql")
         .about("A ToyDB client.")
@@ -36,13 +35,12 @@ async fn main() -> Result<()> {
         .get_matches();
 
     let mut toysql =
-        ToySQL::new(opts.get_one::<String>("host").unwrap(), *opts.get_one("port").unwrap())
-            .await?;
+        ToySQL::new(opts.get_one::<String>("host").unwrap(), *opts.get_one("port").unwrap())?;
 
     if let Some(command) = opts.get_one::<&str>("command") {
-        toysql.execute(command).await
+        toysql.execute(command)
     } else {
-        toysql.run().await
+        toysql.run()
     }
 }
 
@@ -56,9 +54,9 @@ struct ToySQL {
 
 impl ToySQL {
     /// Creates a new ToySQL REPL for the given server host and port
-    async fn new(host: &str, port: u16) -> Result<Self> {
+    fn new(host: &str, port: u16) -> Result<Self> {
         Ok(Self {
-            client: Client::new((host, port)).await?,
+            client: Client::new((host, port))?,
             editor: Editor::new()?,
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),
@@ -67,18 +65,18 @@ impl ToySQL {
     }
 
     /// Executes a line of input
-    async fn execute(&mut self, input: &str) -> Result<()> {
+    fn execute(&mut self, input: &str) -> Result<()> {
         if input.starts_with('!') {
-            self.execute_command(input).await
+            self.execute_command(input)
         } else if !input.is_empty() {
-            self.execute_query(input).await
+            self.execute_query(input)
         } else {
             Ok(())
         }
     }
 
     /// Handles a REPL command (prefixed by !, e.g. !help)
-    async fn execute_command(&mut self, input: &str) -> Result<()> {
+    fn execute_command(&mut self, input: &str) -> Result<()> {
         let mut input = input.split_ascii_whitespace();
         let command = input.next().ok_or_else(|| Error::Parse("Expected command.".to_string()))?;
 
@@ -116,7 +114,7 @@ The following commands are also available:
 "#
             ),
             "!status" => {
-                let status = self.client.status().await?;
+                let status = self.client.status()?;
                 let mut node_logs = status
                     .raft
                     .last_index
@@ -166,11 +164,11 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
             }
             "!table" => {
                 let args = getargs(1)?;
-                println!("{}", self.client.get_table(args[0]).await?);
+                println!("{}", self.client.get_table(args[0])?);
             }
             "!tables" => {
                 getargs(0)?;
-                for table in self.client.list_tables().await? {
+                for table in self.client.list_tables()? {
                     println!("{}", table)
                 }
             }
@@ -180,8 +178,8 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
     }
 
     /// Runs a query and displays the results
-    async fn execute_query(&mut self, query: &str) -> Result<()> {
-        match self.client.execute(query).await? {
+    fn execute_query(&mut self, query: &str) -> Result<()> {
+        match self.client.execute(query)? {
             ResultSet::Begin { version, read_only } => match read_only {
                 false => println!("Began transaction at new version {}", version),
                 true => println!("Began read-only transaction at version {}", version),
@@ -237,7 +235,7 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
     }
 
     /// Runs the ToySQL REPL
-    async fn run(&mut self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         if let Some(path) = &self.history_path {
             match self.editor.load_history(path) {
                 Ok(_) => {}
@@ -252,14 +250,14 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
             rustyline::Cmd::Noop,
         );
 
-        let status = self.client.status().await?;
+        let status = self.client.status()?;
         println!(
             "Connected to toyDB node \"{}\". Enter !help for instructions.",
             status.raft.server
         );
 
         while let Some(input) = self.prompt()? {
-            match self.execute(&input).await {
+            match self.execute(&input) {
                 Ok(()) => {}
                 error @ Err(Error::Internal(_)) => return error,
                 Err(error) => println!("Error: {}", error),

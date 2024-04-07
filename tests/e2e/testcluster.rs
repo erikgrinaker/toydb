@@ -31,22 +31,22 @@ impl TestCluster {
     }
 
     /// Creates a new test cluster and starts it.
-    pub async fn run(nodes: u8) -> Result<Self> {
+    pub fn run(nodes: u8) -> Result<Self> {
         let mut tc = Self::new(nodes)?;
-        tc.start().await?;
+        tc.start()?;
         Ok(tc)
     }
 
     /// Creates a new test cluster, starts it, and imports an initial dataset.
-    pub async fn run_with(nodes: u8, init: &str) -> Result<Self> {
-        let tc = Self::run(nodes).await?;
+    pub fn run_with(nodes: u8, init: &str) -> Result<Self> {
+        let tc = Self::run(nodes)?;
 
-        let mut c = tc.connect_any().await?;
-        c.execute("BEGIN").await?;
+        let mut c = tc.connect_any()?;
+        c.execute("BEGIN")?;
         for stmt in init.split(';') {
-            c.execute(stmt).await?;
+            c.execute(stmt)?;
         }
-        c.execute("COMMIT").await?;
+        c.execute("COMMIT")?;
 
         Ok(tc)
     }
@@ -105,9 +105,7 @@ impl TestCluster {
     }
 
     /// Starts the test cluster. It keeps running until the cluster is dropped.
-    ///
-    /// TODO: this only uses async because Client is still async. Remove it.
-    pub async fn start(&mut self) -> Result<()> {
+    pub fn start(&mut self) -> Result<()> {
         // Build the binary.
         let build = escargot::CargoBuild::new().bin("toydb").run().expect("Failed to build binary");
 
@@ -140,12 +138,12 @@ impl TestCluster {
 
         let deadline = std::time::Instant::now().checked_add(TIMEOUT).unwrap();
         for id in self.ids() {
-            while let Err(e) = async { self.connect(id).await?.status().await }.await {
+            while let Err(e) = self.connect(id).and_then(|mut c| c.status()) {
                 self.assert_alive();
                 if std::time::Instant::now() >= deadline {
                     return Err(e);
                 }
-                tokio::time::sleep(COOLDOWN).await;
+                std::thread::sleep(COOLDOWN);
             }
         }
 
@@ -153,14 +151,14 @@ impl TestCluster {
     }
 
     /// Connects to the given cluster node.
-    pub async fn connect(&self, id: NodeID) -> Result<Client> {
+    pub fn connect(&self, id: NodeID) -> Result<Client> {
         self.assert_id(id);
-        Client::new(self.node_address_sql(id)).await
+        Client::new(self.node_address_sql(id))
     }
 
     /// Connects to a random cluster node.
-    pub async fn connect_any(&self) -> Result<Client> {
-        self.connect(rand::thread_rng().gen_range(1..=self.nodes)).await
+    pub fn connect_any(&self) -> Result<Client> {
+        self.connect(rand::thread_rng().gen_range(1..=self.nodes))
     }
 }
 
