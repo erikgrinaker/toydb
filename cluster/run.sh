@@ -11,9 +11,8 @@ set -euo pipefail
 # Change into the script directory.
 cd "$(dirname $0)"
 
-# Build toyDB and toySQL using release optimizations.
+# Build toyDB using release optimizations.
 cargo build --release --bin toydb
-cargo build --release --bin toysql
 
 # Start nodes 1-5 in the background, prefixing their output with the node ID.
 echo "Starting 5 nodes on ports 9601-9605. To connect to node 5, run:"
