@@ -12,6 +12,10 @@ use tokio_stream::StreamExt as _;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use uuid::Uuid;
 
+// TODO: simplify these types.
+pub type ClientSender = mpsc::UnboundedSender<(Request, oneshot::Sender<Result<Response>>)>;
+pub type ClientReceiver = mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>;
+
 /// The interval between Raft ticks, the unit of time for e.g. heartbeats and
 /// elections.
 const TICK_INTERVAL: Duration = Duration::from_millis(100);
@@ -40,11 +44,7 @@ impl Server {
     }
 
     /// Connects to peers and serves requests.
-    pub async fn serve(
-        self,
-        listener: TcpListener,
-        client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>,
-    ) -> Result<()> {
+    pub async fn serve(self, listener: TcpListener, client_rx: ClientReceiver) -> Result<()> {
         let (tcp_in_tx, tcp_in_rx) = mpsc::unbounded_channel::<Message>();
         let (tcp_out_tx, tcp_out_rx) = mpsc::unbounded_channel::<Message>();
         let (task, tcp_receiver) = Self::tcp_receive(listener, tcp_in_tx).remote_handle();
@@ -64,7 +64,7 @@ impl Server {
     async fn eventloop(
         mut node: Node,
         node_rx: mpsc::UnboundedReceiver<Message>,
-        client_rx: mpsc::UnboundedReceiver<(Request, oneshot::Sender<Result<Response>>)>,
+        client_rx: ClientReceiver,
         tcp_rx: mpsc::UnboundedReceiver<Message>,
         tcp_tx: mpsc::UnboundedSender<Message>,
     ) -> Result<()> {

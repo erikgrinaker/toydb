@@ -41,21 +41,20 @@ impl Server {
         );
 
         let (raft_tx, raft_rx) = mpsc::unbounded_channel();
-        let sql_engine = sql::engine::Raft::new(raft_tx);
 
         tokio::try_join!(
             self.raft.serve(raft_listener, raft_rx),
-            Self::serve_sql(sql_listener, sql_engine),
+            Self::serve_sql(sql_listener, raft_tx),
         )?;
         Ok(())
     }
 
     /// Serves SQL clients.
-    async fn serve_sql(listener: TcpListener, engine: sql::engine::Raft) -> Result<()> {
+    async fn serve_sql(listener: TcpListener, raft_tx: raft::ClientSender) -> Result<()> {
         let mut listener = TcpListenerStream::new(listener);
         while let Some(socket) = listener.try_next().await? {
             let peer = socket.peer_addr()?;
-            let session = Session::new(engine.clone());
+            let session = Session::new(sql::engine::Raft::new(raft_tx.clone()));
             tokio::spawn(async move {
                 info!("Client {} connected", peer);
                 match session.handle(socket).await {
