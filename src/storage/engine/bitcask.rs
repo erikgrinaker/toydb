@@ -62,13 +62,20 @@ impl BitCask {
     }
 
     /// Opens a BitCask database, and automatically compacts it if the amount
-    /// of garbage exceeds the given ratio when opened.
-    pub fn new_compact(path: PathBuf, garbage_ratio_threshold: f64) -> Result<Self> {
+    /// of garbage exceeds the given ratio and byte size when opened.
+    pub fn new_compact(
+        path: PathBuf,
+        garbage_min_ratio: f64,
+        garbage_min_bytes: u64,
+    ) -> Result<Self> {
         let mut s = Self::new(path)?;
 
         let status = s.status()?;
         let garbage_ratio = status.garbage_disk_size as f64 / status.total_disk_size as f64;
-        if status.garbage_disk_size > 0 && garbage_ratio >= garbage_ratio_threshold {
+        if status.garbage_disk_size > 0
+            && status.garbage_disk_size >= garbage_min_bytes
+            && garbage_ratio >= garbage_min_ratio
+        {
             log::info!(
                 "Compacting {} to remove {:.0}% garbage ({} MB out of {} MB)",
                 s.log.path.display(),
@@ -517,25 +524,30 @@ mod tests {
         let path = dir.path().join("orig");
         let compactpath = dir.path().join("compact");
 
-        let mut s = BitCask::new_compact(path.clone(), 0.2)?;
+        let mut s = BitCask::new_compact(path.clone(), 0.2, 0)?;
         setup_log(&mut s)?;
         let status = s.status()?;
         let garbage_ratio = status.garbage_disk_size as f64 / status.total_disk_size as f64;
+        let garbage_size = status.garbage_disk_size;
         drop(s);
 
-        // Test a few threshold value and assert whether it should trigger compaction.
+        // Test a few ratio/size thresholds and assert whether it should trigger compaction.
         let cases = vec![
-            (-1.0, true),
-            (0.0, true),
-            (garbage_ratio - 0.001, true),
-            (garbage_ratio, true),
-            (garbage_ratio + 0.001, false),
-            (1.0, false),
-            (2.0, false),
+            (-1.0, 0, true),
+            (0.0, 0, true),
+            (garbage_ratio - 0.001, 0, true),
+            (garbage_ratio, 0, true),
+            (garbage_ratio + 0.001, 0, false),
+            (1.0, 0, false),
+            (2.0, 0, false),
+            (0.0, 1, true),
+            (0.0, garbage_size - 1, true),
+            (0.0, garbage_size, true),
+            (0.0, garbage_size + 1, false),
         ];
-        for (threshold, expect_compact) in cases.into_iter() {
+        for (min_ratio, min_size, expect_compact) in cases.into_iter() {
             std::fs::copy(&path, &compactpath)?;
-            let mut s = BitCask::new_compact(compactpath.clone(), threshold)?;
+            let mut s = BitCask::new_compact(compactpath.clone(), min_ratio, min_size)?;
             let new_status = s.status()?;
             assert_eq!(new_status.live_disk_size, status.live_disk_size);
             if expect_compact {

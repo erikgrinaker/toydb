@@ -15,6 +15,8 @@ use toydb::sql;
 use toydb::storage;
 use toydb::Server;
 
+const COMPACT_MIN_BYTES: u64 = 1024 * 1024;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = clap::command!()
@@ -38,7 +40,11 @@ async fn main() -> Result<()> {
     let path = std::path::Path::new(&cfg.data_dir);
     let raft_log = match cfg.storage_raft.as_str() {
         "bitcask" | "" => raft::Log::new(
-            storage::engine::BitCask::new_compact(path.join("log"), cfg.compact_threshold)?,
+            storage::engine::BitCask::new_compact(
+                path.join("log"),
+                cfg.compact_threshold,
+                COMPACT_MIN_BYTES,
+            )?,
             cfg.sync,
         )?,
         "memory" => raft::Log::new(storage::engine::Memory::new(), false)?,
@@ -46,8 +52,11 @@ async fn main() -> Result<()> {
     };
     let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
         "bitcask" | "" => {
-            let engine =
-                storage::engine::BitCask::new_compact(path.join("state"), cfg.compact_threshold)?;
+            let engine = storage::engine::BitCask::new_compact(
+                path.join("state"),
+                cfg.compact_threshold,
+                COMPACT_MIN_BYTES,
+            )?;
             Box::new(sql::engine::Raft::new_state(engine)?)
         }
         "memory" => {
