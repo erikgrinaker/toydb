@@ -27,7 +27,7 @@ T2: commit
     del TxnWrite(3, "b")
     del TxnActive(3)
 
-T1: get "a" → 0x00
+T1: get "b" → 0x00
 
 Engine state:
 NextVersion = 4
