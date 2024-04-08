@@ -1820,7 +1820,7 @@ pub mod tests {
         t2.set(b"a", vec![2])?;
         t2.set(b"b", vec![2])?;
         t2.commit()?;
-        assert_eq!(t1.get(b"a")?, Some(vec![0]));
+        assert_eq!(t1.get(b"b")?, Some(vec![0]));
 
         Ok(())
     }
