@@ -1,10 +1,10 @@
 id: 1
 data_dir: toydb1/data
 sync: false
-listen_sql: 0.0.0.0:9601
-listen_raft: 0.0.0.0:9701
+listen_sql: localhost:9601
+listen_raft: localhost:9701
 peers:
-  '2': 127.0.0.1:9702
-  '3': 127.0.0.1:9703
-  '4': 127.0.0.1:9704
-  '5': 127.0.0.1:9705
+  '2': localhost:9702
+  '3': localhost:9703
+  '4': localhost:9704
+  '5': localhost:9705
