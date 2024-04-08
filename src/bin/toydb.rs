@@ -91,7 +91,7 @@ struct Config {
 impl Config {
     fn new(file: &str) -> Result<Self> {
         Ok(config::Config::builder()
-            .set_default("id", "toydb")?
+            .set_default("id", "1")?
             .set_default("listen_sql", "0.0.0.0:9605")?
             .set_default("listen_raft", "0.0.0.0:9705")?
             .set_default("log_level", "info")?
