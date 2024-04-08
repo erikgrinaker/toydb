@@ -54,8 +54,10 @@ type KeyDir = std::collections::BTreeMap<Vec<u8>, (u64, u32)>;
 impl BitCask {
     /// Opens or creates a BitCask database in the given file.
     pub fn new(path: PathBuf) -> Result<Self> {
-        let mut log = Log::new(path)?;
+        log::info!("Opening database {}", path.display());
+        let mut log = Log::new(path.clone())?;
         let keydir = log.build_keydir()?;
+        log::info!("Indexed {} live keys in {}", keydir.len(), path.display());
         Ok(Self { log, keydir })
     }
 
@@ -68,15 +70,15 @@ impl BitCask {
         let garbage_ratio = status.garbage_disk_size as f64 / status.total_disk_size as f64;
         if status.garbage_disk_size > 0 && garbage_ratio >= garbage_ratio_threshold {
             log::info!(
-                "Compacting {} to remove {:.3}MB garbage ({:.0}% of {:.3}MB)",
+                "Compacting {} to remove {:.0}% garbage ({} MB out of {} MB)",
                 s.log.path.display(),
-                status.garbage_disk_size / 1024 / 1024,
                 garbage_ratio * 100.0,
+                status.garbage_disk_size / 1024 / 1024,
                 status.total_disk_size / 1024 / 1024
             );
             s.compact()?;
             log::info!(
-                "Compacted {} to size {:.3}MB",
+                "Compacted {} to size {} MB",
                 s.log.path.display(),
                 (status.total_disk_size - status.garbage_disk_size) / 1024 / 1024
             );
