@@ -554,6 +554,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0474425d51df81997e2f90a21591180b38eccf27292d755f3e30750225c175b"
 
 [[package]]
+name = "escargot"
+version = "0.5.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f474c6844cbd04e783d0f25757583db4f491770ca618bedf2fb01815fc79939"
+dependencies = [
+ "log",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1836,6 +1848,7 @@ dependencies = [
  "clap 4.5.4",
  "config",
  "derivative",
+ "escargot",
  "fs4",
  "futures",
  "futures-util",

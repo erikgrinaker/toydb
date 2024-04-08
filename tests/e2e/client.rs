@@ -1,4 +1,4 @@
-use super::{assert_row, assert_rows, setup};
+use super::{assert_row, assert_rows, dataset, TestCluster};
 
 use toydb::error::{Error, Result};
 use toydb::raft;
@@ -8,7 +8,6 @@ use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Value};
 use toydb::storage;
 use toydb::storage::{engine, mvcc};
-use toydb::Client;
 
 use pretty_assertions::assert_eq;
 use serial_test::serial;
@@ -16,7 +15,8 @@ use serial_test::serial;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn get_table() -> Result<()> {
-    let (mut c, _teardown) = setup::server_with_client(setup::movies()).await?;
+    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let mut c = tc.connect_any().await?;
 
     assert_eq!(
         c.get_table("unknown").await,
@@ -106,7 +106,8 @@ async fn get_table() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn list_tables() -> Result<()> {
-    let (mut c, _teardown) = setup::server_with_client(setup::movies()).await?;
+    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let mut c = tc.connect_any().await?;
 
     assert_eq!(c.list_tables().await?, vec!["countries", "genres", "movies", "studios"]);
     Ok(())
@@ -115,7 +116,8 @@ async fn list_tables() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn status() -> Result<()> {
-    let (mut c, _teardown) = setup::server_with_client(setup::movies()).await?;
+    let tc = TestCluster::run_with(1, &dataset::MOVIES).await?;
+    let mut c = tc.connect_any().await?;
 
     assert_eq!(
         c.status().await?,
@@ -140,12 +142,12 @@ async fn status() -> Result<()> {
                 versions: 1,
                 active_txns: 0,
                 storage: engine::Status {
-                    name: "memory".to_string(),
+                    name: "bitcask".to_string(),
                     keys: 26,
                     size: 1630,
-                    total_disk_size: 0,
-                    live_disk_size: 0,
-                    garbage_disk_size: 0
+                    total_disk_size: 4556,
+                    live_disk_size: 1838,
+                    garbage_disk_size: 2718
                 },
             }
         },
@@ -156,7 +158,8 @@ async fn status() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute() -> Result<()> {
-    let (mut c, _teardown) = setup::server_with_client(setup::movies()).await?;
+    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let mut c = tc.connect_any().await?;
 
     // SELECT
     let result = c.execute("SELECT * FROM genres").await?;
@@ -239,7 +242,8 @@ async fn execute() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute_txn() -> Result<()> {
-    let (mut c, _teardown) = setup::server_with_client(setup::movies()).await?;
+    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let mut c = tc.connect_any().await?;
 
     assert_eq!(c.txn(), None);
 
@@ -330,8 +334,9 @@ async fn execute_txn() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute_txn_concurrent() -> Result<()> {
-    let (mut a, _teardown) = setup::server_with_client(setup::movies()).await?;
-    let mut b = Client::new("127.0.0.1:9605").await?;
+    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
 
     // Concurrent updates should throw a serialization failure on conflict.
     assert_eq!(a.execute("BEGIN").await?, ResultSet::Begin { version: 2, read_only: false });

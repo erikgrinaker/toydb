@@ -1,15 +1,16 @@
-use super::super::{assert_row, setup};
-
-use toydb::error::{Error, Result};
-use toydb::sql::types::Value;
+use super::{assert_row, dataset, TestCluster};
 
 use serial_test::serial;
+use toydb::error::{Error, Result};
+use toydb::sql::types::Value;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A client disconnect or termination should roll back its transaction.
 async fn client_disconnect_rollback() -> Result<()> {
-    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -28,7 +29,9 @@ async fn client_disconnect_rollback() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn client_commit_error() -> Result<()> {
-    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;

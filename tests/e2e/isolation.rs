@@ -1,15 +1,16 @@
-use super::super::{assert_row, assert_rows, setup};
-
-use toydb::error::{Error, Result};
-use toydb::sql::types::Value;
+use super::{assert_row, assert_rows, dataset, TestCluster};
 
 use serial_test::serial;
+use toydb::error::{Error, Result};
+use toydb::sql::types::Value;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 // A dirty write is when b overwrites an uncommitted value written by a.
-async fn anomaly_dirty_write() -> Result<()> {
-    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
+async fn dirty_write() -> Result<()> {
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -29,7 +30,9 @@ async fn anomaly_dirty_write() -> Result<()> {
 #[serial]
 // A dirty read is when b can read an uncommitted value set by a.
 async fn anomaly_dirty_read() -> Result<()> {
-    let (mut a, mut b, _, _teardown) = setup::cluster_simple().await?;
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
 
     a.execute("BEGIN").await?;
     a.execute("INSERT INTO test VALUES (1, 'a')").await?;
@@ -43,7 +46,10 @@ async fn anomaly_dirty_read() -> Result<()> {
 #[serial]
 // A lost update is when a and b both read a value and update it, where b's update replaces a.
 async fn anomaly_lost_update() -> Result<()> {
-    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
+    let mut c = tc.connect_any().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c')").await?;
 
@@ -69,7 +75,10 @@ async fn anomaly_lost_update() -> Result<()> {
 #[serial]
 // A fuzzy (or unrepeatable) read is when b sees a value change after a updates it.
 async fn anomaly_fuzzy_read() -> Result<()> {
-    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
+    let mut c = tc.connect_any().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c')").await?;
 
@@ -94,7 +103,10 @@ async fn anomaly_fuzzy_read() -> Result<()> {
 #[serial]
 // Read skew is when a reads 1 and 2, but b modifies 2 in between the reads.
 async fn anomaly_read_skew() -> Result<()> {
-    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
+    let mut c = tc.connect_any().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'c'), (2, 'c')").await?;
 
@@ -120,7 +132,10 @@ async fn anomaly_read_skew() -> Result<()> {
 // A phantom read is when a reads entries matching some predicate, but a modification by
 // b changes the entries that match the predicate such that a later read by a returns them.
 async fn anomaly_phantom_read() -> Result<()> {
-    let (mut a, mut b, mut c, _teardown) = setup::cluster_simple().await?;
+    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let mut a = tc.connect_any().await?;
+    let mut b = tc.connect_any().await?;
+    let mut c = tc.connect_any().await?;
 
     c.execute("INSERT INTO test VALUES (1, 'true'), (2, 'false')").await?;
 
