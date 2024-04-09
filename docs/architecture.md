@@ -72,18 +72,15 @@ handles configuration, logging, and other process-level concerns.
 
 ## Storage Engine
 
-The storage engine is actually two different storage engines: key/value storage used by the SQL
-engine, and log-structured storage used by the Raft node. These are both pluggable via the
-`storage_sql` and `storage_raft` configuration options, and have multiple implementations with
-different characteristics.
-
-The SQL storage engine will be discussed separately in the [SQL section](#sql-engine).
+ToyDB uses a pluggable key/value storage engine, with the SQL and Raft storage engines configurable
+via the `storage_sql` and `storage_raft` options respectively. The higher-level SQL storage engine 
+will be discussed separately in the [SQL section](#sql-engine).
 
 ### Key/Value Storage
 
 A key/value storage engine stores arbitrary key/value pairs as binary byte slices, and implements
 the
-[`storage::Engine`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/engine/mod.rs) 
+[`storage::Engine`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/engine.rs) 
 trait:
 
 ```rust
@@ -128,7 +125,7 @@ SQL table scans) and has a couple of important implications:
 * Keys should use an order-preserving byte encoding, to allow range scans.
 
 The engine itself does not care what keys contain, but the storage module offers
-an order-preserving key encoding called [KeyCode](https://github.com/erikgrinaker/toydb/blob/master/src/storage/keycode.rs)
+an order-preserving key encoding called [KeyCode](https://github.com/erikgrinaker/toydb/blob/master/src/encoding/keycode.rs)
 for use by higher layers. These storage layers often use composite keys made up
 of several possibly variable-length values (e.g. an index key consists of table,
 column, and value), and the natural ordering of each segment must be preserved,
@@ -150,7 +147,7 @@ Additionally, several container types are supported:
 * Value: like enum.
 
 The default key/value engine is
-[`storage::engine::BitCask`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/kv/bitcask.rs),
+[`storage::BitCask`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/bitcask.rs),
 a very simple variant of Bitcask, an append-only log-structured storage engine.
 All writes are appended to a log file, with an index mapping live keys to file
 positions maintained in memory.  When the amount of garbage (replaced or deleted
@@ -231,75 +228,6 @@ However, this also allows for complete data history, and simplifies the implemen
 
 **Transaction ID overflow:** transaction IDs will overflow after 64 bits, but this is never going to
 happen with toyDB.
-
-### Log-structured Storage
-
-The Raft node needs to keep a log of state machine commands encoded as arbitrary byte slices.
-This log is mostly append-only, and storing it in a random-access key/value store would be
-slower and more complex than using a log-structured store purpose-built for this access pattern.
-
-Log stores implement the [`storage::log::Store`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/log/mod.rs)
-trait, a subset of which includes:
-
-```rust
-pub trait Store: Display + Sync + Send {
-    /// Appends a log entry, returning its index.
-    fn append(&mut self, entry: Vec<u8>) -> Result<u64>;
-
-    /// Commits log entries up to and including the given index, making them immutable.
-    fn commit(&mut self, index: u64) -> Result<()>;
-
-    /// Fetches a log entry, if it exists.
-    fn get(&self, index: u64) -> Result<Option<Vec<u8>>>;
-
-    /// Iterates over an ordered range of log entries.
-    fn scan(&self, range: Range) -> Scan;
-
-    /// Truncates the log by removing any entries above the given index, and returns the
-    /// highest remaining index. Attempting to truncate a committed entry will error.
-    fn truncate(&mut self, index: u64) -> Result<u64>;
-}
-```
-
-The Raft node appends all received commands to its local log, but only commits entries once they
-are confirmed by consensus. The local log may need to be truncated, e.g. in the case of a leader
-change, removing a number of uncommitted entries.
-
-Additionally, the store must be able to store a handful of arbitrary key/value metadata pairs
-for the Raft node, via `set_metadata(key, value)` and `get_metadata(key)` methods.
-
-The default log store in toyDB is
-[`storage::log::Hybrid`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/log/hybrid.rs),
-which stores uncommitted entries in memory and committed entries on disk. This allows the log to
-be written append-only and in order, giving very good performance both for writes and bulk
-reads. The number of uncommitted entries is also generally small since consensus is generally
-fast.
-
-New log entries are kept in a `VecDeque` (double-ended queue) until they are committed. On
-commit, entries are appended to the file with a `u32` length prefix, and the file is fsynced (if
-enabled). Entry positions are kept in an in-memory `HashMap` keyed by entry index, for
-retrieval, and this map is rebuilt on startup by scanning the log file.
-
-Metadata key/value pairs are kept in an in-memory `HashMap` and the entire hashmap is written to
-a separate file on every write.
-
-#### Log Tradeoffs
-
-**Startup log scan:** scanning the entire file on startup to build the entry index can be
-time-consuming, and the index requires a bit of memory. However, this avoids having to maintain
-separate index storage, which could be expensive to fsync, and data sets are expected to be small.
-
-**Metadata storage:** metadata key/value pairs should be stored in e.g. an on-disk B-tree
-key/value store, but toyDB current does not have such a store. However, the number of metadata items
-is very small - specifically 1: the current Raft term/vote tuple.
-
-**Memory buffering:** buffering uncommitted entries in memory may require a lot of memory if
-consensus halts, e.g. due to loss of quorum. However, for toyDB use-cases this is not a major
-problem, and it avoid having to do additional (possibly random) disk IO, greatly improving
-performance.
-
-**Garbage collection:** there is no garbage collection of old log entries, so the log will grow
-without bound.
 
 ## Raft Consensus Engine
 
