@@ -1,8 +1,9 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
+use crate::encoding::{bincode, keycode};
 use crate::error::{Error, Result};
-use crate::storage::{self, bincode, keycode};
+use crate::storage;
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;

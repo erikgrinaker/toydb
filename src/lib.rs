@@ -3,6 +3,7 @@
 #![allow(clippy::unneeded_field_pattern)]
 
 pub mod client;
+pub mod encoding;
 pub mod error;
 pub mod raft;
 pub mod server;

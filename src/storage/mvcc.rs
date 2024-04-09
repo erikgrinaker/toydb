@@ -139,7 +139,8 @@
 //! forever, both out of laziness and also because it allows unlimited time
 //! travel queries (it's a feature, not a bug!).
 
-use super::{bincode, engine::Engine, keycode};
+use super::engine::Engine;
+use crate::encoding::{bincode, keycode};
 use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};

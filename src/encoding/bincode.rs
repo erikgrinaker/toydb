@@ -1,10 +1,10 @@
-//! Bincode is used to encode values. For details, see:
+//! Bincode is used to encode values, both in key/value stores and the toyDB
+//! network protocol. It is a Rust-specific encoding that depends on the
+//! internal data structures being stable, but it's sufficient for toyDB. See:
 //! https://github.com/bincode-org/bincode
 //!
-//! By default, the bincode::(de)serialize functions use fixed-length integer
-//! encoding, despite DefaultOptions using variable-length encoding. This module
-//! provides simple wrappers for these functions that use variable-length
-//! encoding and the other defaults.
+//! This module wraps the standard bincode crate to change the default settings.
+//! In particular, to use variable-length integers rather than fixed-length.
 
 use crate::error::Result;
 
