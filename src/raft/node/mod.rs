@@ -11,7 +11,6 @@ use leader::Leader;
 use ::log::debug;
 use rand::Rng as _;
 use std::collections::HashSet;
-use tokio::sync::mpsc;
 
 /// A node ID.
 pub type NodeID = u8;
@@ -56,7 +55,7 @@ impl Node {
         peers: HashSet<NodeID>,
         log: Log,
         state: Box<dyn State>,
-        node_tx: mpsc::UnboundedSender<Message>,
+        node_tx: crossbeam::channel::Sender<Message>,
     ) -> Result<Self> {
         let node = RawNode::new(id, peers, log, state, node_tx)?;
         if node.peers.is_empty() {
@@ -126,7 +125,7 @@ pub struct RawNode<R: Role = Follower> {
     term: Term,
     log: Log,
     state: Box<dyn State>,
-    node_tx: mpsc::UnboundedSender<Message>,
+    node_tx: crossbeam::channel::Sender<Message>,
     role: R,
 }
 
@@ -258,11 +257,10 @@ mod tests {
     use crate::storage;
     use pretty_assertions::assert_eq;
     use std::collections::HashSet;
-    use tokio::sync::mpsc;
 
     #[track_caller]
     pub fn assert_messages<T: std::fmt::Debug + PartialEq>(
-        rx: &mut mpsc::UnboundedReceiver<T>,
+        rx: &mut crossbeam::channel::Receiver<T>,
         msgs: Vec<T>,
     ) {
         let mut actual = Vec::new();
@@ -432,14 +430,14 @@ mod tests {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> Result<(RawNode<Follower>, mpsc::UnboundedReceiver<Message>)> {
+    fn setup_rolenode() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Message>)> {
         setup_rolenode_peers(vec![2, 3])
     }
 
     fn setup_rolenode_peers(
         peers: Vec<NodeID>,
-    ) -> Result<(RawNode<Follower>, mpsc::UnboundedReceiver<Message>)> {
-        let (node_tx, node_rx) = mpsc::unbounded_channel();
+    ) -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Message>)> {
+        let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let node = RawNode {
             role: Follower::new(None, None),
             id: 1,
@@ -454,7 +452,7 @@ mod tests {
 
     #[test]
     fn new() -> Result<()> {
-        let (node_tx, _) = mpsc::unbounded_channel();
+        let (node_tx, _) = crossbeam::channel::unbounded();
         let node = Node::new(
             1,
             HashSet::from([2, 3]),
@@ -475,7 +473,7 @@ mod tests {
 
     #[test]
     fn new_single() -> Result<()> {
-        let (node_tx, _node_rx) = mpsc::unbounded_channel();
+        let (node_tx, _node_rx) = crossbeam::channel::unbounded();
         let node = Node::new(
             1,
             HashSet::new(),

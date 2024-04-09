@@ -10,8 +10,6 @@ use crate::sql::types::Row;
 use ::log::{debug, error, info};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tokio::net::TcpListener;
-use tokio::sync::mpsc;
 
 /// A toyDB server.
 pub struct Server {
@@ -29,10 +27,10 @@ impl Server {
         Ok(Server { raft: raft::Server::new(id, peers, raft_log, raft_state)? })
     }
 
-    /// Serves Raft and SQL requests until the returned future is dropped. Consumes the server.
-    pub async fn serve(
+    /// Serves Raft and SQL requests indefinitely. Consumes the server.
+    pub fn serve(
         self,
-        raft_listener: TcpListener,
+        raft_listener: std::net::TcpListener,
         sql_listener: std::net::TcpListener,
     ) -> Result<()> {
         info!(
@@ -41,12 +39,13 @@ impl Server {
             raft_listener.local_addr()?
         );
 
-        let (raft_tx, raft_rx) = mpsc::unbounded_channel();
+        std::thread::scope(move |s| {
+            let (raft_tx, raft_rx) = crossbeam::channel::unbounded();
 
-        tokio::task::spawn_blocking(move || Self::serve_sql(sql_listener, raft_tx));
-
-        tokio::try_join!(self.raft.serve(raft_listener, raft_rx))?;
-        Ok(())
+            s.spawn(move || Self::serve_sql(sql_listener, raft_tx));
+            s.spawn(move || self.raft.serve(raft_listener, raft_rx));
+            Ok(())
+        })
     }
 
     /// Serves SQL clients.

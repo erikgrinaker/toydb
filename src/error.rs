@@ -168,33 +168,3 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
         Error::Internal(err.to_string())
     }
 }
-
-impl From<tokio::task::JoinError> for Error {
-    fn from(err: tokio::task::JoinError) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl From<tokio::sync::mpsc::error::TryRecvError> for Error {
-    fn from(err: tokio::sync::mpsc::error::TryRecvError) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Error {
-    fn from(err: tokio::sync::mpsc::error::SendError<T>) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl<T> From<tokio::sync::mpsc::error::TrySendError<T>> for Error {
-    fn from(err: tokio::sync::mpsc::error::TrySendError<T>) -> Self {
-        Error::Internal(err.to_string())
-    }
-}
-
-impl From<tokio::sync::oneshot::error::RecvError> for Error {
-    fn from(err: tokio::sync::oneshot::error::RecvError) -> Self {
-        Error::Internal(err.to_string())
-    }
-}

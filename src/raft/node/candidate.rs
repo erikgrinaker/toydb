@@ -173,11 +173,10 @@ mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
-    use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
-    fn setup() -> Result<(RawNode<Candidate>, mpsc::UnboundedReceiver<Message>)> {
-        let (node_tx, node_rx) = mpsc::unbounded_channel();
+    fn setup() -> Result<(RawNode<Candidate>, crossbeam::channel::Receiver<Message>)> {
+        let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let state = Box::new(TestState::new(0));
         let mut log = Log::new(storage::Memory::new(), false)?;
 

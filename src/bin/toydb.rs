@@ -8,7 +8,6 @@
 
 use serde_derive::Deserialize;
 use std::collections::HashMap;
-use tokio::net::TcpListener;
 use toydb::error::{Error, Result};
 use toydb::raft;
 use toydb::sql;
@@ -17,8 +16,7 @@ use toydb::Server;
 
 const COMPACT_MIN_BYTES: u64 = 1024 * 1024;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let args = clap::command!()
         .arg(
             clap::Arg::new("config")
@@ -68,10 +66,10 @@ async fn main() -> Result<()> {
 
     let srv = Server::new(cfg.id, cfg.peers, raft_log, raft_state)?;
 
-    let raft_listener = TcpListener::bind(&cfg.listen_raft).await?;
+    let raft_listener = std::net::TcpListener::bind(&cfg.listen_raft)?;
     let sql_listener = std::net::TcpListener::bind(&cfg.listen_sql)?;
 
-    srv.serve(raft_listener, sql_listener).await
+    srv.serve(raft_listener, sql_listener)
 }
 
 #[derive(Debug, Deserialize)]

@@ -407,11 +407,10 @@ mod tests {
     use super::*;
     use crate::storage;
     use pretty_assertions::assert_eq;
-    use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
-    fn setup() -> Result<(RawNode<Leader>, mpsc::UnboundedReceiver<Message>)> {
-        let (node_tx, node_rx) = mpsc::unbounded_channel();
+    fn setup() -> Result<(RawNode<Leader>, crossbeam::channel::Receiver<Message>)> {
+        let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let peers = HashSet::from([2, 3, 4, 5]);
         let state = Box::new(TestState::new(0));
         let mut log = Log::new(storage::Memory::new(), false)?;
@@ -688,7 +687,7 @@ mod tests {
     #[test]
     // Sending a mutate request should append it to log, replicate it to peers, and register notification.
     fn step_clientrequest_mutate() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
+        let (leader, node_rx) = setup()?;
         let peers = leader.peers.clone();
         let mut node: Node = leader.into();
 

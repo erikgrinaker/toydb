@@ -8,7 +8,6 @@ use crate::storage::{self, mvcc::TransactionState};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashSet;
-use tokio::sync::{mpsc, oneshot};
 
 /// A Raft state machine mutation.
 ///
@@ -68,22 +67,20 @@ pub struct Status {
 /// A client for the local Raft node.
 #[derive(Clone)]
 struct Client {
-    tx: mpsc::UnboundedSender<(raft::Request, oneshot::Sender<Result<raft::Response>>)>,
+    tx: raft::ClientSender,
 }
 
 impl Client {
     /// Creates a new Raft client.
-    fn new(
-        tx: mpsc::UnboundedSender<(raft::Request, oneshot::Sender<Result<raft::Response>>)>,
-    ) -> Self {
+    fn new(tx: raft::ClientSender) -> Self {
         Self { tx }
     }
 
     /// Executes a request against the Raft cluster.
     fn execute(&self, request: raft::Request) -> Result<raft::Response> {
-        let (response_tx, response_rx) = oneshot::channel();
+        let (response_tx, response_rx) = crossbeam::channel::bounded(1);
         self.tx.send((request, response_tx))?;
-        futures::executor::block_on(response_rx)?
+        response_rx.recv()?
     }
 
     /// Mutates the Raft state machine, deserializing the response into the
@@ -121,9 +118,7 @@ pub struct Raft {
 
 impl Raft {
     /// Creates a new Raft-based SQL engine.
-    pub fn new(
-        tx: mpsc::UnboundedSender<(raft::Request, oneshot::Sender<Result<raft::Response>>)>,
-    ) -> Self {
+    pub fn new(tx: raft::ClientSender) -> Self {
         Self { client: Client::new(tx) }
     }
 

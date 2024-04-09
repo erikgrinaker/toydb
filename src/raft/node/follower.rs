@@ -4,7 +4,6 @@ use crate::error::{Error, Result};
 
 use ::log::{debug, info};
 use std::collections::HashSet;
-use tokio::sync::mpsc;
 
 // A follower replicates state from a leader.
 #[derive(Clone, Debug, PartialEq)]
@@ -44,7 +43,7 @@ impl RawNode<Follower> {
         peers: HashSet<NodeID>,
         mut log: Log,
         state: Box<dyn State>,
-        node_tx: mpsc::UnboundedSender<Message>,
+        node_tx: crossbeam::channel::Sender<Message>,
     ) -> Result<Self> {
         let (term, voted_for) = log.get_term()?;
         let role = Follower::new(None, voted_for);
@@ -288,11 +287,10 @@ pub mod tests {
     use super::*;
     use crate::error::Error;
     use crate::storage;
-    use tokio::sync::mpsc;
 
     #[allow(clippy::type_complexity)]
-    fn setup() -> Result<(RawNode<Follower>, mpsc::UnboundedReceiver<Message>)> {
-        let (node_tx, node_rx) = mpsc::unbounded_channel();
+    fn setup() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Message>)> {
+        let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let state = Box::new(TestState::new(0));
         let mut log = Log::new(storage::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
@@ -590,7 +588,7 @@ pub mod tests {
     // AppendEntries accepts some entries at base 0 without changes
     fn step_appendentries_base0() -> Result<()> {
         // TODO: Move this into a setup function.
-        let (node_tx, mut node_rx) = mpsc::unbounded_channel();
+        let (node_tx, mut node_rx) = crossbeam::channel::unbounded();
         let mut log = Log::new(storage::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
