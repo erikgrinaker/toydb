@@ -8,7 +8,7 @@ use toydb::sql::types::Value;
 #[serial]
 // A client disconnect or termination should roll back its transaction.
 async fn client_disconnect_rollback() -> Result<()> {
-    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let tc = TestCluster::run_with(5, dataset::TEST_TABLE).await?;
     let mut a = tc.connect_any().await?;
     let mut b = tc.connect_any().await?;
 
@@ -29,7 +29,7 @@ async fn client_disconnect_rollback() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn client_commit_error() -> Result<()> {
-    let tc = TestCluster::run_with(5, &dataset::TEST_TABLE).await?;
+    let tc = TestCluster::run_with(5, dataset::TEST_TABLE).await?;
     let mut a = tc.connect_any().await?;
     let mut b = tc.connect_any().await?;
 

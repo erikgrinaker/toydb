@@ -1,11 +1,8 @@
 //! Pre-defined datasets.
 
-use lazy_static::lazy_static;
+pub static TEST_TABLE: &str = "CREATE TABLE test (id INTEGER PRIMARY KEY, value STRING)";
 
-lazy_static! {
-    pub static ref TEST_TABLE: &'static str =
-        "CREATE TABLE test (id INTEGER PRIMARY KEY, value STRING)";
-    pub static ref MOVIES: &'static str = "
+pub static MOVIES: &str = "
         CREATE TABLE countries (
             id STRING PRIMARY KEY,
             name STRING NOT NULL
@@ -52,4 +49,3 @@ lazy_static! {
             (8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE),
             (9, 'Birdman', 4, 3, 2014, 7.7, TRUE),
             (10, 'Inception', 4, 1, 2010, 8.8, TRUE)";
-}

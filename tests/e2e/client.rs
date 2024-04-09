@@ -15,7 +15,7 @@ use serial_test::serial;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn get_table() -> Result<()> {
-    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let tc = TestCluster::run_with(5, dataset::MOVIES).await?;
     let mut c = tc.connect_any().await?;
 
     assert_eq!(
@@ -106,7 +106,7 @@ async fn get_table() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn list_tables() -> Result<()> {
-    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let tc = TestCluster::run_with(5, dataset::MOVIES).await?;
     let mut c = tc.connect_any().await?;
 
     assert_eq!(c.list_tables().await?, vec!["countries", "genres", "movies", "studios"]);
@@ -116,7 +116,7 @@ async fn list_tables() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn status() -> Result<()> {
-    let tc = TestCluster::run_with(1, &dataset::MOVIES).await?;
+    let tc = TestCluster::run_with(1, dataset::MOVIES).await?;
     let mut c = tc.connect_any().await?;
 
     assert_eq!(
@@ -158,7 +158,7 @@ async fn status() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute() -> Result<()> {
-    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let tc = TestCluster::run_with(5, dataset::MOVIES).await?;
     let mut c = tc.connect_any().await?;
 
     // SELECT
@@ -242,7 +242,7 @@ async fn execute() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute_txn() -> Result<()> {
-    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let tc = TestCluster::run_with(5, dataset::MOVIES).await?;
     let mut c = tc.connect_any().await?;
 
     assert_eq!(c.txn(), None);
@@ -334,7 +334,7 @@ async fn execute_txn() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[serial]
 async fn execute_txn_concurrent() -> Result<()> {
-    let tc = TestCluster::run_with(5, &dataset::MOVIES).await?;
+    let tc = TestCluster::run_with(5, dataset::MOVIES).await?;
     let mut a = tc.connect_any().await?;
     let mut b = tc.connect_any().await?;
 

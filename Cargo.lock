@@ -1856,7 +1856,6 @@ dependencies = [
  "hdrhistogram",
  "hex",
  "itertools 0.12.1",
- "lazy_static",
  "log",
  "paste",
  "petname",
