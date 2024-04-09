@@ -60,7 +60,7 @@ pub struct Log {
     /// The underlying storage engine. Uses a trait object instead of generics,
     /// to allow runtime selection of the engine (based on the program config)
     /// and avoid propagating the generic type parameters throughout.
-    engine: Box<dyn storage::engine::Engine>,
+    engine: Box<dyn storage::Engine>,
     /// The index of the last stored entry.
     last_index: Index,
     /// The term of the last stored entry.
@@ -75,7 +75,7 @@ pub struct Log {
 
 impl Log {
     /// Creates a new log, using the given storage engine.
-    pub fn new(mut engine: impl storage::engine::Engine + 'static, sync: bool) -> Result<Self> {
+    pub fn new(mut engine: impl storage::Engine + 'static, sync: bool) -> Result<Self> {
         let (last_index, last_term) = engine
             .scan_prefix(&KeyPrefix::Entry.encode()?)
             .last()
@@ -277,7 +277,7 @@ impl Log {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::engine::Memory;
+    use crate::storage::Memory;
     use pretty_assertions::assert_eq;
 
     fn setup() -> Log {

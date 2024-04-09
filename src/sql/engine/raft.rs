@@ -128,7 +128,7 @@ impl Raft {
     }
 
     /// Creates an underlying state machine for a Raft engine.
-    pub fn new_state<E: storage::engine::Engine>(engine: E) -> Result<State<E>> {
+    pub fn new_state<E: storage::Engine>(engine: E) -> Result<State<E>> {
         State::new(engine)
     }
 
@@ -277,14 +277,14 @@ impl Catalog for Transaction {
 }
 
 /// The Raft state machine for the Raft-based SQL engine, using a KV SQL engine
-pub struct State<E: storage::engine::Engine> {
+pub struct State<E: storage::Engine> {
     /// The underlying KV SQL engine
     engine: super::KV<E>,
     /// The last applied index
     applied_index: u64,
 }
 
-impl<E: storage::engine::Engine> State<E> {
+impl<E: storage::Engine> State<E> {
     /// Creates a new Raft state maching using the given storage engine.
     pub fn new(engine: E) -> Result<Self> {
         let engine = super::KV::new(engine);
@@ -331,7 +331,7 @@ impl<E: storage::engine::Engine> State<E> {
     }
 }
 
-impl<E: storage::engine::Engine> raft::State for State<E> {
+impl<E: storage::Engine> raft::State for State<E> {
     fn get_applied_index(&self) -> u64 {
         self.applied_index
     }

@@ -294,7 +294,7 @@ pub mod tests {
     fn setup() -> Result<(RawNode<Follower>, mpsc::UnboundedReceiver<Message>)> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let state = Box::new(TestState::new(0));
-        let mut log = Log::new(storage::engine::Memory::new(), false)?;
+        let mut log = Log::new(storage::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;
@@ -591,7 +591,7 @@ pub mod tests {
     fn step_appendentries_base0() -> Result<()> {
         // TODO: Move this into a setup function.
         let (node_tx, mut node_rx) = mpsc::unbounded_channel();
-        let mut log = Log::new(storage::engine::Memory::new(), false)?;
+        let mut log = Log::new(storage::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;

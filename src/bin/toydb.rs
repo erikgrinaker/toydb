@@ -40,19 +40,19 @@ async fn main() -> Result<()> {
     let path = std::path::Path::new(&cfg.data_dir);
     let raft_log = match cfg.storage_raft.as_str() {
         "bitcask" | "" => raft::Log::new(
-            storage::engine::BitCask::new_compact(
+            storage::BitCask::new_compact(
                 path.join("log"),
                 cfg.compact_threshold,
                 COMPACT_MIN_BYTES,
             )?,
             cfg.sync,
         )?,
-        "memory" => raft::Log::new(storage::engine::Memory::new(), false)?,
+        "memory" => raft::Log::new(storage::Memory::new(), false)?,
         name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
     };
     let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
         "bitcask" | "" => {
-            let engine = storage::engine::BitCask::new_compact(
+            let engine = storage::BitCask::new_compact(
                 path.join("state"),
                 cfg.compact_threshold,
                 COMPACT_MIN_BYTES,
@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
             Box::new(sql::engine::Raft::new_state(engine)?)
         }
         "memory" => {
-            let engine = storage::engine::Memory::new();
+            let engine = storage::Memory::new();
             Box::new(sql::engine::Raft::new_state(engine)?)
         }
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),

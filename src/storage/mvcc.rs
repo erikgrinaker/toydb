@@ -787,7 +787,7 @@ impl<'a, E: Engine> DoubleEndedIterator for VersionIterator<'a, E> {
 #[cfg(test)]
 pub mod tests {
     use super::super::debug;
-    use super::super::engine::{Debug, Memory};
+    use super::super::{Debug, Memory};
     use super::*;
     use std::collections::HashMap;
     use std::io::Write as _;

@@ -8,8 +8,8 @@ use toydb::sql::engine::{Engine, KV};
 use toydb::storage;
 
 /// Sets up a basic in-memory SQL engine with an initial dataset.
-fn setup(queries: Vec<&str>) -> Result<KV<storage::engine::Memory>> {
-    let engine = KV::new(storage::engine::Memory::new());
+fn setup(queries: Vec<&str>) -> Result<KV<storage::Memory>> {
+    let engine = KV::new(storage::Memory::new());
     let mut session = engine.session();
     session.execute("BEGIN")?;
     for query in queries {

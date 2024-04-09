@@ -93,5 +93,5 @@ impl<'a> DoubleEndedIterator for ScanIterator<'a> {
 mod tests {
     use super::*;
 
-    super::super::tests::test_engine!(Memory::new());
+    super::super::engine::tests::test_engine!(Memory::new());
 }

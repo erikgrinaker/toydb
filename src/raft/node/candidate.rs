@@ -179,7 +179,7 @@ mod tests {
     fn setup() -> Result<(RawNode<Candidate>, mpsc::UnboundedReceiver<Message>)> {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let state = Box::new(TestState::new(0));
-        let mut log = Log::new(storage::engine::Memory::new(), false)?;
+        let mut log = Log::new(storage::Memory::new(), false)?;
 
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;

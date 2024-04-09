@@ -1,11 +1,3 @@
-mod bitcask;
-mod memory;
-
-#[cfg(test)]
-pub use super::debug::Engine as Debug;
-pub use bitcask::BitCask;
-pub use memory::Memory;
-
 use crate::error::Result;
 
 use serde::{Deserialize, Serialize};
@@ -89,7 +81,7 @@ pub struct Status {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     /// Generates common tests for any Engine implementation.
     macro_rules! test_engine {
         ($setup:expr) => {
@@ -474,5 +466,5 @@ mod tests {
         };
     }
 
-    pub(super) use test_engine; // export for use in submodules
+    pub(crate) use test_engine; // export for use in submodules
 }

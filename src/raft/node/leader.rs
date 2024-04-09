@@ -414,7 +414,7 @@ mod tests {
         let (node_tx, node_rx) = mpsc::unbounded_channel();
         let peers = HashSet::from([2, 3, 4, 5]);
         let state = Box::new(TestState::new(0));
-        let mut log = Log::new(storage::engine::Memory::new(), false)?;
+        let mut log = Log::new(storage::Memory::new(), false)?;
         log.append(1, Some(vec![0x01]))?;
         log.append(1, Some(vec![0x02]))?;
         log.append(2, Some(vec![0x03]))?;

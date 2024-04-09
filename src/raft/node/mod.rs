@@ -445,7 +445,7 @@ mod tests {
             id: 1,
             peers: HashSet::from_iter(peers),
             term: 1,
-            log: Log::new(storage::engine::Memory::new(), false)?,
+            log: Log::new(storage::Memory::new(), false)?,
             state: Box::new(TestState::new(0)),
             node_tx,
         };
@@ -458,7 +458,7 @@ mod tests {
         let node = Node::new(
             1,
             HashSet::from([2, 3]),
-            Log::new(storage::engine::Memory::new(), false)?,
+            Log::new(storage::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
         )?;
@@ -479,7 +479,7 @@ mod tests {
         let node = Node::new(
             1,
             HashSet::new(),
-            Log::new(storage::engine::Memory::new(), false)?,
+            Log::new(storage::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
         )?;

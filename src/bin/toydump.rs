@@ -4,7 +4,7 @@
 
 use toydb::error::{Error, Result};
 use toydb::storage::debug;
-use toydb::storage::engine::{BitCask, Engine};
+use toydb::storage::{BitCask, Engine};
 
 fn main() -> Result<()> {
     let args = clap::command!()
