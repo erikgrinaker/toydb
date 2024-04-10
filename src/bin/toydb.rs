@@ -64,12 +64,7 @@ fn main() -> Result<()> {
         name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
     };
 
-    let srv = Server::new(cfg.id, cfg.peers, raft_log, raft_state)?;
-
-    let raft_listener = std::net::TcpListener::bind(&cfg.listen_raft)?;
-    let sql_listener = std::net::TcpListener::bind(&cfg.listen_sql)?;
-
-    srv.serve(raft_listener, sql_listener)
+    Server::new(cfg.id, cfg.peers, raft_log, raft_state)?.serve(&cfg.listen_raft, &cfg.listen_sql)
 }
 
 #[derive(Debug, Deserialize)]

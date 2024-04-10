@@ -62,7 +62,7 @@ pub trait Transaction: Catalog {
 }
 
 /// An SQL session, which handles transaction control and simplified query execution
-pub struct Session<E: Engine> {
+pub struct Session<E: Engine + 'static> {
     /// The underlying engine
     engine: E,
     /// The current session transaction, if any
@@ -115,7 +115,7 @@ impl<E: Engine + 'static> Session<E> {
                 txn.rollback()?;
                 Ok(ResultSet::Rollback { version })
             }
-            ast::Statement::Explain(statement) => self.read_with_txn(|txn| {
+            ast::Statement::Explain(statement) => self.with_txn_read_only(|txn| {
                 Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?.0))
             }),
             statement if self.txn.is_some() => Plan::build(statement, self.txn.as_mut().unwrap())?
@@ -145,10 +145,10 @@ impl<E: Engine + 'static> Session<E> {
     }
 
     /// Runs a read-only closure in the session's transaction, or a new
-    /// transaction if none is active.
+    /// read-only transaction if none is active.
     ///
-    /// TODO: reconsider this
-    pub fn read_with_txn<R, F>(&mut self, f: F) -> Result<R>
+    /// TODO: reconsider this.
+    pub fn with_txn_read_only<F, R>(&mut self, f: F) -> Result<R>
     where
         F: FnOnce(&mut E::Transaction) -> Result<R>,
     {
@@ -159,6 +159,18 @@ impl<E: Engine + 'static> Session<E> {
         let result = f(&mut txn);
         txn.rollback()?;
         result
+    }
+}
+
+impl Session<Raft> {
+    pub fn status(&self) -> Result<Status> {
+        self.engine.status()
+    }
+}
+
+impl<E: Engine + 'static> Drop for Session<E> {
+    fn drop(&mut self) {
+        self.execute("ROLLBACK").ok();
     }
 }
 

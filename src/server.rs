@@ -7,7 +7,7 @@ use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
 
-use ::log::{debug, error, info};
+use log::{debug, error, info};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -30,9 +30,11 @@ impl Server {
     /// Serves Raft and SQL requests indefinitely. Consumes the server.
     pub fn serve(
         self,
-        raft_listener: std::net::TcpListener,
-        sql_listener: std::net::TcpListener,
+        raft_addr: impl std::net::ToSocketAddrs,
+        sql_addr: impl std::net::ToSocketAddrs,
     ) -> Result<()> {
+        let raft_listener = std::net::TcpListener::bind(raft_addr)?;
+        let sql_listener = std::net::TcpListener::bind(sql_addr)?;
         info!(
             "Listening on {} (SQL) and {} (Raft)",
             sql_listener.local_addr()?,
@@ -42,70 +44,54 @@ impl Server {
         std::thread::scope(move |s| {
             let (raft_tx, raft_rx) = crossbeam::channel::unbounded();
 
-            s.spawn(move || Self::serve_sql(sql_listener, raft_tx));
             s.spawn(move || self.raft.serve(raft_listener, raft_rx));
-            Ok(())
-        })
+            s.spawn(move || Self::sql_accept(sql_listener, raft_tx));
+        });
+
+        Ok(())
     }
 
-    /// Serves SQL clients.
-    fn serve_sql(listener: std::net::TcpListener, raft_tx: raft::ClientSender) {
+    /// Accepts new SQL client connections and spawns session threads for them.
+    fn sql_accept(listener: std::net::TcpListener, raft_tx: raft::ClientSender) {
         std::thread::scope(|s| loop {
             let (socket, peer) = match listener.accept() {
                 Ok(r) => r,
                 Err(err) => {
-                    error!("Connection failed: {}", err);
+                    error!("Accept failed: {err}");
                     continue;
                 }
             };
             let raft_tx = raft_tx.clone();
             s.spawn(move || {
-                let session = Session::new(sql::engine::Raft::new(raft_tx));
-                info!("Client {} connected", peer);
-                match session.handle(socket) {
-                    Ok(()) => info!("Client {} disconnected", peer),
-                    Err(err) => error!("Client {} error: {}", peer, err),
+                debug!("Client {peer} connected");
+                match Self::sql_session(socket, raft_tx) {
+                    Ok(()) => debug!("Client {peer} disconnected"),
+                    Err(err) => error!("Client {peer} error: {err}"),
                 }
             });
         })
     }
-}
 
-/// A client request.
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Request {
-    Execute(String),
-    GetTable(String),
-    ListTables,
-    Status,
-}
-
-/// A server response.
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Response {
-    Execute(ResultSet),
-    Row(Option<Row>),
-    GetTable(Table),
-    ListTables(Vec<String>),
-    Status(sql::engine::Status),
-}
-
-/// A client session coupled to a SQL session.
-pub struct Session {
-    engine: sql::engine::Raft,
-    sql: sql::engine::Session<sql::engine::Raft>,
-}
-
-impl Session {
-    /// Creates a new client session.
-    fn new(engine: sql::engine::Raft) -> Self {
-        Self { sql: engine.session(), engine }
-    }
-
-    /// Handles a client connection.
-    fn handle(mut self, mut socket: std::net::TcpStream) -> Result<()> {
+    /// Processes a client SQL session, by executing SQL statements against the
+    /// Raft node.
+    fn sql_session(mut socket: std::net::TcpStream, raft_tx: raft::ClientSender) -> Result<()> {
+        let mut session = sql::engine::Raft::new(raft_tx).session();
         while let Some(request) = bincode::maybe_deserialize_from(&mut socket)? {
-            let mut response = self.request(request);
+            // Execute request.
+            debug!("Received request {request:?}");
+            let mut response = match request {
+                Request::Execute(query) => session.execute(&query).map(Response::Execute),
+                Request::Status => session.status().map(Response::Status),
+                Request::GetTable(table) => session
+                    .with_txn_read_only(|txn| txn.must_read_table(&table))
+                    .map(Response::GetTable),
+                Request::ListTables => session
+                    .with_txn_read_only(|txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
+                    .map(Response::ListTables),
+            };
+
+            // Process response.
+            debug!("Returning response {response:?}");
             let mut rows: Box<dyn Iterator<Item = Result<Response>> + Send> =
                 Box::new(std::iter::empty());
             if let Ok(Response::Execute(ResultSet::Query { rows: ref mut resultrows, .. })) =
@@ -129,33 +115,33 @@ impl Session {
             }
 
             bincode::serialize_into(&mut socket, &response)?;
-
             for row in rows {
                 bincode::serialize_into(&mut socket, &row)?;
             }
         }
         Ok(())
     }
-    /// Executes a request.
-    pub fn request(&mut self, request: Request) -> Result<Response> {
-        debug!("Processing request {:?}", request);
-        let response = match request {
-            Request::Execute(query) => Response::Execute(self.sql.execute(&query)?),
-            Request::GetTable(table) => {
-                Response::GetTable(self.sql.read_with_txn(|txn| txn.must_read_table(&table))?)
-            }
-            Request::ListTables => Response::ListTables(
-                self.sql.read_with_txn(|txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))?,
-            ),
-            Request::Status => Response::Status(self.engine.status()?),
-        };
-        debug!("Returning response {:?}", response);
-        Ok(response)
-    }
 }
 
-impl Drop for Session {
-    fn drop(&mut self) {
-        self.sql.execute("ROLLBACK").ok();
-    }
+/// A SQL client request.
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Request {
+    /// Executes a SQL statement.
+    Execute(String),
+    /// Fetches the given table schema.
+    GetTable(String),
+    /// Lists all tables.
+    ListTables,
+    /// Returns server status.
+    Status,
+}
+
+/// A SQL server response.
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Response {
+    Execute(ResultSet),
+    Row(Option<Row>),
+    GetTable(Table),
+    ListTables(Vec<String>),
+    Status(sql::engine::Status),
 }
