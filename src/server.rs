@@ -243,16 +243,9 @@ impl Server {
                 recv(node_rx) -> msg => {
                     let msg = msg?;
                     match msg {
-                        // FIXME: move broadcast into raft, do request/response differently.
+                        // FIXME: do request/response differently.
                         raft::Message{to: raft::Address::Node(to), ..} => {
                             peers_tx.get_mut(&to).expect("Unknown peer").send(msg)?;
-                        },
-                        raft::Message{to: raft::Address::Broadcast, ..} => {
-                            for (to, peer_tx) in peers_tx.iter() {
-                                let mut msg = msg.clone();
-                                msg.to = raft::Address::Node(*to);
-                                peer_tx.send(msg)?;
-                            }
                         },
                         raft::Message{to: raft::Address::Client, event: raft::Event::ClientResponse{ id, response }, ..} => {
                             if let Some(response_tx) = requests.remove(&id) {

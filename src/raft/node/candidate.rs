@@ -1,4 +1,4 @@
-use super::super::{Address, Event, Message};
+use super::super::{Event, Message};
 use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
@@ -161,7 +161,7 @@ impl RawNode<Candidate> {
         self.log.set_term(term, Some(self.id))?;
 
         let (last_index, last_term) = self.log.get_last_index();
-        self.send(Address::Broadcast, Event::SolicitVote { last_index, last_term })?;
+        self.broadcast(Event::SolicitVote { last_index, last_term })?;
         Ok(())
     }
 }
@@ -169,10 +169,11 @@ impl RawNode<Candidate> {
 #[cfg(test)]
 mod tests {
     use super::super::super::state::tests::TestState;
-    use super::super::super::{Entry, Log, Request};
+    use super::super::super::{Address, Entry, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
+    use itertools::Itertools as _;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(RawNode<Candidate>, crossbeam::channel::Receiver<Message>)> {
@@ -286,17 +287,19 @@ mod tests {
         })?;
         assert_node(&mut node).is_leader().term(3);
 
-        assert_eq!(
-            node_rx.try_recv()?,
-            Message {
-                from: Address::Node(1),
-                to: Address::Broadcast,
-                term: 3,
-                event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
-            },
-        );
+        for to in peers.iter().copied().sorted() {
+            assert_eq!(
+                node_rx.try_recv()?,
+                Message {
+                    from: Address::Node(1),
+                    to: Address::Node(to),
+                    term: 3,
+                    event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
+                },
+            );
+        }
 
-        for to in peers.iter().cloned() {
+        for to in peers.iter().copied() {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
@@ -343,7 +346,8 @@ mod tests {
 
     #[test]
     fn tick() -> Result<()> {
-        let (candidate, mut node_rx) = setup()?;
+        let (candidate, node_rx) = setup()?;
+        let peers = candidate.peers.clone();
         let timeout = candidate.role.election_timeout;
         let mut node = Node::Candidate(candidate);
 
@@ -354,15 +358,17 @@ mod tests {
         }
         assert_node(&mut node).is_candidate().term(4);
 
-        assert_messages(
-            &mut node_rx,
-            vec![Message {
-                from: Address::Node(1),
-                to: Address::Broadcast,
-                term: 4,
-                event: Event::SolicitVote { last_index: 3, last_term: 2 },
-            }],
-        );
+        for to in peers.iter().copied().sorted() {
+            assert_eq!(
+                node_rx.try_recv()?,
+                Message {
+                    from: Address::Node(1),
+                    to: Address::Node(to),
+                    term: 4,
+                    event: Event::SolicitVote { last_index: 3, last_term: 2 },
+                },
+            );
+        }
         Ok(())
     }
 }

@@ -8,7 +8,8 @@ use candidate::Candidate;
 use follower::Follower;
 use leader::Leader;
 
-use ::log::debug;
+use itertools::Itertools as _;
+use log::debug;
 use rand::Rng as _;
 use std::collections::HashSet;
 
@@ -204,6 +205,15 @@ impl<R: Role> RawNode<R> {
         Ok(self.node_tx.send(msg)?)
     }
 
+    /// Broadcasts an event to all peers.
+    fn broadcast(&self, event: Event) -> Result<()> {
+        // Sort for test determinism.
+        for id in self.peers.iter().copied().sorted() {
+            self.send(Address::Node(id), event.clone())?;
+        }
+        Ok(())
+    }
+
     /// Asserts common node invariants.
     fn assert_node(&mut self) -> Result<()> {
         debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
@@ -215,16 +225,13 @@ impl<R: Role> RawNode<R> {
     /// In a real production database, these should be errors instead, since
     /// external input from the network can't be trusted to uphold invariants.
     fn assert_step(&self, msg: &Message) {
-        // Messages must be addressed to the local node, or a broadcast.
+        // Messages must be addressed to the local node.
         match msg.to {
-            Address::Broadcast => {}
             Address::Client => panic!("Message to client"),
             Address::Node(id) => assert_eq!(id, self.id, "Message to other node"),
         }
 
         match msg.from {
-            // The broadcast address can't send anything.
-            Address::Broadcast => panic!("Message from broadcast address"),
             // Clients can only send ClientRequest without a term.
             Address::Client => {
                 assert_eq!(msg.term, 0, "Client message with term");

@@ -287,6 +287,7 @@ pub mod tests {
     use super::*;
     use crate::error::Error;
     use crate::storage;
+    use itertools::Itertools as _;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Message>)> {
@@ -971,6 +972,7 @@ pub mod tests {
     #[test]
     fn tick() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
+        let peers = follower.peers.clone();
         let timeout = follower.role.election_timeout;
         let mut node = Node::Follower(follower);
 
@@ -1002,15 +1004,17 @@ pub mod tests {
         }
         assert_node(&mut node).is_candidate().term(4);
 
-        assert_messages(
-            &mut node_rx,
-            vec![Message {
-                from: Address::Node(1),
-                to: Address::Broadcast,
-                term: 4,
-                event: Event::SolicitVote { last_index: 3, last_term: 2 },
-            }],
-        );
+        for to in peers.iter().copied().sorted() {
+            assert_eq!(
+                node_rx.try_recv()?,
+                Message {
+                    from: Address::Node(1),
+                    to: Address::Node(to),
+                    term: 4,
+                    event: Event::SolicitVote { last_index: 3, last_term: 2 },
+                },
+            );
+        }
         Ok(())
     }
 }

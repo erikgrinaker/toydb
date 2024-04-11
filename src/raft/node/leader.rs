@@ -279,7 +279,7 @@ impl RawNode<Leader> {
     pub(super) fn heartbeat(&mut self) -> Result<()> {
         let (commit_index, commit_term) = self.log.get_commit_index();
         let read_seq = self.role.read_seq;
-        self.send(Address::Broadcast, Event::Heartbeat { commit_index, commit_term, read_seq })?;
+        self.broadcast(Event::Heartbeat { commit_index, commit_term, read_seq })?;
         // NB: We don't reset self.since_heartbeat here, because we want to send
         // periodic heartbeats regardless of any on-demand heartbeats.
         Ok(())
@@ -406,6 +406,7 @@ mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
+    use itertools::Itertools as _;
     use pretty_assertions::assert_eq;
 
     #[allow(clippy::type_complexity)]
@@ -663,7 +664,8 @@ mod tests {
     #[test]
     // Sending a client query request will pass it to the state machine and trigger heartbeats.
     fn step_clientrequest_query() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
+        let (leader, node_rx) = setup()?;
+        let peers = leader.peers.clone();
         let mut node: Node = leader.into();
         node = node.step(Message {
             from: Address::Client,
@@ -672,15 +674,17 @@ mod tests {
             event: Event::ClientRequest { id: vec![0x01], request: Request::Query(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2).last(5);
-        assert_messages(
-            &mut node_rx,
-            vec![Message {
-                from: Address::Node(1),
-                to: Address::Broadcast,
-                term: 3,
-                event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 1 },
-            }],
-        );
+        for to in peers.iter().copied().sorted() {
+            assert_eq!(
+                node_rx.try_recv()?,
+                Message {
+                    from: Address::Node(1),
+                    to: Address::Node(to),
+                    term: 3,
+                    event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 1 },
+                },
+            );
+        }
         Ok(())
     }
 
@@ -768,6 +772,7 @@ mod tests {
     #[test]
     fn tick() -> Result<()> {
         let (leader, mut node_rx) = setup()?;
+        let peers = leader.peers.clone();
         let mut node: Node = leader.into();
         for _ in 0..5 {
             for _ in 0..HEARTBEAT_INTERVAL {
@@ -776,15 +781,17 @@ mod tests {
                 assert_node(&mut node).is_leader().term(3).committed(2);
             }
 
-            assert_eq!(
-                node_rx.try_recv()?,
-                Message {
-                    from: Address::Node(1),
-                    to: Address::Broadcast,
-                    term: 3,
-                    event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
-                }
-            );
+            for to in peers.iter().copied().sorted() {
+                assert_eq!(
+                    node_rx.try_recv()?,
+                    Message {
+                        from: Address::Node(1),
+                        to: Address::Node(to),
+                        term: 3,
+                        event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
+                    }
+                );
+            }
         }
         Ok(())
     }

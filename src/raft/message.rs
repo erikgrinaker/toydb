@@ -14,8 +14,6 @@ pub type ClientReceiver =
 /// A message address.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Address {
-    /// Broadcast to all peers. Only valid as an outbound recipient (to).
-    Broadcast,
     /// A node with the specified node ID (local or remote). Valid both as
     /// sender and recipient.
     Node(NodeID),
