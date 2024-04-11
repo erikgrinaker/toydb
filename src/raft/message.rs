@@ -5,6 +5,12 @@ use crate::storage;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// TODO: simplify these types and move them elsewhere.
+pub type ClientSender =
+    crossbeam::channel::Sender<(Request, crossbeam::channel::Sender<Result<Response>>)>;
+pub type ClientReceiver =
+    crossbeam::channel::Receiver<(Request, crossbeam::channel::Sender<Result<Response>>)>;
+
 /// A message address.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum Address {
