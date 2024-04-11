@@ -11,37 +11,15 @@ pub type ClientSender =
 pub type ClientReceiver =
     crossbeam::channel::Receiver<(Request, crossbeam::channel::Sender<Result<Response>>)>;
 
-/// A message address.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub enum Address {
-    /// A node with the specified node ID (local or remote). Valid both as
-    /// sender and recipient.
-    Node(NodeID),
-    /// A local client. Can only send ClientRequest messages, and receive
-    /// ClientResponse messages.
-    Client,
-}
-
-impl Address {
-    /// Unwraps the node ID, or panics if address is not of kind Node.
-    pub fn unwrap(&self) -> NodeID {
-        match self {
-            Self::Node(id) => *id,
-            _ => panic!("unwrap called on non-Node address {:?}", self),
-        }
-    }
-}
-
 /// A message passed between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
-    /// The current term of the sender. Must be set, unless the sender is
-    /// Address::Client, in which case it must be 0.
+    /// The sender's current term.
     pub term: Term,
-    /// The sender address.
-    pub from: Address,
-    /// The recipient address.
-    pub to: Address,
+    /// The sender.
+    pub from: NodeID,
+    /// The recipient.
+    pub to: NodeID,
     /// The message payload.
     pub event: Event,
 }

@@ -1,5 +1,4 @@
 use crate::encoding::bincode;
-use crate::error::Error;
 use crate::error::Result;
 use crate::raft;
 use crate::sql;
@@ -59,9 +58,6 @@ impl Server {
             let (raft_client_tx, raft_client_rx) = crossbeam::channel::unbounded();
             let (raft_step_tx, raft_step_rx) = crossbeam::channel::unbounded();
 
-            // Serve inbound SQL connections.
-            s.spawn(move || Self::sql_accept(sql_listener, raft_client_tx));
-
             // Serve inbound Raft connections.
             s.spawn(move || Self::raft_accept(raft_listener, raft_step_tx));
 
@@ -85,8 +81,11 @@ impl Server {
                     raft_step_rx,
                     raft_peers_tx,
                 )
-                .expect("event processing failed")
+                .expect("raft processing failed")
             });
+
+            // Serve inbound SQL connections.
+            s.spawn(move || Self::sql_accept(sql_listener, raft_client_tx));
         });
 
         Ok(())
@@ -223,52 +222,69 @@ impl Server {
         }
     }
 
-    /// Routes Raft messages.
+    /// Routes Raft messages:
+    ///
+    /// - node_rx: outbound messages from the local Raft node. Routed to peers
+    ///   via TCP, or to local clients via a response channel.
+    ///
+    /// - request_rx: inbound requests from local SQL clients. Stepped into
+    ///   the local Raft node as ClientRequest messages. Responses are returned
+    ///   via the provided response channel.
+    ///
+    /// - peers_rx: inbound messages from remote Raft peers. Stepped into the
+    ///   local Raft node.
+    ///
+    /// - peers_tx: outbound per-peer channels sent via TCP connections.
+    ///   Messages from the local node's node_rx are sent here.
     fn raft_route(
         mut node: raft::Node,
         node_rx: crossbeam::channel::Receiver<raft::Message>,
-        client_rx: raft::ClientReceiver,
+        request_rx: raft::ClientReceiver,
         peers_rx: crossbeam::channel::Receiver<raft::Message>,
         mut peers_tx: HashMap<raft::NodeID, crossbeam::channel::Sender<raft::Message>>,
     ) -> Result<()> {
+        // Track response channels by request ID. The Raft node will emit
+        // ClientResponse messages that we forward to the response channel.
+        let mut response_txs =
+            HashMap::<raft::RequestID, crossbeam::channel::Sender<Result<raft::Response>>>::new();
+
         let ticker = crossbeam::channel::tick(raft::TICK_INTERVAL);
-        let mut requests =
-            HashMap::<Vec<u8>, crossbeam::channel::Sender<Result<raft::Response>>>::new();
         loop {
             crossbeam::select! {
+                // Periodically tick the node.
                 recv(ticker) -> _ => node = node.tick()?,
 
+                // Step messages from peers into the node.
                 recv(peers_rx) -> msg => node = node.step(msg?)?,
 
-                recv(node_rx) -> msg => {
-                    let msg = msg?;
-                    match msg {
-                        // FIXME: do request/response differently.
-                        raft::Message{to: raft::Address::Node(to), ..} => {
-                            peers_tx.get_mut(&to).expect("Unknown peer").send(msg)?;
-                        },
-                        raft::Message{to: raft::Address::Client, event: raft::Event::ClientResponse{ id, response }, ..} => {
-                            if let Some(response_tx) = requests.remove(&id) {
-                                response_tx
-                                    .send(response)
-                                    .map_err(|e| Error::Internal(format!("Failed to send response {:?}", e)))?;
+                // Send outbound messages from the node to the appropriate peer.
+                // If we receive a client response addressed to the local node,
+                // forward it to the waiting client via the response channel.
+                recv(node_rx) -> result => {
+                    let msg = result?;
+                    if msg.to == node.id() {
+                        if let raft::Event::ClientResponse{ id, response } = msg.event {
+                            if let Some(response_tx) = response_txs.remove(&id) {
+                                response_tx.send(response)?;
                             }
+                            continue
                         }
-                        _ => return Err(Error::Internal(format!("Unexpected message {:?}", msg))),
                     }
+                    peers_tx.get_mut(&msg.to).expect("unknown peer").send(msg)?;
                 }
 
-                recv(client_rx) -> r => {
-                    let (request, response_tx) = r?;
+                // Track inbound client requests and step them into the node.
+                recv(request_rx) -> result => {
+                    let (request, response_tx) = result?;
                     let id = uuid::Uuid::new_v4().as_bytes().to_vec();
                     let msg = raft::Message{
-                        from: raft::Address::Client,
-                        to: raft::Address::Node(node.id()),
-                        term: 0,
+                        from: node.id(),
+                        to: node.id(),
+                        term: node.term(),
                         event: raft::Event::ClientRequest{id: id.clone(), request},
                     };
                     node = node.step(msg)?;
-                    requests.insert(id, response_tx);
+                    response_txs.insert(id, response_tx);
                 }
             }
         }

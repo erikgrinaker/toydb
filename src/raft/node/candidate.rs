@@ -93,7 +93,7 @@ impl RawNode<Candidate> {
         self.assert_step(&msg);
 
         // Drop messages from past terms.
-        if msg.term < self.term && msg.term > 0 {
+        if msg.term < self.term {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
         }
@@ -112,7 +112,7 @@ impl RawNode<Candidate> {
             // We received a vote. Record it, and if we have quorum, assume
             // leadership.
             Event::GrantVote => {
-                self.role.votes.insert(msg.from.unwrap());
+                self.role.votes.insert(msg.from);
                 if self.role.votes.len() as u8 >= self.quorum_size() {
                     return Ok(self.into_leader()?.into());
                 }
@@ -121,7 +121,7 @@ impl RawNode<Candidate> {
             // If we receive a heartbeat or entries in this term, we lost the
             // election and have a new leader. Follow it and step the message.
             Event::Heartbeat { .. } | Event::AppendEntries { .. } => {
-                return self.into_follower(msg.term, Some(msg.from.unwrap()))?.step(msg);
+                return self.into_follower(msg.term, Some(msg.from))?.step(msg);
             }
 
             // Abort any inbound client requests while candidate.
@@ -169,7 +169,7 @@ impl RawNode<Candidate> {
 #[cfg(test)]
 mod tests {
     use super::super::super::state::tests::TestState;
-    use super::super::super::{Address, Entry, Log, Request};
+    use super::super::super::{Entry, Log, Request};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
@@ -205,8 +205,8 @@ mod tests {
     fn step_heartbeat_current_term() -> Result<()> {
         let (candidate, mut node_rx) = setup()?;
         let mut node = candidate.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 7 },
         })?;
@@ -214,8 +214,8 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
@@ -229,8 +229,8 @@ mod tests {
     fn step_heartbeat_future_term() -> Result<()> {
         let (candidate, mut node_rx) = setup()?;
         let mut node = candidate.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 4,
             event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 7 },
         })?;
@@ -238,8 +238,8 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 4,
                 event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
@@ -252,8 +252,8 @@ mod tests {
     fn step_heartbeat_past_term() -> Result<()> {
         let (candidate, mut node_rx) = setup()?;
         let mut node = candidate.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 2,
             event: Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
         })?;
@@ -269,30 +269,20 @@ mod tests {
         let mut node = Node::Candidate(candidate);
 
         // The first vote is not sufficient for a quorum (3 votes including self)
-        node = node.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
-            term: 3,
-            event: Event::GrantVote,
-        })?;
+        node = node.step(Message { from: 3, to: 1, term: 3, event: Event::GrantVote })?;
         assert_node(&mut node).is_candidate().term(3);
         assert_messages(&mut node_rx, vec![]);
 
         // However, the second external vote makes us leader
-        node = node.step(Message {
-            from: Address::Node(5),
-            to: Address::Node(1),
-            term: 3,
-            event: Event::GrantVote,
-        })?;
+        node = node.step(Message { from: 5, to: 1, term: 3, event: Event::GrantVote })?;
         assert_node(&mut node).is_leader().term(3);
 
         for to in peers.iter().copied().sorted() {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Node(to),
+                    from: 1,
+                    to,
                     term: 3,
                     event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
                 },
@@ -303,8 +293,8 @@ mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Node(to),
+                    from: 1,
+                    to,
                     term: 3,
                     event: Event::AppendEntries {
                         base_index: 3,
@@ -326,17 +316,17 @@ mod tests {
         let mut node = Node::Candidate(candidate);
 
         node = node.step(Message {
-            from: Address::Client,
-            to: Address::Node(1),
-            term: 0,
+            from: 1,
+            to: 1,
+            term: 3,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_candidate().term(3);
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Client,
+                from: 1,
+                to: 1,
                 term: 3,
                 event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
             }],
@@ -362,8 +352,8 @@ mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Node(to),
+                    from: 1,
+                    to,
                     term: 4,
                     event: Event::SolicitVote { last_index: 3, last_term: 2 },
                 },

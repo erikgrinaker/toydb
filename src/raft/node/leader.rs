@@ -1,6 +1,4 @@
-use super::super::{
-    Address, Event, Index, Message, ReadSequence, Request, RequestID, Response, Status,
-};
+use super::super::{Event, Index, Message, ReadSequence, Request, RequestID, Response, Status};
 use super::{Follower, Node, NodeID, RawNode, Role, Term, Ticks, HEARTBEAT_INTERVAL};
 use crate::error::{Error, Result};
 
@@ -21,8 +19,8 @@ struct Progress {
 /// A pending client write request.
 #[derive(Clone, Debug, PartialEq)]
 struct Write {
-    /// The client or node which submitted the write.
-    from: Address,
+    /// The node which submitted the write.
+    from: NodeID,
     /// The write request ID.
     id: RequestID,
 }
@@ -32,8 +30,8 @@ struct Write {
 struct Read {
     /// The sequence number of this read.
     seq: ReadSequence,
-    /// The client or node which submitted the read.
-    from: Address,
+    /// The node which submitted the read.
+    from: NodeID,
     /// The read request ID.
     id: RequestID,
     /// The read command.
@@ -132,7 +130,7 @@ impl RawNode<Leader> {
         self.assert_step(&msg);
 
         // Drop messages from past terms.
-        if msg.term < self.term && msg.term > 0 {
+        if msg.term < self.term {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
         }
@@ -147,7 +145,7 @@ impl RawNode<Leader> {
         match msg.event {
             // There can't be two leaders in the same term.
             Event::Heartbeat { .. } | Event::AppendEntries { .. } => {
-                panic!("Saw other leader {} in term {}", msg.from.unwrap(), msg.term);
+                panic!("Saw other leader {} in term {}", msg.from, msg.term);
             }
 
             // A follower received one of our heartbeats and confirms that we
@@ -157,7 +155,7 @@ impl RawNode<Leader> {
             Event::ConfirmLeader { has_committed, read_seq } => {
                 assert!(read_seq <= self.role.read_seq, "Future read sequence number");
 
-                let from = msg.from.unwrap();
+                let from = msg.from;
                 let progress = self.role.progress.get_mut(&from).unwrap();
                 if read_seq > progress.read_seq {
                     progress.read_seq = read_seq;
@@ -177,7 +175,7 @@ impl RawNode<Leader> {
                     "Follower accepted entries after last index"
                 );
 
-                let from = msg.from.unwrap();
+                let from = msg.from;
                 let progress = self.role.progress.get_mut(&from).unwrap();
                 if last_index > progress.last {
                     progress.last = last_index;
@@ -193,7 +191,7 @@ impl RawNode<Leader> {
             // This linear probing, as described in the Raft paper, can be very
             // slow with long divergent logs, but we keep it simple.
             Event::RejectEntries => {
-                let from = msg.from.unwrap();
+                let from = msg.from;
                 self.role.progress.entry(from).and_modify(|p| {
                     if p.next > 1 {
                         p.next -= 1
@@ -333,7 +331,7 @@ impl RawNode<Leader> {
             if let Some(write) = self.role.writes.remove(&index) {
                 // TODO: use self.send() or something.
                 self.node_tx.send(Message {
-                    from: Address::Node(self.id),
+                    from: self.id,
                     to: write.from,
                     term: self.term,
                     event: Event::ClientResponse {
@@ -394,7 +392,7 @@ impl RawNode<Leader> {
 
         let entries = self.log.scan((base_index + 1)..)?.collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
-        self.send(Address::Node(peer), Event::AppendEntries { base_index, base_term, entries })?;
+        self.send(peer, Event::AppendEntries { base_index, base_term, entries })?;
         Ok(())
     }
 }
@@ -442,8 +440,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::ConfirmLeader { has_committed: true, read_seq: 0 },
         })?;
@@ -459,8 +457,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::ConfirmLeader { has_committed: false, read_seq: 0 },
         })?;
@@ -468,8 +466,8 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::AppendEntries { base_index: 5, base_term: 3, entries: vec![] },
             }],
@@ -484,8 +482,8 @@ mod tests {
         let (leader, _) = setup().unwrap();
         leader
             .step(Message {
-                from: Address::Node(2),
-                to: Address::Node(1),
+                from: 2,
+                to: 1,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
             })
@@ -499,8 +497,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 4,
             event: Event::Heartbeat { commit_index: 7, commit_term: 4, read_seq: 7 },
         })?;
@@ -508,8 +506,8 @@ mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 4,
                 event: Event::ConfirmLeader { has_committed: false, read_seq: 7 },
             }],
@@ -524,8 +522,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 2,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
@@ -540,8 +538,8 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AcceptEntries { last_index: 4 },
         })?;
@@ -549,8 +547,8 @@ mod tests {
         assert_messages(&mut node_rx, vec![]);
 
         node = node.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
@@ -558,8 +556,8 @@ mod tests {
         assert_messages(&mut node_rx, vec![]);
 
         node = node.step(Message {
-            from: Address::Node(4),
-            to: Address::Node(1),
+            from: 4,
+            to: 1,
             term: 3,
             event: Event::AcceptEntries { last_index: 5 },
         })?;
@@ -578,8 +576,8 @@ mod tests {
 
         for _ in 0..5 {
             node = node.step(Message {
-                from: Address::Node(2),
-                to: Address::Node(1),
+                from: 2,
+                to: 1,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
             })?;
@@ -598,8 +596,8 @@ mod tests {
 
         for peer in peers.into_iter() {
             node = node.step(Message {
-                from: Address::Node(peer),
-                to: Address::Node(1),
+                from: peer,
+                to: 1,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 3 },
             })?;
@@ -616,8 +614,8 @@ mod tests {
         let (leader, _) = setup().unwrap();
         leader
             .step(Message {
-                from: Address::Node(2),
-                to: Address::Node(1),
+                from: 2,
+                to: 1,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 7 },
             })
@@ -631,20 +629,15 @@ mod tests {
         let mut node: Node = leader.into();
 
         for i in 0..(entries.len() + 3) {
-            node = node.step(Message {
-                from: Address::Node(2),
-                to: Address::Node(1),
-                term: 3,
-                event: Event::RejectEntries,
-            })?;
+            node = node.step(Message { from: 2, to: 1, term: 3, event: Event::RejectEntries })?;
             assert_node(&mut node).is_leader().term(3).committed(2);
             let index = if i >= entries.len() { 0 } else { entries.len() - i - 1 };
             let replicate = entries.get(index..).unwrap().to_vec();
             assert_messages(
                 &mut node_rx,
                 vec![Message {
-                    from: Address::Node(1),
-                    to: Address::Node(2),
+                    from: 1,
+                    to: 2,
                     term: 3,
                     event: Event::AppendEntries {
                         base_index: index as Index,
@@ -668,9 +661,9 @@ mod tests {
         let peers = leader.peers.clone();
         let mut node: Node = leader.into();
         node = node.step(Message {
-            from: Address::Client,
-            to: Address::Node(1),
-            term: 0,
+            from: 1,
+            to: 1,
+            term: 3,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Query(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2).last(5);
@@ -678,8 +671,8 @@ mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Node(to),
+                    from: 1,
+                    to,
                     term: 3,
                     event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 1 },
                 },
@@ -696,9 +689,9 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Client,
-            to: Address::Node(1),
-            term: 0,
+            from: 1,
+            to: 1,
+            term: 3,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2).last(6).entry(Entry {
@@ -711,8 +704,8 @@ mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Node(peer),
+                    from: 1,
+                    to: peer,
                     term: 3,
                     event: Event::AppendEntries {
                         base_index: 5,
@@ -732,9 +725,9 @@ mod tests {
         let mut node: Node = leader.into();
 
         node = node.step(Message {
-            from: Address::Client,
-            to: Address::Node(1),
-            term: 0,
+            from: 1,
+            to: 1,
+            term: 3,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Status },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2).last(5);
@@ -742,8 +735,8 @@ mod tests {
             &mut node_rx,
             vec![Message {
                 term: 3,
-                from: Address::Node(1),
-                to: Address::Client,
+                from: 1,
+                to: 1,
                 event: Event::ClientResponse {
                     id: vec![1],
                     response: Ok(Response::Status(Status {
@@ -785,8 +778,8 @@ mod tests {
                 assert_eq!(
                     node_rx.try_recv()?,
                     Message {
-                        from: Address::Node(1),
-                        to: Address::Node(to),
+                        from: 1,
+                        to,
                         term: 3,
                         event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
                     }

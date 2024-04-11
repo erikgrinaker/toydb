@@ -1,4 +1,4 @@
-use super::super::{Address, Event, Log, Message, RequestID, Response, State};
+use super::super::{Event, Log, Message, RequestID, Response, State};
 use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
@@ -123,7 +123,7 @@ impl RawNode<Follower> {
         self.assert_step(&msg);
 
         // Drop messages from past terms.
-        if msg.term < self.term && msg.term > 0 {
+        if msg.term < self.term {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
         }
@@ -136,7 +136,7 @@ impl RawNode<Follower> {
         }
 
         // Record when we last saw a message from the leader (if any).
-        if self.is_leader(&msg.from) {
+        if self.is_leader(msg.from) {
             self.role.leader_seen = 0
         }
 
@@ -146,7 +146,7 @@ impl RawNode<Follower> {
             // apply state transitions.
             Event::Heartbeat { commit_index, commit_term, read_seq } => {
                 // Check that the heartbeat is from our leader.
-                let from = msg.from.unwrap();
+                let from = msg.from;
                 match self.role.leader {
                     Some(leader) => assert_eq!(from, leader, "Multiple leaders in term"),
                     None => self = self.into_follower(Some(from), msg.term)?,
@@ -169,7 +169,7 @@ impl RawNode<Follower> {
             // this term yet, follow it.
             Event::AppendEntries { base_index, base_term, entries } => {
                 // Check that the entries are from our leader.
-                let from = msg.from.unwrap();
+                let from = msg.from;
                 match self.role.leader {
                     Some(leader) => assert_eq!(from, leader, "Multiple leaders in term"),
                     None => self = self.into_follower(Some(from), msg.term)?,
@@ -187,7 +187,7 @@ impl RawNode<Follower> {
 
             // A candidate in this term is requesting our vote.
             Event::SolicitVote { last_index, last_term } => {
-                let from = msg.from.unwrap();
+                let from = msg.from;
 
                 // If we already voted for someone else in this term, ignore it.
                 if let Some(voted_for) = self.role.voted_for {
@@ -201,7 +201,7 @@ impl RawNode<Follower> {
                 let (log_index, log_term) = self.log.get_last_index();
                 if last_term > log_term || last_term == log_term && last_index >= log_index {
                     info!("Voting for {} in term {} election", from, self.term);
-                    self.send(Address::Node(from), Event::GrantVote)?;
+                    self.send(from, Event::GrantVote)?;
                     self.log.set_term(self.term, Some(from))?;
                     self.role.voted_for = Some(from);
                 }
@@ -214,13 +214,13 @@ impl RawNode<Follower> {
             // Forward client requests to the leader, or abort them if there is
             // none (the client must retry).
             Event::ClientRequest { ref id, .. } => {
-                assert_eq!(msg.from, Address::Client, "Client request from non-client");
+                assert_eq!(msg.from, self.id, "Client request from other node");
 
                 let id = id.clone();
                 if let Some(leader) = self.role.leader {
                     debug!("Forwarding request to leader {}: {:?}", leader, msg);
                     self.role.forwarded.insert(id);
-                    self.send(Address::Node(leader), msg.event)?
+                    self.send(leader, msg.event)?
                 } else {
                     self.send(msg.from, Event::ClientResponse { id, response: Err(Error::Abort) })?
                 }
@@ -228,7 +228,7 @@ impl RawNode<Follower> {
 
             // Returns client responses for forwarded requests.
             Event::ClientResponse { id, mut response } => {
-                assert!(self.is_leader(&msg.from), "Client response from non-leader");
+                assert!(self.is_leader(msg.from), "Client response from non-leader");
 
                 // TODO: Get rid of this field, it should be returned at the RPC
                 // server level instead.
@@ -236,7 +236,7 @@ impl RawNode<Follower> {
                     status.server = self.id;
                 }
                 if self.role.forwarded.remove(&id) {
-                    self.send(Address::Client, Event::ClientResponse { id, response })?;
+                    self.send(self.id, Event::ClientResponse { id, response })?;
                 }
             }
 
@@ -263,19 +263,14 @@ impl RawNode<Follower> {
     fn abort_forwarded(&mut self) -> Result<()> {
         for id in std::mem::take(&mut self.role.forwarded) {
             debug!("Aborting forwarded request {:x?}", id);
-            self.send(Address::Client, Event::ClientResponse { id, response: Err(Error::Abort) })?;
+            self.send(self.id, Event::ClientResponse { id, response: Err(Error::Abort) })?;
         }
         Ok(())
     }
 
     /// Checks if an address is the current leader.
-    fn is_leader(&self, from: &Address) -> bool {
-        if let Some(leader) = &self.role.leader {
-            if let Address::Node(from) = from {
-                return leader == from;
-            }
-        }
-        false
+    fn is_leader(&self, from: NodeID) -> bool {
+        self.role.leader == Some(from)
     }
 }
 
@@ -317,8 +312,8 @@ pub mod tests {
     fn step_heartbeat() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
@@ -332,8 +327,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
@@ -346,8 +341,8 @@ pub mod tests {
     fn step_heartbeat_conflict_commit_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::Heartbeat { commit_index: 3, commit_term: 3, read_seq: 7 },
         })?;
@@ -355,8 +350,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::ConfirmLeader { has_committed: false, read_seq: 7 },
             }],
@@ -369,8 +364,8 @@ pub mod tests {
     fn step_heartbeat_missing_commit_entry() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
         })?;
@@ -378,8 +373,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::ConfirmLeader { has_committed: false, read_seq: 7 },
             }],
@@ -394,8 +389,8 @@ pub mod tests {
         let (follower, _) = setup().unwrap();
         follower
             .step(Message {
-                from: Address::Node(3),
-                to: Address::Node(1),
+                from: 3,
+                to: 1,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
             })
@@ -408,8 +403,8 @@ pub mod tests {
         let (mut follower, mut node_rx) = setup()?;
         follower.role = Follower::new(None, None);
         let mut node = follower.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 3,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
@@ -417,8 +412,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(3),
+                from: 1,
+                to: 3,
                 term: 3,
                 event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
@@ -431,8 +426,8 @@ pub mod tests {
     fn step_heartbeat_old_commit_index() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
         })?;
@@ -440,8 +435,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
@@ -454,8 +449,8 @@ pub mod tests {
     fn step_heartbeat_future_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 4,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
@@ -463,8 +458,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(3),
+                from: 1,
+                to: 3,
                 term: 4,
                 event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
@@ -477,8 +472,8 @@ pub mod tests {
     fn step_heartbeat_past_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 2,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
@@ -494,44 +489,34 @@ pub mod tests {
 
         // The first vote request in this term yields a vote response.
         let mut node = follower.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
-            vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(3),
-                term: 3,
-                event: Event::GrantVote,
-            }],
+            vec![Message { from: 1, to: 3, term: 3, event: Event::GrantVote }],
         );
 
         // Another vote request from the same sender is granted.
         node = node.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
-            vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(3),
-                term: 3,
-                event: Event::GrantVote,
-            }],
+            vec![Message { from: 1, to: 3, term: 3, event: Event::GrantVote }],
         );
 
         // But a vote request from a different node is ignored.
         node = node.step(Message {
-            from: Address::Node(4),
-            to: Address::Node(1),
+            from: 4,
+            to: 1,
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 2 },
         })?;
@@ -544,12 +529,8 @@ pub mod tests {
     // GrantVote messages are ignored
     fn step_grantvote_noop() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
-            term: 3,
-            event: Event::GrantVote,
-        })?;
+        let mut node =
+            follower.step(Message { from: 2, to: 1, term: 3, event: Event::GrantVote })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2));
         assert_messages(&mut node_rx, vec![]);
         Ok(())
@@ -560,8 +541,8 @@ pub mod tests {
     fn step_solicitvote_last_index_outdated() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 3,
             event: Event::SolicitVote { last_index: 2, last_term: 2 },
         })?;
@@ -575,8 +556,8 @@ pub mod tests {
     fn step_solicitvote_last_term_outdated() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 3,
             event: Event::SolicitVote { last_index: 3, last_term: 1 },
         })?;
@@ -607,8 +588,8 @@ pub mod tests {
         };
 
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AppendEntries {
                 base_index: 0,
@@ -626,8 +607,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 2 },
             }],
@@ -640,8 +621,8 @@ pub mod tests {
     fn step_appendentries_append() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AppendEntries {
                 base_index: 3,
@@ -662,8 +643,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 5 },
             }],
@@ -676,8 +657,8 @@ pub mod tests {
     fn step_appendentries_partial_overlap() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AppendEntries {
                 base_index: 1,
@@ -697,8 +678,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
             }],
@@ -711,8 +692,8 @@ pub mod tests {
     fn step_appendentries_replace() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AppendEntries {
                 base_index: 2,
@@ -732,8 +713,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
             }],
@@ -746,8 +727,8 @@ pub mod tests {
     fn step_appendentries_replace_partial() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AppendEntries {
                 base_index: 2,
@@ -767,8 +748,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::AcceptEntries { last_index: 4 },
             }],
@@ -781,8 +762,8 @@ pub mod tests {
     fn step_appendentries_reject_missing_base_index() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AppendEntries {
                 base_index: 5,
@@ -797,12 +778,7 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
-                term: 3,
-                event: Event::RejectEntries,
-            }],
+            vec![Message { from: 1, to: 2, term: 3, event: Event::RejectEntries }],
         );
         Ok(())
     }
@@ -812,8 +788,8 @@ pub mod tests {
     fn step_appendentries_reject_missing_base_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::AppendEntries {
                 base_index: 1,
@@ -828,12 +804,7 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
-                term: 3,
-                event: Event::RejectEntries,
-            }],
+            vec![Message { from: 1, to: 2, term: 3, event: Event::RejectEntries }],
         );
         Ok(())
     }
@@ -845,17 +816,17 @@ pub mod tests {
         let mut node = Node::Follower(follower);
 
         node = node.step(Message {
-            from: Address::Client,
-            to: Address::Node(1),
-            term: 0,
+            from: 1,
+            to: 1,
+            term: 3,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::ClientRequest {
                     id: vec![0x01],
@@ -865,8 +836,8 @@ pub mod tests {
         );
 
         node = node.step(Message {
-            from: Address::Node(2),
-            to: Address::Node(1),
+            from: 2,
+            to: 1,
             term: 3,
             event: Event::ClientResponse {
                 id: vec![0x01],
@@ -877,8 +848,8 @@ pub mod tests {
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Client,
+                from: 1,
+                to: 1,
                 term: 3,
                 event: Event::ClientResponse {
                     id: vec![0x01],
@@ -897,17 +868,17 @@ pub mod tests {
         let mut node = Node::Follower(follower);
 
         node = node.step(Message {
-            from: Address::Client,
-            to: Address::Node(1),
-            term: 0,
+            from: 1,
+            to: 1,
+            term: 3,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(None).forwarded(vec![]);
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Client,
+                from: 1,
+                to: 1,
                 term: 3,
                 event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
             }],
@@ -922,17 +893,17 @@ pub mod tests {
         let mut node = Node::Follower(follower);
 
         node = node.step(Message {
-            from: Address::Client,
-            to: Address::Node(1),
-            term: 0,
+            from: 1,
+            to: 1,
+            term: 3,
             event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
             &mut node_rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 3,
                 event: Event::ClientRequest {
                     id: vec![0x01],
@@ -943,8 +914,8 @@ pub mod tests {
 
         // When a new leader appears, the proxied request is aborted.
         node = node.step(Message {
-            from: Address::Node(3),
-            to: Address::Node(1),
+            from: 3,
+            to: 1,
             term: 4,
             event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
@@ -953,14 +924,14 @@ pub mod tests {
             &mut node_rx,
             vec![
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Client,
+                    from: 1,
+                    to: 1,
                     term: 3,
                     event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
                 },
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Node(3),
+                    from: 1,
+                    to: 3,
                     term: 4,
                     event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
                 },
@@ -982,16 +953,16 @@ pub mod tests {
             assert_node(&mut node).is_follower().term(3).leader(Some(2));
             node = node.tick()?;
             node = node.step(Message {
-                from: Address::Node(2),
-                to: Address::Node(1),
+                from: 2,
+                to: 1,
                 term: 3,
                 event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 7 },
             })?;
             assert_messages(
                 &mut node_rx,
                 vec![Message {
-                    from: Address::Node(1),
-                    to: Address::Node(2),
+                    from: 1,
+                    to: 2,
                     term: 3,
                     event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
                 }],
@@ -1008,8 +979,8 @@ pub mod tests {
             assert_eq!(
                 node_rx.try_recv()?,
                 Message {
-                    from: Address::Node(1),
-                    to: Address::Node(to),
+                    from: 1,
+                    to,
                     term: 4,
                     event: Event::SolicitVote { last_index: 3, last_term: 2 },
                 },

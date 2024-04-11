@@ -2,7 +2,7 @@ mod candidate;
 mod follower;
 mod leader;
 
-use super::{Address, Event, Index, Log, Message, State};
+use super::{Event, Index, Log, Message, State};
 use crate::error::{Error, Result};
 use candidate::Candidate;
 use follower::Follower;
@@ -81,7 +81,16 @@ impl Node {
         }
     }
 
-    /// Processes a message.
+    /// Returns the node term.
+    pub fn term(&self) -> Term {
+        match self {
+            Node::Candidate(n) => n.term,
+            Node::Follower(n) => n.term,
+            Node::Leader(n) => n.term,
+        }
+    }
+
+    /// Processes a message from a peer.
     pub fn step(self, msg: Message) -> Result<Self> {
         debug!("Stepping {:?}", msg);
         match self {
@@ -199,9 +208,9 @@ impl<R: Role> RawNode<R> {
     }
 
     /// Sends an event
-    fn send(&self, to: Address, event: Event) -> Result<()> {
-        let msg = Message { term: self.term, from: Address::Node(self.id), to, event };
-        debug!("Sending {:?}", msg);
+    fn send(&self, to: NodeID, event: Event) -> Result<()> {
+        let msg = Message { term: self.term, from: self.id, to, event };
+        debug!("Sending {msg:?}");
         Ok(self.node_tx.send(msg)?)
     }
 
@@ -209,7 +218,7 @@ impl<R: Role> RawNode<R> {
     fn broadcast(&self, event: Event) -> Result<()> {
         // Sort for test determinism.
         for id in self.peers.iter().copied().sorted() {
-            self.send(Address::Node(id), event.clone())?;
+            self.send(id, event.clone())?;
         }
         Ok(())
     }
@@ -221,31 +230,16 @@ impl<R: Role> RawNode<R> {
     }
 
     /// Asserts message invariants when stepping.
-    ///
-    /// In a real production database, these should be errors instead, since
-    /// external input from the network can't be trusted to uphold invariants.
     fn assert_step(&self, msg: &Message) {
         // Messages must be addressed to the local node.
-        match msg.to {
-            Address::Client => panic!("Message to client"),
-            Address::Node(id) => assert_eq!(id, self.id, "Message to other node"),
-        }
+        assert_eq!(msg.to, self.id, "Message to other node");
 
-        match msg.from {
-            // Clients can only send ClientRequest without a term.
-            Address::Client => {
-                assert_eq!(msg.term, 0, "Client message with term");
-                assert!(
-                    matches!(msg.event, Event::ClientRequest { .. }),
-                    "Non-request message from client"
-                );
-            }
-            // Nodes must be known, and must include their term.
-            Address::Node(id) => {
-                assert!(id == self.id || self.peers.contains(&id), "Unknown sender {}", id);
-                assert!(msg.term > 0, "Message without term");
-            }
-        }
+        // Senders must be known.
+        assert!(
+            msg.from == self.id || self.peers.contains(&msg.from),
+            "Unknown sender {}",
+            msg.from
+        );
     }
 }
 
@@ -520,15 +514,12 @@ mod tests {
     #[test]
     fn send() -> Result<()> {
         let (node, mut rx) = setup_rolenode()?;
-        node.send(
-            Address::Node(2),
-            Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
-        )?;
+        node.send(2, Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 })?;
         assert_messages(
             &mut rx,
             vec![Message {
-                from: Address::Node(1),
-                to: Address::Node(2),
+                from: 1,
+                to: 2,
                 term: 1,
                 event: Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
             }],
