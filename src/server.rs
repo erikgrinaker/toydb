@@ -217,7 +217,15 @@ impl Server {
                         }
                     }
                     let peer_tx = peers_tx.get_mut(&msg.to).expect("unknown peer");
-                    peer_tx.send(msg).expect("peer_tx disconnected");
+                    match peer_tx.try_send(msg) {
+                        Ok(()) => {},
+                        Err(crossbeam::channel::TrySendError::Full(_)) => {
+                            error!("Raft peer channel full, dropping message");
+                        },
+                        Err(crossbeam::channel::TrySendError::Disconnected(_)) => {
+                            panic!("peer_tx disconnected");
+                        },
+                    };
                 }
 
                 // Track inbound client requests and step them into the node.
