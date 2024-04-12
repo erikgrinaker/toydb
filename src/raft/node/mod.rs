@@ -2,7 +2,7 @@ mod candidate;
 mod follower;
 mod leader;
 
-use super::{Event, Index, Log, Message, State};
+use super::{Event, Index, Log, Message, State, ELECTION_TIMEOUT_RANGE};
 use crate::error::{Error, Result};
 use candidate::Candidate;
 use follower::Follower;
@@ -21,19 +21,6 @@ pub type Term = u64;
 
 /// A logical clock interval as number of ticks.
 pub type Ticks = u8;
-
-/// The interval between leader heartbeats, in ticks.
-const HEARTBEAT_INTERVAL: Ticks = 3;
-
-/// The interval between Raft ticks, the unit of time for e.g. heartbeats and
-/// elections.
-///
-/// TODO: consider moving this and other options elsewhere.
-pub const TICK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
-
-/// The randomized election timeout range (min-max), in ticks. This is
-/// randomized per node to avoid ties.
-const ELECTION_TIMEOUT_RANGE: std::ops::Range<u8> = 10..20;
 
 /// Generates a randomized election timeout.
 fn rand_election_timeout() -> Ticks {

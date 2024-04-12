@@ -5,12 +5,6 @@ use crate::storage;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// TODO: simplify these types and move them elsewhere.
-pub type ClientSender =
-    crossbeam::channel::Sender<(Request, crossbeam::channel::Sender<Result<Response>>)>;
-pub type ClientReceiver =
-    crossbeam::channel::Receiver<(Request, crossbeam::channel::Sender<Result<Response>>)>;
-
 /// A message passed between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {

@@ -1,8 +1,10 @@
-use super::super::{Event, Index, Message, ReadSequence, Request, RequestID, Response, Status};
-use super::{Follower, Node, NodeID, RawNode, Role, Term, Ticks, HEARTBEAT_INTERVAL};
+use super::super::{
+    Event, Index, Message, ReadSequence, Request, RequestID, Response, Status, HEARTBEAT_INTERVAL,
+};
+use super::{Follower, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
-use ::log::{debug, info};
+use log::{debug, info};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Peer replication progress.

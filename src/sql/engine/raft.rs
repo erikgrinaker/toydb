@@ -6,6 +6,7 @@ use crate::error::{Error, Result};
 use crate::raft::{self, Entry};
 use crate::storage::{self, mvcc::TransactionState};
 
+use crossbeam::channel::Sender;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -67,12 +68,12 @@ pub struct Status {
 /// A client for the local Raft node.
 #[derive(Clone)]
 struct Client {
-    tx: raft::ClientSender,
+    tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
 }
 
 impl Client {
     /// Creates a new Raft client.
-    fn new(tx: raft::ClientSender) -> Self {
+    fn new(tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>) -> Self {
         Self { tx }
     }
 
@@ -118,7 +119,7 @@ pub struct Raft {
 
 impl Raft {
     /// Creates a new Raft-based SQL engine.
-    pub fn new(tx: raft::ClientSender) -> Self {
+    pub fn new(tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>) -> Self {
         Self { client: Client::new(tx) }
     }
 
