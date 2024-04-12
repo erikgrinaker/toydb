@@ -6,23 +6,29 @@ use crate::sql::execution::ResultSet;
 use crate::sql::schema::Table;
 
 use rand::Rng;
+use std::io::Write as _;
 
 /// A toyDB client
 pub struct Client {
-    conn: std::net::TcpStream,
+    reader: std::io::BufReader<std::net::TcpStream>,
+    writer: std::io::BufWriter<std::net::TcpStream>,
     txn: Option<(u64, bool)>,
 }
 
 impl Client {
     /// Creates a new client
     pub fn new(addr: impl std::net::ToSocketAddrs) -> Result<Self> {
-        Ok(Self { conn: std::net::TcpStream::connect(addr)?, txn: None })
+        let socket = std::net::TcpStream::connect(addr)?;
+        let reader = std::io::BufReader::new(socket.try_clone()?);
+        let writer = std::io::BufWriter::new(socket);
+        Ok(Self { reader, writer, txn: None })
     }
 
     /// Call a server method
     fn call(&mut self, request: Request) -> Result<Response> {
-        bincode::serialize_into(&mut self.conn, &request)?;
-        bincode::deserialize_from(&mut self.conn)?
+        bincode::serialize_into(&mut self.writer, &request)?;
+        self.writer.flush()?;
+        bincode::deserialize_from(&mut self.reader)?
     }
 
     /// Executes a query
@@ -35,7 +41,7 @@ impl Client {
             // FIXME We buffer rows for now to avoid lifetime hassles
             let mut rows = Vec::new();
             loop {
-                match bincode::deserialize_from::<_, Result<_>>(&mut self.conn)?? {
+                match bincode::deserialize_from::<_, Result<_>>(&mut self.reader)?? {
                     Response::Row(Some(row)) => rows.push(row),
                     Response::Row(None) => break,
                     response => {

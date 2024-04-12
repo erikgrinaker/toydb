@@ -1,5 +1,5 @@
 use crate::encoding::bincode;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::raft;
 use crate::sql;
 use crate::sql::engine::Engine as _;
@@ -11,6 +11,7 @@ use crossbeam::channel::{Receiver, Sender};
 use log::{debug, error, info};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::Write as _;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};
 
 /// The outbound Raft peer channel capacity. This buffers messages when a Raft
@@ -130,7 +131,8 @@ impl Server {
 
     /// Receives inbound messages from a peer via TCP, and queues them for
     /// stepping into the Raft node.
-    fn raft_receive_peer(mut socket: TcpStream, raft_step_tx: Sender<raft::Message>) -> Result<()> {
+    fn raft_receive_peer(socket: TcpStream, raft_step_tx: Sender<raft::Message>) -> Result<()> {
+        let mut socket = std::io::BufReader::new(socket);
         while let Some(message) = bincode::maybe_deserialize_from(&mut socket)? {
             raft_step_tx.send(message)?;
         }
@@ -142,7 +144,7 @@ impl Server {
     fn raft_send_peer(addr: String, raft_node_rx: Receiver<raft::Message>) {
         loop {
             let mut socket = match TcpStream::connect(&addr) {
-                Ok(s) => s,
+                Ok(socket) => std::io::BufWriter::new(socket),
                 Err(err) => {
                     error!("Failed connecting to Raft peer {addr}: {err}");
                     std::thread::sleep(RAFT_PEER_RETRY_INTERVAL);
@@ -150,7 +152,9 @@ impl Server {
                 }
             };
             while let Ok(message) = raft_node_rx.recv() {
-                if let Err(err) = bincode::serialize_into(&mut socket, &message) {
+                if let Err(err) = bincode::serialize_into(&mut socket, &message)
+                    .and_then(|()| socket.flush().map_err(Error::from))
+                {
                     error!("Failed sending to Raft peer {addr}: {err}");
                     break;
                 }
@@ -260,11 +264,14 @@ impl Server {
     /// Processes a client SQL session, by executing SQL statements against the
     /// Raft node.
     fn sql_session(
-        mut socket: TcpStream,
+        socket: TcpStream,
         raft_request_tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
     ) -> Result<()> {
         let mut session = sql::engine::Raft::new(raft_request_tx).session();
-        while let Some(request) = bincode::maybe_deserialize_from(&mut socket)? {
+        let mut reader = std::io::BufReader::new(socket.try_clone()?);
+        let mut writer = std::io::BufWriter::new(socket);
+
+        while let Some(request) = bincode::maybe_deserialize_from(&mut reader)? {
             // Execute request.
             debug!("Received request {request:?}");
             let mut response = match request {
@@ -302,10 +309,11 @@ impl Server {
                 );
             }
 
-            bincode::serialize_into(&mut socket, &response)?;
+            bincode::serialize_into(&mut writer, &response)?;
             for row in rows {
-                bincode::serialize_into(&mut socket, &row)?;
+                bincode::serialize_into(&mut writer, &row)?;
             }
+            writer.flush()?;
         }
         Ok(())
     }
