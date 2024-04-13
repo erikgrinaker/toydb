@@ -219,7 +219,7 @@ mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())
@@ -242,7 +242,7 @@ mod tests {
                 from: 1,
                 to: 2,
                 term: 4,
-                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())

@@ -146,20 +146,22 @@ impl RawNode<Follower> {
             // apply state transitions.
             Message::Heartbeat { commit_index, commit_term, read_seq } => {
                 // Check that the heartbeat is from our leader.
-                let from = msg.from;
                 match self.role.leader {
-                    Some(leader) => assert_eq!(from, leader, "Multiple leaders in term"),
-                    None => self = self.into_follower(Some(from), msg.term)?,
+                    Some(leader) => assert_eq!(msg.from, leader, "Multiple leaders in term"),
+                    None => self = self.into_follower(Some(msg.from), msg.term)?,
                 }
 
                 // Respond to the heartbeat.
-                //
-                // TODO: this should return the last index and term.
-                let has_committed = self.log.has(commit_index, commit_term)?;
-                self.send(msg.from, Message::HeartbeatResponse { has_committed, read_seq })?;
+                let (last_index, last_term) = self.log.get_last_index();
+                self.send(
+                    msg.from,
+                    Message::HeartbeatResponse { last_index, last_term, read_seq },
+                )?;
 
                 // Advance commit index and apply entries.
-                if has_committed && commit_index > self.log.get_commit_index().0 {
+                if self.log.has(commit_index, commit_term)?
+                    && commit_index > self.log.get_commit_index().0
+                {
                     self.log.commit(commit_index)?;
                     self.maybe_apply()?;
                 }
@@ -331,7 +333,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())
@@ -354,7 +356,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::HeartbeatResponse { has_committed: false, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())
@@ -377,7 +379,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::HeartbeatResponse { has_committed: false, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())
@@ -416,7 +418,7 @@ pub mod tests {
                 from: 1,
                 to: 3,
                 term: 3,
-                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())
@@ -439,7 +441,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())
@@ -462,7 +464,7 @@ pub mod tests {
                 from: 1,
                 to: 3,
                 term: 4,
-                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 7 },
             }],
         );
         Ok(())
@@ -985,7 +987,11 @@ pub mod tests {
                     from: 1,
                     to: 3,
                     term: 4,
-                    message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                    message: Message::HeartbeatResponse {
+                        last_index: 3,
+                        last_term: 2,
+                        read_seq: 7,
+                    },
                 },
             ],
         );
@@ -1016,7 +1022,11 @@ pub mod tests {
                     from: 1,
                     to: 2,
                     term: 3,
-                    message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
+                    message: Message::HeartbeatResponse {
+                        last_index: 3,
+                        last_term: 2,
+                        read_seq: 7,
+                    },
                 }],
             )
         }

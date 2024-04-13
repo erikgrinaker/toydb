@@ -152,21 +152,21 @@ impl RawNode<Leader> {
             }
 
             // A follower received one of our heartbeats and confirms that we
-            // are its leader. If it doesn't have the commit index in its local
-            // log, replicate the log to it. If the peer's read sequence number
-            // increased, process any pending reads.
-            Message::HeartbeatResponse { has_committed, read_seq } => {
+            // are its leader. If its log is incomplete, append entries. If the
+            // peer's read sequence number increased, process any pending reads.
+            Message::HeartbeatResponse { last_index, last_term, read_seq } => {
                 assert!(read_seq <= self.role.read_seq, "Future read sequence number");
 
-                let from = msg.from;
-                let progress = self.role.progress.get_mut(&from).unwrap();
+                let progress = self.role.progress.get_mut(&msg.from).unwrap();
                 if read_seq > progress.read_seq {
                     progress.read_seq = read_seq;
                     self.maybe_read()?;
                 }
 
-                if !has_committed {
-                    self.send_log(from)?;
+                if last_index < self.log.get_last_index().0
+                    || !self.log.has(last_index, last_term)?
+                {
+                    self.send_log(msg.from)?;
                 }
             }
 
@@ -438,24 +438,7 @@ mod tests {
     }
 
     #[test]
-    // ConfirmLeader triggers vote
-    fn step_confirmleader_vote() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        node = node.step(Envelope {
-            from: 2,
-            to: 1,
-            term: 3,
-            message: Message::HeartbeatResponse { has_committed: true, read_seq: 0 },
-        })?;
-        assert_node(&mut node).is_leader().term(3).committed(2);
-        assert_messages(&mut node_rx, vec![]);
-        Ok(())
-    }
-
-    #[test]
-    // ConfirmLeader without has_committed triggers replication
+    // HeartbeatResponse with old log triggers replication.
     fn step_confirmleader_replicate() -> Result<()> {
         let (leader, mut node_rx) = setup()?;
         let mut node: Node = leader.into();
@@ -464,7 +447,7 @@ mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::HeartbeatResponse { has_committed: false, read_seq: 0 },
+            message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 0 },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2);
         assert_messages(
@@ -513,7 +496,7 @@ mod tests {
                 from: 1,
                 to: 2,
                 term: 4,
-                message: Message::HeartbeatResponse { has_committed: false, read_seq: 7 },
+                message: Message::HeartbeatResponse { last_index: 5, last_term: 3, read_seq: 7 },
             }],
         );
         Ok(())

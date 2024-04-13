@@ -33,11 +33,10 @@ pub enum Message {
 
     /// Followers confirm leader heartbeats.
     HeartbeatResponse {
-        /// If false, the follower does not have the entry at commit_index
-        /// and would like the leader to replicate it.
-        ///
-        /// TODO: consider responding with last_index/term instead.
-        has_committed: bool,
+        /// The index of the follower's last log entry.
+        last_index: Index,
+        /// The term of the follower's last log entry.
+        last_term: Term,
         /// The read sequence number of the heartbeat we're responding to.
         read_seq: ReadSequence,
     },
