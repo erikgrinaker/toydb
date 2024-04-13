@@ -30,29 +30,35 @@ pub enum Message {
         /// The latest read sequence number of the leader.
         read_seq: ReadSequence,
     },
-    /// Followers confirm loyalty to leader after heartbeats.
-    ConfirmLeader {
+
+    /// Followers confirm leader heartbeats.
+    HeartbeatResponse {
         /// If false, the follower does not have the entry at commit_index
         /// and would like the leader to replicate it.
+        ///
+        /// TODO: consider responding with last_index/term instead.
         has_committed: bool,
         /// The read sequence number of the heartbeat we're responding to.
         read_seq: ReadSequence,
     },
 
-    /// Candidates solicit votes from all peers when campaigning for leadership.
-    SolicitVote {
-        // The index of the candidate's last stored log entry
+    /// Candidates campaign for leadership by soliciting votes from peers.
+    Campaign {
+        /// The index of the candidate's last stored log entry
         last_index: Index,
-        // The term of the candidate's last stored log entry
+        /// The term of the candidate's last stored log entry
         last_term: Term,
     },
 
-    /// Followers may grant a single vote to a candidate per term, on a
-    /// first-come basis. Candidates implicitly vote for themselves.
-    GrantVote,
+    /// Followers may vote for a single candidate per term, on a first-come
+    /// first-serve basis. Candidates implicitly vote for themselves.
+    CampaignResponse {
+        /// If true, the sender granted a vote for the candidate.
+        vote: bool,
+    },
 
-    /// Leaders replicate log entries to followers by appending it to their log.
-    AppendEntries {
+    /// Leaders replicate log entries to followers by appending to their logs.
+    Append {
         /// The index of the log entry immediately preceding the submitted commands.
         base_index: Index,
         /// The term of the log entry immediately preceding the submitted commands.
@@ -60,13 +66,16 @@ pub enum Message {
         /// Commands to replicate.
         entries: Vec<Entry>,
     },
-    /// Followers may accept a set of log entries from a leader.
-    AcceptEntries {
-        /// The index of the last log entry.
+
+    /// Followers may accept or reject appending entries from the leader.
+    AppendResponse {
+        /// If true, the follower rejected the leader's entries.
+        reject: bool,
+        /// The index of the follower's last log entry.
+        ///
+        /// TODO: should this include last_term as well?
         last_index: Index,
     },
-    /// Followers may also reject a set of log entries from a leader.
-    RejectEntries,
 
     /// A client request. This can be submitted to the leader, or to a follower
     /// which will forward it to its leader. If there is no leader, or the

@@ -156,7 +156,7 @@ impl RawNode<Follower> {
                 //
                 // TODO: this should return the last index and term.
                 let has_committed = self.log.has(commit_index, commit_term)?;
-                self.send(msg.from, Message::ConfirmLeader { has_committed, read_seq })?;
+                self.send(msg.from, Message::HeartbeatResponse { has_committed, read_seq })?;
 
                 // Advance commit index and apply entries.
                 if has_committed && commit_index > self.log.get_commit_index().0 {
@@ -167,7 +167,7 @@ impl RawNode<Follower> {
 
             // Replicate entries from the leader. If we don't have a leader in
             // this term yet, follow it.
-            Message::AppendEntries { base_index, base_term, entries } => {
+            Message::Append { base_index, base_term, entries } => {
                 // Check that the entries are from our leader.
                 let from = msg.from;
                 match self.role.leader {
@@ -178,38 +178,41 @@ impl RawNode<Follower> {
                 // Append the entries, if possible.
                 if base_index > 0 && !self.log.has(base_index, base_term)? {
                     debug!("Rejecting log entries at base {}", base_index);
-                    self.send(msg.from, Message::RejectEntries)?
+                    let (last_index, _) = self.log.get_last_index();
+                    self.send(msg.from, Message::AppendResponse { reject: true, last_index })?
                 } else {
                     let last_index = self.log.splice(entries)?;
-                    self.send(msg.from, Message::AcceptEntries { last_index })?
+                    self.send(msg.from, Message::AppendResponse { reject: false, last_index })?
                 }
             }
 
             // A candidate in this term is requesting our vote.
-            Message::SolicitVote { last_index, last_term } => {
-                let from = msg.from;
-
-                // If we already voted for someone else in this term, ignore it.
+            Message::Campaign { last_index, last_term } => {
+                // Don't vote if we already voted for someone else in this term.
                 if let Some(voted_for) = self.role.voted_for {
-                    if from != voted_for {
+                    if msg.from != voted_for {
+                        self.send(msg.from, Message::CampaignResponse { vote: false })?;
                         return Ok(self.into());
                     }
                 }
 
-                // Only vote if the candidate's log is at least as up-to-date as
-                // our log.
+                // Don't vote if our log is newer than the candidate's log.
                 let (log_index, log_term) = self.log.get_last_index();
-                if last_term > log_term || last_term == log_term && last_index >= log_index {
-                    info!("Voting for {} in term {} election", from, self.term);
-                    self.send(from, Message::GrantVote)?;
-                    self.log.set_term(self.term, Some(from))?;
-                    self.role.voted_for = Some(from);
+                if log_term > last_term || log_term == last_term && log_index > last_index {
+                    self.send(msg.from, Message::CampaignResponse { vote: false })?;
+                    return Ok(self.into());
                 }
+
+                // Grant the vote.
+                info!("Voting for {} in term {} election", msg.from, self.term);
+                self.send(msg.from, Message::CampaignResponse { vote: true })?;
+                self.log.set_term(self.term, Some(msg.from))?;
+                self.role.voted_for = Some(msg.from);
             }
 
             // We may receive a vote after we lost an election and followed a
             // different leader. Ignore it.
-            Message::GrantVote => {}
+            Message::CampaignResponse { .. } => {}
 
             // Forward client requests to the leader, or abort them if there is
             // none (the client must retry).
@@ -239,9 +242,9 @@ impl RawNode<Follower> {
             }
 
             // We're not a leader nor candidate in this term, so we shoudn't see these.
-            Message::ConfirmLeader { .. }
-            | Message::AcceptEntries { .. }
-            | Message::RejectEntries { .. } => panic!("Received unexpected message {:?}", msg),
+            Message::HeartbeatResponse { .. } | Message::AppendResponse { .. } => {
+                panic!("Received unexpected message {msg:?}")
+            }
         };
         Ok(self.into())
     }
@@ -328,7 +331,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -351,7 +354,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::ConfirmLeader { has_committed: false, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: false, read_seq: 7 },
             }],
         );
         Ok(())
@@ -374,7 +377,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::ConfirmLeader { has_committed: false, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: false, read_seq: 7 },
             }],
         );
         Ok(())
@@ -413,7 +416,7 @@ pub mod tests {
                 from: 1,
                 to: 3,
                 term: 3,
-                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -436,7 +439,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -459,7 +462,7 @@ pub mod tests {
                 from: 1,
                 to: 3,
                 term: 4,
-                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -490,12 +493,17 @@ pub mod tests {
             from: 3,
             to: 1,
             term: 3,
-            message: Message::SolicitVote { last_index: 3, last_term: 2 },
+            message: Message::Campaign { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
-            vec![Envelope { from: 1, to: 3, term: 3, message: Message::GrantVote }],
+            vec![Envelope {
+                from: 1,
+                to: 3,
+                term: 3,
+                message: Message::CampaignResponse { vote: true },
+            }],
         );
 
         // Another vote request from the same sender is granted.
@@ -503,12 +511,17 @@ pub mod tests {
             from: 3,
             to: 1,
             term: 3,
-            message: Message::SolicitVote { last_index: 3, last_term: 2 },
+            message: Message::Campaign { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
-            vec![Envelope { from: 1, to: 3, term: 3, message: Message::GrantVote }],
+            vec![Envelope {
+                from: 1,
+                to: 3,
+                term: 3,
+                message: Message::CampaignResponse { vote: true },
+            }],
         );
 
         // But a vote request from a different node is ignored.
@@ -516,19 +529,31 @@ pub mod tests {
             from: 4,
             to: 1,
             term: 3,
-            message: Message::SolicitVote { last_index: 3, last_term: 2 },
+            message: Message::Campaign { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
-        assert_messages(&mut node_rx, vec![]);
+        assert_messages(
+            &mut node_rx,
+            vec![Envelope {
+                from: 1,
+                to: 4,
+                term: 3,
+                message: Message::CampaignResponse { vote: false },
+            }],
+        );
         Ok(())
     }
 
     #[test]
-    // GrantVote messages are ignored
+    // Vote messages are ignored.
     fn step_grantvote_noop() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node =
-            follower.step(Envelope { from: 2, to: 1, term: 3, message: Message::GrantVote })?;
+        let mut node = follower.step(Envelope {
+            from: 2,
+            to: 1,
+            term: 3,
+            message: Message::CampaignResponse { vote: true },
+        })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2));
         assert_messages(&mut node_rx, vec![]);
         Ok(())
@@ -542,10 +567,18 @@ pub mod tests {
             from: 3,
             to: 1,
             term: 3,
-            message: Message::SolicitVote { last_index: 2, last_term: 2 },
+            message: Message::Campaign { last_index: 2, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None);
-        assert_messages(&mut node_rx, vec![]);
+        assert_messages(
+            &mut node_rx,
+            vec![Envelope {
+                from: 1,
+                to: 3,
+                term: 3,
+                message: Message::CampaignResponse { vote: false },
+            }],
+        );
         Ok(())
     }
 
@@ -557,10 +590,18 @@ pub mod tests {
             from: 3,
             to: 1,
             term: 3,
-            message: Message::SolicitVote { last_index: 3, last_term: 1 },
+            message: Message::Campaign { last_index: 3, last_term: 1 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None);
-        assert_messages(&mut node_rx, vec![]);
+        assert_messages(
+            &mut node_rx,
+            vec![Envelope {
+                from: 1,
+                to: 3,
+                term: 3,
+                message: Message::CampaignResponse { vote: false },
+            }],
+        );
         Ok(())
     }
 
@@ -589,7 +630,7 @@ pub mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendEntries {
+            message: Message::Append {
                 base_index: 0,
                 base_term: 0,
                 entries: vec![
@@ -608,7 +649,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 2 },
+                message: Message::AppendResponse { reject: false, last_index: 2 },
             }],
         );
         Ok(())
@@ -622,7 +663,7 @@ pub mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendEntries {
+            message: Message::Append {
                 base_index: 3,
                 base_term: 2,
                 entries: vec![
@@ -644,7 +685,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 5 },
+                message: Message::AppendResponse { reject: false, last_index: 5 },
             }],
         );
         Ok(())
@@ -658,7 +699,7 @@ pub mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendEntries {
+            message: Message::Append {
                 base_index: 1,
                 base_term: 1,
                 entries: vec![
@@ -679,7 +720,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 4 },
+                message: Message::AppendResponse { reject: false, last_index: 4 },
             }],
         );
         Ok(())
@@ -693,7 +734,7 @@ pub mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendEntries {
+            message: Message::Append {
                 base_index: 2,
                 base_term: 1,
                 entries: vec![
@@ -714,7 +755,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 4 },
+                message: Message::AppendResponse { reject: false, last_index: 4 },
             }],
         );
         Ok(())
@@ -728,7 +769,7 @@ pub mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendEntries {
+            message: Message::Append {
                 base_index: 2,
                 base_term: 1,
                 entries: vec![
@@ -749,7 +790,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 4 },
+                message: Message::AppendResponse { reject: false, last_index: 4 },
             }],
         );
         Ok(())
@@ -763,7 +804,7 @@ pub mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendEntries {
+            message: Message::Append {
                 base_index: 5,
                 base_term: 2,
                 entries: vec![Entry { index: 6, term: 3, command: Some(vec![0x04]) }],
@@ -776,7 +817,12 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Envelope { from: 1, to: 2, term: 3, message: Message::RejectEntries }],
+            vec![Envelope {
+                from: 1,
+                to: 2,
+                term: 3,
+                message: Message::AppendResponse { reject: true, last_index: 3 },
+            }],
         );
         Ok(())
     }
@@ -789,7 +835,7 @@ pub mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendEntries {
+            message: Message::Append {
                 base_index: 1,
                 base_term: 2,
                 entries: vec![Entry { index: 2, term: 3, command: Some(vec![0x04]) }],
@@ -802,7 +848,12 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Envelope { from: 1, to: 2, term: 3, message: Message::RejectEntries }],
+            vec![Envelope {
+                from: 1,
+                to: 2,
+                term: 3,
+                message: Message::AppendResponse { reject: true, last_index: 3 },
+            }],
         );
         Ok(())
     }
@@ -943,7 +994,7 @@ pub mod tests {
                     from: 1,
                     to: 3,
                     term: 4,
-                    message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                    message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
                 },
             ],
         );
@@ -974,7 +1025,7 @@ pub mod tests {
                     from: 1,
                     to: 2,
                     term: 3,
-                    message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                    message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
                 }],
             )
         }
@@ -992,7 +1043,7 @@ pub mod tests {
                     from: 1,
                     to,
                     term: 4,
-                    message: Message::SolicitVote { last_index: 3, last_term: 2 },
+                    message: Message::Campaign { last_index: 3, last_term: 2 },
                 },
             );
         }

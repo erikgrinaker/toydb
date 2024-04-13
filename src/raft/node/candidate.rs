@@ -107,20 +107,23 @@ impl RawNode<Candidate> {
 
         match msg.message {
             // Ignore other candidates when we're also campaigning.
-            Message::SolicitVote { .. } => {}
+            Message::Campaign { .. } => {}
 
-            // We received a vote. Record it, and if we have quorum, assume
-            // leadership.
-            Message::GrantVote => {
+            // If we received a vote, record it. If the vote gives us quorum,
+            // assume leadership.
+            Message::CampaignResponse { vote: true } => {
                 self.role.votes.insert(msg.from);
                 if self.role.votes.len() as u8 >= self.quorum_size() {
                     return Ok(self.into_leader()?.into());
                 }
             }
 
+            // We didn't get a vote. :(
+            Message::CampaignResponse { vote: false } => {}
+
             // If we receive a heartbeat or entries in this term, we lost the
             // election and have a new leader. Follow it and step the message.
-            Message::Heartbeat { .. } | Message::AppendEntries { .. } => {
+            Message::Heartbeat { .. } | Message::Append { .. } => {
                 return self.into_follower(msg.term, Some(msg.from))?.step(msg);
             }
 
@@ -131,9 +134,8 @@ impl RawNode<Candidate> {
 
             // We're not a leader in this term, nor are we forwarding requests,
             // so we shouldn't see these.
-            Message::ConfirmLeader { .. }
-            | Message::AcceptEntries { .. }
-            | Message::RejectEntries { .. }
+            Message::HeartbeatResponse { .. }
+            | Message::AppendResponse { .. }
             | Message::ClientResponse { .. } => panic!("Received unexpected message {:?}", msg),
         }
         Ok(self.into())
@@ -161,7 +163,7 @@ impl RawNode<Candidate> {
         self.log.set_term(term, Some(self.id))?;
 
         let (last_index, last_term) = self.log.get_last_index();
-        self.broadcast(Message::SolicitVote { last_index, last_term })?;
+        self.broadcast(Message::Campaign { last_index, last_term })?;
         Ok(())
     }
 }
@@ -217,7 +219,7 @@ mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -240,7 +242,7 @@ mod tests {
                 from: 1,
                 to: 2,
                 term: 4,
-                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -268,12 +270,22 @@ mod tests {
         let mut node = Node::Candidate(candidate);
 
         // The first vote is not sufficient for a quorum (3 votes including self)
-        node = node.step(Envelope { from: 3, to: 1, term: 3, message: Message::GrantVote })?;
+        node = node.step(Envelope {
+            from: 3,
+            to: 1,
+            term: 3,
+            message: Message::CampaignResponse { vote: true },
+        })?;
         assert_node(&mut node).is_candidate().term(3);
         assert_messages(&mut node_rx, vec![]);
 
         // However, the second external vote makes us leader
-        node = node.step(Envelope { from: 5, to: 1, term: 3, message: Message::GrantVote })?;
+        node = node.step(Envelope {
+            from: 5,
+            to: 1,
+            term: 3,
+            message: Message::CampaignResponse { vote: true },
+        })?;
         assert_node(&mut node).is_leader().term(3);
 
         for to in peers.iter().copied().sorted() {
@@ -295,7 +307,7 @@ mod tests {
                     from: 1,
                     to,
                     term: 3,
-                    message: Message::AppendEntries {
+                    message: Message::Append {
                         base_index: 3,
                         base_term: 2,
                         entries: vec![Entry { index: 4, term: 3, command: None }],
@@ -357,7 +369,7 @@ mod tests {
                     from: 1,
                     to,
                     term: 4,
-                    message: Message::SolicitVote { last_index: 3, last_term: 2 },
+                    message: Message::Campaign { last_index: 3, last_term: 2 },
                 },
             );
         }

@@ -147,7 +147,7 @@ impl RawNode<Leader> {
 
         match msg.message {
             // There can't be two leaders in the same term.
-            Message::Heartbeat { .. } | Message::AppendEntries { .. } => {
+            Message::Heartbeat { .. } | Message::Append { .. } => {
                 panic!("Saw other leader {} in term {}", msg.from, msg.term);
             }
 
@@ -155,7 +155,7 @@ impl RawNode<Leader> {
             // are its leader. If it doesn't have the commit index in its local
             // log, replicate the log to it. If the peer's read sequence number
             // increased, process any pending reads.
-            Message::ConfirmLeader { has_committed, read_seq } => {
+            Message::HeartbeatResponse { has_committed, read_seq } => {
                 assert!(read_seq <= self.role.read_seq, "Future read sequence number");
 
                 let from = msg.from;
@@ -172,7 +172,7 @@ impl RawNode<Leader> {
 
             // A follower appended log entries we sent it. Record its progress
             // and attempt to commit new entries.
-            Message::AcceptEntries { last_index } => {
+            Message::AppendResponse { reject: false, last_index } => {
                 assert!(
                     last_index <= self.log.get_last_index().0,
                     "Follower accepted entries after last index"
@@ -193,7 +193,9 @@ impl RawNode<Leader> {
             //
             // This linear probing, as described in the Raft paper, can be very
             // slow with long divergent logs, but we keep it simple.
-            Message::RejectEntries => {
+            //
+            // TODO: make use of last_index and last_term here.
+            Message::AppendResponse { reject: true, last_index: _ } => {
                 let from = msg.from;
                 self.role.progress.entry(from).and_modify(|p| {
                     if p.next > 1 {
@@ -253,7 +255,7 @@ impl RawNode<Leader> {
             }
 
             // Votes can come in after we won the election, ignore them.
-            Message::SolicitVote { .. } | Message::GrantVote => {}
+            Message::Campaign { .. } | Message::CampaignResponse { .. } => {}
 
             // Leaders never proxy client requests, so we don't expect to see
             // responses from other nodes.
@@ -394,7 +396,7 @@ impl RawNode<Leader> {
 
         let entries = self.log.scan((base_index + 1)..)?.collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
-        self.send(peer, Message::AppendEntries { base_index, base_term, entries })?;
+        self.send(peer, Message::Append { base_index, base_term, entries })?;
         Ok(())
     }
 }
@@ -445,7 +447,7 @@ mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::ConfirmLeader { has_committed: true, read_seq: 0 },
+            message: Message::HeartbeatResponse { has_committed: true, read_seq: 0 },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2);
         assert_messages(&mut node_rx, vec![]);
@@ -462,7 +464,7 @@ mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::ConfirmLeader { has_committed: false, read_seq: 0 },
+            message: Message::HeartbeatResponse { has_committed: false, read_seq: 0 },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2);
         assert_messages(
@@ -471,7 +473,7 @@ mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendEntries { base_index: 5, base_term: 3, entries: vec![] },
+                message: Message::Append { base_index: 5, base_term: 3, entries: vec![] },
             }],
         );
         Ok(())
@@ -511,7 +513,7 @@ mod tests {
                 from: 1,
                 to: 2,
                 term: 4,
-                message: Message::ConfirmLeader { has_committed: false, read_seq: 7 },
+                message: Message::HeartbeatResponse { has_committed: false, read_seq: 7 },
             }],
         );
         Ok(())
@@ -543,7 +545,7 @@ mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AcceptEntries { last_index: 4 },
+            message: Message::AppendResponse { reject: false, last_index: 4 },
         })?;
         assert_node(&mut node).committed(2);
         assert_messages(&mut node_rx, vec![]);
@@ -552,7 +554,7 @@ mod tests {
             from: 3,
             to: 1,
             term: 3,
-            message: Message::AcceptEntries { last_index: 5 },
+            message: Message::AppendResponse { reject: false, last_index: 5 },
         })?;
         assert_node(&mut node).committed(4).applied(4);
         assert_messages(&mut node_rx, vec![]);
@@ -561,7 +563,7 @@ mod tests {
             from: 4,
             to: 1,
             term: 3,
-            message: Message::AcceptEntries { last_index: 5 },
+            message: Message::AppendResponse { reject: false, last_index: 5 },
         })?;
         assert_node(&mut node).committed(5).applied(5);
         assert_messages(&mut node_rx, vec![]);
@@ -581,7 +583,7 @@ mod tests {
                 from: 2,
                 to: 1,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 5 },
+                message: Message::AppendResponse { reject: false, last_index: 5 },
             })?;
             assert_node(&mut node).is_leader().term(3).committed(2);
             assert_messages(&mut node_rx, vec![]);
@@ -601,7 +603,7 @@ mod tests {
                 from: peer,
                 to: 1,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 3 },
+                message: Message::AppendResponse { reject: false, last_index: 3 },
             })?;
             assert_node(&mut node).is_leader().term(3).committed(2);
             assert_messages(&mut node_rx, vec![]);
@@ -619,7 +621,7 @@ mod tests {
                 from: 2,
                 to: 1,
                 term: 3,
-                message: Message::AcceptEntries { last_index: 7 },
+                message: Message::AppendResponse { reject: false, last_index: 7 },
             })
             .unwrap();
     }
@@ -631,8 +633,12 @@ mod tests {
         let mut node: Node = leader.into();
 
         for i in 0..(entries.len() + 3) {
-            node =
-                node.step(Envelope { from: 2, to: 1, term: 3, message: Message::RejectEntries })?;
+            node = node.step(Envelope {
+                from: 2,
+                to: 1,
+                term: 3,
+                message: Message::AppendResponse { reject: true, last_index: 0 },
+            })?;
             assert_node(&mut node).is_leader().term(3).committed(2);
             let index = if i >= entries.len() { 0 } else { entries.len() - i - 1 };
             let replicate = entries.get(index..).unwrap().to_vec();
@@ -642,7 +648,7 @@ mod tests {
                     from: 1,
                     to: 2,
                     term: 3,
-                    message: Message::AppendEntries {
+                    message: Message::Append {
                         base_index: index as Index,
                         base_term: if index > 0 {
                             entries.get(index - 1).map(|e| e.term).unwrap()
@@ -713,7 +719,7 @@ mod tests {
                     from: 1,
                     to: peer,
                     term: 3,
-                    message: Message::AppendEntries {
+                    message: Message::Append {
                         base_index: 5,
                         base_term: 3,
                         entries: vec![Entry { index: 6, term: 3, command: Some(vec![0xaf]) },]
