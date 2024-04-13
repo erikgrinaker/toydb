@@ -172,14 +172,17 @@ impl RawNode<Leader> {
 
             // A follower appended log entries we sent it. Record its progress
             // and attempt to commit new entries.
-            Message::AppendResponse { reject: false, last_index } => {
+            Message::AppendResponse { reject: false, last_index, last_term } => {
                 assert!(
                     last_index <= self.log.get_last_index().0,
                     "Follower accepted entries after last index"
                 );
+                assert!(
+                    last_term <= self.log.get_last_index().1,
+                    "Follower accepted entries after last term"
+                );
 
-                let from = msg.from;
-                let progress = self.role.progress.get_mut(&from).unwrap();
+                let progress = self.role.progress.get_mut(&msg.from).unwrap();
                 if last_index > progress.last {
                     progress.last = last_index;
                     progress.next = last_index + 1;
@@ -195,14 +198,13 @@ impl RawNode<Leader> {
             // slow with long divergent logs, but we keep it simple.
             //
             // TODO: make use of last_index and last_term here.
-            Message::AppendResponse { reject: true, last_index: _ } => {
-                let from = msg.from;
-                self.role.progress.entry(from).and_modify(|p| {
+            Message::AppendResponse { reject: true, last_index: _, last_term: _ } => {
+                self.role.progress.entry(msg.from).and_modify(|p| {
                     if p.next > 1 {
                         p.next -= 1
                     }
                 });
-                self.send_log(from)?;
+                self.send_log(msg.from)?;
             }
 
             // A client submitted a read command. To ensure linearizability, we
@@ -528,7 +530,7 @@ mod tests {
             from: 2,
             to: 1,
             term: 3,
-            message: Message::AppendResponse { reject: false, last_index: 4 },
+            message: Message::AppendResponse { reject: false, last_index: 4, last_term: 3 },
         })?;
         assert_node(&mut node).committed(2);
         assert_messages(&mut node_rx, vec![]);
@@ -537,7 +539,7 @@ mod tests {
             from: 3,
             to: 1,
             term: 3,
-            message: Message::AppendResponse { reject: false, last_index: 5 },
+            message: Message::AppendResponse { reject: false, last_index: 5, last_term: 3 },
         })?;
         assert_node(&mut node).committed(4).applied(4);
         assert_messages(&mut node_rx, vec![]);
@@ -546,7 +548,7 @@ mod tests {
             from: 4,
             to: 1,
             term: 3,
-            message: Message::AppendResponse { reject: false, last_index: 5 },
+            message: Message::AppendResponse { reject: false, last_index: 5, last_term: 3 },
         })?;
         assert_node(&mut node).committed(5).applied(5);
         assert_messages(&mut node_rx, vec![]);
@@ -566,7 +568,7 @@ mod tests {
                 from: 2,
                 to: 1,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 5 },
+                message: Message::AppendResponse { reject: false, last_index: 5, last_term: 3 },
             })?;
             assert_node(&mut node).is_leader().term(3).committed(2);
             assert_messages(&mut node_rx, vec![]);
@@ -586,7 +588,7 @@ mod tests {
                 from: peer,
                 to: 1,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 3 },
+                message: Message::AppendResponse { reject: false, last_index: 3, last_term: 3 },
             })?;
             assert_node(&mut node).is_leader().term(3).committed(2);
             assert_messages(&mut node_rx, vec![]);
@@ -604,7 +606,7 @@ mod tests {
                 from: 2,
                 to: 1,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 7 },
+                message: Message::AppendResponse { reject: false, last_index: 7, last_term: 3 },
             })
             .unwrap();
     }
@@ -620,7 +622,7 @@ mod tests {
                 from: 2,
                 to: 1,
                 term: 3,
-                message: Message::AppendResponse { reject: true, last_index: 0 },
+                message: Message::AppendResponse { reject: true, last_index: 0, last_term: 3 },
             })?;
             assert_node(&mut node).is_leader().term(3).committed(2);
             let index = if i >= entries.len() { 0 } else { entries.len() - i - 1 };

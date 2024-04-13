@@ -71,9 +71,9 @@ pub enum Message {
         /// If true, the follower rejected the leader's entries.
         reject: bool,
         /// The index of the follower's last log entry.
-        ///
-        /// TODO: should this include last_term as well?
         last_index: Index,
+        /// The term of the follower's last log entry.
+        last_term: Term,
     },
 
     /// A client request. This can be submitted to the leader, or to a follower

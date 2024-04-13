@@ -178,14 +178,12 @@ impl RawNode<Follower> {
                 }
 
                 // Append the entries, if possible.
-                if base_index > 0 && !self.log.has(base_index, base_term)? {
-                    debug!("Rejecting log entries at base {}", base_index);
-                    let (last_index, _) = self.log.get_last_index();
-                    self.send(msg.from, Message::AppendResponse { reject: true, last_index })?
-                } else {
-                    let last_index = self.log.splice(entries)?;
-                    self.send(msg.from, Message::AppendResponse { reject: false, last_index })?
+                let reject = base_index > 0 && !self.log.has(base_index, base_term)?;
+                if !reject {
+                    self.log.splice(entries)?;
                 }
+                let (last_index, last_term) = self.log.get_last_index();
+                self.send(msg.from, Message::AppendResponse { reject, last_index, last_term })?;
             }
 
             // A candidate in this term is requesting our vote.
@@ -651,7 +649,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 2 },
+                message: Message::AppendResponse { reject: false, last_index: 2, last_term: 1 },
             }],
         );
         Ok(())
@@ -687,7 +685,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 5 },
+                message: Message::AppendResponse { reject: false, last_index: 5, last_term: 3 },
             }],
         );
         Ok(())
@@ -722,7 +720,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 4 },
+                message: Message::AppendResponse { reject: false, last_index: 4, last_term: 3 },
             }],
         );
         Ok(())
@@ -757,7 +755,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 4 },
+                message: Message::AppendResponse { reject: false, last_index: 4, last_term: 3 },
             }],
         );
         Ok(())
@@ -792,7 +790,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 4 },
+                message: Message::AppendResponse { reject: false, last_index: 4, last_term: 3 },
             }],
         );
         Ok(())
@@ -823,7 +821,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendResponse { reject: true, last_index: 3 },
+                message: Message::AppendResponse { reject: true, last_index: 3, last_term: 2 },
             }],
         );
         Ok(())
@@ -854,7 +852,7 @@ pub mod tests {
                 from: 1,
                 to: 2,
                 term: 3,
-                message: Message::AppendResponse { reject: true, last_index: 3 },
+                message: Message::AppendResponse { reject: true, last_index: 3, last_term: 2 },
             }],
         );
         Ok(())
