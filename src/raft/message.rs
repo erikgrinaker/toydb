@@ -114,10 +114,6 @@ pub enum Response {
 /// Raft cluster status.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
-    /// The server handling this status request.
-    ///
-    /// TODO: this should be moved to the RPC server.
-    pub server: NodeID,
     /// The current Raft leader, which generated this status.
     pub leader: NodeID,
     /// The current Raft term.

@@ -232,7 +232,6 @@ impl RawNode<Leader> {
 
             Event::ClientRequest { id, request: Request::Status } => {
                 let status = Status {
-                    server: self.id,
                     leader: self.id,
                     term: self.term,
                     last_index: self
@@ -742,7 +741,6 @@ mod tests {
                 event: Event::ClientResponse {
                     id: vec![1],
                     response: Ok(Response::Status(Status {
-                        server: 1,
                         leader: 1,
                         term: 3,
                         last_index: HashMap::from([(1, 5), (2, 0), (3, 0), (4, 0), (5, 0)]),

@@ -6,6 +6,7 @@ use crate::sql::engine::Engine as _;
 use crate::sql::execution::ResultSet;
 use crate::sql::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
+use crate::storage;
 
 use crossbeam::channel::{Receiver, Sender};
 use log::{debug, error, info};
@@ -73,6 +74,7 @@ impl Server {
         );
 
         std::thread::scope(move |s| {
+            let id = self.node.id();
             let (raft_request_tx, raft_request_rx) = crossbeam::channel::unbounded();
             let (raft_step_tx, raft_step_rx) = crossbeam::channel::unbounded();
 
@@ -101,7 +103,7 @@ impl Server {
             });
 
             // Serve inbound SQL connections.
-            s.spawn(move || Self::sql_accept(sql_listener, raft_request_tx));
+            s.spawn(move || Self::sql_accept(id, sql_listener, raft_request_tx));
         });
 
         Ok(())
@@ -247,6 +249,7 @@ impl Server {
 
     /// Accepts new SQL client connections and spawns session threads for them.
     fn sql_accept(
+        id: raft::NodeID,
         listener: TcpListener,
         raft_request_tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
     ) {
@@ -261,7 +264,7 @@ impl Server {
             let raft_request_tx = raft_request_tx.clone();
             s.spawn(move || {
                 debug!("Client {peer} connected");
-                match Self::sql_session(socket, raft_request_tx) {
+                match Self::sql_session(id, socket, raft_request_tx) {
                     Ok(()) => debug!("Client {peer} disconnected"),
                     Err(err) => error!("Client {peer} error: {err}"),
                 }
@@ -272,6 +275,7 @@ impl Server {
     /// Processes a client SQL session, by executing SQL statements against the
     /// Raft node.
     fn sql_session(
+        id: raft::NodeID,
         socket: TcpStream,
         raft_request_tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
     ) -> Result<()> {
@@ -284,13 +288,16 @@ impl Server {
             debug!("Received request {request:?}");
             let mut response = match request {
                 Request::Execute(query) => session.execute(&query).map(Response::Execute),
-                Request::Status => session.status().map(Response::Status),
                 Request::GetTable(table) => session
                     .with_txn_read_only(|txn| txn.must_read_table(&table))
                     .map(Response::GetTable),
                 Request::ListTables => session
                     .with_txn_read_only(|txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
                     .map(Response::ListTables),
+                Request::Status => session
+                    .status()
+                    .map(|s| Status { server: id, raft: s.raft, mvcc: s.mvcc })
+                    .map(Response::Status),
             };
 
             // Process response.
@@ -347,5 +354,13 @@ pub enum Response {
     Row(Option<Row>),
     GetTable(Table),
     ListTables(Vec<String>),
-    Status(sql::engine::Status),
+    Status(Status),
+}
+
+/// SQL server status.
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Status {
+    pub server: raft::NodeID,
+    pub raft: raft::Status,
+    pub mvcc: storage::mvcc::Status,
 }

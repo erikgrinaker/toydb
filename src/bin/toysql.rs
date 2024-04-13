@@ -130,7 +130,7 @@ Node logs: {logs}
 MVCC:      {active_txns} active txns, {versions} versions
 Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk, {garbage_percent}% garbage ({sql_storage} engine)
 "#,
-                    server = status.raft.server,
+                    server = status.server,
                     leader = status.raft.leader,
                     term = status.raft.term,
                     nodes = status.raft.last_index.len(),
@@ -251,10 +251,7 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
         );
 
         let status = self.client.status()?;
-        println!(
-            "Connected to toyDB node \"{}\". Enter !help for instructions.",
-            status.raft.server
-        );
+        println!("Connected to toyDB node \"{}\". Enter !help for instructions.", status.server);
 
         while let Some(input) = self.prompt()? {
             match self.execute(&input) {

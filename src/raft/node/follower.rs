@@ -1,4 +1,4 @@
-use super::super::{Event, Log, Message, RequestID, Response, State};
+use super::super::{Event, Log, Message, RequestID, State};
 use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
@@ -227,14 +227,9 @@ impl RawNode<Follower> {
             }
 
             // Returns client responses for forwarded requests.
-            Event::ClientResponse { id, mut response } => {
+            Event::ClientResponse { id, response } => {
                 assert!(self.is_leader(msg.from), "Client response from non-leader");
 
-                // TODO: Get rid of this field, it should be returned at the RPC
-                // server level instead.
-                if let Ok(Response::Status(ref mut status)) = response {
-                    status.server = self.id;
-                }
                 if self.role.forwarded.remove(&id) {
                     self.send(self.id, Event::ClientResponse { id, response })?;
                 }
@@ -277,7 +272,7 @@ impl RawNode<Follower> {
 #[cfg(test)]
 pub mod tests {
     use super::super::super::state::tests::TestState;
-    use super::super::super::{Entry, Log, Request};
+    use super::super::super::{Entry, Log, Request, Response};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::error::Error;

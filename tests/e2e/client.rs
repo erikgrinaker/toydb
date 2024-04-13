@@ -2,7 +2,7 @@ use super::{assert_row, assert_rows, dataset, TestCluster};
 
 use toydb::error::{Error, Result};
 use toydb::raft;
-use toydb::sql::engine::Status;
+use toydb::server::Status;
 use toydb::sql::execution::ResultSet;
 use toydb::sql::schema;
 use toydb::sql::types::{Column, DataType, Value};
@@ -119,8 +119,8 @@ fn status() -> Result<()> {
     assert_eq!(
         c.status()?,
         Status {
+            server: 1,
             raft: raft::Status {
-                server: 1,
                 leader: 1,
                 term: 1,
                 last_index: [(1, 27)].into(),
