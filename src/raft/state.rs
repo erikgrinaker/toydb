@@ -17,8 +17,8 @@ pub trait State: Send {
     /// TODO: consider using runtime assertions instead of Error::Internal.
     fn apply(&mut self, entry: Entry) -> Result<Vec<u8>>;
 
-    /// Queries the state machine. All errors are propagated to the caller.
-    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>>;
+    /// Reads from the state machine. All errors are propagated to the caller.
+    fn read(&self, command: Vec<u8>) -> Result<Vec<u8>>;
 }
 
 #[cfg(test)]
@@ -56,7 +56,7 @@ pub mod tests {
         }
 
         // Appends the command to the internal commands list.
-        fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+        fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
             self.commands.lock()?.push(command.clone());
             Ok(command)
         }

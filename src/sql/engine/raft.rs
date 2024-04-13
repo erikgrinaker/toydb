@@ -347,7 +347,7 @@ impl<E: storage::Engine> raft::State for State<E> {
         result
     }
 
-    fn query(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+    fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
         match bincode::deserialize(&command)? {
             Query::Read { txn, table, id } => {
                 bincode::serialize(&self.engine.resume(txn)?.read(&table, &id)?)

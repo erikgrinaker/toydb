@@ -375,7 +375,7 @@ impl RawNode<Leader> {
                 break;
             }
             let read = self.role.reads.pop_front().unwrap();
-            let result = self.state.query(read.command);
+            let result = self.state.read(read.command);
             self.send(
                 read.from,
                 Message::ClientResponse { id: read.id, response: result.map(Response::Read) },
