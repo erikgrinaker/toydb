@@ -36,7 +36,7 @@ pub struct Server {
     /// The inner Raft node.
     node: raft::Node,
     /// Outbound messages from the Raft node.
-    node_rx: Receiver<raft::Message>,
+    node_rx: Receiver<raft::Envelope>,
     /// Raft peer IDs and addresses.
     peers: HashMap<raft::NodeID, String>,
 }
@@ -111,7 +111,7 @@ impl Server {
 
     /// Accepts new inbound Raft connections from peers and spawns threads
     /// routing inbound messages to the local Raft node.
-    fn raft_accept(listener: TcpListener, raft_step_tx: Sender<raft::Message>) {
+    fn raft_accept(listener: TcpListener, raft_step_tx: Sender<raft::Envelope>) {
         std::thread::scope(|s| loop {
             let (socket, peer) = match listener.accept() {
                 Ok(sp) => sp,
@@ -133,7 +133,7 @@ impl Server {
 
     /// Receives inbound messages from a peer via TCP, and queues them for
     /// stepping into the Raft node.
-    fn raft_receive_peer(socket: TcpStream, raft_step_tx: Sender<raft::Message>) -> Result<()> {
+    fn raft_receive_peer(socket: TcpStream, raft_step_tx: Sender<raft::Envelope>) -> Result<()> {
         let mut socket = std::io::BufReader::new(socket);
         while let Some(message) = bincode::maybe_deserialize_from(&mut socket)? {
             raft_step_tx.send(message)?;
@@ -143,7 +143,7 @@ impl Server {
 
     /// Sends outbound messages to a peer via TCP. Retries indefinitely if the
     /// connection fails.
-    fn raft_send_peer(addr: String, raft_node_rx: Receiver<raft::Message>) {
+    fn raft_send_peer(addr: String, raft_node_rx: Receiver<raft::Envelope>) {
         loop {
             let mut socket = match TcpStream::connect(&addr) {
                 Ok(socket) => std::io::BufWriter::new(socket),
@@ -184,9 +184,9 @@ impl Server {
     /// state transitions.
     fn raft_route(
         mut node: raft::Node,
-        node_rx: Receiver<raft::Message>,
-        peers_rx: Receiver<raft::Message>,
-        mut peers_tx: HashMap<raft::NodeID, Sender<raft::Message>>,
+        node_rx: Receiver<raft::Envelope>,
+        peers_rx: Receiver<raft::Envelope>,
+        mut peers_tx: HashMap<raft::NodeID, Sender<raft::Envelope>>,
         request_rx: Receiver<(raft::Request, Sender<Result<raft::Response>>)>,
     ) {
         // Track response channels by request ID. The Raft node will emit
@@ -211,7 +211,7 @@ impl Server {
                 recv(node_rx) -> result => {
                     let msg = result.expect("node_rx disconnected");
                     if msg.to == node.id() {
-                        if let raft::Event::ClientResponse{ id, response } = msg.event {
+                        if let raft::Message::ClientResponse{ id, response } = msg.message {
                             if let Some(response_tx) = response_txs.remove(&id) {
                                 response_tx.send(response).expect("response_tx disconnected");
                             }
@@ -234,11 +234,11 @@ impl Server {
                 recv(request_rx) -> result => {
                     let (request, response_tx) = result.expect("request_rx disconnected");
                     let id = uuid::Uuid::new_v4().into_bytes().to_vec();
-                    let msg = raft::Message{
+                    let msg = raft::Envelope{
                         from: node.id(),
                         to: node.id(),
                         term: node.term(),
-                        event: raft::Event::ClientRequest{id: id.clone(), request},
+                        message: raft::Message::ClientRequest{id: id.clone(), request},
                     };
                     node = node.step(msg).expect("step failed");
                     response_txs.insert(id, response_tx);

@@ -2,7 +2,7 @@ mod candidate;
 mod follower;
 mod leader;
 
-use super::{Event, Index, Log, Message, State, ELECTION_TIMEOUT_RANGE};
+use super::{Envelope, Index, Log, Message, State, ELECTION_TIMEOUT_RANGE};
 use crate::error::{Error, Result};
 use candidate::Candidate;
 use follower::Follower;
@@ -49,7 +49,7 @@ impl Node {
         peers: HashSet<NodeID>,
         log: Log,
         state: Box<dyn State>,
-        node_tx: crossbeam::channel::Sender<Message>,
+        node_tx: crossbeam::channel::Sender<Envelope>,
     ) -> Result<Self> {
         let node = RawNode::new(id, peers, log, state, node_tx)?;
         if node.peers.is_empty() {
@@ -78,7 +78,7 @@ impl Node {
     }
 
     /// Processes a message from a peer.
-    pub fn step(self, msg: Message) -> Result<Self> {
+    pub fn step(self, msg: Envelope) -> Result<Self> {
         debug!("Stepping {:?}", msg);
         match self {
             Node::Candidate(n) => n.step(msg),
@@ -128,7 +128,7 @@ pub struct RawNode<R: Role = Follower> {
     term: Term,
     log: Log,
     state: Box<dyn State>,
-    node_tx: crossbeam::channel::Sender<Message>,
+    node_tx: crossbeam::channel::Sender<Envelope>,
     role: R,
 }
 
@@ -194,18 +194,18 @@ impl<R: Role> RawNode<R> {
         quorum_value(values)
     }
 
-    /// Sends an event
-    fn send(&self, to: NodeID, event: Event) -> Result<()> {
-        let msg = Message { term: self.term, from: self.id, to, event };
+    /// Sends a message.
+    fn send(&self, to: NodeID, message: Message) -> Result<()> {
+        let msg = Envelope { from: self.id, to, term: self.term, message };
         debug!("Sending {msg:?}");
         Ok(self.node_tx.send(msg)?)
     }
 
-    /// Broadcasts an event to all peers.
-    fn broadcast(&self, event: Event) -> Result<()> {
+    /// Broadcasts a message to all peers.
+    fn broadcast(&self, message: Message) -> Result<()> {
         // Sort for test determinism.
         for id in self.peers.iter().copied().sorted() {
-            self.send(id, event.clone())?;
+            self.send(id, message.clone())?;
         }
         Ok(())
     }
@@ -217,7 +217,7 @@ impl<R: Role> RawNode<R> {
     }
 
     /// Asserts message invariants when stepping.
-    fn assert_step(&self, msg: &Message) {
+    fn assert_step(&self, msg: &Envelope) {
         // Messages must be addressed to the local node.
         assert_eq!(msg.to, self.id, "Message to other node");
 
@@ -424,13 +424,13 @@ mod tests {
         NodeAsserter::new(node)
     }
 
-    fn setup_rolenode() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Message>)> {
+    fn setup_rolenode() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Envelope>)> {
         setup_rolenode_peers(vec![2, 3])
     }
 
     fn setup_rolenode_peers(
         peers: Vec<NodeID>,
-    ) -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Message>)> {
+    ) -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Envelope>)> {
         let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let node = RawNode {
             role: Follower::new(None, None),
@@ -501,14 +501,14 @@ mod tests {
     #[test]
     fn send() -> Result<()> {
         let (node, mut rx) = setup_rolenode()?;
-        node.send(2, Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 })?;
+        node.send(2, Message::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 })?;
         assert_messages(
             &mut rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 1,
-                event: Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
+                message: Message::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
             }],
         );
         Ok(())

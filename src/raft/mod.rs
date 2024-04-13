@@ -4,7 +4,7 @@ mod node;
 mod state;
 
 pub use log::{Entry, Index, Log};
-pub use message::{Event, Message, ReadSequence, Request, RequestID, Response, Status};
+pub use message::{Envelope, Message, ReadSequence, Request, RequestID, Response, Status};
 pub use node::{Node, NodeID, Term, Ticks};
 pub use state::State;
 

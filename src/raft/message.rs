@@ -5,22 +5,22 @@ use crate::storage;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// A message passed between Raft nodes.
+/// A message envelope sent between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Message {
-    /// The sender's current term.
-    pub term: Term,
+pub struct Envelope {
     /// The sender.
     pub from: NodeID,
     /// The recipient.
     pub to: NodeID,
-    /// The message payload.
-    pub event: Event,
+    /// The sender's current term.
+    pub term: Term,
+    /// The message.
+    pub message: Message,
 }
 
-/// An event contained within messages.
+/// A message sent between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum Event {
+pub enum Message {
     /// Leaders send periodic heartbeats to its followers.
     Heartbeat {
         /// The index of the leader's last committed log entry.

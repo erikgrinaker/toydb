@@ -1,4 +1,4 @@
-use super::super::{Event, Log, Message, RequestID, State};
+use super::super::{Envelope, Log, Message, RequestID, State};
 use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
@@ -43,7 +43,7 @@ impl RawNode<Follower> {
         peers: HashSet<NodeID>,
         mut log: Log,
         state: Box<dyn State>,
-        node_tx: crossbeam::channel::Sender<Message>,
+        node_tx: crossbeam::channel::Sender<Envelope>,
     ) -> Result<Self> {
         let (term, voted_for) = log.get_term()?;
         let role = Follower::new(None, voted_for);
@@ -118,7 +118,7 @@ impl RawNode<Follower> {
     }
 
     /// Processes a message.
-    pub fn step(mut self, msg: Message) -> Result<Node> {
+    pub fn step(mut self, msg: Envelope) -> Result<Node> {
         self.assert()?;
         self.assert_step(&msg);
 
@@ -140,11 +140,11 @@ impl RawNode<Follower> {
             self.role.leader_seen = 0
         }
 
-        match msg.event {
+        match msg.message {
             // The leader will send periodic heartbeats. If we don't have a
             // leader in this term yet, follow it. If the commit_index advances,
             // apply state transitions.
-            Event::Heartbeat { commit_index, commit_term, read_seq } => {
+            Message::Heartbeat { commit_index, commit_term, read_seq } => {
                 // Check that the heartbeat is from our leader.
                 let from = msg.from;
                 match self.role.leader {
@@ -156,7 +156,7 @@ impl RawNode<Follower> {
                 //
                 // TODO: this should return the last index and term.
                 let has_committed = self.log.has(commit_index, commit_term)?;
-                self.send(msg.from, Event::ConfirmLeader { has_committed, read_seq })?;
+                self.send(msg.from, Message::ConfirmLeader { has_committed, read_seq })?;
 
                 // Advance commit index and apply entries.
                 if has_committed && commit_index > self.log.get_commit_index().0 {
@@ -167,7 +167,7 @@ impl RawNode<Follower> {
 
             // Replicate entries from the leader. If we don't have a leader in
             // this term yet, follow it.
-            Event::AppendEntries { base_index, base_term, entries } => {
+            Message::AppendEntries { base_index, base_term, entries } => {
                 // Check that the entries are from our leader.
                 let from = msg.from;
                 match self.role.leader {
@@ -178,15 +178,15 @@ impl RawNode<Follower> {
                 // Append the entries, if possible.
                 if base_index > 0 && !self.log.has(base_index, base_term)? {
                     debug!("Rejecting log entries at base {}", base_index);
-                    self.send(msg.from, Event::RejectEntries)?
+                    self.send(msg.from, Message::RejectEntries)?
                 } else {
                     let last_index = self.log.splice(entries)?;
-                    self.send(msg.from, Event::AcceptEntries { last_index })?
+                    self.send(msg.from, Message::AcceptEntries { last_index })?
                 }
             }
 
             // A candidate in this term is requesting our vote.
-            Event::SolicitVote { last_index, last_term } => {
+            Message::SolicitVote { last_index, last_term } => {
                 let from = msg.from;
 
                 // If we already voted for someone else in this term, ignore it.
@@ -201,7 +201,7 @@ impl RawNode<Follower> {
                 let (log_index, log_term) = self.log.get_last_index();
                 if last_term > log_term || last_term == log_term && last_index >= log_index {
                     info!("Voting for {} in term {} election", from, self.term);
-                    self.send(from, Event::GrantVote)?;
+                    self.send(from, Message::GrantVote)?;
                     self.log.set_term(self.term, Some(from))?;
                     self.role.voted_for = Some(from);
                 }
@@ -209,36 +209,39 @@ impl RawNode<Follower> {
 
             // We may receive a vote after we lost an election and followed a
             // different leader. Ignore it.
-            Event::GrantVote => {}
+            Message::GrantVote => {}
 
             // Forward client requests to the leader, or abort them if there is
             // none (the client must retry).
-            Event::ClientRequest { ref id, .. } => {
+            Message::ClientRequest { ref id, .. } => {
                 assert_eq!(msg.from, self.id, "Client request from other node");
 
                 let id = id.clone();
                 if let Some(leader) = self.role.leader {
                     debug!("Forwarding request to leader {}: {:?}", leader, msg);
                     self.role.forwarded.insert(id);
-                    self.send(leader, msg.event)?
+                    self.send(leader, msg.message)?
                 } else {
-                    self.send(msg.from, Event::ClientResponse { id, response: Err(Error::Abort) })?
+                    self.send(
+                        msg.from,
+                        Message::ClientResponse { id, response: Err(Error::Abort) },
+                    )?
                 }
             }
 
             // Returns client responses for forwarded requests.
-            Event::ClientResponse { id, response } => {
+            Message::ClientResponse { id, response } => {
                 assert!(self.is_leader(msg.from), "Client response from non-leader");
 
                 if self.role.forwarded.remove(&id) {
-                    self.send(self.id, Event::ClientResponse { id, response })?;
+                    self.send(self.id, Message::ClientResponse { id, response })?;
                 }
             }
 
             // We're not a leader nor candidate in this term, so we shoudn't see these.
-            Event::ConfirmLeader { .. }
-            | Event::AcceptEntries { .. }
-            | Event::RejectEntries { .. } => panic!("Received unexpected message {:?}", msg),
+            Message::ConfirmLeader { .. }
+            | Message::AcceptEntries { .. }
+            | Message::RejectEntries { .. } => panic!("Received unexpected message {:?}", msg),
         };
         Ok(self.into())
     }
@@ -258,7 +261,7 @@ impl RawNode<Follower> {
     fn abort_forwarded(&mut self) -> Result<()> {
         for id in std::mem::take(&mut self.role.forwarded) {
             debug!("Aborting forwarded request {:x?}", id);
-            self.send(self.id, Event::ClientResponse { id, response: Err(Error::Abort) })?;
+            self.send(self.id, Message::ClientResponse { id, response: Err(Error::Abort) })?;
         }
         Ok(())
     }
@@ -280,7 +283,7 @@ pub mod tests {
     use itertools::Itertools as _;
 
     #[allow(clippy::type_complexity)]
-    fn setup() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Message>)> {
+    fn setup() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Envelope>)> {
         let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let state = Box::new(TestState::new(0));
         let mut log = Log::new(storage::Memory::new(), false)?;
@@ -306,11 +309,11 @@ pub mod tests {
     // Heartbeat from current leader should commit and apply
     fn step_heartbeat() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
         assert_node(&mut node)
             .is_follower()
@@ -321,11 +324,11 @@ pub mod tests {
             .applied(3);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -335,20 +338,20 @@ pub mod tests {
     // Heartbeat from current leader with conflicting commit_term
     fn step_heartbeat_conflict_commit_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::Heartbeat { commit_index: 3, commit_term: 3, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 3, commit_term: 3, read_seq: 7 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::ConfirmLeader { has_committed: false, read_seq: 7 },
+                message: Message::ConfirmLeader { has_committed: false, read_seq: 7 },
             }],
         );
         Ok(())
@@ -358,20 +361,20 @@ pub mod tests {
     // Heartbeat from current leader with a missing commit_index
     fn step_heartbeat_missing_commit_entry() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::ConfirmLeader { has_committed: false, read_seq: 7 },
+                message: Message::ConfirmLeader { has_committed: false, read_seq: 7 },
             }],
         );
         Ok(())
@@ -383,11 +386,11 @@ pub mod tests {
     fn step_heartbeat_fake_leader() {
         let (follower, _) = setup().unwrap();
         follower
-            .step(Message {
+            .step(Envelope {
                 from: 3,
                 to: 1,
                 term: 3,
-                event: Event::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
+                message: Message::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
             })
             .unwrap();
     }
@@ -397,20 +400,20 @@ pub mod tests {
     fn step_heartbeat_no_leader() -> Result<()> {
         let (mut follower, mut node_rx) = setup()?;
         follower.role = Follower::new(None, None);
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 3,
             to: 1,
             term: 3,
-            event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(3)).voted_for(None).committed(3);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 3,
                 term: 3,
-                event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -420,20 +423,20 @@ pub mod tests {
     // Heartbeat from current leader with old commit_index
     fn step_heartbeat_old_commit_index() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 1, commit_term: 1, read_seq: 7 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -443,20 +446,20 @@ pub mod tests {
     // Heartbeat for future term with other leader changes leader
     fn step_heartbeat_future_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 3,
             to: 1,
             term: 4,
-            event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
         assert_node(&mut node).is_follower().term(4).leader(Some(3)).voted_for(None);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 3,
                 term: 4,
-                event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
+                message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
             }],
         );
         Ok(())
@@ -466,11 +469,11 @@ pub mod tests {
     // Heartbeat from past term
     fn step_heartbeat_past_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 2,
-            event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None).committed(2);
         assert_messages(&mut node_rx, vec![]);
@@ -483,37 +486,37 @@ pub mod tests {
         let (follower, mut node_rx) = setup()?;
 
         // The first vote request in this term yields a vote response.
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 3,
             to: 1,
             term: 3,
-            event: Event::SolicitVote { last_index: 3, last_term: 2 },
+            message: Message::SolicitVote { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
-            vec![Message { from: 1, to: 3, term: 3, event: Event::GrantVote }],
+            vec![Envelope { from: 1, to: 3, term: 3, message: Message::GrantVote }],
         );
 
         // Another vote request from the same sender is granted.
-        node = node.step(Message {
+        node = node.step(Envelope {
             from: 3,
             to: 1,
             term: 3,
-            event: Event::SolicitVote { last_index: 3, last_term: 2 },
+            message: Message::SolicitVote { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(
             &mut node_rx,
-            vec![Message { from: 1, to: 3, term: 3, event: Event::GrantVote }],
+            vec![Envelope { from: 1, to: 3, term: 3, message: Message::GrantVote }],
         );
 
         // But a vote request from a different node is ignored.
-        node = node.step(Message {
+        node = node.step(Envelope {
             from: 4,
             to: 1,
             term: 3,
-            event: Event::SolicitVote { last_index: 3, last_term: 2 },
+            message: Message::SolicitVote { last_index: 3, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(Some(3));
         assert_messages(&mut node_rx, vec![]);
@@ -525,7 +528,7 @@ pub mod tests {
     fn step_grantvote_noop() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node =
-            follower.step(Message { from: 2, to: 1, term: 3, event: Event::GrantVote })?;
+            follower.step(Envelope { from: 2, to: 1, term: 3, message: Message::GrantVote })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2));
         assert_messages(&mut node_rx, vec![]);
         Ok(())
@@ -535,11 +538,11 @@ pub mod tests {
     // SolicitVote is rejected if last_term is outdated.
     fn step_solicitvote_last_index_outdated() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 3,
             to: 1,
             term: 3,
-            event: Event::SolicitVote { last_index: 2, last_term: 2 },
+            message: Message::SolicitVote { last_index: 2, last_term: 2 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None);
         assert_messages(&mut node_rx, vec![]);
@@ -550,11 +553,11 @@ pub mod tests {
     // SolicitVote is rejected if last_term is outdated.
     fn step_solicitvote_last_term_outdated() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 3,
             to: 1,
             term: 3,
-            event: Event::SolicitVote { last_index: 3, last_term: 1 },
+            message: Message::SolicitVote { last_index: 3, last_term: 1 },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).voted_for(None);
         assert_messages(&mut node_rx, vec![]);
@@ -582,11 +585,11 @@ pub mod tests {
             role: Follower::new(Some(2), None),
         };
 
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::AppendEntries {
+            message: Message::AppendEntries {
                 base_index: 0,
                 base_term: 0,
                 entries: vec![
@@ -601,11 +604,11 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::AcceptEntries { last_index: 2 },
+                message: Message::AcceptEntries { last_index: 2 },
             }],
         );
         Ok(())
@@ -615,11 +618,11 @@ pub mod tests {
     // AppendEntries appends entries but does not commit them
     fn step_appendentries_append() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::AppendEntries {
+            message: Message::AppendEntries {
                 base_index: 3,
                 base_term: 2,
                 entries: vec![
@@ -637,11 +640,11 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::AcceptEntries { last_index: 5 },
+                message: Message::AcceptEntries { last_index: 5 },
             }],
         );
         Ok(())
@@ -651,11 +654,11 @@ pub mod tests {
     // AppendEntries accepts partially overlapping entries
     fn step_appendentries_partial_overlap() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::AppendEntries {
+            message: Message::AppendEntries {
                 base_index: 1,
                 base_term: 1,
                 entries: vec![
@@ -672,11 +675,11 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::AcceptEntries { last_index: 4 },
+                message: Message::AcceptEntries { last_index: 4 },
             }],
         );
         Ok(())
@@ -686,11 +689,11 @@ pub mod tests {
     // AppendEntries replaces conflicting entries
     fn step_appendentries_replace() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::AppendEntries {
+            message: Message::AppendEntries {
                 base_index: 2,
                 base_term: 1,
                 entries: vec![
@@ -707,11 +710,11 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::AcceptEntries { last_index: 4 },
+                message: Message::AcceptEntries { last_index: 4 },
             }],
         );
         Ok(())
@@ -721,11 +724,11 @@ pub mod tests {
     // AppendEntries replaces partially conflicting entries
     fn step_appendentries_replace_partial() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::AppendEntries {
+            message: Message::AppendEntries {
                 base_index: 2,
                 base_term: 1,
                 entries: vec![
@@ -742,11 +745,11 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::AcceptEntries { last_index: 4 },
+                message: Message::AcceptEntries { last_index: 4 },
             }],
         );
         Ok(())
@@ -756,11 +759,11 @@ pub mod tests {
     // AppendEntries rejects missing base index
     fn step_appendentries_reject_missing_base_index() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::AppendEntries {
+            message: Message::AppendEntries {
                 base_index: 5,
                 base_term: 2,
                 entries: vec![Entry { index: 6, term: 3, command: Some(vec![0x04]) }],
@@ -773,7 +776,7 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message { from: 1, to: 2, term: 3, event: Event::RejectEntries }],
+            vec![Envelope { from: 1, to: 2, term: 3, message: Message::RejectEntries }],
         );
         Ok(())
     }
@@ -782,11 +785,11 @@ pub mod tests {
     // AppendEntries rejects conflicting base term
     fn step_appendentries_reject_missing_base_term() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
-        let mut node = follower.step(Message {
+        let mut node = follower.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::AppendEntries {
+            message: Message::AppendEntries {
                 base_index: 1,
                 base_term: 2,
                 entries: vec![Entry { index: 2, term: 3, command: Some(vec![0x04]) }],
@@ -799,7 +802,7 @@ pub mod tests {
         ]);
         assert_messages(
             &mut node_rx,
-            vec![Message { from: 1, to: 2, term: 3, event: Event::RejectEntries }],
+            vec![Envelope { from: 1, to: 2, term: 3, message: Message::RejectEntries }],
         );
         Ok(())
     }
@@ -810,31 +813,34 @@ pub mod tests {
         let (follower, mut node_rx) = setup()?;
         let mut node = Node::Follower(follower);
 
-        node = node.step(Message {
+        node = node.step(Envelope {
             from: 1,
             to: 1,
             term: 3,
-            event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
+            message: Message::ClientRequest {
+                id: vec![0x01],
+                request: Request::Mutate(vec![0xaf]),
+            },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::ClientRequest {
+                message: Message::ClientRequest {
                     id: vec![0x01],
                     request: Request::Mutate(vec![0xaf]),
                 },
             }],
         );
 
-        node = node.step(Message {
+        node = node.step(Envelope {
             from: 2,
             to: 1,
             term: 3,
-            event: Event::ClientResponse {
+            message: Message::ClientResponse {
                 id: vec![0x01],
                 response: Ok(Response::Mutate(vec![0xaf])),
             },
@@ -842,11 +848,11 @@ pub mod tests {
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 1,
                 term: 3,
-                event: Event::ClientResponse {
+                message: Message::ClientResponse {
                     id: vec![0x01],
                     response: Ok(Response::Mutate(vec![0xaf])),
                 },
@@ -862,20 +868,23 @@ pub mod tests {
         follower.role = Follower::new(None, None);
         let mut node = Node::Follower(follower);
 
-        node = node.step(Message {
+        node = node.step(Envelope {
             from: 1,
             to: 1,
             term: 3,
-            event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
+            message: Message::ClientRequest {
+                id: vec![0x01],
+                request: Request::Mutate(vec![0xaf]),
+            },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(None).forwarded(vec![]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 1,
                 term: 3,
-                event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
+                message: Message::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
             }],
         );
         Ok(())
@@ -887,20 +896,23 @@ pub mod tests {
         let (follower, mut node_rx) = setup()?;
         let mut node = Node::Follower(follower);
 
-        node = node.step(Message {
+        node = node.step(Envelope {
             from: 1,
             to: 1,
             term: 3,
-            event: Event::ClientRequest { id: vec![0x01], request: Request::Mutate(vec![0xaf]) },
+            message: Message::ClientRequest {
+                id: vec![0x01],
+                request: Request::Mutate(vec![0xaf]),
+            },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
             &mut node_rx,
-            vec![Message {
+            vec![Envelope {
                 from: 1,
                 to: 2,
                 term: 3,
-                event: Event::ClientRequest {
+                message: Message::ClientRequest {
                     id: vec![0x01],
                     request: Request::Mutate(vec![0xaf]),
                 },
@@ -908,27 +920,30 @@ pub mod tests {
         );
 
         // When a new leader appears, the proxied request is aborted.
-        node = node.step(Message {
+        node = node.step(Envelope {
             from: 3,
             to: 1,
             term: 4,
-            event: Event::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
+            message: Message::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
         })?;
         assert_node(&mut node).is_follower().term(4).leader(Some(3)).forwarded(vec![]);
         assert_messages(
             &mut node_rx,
             vec![
-                Message {
+                Envelope {
                     from: 1,
                     to: 1,
                     term: 3,
-                    event: Event::ClientResponse { id: vec![0x01], response: Err(Error::Abort) },
+                    message: Message::ClientResponse {
+                        id: vec![0x01],
+                        response: Err(Error::Abort),
+                    },
                 },
-                Message {
+                Envelope {
                     from: 1,
                     to: 3,
                     term: 4,
-                    event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
+                    message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
                 },
             ],
         );
@@ -947,19 +962,19 @@ pub mod tests {
         for _ in 0..(3 * timeout) {
             assert_node(&mut node).is_follower().term(3).leader(Some(2));
             node = node.tick()?;
-            node = node.step(Message {
+            node = node.step(Envelope {
                 from: 2,
                 to: 1,
                 term: 3,
-                event: Event::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 7 },
+                message: Message::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 7 },
             })?;
             assert_messages(
                 &mut node_rx,
-                vec![Message {
+                vec![Envelope {
                     from: 1,
                     to: 2,
                     term: 3,
-                    event: Event::ConfirmLeader { has_committed: true, read_seq: 7 },
+                    message: Message::ConfirmLeader { has_committed: true, read_seq: 7 },
                 }],
             )
         }
@@ -973,11 +988,11 @@ pub mod tests {
         for to in peers.iter().copied().sorted() {
             assert_eq!(
                 node_rx.try_recv()?,
-                Message {
+                Envelope {
                     from: 1,
                     to,
                     term: 4,
-                    event: Event::SolicitVote { last_index: 3, last_term: 2 },
+                    message: Message::SolicitVote { last_index: 3, last_term: 2 },
                 },
             );
         }
