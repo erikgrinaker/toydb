@@ -209,7 +209,7 @@ impl RawNode<Leader> {
             // must confirm that we are still the leader by sending a heartbeat
             // with the read's sequence number and wait for confirmation from a
             // quorum before executing the read.
-            Message::ClientRequest { id, request: Request::Query(command) } => {
+            Message::ClientRequest { id, request: Request::Read(command) } => {
                 self.role.read_seq += 1;
                 self.role.reads.push_back(Read {
                     seq: self.role.read_seq,
@@ -225,7 +225,7 @@ impl RawNode<Leader> {
 
             // A client submitted a write command. Propose it, and track it
             // until it's applied and the response is returned to the client.
-            Message::ClientRequest { id, request: Request::Mutate(command) } => {
+            Message::ClientRequest { id, request: Request::Write(command) } => {
                 let index = self.propose(Some(command))?;
                 self.role.writes.insert(index, Write { from: msg.from, id: id.clone() });
                 if self.peers.is_empty() {
@@ -340,7 +340,7 @@ impl RawNode<Leader> {
                     term: self.term,
                     message: Message::ClientResponse {
                         id: write.id,
-                        response: result.map(Response::Mutate),
+                        response: result.map(Response::Write),
                     },
                 })?;
             }
@@ -376,7 +376,7 @@ impl RawNode<Leader> {
             let result = self.state.query(read.command);
             self.send(
                 read.from,
-                Message::ClientResponse { id: read.id, response: result.map(Response::Query) },
+                Message::ClientResponse { id: read.id, response: result.map(Response::Read) },
             )?;
         }
 
@@ -673,7 +673,7 @@ mod tests {
             from: 1,
             to: 1,
             term: 3,
-            message: Message::ClientRequest { id: vec![0x01], request: Request::Query(vec![0xaf]) },
+            message: Message::ClientRequest { id: vec![0x01], request: Request::Read(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2).last(5);
         for to in peers.iter().copied().sorted() {
@@ -701,10 +701,7 @@ mod tests {
             from: 1,
             to: 1,
             term: 3,
-            message: Message::ClientRequest {
-                id: vec![0x01],
-                request: Request::Mutate(vec![0xaf]),
-            },
+            message: Message::ClientRequest { id: vec![0x01], request: Request::Write(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_leader().term(3).committed(2).last(6).entry(Entry {
             index: 6,

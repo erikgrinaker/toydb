@@ -868,10 +868,7 @@ pub mod tests {
             from: 1,
             to: 1,
             term: 3,
-            message: Message::ClientRequest {
-                id: vec![0x01],
-                request: Request::Mutate(vec![0xaf]),
-            },
+            message: Message::ClientRequest { id: vec![0x01], request: Request::Write(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
@@ -882,7 +879,7 @@ pub mod tests {
                 term: 3,
                 message: Message::ClientRequest {
                     id: vec![0x01],
-                    request: Request::Mutate(vec![0xaf]),
+                    request: Request::Write(vec![0xaf]),
                 },
             }],
         );
@@ -893,7 +890,7 @@ pub mod tests {
             term: 3,
             message: Message::ClientResponse {
                 id: vec![0x01],
-                response: Ok(Response::Mutate(vec![0xaf])),
+                response: Ok(Response::Write(vec![0xaf])),
             },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![]);
@@ -905,7 +902,7 @@ pub mod tests {
                 term: 3,
                 message: Message::ClientResponse {
                     id: vec![0x01],
-                    response: Ok(Response::Mutate(vec![0xaf])),
+                    response: Ok(Response::Write(vec![0xaf])),
                 },
             }],
         );
@@ -923,10 +920,7 @@ pub mod tests {
             from: 1,
             to: 1,
             term: 3,
-            message: Message::ClientRequest {
-                id: vec![0x01],
-                request: Request::Mutate(vec![0xaf]),
-            },
+            message: Message::ClientRequest { id: vec![0x01], request: Request::Write(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(None).forwarded(vec![]);
         assert_messages(
@@ -951,10 +945,7 @@ pub mod tests {
             from: 1,
             to: 1,
             term: 3,
-            message: Message::ClientRequest {
-                id: vec![0x01],
-                request: Request::Mutate(vec![0xaf]),
-            },
+            message: Message::ClientRequest { id: vec![0x01], request: Request::Write(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_follower().term(3).leader(Some(2)).forwarded(vec![vec![0x01]]);
         assert_messages(
@@ -965,7 +956,7 @@ pub mod tests {
                 term: 3,
                 message: Message::ClientRequest {
                     id: vec![0x01],
-                    request: Request::Mutate(vec![0xaf]),
+                    request: Request::Write(vec![0xaf]),
                 },
             }],
         );

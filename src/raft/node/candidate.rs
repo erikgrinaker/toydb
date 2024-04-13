@@ -330,10 +330,7 @@ mod tests {
             from: 1,
             to: 1,
             term: 3,
-            message: Message::ClientRequest {
-                id: vec![0x01],
-                request: Request::Mutate(vec![0xaf]),
-            },
+            message: Message::ClientRequest { id: vec![0x01], request: Request::Write(vec![0xaf]) },
         })?;
         assert_node(&mut node).is_candidate().term(3);
         assert_messages(

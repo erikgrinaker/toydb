@@ -104,19 +104,31 @@ pub type RequestID = Vec<u8>;
 /// A read sequence number, used to confirm leadership for linearizable reads.
 pub type ReadSequence = u64;
 
-/// A client request.
+/// A client request, typically passed through to the state machine.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Request {
-    Query(Vec<u8>),
-    Mutate(Vec<u8>),
+    /// A state machine read command. This is not replicated, and only evaluted
+    /// on the leader.
+    Read(Vec<u8>),
+    /// A state machine write command. This is replicated across all nodes, and
+    /// must result in a deterministic response.
+    Write(Vec<u8>),
+    /// Requests Raft cluster status from the leader.
     Status,
 }
 
-/// A client response.
+/// A client response. This will be wrapped in a Result to handle errors.
+///
+/// TODO: consider a separate error kind here, or a wrapped Result, to separate
+/// fallible state machine operations (returned to the caller) from apply errors
+/// (fatal).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Response {
-    Query(Vec<u8>),
-    Mutate(Vec<u8>),
+    /// A state machine read result.
+    Read(Vec<u8>),
+    /// A state machine write result.
+    Write(Vec<u8>),
+    /// The current Raft leader status.
     Status(Status),
 }
 
