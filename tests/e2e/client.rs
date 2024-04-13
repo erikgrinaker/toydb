@@ -129,9 +129,9 @@ fn status() -> Result<()> {
                 storage: storage::engine::Status {
                     name: "bitcask".to_string(),
                     keys: 29,
-                    size: 1324,
-                    total_disk_size: 1831,
-                    live_disk_size: 1556,
+                    size: 1322,
+                    total_disk_size: 1829,
+                    live_disk_size: 1554,
                     garbage_disk_size: 275
                 },
             },

@@ -15,8 +15,8 @@ use std::collections::HashSet;
 /// TODO: use Cows for these.
 #[derive(Clone, Serialize, Deserialize)]
 enum Mutation {
-    /// Begins a transaction
-    Begin { read_only: bool, as_of: Option<u64> },
+    /// Begins a read-write transaction
+    Begin,
     /// Commits the given transaction
     Commit(TransactionState),
     /// Rolls back the given transaction
@@ -40,6 +40,8 @@ enum Mutation {
 /// TODO: use Cows for these.
 #[derive(Clone, Serialize, Deserialize)]
 enum Query {
+    /// Begins a read-only transaction
+    BeginReadOnly { as_of: Option<u64> },
     /// Fetches engine status
     Status,
 
@@ -160,7 +162,11 @@ pub struct Transaction {
 impl Transaction {
     /// Starts a transaction in the given mode.
     fn begin(client: Client, read_only: bool, as_of: Option<u64>) -> Result<Self> {
-        let state = client.mutate(Mutation::Begin { read_only, as_of })?;
+        let state = if read_only || as_of.is_some() {
+            client.query(Query::BeginReadOnly { as_of })?
+        } else {
+            client.mutate(Mutation::Begin)?
+        };
         Ok(Self { client, state })
     }
 }
@@ -175,11 +181,17 @@ impl super::Transaction for Transaction {
     }
 
     fn commit(self) -> Result<()> {
-        self.client.mutate(Mutation::Commit(self.state.clone()))
+        if !self.read_only() {
+            self.client.mutate(Mutation::Commit(self.state.clone()))?
+        }
+        Ok(())
     }
 
     fn rollback(self) -> Result<()> {
-        self.client.mutate(Mutation::Rollback(self.state.clone()))
+        if !self.read_only() {
+            self.client.mutate(Mutation::Rollback(self.state.clone()))?;
+        }
+        Ok(())
     }
 
     fn create(&mut self, table: &str, row: Row) -> Result<()> {
@@ -294,16 +306,7 @@ impl<E: storage::Engine> State<E> {
     /// Mutates the state machine.
     fn mutate(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
         match mutation {
-            Mutation::Begin { read_only, as_of } => {
-                let txn = if !read_only {
-                    self.engine.begin()?
-                } else if let Some(version) = as_of {
-                    self.engine.begin_as_of(version)?
-                } else {
-                    self.engine.begin_read_only()?
-                };
-                bincode::serialize(&txn.state())
-            }
+            Mutation::Begin => bincode::serialize(&self.engine.begin()?.state()),
             Mutation::Commit(txn) => bincode::serialize(&self.engine.resume(txn)?.commit()?),
             Mutation::Rollback(txn) => bincode::serialize(&self.engine.resume(txn)?.rollback()?),
 
@@ -349,6 +352,14 @@ impl<E: storage::Engine> raft::State for State<E> {
 
     fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
         match bincode::deserialize(&command)? {
+            Query::BeginReadOnly { as_of } => {
+                let txn = if let Some(version) = as_of {
+                    self.engine.begin_as_of(version)?
+                } else {
+                    self.engine.begin_read_only()?
+                };
+                bincode::serialize(&txn.state())
+            }
             Query::Read { txn, table, id } => {
                 bincode::serialize(&self.engine.resume(txn)?.read(&table, &id)?)
             }
