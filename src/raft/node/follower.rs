@@ -560,7 +560,7 @@ pub mod tests {
     }
 
     #[test]
-    // SolicitVote is rejected if last_term is outdated.
+    // SolicitVote is rejected if last_index is outdated.
     fn step_solicitvote_last_index_outdated() -> Result<()> {
         let (follower, mut node_rx) = setup()?;
         let mut node = follower.step(Envelope {
