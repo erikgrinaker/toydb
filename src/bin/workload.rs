@@ -12,6 +12,7 @@
 
 use clap::Parser;
 use itertools::Itertools;
+use petname::Generator as _;
 use rand::distributions::Distribution as _;
 use rand::rngs::StdRng;
 use rand::SeedableRng as _;
