@@ -76,11 +76,15 @@ impl RawNode<Candidate> {
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last_index();
         let mut node = self.into_role(Leader::new(peers, last_index));
-        node.heartbeat()?;
 
         // Propose an empty command when assuming leadership, to disambiguate
         // previous entries in the log. See section 8 in the Raft paper.
+        //
+        // We do this prior to the heartbeat, to avoid a wasted replication
+        // roundtrip if the heartbeat response indicates the peer is behind.
         node.propose(None)?;
+        node.heartbeat()?;
+
         Ok(node)
     }
 
@@ -294,9 +298,13 @@ mod tests {
                     from: 1,
                     to,
                     term: 3,
-                    message: Message::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
-                },
-            );
+                    message: Message::Append {
+                        base_index: 3,
+                        base_term: 2,
+                        entries: vec![Entry { index: 4, term: 3, command: None }],
+                    },
+                }
+            )
         }
 
         for to in peers.iter().copied().sorted() {
@@ -306,13 +314,9 @@ mod tests {
                     from: 1,
                     to,
                     term: 3,
-                    message: Message::Append {
-                        base_index: 3,
-                        base_term: 2,
-                        entries: vec![Entry { index: 4, term: 3, command: None }],
-                    },
-                }
-            )
+                    message: Message::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 0 },
+                },
+            );
         }
 
         assert_messages(&mut node_rx, vec![]);
