@@ -5,6 +5,7 @@ use super::super::{
 use super::{Follower, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
+use itertools::Itertools as _;
 use log::{debug, info};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -295,7 +296,7 @@ impl RawNode<Leader> {
     /// and applied to the state machine.
     pub(super) fn propose(&mut self, command: Option<Vec<u8>>) -> Result<Index> {
         let index = self.log.append(self.term, command)?;
-        for peer in self.peers.clone() {
+        for peer in self.peers.iter().copied().sorted() {
             self.send_log(peer)?;
         }
         Ok(index)
@@ -411,7 +412,6 @@ mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
-    use itertools::Itertools as _;
     use pretty_assertions::assert_eq;
 
     #[allow(clippy::type_complexity)]
@@ -696,7 +696,7 @@ mod tests {
             command: Some(vec![0xaf]),
         });
 
-        for peer in peers.iter().cloned() {
+        for peer in peers.iter().copied().sorted() {
             assert_eq!(
                 node_rx.try_recv()?,
                 Envelope {

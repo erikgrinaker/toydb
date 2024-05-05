@@ -299,7 +299,7 @@ mod tests {
             );
         }
 
-        for to in peers.iter().copied() {
+        for to in peers.iter().copied().sorted() {
             assert_eq!(
                 node_rx.try_recv()?,
                 Envelope {
