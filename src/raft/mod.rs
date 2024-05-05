@@ -15,6 +15,6 @@ pub const TICK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(
 /// The interval between leader heartbeats, in ticks.
 pub const HEARTBEAT_INTERVAL: Ticks = 3;
 
-/// The election timeout range, in ticks. This is randomized per node in this
-/// interval, to avoid ties.
-const ELECTION_TIMEOUT_RANGE: std::ops::Range<Ticks> = 10..20;
+/// The default election timeout range, in ticks. This is randomized in this
+/// interval, to avoid election ties.
+pub const ELECTION_TIMEOUT_RANGE: std::ops::Range<Ticks> = 10..20;

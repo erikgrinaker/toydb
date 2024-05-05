@@ -1,5 +1,5 @@
 use super::super::{Envelope, Message};
-use super::{rand_election_timeout, Follower, Leader, Node, NodeID, RawNode, Role, Term, Ticks};
+use super::{Follower, Leader, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, info};
@@ -18,12 +18,8 @@ pub struct Candidate {
 
 impl Candidate {
     /// Creates a new candidate role.
-    pub fn new() -> Self {
-        Self {
-            votes: HashSet::new(),
-            election_duration: 0,
-            election_timeout: rand_election_timeout(),
-        }
+    pub fn new(election_timeout: Ticks) -> Self {
+        Self { votes: HashSet::new(), election_duration: 0, election_timeout }
     }
 }
 
@@ -56,12 +52,13 @@ impl RawNode<Candidate> {
     ) -> Result<RawNode<Follower>> {
         assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
 
+        let election_timeout = self.gen_election_timeout();
         if let Some(leader) = leader {
             // We lost the election, follow the winner.
             assert_eq!(term, self.term, "Can't follow leader in different term");
             info!("Lost election, following leader {} in term {}", leader, term);
             let voted_for = Some(self.id); // by definition
-            Ok(self.into_role(Follower::new(Some(leader), voted_for)))
+            Ok(self.into_role(Follower::new(Some(leader), voted_for, election_timeout)))
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
@@ -69,7 +66,7 @@ impl RawNode<Candidate> {
             info!("Discovered new term {}", term);
             self.term = term;
             self.log.set_term(term, None)?;
-            Ok(self.into_role(Follower::new(None, None)))
+            Ok(self.into_role(Follower::new(None, None, election_timeout)))
         }
     }
 
@@ -157,7 +154,7 @@ impl RawNode<Candidate> {
     pub(super) fn campaign(&mut self) -> Result<()> {
         let term = self.term + 1;
         info!("Starting new election for term {}", term);
-        self.role = Candidate::new();
+        self.role = Candidate::new(self.gen_election_timeout());
         self.role.votes.insert(self.id); // vote for ourself
         self.term = term;
         self.log.set_term(term, Some(self.id))?;
@@ -171,11 +168,12 @@ impl RawNode<Candidate> {
 #[cfg(test)]
 mod tests {
     use super::super::super::state::tests::TestState;
-    use super::super::super::{Entry, Log, Request};
+    use super::super::super::{Entry, Log, Request, ELECTION_TIMEOUT_RANGE};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
     use itertools::Itertools as _;
+    use rand::Rng as _;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(RawNode<Candidate>, crossbeam::channel::Receiver<Envelope>)> {
@@ -196,7 +194,8 @@ mod tests {
             log,
             state,
             node_tx,
-            role: Candidate::new(),
+            election_timeout_range: ELECTION_TIMEOUT_RANGE,
+            role: Candidate::new(rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE)),
         };
         node.role.votes.insert(1);
         Ok((node, node_rx))

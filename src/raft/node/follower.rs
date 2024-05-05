@@ -1,5 +1,5 @@
 use super::super::{Envelope, Log, Message, RequestID, State};
-use super::{rand_election_timeout, Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
+use super::{Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, info};
@@ -23,14 +23,8 @@ pub struct Follower {
 
 impl Follower {
     /// Creates a new follower role.
-    pub fn new(leader: Option<NodeID>, voted_for: Option<NodeID>) -> Self {
-        Self {
-            leader,
-            voted_for,
-            leader_seen: 0,
-            election_timeout: rand_election_timeout(),
-            forwarded: HashSet::new(),
-        }
+    pub fn new(leader: Option<NodeID>, voted_for: Option<NodeID>, election_timeout: Ticks) -> Self {
+        Self { leader, voted_for, leader_seen: 0, election_timeout, forwarded: HashSet::new() }
     }
 }
 
@@ -44,10 +38,13 @@ impl RawNode<Follower> {
         mut log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
+        election_timeout_range: std::ops::Range<Ticks>,
     ) -> Result<Self> {
         let (term, voted_for) = log.get_term()?;
-        let role = Follower::new(None, voted_for);
-        Ok(Self { id, peers, term, log, state, node_tx, role })
+        let role = Follower::new(None, voted_for, 0);
+        let mut node = Self { id, peers, term, log, state, node_tx, election_timeout_range, role };
+        node.role.election_timeout = node.gen_election_timeout();
+        Ok(node)
     }
 
     /// Asserts internal invariants.
@@ -81,7 +78,8 @@ impl RawNode<Follower> {
         // Apply any pending log entries, so that we're caught up if we win.
         self.maybe_apply()?;
 
-        let mut node = self.into_role(Candidate::new());
+        let election_timeout = self.gen_election_timeout();
+        let mut node = self.into_role(Candidate::new(election_timeout));
         node.campaign()?;
         Ok(node)
     }
@@ -104,7 +102,8 @@ impl RawNode<Follower> {
             assert_eq!(self.role.leader, None, "Already have leader in term");
             assert_eq!(term, self.term, "Can't follow leader in different term");
             info!("Following leader {} in term {}", leader, term);
-            self.role = Follower::new(Some(leader), self.role.voted_for);
+            self.role =
+                Follower::new(Some(leader), self.role.voted_for, self.role.election_timeout);
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
@@ -112,7 +111,7 @@ impl RawNode<Follower> {
             info!("Discovered new term {}", term);
             self.term = term;
             self.log.set_term(term, None)?;
-            self.role = Follower::new(None, None);
+            self.role = Follower::new(None, None, self.gen_election_timeout());
         }
         Ok(self)
     }
@@ -278,12 +277,13 @@ impl RawNode<Follower> {
 #[cfg(test)]
 pub mod tests {
     use super::super::super::state::tests::TestState;
-    use super::super::super::{Entry, Log, Request, Response};
+    use super::super::super::{Entry, Log, Request, Response, ELECTION_TIMEOUT_RANGE};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::error::Error;
     use crate::storage;
     use itertools::Itertools as _;
+    use rand::Rng as _;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Envelope>)> {
@@ -303,7 +303,12 @@ pub mod tests {
             log,
             state,
             node_tx,
-            role: Follower::new(Some(2), None),
+            election_timeout_range: ELECTION_TIMEOUT_RANGE,
+            role: Follower::new(
+                Some(2),
+                None,
+                rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE),
+            ),
         };
         Ok((node, node_rx))
     }
@@ -402,7 +407,7 @@ pub mod tests {
     // Heartbeat when no current leader makes us follow the leader
     fn step_heartbeat_no_leader() -> Result<()> {
         let (mut follower, mut node_rx) = setup()?;
-        follower.role = Follower::new(None, None);
+        follower.role = Follower::new(None, None, follower.role.election_timeout);
         let mut node = follower.step(Envelope {
             from: 3,
             to: 1,
@@ -623,7 +628,12 @@ pub mod tests {
             log,
             state: Box::new(TestState::new(0)),
             node_tx,
-            role: Follower::new(Some(2), None),
+            election_timeout_range: ELECTION_TIMEOUT_RANGE,
+            role: Follower::new(
+                Some(2),
+                None,
+                rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE),
+            ),
         };
 
         let mut node = follower.step(Envelope {
@@ -913,7 +923,7 @@ pub mod tests {
     // ClientRequest returns Error::Abort when there is no leader.
     fn step_clientrequest_no_leader() -> Result<()> {
         let (mut follower, mut node_rx) = setup()?;
-        follower.role = Follower::new(None, None);
+        follower.role = Follower::new(None, None, follower.role.election_timeout);
         let mut node = Node::Follower(follower);
 
         node = node.step(Envelope {

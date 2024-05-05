@@ -2,7 +2,7 @@ mod candidate;
 mod follower;
 mod leader;
 
-use super::{Envelope, Index, Log, Message, State, ELECTION_TIMEOUT_RANGE};
+use super::{Envelope, Index, Log, Message, State};
 use crate::error::{Error, Result};
 use candidate::Candidate;
 use follower::Follower;
@@ -21,11 +21,6 @@ pub type Term = u64;
 
 /// A logical clock interval as number of ticks.
 pub type Ticks = u8;
-
-/// Generates a randomized election timeout.
-fn rand_election_timeout() -> Ticks {
-    rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE)
-}
 
 /// A Raft node, with a dynamic role. The node is driven synchronously by
 /// processing inbound messages via step() or by advancing time via tick().
@@ -50,8 +45,9 @@ impl Node {
         log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
+        election_timeout_range: std::ops::Range<Ticks>,
     ) -> Result<Self> {
-        let node = RawNode::new(id, peers, log, state, node_tx)?;
+        let node = RawNode::new(id, peers, log, state, node_tx, election_timeout_range)?;
         if node.peers.is_empty() {
             // If there are no peers, become leader immediately.
             return Ok(node.into_candidate()?.into_leader()?.into());
@@ -129,6 +125,7 @@ pub struct RawNode<R: Role = Follower> {
     log: Log,
     state: Box<dyn State>,
     node_tx: crossbeam::channel::Sender<Envelope>,
+    election_timeout_range: std::ops::Range<Ticks>,
     role: R,
 }
 
@@ -142,6 +139,7 @@ impl<R: Role> RawNode<R> {
             log: self.log,
             state: self.state,
             node_tx: self.node_tx,
+            election_timeout_range: self.election_timeout_range,
             role,
         }
     }
@@ -210,6 +208,11 @@ impl<R: Role> RawNode<R> {
         Ok(())
     }
 
+    /// Generates a randomized election timeout.
+    fn gen_election_timeout(&self) -> Ticks {
+        rand::thread_rng().gen_range(self.election_timeout_range.clone())
+    }
+
     /// Asserts common node invariants.
     fn assert_node(&mut self) -> Result<()> {
         debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
@@ -246,7 +249,7 @@ fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
 #[cfg(test)]
 mod tests {
     pub use super::super::state::tests::TestState;
-    use super::super::{Entry, RequestID};
+    use super::super::{Entry, RequestID, ELECTION_TIMEOUT_RANGE};
     use super::*;
     use crate::storage;
     use pretty_assertions::assert_eq;
@@ -433,12 +436,13 @@ mod tests {
     ) -> Result<(RawNode<Follower>, crossbeam::channel::Receiver<Envelope>)> {
         let (node_tx, node_rx) = crossbeam::channel::unbounded();
         let node = RawNode {
-            role: Follower::new(None, None),
+            role: Follower::new(None, None, rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE)),
             id: 1,
             peers: HashSet::from_iter(peers),
             term: 1,
             log: Log::new(storage::Memory::new(), false)?,
             state: Box::new(TestState::new(0)),
+            election_timeout_range: ELECTION_TIMEOUT_RANGE,
             node_tx,
         };
         Ok((node, node_rx))
@@ -453,6 +457,7 @@ mod tests {
             Log::new(storage::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
+            ELECTION_TIMEOUT_RANGE,
         )?;
         match node {
             Node::Follower(rolenode) => {
@@ -474,6 +479,7 @@ mod tests {
             Log::new(storage::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
+            ELECTION_TIMEOUT_RANGE,
         )?;
         match node {
             Node::Leader(rolenode) => {
@@ -489,7 +495,7 @@ mod tests {
     #[test]
     fn into_role() -> Result<()> {
         let (node, _) = setup_rolenode()?;
-        let role = Candidate::new();
+        let role = Candidate::new(node.gen_election_timeout());
         let new = node.into_role(role.clone());
         assert_eq!(new.id, 1);
         assert_eq!(new.term, 1);

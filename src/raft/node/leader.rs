@@ -124,7 +124,8 @@ impl RawNode<Leader> {
 
         self.term = term;
         self.log.set_term(term, None)?;
-        Ok(self.into_role(Follower::new(None, None)))
+        let election_timeout = self.gen_election_timeout();
+        Ok(self.into_role(Follower::new(None, None, election_timeout)))
     }
 
     /// Processes a message.
@@ -406,7 +407,7 @@ impl RawNode<Leader> {
 #[cfg(test)]
 mod tests {
     use super::super::super::state::tests::TestState;
-    use super::super::super::{Entry, Log};
+    use super::super::super::{Entry, Log, ELECTION_TIMEOUT_RANGE};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
@@ -434,6 +435,7 @@ mod tests {
             role: Leader::new(peers, log.get_last_index().0),
             log,
             state,
+            election_timeout_range: ELECTION_TIMEOUT_RANGE,
             node_tx,
         };
         Ok((node, node_rx))
