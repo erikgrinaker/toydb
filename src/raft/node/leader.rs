@@ -1,7 +1,4 @@
-use super::super::{
-    Envelope, Index, Message, ReadSequence, Request, RequestID, Response, Status,
-    HEARTBEAT_INTERVAL,
-};
+use super::super::{Envelope, Index, Message, ReadSequence, Request, RequestID, Response, Status};
 use super::{Follower, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
@@ -274,7 +271,7 @@ impl RawNode<Leader> {
         self.assert()?;
 
         self.role.since_heartbeat += 1;
-        if self.role.since_heartbeat >= HEARTBEAT_INTERVAL {
+        if self.role.since_heartbeat >= self.heartbeat_interval {
             self.heartbeat()?;
             self.role.since_heartbeat = 0;
         }
@@ -408,7 +405,7 @@ impl RawNode<Leader> {
 #[cfg(test)]
 mod tests {
     use super::super::super::state::tests::TestState;
-    use super::super::super::{Entry, Log, ELECTION_TIMEOUT_RANGE};
+    use super::super::super::{Entry, Log, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::storage;
@@ -435,6 +432,7 @@ mod tests {
             role: Leader::new(peers, log.get_last_index().0),
             log,
             state,
+            heartbeat_interval: HEARTBEAT_INTERVAL,
             election_timeout_range: ELECTION_TIMEOUT_RANGE,
             node_tx,
         };

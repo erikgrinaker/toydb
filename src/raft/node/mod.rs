@@ -45,9 +45,18 @@ impl Node {
         log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
+        heartbeat_interval: Ticks,
         election_timeout_range: std::ops::Range<Ticks>,
     ) -> Result<Self> {
-        let node = RawNode::new(id, peers, log, state, node_tx, election_timeout_range)?;
+        let node = RawNode::new(
+            id,
+            peers,
+            log,
+            state,
+            node_tx,
+            heartbeat_interval,
+            election_timeout_range,
+        )?;
         if node.peers.is_empty() {
             // If there are no peers, become leader immediately.
             return Ok(node.into_candidate()?.into_leader()?.into());
@@ -125,6 +134,7 @@ pub struct RawNode<R: Role = Follower> {
     log: Log,
     state: Box<dyn State>,
     node_tx: crossbeam::channel::Sender<Envelope>,
+    heartbeat_interval: Ticks,
     election_timeout_range: std::ops::Range<Ticks>,
     role: R,
 }
@@ -139,6 +149,7 @@ impl<R: Role> RawNode<R> {
             log: self.log,
             state: self.state,
             node_tx: self.node_tx,
+            heartbeat_interval: self.heartbeat_interval,
             election_timeout_range: self.election_timeout_range,
             role,
         }
@@ -251,6 +262,7 @@ mod tests {
     pub use super::super::state::tests::TestState;
     use super::super::{Entry, RequestID, ELECTION_TIMEOUT_RANGE};
     use super::*;
+    use crate::raft::HEARTBEAT_INTERVAL;
     use crate::storage;
     use pretty_assertions::assert_eq;
     use std::collections::HashSet;
@@ -442,6 +454,7 @@ mod tests {
             term: 1,
             log: Log::new(storage::Memory::new(), false)?,
             state: Box::new(TestState::new(0)),
+            heartbeat_interval: HEARTBEAT_INTERVAL,
             election_timeout_range: ELECTION_TIMEOUT_RANGE,
             node_tx,
         };
@@ -457,6 +470,7 @@ mod tests {
             Log::new(storage::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
+            HEARTBEAT_INTERVAL,
             ELECTION_TIMEOUT_RANGE,
         )?;
         match node {
@@ -479,6 +493,7 @@ mod tests {
             Log::new(storage::Memory::new(), false)?,
             Box::new(TestState::new(0)),
             node_tx,
+            HEARTBEAT_INTERVAL,
             ELECTION_TIMEOUT_RANGE,
         )?;
         match node {

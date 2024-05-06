@@ -175,6 +175,7 @@ mod tests {
     use super::super::super::{Entry, Log, Request, ELECTION_TIMEOUT_RANGE};
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
+    use crate::raft::HEARTBEAT_INTERVAL;
     use crate::storage;
     use itertools::Itertools as _;
     use rand::Rng as _;
@@ -198,6 +199,7 @@ mod tests {
             log,
             state,
             node_tx,
+            heartbeat_interval: HEARTBEAT_INTERVAL,
             election_timeout_range: ELECTION_TIMEOUT_RANGE,
             role: Candidate::new(rand::thread_rng().gen_range(ELECTION_TIMEOUT_RANGE)),
         };

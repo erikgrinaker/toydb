@@ -57,6 +57,7 @@ impl Server {
                 raft_log,
                 raft_state,
                 node_tx,
+                raft::HEARTBEAT_INTERVAL,
                 raft::ELECTION_TIMEOUT_RANGE,
             )?,
             peers,

@@ -38,11 +38,22 @@ impl RawNode<Follower> {
         mut log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
+        heartbeat_interval: Ticks,
         election_timeout_range: std::ops::Range<Ticks>,
     ) -> Result<Self> {
         let (term, voted_for) = log.get_term()?;
         let role = Follower::new(None, voted_for, 0);
-        let mut node = Self { id, peers, term, log, state, node_tx, election_timeout_range, role };
+        let mut node = Self {
+            id,
+            peers,
+            term,
+            log,
+            state,
+            node_tx,
+            heartbeat_interval,
+            election_timeout_range,
+            role,
+        };
         node.role.election_timeout = node.gen_election_timeout();
         Ok(node)
     }
@@ -281,6 +292,7 @@ pub mod tests {
     use super::super::tests::{assert_messages, assert_node};
     use super::*;
     use crate::error::Error;
+    use crate::raft::HEARTBEAT_INTERVAL;
     use crate::storage;
     use itertools::Itertools as _;
     use rand::Rng as _;
@@ -303,6 +315,7 @@ pub mod tests {
             log,
             state,
             node_tx,
+            heartbeat_interval: HEARTBEAT_INTERVAL,
             election_timeout_range: ELECTION_TIMEOUT_RANGE,
             role: Follower::new(
                 Some(2),
@@ -628,6 +641,7 @@ pub mod tests {
             log,
             state: Box::new(TestState::new(0)),
             node_tx,
+            heartbeat_interval: HEARTBEAT_INTERVAL,
             election_timeout_range: ELECTION_TIMEOUT_RANGE,
             role: Follower::new(
                 Some(2),
