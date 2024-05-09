@@ -107,8 +107,10 @@ impl RawNode<Candidate> {
         }
 
         match msg.message {
-            // Ignore other candidates when we're also campaigning.
-            Message::Campaign { .. } => {}
+            // Don't grant votes for other candidates who also campaign.
+            Message::Campaign { .. } => {
+                self.send(msg.from, Message::CampaignResponse { vote: false })?
+            }
 
             // If we received a vote, record it. If the vote gives us quorum,
             // assume leadership.

@@ -255,8 +255,13 @@ impl RawNode<Leader> {
                 )?;
             }
 
+            // Don't grant other votes in this term.
+            Message::Campaign { .. } => {
+                self.send(msg.from, Message::CampaignResponse { vote: false })?
+            }
+
             // Votes can come in after we won the election, ignore them.
-            Message::Campaign { .. } | Message::CampaignResponse { .. } => {}
+            Message::CampaignResponse { .. } => {}
 
             // Leaders never proxy client requests, so we don't expect to see
             // responses from other nodes.
