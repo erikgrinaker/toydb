@@ -107,13 +107,16 @@ impl RawNode<Leader> {
         info!("Discovered new term {}", term);
 
         // Cancel in-flight requests.
-        for write in std::mem::take(&mut self.role.writes).into_values() {
+        for write in
+            std::mem::take(&mut self.role.writes).into_values().sorted_by_key(|w| w.id.clone())
+        {
             self.send(
                 write.from,
                 Message::ClientResponse { id: write.id, response: Err(Error::Abort) },
             )?;
         }
-        for read in std::mem::take(&mut self.role.reads).into_iter() {
+        for read in std::mem::take(&mut self.role.reads).into_iter().sorted_by_key(|r| r.id.clone())
+        {
             self.send(
                 read.from,
                 Message::ClientResponse { id: read.id, response: Err(Error::Abort) },

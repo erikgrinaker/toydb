@@ -3,6 +3,7 @@ use super::{Candidate, Node, NodeID, RawNode, Role, Term, Ticks};
 use crate::error::{Error, Result};
 
 use ::log::{debug, info};
+use itertools::Itertools as _;
 use std::collections::HashSet;
 
 // A follower replicates state from a leader.
@@ -272,7 +273,8 @@ impl RawNode<Follower> {
 
     /// Aborts all forwarded requests.
     fn abort_forwarded(&mut self) -> Result<()> {
-        for id in std::mem::take(&mut self.role.forwarded) {
+        // Sort the IDs for test determinism.
+        for id in std::mem::take(&mut self.role.forwarded).into_iter().sorted() {
             debug!("Aborting forwarded request {:x?}", id);
             self.send(self.id, Message::ClientResponse { id, response: Err(Error::Abort) })?;
         }
@@ -294,7 +296,6 @@ pub mod tests {
     use crate::error::Error;
     use crate::raft::HEARTBEAT_INTERVAL;
     use crate::storage;
-    use itertools::Itertools as _;
     use rand::Rng as _;
 
     #[allow(clippy::type_complexity)]
