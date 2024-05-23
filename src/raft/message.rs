@@ -3,7 +3,7 @@ use crate::error::Result;
 use crate::storage;
 
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// A message envelope sent between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -138,8 +138,9 @@ pub struct Status {
     pub leader: NodeID,
     /// The current Raft term.
     pub term: Term,
-    /// The last log indexes of all nodes.
-    pub last_index: HashMap<NodeID, Index>,
+    /// The last log indexes of all nodes. Use a BTreeMap for deterministic
+    /// debug output.
+    pub last_index: BTreeMap<NodeID, Index>,
     /// The current commit index.
     pub commit_index: Index,
     /// The current applied index.

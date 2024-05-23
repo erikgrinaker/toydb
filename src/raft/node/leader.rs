@@ -244,6 +244,7 @@ impl RawNode<Leader> {
                         .iter()
                         .map(|(id, p)| (*id, p.last))
                         .chain(std::iter::once((self.id, self.log.get_last_index().0)))
+                        .sorted()
                         .collect(),
                     commit_index: self.log.get_commit_index().0,
                     apply_index: self.state.get_applied_index(),
@@ -415,6 +416,7 @@ mod tests {
     use super::*;
     use crate::storage;
     use pretty_assertions::assert_eq;
+    use std::collections::BTreeMap;
 
     #[allow(clippy::type_complexity)]
     fn setup() -> Result<(RawNode<Leader>, crossbeam::channel::Receiver<Envelope>)> {
@@ -741,7 +743,7 @@ mod tests {
                     response: Ok(Response::Status(Status {
                         leader: 1,
                         term: 3,
-                        last_index: HashMap::from([(1, 5), (2, 0), (3, 0), (4, 0), (5, 0)]),
+                        last_index: BTreeMap::from([(1, 5), (2, 0), (3, 0), (4, 0), (5, 0)]),
                         commit_index: 2,
                         apply_index: 0,
                         storage: storage::engine::Status {
