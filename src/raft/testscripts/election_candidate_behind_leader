@@ -1,0 +1,130 @@
+# A candidate that lags behind the leader can still win the election
+# as long as it isn't behind the quorum.
+
+cluster nodes=5 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n4@1 follower(n1) last=1@1 commit=1@1 apply=1
+n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Partition n1+n2 away from the cluster.
+partition 1 2
+---
+n1 n2 ⇹ n3 n4 n5
+
+# Replica a write on n1+n2. The write can't be committed, because n1 doesn't
+# have quorum.
+(put 1 foo=bar)
+(stabilize)
+status
+---
+n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=2@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n4@1 follower(n1) last=1@1 commit=1@1 apply=1
+n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# List the logs on n1 n2 n3 to show the replicated but uncommitted entry.
+log 1 2 3
+---
+n1@1 last=2@1 commit=1@1
+n1@1 entry 1@1 None
+n1@1 entry 2@1 put foo=bar
+n2@1 last=2@1 commit=1@1
+n2@1 entry 1@1 None
+n2@1 entry 2@1 put foo=bar
+n3@1 last=1@1 commit=1@1
+n3@1 entry 1@1 None
+
+# Heal the partition.
+heal
+---
+n1 n2 n3 n4 n5 fully connected
+
+# Make n5 campaign. n3+n4 grant their votes, n1+n2 reject it. n1 aborts the
+# in-flight write request because the term changes.
+campaign 5
+deliver
+---
+n5@1 follower(n1) ⇨ n5@2 candidate
+n5@2 → n1 Campaign last=1@1
+n5@2 → n2 Campaign last=1@1
+n5@2 → n3 Campaign last=1@1
+n5@2 → n4 Campaign last=1@1
+n1@1 leader ⇨ n1@2 follower()
+n1@1 → c1 ClientResponse id=0x01 Error::Abort
+c1@1 put foo=bar ⇒ Error::Abort (Operation aborted)
+n1@2 → n5 CampaignResponse vote=false
+n2@1 follower(n1) ⇨ n2@2 follower()
+n2@2 → n5 CampaignResponse vote=false
+n3@1 follower(n1) ⇨ n3@2 follower()
+n3@2 → n5 CampaignResponse vote=true
+n4@1 follower(n1) ⇨ n4@2 follower()
+n4@2 → n5 CampaignResponse vote=true
+
+# n5 wins the election and becomes leader.
+stabilize heartbeat=true
+---
+n5@2 candidate ⇨ n5@2 leader
+n5@2 append 2@2 None
+n5@2 → n1 Append base=1@1 [2@2]
+n5@2 → n2 Append base=1@1 [2@2]
+n5@2 → n3 Append base=1@1 [2@2]
+n5@2 → n4 Append base=1@1 [2@2]
+n5@2 → n1 Heartbeat commit=1@1 read_seq=0
+n5@2 → n2 Heartbeat commit=1@1 read_seq=0
+n5@2 → n3 Heartbeat commit=1@1 read_seq=0
+n5@2 → n4 Heartbeat commit=1@1 read_seq=0
+n1@2 follower() ⇨ n1@2 follower(n5)
+n1@2 → n5 AppendResponse last=2@2 reject=false
+n1@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n2@2 follower() ⇨ n2@2 follower(n5)
+n2@2 → n5 AppendResponse last=2@2 reject=false
+n2@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n3@2 follower() ⇨ n3@2 follower(n5)
+n3@2 append 2@2 None
+n3@2 → n5 AppendResponse last=2@2 reject=false
+n3@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n4@2 follower() ⇨ n4@2 follower(n5)
+n4@2 append 2@2 None
+n4@2 → n5 AppendResponse last=2@2 reject=false
+n4@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n5@2 commit 2@2
+n5@2 apply 2@2 None
+n5@2 → n1 Heartbeat commit=2@2 read_seq=0
+n5@2 → n2 Heartbeat commit=2@2 read_seq=0
+n5@2 → n3 Heartbeat commit=2@2 read_seq=0
+n5@2 → n4 Heartbeat commit=2@2 read_seq=0
+n1@2 commit 2@2
+n1@2 apply 2@2 None
+n1@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n2@2 commit 2@2
+n2@2 apply 2@2 None
+n2@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n3@2 commit 2@2
+n3@2 apply 2@2 None
+n3@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n4@2 commit 2@2
+n4@2 apply 2@2 None
+n4@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+
+# n1+n2's in-flight write at log position 2 has been replaced by the
+# empty log entry appended by n5 when it became leader.
+log 1 2
+---
+n1@2 last=2@2 commit=2@2
+n1@2 entry 1@1 None
+n1@2 entry 2@2 None
+n2@2 last=2@2 commit=2@2
+n2@2 entry 1@1 None
+n2@2 entry 2@2 None
+
+status
+---
+n1@2 follower(n5) last=2@2 commit=2@2 apply=2
+n2@2 follower(n5) last=2@2 commit=2@2 apply=2
+n3@2 follower(n5) last=2@2 commit=2@2 apply=2
+n4@2 follower(n5) last=2@2 commit=2@2 apply=2
+n5@2 leader last=2@2 commit=2@2 apply=2 progress={1:2→3 2:2→3 3:2→3 4:2→3}

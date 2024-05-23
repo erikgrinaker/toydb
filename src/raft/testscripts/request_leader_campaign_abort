@@ -1,0 +1,36 @@
+# A leader aborts in-flight requests when it steps down.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Submit a read and write on n1.
+put 1 foo=bar
+get 1 foo
+---
+c1@1 → n1 ClientRequest id=0x01 write 0x0103666f6f03626172
+n1@1 append 2@1 put foo=bar
+n1@1 → n2 Append base=1@1 [2@1]
+n1@1 → n3 Append base=1@1 [2@1]
+c1@1 → n1 ClientRequest id=0x02 read 0x0003666f6f
+n1@1 → n2 Heartbeat commit=1@1 read_seq=1
+n1@1 → n3 Heartbeat commit=1@1 read_seq=1
+
+# n2 campaigns before n1's requests achieve quorum.
+campaign 2
+---
+n2@1 follower(n1) ⇨ n2@2 candidate
+n2@2 → n1 Campaign last=1@1
+n2@2 → n3 Campaign last=1@1
+
+# When n1 receives the campaign message, the requests are aborted.
+deliver 1 from=2
+---
+n1@1 leader ⇨ n1@2 follower()
+n1@1 → c1 ClientResponse id=0x01 Error::Abort
+c1@1 put foo=bar ⇒ Error::Abort (Operation aborted)
+n1@1 → c1 ClientResponse id=0x02 Error::Abort
+c1@1 get foo ⇒ Error::Abort (Operation aborted)
+n1@2 → n2 CampaignResponse vote=false

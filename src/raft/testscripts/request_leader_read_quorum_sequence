@@ -1,0 +1,80 @@
+# Client read requests are only served once a quorum confirm the read sequence
+# number, including higher sequence numbers.
+
+cluster nodes=5 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n4@1 follower(n1) last=1@1 commit=1@1 apply=1
+n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Write foo=bar and read it back.
+(put 1 foo=bar)
+(stabilize heartbeat=true)
+(get 1 foo)
+(stabilize)
+---
+ok
+
+# Send a heartbeat with sequence number 1, and deliver it to all followers.
+heartbeat 1
+deliver
+---
+n1@1 → n2 Heartbeat commit=2@1 read_seq=1
+n1@1 → n3 Heartbeat commit=2@1 read_seq=1
+n1@1 → n4 Heartbeat commit=2@1 read_seq=1
+n1@1 → n5 Heartbeat commit=2@1 read_seq=1
+n2@1 → n1 HeartbeatResponse last=2@1 read_seq=1
+n3@1 → n1 HeartbeatResponse last=2@1 read_seq=1
+n4@1 → n1 HeartbeatResponse last=2@1 read_seq=1
+n5@1 → n1 HeartbeatResponse last=2@1 read_seq=1
+
+# Partition n1 away.
+partition 1
+---
+n1 ⇹ n2 n3 n4 n5
+
+# Perform a read at sequence number 2. The heartbeats are lost.
+get 1 foo
+---
+c1@1 → n1 ClientRequest id=0x03 read 0x0003666f6f
+n1@1 ⇥ n2 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶2̶
+n1@1 ⇥ n3 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶2̶
+n1@1 ⇥ n4 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶2̶
+n1@1 ⇥ n5 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶2̶
+
+# Deliver the heartbeat responses at sequence number 1. These should not satisfy
+# the read at sequence number 2.
+deliver 1
+---
+ok
+
+# Heal the partition and perform another read at sequence number 3. Followers
+# respond to the heartbeats at sequence number 3.
+heal
+get 1 foo
+---
+n1 n2 n3 n4 n5 fully connected
+c1@1 → n1 ClientRequest id=0x04 read 0x0003666f6f
+n1@1 → n2 Heartbeat commit=2@1 read_seq=3
+n1@1 → n3 Heartbeat commit=2@1 read_seq=3
+n1@1 → n4 Heartbeat commit=2@1 read_seq=3
+n1@1 → n5 Heartbeat commit=2@1 read_seq=3
+
+deliver
+---
+n2@1 → n1 HeartbeatResponse last=2@1 read_seq=3
+n3@1 → n1 HeartbeatResponse last=2@1 read_seq=3
+n4@1 → n1 HeartbeatResponse last=2@1 read_seq=3
+n5@1 → n1 HeartbeatResponse last=2@1 read_seq=3
+
+# Once n1 receives two heartbeat responses it has a read quorum and
+# serves both the read at seqnums 2 (id=0x03) and 3 (id=0x04).
+deliver 1 from=3
+deliver 1 from=5
+---
+n1@1 → c1 ClientResponse id=0x03 read 0x000103626172
+c1@1 get foo ⇒ bar
+n1@1 → c1 ClientResponse id=0x04 read 0x000103626172
+c1@1 get foo ⇒ bar

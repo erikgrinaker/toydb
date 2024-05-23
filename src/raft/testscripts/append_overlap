@@ -1,0 +1,60 @@
+# Overlapping entries are appended just fine.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Propose three writes before the acks are received. This emits duplicate,
+# overlapping entries in successive messages, which should all be accepted.
+put 1 a=1
+deliver 2 3
+---
+c1@1 → n1 ClientRequest id=0x01 write 0x0101610131
+n1@1 append 2@1 put a=1
+n1@1 → n2 Append base=1@1 [2@1]
+n1@1 → n3 Append base=1@1 [2@1]
+n2@1 append 2@1 put a=1
+n2@1 → n1 AppendResponse last=2@1 reject=false
+n3@1 append 2@1 put a=1
+n3@1 → n1 AppendResponse last=2@1 reject=false
+
+put 1 b=2
+deliver 2 3
+---
+c1@1 → n1 ClientRequest id=0x02 write 0x0101620132
+n1@1 append 3@1 put b=2
+n1@1 → n2 Append base=1@1 [2@1 3@1]
+n1@1 → n3 Append base=1@1 [2@1 3@1]
+n2@1 append 3@1 put b=2
+n2@1 → n1 AppendResponse last=3@1 reject=false
+n3@1 append 3@1 put b=2
+n3@1 → n1 AppendResponse last=3@1 reject=false
+
+put 1 c=3
+deliver 2 3
+---
+c1@1 → n1 ClientRequest id=0x03 write 0x0101630133
+n1@1 append 4@1 put c=3
+n1@1 → n2 Append base=1@1 [2@1 3@1 4@1]
+n1@1 → n3 Append base=1@1 [2@1 3@1 4@1]
+n2@1 append 4@1 put c=3
+n2@1 → n1 AppendResponse last=4@1 reject=false
+n3@1 append 4@1 put c=3
+n3@1 → n1 AppendResponse last=4@1 reject=false
+
+stabilize
+---
+n1@1 commit 2@1
+n1@1 apply 2@1 put a=1
+n1@1 → c1 ClientResponse id=0x01 write 0x0102
+c1@1 put a=1 ⇒ 2
+n1@1 commit 3@1
+n1@1 apply 3@1 put b=2
+n1@1 → c1 ClientResponse id=0x02 write 0x0103
+c1@1 put b=2 ⇒ 3
+n1@1 commit 4@1
+n1@1 apply 4@1 put c=3
+n1@1 → c1 ClientResponse id=0x03 write 0x0104
+c1@1 put c=3 ⇒ 4

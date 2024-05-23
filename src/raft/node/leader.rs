@@ -8,13 +8,16 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Peer replication progress.
 #[derive(Clone, Debug, PartialEq)]
-struct Progress {
+pub(super) struct Progress {
     /// The next index to replicate to the peer.
-    next: Index,
+    pub(super) next: Index,
     /// The last index known to be replicated to the peer.
-    last: Index,
+    ///
+    /// TODO: rename to match. It needs to track the position where the
+    /// follower's log matches the leader's, not its last position.
+    pub(super) last: Index,
     /// The last read sequence number confirmed by the peer.
-    read_seq: ReadSequence,
+    pub(super) read_seq: ReadSequence,
 }
 
 /// A pending client write request.
@@ -43,7 +46,7 @@ struct Read {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Leader {
     /// Peer replication progress.
-    progress: HashMap<NodeID, Progress>,
+    pub(super) progress: HashMap<NodeID, Progress>,
     /// Keeps track of pending write requests, keyed by log index. These are
     /// added when the write is proposed and appended to the leader's log, and
     /// removed when the command is applied to the state machine, sending the
@@ -150,12 +153,16 @@ impl RawNode<Leader> {
         match msg.message {
             // There can't be two leaders in the same term.
             Message::Heartbeat { .. } | Message::Append { .. } => {
-                panic!("Saw other leader {} in term {}", msg.from, msg.term);
+                panic!("saw other leader {} in term {}", msg.from, msg.term);
             }
 
             // A follower received one of our heartbeats and confirms that we
             // are its leader. If its log is incomplete, append entries. If the
             // peer's read sequence number increased, process any pending reads.
+            //
+            // TODO: this needs to commit and apply entries following a leader
+            // change too, otherwise we can serve stale reads if the new leader
+            // hadn't fully committed and applied entries yet.
             Message::HeartbeatResponse { last_index, last_term, read_seq } => {
                 assert!(read_seq <= self.role.read_seq, "Future read sequence number");
 
@@ -177,11 +184,11 @@ impl RawNode<Leader> {
             Message::AppendResponse { reject: false, last_index, last_term } => {
                 assert!(
                     last_index <= self.log.get_last_index().0,
-                    "Follower accepted entries after last index"
+                    "follower accepted entries after last index"
                 );
                 assert!(
                     last_term <= self.log.get_last_index().1,
-                    "Follower accepted entries after last term"
+                    "follower accepted entries after last term"
                 );
 
                 let progress = self.role.progress.get_mut(&msg.from).unwrap();
@@ -398,401 +405,15 @@ impl RawNode<Leader> {
         let (base_index, base_term) = match self.role.progress.get(&peer) {
             Some(Progress { next, .. }) if *next > 1 => match self.log.get(next - 1)? {
                 Some(entry) => (entry.index, entry.term),
-                None => panic!("Missing base entry {}", next - 1),
+                None => panic!("missing base entry {}", next - 1),
             },
             Some(_) => (0, 0),
-            None => panic!("Unknown peer {}", peer),
+            None => panic!("unknown peer {}", peer),
         };
 
         let entries = self.log.scan((base_index + 1)..)?.collect::<Result<Vec<_>>>()?;
         debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
         self.send(peer, Message::Append { base_index, base_term, entries })?;
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::super::super::state::tests::TestState;
-    use super::super::super::{Entry, Log, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL};
-    use super::super::tests::{assert_messages, assert_node};
-    use super::*;
-    use crate::storage;
-    use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
-
-    #[allow(clippy::type_complexity)]
-    fn setup() -> Result<(RawNode<Leader>, crossbeam::channel::Receiver<Envelope>)> {
-        let (node_tx, node_rx) = crossbeam::channel::unbounded();
-        let peers = HashSet::from([2, 3, 4, 5]);
-        let state = Box::new(TestState::new(0));
-        let mut log = Log::new(storage::Memory::new(), false)?;
-        log.append(1, Some(vec![0x01]))?;
-        log.append(1, Some(vec![0x02]))?;
-        log.append(2, Some(vec![0x03]))?;
-        log.append(3, Some(vec![0x04]))?;
-        log.append(3, Some(vec![0x05]))?;
-        log.commit(2)?;
-        log.set_term(3, Some(1))?;
-
-        let node = RawNode {
-            id: 1,
-            peers: peers.clone(),
-            term: 3,
-            role: Leader::new(peers, log.get_last_index().0),
-            log,
-            state,
-            heartbeat_interval: HEARTBEAT_INTERVAL,
-            election_timeout_range: ELECTION_TIMEOUT_RANGE,
-            node_tx,
-        };
-        Ok((node, node_rx))
-    }
-
-    #[test]
-    // HeartbeatResponse with old log triggers replication.
-    fn step_confirmleader_replicate() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        node = node.step(Envelope {
-            from: 2,
-            to: 1,
-            term: 3,
-            message: Message::HeartbeatResponse { last_index: 3, last_term: 2, read_seq: 0 },
-        })?;
-        assert_node(&mut node).is_leader().term(3).committed(2);
-        assert_messages(
-            &mut node_rx,
-            vec![Envelope {
-                from: 1,
-                to: 2,
-                term: 3,
-                message: Message::Append { base_index: 5, base_term: 3, entries: vec![] },
-            }],
-        );
-        Ok(())
-    }
-
-    #[test]
-    #[should_panic(expected = "Saw other leader 2 in term 3")]
-    // Heartbeats from other leaders in current term panics.
-    fn step_heartbeat_current_term() {
-        let (leader, _) = setup().unwrap();
-        leader
-            .step(Envelope {
-                from: 2,
-                to: 1,
-                term: 3,
-                message: Message::Heartbeat { commit_index: 5, commit_term: 3, read_seq: 7 },
-            })
-            .unwrap();
-    }
-
-    #[test]
-    // Heartbeats from other leaders in future term converts to follower and steps.
-    fn step_heartbeat_future_term() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        node = node.step(Envelope {
-            from: 2,
-            to: 1,
-            term: 4,
-            message: Message::Heartbeat { commit_index: 7, commit_term: 4, read_seq: 7 },
-        })?;
-        assert_node(&mut node).is_follower().term(4).leader(Some(2)).committed(2);
-        assert_messages(
-            &mut node_rx,
-            vec![Envelope {
-                from: 1,
-                to: 2,
-                term: 4,
-                message: Message::HeartbeatResponse { last_index: 5, last_term: 3, read_seq: 7 },
-            }],
-        );
-        Ok(())
-    }
-
-    #[test]
-    // Heartbeats from other leaders in past terms are ignored.
-    fn step_heartbeat_past_term() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        node = node.step(Envelope {
-            from: 2,
-            to: 1,
-            term: 2,
-            message: Message::Heartbeat { commit_index: 3, commit_term: 2, read_seq: 7 },
-        })?;
-        assert_node(&mut node).is_leader().term(3).committed(2);
-        assert_messages(&mut node_rx, vec![]);
-        Ok(())
-    }
-
-    #[test]
-    fn step_acceptentries() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        node = node.step(Envelope {
-            from: 2,
-            to: 1,
-            term: 3,
-            message: Message::AppendResponse { reject: false, last_index: 4, last_term: 3 },
-        })?;
-        assert_node(&mut node).committed(2);
-        assert_messages(&mut node_rx, vec![]);
-
-        node = node.step(Envelope {
-            from: 3,
-            to: 1,
-            term: 3,
-            message: Message::AppendResponse { reject: false, last_index: 5, last_term: 3 },
-        })?;
-        assert_node(&mut node).committed(4).applied(4);
-        assert_messages(&mut node_rx, vec![]);
-
-        node = node.step(Envelope {
-            from: 4,
-            to: 1,
-            term: 3,
-            message: Message::AppendResponse { reject: false, last_index: 5, last_term: 3 },
-        })?;
-        assert_node(&mut node).committed(5).applied(5);
-        assert_messages(&mut node_rx, vec![]);
-
-        assert_node(&mut node).is_leader().term(3);
-        Ok(())
-    }
-
-    #[test]
-    // Duplicate AcceptEntries from single node should not trigger commit.
-    fn step_acceptentries_duplicate() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        for _ in 0..5 {
-            node = node.step(Envelope {
-                from: 2,
-                to: 1,
-                term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 5, last_term: 3 },
-            })?;
-            assert_node(&mut node).is_leader().term(3).committed(2);
-            assert_messages(&mut node_rx, vec![]);
-        }
-        Ok(())
-    }
-
-    #[test]
-    // AcceptEntries quorum for entry in past term should not trigger commit
-    fn step_acceptentries_past_term() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let peers = leader.peers.clone();
-        let mut node: Node = leader.into();
-
-        for peer in peers.into_iter() {
-            node = node.step(Envelope {
-                from: peer,
-                to: 1,
-                term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 3, last_term: 3 },
-            })?;
-            assert_node(&mut node).is_leader().term(3).committed(2);
-            assert_messages(&mut node_rx, vec![]);
-        }
-        Ok(())
-    }
-
-    #[test]
-    #[should_panic(expected = "Follower accepted entries after last index")]
-    // AcceptEntries panics if last_index is beyond leader's log.
-    fn step_acceptentries_future_index() {
-        let (leader, _) = setup().unwrap();
-        leader
-            .step(Envelope {
-                from: 2,
-                to: 1,
-                term: 3,
-                message: Message::AppendResponse { reject: false, last_index: 7, last_term: 3 },
-            })
-            .unwrap();
-    }
-
-    #[test]
-    fn step_rejectentries() -> Result<()> {
-        let (mut leader, mut node_rx) = setup()?;
-        let entries = leader.log.scan(0..)?.collect::<Result<Vec<_>>>()?;
-        let mut node: Node = leader.into();
-
-        for i in 0..(entries.len() + 3) {
-            node = node.step(Envelope {
-                from: 2,
-                to: 1,
-                term: 3,
-                message: Message::AppendResponse { reject: true, last_index: 0, last_term: 3 },
-            })?;
-            assert_node(&mut node).is_leader().term(3).committed(2);
-            let index = if i >= entries.len() { 0 } else { entries.len() - i - 1 };
-            let replicate = entries.get(index..).unwrap().to_vec();
-            assert_messages(
-                &mut node_rx,
-                vec![Envelope {
-                    from: 1,
-                    to: 2,
-                    term: 3,
-                    message: Message::Append {
-                        base_index: index as Index,
-                        base_term: if index > 0 {
-                            entries.get(index - 1).map(|e| e.term).unwrap()
-                        } else {
-                            0
-                        },
-                        entries: replicate,
-                    },
-                }],
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    // Sending a client query request will pass it to the state machine and trigger heartbeats.
-    fn step_clientrequest_query() -> Result<()> {
-        let (leader, node_rx) = setup()?;
-        let peers = leader.peers.clone();
-        let mut node: Node = leader.into();
-        node = node.step(Envelope {
-            from: 1,
-            to: 1,
-            term: 3,
-            message: Message::ClientRequest { id: vec![0x01], request: Request::Read(vec![0xaf]) },
-        })?;
-        assert_node(&mut node).is_leader().term(3).committed(2).last(5);
-        for to in peers.iter().copied().sorted() {
-            assert_eq!(
-                node_rx.try_recv()?,
-                Envelope {
-                    from: 1,
-                    to,
-                    term: 3,
-                    message: Message::Heartbeat { commit_index: 2, commit_term: 1, read_seq: 1 },
-                },
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    // Sending a mutate request should append it to log, replicate it to peers, and register notification.
-    fn step_clientrequest_mutate() -> Result<()> {
-        let (leader, node_rx) = setup()?;
-        let peers = leader.peers.clone();
-        let mut node: Node = leader.into();
-
-        node = node.step(Envelope {
-            from: 1,
-            to: 1,
-            term: 3,
-            message: Message::ClientRequest { id: vec![0x01], request: Request::Write(vec![0xaf]) },
-        })?;
-        assert_node(&mut node).is_leader().term(3).committed(2).last(6).entry(Entry {
-            index: 6,
-            term: 3,
-            command: Some(vec![0xaf]),
-        });
-
-        for peer in peers.iter().copied().sorted() {
-            assert_eq!(
-                node_rx.try_recv()?,
-                Envelope {
-                    from: 1,
-                    to: peer,
-                    term: 3,
-                    message: Message::Append {
-                        base_index: 5,
-                        base_term: 3,
-                        entries: vec![Entry { index: 6, term: 3, command: Some(vec![0xaf]) },]
-                    },
-                }
-            )
-        }
-        Ok(())
-    }
-
-    #[test]
-    // Sending a status request should pass it on to state machine, to add status.
-    fn step_clientrequest_status() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let mut node: Node = leader.into();
-
-        node = node.step(Envelope {
-            from: 1,
-            to: 1,
-            term: 3,
-            message: Message::ClientRequest { id: vec![0x01], request: Request::Status },
-        })?;
-        assert_node(&mut node).is_leader().term(3).committed(2).last(5);
-        assert_messages(
-            &mut node_rx,
-            vec![Envelope {
-                term: 3,
-                from: 1,
-                to: 1,
-                message: Message::ClientResponse {
-                    id: vec![1],
-                    response: Ok(Response::Status(Status {
-                        leader: 1,
-                        term: 3,
-                        last_index: BTreeMap::from([(1, 5), (2, 0), (3, 0), (4, 0), (5, 0)]),
-                        commit_index: 2,
-                        apply_index: 0,
-                        storage: storage::engine::Status {
-                            name: "memory".to_string(),
-                            keys: 7,
-                            size: 72,
-                            total_disk_size: 0,
-                            live_disk_size: 0,
-                            garbage_disk_size: 0,
-                        },
-                    })),
-                },
-            }],
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn tick() -> Result<()> {
-        let (leader, mut node_rx) = setup()?;
-        let peers = leader.peers.clone();
-        let mut node: Node = leader.into();
-        for _ in 0..5 {
-            for _ in 0..HEARTBEAT_INTERVAL {
-                assert_messages(&mut node_rx, vec![]);
-                node = node.tick()?;
-                assert_node(&mut node).is_leader().term(3).committed(2);
-            }
-
-            for to in peers.iter().copied().sorted() {
-                assert_eq!(
-                    node_rx.try_recv()?,
-                    Envelope {
-                        from: 1,
-                        to,
-                        term: 3,
-                        message: Message::Heartbeat {
-                            commit_index: 2,
-                            commit_term: 1,
-                            read_seq: 0
-                        },
-                    }
-                );
-            }
-        }
         Ok(())
     }
 }

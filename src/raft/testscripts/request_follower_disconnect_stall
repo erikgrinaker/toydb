@@ -1,0 +1,35 @@
+# Client read/write requests stall if the follower is disconnected from the
+# leader when the request is submitted. They are not retried, nor aborted.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Partition n3 away from the cluster.
+partition 3
+---
+n3 ⇹ n1 n2
+
+# Submit write and read requests to n3. They don't return a result.
+put 3 foo=bar
+get 3 foo
+stabilize
+---
+c3@1 → n3 ClientRequest id=0x01 write 0x0103666f6f03626172
+n3@1 ⇥ n1 C̶l̶i̶e̶n̶t̶R̶e̶q̶u̶e̶s̶t̶ ̶i̶d̶=̶0̶x̶0̶1̶ ̶w̶r̶i̶t̶e̶ ̶0̶x̶0̶1̶0̶3̶6̶6̶6̶f̶6̶f̶0̶3̶6̶2̶6̶1̶7̶2̶
+c3@1 → n3 ClientRequest id=0x02 read 0x0003666f6f
+n3@1 ⇥ n1 C̶l̶i̶e̶n̶t̶R̶e̶q̶u̶e̶s̶t̶ ̶i̶d̶=̶0̶x̶0̶2̶ ̶r̶e̶a̶d̶ ̶0̶x̶0̶0̶0̶3̶6̶6̶6̶f̶6̶f̶
+
+# Heal the partition and heartbeat. The requests still don't return a result.
+heal
+---
+n1 n2 n3 fully connected
+
+stabilize heartbeat=true
+---
+n1@1 → n2 Heartbeat commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat commit=1@1 read_seq=0
+n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n3@1 → n1 HeartbeatResponse last=1@1 read_seq=0

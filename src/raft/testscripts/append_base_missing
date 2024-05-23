@@ -1,0 +1,91 @@
+# Appends with a base beyond the node's last log entry work.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Partition n3 so that it does not receive writes.
+partition 3
+---
+n3 ⇹ n1 n2
+
+# Replicate a couple of writes.
+(put 1 a=1)
+(put 1 b=2)
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=3@1 commit=3@1 apply=3 progress={2:3→4 3:1→2}
+n2@1 follower(n1) last=3@1 commit=3@1 apply=3
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Elect n2 as a new leader.
+(campaign 2)
+(stabilize heartbeat=true)
+status
+---
+n1@2 follower(n2) last=4@2 commit=4@2 apply=4
+n2@2 leader last=4@2 commit=4@2 apply=4 progress={1:4→5 3:0→4}
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Heal the partition, and propose another write.
+heal
+put 2 c=3
+---
+n1 n2 n3 fully connected
+c2@2 → n2 ClientRequest id=0x03 write 0x0101630133
+n2@2 append 5@2 put c=3
+n2@2 → n1 Append base=4@2 [5@2]
+n2@2 → n3 Append base=3@1 [4@2 5@2]
+
+# The 3@1 base is beyond n3's last index 1@1, so the append is rejected.
+deliver 3
+---
+n3@1 follower(n1) ⇨ n3@2 follower(n2)
+n3@2 → n2 AppendResponse last=1@1 reject=true
+
+# n2 reduces the base by 1 and tries again, but this is also rejected.
+#
+# TODO: this should retry at 1@1 immediately, since the leader knows the
+# follower's last index. The progress also isn't updated.
+deliver 2
+status 2
+---
+n2@2 → n3 Append base=2@1 [3@1 4@2 5@2]
+n2@2 leader last=5@2 commit=4@2 apply=4 progress={1:4→5 3:0→3}
+
+deliver 3
+---
+n3@2 → n2 AppendResponse last=1@1 reject=true
+
+# Finally, n2 sends base 1 which succeeds.
+deliver 2
+status 2
+---
+n2@2 → n3 Append base=1@1 [2@1 3@1 4@2 5@2]
+n2@2 leader last=5@2 commit=4@2 apply=4 progress={1:4→5 3:0→2}
+
+deliver 3
+---
+n3@2 append 2@1 put a=1
+n3@2 append 3@1 put b=2
+n3@2 append 4@2 None
+n3@2 append 5@2 put c=3
+n3@2 → n2 AppendResponse last=5@2 reject=false
+
+# When n2 receives the ack, it commits and applies the write.
+deliver 2
+---
+n2@2 commit 5@2
+n2@2 apply 5@2 put c=3
+n2@2 → c2 ClientResponse id=0x03 write 0x0105
+c2@2 put c=3 ⇒ 5
+
+# The progress is also updated (finally).
+status
+---
+n1@2 follower(n2) last=4@2 commit=4@2 apply=4
+n2@2 leader last=5@2 commit=5@2 apply=5 progress={1:4→5 3:5→6}
+n3@2 follower(n2) last=5@2 commit=1@1 apply=1

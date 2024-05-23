@@ -1,0 +1,80 @@
+# No leader can be elected with an election tie.
+
+cluster nodes=3 election_timeout=2
+---
+n1@0 follower() last=0@0 commit=0@0 apply=0
+n2@0 follower() last=0@0 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
+
+# Tick all nodes twice to make them all campaign.
+tick
+tick
+---
+n1@0 follower() ⇨ n1@1 candidate
+n1@1 → n2 Campaign last=0@0
+n1@1 → n3 Campaign last=0@0
+n2@0 follower() ⇨ n2@1 candidate
+n2@1 → n1 Campaign last=0@0
+n2@1 → n3 Campaign last=0@0
+n3@0 follower() ⇨ n3@1 candidate
+n3@1 → n1 Campaign last=0@0
+n3@1 → n2 Campaign last=0@0
+
+# Stabilizing the cluster will not result in a leader.
+stabilize
+---
+n1@1 → n2 CampaignResponse vote=false
+n1@1 → n3 CampaignResponse vote=false
+n2@1 → n1 CampaignResponse vote=false
+n2@1 → n3 CampaignResponse vote=false
+n3@1 → n1 CampaignResponse vote=false
+n3@1 → n2 CampaignResponse vote=false
+
+status
+---
+n1@1 candidate last=0@0 commit=0@0 apply=0
+n2@1 candidate last=0@0 commit=0@0 apply=0
+n3@1 candidate last=0@0 commit=0@0 apply=0
+
+# A node can call another election in a new term and win.
+tick 2
+tick 2
+---
+n2@1 candidate ⇨ n2@2 candidate
+n2@2 → n1 Campaign last=0@0
+n2@2 → n3 Campaign last=0@0
+
+deliver
+---
+n1@1 candidate ⇨ n1@2 follower()
+n1@2 → n2 CampaignResponse vote=true
+n3@1 candidate ⇨ n3@2 follower()
+n3@2 → n2 CampaignResponse vote=true
+
+deliver
+---
+n2@2 candidate ⇨ n2@2 leader
+n2@2 append 1@2 None
+n2@2 → n1 Append base=0@0 [1@2]
+n2@2 → n3 Append base=0@0 [1@2]
+n2@2 → n1 Heartbeat commit=0@0 read_seq=0
+n2@2 → n3 Heartbeat commit=0@0 read_seq=0
+
+stabilize
+---
+n1@2 follower() ⇨ n1@2 follower(n2)
+n1@2 append 1@2 None
+n1@2 → n2 AppendResponse last=1@2 reject=false
+n1@2 → n2 HeartbeatResponse last=1@2 read_seq=0
+n3@2 follower() ⇨ n3@2 follower(n2)
+n3@2 append 1@2 None
+n3@2 → n2 AppendResponse last=1@2 reject=false
+n3@2 → n2 HeartbeatResponse last=1@2 read_seq=0
+n2@2 commit 1@2
+n2@2 apply 1@2 None
+
+status
+---
+n1@2 follower(n2) last=1@2 commit=0@0 apply=0
+n2@2 leader last=1@2 commit=1@2 apply=1 progress={1:1→2 3:1→2}
+n3@2 follower(n2) last=1@2 commit=0@0 apply=0

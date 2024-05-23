@@ -1,0 +1,55 @@
+# Client read/write requests are proxied by followers.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# An initial get on a follower yields None.
+get 2 foo
+stabilize
+---
+c2@1 → n2 ClientRequest id=0x01 read 0x0003666f6f
+n2@1 → n1 ClientRequest id=0x01 read 0x0003666f6f
+n1@1 → n2 Heartbeat commit=1@1 read_seq=1
+n1@1 → n3 Heartbeat commit=1@1 read_seq=1
+n2@1 → n1 HeartbeatResponse last=1@1 read_seq=1
+n3@1 → n1 HeartbeatResponse last=1@1 read_seq=1
+n1@1 → n2 ClientResponse id=0x01 read 0x0000
+n2@1 → c2 ClientResponse id=0x01 read 0x0000
+c2@1 get foo ⇒ None
+
+# Write a value on the follower.
+put 2 foo=bar
+stabilize
+(stabilize heartbeat=true)
+---
+c2@1 → n2 ClientRequest id=0x02 write 0x0103666f6f03626172
+n2@1 → n1 ClientRequest id=0x02 write 0x0103666f6f03626172
+n1@1 append 2@1 put foo=bar
+n1@1 → n2 Append base=1@1 [2@1]
+n1@1 → n3 Append base=1@1 [2@1]
+n2@1 append 2@1 put foo=bar
+n2@1 → n1 AppendResponse last=2@1 reject=false
+n3@1 append 2@1 put foo=bar
+n3@1 → n1 AppendResponse last=2@1 reject=false
+n1@1 commit 2@1
+n1@1 apply 2@1 put foo=bar
+n1@1 → n2 ClientResponse id=0x02 write 0x0102
+n2@1 → c2 ClientResponse id=0x02 write 0x0102
+c2@1 put foo=bar ⇒ 2
+
+# Read the value back on the follower.
+get 2 foo
+stabilize
+---
+c2@1 → n2 ClientRequest id=0x03 read 0x0003666f6f
+n2@1 → n1 ClientRequest id=0x03 read 0x0003666f6f
+n1@1 → n2 Heartbeat commit=2@1 read_seq=2
+n1@1 → n3 Heartbeat commit=2@1 read_seq=2
+n2@1 → n1 HeartbeatResponse last=2@1 read_seq=2
+n3@1 → n1 HeartbeatResponse last=2@1 read_seq=2
+n1@1 → n2 ClientResponse id=0x03 read 0x000103626172
+n2@1 → c2 ClientResponse id=0x03 read 0x000103626172
+c2@1 get foo ⇒ bar

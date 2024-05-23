@@ -1,0 +1,28 @@
+# Client read/write requests fail on candidates.
+
+cluster nodes=3
+---
+n1@0 follower() last=0@0 commit=0@0 apply=0
+n2@0 follower() last=0@0 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
+
+# n1 campaigns.
+campaign 1
+---
+n1@0 follower() ⇨ n1@1 candidate
+n1@1 → n2 Campaign last=0@0
+n1@1 → n3 Campaign last=0@0
+
+# A read request on n1 should be rejected.
+get 1 foo
+---
+c1@1 → n1 ClientRequest id=0x01 read 0x0003666f6f
+n1@1 → c1 ClientResponse id=0x01 Error::Abort
+c1@1 get foo ⇒ Error::Abort (Operation aborted)
+
+# A write request on n1 should be rejected.
+put 1 foo=bar
+---
+c1@1 → n1 ClientRequest id=0x02 write 0x0103666f6f03626172
+n1@1 → c1 ClientResponse id=0x02 Error::Abort
+c1@1 put foo=bar ⇒ Error::Abort (Operation aborted)

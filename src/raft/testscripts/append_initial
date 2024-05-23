@@ -1,0 +1,78 @@
+# An initial append at base 0 can have a single or multiple entries.
+
+cluster nodes=3
+---
+n1@0 follower() last=0@0 commit=0@0 apply=0
+n2@0 follower() last=0@0 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
+
+# Partition n3 so that is has an empty log.
+partition 3
+---
+n3 ⇹ n1 n2
+
+# n1 campaigns.
+campaign 1
+deliver
+---
+n1@0 follower() ⇨ n1@1 candidate
+n1@1 → n2 Campaign last=0@0
+n1@1 ⇥ n3 C̶a̶m̶p̶a̶i̶g̶n̶ ̶l̶a̶s̶t̶=̶0̶@̶0̶
+n2@0 follower() ⇨ n2@1 follower()
+n2@1 → n1 CampaignResponse vote=true
+
+# When n1 wins, it successfully appends an entry at base 0 to n2.
+stabilize
+---
+n1@1 candidate ⇨ n1@1 leader
+n1@1 append 1@1 None
+n1@1 → n2 Append base=0@0 [1@1]
+n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶0̶@̶0̶ ̶[̶1̶@̶1̶]̶
+n1@1 → n2 Heartbeat commit=0@0 read_seq=0
+n1@1 ⇥ n3 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶c̶o̶m̶m̶i̶t̶=̶0̶@̶0̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶0̶
+n2@1 follower() ⇨ n2@1 follower(n1)
+n2@1 append 1@1 None
+n2@1 → n1 AppendResponse last=1@1 reject=false
+n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n1@1 commit 1@1
+n1@1 apply 1@1 None
+
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:0→1}
+n2@1 follower(n1) last=1@1 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
+
+# Heal the partition.
+heal
+---
+n1 n2 n3 fully connected
+
+# Propose a write. This appends entry 2 to n2 at base 1, and entries 1-2 to n3 at base 0.
+put 1 foo=bar
+---
+c1@1 → n1 ClientRequest id=0x01 write 0x0103666f6f03626172
+n1@1 append 2@1 put foo=bar
+n1@1 → n2 Append base=1@1 [2@1]
+n1@1 → n3 Append base=0@0 [1@1 2@1]
+
+deliver
+---
+n2@1 append 2@1 put foo=bar
+n2@1 → n1 AppendResponse last=2@1 reject=false
+n3@0 follower() ⇨ n3@1 follower(n1)
+n3@1 append 1@1 None
+n3@1 append 2@1 put foo=bar
+n3@1 → n1 AppendResponse last=2@1 reject=false
+
+log
+---
+n1@1 last=2@1 commit=1@1
+n1@1 entry 1@1 None
+n1@1 entry 2@1 put foo=bar
+n2@1 last=2@1 commit=0@0
+n2@1 entry 1@1 None
+n2@1 entry 2@1 put foo=bar
+n3@1 last=2@1 commit=0@0
+n3@1 entry 1@1 None
+n3@1 entry 2@1 put foo=bar

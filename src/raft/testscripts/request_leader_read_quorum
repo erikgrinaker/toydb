@@ -1,0 +1,47 @@
+# Client read requests are only processed once a quorum confirms the read sequence.
+
+cluster nodes=5 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n4@1 follower(n1) last=1@1 commit=1@1 apply=1
+n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Write foo=bar.
+(put 1 foo=bar)
+(stabilize heartbeat=true)
+---
+ok
+
+# Read it once.
+(get 1 foo)
+(stabilize)
+---
+ok
+
+# Attempt to read it again. The read only returns once a quorum have
+# confirmed the read sequence.
+get 1 foo
+---
+c1@1 → n1 ClientRequest id=0x03 read 0x0003666f6f
+n1@1 → n2 Heartbeat commit=2@1 read_seq=2
+n1@1 → n3 Heartbeat commit=2@1 read_seq=2
+n1@1 → n4 Heartbeat commit=2@1 read_seq=2
+n1@1 → n5 Heartbeat commit=2@1 read_seq=2
+
+deliver 2
+deliver 1
+---
+n2@1 → n1 HeartbeatResponse last=2@1 read_seq=2
+
+deliver 3
+deliver 1
+---
+n3@1 → n1 HeartbeatResponse last=2@1 read_seq=2
+n1@1 → c1 ClientResponse id=0x03 read 0x000103626172
+c1@1 get foo ⇒ bar
+
+(stabilize)
+---
+ok

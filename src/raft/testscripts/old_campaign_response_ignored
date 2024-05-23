@@ -1,0 +1,100 @@
+# Old campaign responses (in the same term) are ignored by leaders and followers
+# once a leader is elected.
+
+cluster nodes=7
+---
+n1@0 follower() last=0@0 commit=0@0 apply=0
+n2@0 follower() last=0@0 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
+n4@0 follower() last=0@0 commit=0@0 apply=0
+n5@0 follower() last=0@0 commit=0@0 apply=0
+n6@0 follower() last=0@0 commit=0@0 apply=0
+n7@0 follower() last=0@0 commit=0@0 apply=0
+
+# n1 and n2 campaign.
+campaign 1 2
+---
+n1@0 follower() ⇨ n1@1 candidate
+n1@1 → n2 Campaign last=0@0
+n1@1 → n3 Campaign last=0@0
+n1@1 → n4 Campaign last=0@0
+n1@1 → n5 Campaign last=0@0
+n1@1 → n6 Campaign last=0@0
+n1@1 → n7 Campaign last=0@0
+n2@0 follower() ⇨ n2@1 candidate
+n2@1 → n1 Campaign last=0@0
+n2@1 → n3 Campaign last=0@0
+n2@1 → n4 Campaign last=0@0
+n2@1 → n5 Campaign last=0@0
+n2@1 → n6 Campaign last=0@0
+n2@1 → n7 Campaign last=0@0
+
+# n3-n6 vote for n1, n7 votes for n2.
+deliver 3 4 5 6 from=1
+deliver 7 from=2
+---
+n3@0 follower() ⇨ n3@1 follower()
+n3@1 → n1 CampaignResponse vote=true
+n4@0 follower() ⇨ n4@1 follower()
+n4@1 → n1 CampaignResponse vote=true
+n5@0 follower() ⇨ n5@1 follower()
+n5@1 → n1 CampaignResponse vote=true
+n6@0 follower() ⇨ n6@1 follower()
+n6@1 → n1 CampaignResponse vote=true
+n7@0 follower() ⇨ n7@1 follower()
+n7@1 → n2 CampaignResponse vote=true
+
+# n1 receives votes from n3-n5 and assumes leadership.
+deliver 1 from=3
+deliver 1 from=4
+deliver 1 from=5
+---
+n1@1 candidate ⇨ n1@1 leader
+n1@1 append 1@1 None
+n1@1 → n2 Append base=0@0 [1@1]
+n1@1 → n3 Append base=0@0 [1@1]
+n1@1 → n4 Append base=0@0 [1@1]
+n1@1 → n5 Append base=0@0 [1@1]
+n1@1 → n6 Append base=0@0 [1@1]
+n1@1 → n7 Append base=0@0 [1@1]
+n1@1 → n2 Heartbeat commit=0@0 read_seq=0
+n1@1 → n3 Heartbeat commit=0@0 read_seq=0
+n1@1 → n4 Heartbeat commit=0@0 read_seq=0
+n1@1 → n5 Heartbeat commit=0@0 read_seq=0
+n1@1 → n6 Heartbeat commit=0@0 read_seq=0
+n1@1 → n7 Heartbeat commit=0@0 read_seq=0
+
+# n2 receives n1's heartbeats and becomes follower.
+deliver 2 from=1
+---
+n2@1 → n1 CampaignResponse vote=false
+n2@1 candidate ⇨ n2@1 follower(n1)
+n2@1 append 1@1 None
+n2@1 → n1 AppendResponse last=1@1 reject=false
+n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+
+# n1 (leader) receives n6's vote and ignores it. n2 (follower) receives n7's
+# vote and ignores it. They remain leader and follower.
+deliver 1 from=6
+deliver 2 from=7
+status
+---
+n1@1 leader last=1@1 commit=0@0 apply=0 progress={2:0→1 3:0→1 4:0→1 5:0→1 6:0→1 7:0→1}
+n2@1 follower(n1) last=1@1 commit=0@0 apply=0
+n3@1 follower() last=0@0 commit=0@0 apply=0
+n4@1 follower() last=0@0 commit=0@0 apply=0
+n5@1 follower() last=0@0 commit=0@0 apply=0
+n6@1 follower() last=0@0 commit=0@0 apply=0
+n7@1 follower() last=0@0 commit=0@0 apply=0
+
+# Stabilizing the cluster results in everyone following n1.
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2 6:1→2 7:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n4@1 follower(n1) last=1@1 commit=1@1 apply=1
+n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+n6@1 follower(n1) last=1@1 commit=1@1 apply=1
+n7@1 follower(n1) last=1@1 commit=1@1 apply=1

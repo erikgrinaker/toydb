@@ -140,6 +140,8 @@ pub struct Status {
     pub term: Term,
     /// The last log indexes of all nodes. Use a BTreeMap for deterministic
     /// debug output.
+    ///
+    /// TODO: rename to match.
     pub last_index: BTreeMap<NodeID, Index>,
     /// The current commit index.
     pub commit_index: Index,

@@ -1,0 +1,39 @@
+# Ticking a follower will transition it to candidate if it hasn't
+# heard from the leader in a while.
+
+cluster nodes=3 leader=1 heartbeat_interval=1 election_timeout=2
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# A single follower tick does nothing.
+tick 2
+---
+ok
+
+# If n1 heartbeats, the election counter is reset, and another n2 tick does nothing.
+heartbeat 1
+stabilize
+---
+n1@1 → n2 Heartbeat commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat commit=1@1 read_seq=0
+n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n3@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+
+tick 2
+---
+ok
+
+# Ticking n2 again exceeds the election timeout, making it campaign.
+tick 2
+---
+n2@1 follower(n1) ⇨ n2@2 candidate
+n2@2 → n1 Campaign last=1@1
+n2@2 → n3 Campaign last=1@1
+
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@2 candidate last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1

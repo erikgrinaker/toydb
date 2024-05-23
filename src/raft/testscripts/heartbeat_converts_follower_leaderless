@@ -1,0 +1,45 @@
+# A heartbeat from a leader should convert a leaderless follower.
+
+cluster nodes=3
+---
+n1@0 follower() last=0@0 commit=0@0 apply=0
+n2@0 follower() last=0@0 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
+
+# Partition n3 away from the cluster.
+partition 3
+---
+n3 ⇹ n1 n2
+
+# Elect n1 as a new leader.
+(campaign 1)
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:0→1}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@0 follower() last=0@0 commit=0@0 apply=0
+
+# Heal the partition.
+heal
+---
+n1 n2 n3 fully connected
+
+# The next heartbeat from n1 converts n3 to a follower in term 1.
+heartbeat 1
+stabilize
+---
+n1@1 → n2 Heartbeat commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat commit=1@1 read_seq=0
+n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n3@0 follower() ⇨ n3@1 follower(n1)
+n3@1 → n1 HeartbeatResponse last=0@0 read_seq=0
+n1@1 → n3 Append base=0@0 [1@1]
+n3@1 append 1@1 None
+n3@1 → n1 AppendResponse last=1@1 reject=false
+
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=0@0 apply=0

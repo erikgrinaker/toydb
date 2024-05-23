@@ -1,0 +1,89 @@
+# A leader can be elected even when there are multiple candidates.
+
+cluster nodes=5 election_timeout=2
+---
+n1@0 follower() last=0@0 commit=0@0 apply=0
+n2@0 follower() last=0@0 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
+n4@0 follower() last=0@0 commit=0@0 apply=0
+n5@0 follower() last=0@0 commit=0@0 apply=0
+
+# n1 and n5 campaign.
+tick
+tick 1 5
+---
+n1@0 follower() ⇨ n1@1 candidate
+n1@1 → n2 Campaign last=0@0
+n1@1 → n3 Campaign last=0@0
+n1@1 → n4 Campaign last=0@0
+n1@1 → n5 Campaign last=0@0
+n5@0 follower() ⇨ n5@1 candidate
+n5@1 → n1 Campaign last=0@0
+n5@1 → n2 Campaign last=0@0
+n5@1 → n3 Campaign last=0@0
+n5@1 → n4 Campaign last=0@0
+
+# n1 and n5 ignore each other, since they're both campaigning.
+deliver 1 5
+---
+n1@1 → n5 CampaignResponse vote=false
+n5@1 → n1 CampaignResponse vote=false
+
+# n1 reaches n2,n3 first, but n5 reaches n4 first.
+deliver 2 3
+deliver 4 from=5
+deliver 4
+---
+n2@0 follower() ⇨ n2@1 follower()
+n2@1 → n1 CampaignResponse vote=true
+n2@1 → n5 CampaignResponse vote=false
+n3@0 follower() ⇨ n3@1 follower()
+n3@1 → n1 CampaignResponse vote=true
+n3@1 → n5 CampaignResponse vote=false
+n4@0 follower() ⇨ n4@1 follower()
+n4@1 → n5 CampaignResponse vote=true
+n4@1 → n1 CampaignResponse vote=false
+
+# n1 and n5 receive their votes. n1 has quorum and becomes leader.
+deliver
+---
+n1@1 candidate ⇨ n1@1 leader
+n1@1 append 1@1 None
+n1@1 → n2 Append base=0@0 [1@1]
+n1@1 → n3 Append base=0@0 [1@1]
+n1@1 → n4 Append base=0@0 [1@1]
+n1@1 → n5 Append base=0@0 [1@1]
+n1@1 → n2 Heartbeat commit=0@0 read_seq=0
+n1@1 → n3 Heartbeat commit=0@0 read_seq=0
+n1@1 → n4 Heartbeat commit=0@0 read_seq=0
+n1@1 → n5 Heartbeat commit=0@0 read_seq=0
+
+# All nodes accept n1 as leader in term 1 and become followers.
+stabilize
+---
+n2@1 follower() ⇨ n2@1 follower(n1)
+n2@1 append 1@1 None
+n2@1 → n1 AppendResponse last=1@1 reject=false
+n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n3@1 follower() ⇨ n3@1 follower(n1)
+n3@1 append 1@1 None
+n3@1 → n1 AppendResponse last=1@1 reject=false
+n3@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n4@1 follower() ⇨ n4@1 follower(n1)
+n4@1 append 1@1 None
+n4@1 → n1 AppendResponse last=1@1 reject=false
+n4@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n5@1 candidate ⇨ n5@1 follower(n1)
+n5@1 append 1@1 None
+n5@1 → n1 AppendResponse last=1@1 reject=false
+n5@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n1@1 commit 1@1
+n1@1 apply 1@1 None
+
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=0@0 apply=0
+n3@1 follower(n1) last=1@1 commit=0@0 apply=0
+n4@1 follower(n1) last=1@1 commit=0@0 apply=0
+n5@1 follower(n1) last=1@1 commit=0@0 apply=0
