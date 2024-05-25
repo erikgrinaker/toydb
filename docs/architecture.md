@@ -235,9 +235,9 @@ The Raft consensus protocol is explained well in the
 [original Raft paper](https://raft.github.io/raft.pdf), and will not be repeated here - refer to
 it for details. toyDB's implementation follows the paper fairly closely.
 
-The Raft node [`raft::Node`](https://github.com/erikgrinaker/toydb/tree/master/src/raft/node) is
+The Raft node [`raft::Node`](https://github.com/erikgrinaker/toydb/tree/master/src/raft/node.rs) is
 the core of the implementation, a finite state machine with enum variants for the node roles:
-leader, follower, and candidate. This enum wraps the `RoleNode` struct, which contains common
+leader, follower, and candidate. This enum wraps the `RawNode` struct, which contains common
 node functionality and is generic over the specific roles `Leader`, `Follower`, and `Candidate`
 that implement the Raft protocol.
 

@@ -1,17 +1,12 @@
-mod candidate;
-mod follower;
-mod leader;
-
-use super::{Envelope, Index, Log, Message, State};
+use super::{
+    Envelope, Index, Log, Message, ReadSequence, Request, RequestID, Response, State, Status,
+};
 use crate::error::{Error, Result};
-use candidate::Candidate;
-use follower::Follower;
-use leader::Leader;
 
 use itertools::Itertools as _;
-use log::debug;
+use log::{debug, info};
 use rand::Rng as _;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// A node ID.
 pub type NodeID = u8;
@@ -241,6 +236,857 @@ impl<R: Role> RawNode<R> {
             "Unknown sender {}",
             msg.from
         );
+    }
+}
+
+/// A candidate is campaigning to become a leader.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Candidate {
+    /// Votes received (including ourself).
+    votes: HashSet<NodeID>,
+    /// Ticks elapsed since election start.
+    election_duration: Ticks,
+    /// Election timeout, in ticks.
+    election_timeout: Ticks,
+}
+
+impl Candidate {
+    /// Creates a new candidate role.
+    fn new(election_timeout: Ticks) -> Self {
+        Self { votes: HashSet::new(), election_duration: 0, election_timeout }
+    }
+}
+
+impl Role for Candidate {}
+
+impl RawNode<Candidate> {
+    /// Asserts internal invariants.
+    fn assert(&mut self) -> Result<()> {
+        self.assert_node()?;
+
+        assert_ne!(self.term, 0, "Candidates can't have term 0");
+        assert!(self.role.votes.contains(&self.id), "Candidate did not vote for self");
+        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+
+        assert!(
+            self.role.election_duration < self.role.election_timeout,
+            "Election timeout passed"
+        );
+
+        Ok(())
+    }
+
+    /// Transitions the candidate to a follower. We either lost the election and
+    /// follow the winner, or we discovered a new term in which case we step
+    /// into it as a leaderless follower.
+    fn into_follower(mut self, term: Term, leader: Option<NodeID>) -> Result<RawNode<Follower>> {
+        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+
+        let election_timeout = self.gen_election_timeout();
+        if let Some(leader) = leader {
+            // We lost the election, follow the winner.
+            assert_eq!(term, self.term, "Can't follow leader in different term");
+            info!("Lost election, following leader {} in term {}", leader, term);
+            let voted_for = Some(self.id); // by definition
+            Ok(self.into_role(Follower::new(Some(leader), voted_for, election_timeout)))
+        } else {
+            // We found a new term, but we don't necessarily know who the leader
+            // is yet. We'll find out when we step a message from it.
+            assert_ne!(term, self.term, "Can't become leaderless follower in current term");
+            info!("Discovered new term {}", term);
+            self.term = term;
+            self.log.set_term(term, None)?;
+            Ok(self.into_role(Follower::new(None, None, election_timeout)))
+        }
+    }
+
+    /// Transitions the candidate to a leader. We won the election.
+    fn into_leader(self) -> Result<RawNode<Leader>> {
+        info!("Won election for term {}, becoming leader", self.term);
+        let peers = self.peers.clone();
+        let (last_index, _) = self.log.get_last_index();
+        let mut node = self.into_role(Leader::new(peers, last_index));
+
+        // Propose an empty command when assuming leadership, to disambiguate
+        // previous entries in the log. See section 8 in the Raft paper.
+        //
+        // We do this prior to the heartbeat, to avoid a wasted replication
+        // roundtrip if the heartbeat response indicates the peer is behind.
+        node.propose(None)?;
+        node.heartbeat()?;
+
+        Ok(node)
+    }
+
+    /// Processes a message.
+    fn step(mut self, msg: Envelope) -> Result<Node> {
+        self.assert()?;
+        self.assert_step(&msg);
+
+        // Drop messages from past terms.
+        if msg.term < self.term {
+            debug!("Dropping message from past term ({:?})", msg);
+            return Ok(self.into());
+        }
+
+        // If we receive a message for a future term, become a leaderless
+        // follower in it and step the message. If the message is a Heartbeat or
+        // AppendEntries from the leader, stepping it will follow the leader.
+        if msg.term > self.term {
+            return self.into_follower(msg.term, None)?.step(msg);
+        }
+
+        match msg.message {
+            // Don't grant votes for other candidates who also campaign.
+            Message::Campaign { .. } => {
+                self.send(msg.from, Message::CampaignResponse { vote: false })?
+            }
+
+            // If we received a vote, record it. If the vote gives us quorum,
+            // assume leadership.
+            Message::CampaignResponse { vote: true } => {
+                self.role.votes.insert(msg.from);
+                if self.role.votes.len() as u8 >= self.quorum_size() {
+                    return Ok(self.into_leader()?.into());
+                }
+            }
+
+            // We didn't get a vote. :(
+            Message::CampaignResponse { vote: false } => {}
+
+            // If we receive a heartbeat or entries in this term, we lost the
+            // election and have a new leader. Follow it and step the message.
+            Message::Heartbeat { .. } | Message::Append { .. } => {
+                return self.into_follower(msg.term, Some(msg.from))?.step(msg);
+            }
+
+            // Abort any inbound client requests while candidate.
+            Message::ClientRequest { id, .. } => {
+                self.send(msg.from, Message::ClientResponse { id, response: Err(Error::Abort) })?;
+            }
+
+            // We're not a leader in this term, nor are we forwarding requests,
+            // so we shouldn't see these.
+            Message::HeartbeatResponse { .. }
+            | Message::AppendResponse { .. }
+            | Message::ClientResponse { .. } => panic!("Received unexpected message {:?}", msg),
+        }
+        Ok(self.into())
+    }
+
+    /// Processes a logical clock tick.
+    fn tick(mut self) -> Result<Node> {
+        self.assert()?;
+
+        self.role.election_duration += 1;
+        if self.role.election_duration >= self.role.election_timeout {
+            self.campaign()?;
+        }
+        Ok(self.into())
+    }
+
+    /// Campaign for leadership by increasing the term, voting for ourself, and
+    /// soliciting votes from all peers.
+    fn campaign(&mut self) -> Result<()> {
+        let term = self.term + 1;
+        info!("Starting new election for term {}", term);
+        self.role = Candidate::new(self.gen_election_timeout());
+        self.role.votes.insert(self.id); // vote for ourself
+        self.term = term;
+        self.log.set_term(term, Some(self.id))?;
+
+        let (last_index, last_term) = self.log.get_last_index();
+        self.broadcast(Message::Campaign { last_index, last_term })?;
+        Ok(())
+    }
+}
+
+// A follower replicates state from a leader.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Follower {
+    /// The leader, or None if just initialized.
+    leader: Option<NodeID>,
+    /// The number of ticks since the last message from the leader.
+    leader_seen: Ticks,
+    /// The leader_seen timeout before triggering an election.
+    election_timeout: Ticks,
+    /// The node we voted for in the current term, if any.
+    voted_for: Option<NodeID>,
+    // Local client requests that have been forwarded to the leader. These are
+    // aborted on leader/term changes.
+    forwarded: HashSet<RequestID>,
+}
+
+impl Follower {
+    /// Creates a new follower role.
+    fn new(leader: Option<NodeID>, voted_for: Option<NodeID>, election_timeout: Ticks) -> Self {
+        Self { leader, voted_for, leader_seen: 0, election_timeout, forwarded: HashSet::new() }
+    }
+}
+
+impl Role for Follower {}
+
+impl RawNode<Follower> {
+    /// Creates a new node as a leaderless follower.
+    fn new(
+        id: NodeID,
+        peers: HashSet<NodeID>,
+        mut log: Log,
+        state: Box<dyn State>,
+        node_tx: crossbeam::channel::Sender<Envelope>,
+        heartbeat_interval: Ticks,
+        election_timeout_range: std::ops::Range<Ticks>,
+    ) -> Result<Self> {
+        let (term, voted_for) = log.get_term()?;
+        let role = Follower::new(None, voted_for, 0);
+        let mut node = Self {
+            id,
+            peers,
+            term,
+            log,
+            state,
+            node_tx,
+            heartbeat_interval,
+            election_timeout_range,
+            role,
+        };
+        node.role.election_timeout = node.gen_election_timeout();
+        Ok(node)
+    }
+
+    /// Asserts internal invariants.
+    fn assert(&mut self) -> Result<()> {
+        self.assert_node()?;
+
+        if let Some(leader) = self.role.leader {
+            assert_ne!(leader, self.id, "Can't follow self");
+            assert!(self.peers.contains(&leader), "Leader not in peers");
+            assert_ne!(self.term, 0, "Followers with leaders can't have term 0");
+        } else {
+            assert!(self.role.forwarded.is_empty(), "Leaderless follower has forwarded requests");
+        }
+
+        // NB: We allow voted_for not in peers, since this can happen when
+        // removing nodes from the cluster via a cold restart. We also allow
+        // voted_for self, which can happen if we lose an election.
+
+        debug_assert_eq!(self.role.voted_for, self.log.get_term()?.1, "Vote does not match log");
+        assert!(self.role.leader_seen < self.role.election_timeout, "Election timeout passed");
+
+        Ok(())
+    }
+
+    /// Transitions the follower into a candidate, by campaigning for
+    /// leadership in a new term.
+    fn into_candidate(mut self) -> Result<RawNode<Candidate>> {
+        // Abort any forwarded requests. These must be retried with new leader.
+        self.abort_forwarded()?;
+
+        // Apply any pending log entries, so that we're caught up if we win.
+        self.maybe_apply()?;
+
+        let election_timeout = self.gen_election_timeout();
+        let mut node = self.into_role(Candidate::new(election_timeout));
+        node.campaign()?;
+        Ok(node)
+    }
+
+    /// Transitions the candidate into a follower, either a leaderless follower
+    /// in a new term (e.g. if someone holds a new election) or following a
+    /// leader in the current term once someone wins the election.
+    fn into_follower(mut self, leader: Option<NodeID>, term: Term) -> Result<RawNode<Follower>> {
+        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+
+        // Abort any forwarded requests. These must be retried with new leader.
+        self.abort_forwarded()?;
+
+        if let Some(leader) = leader {
+            // We found a leader in the current term.
+            assert_eq!(self.role.leader, None, "Already have leader in term");
+            assert_eq!(term, self.term, "Can't follow leader in different term");
+            info!("Following leader {} in term {}", leader, term);
+            self.role =
+                Follower::new(Some(leader), self.role.voted_for, self.role.election_timeout);
+        } else {
+            // We found a new term, but we don't necessarily know who the leader
+            // is yet. We'll find out when we step a message from it.
+            assert_ne!(term, self.term, "Can't become leaderless follower in current term");
+            info!("Discovered new term {}", term);
+            self.term = term;
+            self.log.set_term(term, None)?;
+            self.role = Follower::new(None, None, self.gen_election_timeout());
+        }
+        Ok(self)
+    }
+
+    /// Processes a message.
+    fn step(mut self, msg: Envelope) -> Result<Node> {
+        self.assert()?;
+        self.assert_step(&msg);
+
+        // Drop messages from past terms.
+        if msg.term < self.term {
+            debug!("Dropping message from past term ({:?})", msg);
+            return Ok(self.into());
+        }
+
+        // If we receive a message for a future term, become a leaderless
+        // follower in it and step the message. If the message is a Heartbeat or
+        // AppendEntries from the leader, stepping it will follow the leader.
+        if msg.term > self.term {
+            return self.into_follower(None, msg.term)?.step(msg);
+        }
+
+        // Record when we last saw a message from the leader (if any).
+        if self.is_leader(msg.from) {
+            self.role.leader_seen = 0
+        }
+
+        match msg.message {
+            // The leader will send periodic heartbeats. If we don't have a
+            // leader in this term yet, follow it. If the commit_index advances,
+            // apply state transitions.
+            Message::Heartbeat { commit_index, commit_term, read_seq } => {
+                // Check that the heartbeat is from our leader.
+                match self.role.leader {
+                    Some(leader) => assert_eq!(msg.from, leader, "multiple leaders in term"),
+                    None => self = self.into_follower(Some(msg.from), msg.term)?,
+                }
+
+                // Respond to the heartbeat.
+                let (last_index, last_term) = self.log.get_last_index();
+                self.send(
+                    msg.from,
+                    Message::HeartbeatResponse { last_index, last_term, read_seq },
+                )?;
+
+                // Advance commit index and apply entries.
+                if self.log.has(commit_index, commit_term)?
+                    && commit_index > self.log.get_commit_index().0
+                {
+                    self.log.commit(commit_index)?;
+                    self.maybe_apply()?;
+                }
+            }
+
+            // Replicate entries from the leader. If we don't have a leader in
+            // this term yet, follow it.
+            Message::Append { base_index, base_term, entries } => {
+                // Check that the entries are from our leader.
+                let from = msg.from;
+                match self.role.leader {
+                    Some(leader) => assert_eq!(from, leader, "multiple leaders in term"),
+                    None => self = self.into_follower(Some(from), msg.term)?,
+                }
+
+                // Append the entries, if possible.
+                let reject = base_index > 0 && !self.log.has(base_index, base_term)?;
+                if !reject {
+                    self.log.splice(entries)?;
+                }
+                let (last_index, last_term) = self.log.get_last_index();
+                self.send(msg.from, Message::AppendResponse { reject, last_index, last_term })?;
+            }
+
+            // A candidate in this term is requesting our vote.
+            Message::Campaign { last_index, last_term } => {
+                // Don't vote if we already voted for someone else in this term.
+                if let Some(voted_for) = self.role.voted_for {
+                    if msg.from != voted_for {
+                        self.send(msg.from, Message::CampaignResponse { vote: false })?;
+                        return Ok(self.into());
+                    }
+                }
+
+                // Don't vote if our log is newer than the candidate's log.
+                let (log_index, log_term) = self.log.get_last_index();
+                if log_term > last_term || log_term == last_term && log_index > last_index {
+                    self.send(msg.from, Message::CampaignResponse { vote: false })?;
+                    return Ok(self.into());
+                }
+
+                // Grant the vote.
+                info!("Voting for {} in term {} election", msg.from, self.term);
+                self.send(msg.from, Message::CampaignResponse { vote: true })?;
+                self.log.set_term(self.term, Some(msg.from))?;
+                self.role.voted_for = Some(msg.from);
+            }
+
+            // We may receive a vote after we lost an election and followed a
+            // different leader. Ignore it.
+            Message::CampaignResponse { .. } => {}
+
+            // Forward client requests to the leader, or abort them if there is
+            // none (the client must retry).
+            Message::ClientRequest { ref id, .. } => {
+                assert_eq!(msg.from, self.id, "Client request from other node");
+
+                let id = id.clone();
+                if let Some(leader) = self.role.leader {
+                    debug!("Forwarding request to leader {}: {:?}", leader, msg);
+                    self.role.forwarded.insert(id);
+                    self.send(leader, msg.message)?
+                } else {
+                    self.send(
+                        msg.from,
+                        Message::ClientResponse { id, response: Err(Error::Abort) },
+                    )?
+                }
+            }
+
+            // Returns client responses for forwarded requests.
+            Message::ClientResponse { id, response } => {
+                assert!(self.is_leader(msg.from), "Client response from non-leader");
+
+                if self.role.forwarded.remove(&id) {
+                    self.send(self.id, Message::ClientResponse { id, response })?;
+                }
+            }
+
+            // We're not a leader nor candidate in this term, so we shoudn't see these.
+            Message::HeartbeatResponse { .. } | Message::AppendResponse { .. } => {
+                panic!("Received unexpected message {msg:?}")
+            }
+        };
+        Ok(self.into())
+    }
+
+    /// Processes a logical clock tick.
+    fn tick(mut self) -> Result<Node> {
+        self.assert()?;
+
+        self.role.leader_seen += 1;
+        if self.role.leader_seen >= self.role.election_timeout {
+            return Ok(self.into_candidate()?.into());
+        }
+        Ok(self.into())
+    }
+
+    /// Aborts all forwarded requests.
+    fn abort_forwarded(&mut self) -> Result<()> {
+        // Sort the IDs for test determinism.
+        for id in std::mem::take(&mut self.role.forwarded).into_iter().sorted() {
+            debug!("Aborting forwarded request {:x?}", id);
+            self.send(self.id, Message::ClientResponse { id, response: Err(Error::Abort) })?;
+        }
+        Ok(())
+    }
+
+    /// Checks if an address is the current leader.
+    fn is_leader(&self, from: NodeID) -> bool {
+        self.role.leader == Some(from)
+    }
+}
+
+/// Peer replication progress.
+#[derive(Clone, Debug, PartialEq)]
+struct Progress {
+    /// The next index to replicate to the peer.
+    next: Index,
+    /// The last index known to be replicated to the peer.
+    ///
+    /// TODO: rename to match. It needs to track the position where the
+    /// follower's log matches the leader's, not its last position.
+    last: Index,
+    /// The last read sequence number confirmed by the peer.
+    read_seq: ReadSequence,
+}
+
+/// A pending client write request.
+#[derive(Clone, Debug, PartialEq)]
+struct Write {
+    /// The node which submitted the write.
+    from: NodeID,
+    /// The write request ID.
+    id: RequestID,
+}
+
+/// A pending client read request.
+#[derive(Clone, Debug, PartialEq)]
+struct Read {
+    /// The sequence number of this read.
+    seq: ReadSequence,
+    /// The node which submitted the read.
+    from: NodeID,
+    /// The read request ID.
+    id: RequestID,
+    /// The read command.
+    command: Vec<u8>,
+}
+
+// A leader serves requests and replicates the log to followers.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Leader {
+    /// Peer replication progress.
+    progress: HashMap<NodeID, Progress>,
+    /// Keeps track of pending write requests, keyed by log index. These are
+    /// added when the write is proposed and appended to the leader's log, and
+    /// removed when the command is applied to the state machine, sending the
+    /// command result to the waiting client.
+    ///
+    /// If the leader loses leadership, all pending write requests are aborted
+    /// by returning Error::Abort.
+    writes: HashMap<Index, Write>,
+    /// Keeps track of pending read requests. To guarantee linearizability, read
+    /// requests are assigned a sequence number and registered here when
+    /// received, but only executed once a quorum of nodes have confirmed the
+    /// current leader by responding to heartbeats with the sequence number.
+    ///
+    /// If we lose leadership before the command is processed, all pending read
+    /// requests are aborted by returning Error::Abort.
+    reads: VecDeque<Read>,
+    /// The read sequence number used for the last read. Incremented for every
+    /// read command, and reset when we lose leadership (thus only valid for
+    /// this term).
+    read_seq: ReadSequence,
+    /// Number of ticks since last periodic heartbeat.
+    since_heartbeat: Ticks,
+}
+
+impl Leader {
+    /// Creates a new leader role.
+    fn new(peers: HashSet<NodeID>, last_index: Index) -> Self {
+        let next = last_index + 1;
+        let progress =
+            peers.into_iter().map(|p| (p, Progress { next, last: 0, read_seq: 0 })).collect();
+        Self {
+            progress,
+            writes: HashMap::new(),
+            reads: VecDeque::new(),
+            read_seq: 0,
+            since_heartbeat: 0,
+        }
+    }
+}
+
+impl Role for Leader {}
+
+impl RawNode<Leader> {
+    /// Asserts internal invariants.
+    fn assert(&mut self) -> Result<()> {
+        self.assert_node()?;
+
+        assert_ne!(self.term, 0, "Leaders can't have term 0");
+        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+
+        Ok(())
+    }
+
+    /// Transitions the leader into a follower. This can only happen if we
+    /// discover a new term, so we become a leaderless follower. Subsequently
+    /// stepping the received message may discover the leader, if there is one.
+    fn into_follower(mut self, term: Term) -> Result<RawNode<Follower>> {
+        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+        assert!(term > self.term, "Can only become follower in later term");
+
+        info!("Discovered new term {}", term);
+
+        // Cancel in-flight requests.
+        for write in
+            std::mem::take(&mut self.role.writes).into_values().sorted_by_key(|w| w.id.clone())
+        {
+            self.send(
+                write.from,
+                Message::ClientResponse { id: write.id, response: Err(Error::Abort) },
+            )?;
+        }
+        for read in std::mem::take(&mut self.role.reads).into_iter().sorted_by_key(|r| r.id.clone())
+        {
+            self.send(
+                read.from,
+                Message::ClientResponse { id: read.id, response: Err(Error::Abort) },
+            )?;
+        }
+
+        self.term = term;
+        self.log.set_term(term, None)?;
+        let election_timeout = self.gen_election_timeout();
+        Ok(self.into_role(Follower::new(None, None, election_timeout)))
+    }
+
+    /// Processes a message.
+    fn step(mut self, msg: Envelope) -> Result<Node> {
+        self.assert()?;
+        self.assert_step(&msg);
+
+        // Drop messages from past terms.
+        if msg.term < self.term {
+            debug!("Dropping message from past term ({:?})", msg);
+            return Ok(self.into());
+        }
+
+        // If we receive a message for a future term, become a leaderless
+        // follower in it and step the message. If the message is a Heartbeat or
+        // AppendEntries from the leader, stepping it will follow the leader.
+        if msg.term > self.term {
+            return self.into_follower(msg.term)?.step(msg);
+        }
+
+        match msg.message {
+            // There can't be two leaders in the same term.
+            Message::Heartbeat { .. } | Message::Append { .. } => {
+                panic!("saw other leader {} in term {}", msg.from, msg.term);
+            }
+
+            // A follower received one of our heartbeats and confirms that we
+            // are its leader. If its log is incomplete, append entries. If the
+            // peer's read sequence number increased, process any pending reads.
+            //
+            // TODO: this needs to commit and apply entries following a leader
+            // change too, otherwise we can serve stale reads if the new leader
+            // hadn't fully committed and applied entries yet.
+            Message::HeartbeatResponse { last_index, last_term, read_seq } => {
+                assert!(read_seq <= self.role.read_seq, "Future read sequence number");
+
+                let progress = self.role.progress.get_mut(&msg.from).unwrap();
+                if read_seq > progress.read_seq {
+                    progress.read_seq = read_seq;
+                    self.maybe_read()?;
+                }
+
+                if last_index < self.log.get_last_index().0
+                    || !self.log.has(last_index, last_term)?
+                {
+                    self.send_log(msg.from)?;
+                }
+            }
+
+            // A follower appended log entries we sent it. Record its progress
+            // and attempt to commit new entries.
+            Message::AppendResponse { reject: false, last_index, last_term } => {
+                assert!(
+                    last_index <= self.log.get_last_index().0,
+                    "follower accepted entries after last index"
+                );
+                assert!(
+                    last_term <= self.log.get_last_index().1,
+                    "follower accepted entries after last term"
+                );
+
+                let progress = self.role.progress.get_mut(&msg.from).unwrap();
+                if last_index > progress.last {
+                    progress.last = last_index;
+                    progress.next = last_index + 1;
+                    self.maybe_commit_and_apply()?;
+                }
+            }
+
+            // A follower rejected log entries we sent it, typically because it
+            // does not have the base index in its log. Try to replicate from
+            // the previous entry.
+            //
+            // This linear probing, as described in the Raft paper, can be very
+            // slow with long divergent logs, but we keep it simple.
+            //
+            // TODO: make use of last_index and last_term here.
+            Message::AppendResponse { reject: true, last_index: _, last_term: _ } => {
+                self.role.progress.entry(msg.from).and_modify(|p| {
+                    if p.next > 1 {
+                        p.next -= 1
+                    }
+                });
+                self.send_log(msg.from)?;
+            }
+
+            // A client submitted a read command. To ensure linearizability, we
+            // must confirm that we are still the leader by sending a heartbeat
+            // with the read's sequence number and wait for confirmation from a
+            // quorum before executing the read.
+            Message::ClientRequest { id, request: Request::Read(command) } => {
+                self.role.read_seq += 1;
+                self.role.reads.push_back(Read {
+                    seq: self.role.read_seq,
+                    from: msg.from,
+                    id,
+                    command,
+                });
+                if self.peers.is_empty() {
+                    self.maybe_read()?;
+                }
+                self.heartbeat()?;
+            }
+
+            // A client submitted a write command. Propose it, and track it
+            // until it's applied and the response is returned to the client.
+            Message::ClientRequest { id, request: Request::Write(command) } => {
+                let index = self.propose(Some(command))?;
+                self.role.writes.insert(index, Write { from: msg.from, id: id.clone() });
+                if self.peers.is_empty() {
+                    self.maybe_commit_and_apply()?;
+                }
+            }
+
+            Message::ClientRequest { id, request: Request::Status } => {
+                let status = Status {
+                    leader: self.id,
+                    term: self.term,
+                    last_index: self
+                        .role
+                        .progress
+                        .iter()
+                        .map(|(id, p)| (*id, p.last))
+                        .chain(std::iter::once((self.id, self.log.get_last_index().0)))
+                        .sorted()
+                        .collect(),
+                    commit_index: self.log.get_commit_index().0,
+                    apply_index: self.state.get_applied_index(),
+                    storage: self.log.status()?,
+                };
+                self.send(
+                    msg.from,
+                    Message::ClientResponse { id, response: Ok(Response::Status(status)) },
+                )?;
+            }
+
+            // Don't grant other votes in this term.
+            Message::Campaign { .. } => {
+                self.send(msg.from, Message::CampaignResponse { vote: false })?
+            }
+
+            // Votes can come in after we won the election, ignore them.
+            Message::CampaignResponse { .. } => {}
+
+            // Leaders never proxy client requests, so we don't expect to see
+            // responses from other nodes.
+            Message::ClientResponse { .. } => panic!("Unexpected message {:?}", msg),
+        }
+
+        Ok(self.into())
+    }
+
+    /// Processes a logical clock tick.
+    fn tick(mut self) -> Result<Node> {
+        self.assert()?;
+
+        self.role.since_heartbeat += 1;
+        if self.role.since_heartbeat >= self.heartbeat_interval {
+            self.heartbeat()?;
+            self.role.since_heartbeat = 0;
+        }
+        Ok(self.into())
+    }
+
+    /// Broadcasts a heartbeat to all peers.
+    fn heartbeat(&mut self) -> Result<()> {
+        let (commit_index, commit_term) = self.log.get_commit_index();
+        let read_seq = self.role.read_seq;
+        self.broadcast(Message::Heartbeat { commit_index, commit_term, read_seq })?;
+        // NB: We don't reset self.since_heartbeat here, because we want to send
+        // periodic heartbeats regardless of any on-demand heartbeats.
+        Ok(())
+    }
+
+    /// Proposes a command for consensus by appending it to our log and
+    /// replicating it to peers. If successful, it will eventually be committed
+    /// and applied to the state machine.
+    fn propose(&mut self, command: Option<Vec<u8>>) -> Result<Index> {
+        let index = self.log.append(self.term, command)?;
+        for peer in self.peers.iter().copied().sorted() {
+            self.send_log(peer)?;
+        }
+        Ok(index)
+    }
+
+    /// Commits any new log entries that have been replicated to a quorum, and
+    /// applies them to the state machine.
+    fn maybe_commit_and_apply(&mut self) -> Result<Index> {
+        // Determine the new commit index.
+        let quorum_index = self.quorum_value(
+            self.role
+                .progress
+                .values()
+                .map(|p| p.last)
+                .chain(std::iter::once(self.log.get_last_index().0))
+                .collect(),
+        );
+
+        // If the commit index doesn't advance, do nothing. We don't assert on
+        // this, since the quorum value may regress e.g. following a restart or
+        // leader change where followers are initialized with log index 0.
+        let mut commit_index = self.log.get_commit_index().0;
+        if quorum_index <= commit_index {
+            return Ok(commit_index);
+        }
+
+        // We can only safely commit an entry from our own term (see figure 8 in
+        // Raft paper).
+        commit_index = match self.log.get(quorum_index)? {
+            Some(entry) if entry.term == self.term => quorum_index,
+            Some(_) => return Ok(commit_index),
+            None => panic!("Commit index {} missing", quorum_index),
+        };
+
+        // Commit the new entries.
+        self.log.commit(commit_index)?;
+
+        // Apply entries and respond to client writers.
+        Self::maybe_apply_with(&mut self.log, &mut self.state, |index, result| -> Result<()> {
+            if let Some(write) = self.role.writes.remove(&index) {
+                // TODO: use self.send() or something.
+                self.node_tx.send(Envelope {
+                    from: self.id,
+                    to: write.from,
+                    term: self.term,
+                    message: Message::ClientResponse {
+                        id: write.id,
+                        response: result.map(Response::Write),
+                    },
+                })?;
+            }
+            Ok(())
+        })?;
+
+        Ok(commit_index)
+    }
+
+    /// Executes any pending read requests that are now ready after quorum
+    /// confirmation of their sequence number.
+    fn maybe_read(&mut self) -> Result<()> {
+        if self.role.reads.is_empty() {
+            return Ok(());
+        }
+
+        // Determine the maximum read sequence confirmed by quorum.
+        let read_seq = self.quorum_value(
+            self.role
+                .progress
+                .values()
+                .map(|p| p.read_seq)
+                .chain(std::iter::once(self.role.read_seq))
+                .collect(),
+        );
+
+        // Execute the ready reads.
+        while let Some(read) = self.role.reads.front() {
+            if read.seq > read_seq {
+                break;
+            }
+            let read = self.role.reads.pop_front().unwrap();
+            let result = self.state.read(read.command);
+            self.send(
+                read.from,
+                Message::ClientResponse { id: read.id, response: result.map(Response::Read) },
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Sends pending log entries to a peer.
+    fn send_log(&mut self, peer: NodeID) -> Result<()> {
+        let (base_index, base_term) = match self.role.progress.get(&peer) {
+            Some(Progress { next, .. }) if *next > 1 => match self.log.get(next - 1)? {
+                Some(entry) => (entry.index, entry.term),
+                None => panic!("missing base entry {}", next - 1),
+            },
+            Some(_) => (0, 0),
+            None => panic!("unknown peer {}", peer),
+        };
+
+        let entries = self.log.scan((base_index + 1)..)?.collect::<Result<Vec<_>>>()?;
+        debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
+        self.send(peer, Message::Append { base_index, base_term, entries })?;
+        Ok(())
     }
 }
 
