@@ -1135,8 +1135,8 @@ mod tests {
         assert_eq!(super::quorum_value(vec![1, 1, 2, 2, 2]), 2);
     }
 
-    // Run goldenscript tests in src/raft/testscripts/.
-    test_each_path! { in "src/raft/testscripts" as scripts => test_goldenscript }
+    // Run goldenscript tests in src/raft/testscripts/node.
+    test_each_path! { in "src/raft/testscripts/node" as scripts => test_goldenscript }
 
     fn test_goldenscript(path: &std::path::Path) {
         goldenscript::run(&mut TestRunner::new(), path).expect("goldenscript failed")
