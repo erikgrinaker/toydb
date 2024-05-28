@@ -1,0 +1,161 @@
+# Splicing at index 0 should fail.
+!splice 0@1=foo
+---
+Error: Spliced entries must begin before last index
+
+# Splicing at index 2 should fail (not contiguous).
+!splice 2@1=foo
+---
+Error: Spliced entries must begin before last index
+
+# Splicing entries at start should work, both with and without
+# commands, and starting at a term after 1. It should also update
+# the state.
+# TODO: test that this flushes.
+splice 1@2= 2@2=command
+status
+scan
+---
+splice → 2@2 command
+last=2@2 commit=0@0
+1@2 None
+2@2 command
+
+# Splicing multiple duplicate entries should fail.
+!splice 3@2= 3@2=
+---
+Error: Spliced entries must be contiguous
+
+# Splicing entries with a gap should fail.
+!splice 3@2= 5@2=
+---
+Error: Spliced entries must be contiguous
+
+# Splicing with a term regression should fail.
+# TODO: fix this.
+#!splice 3@1=
+#---
+
+# Splicing with a term regression in the given entries should fail.
+# TODO: fix this.
+#splice 3@2= 4@1=
+#---
+
+# Overlapping entries is a noop.
+splice 1@2= 2@2=command
+scan
+---
+splice → 2@2 command
+1@2 None
+2@2 command
+
+# An overlapping prefix is a noop.
+# TODO: fix this.
+#splice 1@2=
+#scan
+#---
+
+# An overlapping suffix is a noop.
+splice 2@2=command
+scan
+---
+splice → 2@2 command
+1@2 None
+2@2 command
+
+# Changing a command with the same term/index should fail.
+# TODO: instead of a noop, this should error.
+splice 2@2=foo
+scan
+---
+splice → 2@2 command
+1@2 None
+2@2 command
+
+# Appending a new entry in the same term should work, as should
+# appending one in a new term.
+splice 3@2=bar
+splice 4@3=
+scan
+---
+splice → 3@2 bar
+splice → 4@3 None
+1@2 None
+2@2 command
+3@2 bar
+4@3 None
+
+# Splicing with suffix overlap should work.
+splice 3@2=bar 4@3= 5@3=foo
+scan
+---
+splice → 5@3 foo
+1@2 None
+2@2 command
+3@2 bar
+4@3 None
+5@3 foo
+
+# Splicing at an existing index with a new term should replace the tail.
+splice 3@4=
+status
+scan
+---
+splice → 3@4 None
+last=3@4 commit=0@0
+1@2 None
+2@2 command
+3@4 None
+
+# This also holds at the start of the log.
+splice 1@5= 2@5=foo 3@5=bar
+status
+scan
+---
+splice → 3@5 bar
+last=3@5 commit=0@0
+1@5 None
+2@5 foo
+3@5 bar
+
+# Splicing across the commit index should work, as long as the entries match.
+commit 2
+splice 1@5= 2@5=foo 3@5=bar 4@5=
+status
+scan
+---
+commit → 2@5 foo
+splice → 4@5 None
+last=4@5 commit=2@5
+1@5 None
+2@5 foo
+3@5 bar
+4@5 None
+
+# Splicing across the commit index can replace a tail after the commit index.
+splice 3@6= 4@6=bar
+status
+scan
+---
+splice → 4@6 bar
+last=4@6 commit=2@5
+1@5 None
+2@5 foo
+3@6 None
+4@6 bar
+
+# But replacing a tail at or before the commit index should fail.
+!splice 2@7=
+!splice 1@7=
+---
+Error: Spliced entries must begin after commit index
+Error: Spliced entries must begin after commit index
+
+# Dump the raw data.
+raw
+---
+Entry(1) 0x000000000000000001 = 0x0500
+Entry(2) 0x000000000000000002 = 0x050103666f6f
+Entry(3) 0x000000000000000003 = 0x0600
+Entry(4) 0x000000000000000004 = 0x060103626172
+CommitIndex 0x02 = 0x0205

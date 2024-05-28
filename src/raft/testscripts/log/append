@@ -1,0 +1,63 @@
+# Appending to an empty log works. The term doesn't have to be 1, and doesn't
+# have to match get_term().
+#
+# TODO: test that append flushes to disk.
+append 2 foo
+scan
+---
+append → 1@2 foo
+1@2 foo
+
+# Appending a noop entry (no command) works.
+append 2
+scan
+---
+append → 2@2 None
+1@2 foo
+2@2 None
+
+# The last index/term should be updated, the commit index shouldn't.
+status
+---
+last=2@2 commit=0@0
+
+# Check the raw encoding.
+raw
+---
+Entry(1) 0x000000000000000001 = 0x020103666f6f
+Entry(2) 0x000000000000000002 = 0x0200
+
+# Bumping the term with a command is allowed. Skipping a term and omitting the
+# command is also allowed.
+append 3 command
+append 5
+---
+append → 3@3 command
+append → 4@5 None
+
+# A term regression is allowed, as is a 0 term.
+# TODO: it shouldn't be.
+append 1 old
+append 0
+---
+append → 5@1 old
+append → 6@0 None
+
+# Dump the final status and data.
+status
+scan
+raw
+---
+last=6@0 commit=0@0
+1@2 foo
+2@2 None
+3@3 command
+4@5 None
+5@1 old
+6@0 None
+Entry(1) 0x000000000000000001 = 0x020103666f6f
+Entry(2) 0x000000000000000002 = 0x0200
+Entry(3) 0x000000000000000003 = 0x030107636f6d6d616e64
+Entry(4) 0x000000000000000004 = 0x0500
+Entry(5) 0x000000000000000005 = 0x0101036f6c64
+Entry(6) 0x000000000000000006 = 0x0000

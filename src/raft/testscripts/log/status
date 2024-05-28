@@ -1,0 +1,35 @@
+# Status on empty engine works.
+status engine=true
+---
+last=0@0 commit=0@0 engine=Status {
+    name: "memory",
+    keys: 0,
+    size: 0,
+    total_disk_size: 0,
+    live_disk_size: 0,
+    garbage_disk_size: 0,
+}
+
+# Write some data.
+set_term 2 1
+append 1
+append 1 foo
+append 2 bar
+commit 2
+---
+append → 1@1 None
+append → 2@1 foo
+append → 3@2 bar
+commit → 2@1 foo
+
+# Status gives correct info.
+status engine=true
+---
+last=3@2 commit=2@1 engine=Status {
+    name: "memory",
+    keys: 5,
+    size: 48,
+    total_disk_size: 0,
+    live_disk_size: 0,
+    garbage_disk_size: 0,
+}

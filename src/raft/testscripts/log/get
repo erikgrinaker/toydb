@@ -1,0 +1,26 @@
+# get returns None on an empty engine.
+get 1
+---
+None
+
+# Append a few entries.
+append 1
+append 1 foo
+append 2 bar
+---
+append → 1@1 None
+append → 2@1 foo
+append → 3@2 bar
+
+# get returns noop entries and regular entries.
+get 1 2
+---
+1@1 None
+2@1 foo
+
+# get returns None for missing entries, and for index 0.
+# TODO: consider erroring on index 0.
+get 4 0
+---
+None
+None

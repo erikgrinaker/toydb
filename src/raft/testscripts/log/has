@@ -1,0 +1,33 @@
+# has returns false on an empty engine.
+has 1@1
+---
+false
+
+# Append a few entries.
+append 1
+append 1 foo
+append 2 bar
+---
+append → 1@1 None
+append → 2@1 foo
+append → 3@2 bar
+
+# has returns true both for noop entries and regular entries.
+has 1@1 2@1
+---
+true
+true
+
+# has returns false for missing entries, but true for index 0.
+# TODO: consider erroring or returning false on index 0.
+has 4@2 0@0
+---
+false
+true
+
+# has returns false for term mismatches.
+has 1@2 3@1 0@1
+---
+false
+false
+false

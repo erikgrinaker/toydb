@@ -1,0 +1,45 @@
+# get_term works on empty engine.
+get_term
+---
+term=0 vote=None
+
+# set_term stores a term and empty vote.
+set_term 3
+get_term
+raw
+---
+term=3 vote=None
+TermVote 0x01 = 0x0300
+
+# set_term stores a term and vote.
+set_term 3 7
+get_term
+raw
+---
+term=3 vote=Some(7)
+TermVote 0x01 = 0x030107
+
+# Removing the vote is allowed.
+#
+# TODO: it shouldn't be, nor should changing it. But it should be idempotent.
+set_term 3
+get_term
+---
+term=3 vote=None
+
+# Moving the term into the far future or past is allowed.
+set_term 7
+get_term
+set_term 1 2
+get_term
+---
+term=7 vote=None
+term=1 vote=Some(2)
+
+# Clearing the term is allowed.
+set_term 0
+get_term
+raw
+---
+term=0 vote=None
+TermVote 0x01 = 0x0000
