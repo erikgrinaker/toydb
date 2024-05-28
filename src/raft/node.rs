@@ -1180,19 +1180,15 @@ mod tests {
                 //
                 // Creates a new Raft cluster.
                 "cluster" => {
-                    let mut nodes = 0;
-                    let mut leader = None;
-                    let mut heartbeat_interval = HEARTBEAT_INTERVAL;
-                    let mut election_timeout = ELECTION_TIMEOUT_RANGE.start;
-                    for arg in &command.args {
-                        match arg.key.as_deref() {
-                            Some("election_timeout") => election_timeout = arg.parse()?,
-                            Some("heartbeat_interval") => heartbeat_interval = arg.parse()?,
-                            Some("leader") => leader = Some(arg.parse()?),
-                            Some("nodes") => nodes = arg.parse()?,
-                            _ => return Err(format!("invalid argument '{}'", arg.name()).into()),
-                        }
-                    }
+                    let mut args = command.consume_args();
+                    let nodes = args.lookup_parse("nodes")?.unwrap_or(0);
+                    let leader = args.lookup_parse("leader")?;
+                    let heartbeat_interval =
+                        args.lookup_parse("heartbeat_interval")?.unwrap_or(HEARTBEAT_INTERVAL);
+                    let election_timeout = args
+                        .lookup_parse("election_timeout")?
+                        .unwrap_or(ELECTION_TIMEOUT_RANGE.start);
+                    args.reject_rest()?;
                     self.cluster(nodes, leader, heartbeat_interval, election_timeout, &mut output)?;
                 }
 
@@ -1202,14 +1198,9 @@ mod tests {
                 // is given, only messages from the given node is delivered, the
                 // others are left pending.
                 "deliver" => {
-                    let ids = self.parse_ids_or_all(&command.pos_args())?;
-                    let mut from = None;
-                    for arg in command.key_args() {
-                        match arg.key.as_deref().unwrap() {
-                            "from" => from = Some(arg.parse()?),
-                            key => return Err(format!("invalid argument '{key}'").into()),
-                        }
-                    }
+                    let mut args = command.consume_args();
+                    let from = args.lookup_parse("from")?;
+                    let ids = self.parse_ids_or_all(&args.rest())?;
                     self.deliver(&ids, from, &mut output)?;
                 }
 
@@ -1218,11 +1209,10 @@ mod tests {
                 // Sends a client request to the given node to read the given
                 // key from the state machine (key/value store).
                 "get" => {
-                    self.reject_args(&command.key_args())?;
-                    let mut args = command.pos_args().into_iter();
-                    let id = args.next().ok_or("must specify node ID")?.parse()?;
-                    let key = args.next().ok_or("must specify key")?.value.clone();
-                    self.reject_args(&args.collect_vec())?;
+                    let mut args = command.consume_args();
+                    let id = args.next_pos().ok_or("must specify node ID")?.parse()?;
+                    let key = args.next_pos().ok_or("must specify key")?.value.clone();
+                    args.reject_rest()?;
                     let request = Request::Read(TestCommand::Get { key }.encode()?);
                     self.request(id, request, &mut output)?;
                 }
@@ -1266,12 +1256,11 @@ mod tests {
                 // Sends a client request to the given node to write a key/value
                 // pair to the state machine (key/value store).
                 "put" => {
-                    let mut args = command.args.iter();
-                    let id = args.next().ok_or("must specify node ID")?.parse()?;
-                    let kv = args.next().ok_or("must specify key/value pair")?;
-                    let key = kv.key.clone().ok_or("must specify key/value pair")?;
-                    let value = kv.value.clone();
-                    self.reject_args(&args.collect_vec())?;
+                    let mut args = command.consume_args();
+                    let id = args.next_pos().ok_or("must specify node ID")?.parse()?;
+                    let kv = args.next_key().ok_or("must specify key/value pair")?.clone();
+                    let (key, value) = (kv.key.unwrap(), kv.value);
+                    args.reject_rest()?;
                     let request = Request::Write(TestCommand::Put { key, value }.encode()?);
                     self.request(id, request, &mut output)?;
                 }
@@ -1283,14 +1272,9 @@ mod tests {
                 // emits a heartbeat from the leader and restabilizes, e.g. to
                 // propagate the commit index.
                 "stabilize" => {
-                    let ids = self.parse_ids_or_all(&command.pos_args())?;
-                    let mut heartbeat = false;
-                    for arg in command.key_args() {
-                        match arg.key.as_deref().unwrap() {
-                            "heartbeat" => heartbeat = arg.parse()?,
-                            key => return Err(format!("invalid argument '{key}'").into()),
-                        }
-                    }
+                    let mut args = command.consume_args();
+                    let heartbeat = args.lookup_parse("heartbeat")?.unwrap_or(false);
+                    let ids = self.parse_ids_or_all(&args.rest())?;
                     self.stabilize(&ids, heartbeat, &mut output)?;
                 }
 
@@ -1308,14 +1292,9 @@ mod tests {
                 // is true, sends a status client request to a single node,
                 // otherwise fetches status directly from each node.
                 "status" => {
-                    let ids = self.parse_ids_or_all(&command.pos_args())?;
-                    let mut request = false;
-                    for arg in command.key_args() {
-                        match arg.key.as_deref().unwrap() {
-                            "request" => request = arg.parse()?,
-                            key => return Err(format!("invalid argument '{key}'").into()),
-                        }
-                    }
+                    let mut args = command.consume_args();
+                    let request = args.lookup_parse("request")?.unwrap_or(false);
+                    let ids = self.parse_ids_or_all(&args.rest())?;
                     if request {
                         if ids.len() != 1 {
                             return Err("request=true requires 1 node ID".into());
@@ -1326,22 +1305,16 @@ mod tests {
                     }
                 }
 
-                // step ID JSON
+                // step [panic=BOOL] ID JSON
                 //
                 // Steps a manually generated JSON message on the given node.
                 "step" => {
-                    let mut pos_args = command.pos_args().into_iter();
-                    let id = pos_args.next().ok_or("node ID not given")?.parse()?;
-                    let raw = pos_args.next().ok_or("message not given")?.value.clone();
-                    let msg = serde_json::from_str(&raw)?;
-                    self.reject_args(&pos_args.collect_vec())?;
-                    let mut panic = false;
-                    for arg in command.key_args() {
-                        match arg.key.as_deref().unwrap() {
-                            "panic" => panic = arg.parse()?,
-                            key => return Err(format!("unknown key '{key}'").into()),
-                        }
-                    }
+                    let mut args = command.consume_args();
+                    let panic = args.lookup_parse("panic")?.unwrap_or(false);
+                    let id = args.next_pos().ok_or("node ID not given")?.parse()?;
+                    let raw = &args.next_pos().ok_or("message not given")?.value;
+                    let msg = serde_json::from_str(raw)?;
+                    args.reject_rest()?;
                     self.transition_catch(id, |n| n.step(msg), panic, &mut output)?;
                 }
 
@@ -1805,17 +1778,6 @@ mod tests {
                 return Err("node ID not given".into());
             }
             Ok(ids)
-        }
-
-        // Errors if any arguments are passed.
-        fn reject_args<A>(&self, args: &[A]) -> Result<(), Box<dyn Error>>
-        where
-            A: Borrow<goldenscript::Argument>,
-        {
-            if let Some(arg) = args.first().map(|a| a.borrow()) {
-                return Err(format!("unexpected argument '{}'", arg.name()).into());
-            }
-            Ok(())
         }
 
         /// Formats network partitions.
