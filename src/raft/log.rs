@@ -3,7 +3,6 @@ use crate::encoding::{bincode, keycode};
 use crate::error::{Error, Result};
 use crate::storage;
 
-use ::log::debug;
 use serde::{Deserialize, Serialize};
 
 /// A log index.
@@ -122,23 +121,28 @@ impl Log {
         (self.last_index, self.last_term)
     }
 
-    /// Returns the last known term (0 if none), and cast vote (if any).
+    /// Returns the last known term (0 if none) and cast vote (if any).
     pub fn get_term(&mut self) -> Result<(Term, Option<NodeID>)> {
-        let (term, voted_for) = self
+        Ok(self
             .engine
             .get(&Key::TermVote.encode()?)?
             .map(|v| bincode::deserialize(&v))
             .transpose()?
-            .unwrap_or((0, None));
-        debug!("Loaded term {} and voted_for {:?} from log", term, voted_for);
-        Ok((term, voted_for))
+            .unwrap_or((0, None)))
     }
 
-    /// Sets the most recent term, and cast vote (if any).
-    ///
-    /// TODO: rename voted_for to vote.
-    pub fn set_term(&mut self, term: Term, voted_for: Option<NodeID>) -> Result<()> {
-        self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, voted_for))?)?;
+    /// Stores the most recent term and cast vote (if any). Enforces that the
+    /// term does not regress, and that we only vote for one node in a term.
+    pub fn set_term(&mut self, term: Term, vote: Option<NodeID>) -> Result<()> {
+        match self.get_term()? {
+            (t, _) if term < t => Err(Error::Value(format!("term regression {t} → {term}"))),
+            (t, _) if term > t => Ok(()), // below, term == t
+            (0, _) => Err(Error::Value("can't set term 0".to_string())),
+            (_, None) => Ok(()),
+            (_, v) if vote != v => Err(Error::Value(format!("can't change vote {v:?} → {vote:?}"))),
+            (_, _) => Ok(()),
+        }?;
+        self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, vote))?)?;
         self.engine.flush()?;
         Ok(())
     }
@@ -331,7 +335,10 @@ mod tests {
                 "get_term" => {
                     command.consume_args().reject_rest()?;
                     let (term, vote) = self.log.get_term()?;
-                    output.push_str(&format!("term={term} vote={vote:?}\n"));
+                    output.push_str(&format!(
+                        "term={term} vote={}\n",
+                        vote.map(|v| v.to_string()).unwrap_or("None".to_string())
+                    ));
                 }
 
                 // has INDEX@TERM...

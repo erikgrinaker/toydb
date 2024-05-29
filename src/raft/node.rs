@@ -287,8 +287,8 @@ impl RawNode<Candidate> {
             // We lost the election, follow the winner.
             assert_eq!(term, self.term, "Can't follow leader in different term");
             info!("Lost election, following leader {} in term {}", leader, term);
-            let voted_for = Some(self.id); // by definition
-            Ok(self.into_role(Follower::new(Some(leader), voted_for, election_timeout)))
+            let vote = Some(self.id); // by definition
+            Ok(self.into_role(Follower::new(Some(leader), vote, election_timeout)))
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
@@ -411,7 +411,7 @@ pub struct Follower {
     /// The leader_seen timeout before triggering an election.
     election_timeout: Ticks,
     /// The node we voted for in the current term, if any.
-    voted_for: Option<NodeID>,
+    vote: Option<NodeID>,
     // Local client requests that have been forwarded to the leader. These are
     // aborted on leader/term changes.
     forwarded: HashSet<RequestID>,
@@ -419,8 +419,8 @@ pub struct Follower {
 
 impl Follower {
     /// Creates a new follower role.
-    fn new(leader: Option<NodeID>, voted_for: Option<NodeID>, election_timeout: Ticks) -> Self {
-        Self { leader, voted_for, leader_seen: 0, election_timeout, forwarded: HashSet::new() }
+    fn new(leader: Option<NodeID>, vote: Option<NodeID>, election_timeout: Ticks) -> Self {
+        Self { leader, vote, leader_seen: 0, election_timeout, forwarded: HashSet::new() }
     }
 }
 
@@ -437,8 +437,8 @@ impl RawNode<Follower> {
         heartbeat_interval: Ticks,
         election_timeout_range: std::ops::Range<Ticks>,
     ) -> Result<Self> {
-        let (term, voted_for) = log.get_term()?;
-        let role = Follower::new(None, voted_for, 0);
+        let (term, vote) = log.get_term()?;
+        let role = Follower::new(None, vote, 0);
         let mut node = Self {
             id,
             peers,
@@ -466,11 +466,11 @@ impl RawNode<Follower> {
             assert!(self.role.forwarded.is_empty(), "Leaderless follower has forwarded requests");
         }
 
-        // NB: We allow voted_for not in peers, since this can happen when
-        // removing nodes from the cluster via a cold restart. We also allow
-        // voted_for self, which can happen if we lose an election.
+        // NB: We allow vote not in peers, since this can happen when removing
+        // nodes from the cluster via a cold restart. We also allow vote for
+        // self, which can happen if we lose an election.
 
-        debug_assert_eq!(self.role.voted_for, self.log.get_term()?.1, "Vote does not match log");
+        debug_assert_eq!(self.role.vote, self.log.get_term()?.1, "Vote does not match log");
         assert!(self.role.leader_seen < self.role.election_timeout, "Election timeout passed");
 
         Ok(())
@@ -505,8 +505,7 @@ impl RawNode<Follower> {
             assert_eq!(self.role.leader, None, "Already have leader in term");
             assert_eq!(term, self.term, "Can't follow leader in different term");
             info!("Following leader {} in term {}", leader, term);
-            self.role =
-                Follower::new(Some(leader), self.role.voted_for, self.role.election_timeout);
+            self.role = Follower::new(Some(leader), self.role.vote, self.role.election_timeout);
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
@@ -591,8 +590,8 @@ impl RawNode<Follower> {
             // A candidate in this term is requesting our vote.
             Message::Campaign { last_index, last_term } => {
                 // Don't vote if we already voted for someone else in this term.
-                if let Some(voted_for) = self.role.voted_for {
-                    if msg.from != voted_for {
+                if let Some(vote) = self.role.vote {
+                    if msg.from != vote {
                         self.send(msg.from, Message::CampaignResponse { vote: false })?;
                         return Ok(self.into());
                     }
@@ -609,7 +608,7 @@ impl RawNode<Follower> {
                 info!("Voting for {} in term {} election", msg.from, self.term);
                 self.send(msg.from, Message::CampaignResponse { vote: true })?;
                 self.log.set_term(self.term, Some(msg.from))?;
-                self.role.voted_for = Some(msg.from);
+                self.role.vote = Some(msg.from);
             }
 
             // We may receive a vote after we lost an election and followed a
