@@ -1305,17 +1305,16 @@ mod tests {
                     }
                 }
 
-                // step [panic=BOOL] ID JSON
+                // step ID JSON
                 //
                 // Steps a manually generated JSON message on the given node.
                 "step" => {
                     let mut args = command.consume_args();
-                    let panic = args.lookup_parse("panic")?.unwrap_or(false);
                     let id = args.next_pos().ok_or("node ID not given")?.parse()?;
                     let raw = &args.next_pos().ok_or("message not given")?.value;
                     let msg = serde_json::from_str(raw)?;
                     args.reject_rest()?;
-                    self.transition_catch(id, |n| n.step(msg), panic, &mut output)?;
+                    self.transition(id, |n| n.step(msg), &mut output)?;
                 }
 
                 // tick [ID...]
@@ -1663,40 +1662,14 @@ mod tests {
             f: F,
             output: &mut String,
         ) -> Result<(), Box<dyn Error>> {
-            self.transition_catch(id, f, false, output)
-        }
-
-        /// Applies a node transition, catching panics if requested.
-        fn transition_catch<F: FnOnce(Node) -> crate::error::Result<Node>>(
-            &mut self,
-            id: NodeID,
-            f: F,
-            catch_unwind: bool,
-            output: &mut String,
-        ) -> Result<(), Box<dyn Error>> {
             let mut node = self.nodes.remove(&id).ok_or(format!("unknown node {id}"))?;
-            let nodefmt = Self::format_node(&node);
 
             let old_noderole = Self::format_node_role(&node);
             let old_commit_index = Self::borrow_log(&node).get_commit_index().0;
             let old_last_index = Self::borrow_log(&node).get_last_index().0;
 
-            // Apply the transition and handle panics. We mark it as
-            // AssertUnwindSafe since we've removed the node from the nodes map,
-            // so any future node access will fail anyway if we panic.
-            node = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(node))) {
-                Ok(result) => result?,
-                Err(panic) if !catch_unwind => std::panic::resume_unwind(panic),
-                Err(panic) => {
-                    let message = panic
-                        .downcast_ref::<&str>()
-                        .map(|s| s.to_string())
-                        .or_else(|| panic.downcast_ref::<String>().cloned())
-                        .unwrap_or_else(|| std::panic::resume_unwind(panic));
-                    output.push_str(&format!("{nodefmt} panic: {message}\n"));
-                    return Ok(());
-                }
-            };
+            // Apply the transition.
+            node = f(node)?;
 
             let nodefmt = Self::format_node(&node);
             let noderole = Self::format_node_role(&node);
