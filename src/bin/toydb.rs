@@ -37,15 +37,12 @@ fn main() -> Result<()> {
 
     let path = std::path::Path::new(&cfg.data_dir);
     let raft_log = match cfg.storage_raft.as_str() {
-        "bitcask" | "" => raft::Log::new(
-            storage::BitCask::new_compact(
-                path.join("log"),
-                cfg.compact_threshold,
-                COMPACT_MIN_BYTES,
-            )?,
-            cfg.sync,
-        )?,
-        "memory" => raft::Log::new(storage::Memory::new(), false)?,
+        "bitcask" | "" => raft::Log::new(storage::BitCask::new_compact(
+            path.join("log"),
+            cfg.compact_threshold,
+            COMPACT_MIN_BYTES,
+        )?)?,
+        "memory" => raft::Log::new(storage::Memory::new())?,
         name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
     };
     let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
@@ -76,7 +73,6 @@ struct Config {
     log_level: String,
     data_dir: String,
     compact_threshold: f64,
-    sync: bool,
     storage_raft: String,
     storage_sql: String,
 }
@@ -90,7 +86,6 @@ impl Config {
             .set_default("log_level", "info")?
             .set_default("data_dir", "data")?
             .set_default("compact_threshold", 0.2)?
-            .set_default("sync", true)?
             .set_default("storage_raft", "bitcask")?
             .set_default("storage_sql", "bitcask")?
             .add_source(config::File::with_name(file))

@@ -71,14 +71,11 @@ pub struct Log {
     commit_index: Index,
     /// The term of the last committed entry.
     commit_term: Term,
-    /// Whether to sync writes to disk.
-    /// TODO: remove this and always sync when necessary.
-    sync: bool,
 }
 
 impl Log {
     /// Creates a new log, using the given storage engine.
-    pub fn new(mut engine: impl storage::Engine + 'static, sync: bool) -> Result<Self> {
+    pub fn new(mut engine: impl storage::Engine + 'static) -> Result<Self> {
         let (last_index, last_term) = engine
             .scan_prefix(&KeyPrefix::Entry.encode()?)
             .last()
@@ -92,14 +89,7 @@ impl Log {
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, 0));
-        Ok(Self {
-            engine: Box::new(engine),
-            last_index,
-            last_term,
-            commit_index,
-            commit_term,
-            sync,
-        })
+        Ok(Self { engine: Box::new(engine), last_index, last_term, commit_index, commit_term })
     }
 
     /// Decodes an entry from a log key/value pair.
@@ -149,14 +139,7 @@ impl Log {
     /// TODO: rename voted_for to vote.
     pub fn set_term(&mut self, term: Term, voted_for: Option<NodeID>) -> Result<()> {
         self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, voted_for))?)?;
-        self.maybe_flush()
-    }
-
-    /// Flushes the log to stable storage, if enabled.
-    fn maybe_flush(&mut self) -> Result<()> {
-        if self.sync {
-            self.engine.flush()?;
-        }
+        self.engine.flush()?;
         Ok(())
     }
 
@@ -165,7 +148,7 @@ impl Log {
     pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
         let index = self.last_index + 1;
         self.engine.set(&Key::Entry(index).encode()?, bincode::serialize(&(term, command))?)?;
-        self.maybe_flush()?;
+        self.engine.flush()?;
         self.last_index = index;
         self.last_term = term;
         Ok(index)
@@ -188,7 +171,7 @@ impl Log {
         };
         self.engine
             .set(&Key::CommitIndex.encode()?, bincode::serialize(&(entry.index, entry.term))?)?;
-        self.maybe_flush()?;
+        self.engine.flush()?;
         self.commit_index = entry.index;
         self.commit_term = entry.term;
         Ok(index)
@@ -279,7 +262,7 @@ impl Log {
         for index in (last_index + 1)..=self.last_index {
             self.engine.delete(&Key::Entry(index).encode()?)?;
         }
-        self.maybe_flush()?;
+        self.engine.flush()?;
         self.last_index = last_index;
         self.last_term = last_term;
         Ok(self.last_index)
@@ -448,7 +431,7 @@ mod tests {
 
     impl TestRunner {
         fn new() -> Self {
-            let log = Log::new(crate::storage::Memory::new(), false).expect("log failed");
+            let log = Log::new(crate::storage::Memory::new()).expect("log failed");
             Self { log }
         }
 

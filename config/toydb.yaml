@@ -12,13 +12,6 @@ listen_raft: 0.0.0.0:9705
 data_dir: data
 compact_threshold: 0.2
 
-# Whether to fsync writes. Fsyncing guarantees that committed data is persisted
-# to disk, but has a high performance penalty. Disabling fsync and relying on
-# cluster redundancy for data durability may be a reasonable trade-off, although
-# this can compromise Raft linearizability guarantees in rare edge cases where
-# committed entries lose majority.
-sync: true
-
 # Raft log storage engine
 # - bitcask (default): an append-only log-structured store.
 # - memory: an in-memory store using the Rust standard library's BTreeMap.

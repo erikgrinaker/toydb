@@ -1,6 +1,5 @@
 id: 1
 data_dir: toydb1/data
-sync: false
 listen_sql: localhost:9601
 listen_raft: localhost:9701
 peers:

@@ -1378,7 +1378,7 @@ mod tests {
                 let (node_tx, node_rx) = crossbeam::channel::unbounded();
                 let (applied_tx, applied_rx) = crossbeam::channel::unbounded();
                 let peers = self.ids.iter().copied().filter(|i| *i != id).collect();
-                let log = Log::new(crate::storage::Memory::new(), false)?;
+                let log = Log::new(crate::storage::Memory::new())?;
                 let state = Box::new(TestState::new(applied_tx));
                 self.nodes.insert(
                     id,
