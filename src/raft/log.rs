@@ -192,13 +192,9 @@ impl Log {
             .transpose()
     }
 
-    /// Checks if the log contains an entry with the given term.
+    /// Checks if the log contains an entry with the given index and term.
     pub fn has(&mut self, index: Index, term: Term) -> Result<bool> {
-        match self.get(index)? {
-            Some(entry) => Ok(entry.term == term),
-            None if index == 0 && term == 0 => Ok(true),
-            None => Ok(false),
-        }
+        Ok(self.get(index)?.map(|e| e.term == term).unwrap_or(false))
     }
 
     /// Iterates over log entries in the given index range.

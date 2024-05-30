@@ -844,7 +844,7 @@ impl RawNode<Leader> {
                 }
 
                 if last_index < self.log.get_last_index().0
-                    || !self.log.has(last_index, last_term)?
+                    || (last_index > 0 && !self.log.has(last_index, last_term)?)
                 {
                     self.send_log(msg.from)?;
                 }
