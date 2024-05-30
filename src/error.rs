@@ -1,7 +1,6 @@
 use serde_derive::{Deserialize, Serialize};
-use std::fmt::{self, Display};
 
-/// Result returning Error
+/// Result returning Error.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// toyDB errors. All except Internal are considered user-facing.
@@ -18,8 +17,8 @@ pub enum Error {
 
 impl std::error::Error for Error {}
 
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::Config(s) | Error::Internal(s) | Error::Parse(s) | Error::Value(s) => {
                 write!(f, "{}", s)
@@ -32,13 +31,13 @@ impl Display for Error {
 }
 
 impl serde::ser::Error for Error {
-    fn custom<T: Display>(msg: T) -> Self {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
         Error::Internal(msg.to_string())
     }
 }
 
 impl serde::de::Error for Error {
-    fn custom<T: Display>(msg: T) -> Self {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
         Error::Internal(msg.to_string())
     }
 }
