@@ -178,7 +178,9 @@ impl Log {
             None => return errassert!("commit index {index} does not exist"),
         };
         self.engine.set(&Key::CommitIndex.encode()?, bincode::serialize(&(index, term))?)?;
-        self.engine.flush()?;
+        // NB: the commit index doesn't need to be fsynced, since the entries
+        // are fsynced and the commit index can be recovered from a log quorum.
+        // TODO: add testing for this.
         self.commit_index = index;
         self.commit_term = term;
         Ok(index)
