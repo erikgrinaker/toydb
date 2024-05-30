@@ -3,16 +3,40 @@ use serde_derive::{Deserialize, Serialize};
 /// Result returning Error.
 pub type Result<T> = std::result::Result<T, Error>;
 
+impl<T> From<Error> for Result<T> {
+    fn from(error: Error) -> Self {
+        Err(error)
+    }
+}
+
 /// toyDB errors. All except Internal are considered user-facing.
+///
+/// TODO: simplify these. Add an IO kind that is used to signal Raft application
+/// failure.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Error {
     Abort,
-    Config(String),
-    Internal(String),
-    Parse(String),
+    Assert(String),   // TODO include backtrace
+    Config(String),   // TODO replace with Input
+    Internal(String), // TODO remove
+    Parse(String),    // TODO replace with Input
     ReadOnly,
     Serialization,
-    Value(String),
+    Value(String), // TODO replace with Input or Data
+}
+
+/// Constructs an Error::Assert via format!() and into().
+#[macro_export]
+macro_rules! errassert {
+    ($($args:tt)*) => { Error::Assert(format!($($args)*)).into() };
+}
+
+/// Returns an Error::Assert if the given condition is false.
+#[macro_export]
+macro_rules! asserterr {
+    ($cond:expr, $($args:tt)*) => {
+        if !$cond { return errassert!($($args)*) }
+    };
 }
 
 impl std::error::Error for Error {}
@@ -23,6 +47,7 @@ impl std::fmt::Display for Error {
             Error::Config(s) | Error::Internal(s) | Error::Parse(s) | Error::Value(s) => {
                 write!(f, "{}", s)
             }
+            Error::Assert(s) => write!(f, "assertion failed: {s}"),
             Error::Abort => write!(f, "Operation aborted"),
             Error::Serialization => write!(f, "Serialization failure, retry transaction"),
             Error::ReadOnly => write!(f, "Read-only transaction"),

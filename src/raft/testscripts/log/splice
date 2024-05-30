@@ -1,12 +1,12 @@
 # Splicing at index 0 should fail.
 !splice 0@1=foo
 ---
-Error: Spliced entries must begin before last index
+Error: assertion failed: spliced entries must begin before last index
 
 # Splicing at index 2 should fail (not contiguous).
 !splice 2@1=foo
 ---
-Error: Spliced entries must begin before last index
+Error: assertion failed: spliced entries must begin before last index
 
 # Splicing entries at start should work, both with and without
 # commands, and starting at a term after 1. It should also update
@@ -24,12 +24,12 @@ last=2@2 commit=0@0
 # Splicing multiple duplicate entries should fail.
 !splice 3@2= 3@2=
 ---
-Error: Spliced entries must be contiguous
+Error: assertion failed: spliced entries must be contiguous
 
 # Splicing entries with a gap should fail.
 !splice 3@2= 5@2=
 ---
-Error: Spliced entries must be contiguous
+Error: assertion failed: spliced entries must be contiguous
 
 # Splicing with a term regression should fail.
 # TODO: fix this.
@@ -148,8 +148,8 @@ last=4@6 commit=2@5
 !splice 2@7=
 !splice 1@7=
 ---
-Error: Spliced entries must begin after commit index
-Error: Spliced entries must begin after commit index
+Error: assertion failed: spliced entries must begin after commit index
+Error: assertion failed: spliced entries must begin after commit index
 
 # Dump the raw data.
 raw

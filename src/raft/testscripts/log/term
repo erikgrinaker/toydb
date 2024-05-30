@@ -6,7 +6,7 @@ term=0 vote=None
 # Storing a 0 term errors.
 !set_term 0
 ---
-Error: can't set term 0
+Error: assertion failed: can't set term 0
 
 # set_term stores a term and empty vote.
 set_term 3
@@ -45,17 +45,17 @@ term=9 vote=1
 # Regressing the term errors.
 !set_term 8
 ---
-Error: term regression 9 → 8
+Error: assertion failed: term regression 9 → 8
 
 # Clearing the vote errors.
 !set_term 9
 ---
-Error: can't change vote Some(1) → None
+Error: assertion failed: can't change vote Some(1) → None
 
 # Changing the vote errors.
 !set_term 9 2
 ---
-Error: can't change vote Some(1) → Some(2)
+Error: assertion failed: can't change vote Some(1) → Some(2)
 
 # The above errors should not have changed the term/vote.
 get_term

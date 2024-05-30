@@ -14,7 +14,8 @@ pub trait State: Send {
     /// leader changes. This still needs to be applied to the state machine to
     /// properly track the applied index, and returns an empty result.
     ///
-    /// TODO: consider using runtime assertions instead of Error::Internal.
+    /// TODO: add an IO error kind instead to signify non-deterministic
+    /// application failure which should not consider the command applied.
     fn apply(&mut self, entry: Entry) -> Result<Vec<u8>>;
 
     /// Reads from the state machine. All errors are propagated to the caller.

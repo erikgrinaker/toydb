@@ -1,5 +1,6 @@
 use super::{NodeID, Term};
 use crate::encoding::{bincode, keycode};
+use crate::errassert;
 use crate::error::{Error, Result};
 use crate::storage;
 
@@ -135,13 +136,13 @@ impl Log {
     /// term does not regress, and that we only vote for one node in a term.
     pub fn set_term(&mut self, term: Term, vote: Option<NodeID>) -> Result<()> {
         match self.get_term()? {
-            (t, _) if term < t => Err(Error::Value(format!("term regression {t} → {term}"))),
-            (t, _) if term > t => Ok(()), // below, term == t
-            (0, _) => Err(Error::Value("can't set term 0".to_string())),
-            (_, None) => Ok(()),
-            (_, v) if vote != v => Err(Error::Value(format!("can't change vote {v:?} → {vote:?}"))),
-            (_, _) => Ok(()),
-        }?;
+            (t, _) if term < t => return errassert!("term regression {t} → {term}"),
+            (t, _) if term > t => {} // below, term == t
+            (0, _) => return errassert!("can't set term 0"),
+            (_, None) => {}
+            (_, v) if vote != v => return errassert!("can't change vote {v:?} → {vote:?}"),
+            (_, _) => {}
+        };
         self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, vote))?)?;
         self.engine.flush()?;
         Ok(())
@@ -165,13 +166,10 @@ impl Log {
     /// don't commit an entry for a divergent log.
     pub fn commit(&mut self, index: Index) -> Result<Index> {
         if index < self.commit_index {
-            return Err(Error::Internal(format!(
-                "Commit index regression {} -> {}",
-                self.commit_index, index
-            )));
+            return errassert!("commit index regression {} → {}", self.commit_index, index);
         }
         let Some(entry) = self.get(index)? else {
-            return Err(Error::Internal(format!("Can't commit non-existant index {}", index)));
+            return errassert!("can't commit non-existant index {index}");
         };
         self.engine
             .set(&Key::CommitIndex.encode()?, bincode::serialize(&(entry.index, entry.term))?)?;
@@ -234,10 +232,10 @@ impl Log {
             return Ok(self.last_index);
         }
         if entries[0].index == 0 || entries[0].index > self.last_index + 1 {
-            return Err(Error::Internal("Spliced entries must begin before last index".into()));
+            return errassert!("spliced entries must begin before last index");
         }
         if !entries.windows(2).all(|w| w[0].index + 1 == w[1].index) {
-            return Err(Error::Internal("Spliced entries must be contiguous".into()));
+            return errassert!("spliced entries must be contiguous");
         }
         let (last_index, last_term) = entries.last().map(|e| (e.index, e.term)).unwrap();
 
@@ -253,7 +251,7 @@ impl Log {
         drop(scan);
 
         if !entries.is_empty() && entries[0].index <= self.commit_index {
-            return Err(Error::Internal("Spliced entries must begin after commit index".into()));
+            return errassert!("spliced entries must begin after commit index");
         }
 
         // Write any entries not already in the log.

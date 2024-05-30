@@ -1,7 +1,7 @@
 # Committing fails on an empty engine.
 !commit 1
 ---
-Error: Can't commit non-existant index 1
+Error: assertion failed: can't commit non-existant index 1
 
 # Add some entries.
 append 1
@@ -15,7 +15,7 @@ append → 3@2 bar
 # Committing entry 0 fails.
 !commit 0
 ---
-Error: Can't commit non-existant index 0
+Error: assertion failed: can't commit non-existant index 0
 
 # Committing entry 1 works, and updates the commit index. Dump the
 # raw value too.
@@ -48,14 +48,14 @@ last=3@2 commit=3@2
 !commit 2
 status
 ---
-Error: Commit index regression 3 -> 2
+Error: assertion failed: commit index regression 3 → 2
 last=3@2 commit=3@2
 
 # Committing non-existant indexes error.
 !commit 4
 status
 ---
-Error: Can't commit non-existant index 4
+Error: assertion failed: can't commit non-existant index 4
 last=3@2 commit=3@2
 
 # Dump the raw value.
