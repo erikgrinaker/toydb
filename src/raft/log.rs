@@ -149,8 +149,15 @@ impl Log {
     }
 
     /// Appends a command to the log, returning its index. None implies a noop
-    /// command, typically after Raft leader changes.
+    /// command, typically after Raft leader changes. The term must be equal to
+    /// or greater than the previous entry.
     pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
+        match self.get(self.last_index)? {
+            Some(e) if term < e.term => return errassert!("term regression {} → {term}", e.term),
+            None if self.last_index > 0 => return errassert!("log gap at {}", self.last_index),
+            None if term == 0 => return errassert!("can't append entry with term 0"),
+            Some(_) | None => {}
+        }
         let index = self.last_index + 1;
         self.engine.set(&Key::Entry(index).encode()?, bincode::serialize(&(term, command))?)?;
         self.engine.flush()?;
