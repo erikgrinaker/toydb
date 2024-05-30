@@ -21,23 +21,44 @@ pub struct Envelope {
 /// A message sent between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Message {
-    /// Leaders send periodic heartbeats to its followers.
+    /// Leaders send heartbeats periodically, and on client read requests. This
+    /// serves several purposes:
+    ///
+    /// * Inform nodes about the leader, and prevent elections.
+    /// * Probe follower log progress.
+    /// * Advance followers' commit indexes, so they can apply entries.
+    /// * Confirm leadership for client reads, to avoid stale reads.
+    ///
+    /// While some of this could be split out to other messages, the heartbeat
+    /// periodicity also implicitly provides retries, so it is convenient to
+    /// piggyback on it.
+    ///
+    /// The Raft paper does not have a distinct heartbeat message, and instead
+    /// uses an empty AppendEntries RPC, but we choose to add one for better
+    /// separation of concerns.
     Heartbeat {
         /// The index of the leader's last committed log entry.
         commit_index: Index,
         /// The term of the leader's last committed log entry.
+        ///
+        /// The Raft paper does not propagate this, because it uses the
+        /// AppendEntries RPC for heartbeats and commit index propagation, which
+        /// includes a base index/term check guaranteeing that the commit index
+        /// is consistent with the leader. We need it to ensure a divergent
+        /// follower doesn't commit a stale entry from a different term.
         commit_term: Term,
-        /// The latest read sequence number of the leader.
+        /// The leader's latest read sequence number in this term. Read requests
+        /// are served once the sequence number has been confirmed by a quorum.
         read_seq: ReadSequence,
     },
 
-    /// Followers confirm leader heartbeats.
+    /// Followers respond to leader heartbeats if they still consider it leader.
     HeartbeatResponse {
         /// The index of the follower's last log entry.
         last_index: Index,
         /// The term of the follower's last log entry.
         last_term: Term,
-        /// The read sequence number of the heartbeat we're responding to.
+        /// The heartbeat's read sequence number.
         read_seq: ReadSequence,
     },
 
@@ -59,6 +80,9 @@ pub enum Message {
     /// Leaders replicate log entries to followers by appending to their logs.
     Append {
         /// The index of the log entry immediately preceding the submitted commands.
+        ///
+        /// TODO: this isn't needed -- determine it from the first entry, and
+        /// require it to be included.
         base_index: Index,
         /// The term of the log entry immediately preceding the submitted commands.
         base_term: Term,

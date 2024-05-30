@@ -160,22 +160,20 @@ impl Log {
     }
 
     /// Commits entries up to and including the given index. The index must
-    /// exist, and must be at or after the current commit index.
-    ///
-    /// TODO: this should take and verify the term as well, to ensure followers
-    /// don't commit an entry for a divergent log.
-    pub fn commit(&mut self, index: Index) -> Result<Index> {
+    /// exist, be at or after the current commit index, and have the given term.
+    pub fn commit(&mut self, index: Index, term: Term) -> Result<Index> {
         if index < self.commit_index {
             return errassert!("commit index regression {} → {}", self.commit_index, index);
         }
-        let Some(entry) = self.get(index)? else {
-            return errassert!("can't commit non-existant index {index}");
+        match self.get(index)? {
+            Some(e) if e.term != term => return errassert!("commit term {term} != {}", e.term),
+            Some(_) => {}
+            None => return errassert!("commit index {index} does not exist"),
         };
-        self.engine
-            .set(&Key::CommitIndex.encode()?, bincode::serialize(&(entry.index, entry.term))?)?;
+        self.engine.set(&Key::CommitIndex.encode()?, bincode::serialize(&(index, term))?)?;
         self.engine.flush()?;
-        self.commit_index = entry.index;
-        self.commit_term = entry.term;
+        self.commit_index = index;
+        self.commit_term = term;
         Ok(index)
     }
 
@@ -304,12 +302,14 @@ mod tests {
                     output.push_str(&format!("append → {}\n", Self::format_entry(&entry)));
                 }
 
-                // commit INDEX
+                // commit INDEX@TERM
                 "commit" => {
                     let mut args = command.consume_args();
-                    let index = args.next_pos().ok_or("index not given")?.parse()?;
+                    let (index, term) = Self::parse_index_term(
+                        &args.next_pos().ok_or("index/term not given")?.value,
+                    )?;
                     args.reject_rest()?;
-                    let index = self.log.commit(index)?;
+                    let index = self.log.commit(index, term)?;
                     let entry = self.log.get(index)?.expect("entry not found");
                     output.push_str(&format!("commit → {}\n", Self::format_entry(&entry)));
                 }

@@ -15,7 +15,7 @@ set_term 2 1
 append 1
 append 1 foo
 append 2 bar
-commit 2
+commit 2@1
 ---
 append → 1@1 None
 append → 2@1 foo

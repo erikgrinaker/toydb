@@ -560,10 +560,10 @@ impl RawNode<Follower> {
                 )?;
 
                 // Advance commit index and apply entries.
-                if self.log.has(commit_index, commit_term)?
-                    && commit_index > self.log.get_commit_index().0
+                if commit_index > self.log.get_commit_index().0
+                    && self.log.has(commit_index, commit_term)?
                 {
-                    self.log.commit(commit_index)?;
+                    self.log.commit(commit_index, commit_term)?;
                     self.maybe_apply()?;
                 }
             }
@@ -1016,7 +1016,7 @@ impl RawNode<Leader> {
         };
 
         // Commit the new entries.
-        self.log.commit(commit_index)?;
+        self.log.commit(commit_index, self.term)?;
 
         // Apply entries and respond to client writers.
         Self::maybe_apply_with(&mut self.log, &mut self.state, |index, result| -> Result<()> {

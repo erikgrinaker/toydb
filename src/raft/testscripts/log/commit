@@ -1,7 +1,7 @@
 # Committing fails on an empty engine.
-!commit 1
+!commit 1@1
 ---
-Error: assertion failed: can't commit non-existant index 1
+Error: assertion failed: commit index 1 does not exist
 
 # Add some entries.
 append 1
@@ -13,13 +13,13 @@ append → 2@1 foo
 append → 3@2 bar
 
 # Committing entry 0 fails.
-!commit 0
+!commit 0@0
 ---
-Error: assertion failed: can't commit non-existant index 0
+Error: assertion failed: commit index 0 does not exist
 
 # Committing entry 1 works, and updates the commit index. Dump the
 # raw value too.
-commit 1
+commit 1@1
 status
 raw
 ---
@@ -31,31 +31,40 @@ Entry(3) 0x000000000000000003 = 0x020103626172
 CommitIndex 0x02 = 0x0101
 
 # Commits are idempotent.
-commit 1
+commit 1@1
 status
 ---
 commit → 1@1 None
 last=3@2 commit=1@1
 
+# Commit term conflicts error, both for the current and next index.
+!commit 1@2
+!commit 2@2
+status
+---
+Error: assertion failed: commit term 2 != 1
+Error: assertion failed: commit term 2 != 1
+last=3@2 commit=1@1
+
 # Commits can skip an entry.
-commit 3
+commit 3@2
 status
 ---
 commit → 3@2 bar
 last=3@2 commit=3@2
 
 # Commit regressions error.
-!commit 2
+!commit 2@1
 status
 ---
 Error: assertion failed: commit index regression 3 → 2
 last=3@2 commit=3@2
 
 # Committing non-existant indexes error.
-!commit 4
+!commit 4@2
 status
 ---
-Error: assertion failed: can't commit non-existant index 4
+Error: assertion failed: commit index 4 does not exist
 last=3@2 commit=3@2
 
 # Dump the raw value.

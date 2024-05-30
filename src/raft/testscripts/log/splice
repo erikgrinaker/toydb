@@ -119,7 +119,7 @@ last=3@5 commit=0@0
 3@5 bar
 
 # Splicing across the commit index should work, as long as the entries match.
-commit 2
+commit 2@5
 splice 1@5= 2@5=foo 3@5=bar 4@5=
 status
 scan
