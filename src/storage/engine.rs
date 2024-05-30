@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Only supports single-threaded use since all methods (including reads) take a
 /// mutable reference -- serialized access can't be avoided anyway, since both
 /// Raft execution and file access is serial.
-pub trait Engine: std::fmt::Display + Send + Sync {
+pub trait Engine: std::fmt::Display + Send {
     /// The iterator returned by scan().
     type ScanIterator<'a>: ScanIterator + 'a
     where
