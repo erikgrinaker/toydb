@@ -139,6 +139,7 @@ impl Log {
             (t, _) if term < t => return errassert!("term regression {t} → {term}"),
             (t, _) if term > t => {} // below, term == t
             (0, _) => return errassert!("can't set term 0"),
+            (t, v) if t == term && v == vote => return Ok(()),
             (_, None) => {}
             (_, v) if vote != v => return errassert!("can't change vote {v:?} → {vote:?}"),
             (_, _) => {}
@@ -169,18 +170,18 @@ impl Log {
     /// Commits entries up to and including the given index. The index must
     /// exist, be at or after the current commit index, and have the given term.
     pub fn commit(&mut self, index: Index, term: Term) -> Result<Index> {
-        if index < self.commit_index {
-            return errassert!("commit index regression {} → {}", self.commit_index, index);
-        }
         match self.get(index)? {
+            Some(e) if e.index < self.commit_index => {
+                return errassert!("commit index regression {} → {}", self.commit_index, e.index);
+            }
             Some(e) if e.term != term => return errassert!("commit term {term} != {}", e.term),
+            Some(e) if e.index == self.commit_index => return Ok(index),
             Some(_) => {}
             None => return errassert!("commit index {index} does not exist"),
         };
         self.engine.set(&Key::CommitIndex.encode()?, bincode::serialize(&(index, term))?)?;
         // NB: the commit index doesn't need to be fsynced, since the entries
         // are fsynced and the commit index can be recovered from a log quorum.
-        // TODO: add testing for this.
         self.commit_index = index;
         self.commit_term = term;
         Ok(index)
@@ -300,6 +301,7 @@ impl Log {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossbeam::channel::Receiver;
     use std::{error::Error, result::Result};
     use test_each_file::test_each_path;
 
@@ -313,32 +315,37 @@ mod tests {
     /// Runs Raft log goldenscript tests. For available commands, see run().
     struct TestRunner {
         log: Log,
+        op_rx: Receiver<storage::debug::Operation>,
     }
 
     impl goldenscript::Runner for TestRunner {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
             match command.name.as_str() {
-                // append TERM [COMMAND]
+                // append TERM [COMMAND] [oplog=BOOL]
                 "append" => {
                     let mut args = command.consume_args();
                     let term = args.next_pos().ok_or("term not given")?.parse()?;
                     let command = args.next_pos().map(|a| a.value.as_bytes().to_vec());
+                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
                     let index = self.log.append(term, command)?;
                     let entry = self.log.get(index)?.expect("entry not found");
+                    self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("append → {}\n", Self::format_entry(&entry)));
                 }
 
-                // commit INDEX@TERM
+                // commit INDEX@TERM [oplog=BOOL]
                 "commit" => {
                     let mut args = command.consume_args();
                     let (index, term) = Self::parse_index_term(
                         &args.next_pos().ok_or("index/term not given")?.value,
                     )?;
+                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
                     let index = self.log.commit(index, term)?;
                     let entry = self.log.get(index)?.expect("entry not found");
+                    self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("commit → {}\n", Self::format_entry(&entry)));
                 }
 
@@ -388,12 +395,8 @@ mod tests {
                     let range = (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded);
                     let mut scan = self.log.engine.scan_dyn(range);
                     while let Some((key, value)) = scan.next().transpose()? {
-                        output.push_str(&format!(
-                            "{:?} 0x{} = 0x{}\n",
-                            Key::decode(&key)?,
-                            hex::encode(&key),
-                            hex::encode(&value)
-                        ));
+                        output.push_str(&Self::format_key_value(&key, &value));
+                        output.push('\n');
                     }
                 }
 
@@ -413,18 +416,21 @@ mod tests {
                     }
                 }
 
-                // set_term TERM [VOTE]
+                // set_term TERM [VOTE] [oplog=true]
                 "set_term" => {
                     let mut args = command.consume_args();
                     let term = args.next_pos().ok_or("term not given")?.parse()?;
                     let vote = args.next_pos().map(|a| a.parse()).transpose()?;
+                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
                     self.log.set_term(term, vote)?;
+                    self.maybe_oplog(oplog, &mut output);
                 }
 
-                // splice [INDEX@TERM=COMMAND...]
+                // splice [INDEX@TERM=COMMAND...] [oplog=BOOL]
                 "splice" => {
                     let mut args = command.consume_args();
+                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     let mut entries = Vec::new();
                     for arg in args.rest_key() {
                         let (index, term) = Self::parse_index_term(arg.key.as_deref().unwrap())?;
@@ -437,6 +443,7 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.splice(entries)?;
                     let entry = self.log.get(index)?.expect("entry not found");
+                    self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("splice → {}\n", Self::format_entry(&entry)));
                 }
 
@@ -460,12 +467,20 @@ mod tests {
             }
             Ok(output)
         }
+
+        fn end_command(&mut self, _: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+            // Drain the oplog, to avoid it leaking to another command.
+            while self.op_rx.try_recv().is_ok() {}
+            Ok(String::new())
+        }
     }
 
     impl TestRunner {
         fn new() -> Self {
-            let log = Log::new(crate::storage::Memory::new()).expect("log failed");
-            Self { log }
+            let engine = storage::Debug::new(storage::Memory::new());
+            let op_rx = engine.op_rx();
+            let log = Log::new(engine).expect("log init failed");
+            Self { log, op_rx }
         }
 
         /// Formats a log entry.
@@ -475,6 +490,33 @@ mod tests {
                 None => "None",
             };
             format!("{}@{} {command}", entry.index, entry.term)
+        }
+
+        /// Formats a raw key.
+        fn format_key(key: &[u8]) -> String {
+            format!("{:?} 0x{}", Key::decode(key).expect("invalid key"), hex::encode(key))
+        }
+
+        /// Formats a raw key/value pair.
+        fn format_key_value(key: &[u8], value: &[u8]) -> String {
+            format!("{} = 0x{}", Self::format_key(key), hex::encode(value))
+        }
+
+        /// Outputs the oplog if requested.
+        fn maybe_oplog(&self, maybe: bool, output: &mut String) {
+            if !maybe {
+                return;
+            }
+            while let Ok(op) = self.op_rx.try_recv() {
+                use storage::debug::Operation;
+                let s = match op {
+                    Operation::Delete(k) => format!("delete {}", Self::format_key(&k)),
+                    Operation::Flush => "flush".to_string(),
+                    Operation::Set(k, v) => format!("set {}", Self::format_key_value(&k, &v)),
+                };
+                output.push_str(&s);
+                output.push('\n');
+            }
         }
 
         /// Parses an index@term pair.

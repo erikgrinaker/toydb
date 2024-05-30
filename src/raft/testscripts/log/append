@@ -1,36 +1,33 @@
 # Appending an entry with term 0 fails, even on an empty log.
 !append 0 foo
-status
 ---
 Error: assertion failed: can't append entry with term 0
-last=0@0 commit=0@0
 
 # Appending to an empty log works. The term doesn't have to be 1, and doesn't
-# have to match get_term().
-#
-# TODO: test that append flushes to disk.
-append 2 foo
-scan
+# have to match get_term(). The entry is written to the engine and flushed
+# to durable storage.
+append 2 foo oplog=true
 ---
+set Entry(1) 0x000000000000000001 = 0x020103666f6f
+flush
 append → 1@2 foo
-1@2 foo
 
-# Appending a noop entry (no command) works.
-append 2
-scan
+# Appending a noop entry (no command) also works.
+append 2 oplog=true
 ---
+set Entry(2) 0x000000000000000002 = 0x0200
+flush
 append → 2@2 None
-1@2 foo
-2@2 None
 
-# The last index/term should be updated, the commit index shouldn't.
+# Check that the last index/term is updated (commit index isn't), and that
+# the engine contains the expected data, both in logical and raw form.
 status
----
-last=2@2 commit=0@0
-
-# Check the raw encoding.
+scan
 raw
 ---
+last=2@2 commit=0@0
+1@2 foo
+2@2 None
 Entry(1) 0x000000000000000001 = 0x020103666f6f
 Entry(2) 0x000000000000000002 = 0x0200
 
