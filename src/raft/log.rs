@@ -1,8 +1,8 @@
 use super::{NodeID, Term};
 use crate::encoding::{bincode, keycode};
-use crate::errassert;
 use crate::error::{Error, Result};
 use crate::storage;
+use crate::{asserterr, errassert};
 
 use serde::{Deserialize, Serialize};
 
@@ -222,54 +222,77 @@ impl Log {
             .map(|r| r.and_then(|(k, v)| Self::decode_entry(&k, &v))))
     }
 
-    /// Splices a set of entries into the log. The entries must be contiguous,
-    /// and the first entry must be at most last_index+1. If an entry does not
-    /// exist, append it. If an existing entry has a term mismatch, replace it
-    /// and all following entries.
-    ///
-    /// TODO: this shouldn't truncate the log if it overlaps with an infix,
-    /// since message reordering can lead to data loss of committed entries.
+    /// Splices a set of entries into the log. The entries must have contiguous
+    /// indexes and equal/increasing terms, and the first entry must be in the
+    /// range [1,last_index+1] with a term at or equal to the previous (base)
+    /// entry's term. New indexes will be appended. Overlapping indexes with the
+    /// same term must be equal and will be ignored. Overlapping indexes with
+    /// different terms will truncate the existing log at the first conflict and
+    /// then splice the new entries.
     pub fn splice(&mut self, entries: Vec<Entry>) -> Result<Index> {
-        // TODO: don't allow empty entries.
-        if entries.is_empty() {
-            return Ok(self.last_index);
-        }
-        if entries[0].index == 0 || entries[0].index > self.last_index + 1 {
-            return errassert!("spliced entries must begin before last index");
+        let (Some(first), Some(last)) = (entries.first(), entries.last()) else {
+            return Ok(self.last_index); // empty input is noop
+        };
+
+        // Check that the entries are well-formed.
+        if first.index == 0 || first.term == 0 {
+            return errassert!("spliced entry has index or term 0");
         }
         if !entries.windows(2).all(|w| w[0].index + 1 == w[1].index) {
-            return errassert!("spliced entries must be contiguous");
+            return errassert!("spliced entries are not contiguous");
         }
-        let (last_index, last_term) = entries.last().map(|e| (e.index, e.term)).unwrap();
+        if !entries.windows(2).all(|w| w[0].term <= w[1].term) {
+            return errassert!("spliced entries have term regression");
+        }
 
-        // Skip entries that are already in the log (identified by index and term).
+        // Check that the entries connect to the existing log (if any), and that the
+        // term doesn't regress.
+        match self.get(first.index - 1)? {
+            Some(base) if first.term < base.term => {
+                return errassert!("splice term regression {} → {}", base.term, first.term)
+            }
+            Some(_) => {}
+            None if first.index == 1 => {}
+            None => return errassert!("first index {} must touch existing log", first.index),
+        }
+
+        // Skip entries that are already in the log.
         let mut entries = entries.as_slice();
-        let mut scan = self.scan(entries[0].index..=entries.last().unwrap().index)?;
-        while let Some(e) = scan.next().transpose()? {
-            if e.term != entries[0].term {
+        let mut scan = self.scan(first.index..=last.index)?;
+        while let Some(entry) = scan.next().transpose()? {
+            // [0] is ok, because the scan has the same size as entries.
+            asserterr!(entry.index == entries[0].index, "index mismatch at {entry:?}");
+            if entry.term != entries[0].term {
                 break;
             }
+            asserterr!(entry.command == entries[0].command, "command mismatch at {entry:?}");
             entries = &entries[1..];
         }
         drop(scan);
 
-        if !entries.is_empty() && entries[0].index <= self.commit_index {
-            return errassert!("spliced entries must begin after commit index");
-        }
+        // If all entries already exist then we're done.
+        let Some(first) = entries.first() else {
+            return Ok(self.last_index);
+        };
 
-        // Write any entries not already in the log.
-        for e in entries {
-            self.engine
-                .set(&Key::Entry(e.index).encode()?, bincode::serialize(&(&e.term, &e.command))?)?;
-        }
+        // Write the entries that weren't already in the log, and remove the
+        // tail of the old log if any. We can't write below the commit index,
+        // since these entries must be immutable.
+        asserterr!(first.index > self.commit_index, "spliced entries below commit index");
 
-        // Remove the remaining tail of the old log, if any, and update the index.
-        for index in (last_index + 1)..=self.last_index {
+        for entry in entries {
+            self.engine.set(
+                &Key::Entry(entry.index).encode()?,
+                bincode::serialize(&(&entry.term, &entry.command))?,
+            )?;
+        }
+        for index in last.index + 1..=self.last_index {
             self.engine.delete(&Key::Entry(index).encode()?)?;
         }
         self.engine.flush()?;
-        self.last_index = last_index;
-        self.last_term = last_term;
+
+        self.last_index = last.index;
+        self.last_term = last.term;
         Ok(self.last_index)
     }
 }
