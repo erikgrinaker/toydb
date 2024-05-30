@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use crossbeam::channel::{Receiver, Sender};
+
 use super::engine::{self, ScanIterator, Status};
 use super::mvcc::{self, TransactionState};
 use crate::encoding::bincode;
@@ -91,12 +93,14 @@ pub fn format_key_value(key: &[u8], value: &Option<Vec<u8>>) -> (String, Option<
     (fkey, fvalue)
 }
 
-/// A debug storage engine, which wraps another engine and logs mutations.
+/// A debug storage engine, which wraps another engine and emits events.
 pub struct Engine<E: engine::Engine> {
     /// The wrapped engine.
     inner: E,
-    /// Write log as key/value tuples. Value is None for deletes.
-    write_log: Vec<(Vec<u8>, Option<Vec<u8>>)>,
+    /// Sends engine operations.
+    op_tx: Sender<Operation>,
+    /// Receives engine operations.
+    op_rx: Receiver<Operation>,
 }
 
 impl<E: engine::Engine> std::fmt::Display for Engine<E> {
@@ -107,14 +111,12 @@ impl<E: engine::Engine> std::fmt::Display for Engine<E> {
 
 impl<E: engine::Engine> Engine<E> {
     pub fn new(inner: E) -> Self {
-        Self { inner, write_log: Vec::new() }
+        let (op_tx, op_rx) = crossbeam::channel::unbounded();
+        Self { inner, op_tx, op_rx }
     }
 
-    /// Returns and resets the write log. The next call only returns new writes.
-    pub fn take_write_log(&mut self) -> Vec<(Vec<u8>, Option<Vec<u8>>)> {
-        let mut write_log = Vec::new();
-        std::mem::swap(&mut write_log, &mut self.write_log);
-        write_log
+    pub fn op_rx(&self) -> Receiver<Operation> {
+        self.op_rx.clone()
     }
 }
 
@@ -122,12 +124,14 @@ impl<E: engine::Engine> engine::Engine for Engine<E> {
     type ScanIterator<'a> = E::ScanIterator<'a> where E: 'a;
 
     fn flush(&mut self) -> Result<()> {
-        self.inner.flush()
+        self.inner.flush()?;
+        self.op_tx.send(Operation::Flush)?;
+        Ok(())
     }
 
     fn delete(&mut self, key: &[u8]) -> Result<()> {
         self.inner.delete(key)?;
-        self.write_log.push((key.to_vec(), None));
+        self.op_tx.send(Operation::Delete(key.to_vec()))?;
         Ok(())
     }
 
@@ -148,11 +152,18 @@ impl<E: engine::Engine> engine::Engine for Engine<E> {
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.inner.set(key, value.clone())?;
-        self.write_log.push((key.to_vec(), Some(value)));
+        self.op_tx.send(Operation::Set(key.to_vec(), value))?;
         Ok(())
     }
 
     fn status(&mut self) -> Result<Status> {
         self.inner.status()
     }
+}
+
+/// An engine operation, emitted by the debug engine.
+pub enum Operation {
+    Delete(Vec<u8>),
+    Flush,
+    Set(Vec<u8>, Vec<u8>),
 }

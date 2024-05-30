@@ -462,6 +462,9 @@ impl<E: Engine> Transaction<E> {
     /// Commits the transaction, by removing it from the active set. This will
     /// immediately make its writes visible to subsequent transactions. Also
     /// removes its TxnWrite records, which are no longer needed.
+    ///
+    /// NB: commit does not flush writes to durable storage, since we rely on
+    /// the Raft log for persistence.
     pub fn commit(self) -> Result<()> {
         if self.st.read_only {
             return Ok(());
@@ -795,6 +798,7 @@ pub mod tests {
     const GOLDEN_DIR: &str = "src/storage/golden/mvcc";
 
     /// An MVCC wrapper that records transaction schedules to golden masters.
+    /// TODO: migrate this to goldenscript.
     struct Schedule {
         mvcc: MVCC<Debug<Memory>>,
         mint: goldenfile::Mint,
@@ -838,7 +842,7 @@ pub mod tests {
                 txn.commit()?;
             }
             // Flush the write log, but dump the engine contents.
-            self.mvcc.engine.lock()?.take_write_log();
+            while self.mvcc.engine.lock()?.op_rx().try_recv().is_ok() {}
             self.print_engine()?;
             writeln!(&mut self.file.lock()?)?;
             Ok(())
@@ -895,13 +899,18 @@ pub mod tests {
             f: &mut MutexGuard<'_, std::fs::File>,
             engine: &mut MutexGuard<'_, Debug<Memory>>,
         ) -> Result<()> {
-            let writes = engine.take_write_log();
-            for (key, value) in &writes {
-                let (fkey, fvalue) = debug::format_key_value(key, value);
-                match fvalue {
-                    Some(fvalue) => writeln!(f, "    set {} = {}", fkey, fvalue)?,
-                    None => writeln!(f, "    del {}", fkey)?,
-                }
+            while let Ok(op) = engine.op_rx().try_recv() {
+                match op {
+                    debug::Operation::Delete(key) => {
+                        let (fkey, _) = debug::format_key_value(&key, &None);
+                        writeln!(f, "    del {fkey}")
+                    }
+                    debug::Operation::Flush => writeln!(f, "    flush"),
+                    debug::Operation::Set(key, value) => {
+                        let (fkey, fvalue) = debug::format_key_value(&key, &Some(value));
+                        writeln!(f, "    set {} = {}", fkey, fvalue.unwrap())
+                    }
+                }?;
             }
             Ok(())
         }
