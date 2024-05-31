@@ -1,4 +1,4 @@
-use crate::encoding::bincode;
+use crate::encoding::{self, Value as _};
 use crate::error::{Error, Result};
 use crate::raft;
 use crate::sql;
@@ -137,7 +137,7 @@ impl Server {
     /// stepping into the Raft node.
     fn raft_receive_peer(socket: TcpStream, raft_step_tx: Sender<raft::Envelope>) -> Result<()> {
         let mut socket = std::io::BufReader::new(socket);
-        while let Some(message) = bincode::maybe_deserialize_from(&mut socket)? {
+        while let Some(message) = raft::Envelope::maybe_decode_from(&mut socket)? {
             raft_step_tx.send(message)?;
         }
         Ok(())
@@ -156,7 +156,8 @@ impl Server {
                 }
             };
             while let Ok(message) = raft_node_rx.recv() {
-                if let Err(err) = bincode::serialize_into(&mut socket, &message)
+                if let Err(err) = message
+                    .encode_into(&mut socket)
                     .and_then(|()| socket.flush().map_err(Error::from))
                 {
                     error!("Failed sending to Raft peer {addr}: {err}");
@@ -285,7 +286,7 @@ impl Server {
         let mut reader = std::io::BufReader::new(socket.try_clone()?);
         let mut writer = std::io::BufWriter::new(socket);
 
-        while let Some(request) = bincode::maybe_deserialize_from(&mut reader)? {
+        while let Some(request) = Request::maybe_decode_from(&mut reader)? {
             // Execute request.
             debug!("Received request {request:?}");
             let mut response = match request {
@@ -326,9 +327,9 @@ impl Server {
                 );
             }
 
-            bincode::serialize_into(&mut writer, &response)?;
+            response.encode_into(&mut writer)?;
             for row in rows {
-                bincode::serialize_into(&mut writer, &row)?;
+                row.encode_into(&mut writer)?;
             }
             writer.flush()?;
         }
@@ -349,6 +350,8 @@ pub enum Request {
     Status,
 }
 
+impl encoding::Value for Request {}
+
 /// A SQL server response.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
@@ -358,6 +361,8 @@ pub enum Response {
     ListTables(Vec<String>),
     Status(Status),
 }
+
+impl encoding::Value for Response {}
 
 /// SQL server status.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]

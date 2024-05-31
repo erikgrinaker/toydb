@@ -6,7 +6,7 @@ use crossbeam::channel::{Receiver, Sender};
 
 use super::engine::{self, ScanIterator, Status};
 use super::mvcc::{self, TransactionState};
-use crate::encoding::bincode;
+use crate::encoding::{bincode, Key as _};
 use crate::error::Result;
 
 /// Formats a raw byte string, either as a UTF-8 string (if valid and

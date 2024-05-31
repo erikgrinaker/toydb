@@ -1,7 +1,7 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
-use crate::encoding::{bincode, keycode};
+use crate::encoding::{self, Key as _, Value as _};
 use crate::error::{Error, Result};
 use crate::storage;
 
@@ -64,16 +64,6 @@ impl<E: storage::Engine> super::Engine for KV<E> {
     }
 }
 
-/// Serializes SQL metadata.
-fn serialize<V: Serialize>(value: &V) -> Result<Vec<u8>> {
-    bincode::serialize(value)
-}
-
-/// Deserializes SQL metadata.
-fn deserialize<'a, V: Deserialize<'a>>(bytes: &'a [u8]) -> Result<V> {
-    bincode::deserialize(bytes)
-}
-
 /// An SQL transaction based on an MVCC key/value transaction
 pub struct Transaction<E: storage::Engine> {
     txn: storage::mvcc::Transaction<E>,
@@ -95,7 +85,7 @@ impl<E: storage::Engine> Transaction<E> {
         Ok(self
             .txn
             .get(&Key::Index(table.into(), column.into(), value.into()).encode()?)?
-            .map(|v| deserialize(&v))
+            .map(|v| HashSet::<Value>::decode(&v))
             .transpose()?
             .unwrap_or_default())
     }
@@ -112,7 +102,7 @@ impl<E: storage::Engine> Transaction<E> {
         if index.is_empty() {
             self.txn.delete(&key)
         } else {
-            self.txn.set(&key, serialize(&index)?)
+            self.txn.set(&key, index.encode()?)
         }
     }
 }
@@ -144,7 +134,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                 id, table.name
             )));
         }
-        self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode()?, serialize(&row)?)?;
+        self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode()?, row.encode()?)?;
 
         // Update indexes
         for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
@@ -192,7 +182,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>> {
         self.txn
             .get(&Key::Row(table.into(), id.into()).encode()?)?
-            .map(|v| deserialize(&v))
+            .map(|v| Row::decode(&v))
             .transpose()
     }
 
@@ -209,7 +199,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             self.txn
                 .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode()?)?
                 .iter()
-                .map(|r| r.and_then(|(_, v)| deserialize(&v)))
+                .map(|r| r.and_then(|(_, v)| Row::decode(&v)))
                 .filter_map(move |r| match r {
                     Ok(row) => match &filter {
                         Some(filter) => match filter.evaluate(Some(&row)) {
@@ -248,7 +238,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                         Key::Index(_, _, pk) => pk.into_owned(),
                         _ => return Err(Error::Internal("Invalid index key".into())),
                     };
-                    Ok((value, deserialize(&v)?))
+                    Ok((value, HashSet::<Value>::decode(&v)?))
                 })
                 .collect::<Vec<_>>()
                 .into_iter(),
@@ -283,7 +273,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         }
 
         table.validate_row(&row, self)?;
-        self.txn.set(&Key::Row(table.name.into(), id.into()).encode()?, serialize(&row)?)
+        self.txn.set(&Key::Row(table.name.into(), id.into()).encode()?, row.encode()?)
     }
 }
 
@@ -293,7 +283,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
             return Err(Error::Value(format!("Table {} already exists", table.name)));
         }
         table.validate(self)?;
-        self.txn.set(&Key::Table((&table.name).into()).encode()?, serialize(&table)?)
+        self.txn.set(&Key::Table((&table.name).into()).encode()?, table.encode()?)
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
@@ -312,7 +302,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
     }
 
     fn read_table(&self, table: &str) -> Result<Option<Table>> {
-        self.txn.get(&Key::Table(table.into()).encode()?)?.map(|v| deserialize(&v)).transpose()
+        self.txn.get(&Key::Table(table.into()).encode()?)?.map(|v| Table::decode(&v)).transpose()
     }
 
     fn scan_tables(&self) -> Result<Tables> {
@@ -320,7 +310,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
             self.txn
                 .scan_prefix(&KeyPrefix::Table.encode()?)?
                 .iter()
-                .map(|r| r.and_then(|(_, v)| deserialize(&v)))
+                .map(|r| r.and_then(|(_, v)| Table::decode(&v)))
                 .collect::<Result<Vec<_>>>()?
                 .into_iter(),
         ))
@@ -341,15 +331,7 @@ enum Key<'a> {
     Row(Cow<'a, str>, Cow<'a, Value>),
 }
 
-impl<'a> Key<'a> {
-    fn encode(self) -> Result<Vec<u8>> {
-        keycode::serialize(&self)
-    }
-
-    fn decode(bytes: &[u8]) -> Result<Self> {
-        keycode::deserialize(bytes)
-    }
-}
+impl<'a> encoding::Key<'a> for Key<'a> {}
 
 /// Key prefixes, allowing prefix scans of specific parts of the keyspace. These
 /// must match the keys -- in particular, the enum variant indexes must match.
@@ -363,8 +345,4 @@ enum KeyPrefix<'a> {
     Row(Cow<'a, str>),
 }
 
-impl<'a> KeyPrefix<'a> {
-    fn encode(self) -> Result<Vec<u8>> {
-        keycode::serialize(&self)
-    }
-}
+impl<'a> encoding::Key<'a> for KeyPrefix<'a> {}

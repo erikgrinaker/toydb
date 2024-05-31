@@ -1,6 +1,7 @@
 use super::engine::Transaction;
 use super::parser::format_ident;
 use super::types::{DataType, Value};
+use crate::encoding;
 use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
@@ -52,6 +53,8 @@ pub struct Table {
     pub name: String,
     pub columns: Vec<Column>,
 }
+
+impl encoding::Value for Table {}
 
 impl Table {
     /// Creates a new table schema

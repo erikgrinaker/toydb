@@ -1,7 +1,7 @@
 use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, IndexScan, Scan, Transaction as _};
-use crate::encoding::bincode;
+use crate::encoding::{self, bincode, Value as _};
 use crate::error::{Error, Result};
 use crate::raft::{self, Entry};
 use crate::storage::{self, mvcc::TransactionState};
@@ -35,6 +35,8 @@ enum Mutation {
     DeleteTable { txn: TransactionState, table: String },
 }
 
+impl encoding::Value for Mutation {}
+
 /// A Raft state machine query.
 ///
 /// TODO: use Cows for these.
@@ -59,6 +61,8 @@ enum Query {
     /// Reads a table
     ReadTable { txn: TransactionState, table: String },
 }
+
+impl encoding::Value for Query {}
 
 /// Status for the Raft SQL engine.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,7 +93,7 @@ impl Client {
     /// Mutates the Raft state machine, deserializing the response into the
     /// return type.
     fn mutate<V: DeserializeOwned>(&self, mutation: Mutation) -> Result<V> {
-        match self.execute(raft::Request::Write(bincode::serialize(&mutation)?))? {
+        match self.execute(raft::Request::Write(mutation.encode()?))? {
             raft::Response::Write(response) => Ok(bincode::deserialize(&response)?),
             resp => Err(Error::Internal(format!("Unexpected Raft mutation response {:?}", resp))),
         }
@@ -98,7 +102,7 @@ impl Client {
     /// Queries the Raft state machine, deserializing the response into the
     /// return type.
     fn query<V: DeserializeOwned>(&self, query: Query) -> Result<V> {
-        match self.execute(raft::Request::Read(bincode::serialize(&query)?))? {
+        match self.execute(raft::Request::Read(query.encode()?))? {
             raft::Response::Read(response) => Ok(bincode::deserialize(&response)?),
             resp => Err(Error::Internal(format!("Unexpected Raft query response {:?}", resp))),
         }
@@ -306,7 +310,7 @@ impl<E: storage::Engine> State<E> {
     /// Mutates the state machine.
     fn mutate(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
         match mutation {
-            Mutation::Begin => bincode::serialize(&self.engine.begin()?.state()),
+            Mutation::Begin => self.engine.begin()?.state().encode(),
             Mutation::Commit(txn) => bincode::serialize(&self.engine.resume(txn)?.commit()?),
             Mutation::Rollback(txn) => bincode::serialize(&self.engine.resume(txn)?.rollback()?),
 
@@ -339,7 +343,7 @@ impl<E: storage::Engine> raft::State for State<E> {
         assert_eq!(entry.index, self.applied_index + 1, "entry index not after applied index");
 
         let result = match &entry.command {
-            Some(command) => match self.mutate(bincode::deserialize(command)?) {
+            Some(command) => match self.mutate(Mutation::decode(command)?) {
                 error @ Err(Error::Internal(_)) => return error, // don't record as applied
                 result => result,
             },
@@ -351,39 +355,36 @@ impl<E: storage::Engine> raft::State for State<E> {
     }
 
     fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
-        match bincode::deserialize(&command)? {
+        match Query::decode(&command)? {
             Query::BeginReadOnly { as_of } => {
                 let txn = if let Some(version) = as_of {
                     self.engine.begin_as_of(version)?
                 } else {
                     self.engine.begin_read_only()?
                 };
-                bincode::serialize(&txn.state())
+                txn.state().encode()
             }
-            Query::Read { txn, table, id } => {
-                bincode::serialize(&self.engine.resume(txn)?.read(&table, &id)?)
-            }
+            Query::Read { txn, table, id } => self.engine.resume(txn)?.read(&table, &id)?.encode(),
             Query::ReadIndex { txn, table, column, value } => {
-                bincode::serialize(&self.engine.resume(txn)?.read_index(&table, &column, &value)?)
+                self.engine.resume(txn)?.read_index(&table, &column, &value)?.encode()
             }
             // FIXME These need to stream rows somehow
-            Query::Scan { txn, table, filter } => bincode::serialize(
-                &self.engine.resume(txn)?.scan(&table, filter)?.collect::<Result<Vec<_>>>()?,
-            ),
-            Query::ScanIndex { txn, table, column } => bincode::serialize(
-                &self
-                    .engine
-                    .resume(txn)?
-                    .scan_index(&table, &column)?
-                    .collect::<Result<Vec<_>>>()?,
-            ),
-            Query::Status => bincode::serialize(&self.engine.kv.status()?),
+            Query::Scan { txn, table, filter } => {
+                self.engine.resume(txn)?.scan(&table, filter)?.collect::<Result<Vec<_>>>()?.encode()
+            }
+            Query::ScanIndex { txn, table, column } => self
+                .engine
+                .resume(txn)?
+                .scan_index(&table, &column)?
+                .collect::<Result<Vec<_>>>()?
+                .encode(),
+            Query::Status => self.engine.kv.status()?.encode(),
 
             Query::ReadTable { txn, table } => {
-                bincode::serialize(&self.engine.resume(txn)?.read_table(&table)?)
+                self.engine.resume(txn)?.read_table(&table)?.encode()
             }
             Query::ScanTables { txn } => {
-                bincode::serialize(&self.engine.resume(txn)?.scan_tables()?.collect::<Vec<_>>())
+                self.engine.resume(txn)?.scan_tables()?.collect::<Vec<_>>().encode()
             }
         }
     }

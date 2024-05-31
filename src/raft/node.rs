@@ -1105,7 +1105,7 @@ fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encoding::bincode;
+    use crate::encoding::{self, bincode, Value as _};
     use crate::raft::{
         Entry, Request, RequestID, Response, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL,
     };
@@ -2025,6 +2025,8 @@ mod tests {
         Scan,
     }
 
+    impl encoding::Value for TestCommand {}
+
     impl std::fmt::Display for TestCommand {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
@@ -2032,16 +2034,6 @@ mod tests {
                 Self::Put { key, value } => write!(f, "put {key}={value}"),
                 Self::Scan => write!(f, "scan"),
             }
-        }
-    }
-
-    impl TestCommand {
-        fn decode(raw: &[u8]) -> crate::error::Result<Self> {
-            bincode::deserialize(raw)
-        }
-
-        fn encode(&self) -> crate::error::Result<Vec<u8>> {
-            bincode::serialize(self)
         }
     }
 
@@ -2056,6 +2048,8 @@ mod tests {
         Scan(BTreeMap<String, String>),
     }
 
+    impl encoding::Value for TestResponse {}
+
     impl std::fmt::Display for TestResponse {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
@@ -2067,16 +2061,6 @@ mod tests {
                 }
             };
             Ok(())
-        }
-    }
-
-    impl TestResponse {
-        fn decode(raw: &[u8]) -> crate::error::Result<Self> {
-            bincode::deserialize(raw)
-        }
-
-        fn encode(&self) -> crate::error::Result<Vec<u8>> {
-            bincode::serialize(self)
         }
     }
 }

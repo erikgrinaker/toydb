@@ -1,6 +1,7 @@
 mod expression;
 pub use expression::Expression;
 
+use crate::encoding;
 use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
@@ -37,6 +38,8 @@ pub enum Value {
     Float(f64),
     String(String),
 }
+
+impl encoding::Value for Value {}
 
 impl std::cmp::Eq for Value {}
 

@@ -140,7 +140,7 @@
 //! travel queries (it's a feature, not a bug!).
 
 use super::engine::Engine;
-use crate::encoding::{bincode, keycode};
+use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
@@ -152,6 +152,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// An MVCC version represents a logical timestamp. The latest version
 /// is incremented when beginning each read-write transaction.
 type Version = u64;
+
+impl encoding::Value for Version {}
 
 /// MVCC keys, using the KeyCode encoding which preserves the ordering and
 /// grouping of keys. Cow byte slices allow encoding borrowed values and
@@ -191,15 +193,7 @@ pub enum Key<'a> {
     ),
 }
 
-impl<'a> Key<'a> {
-    pub fn decode(bytes: &'a [u8]) -> Result<Self> {
-        keycode::deserialize(bytes)
-    }
-
-    pub fn encode(&self) -> Result<Vec<u8>> {
-        keycode::serialize(&self)
-    }
-}
+impl<'a> encoding::Key<'a> for Key<'a> {}
 
 /// MVCC key prefixes, for prefix scans. These must match the keys above,
 /// including the enum variant index.
@@ -217,11 +211,7 @@ enum KeyPrefix<'a> {
     Unversioned,
 }
 
-impl<'a> KeyPrefix<'a> {
-    fn encode(&self) -> Result<Vec<u8>> {
-        keycode::serialize(&self)
-    }
-}
+impl<'a> encoding::Key<'a> for KeyPrefix<'a> {}
 
 /// An MVCC-based transactional key-value engine. It wraps an underlying storage
 /// engine that's used for raw key/value storage.
@@ -282,7 +272,7 @@ impl<E: Engine> MVCC<E> {
     pub fn status(&self) -> Result<Status> {
         let mut engine = self.engine.lock()?;
         let versions = match engine.get(&Key::NextVersion.encode()?)? {
-            Some(ref v) => bincode::deserialize::<u64>(v)? - 1,
+            Some(ref v) => Version::decode(v)? - 1,
             None => 0,
         };
         let active_txns = engine.scan_prefix(&KeyPrefix::TxnActive.encode()?).count() as u64;
@@ -300,6 +290,8 @@ pub struct Status {
     /// The storage engine.
     pub storage: super::engine::Status,
 }
+
+impl encoding::Value for Status {}
 
 /// An MVCC transaction.
 pub struct Transaction<E: Engine> {
@@ -336,6 +328,8 @@ pub struct TransactionState {
     pub active: HashSet<Version>,
 }
 
+impl encoding::Value for TransactionState {}
+
 impl TransactionState {
     /// Checks whether the given version is visible to this transaction.
     ///
@@ -369,16 +363,16 @@ impl<E: Engine> Transaction<E> {
 
         // Allocate a new version to write at.
         let version = match session.get(&Key::NextVersion.encode()?)? {
-            Some(ref v) => bincode::deserialize(v)?,
+            Some(ref v) => Version::decode(v)?,
             None => 1,
         };
-        session.set(&Key::NextVersion.encode()?, bincode::serialize(&(version + 1))?)?;
+        session.set(&Key::NextVersion.encode()?, (version + 1).encode()?)?;
 
         // Fetch the current set of active transactions, persist it for
         // time-travel queries if non-empty, then add this txn to it.
         let active = Self::scan_active(&mut session)?;
         if !active.is_empty() {
-            session.set(&Key::TxnActiveSnapshot(version).encode()?, bincode::serialize(&active)?)?
+            session.set(&Key::TxnActiveSnapshot(version).encode()?, active.encode()?)?
         }
         session.set(&Key::TxnActive(version).encode()?, vec![])?;
         drop(session);
@@ -395,7 +389,7 @@ impl<E: Engine> Transaction<E> {
 
         // Fetch the latest version.
         let mut version = match session.get(&Key::NextVersion.encode()?)? {
-            Some(ref v) => bincode::deserialize(v)?,
+            Some(ref v) => Version::decode(v)?,
             None => 1,
         };
 
@@ -409,7 +403,7 @@ impl<E: Engine> Transaction<E> {
             }
             version = as_of;
             if let Some(value) = session.get(&Key::TxnActiveSnapshot(version).encode()?)? {
-                active = bincode::deserialize(&value)?;
+                active = HashSet::<Version>::decode(&value)?;
             }
         } else {
             active = Self::scan_active(&mut session)?;

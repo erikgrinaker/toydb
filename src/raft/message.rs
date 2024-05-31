@@ -1,4 +1,5 @@
 use super::{Entry, Index, NodeID, Term};
+use crate::encoding;
 use crate::error::Result;
 use crate::storage;
 
@@ -17,6 +18,8 @@ pub struct Envelope {
     /// The message.
     pub message: Message,
 }
+
+impl encoding::Value for Envelope {}
 
 /// A message sent between Raft nodes.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -140,6 +143,8 @@ pub enum Request {
     Status,
 }
 
+impl encoding::Value for Request {}
+
 /// A client response. This will be wrapped in a Result to handle errors.
 ///
 /// TODO: consider a separate error kind here, or a wrapped Result, to separate
@@ -154,6 +159,8 @@ pub enum Response {
     /// The current Raft leader status.
     Status(Status),
 }
+
+impl encoding::Value for Response {}
 
 /// Raft cluster status.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

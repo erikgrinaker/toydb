@@ -1,5 +1,5 @@
 use super::{NodeID, Term};
-use crate::encoding::{bincode, keycode};
+use crate::encoding::{self, bincode, Key as _};
 use crate::error::{Error, Result};
 use crate::storage;
 use crate::{asserterr, errassert};
@@ -31,15 +31,7 @@ pub enum Key {
     CommitIndex,
 }
 
-impl Key {
-    fn decode(bytes: &[u8]) -> Result<Self> {
-        keycode::deserialize(bytes)
-    }
-
-    fn encode(&self) -> Result<Vec<u8>> {
-        keycode::serialize(self)
-    }
-}
+impl encoding::Key<'_> for Key {}
 
 /// Log key prefixes, used for prefix scans.
 ///
@@ -51,11 +43,7 @@ enum KeyPrefix {
     CommitIndex,
 }
 
-impl KeyPrefix {
-    fn encode(&self) -> Result<Vec<u8>> {
-        keycode::serialize(self)
-    }
-}
+impl encoding::Key<'_> for KeyPrefix {}
 
 /// A Raft log.
 pub struct Log {
