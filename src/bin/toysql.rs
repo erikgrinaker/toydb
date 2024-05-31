@@ -24,7 +24,7 @@ fn main() -> Result<()> {
                 .short('H')
                 .long("host")
                 .help("Host to connect to")
-                .default_value("127.0.0.1"),
+                .default_value("localhost"),
             clap::Arg::new("port")
                 .short('p')
                 .long("port")
