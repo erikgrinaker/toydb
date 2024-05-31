@@ -16,7 +16,8 @@ pub struct Entry {
     pub index: Index,
     /// The term in which the entry was added.
     pub term: Term,
-    /// The state machine command. None is used to commit noops during leader election.
+    /// The state machine command. None (noop) commands are used during leader
+    /// election to commit old entries, see section 5.4.2 in the Raft paper.
     pub command: Option<Vec<u8>>,
 }
 
@@ -45,7 +46,41 @@ enum KeyPrefix {
 
 impl encoding::Key<'_> for KeyPrefix {}
 
-/// A Raft log.
+/// The Raft log stores a sequence of arbitrary commands (typically writes) that
+/// are replicated across nodes and applied sequentially to the local state
+/// machine. Each entry contains an index, command, and the term in which the
+/// leader proposed it. Commands may be noops (None), which are added when a
+/// leader is elected (see section 5.4.2 in the Raft paper).
+///
+/// A key/value store is used to store the log entries on disk, keyed by index,
+/// along with a few other metadata keys (e.g. who we voted for in this term).
+///
+/// In the steady state, the log is append-only: when a client submits a
+/// command, the leader appends it to its own log (via [`Log::append`]) and
+/// replicates it to followers who append it to their logs (via
+/// [`Log::splice`]). When an index has been replicated to a majority of nodes
+/// it becomes committed, making the log immutable up to that index and
+/// guaranteeing that all nodes will eventually contain it. Nodes keep track of
+/// the commit index via [`Log::commit`] and apply committed commands to the
+/// state machine.
+///
+/// However, uncommitted entries can be replaced or removed. A leader may append
+/// entries to its log, but then be unable to reach consensus on them (e.g.
+/// because it is unable to communicate with a majority of nodes). If a
+/// different leader is elected and writes different commands to those same
+/// indexes, then the uncommitted entries will be replaced with entries from the
+/// new leader once the old leader (or a follower) discovers it.
+///
+/// The Raft log has the following invariants:
+///
+/// * Entry indexes are contiguous starting at 1 (no index gaps).
+/// * Entry terms never decrease from the previous entry.
+/// * Appended entries are durable (flushed to disk).
+/// * Committed entries are never changed or removed (no log truncation).
+/// * Committed entries will eventually be replicated to all nodes.
+/// * Entries with the same index/term contain the same command.
+/// * If two logs contain a matching index/term, all previous entries
+///   are identical (see section 5.3 in the Raft paper).
 pub struct Log {
     /// The underlying storage engine. Uses a trait object instead of generics,
     /// to allow runtime selection of the engine and avoid propagating the
