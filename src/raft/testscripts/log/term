@@ -13,16 +13,16 @@ Error: assertion failed: can't set term 0
 set_term 3 oplog=true
 get_term
 ---
-set TermVote 0x01 = 0x0300
-flush
+engine: set TermVote 0x01 = 0x0300
+engine: flush
 term=3 vote=None
 
 # set_term stores a term and vote.
 set_term 3 7 oplog=true
 get_term
 ---
-set TermVote 0x01 = 0x030107
-flush
+engine: set TermVote 0x01 = 0x030107
+engine: flush
 term=3 vote=7
 
 # set_term is idempotent, which doesn't incur an engine write.
@@ -60,7 +60,7 @@ Error: assertion failed: can't change vote Some(1) → Some(2)
 
 # The above errors should not have changed the term/vote.
 get_term
-raw
+dump
 ---
 term=9 vote=1
 TermVote 0x01 = 0x090101

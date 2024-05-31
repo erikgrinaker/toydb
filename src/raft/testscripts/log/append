@@ -8,28 +8,28 @@ Error: assertion failed: can't append entry with term 0
 # to durable storage.
 append 2 foo oplog=true
 ---
-set Entry(1) 0x000000000000000001 = 0x020103666f6f
-flush
+engine: set Entry(1) 0x000000000000000001 = 0x01020103666f6f
+engine: flush
 append → 1@2 foo
 
 # Appending a noop entry (no command) also works.
 append 2 oplog=true
 ---
-set Entry(2) 0x000000000000000002 = 0x0200
-flush
+engine: set Entry(2) 0x000000000000000002 = 0x020200
+engine: flush
 append → 2@2 None
 
 # Check that the last index/term is updated (commit index isn't), and that
 # the engine contains the expected data, both in logical and raw form.
 status
 scan
-raw
+dump
 ---
 last=2@2 commit=0@0
 1@2 foo
 2@2 None
-Entry(1) 0x000000000000000001 = 0x020103666f6f
-Entry(2) 0x000000000000000002 = 0x0200
+Entry(1) 0x000000000000000001 = 0x01020103666f6f
+Entry(2) 0x000000000000000002 = 0x020200
 
 # Bumping the term with a command is allowed. Skipping a term and omitting the
 # command is also allowed.
@@ -49,14 +49,14 @@ Error: assertion failed: term regression 5 → 0
 # Dump the final status and data.
 status
 scan
-raw
+dump
 ---
 last=4@5 commit=0@0
 1@2 foo
 2@2 None
 3@3 command
 4@5 None
-Entry(1) 0x000000000000000001 = 0x020103666f6f
-Entry(2) 0x000000000000000002 = 0x0200
-Entry(3) 0x000000000000000003 = 0x030107636f6d6d616e64
-Entry(4) 0x000000000000000004 = 0x0500
+Entry(1) 0x000000000000000001 = 0x01020103666f6f
+Entry(2) 0x000000000000000002 = 0x020200
+Entry(3) 0x000000000000000003 = 0x03030107636f6d6d616e64
+Entry(4) 0x000000000000000004 = 0x040500

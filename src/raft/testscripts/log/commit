@@ -20,16 +20,16 @@ Error: assertion failed: commit index 0 does not exist
 commit 1@1 oplog=true
 status
 ---
-set CommitIndex 0x02 = 0x0101
+engine: set CommitIndex 0x02 = 0x0101
 commit → 1@1 None
 last=3@2 commit=1@1
 
-# Dump the raw engine contents too.
-raw
+# Dump the raw engine contents tdump
+dump
 ---
-Entry(1) 0x000000000000000001 = 0x0100
-Entry(2) 0x000000000000000002 = 0x010103666f6f
-Entry(3) 0x000000000000000003 = 0x020103626172
+Entry(1) 0x000000000000000001 = 0x010100
+Entry(2) 0x000000000000000002 = 0x02010103666f6f
+Entry(3) 0x000000000000000003 = 0x03020103626172
 CommitIndex 0x02 = 0x0101
 
 # Commits are idempotent, which doesn't incur an engine set.
@@ -69,10 +69,10 @@ status
 Error: assertion failed: commit index 4 does not exist
 last=3@2 commit=3@2
 
-# Dump the raw value.
-raw
+# Dump the raw values.
+dump
 ---
-Entry(1) 0x000000000000000001 = 0x0100
-Entry(2) 0x000000000000000002 = 0x010103666f6f
-Entry(3) 0x000000000000000003 = 0x020103626172
+Entry(1) 0x000000000000000001 = 0x010100
+Entry(2) 0x000000000000000002 = 0x02010103666f6f
+Entry(3) 0x000000000000000003 = 0x03020103626172
 CommitIndex 0x02 = 0x0302

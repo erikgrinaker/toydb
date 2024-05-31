@@ -1,12 +1,12 @@
 use super::{NodeID, Term};
-use crate::encoding::{self, bincode, Key as _};
+use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::Result;
 use crate::storage;
-use crate::{asserterr, errassert, errdata};
+use crate::{asserterr, errassert};
 
 use serde::{Deserialize, Serialize};
 
-/// A log index.
+/// A log index. Starts at 1, indicates no index if 0.
 pub type Index = u64;
 
 /// A log entry.
@@ -20,7 +20,9 @@ pub struct Entry {
     pub command: Option<Vec<u8>>,
 }
 
-/// A log key, encoded using KeyCode.
+impl encoding::Value for Entry {}
+
+/// A log storage key.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Key {
     /// A log entry, storing the term and command.
@@ -33,9 +35,7 @@ pub enum Key {
 
 impl encoding::Key<'_> for Key {}
 
-/// Log key prefixes, used for prefix scans.
-///
-/// TODO: consider handling this in Key somehow.
+/// Log key prefixes used for prefix scans. Must match the Key structure.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 enum KeyPrefix {
     Entry,
@@ -48,8 +48,8 @@ impl encoding::Key<'_> for KeyPrefix {}
 /// A Raft log.
 pub struct Log {
     /// The underlying storage engine. Uses a trait object instead of generics,
-    /// to allow runtime selection of the engine (based on the program config)
-    /// and avoid propagating the generic type parameters throughout.
+    /// to allow runtime selection of the engine and avoid propagating the
+    /// generic type parameters throughout Raft.
     engine: Box<dyn storage::Engine>,
     /// The index of the last stored entry.
     last_index: Index,
@@ -62,13 +62,13 @@ pub struct Log {
 }
 
 impl Log {
-    /// Creates a new log, using the given storage engine.
+    /// Initializes a log using the given storage engine.
     pub fn new(mut engine: impl storage::Engine + 'static) -> Result<Self> {
         let (last_index, last_term) = engine
             .scan_prefix(&KeyPrefix::Entry.encode()?)
             .last()
             .transpose()?
-            .map(|(k, v)| Self::decode_entry(&k, &v))
+            .map(|(_, v)| Entry::decode(&v))
             .transpose()?
             .map(|e| (e.index, e.term))
             .unwrap_or((0, 0));
@@ -78,23 +78,6 @@ impl Log {
             .transpose()?
             .unwrap_or((0, 0));
         Ok(Self { engine: Box::new(engine), last_index, last_term, commit_index, commit_term })
-    }
-
-    /// Decodes an entry from a log key/value pair.
-    fn decode_entry(key: &[u8], value: &[u8]) -> Result<Entry> {
-        let Key::Entry(index) = Key::decode(key)? else { return errdata!("invalid key {key:x?}") };
-            Self::decode_entry_value(index, value)
-    }
-
-    /// Decodes an entry from a value at a given index.
-    fn decode_entry_value(index: Index, value: &[u8]) -> Result<Entry> {
-        let (term, command) = bincode::deserialize(value)?;
-        Ok(Entry { index, term, command })
-    }
-
-    /// Returns log engine name and status.
-    pub fn status(&mut self) -> Result<storage::engine::Status> {
-        self.engine.status()
     }
 
     /// Returns the commit index and term.
@@ -134,9 +117,9 @@ impl Log {
         Ok(())
     }
 
-    /// Appends a command to the log, returning its index. None implies a noop
-    /// command, typically after Raft leader changes. The term must be equal to
-    /// or greater than the previous entry.
+    /// Appends a command to the log and flushes it to disk, returning its
+    /// index. None implies a noop command, typically after Raft leader changes.
+    /// The term must be equal to or greater than the previous entry.
     pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
         match self.get(self.last_index)? {
             Some(e) if term < e.term => return errassert!("term regression {} → {term}", e.term),
@@ -144,12 +127,14 @@ impl Log {
             None if term == 0 => return errassert!("can't append entry with term 0"),
             Some(_) | None => {}
         }
-        let index = self.last_index + 1;
-        self.engine.set(&Key::Entry(index).encode()?, bincode::serialize(&(term, command))?)?;
+        // We could omit the index in the encoded value, since it's also stored
+        // in the key, but we keep it simple.
+        let entry = Entry { index: self.last_index + 1, term, command };
+        self.engine.set(&Key::Entry(entry.index).encode()?, entry.encode()?)?;
         self.engine.flush()?;
-        self.last_index = index;
-        self.last_term = term;
-        Ok(index)
+        self.last_index = entry.index;
+        self.last_term = entry.term;
+        Ok(entry.index)
     }
 
     /// Commits entries up to and including the given index. The index must
@@ -174,10 +159,7 @@ impl Log {
 
     /// Fetches an entry at an index, or None if it does not exist.
     pub fn get(&mut self, index: Index) -> Result<Option<Entry>> {
-        self.engine
-            .get(&Key::Entry(index).encode()?)?
-            .map(|v| Self::decode_entry_value(index, &v))
-            .transpose()
+        self.engine.get(&Key::Entry(index).encode()?)?.map(|v| Entry::decode(&v)).transpose()
     }
 
     /// Checks if the log contains an entry with the given index and term.
@@ -190,31 +172,27 @@ impl Log {
         &mut self,
         range: impl std::ops::RangeBounds<Index>,
     ) -> Result<impl Iterator<Item = Result<Entry>> + '_> {
+        use std::ops::Bound;
         let from = match range.start_bound() {
-            std::ops::Bound::Excluded(i) => std::ops::Bound::Excluded(Key::Entry(*i).encode()?),
-            std::ops::Bound::Included(i) => std::ops::Bound::Included(Key::Entry(*i).encode()?),
-            std::ops::Bound::Unbounded => std::ops::Bound::Included(Key::Entry(0).encode()?),
+            Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()?),
+            Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()?),
+            Bound::Unbounded => Bound::Included(Key::Entry(0).encode()?),
         };
         let to = match range.end_bound() {
-            std::ops::Bound::Excluded(i) => std::ops::Bound::Excluded(Key::Entry(*i).encode()?),
-            std::ops::Bound::Included(i) => std::ops::Bound::Included(Key::Entry(*i).encode()?),
-            std::ops::Bound::Unbounded => {
-                std::ops::Bound::Included(Key::Entry(Index::MAX).encode()?)
-            }
+            Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()?),
+            Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()?),
+            Bound::Unbounded => Bound::Included(Key::Entry(Index::MAX).encode()?),
         };
-        Ok(self
-            .engine
-            .scan_dyn((from, to))
-            .map(|r| r.and_then(|(k, v)| Self::decode_entry(&k, &v))))
+        Ok(self.engine.scan_dyn((from, to)).map(|r| r.and_then(|(_, v)| Entry::decode(&v))))
     }
 
-    /// Splices a set of entries into the log. The entries must have contiguous
-    /// indexes and equal/increasing terms, and the first entry must be in the
-    /// range [1,last_index+1] with a term at or equal to the previous (base)
-    /// entry's term. New indexes will be appended. Overlapping indexes with the
-    /// same term must be equal and will be ignored. Overlapping indexes with
-    /// different terms will truncate the existing log at the first conflict and
-    /// then splice the new entries.
+    /// Splices a set of entries into the log and flushes it to disk. The
+    /// entries must have contiguous indexes and equal/increasing terms, and the
+    /// first entry must be in the range [1,last_index+1] with a term at or
+    /// equal to the previous (base) entry's term. New indexes will be appended.
+    /// Overlapping indexes with the same term must be equal and will be
+    /// ignored. Overlapping indexes with different terms will truncate the
+    /// existing log at the first conflict and then splice the new entries.
     pub fn splice(&mut self, entries: Vec<Entry>) -> Result<Index> {
         let (Some(first), Some(last)) = (entries.first(), entries.last()) else {
             return Ok(self.last_index); // empty input is noop
@@ -267,10 +245,7 @@ impl Log {
         asserterr!(first.index > self.commit_index, "spliced entries below commit index");
 
         for entry in entries {
-            self.engine.set(
-                &Key::Entry(entry.index).encode()?,
-                bincode::serialize(&(&entry.term, &entry.command))?,
-            )?;
+            self.engine.set(&Key::Entry(entry.index).encode()?, entry.encode()?)?;
         }
         for index in last.index + 1..=self.last_index {
             self.engine.delete(&Key::Entry(index).encode()?)?;
@@ -280,6 +255,11 @@ impl Log {
         self.last_index = last.index;
         self.last_term = last.term;
         Ok(self.last_index)
+    }
+
+    /// Returns log engine status.
+    pub fn status(&mut self) -> Result<storage::Status> {
+        self.engine.status()
     }
 }
 
@@ -334,6 +314,17 @@ mod tests {
                     output.push_str(&format!("commit → {}\n", Self::format_entry(&entry)));
                 }
 
+                // dump
+                "dump" => {
+                    command.consume_args().reject_rest()?;
+                    let range = (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded);
+                    let mut scan = self.log.engine.scan_dyn(range);
+                    while let Some((key, value)) = scan.next().transpose()? {
+                        output.push_str(&Self::format_key_value(&key, &value));
+                        output.push('\n');
+                    }
+                }
+
                 // get INDEX...
                 "get" => {
                     let mut args = command.consume_args();
@@ -341,11 +332,13 @@ mod tests {
                         args.rest_pos().iter().map(|a| a.parse()).collect::<Result<_, _>>()?;
                     args.reject_rest()?;
                     for index in indexes {
-                        let result = match self.log.get(index)? {
-                            Some(entry) => Self::format_entry(&entry),
-                            None => "None".to_string(),
-                        };
-                        output.push_str(&format!("{result}\n"));
+                        let entry = self
+                            .log
+                            .get(index)?
+                            .as_ref()
+                            .map(Self::format_entry)
+                            .unwrap_or("None".to_string());
+                        output.push_str(&format!("{entry}\n"));
                     }
                 }
 
@@ -371,17 +364,6 @@ mod tests {
                     for (index, term) in indexes {
                         let has = self.log.has(index, term)?;
                         output.push_str(&format!("{has}\n"));
-                    }
-                }
-
-                // raw
-                "raw" => {
-                    command.consume_args().reject_rest()?;
-                    let range = (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded);
-                    let mut scan = self.log.engine.scan_dyn(range);
-                    while let Some((key, value)) = scan.next().transpose()? {
-                        output.push_str(&Self::format_key_value(&key, &value));
-                        output.push('\n');
                     }
                 }
 
@@ -499,8 +481,7 @@ mod tests {
                     Operation::Flush => "flush".to_string(),
                     Operation::Set(k, v) => format!("set {}", Self::format_key_value(&k, &v)),
                 };
-                output.push_str(&s);
-                output.push('\n');
+                output.push_str(&format!("engine: {s}\n"));
             }
         }
 

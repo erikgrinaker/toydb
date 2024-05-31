@@ -15,9 +15,9 @@ splice 1@2= 2@2=command oplog=true
 status
 scan
 ---
-set Entry(1) 0x000000000000000001 = 0x0200
-set Entry(2) 0x000000000000000002 = 0x020107636f6d6d616e64
-flush
+engine: set Entry(1) 0x000000000000000001 = 0x010200
+engine: set Entry(2) 0x000000000000000002 = 0x02020107636f6d6d616e64
+engine: flush
 splice → 2@2 command
 last=2@2 commit=0@0
 1@2 None
@@ -107,9 +107,9 @@ splice → 4@3 None
 splice 3@2=bar 4@3= 5@3=foo 6@3=bar oplog=true
 scan
 ---
-set Entry(5) 0x000000000000000005 = 0x030103666f6f
-set Entry(6) 0x000000000000000006 = 0x030103626172
-flush
+engine: set Entry(5) 0x000000000000000005 = 0x05030103666f6f
+engine: set Entry(6) 0x000000000000000006 = 0x06030103626172
+engine: flush
 splice → 6@3 bar
 1@2 None
 2@2 command
@@ -123,10 +123,10 @@ splice 4@4= oplog=true
 status
 scan
 ---
-set Entry(4) 0x000000000000000004 = 0x0400
-delete Entry(5) 0x000000000000000005
-delete Entry(6) 0x000000000000000006
-flush
+engine: set Entry(4) 0x000000000000000004 = 0x040400
+engine: delete Entry(5) 0x000000000000000005
+engine: delete Entry(6) 0x000000000000000006
+engine: flush
 splice → 4@4 None
 last=4@4 commit=0@0
 1@2 None
@@ -139,11 +139,11 @@ splice 1@5= 2@5=foo 3@5=bar oplog=true
 status
 scan
 ---
-set Entry(1) 0x000000000000000001 = 0x0500
-set Entry(2) 0x000000000000000002 = 0x050103666f6f
-set Entry(3) 0x000000000000000003 = 0x050103626172
-delete Entry(4) 0x000000000000000004
-flush
+engine: set Entry(1) 0x000000000000000001 = 0x010500
+engine: set Entry(2) 0x000000000000000002 = 0x02050103666f6f
+engine: set Entry(3) 0x000000000000000003 = 0x03050103626172
+engine: delete Entry(4) 0x000000000000000004
+engine: flush
 splice → 3@5 bar
 last=3@5 commit=0@0
 1@5 None
@@ -184,10 +184,10 @@ Error: assertion failed: spliced entries below commit index
 Error: assertion failed: spliced entries below commit index
 
 # Dump the raw data.
-raw
+dump
 ---
-Entry(1) 0x000000000000000001 = 0x0500
-Entry(2) 0x000000000000000002 = 0x050103666f6f
-Entry(3) 0x000000000000000003 = 0x0600
-Entry(4) 0x000000000000000004 = 0x060103626172
+Entry(1) 0x000000000000000001 = 0x010500
+Entry(2) 0x000000000000000002 = 0x02050103666f6f
+Entry(3) 0x000000000000000003 = 0x030600
+Entry(4) 0x000000000000000004 = 0x04060103626172
 CommitIndex 0x02 = 0x0205

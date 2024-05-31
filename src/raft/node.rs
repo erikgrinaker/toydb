@@ -164,7 +164,9 @@ impl<R: Role> RawNode<R> {
     {
         let applied_index = state.get_applied_index();
         let commit_index = log.get_commit_index().0;
-        assert!(commit_index >= applied_index, "Commit index below applied index");
+        // NB: we don't assert that commit_index >= applied_index, because the
+        // local commit index is not synced to durable storage -- on restart, it
+        // can be recovered from a quorum of logs.
         if applied_index >= commit_index {
             return Ok(());
         }
