@@ -1,8 +1,8 @@
 use super::{NodeID, Term};
 use crate::encoding::{self, bincode, Key as _};
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::storage;
-use crate::{asserterr, errassert};
+use crate::{asserterr, errassert, errdata};
 
 use serde::{Deserialize, Serialize};
 
@@ -82,11 +82,8 @@ impl Log {
 
     /// Decodes an entry from a log key/value pair.
     fn decode_entry(key: &[u8], value: &[u8]) -> Result<Entry> {
-        if let Key::Entry(index) = Key::decode(key)? {
+        let Key::Entry(index) = Key::decode(key)? else { return errdata!("invalid key {key:x?}") };
             Self::decode_entry_value(index, value)
-        } else {
-            Err(Error::Internal(format!("Invalid key {:x?}", key)))
-        }
     }
 
     /// Decodes an entry from a value at a given index.

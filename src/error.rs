@@ -16,9 +16,11 @@ impl<T> From<Error> for Result<T> {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Error {
     Abort,
-    Assert(String),   // TODO include backtrace
-    Config(String),   // TODO replace with Input
-    Internal(String), // TODO remove
+    Assert(String), // TODO include backtrace
+    Config(String), // TODO replace with Input
+    /// Invalid data, typically decoding errors.
+    InvalidData(String),
+    Internal(String), // TODO remove?
     Parse(String),    // TODO replace with Input
     ReadOnly,
     Serialization,
@@ -28,7 +30,13 @@ pub enum Error {
 /// Constructs an Error::Assert via format!() and into().
 #[macro_export]
 macro_rules! errassert {
-    ($($args:tt)*) => { Error::Assert(format!($($args)*)).into() };
+    ($($args:tt)*) => { $crate::error::Error::Assert(format!($($args)*)).into() };
+}
+
+/// Constructs an Error::InvalidData via format!() and into().
+#[macro_export]
+macro_rules! errdata {
+    ($($args:tt)*) => { $crate::error::Error::InvalidData(format!($($args)*)).into() };
 }
 
 /// Returns an Error::Assert if the given condition is false.
@@ -44,7 +52,11 @@ impl std::error::Error for Error {}
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::Config(s) | Error::Internal(s) | Error::Parse(s) | Error::Value(s) => {
+            Error::Config(s)
+            | Error::InvalidData(s)
+            | Error::Internal(s)
+            | Error::Parse(s)
+            | Error::Value(s) => {
                 write!(f, "{}", s)
             }
             Error::Assert(s) => write!(f, "assertion failed: {s}"),
@@ -57,19 +69,19 @@ impl std::fmt::Display for Error {
 
 impl serde::ser::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::Internal(msg.to_string())
+        Error::InvalidData(msg.to_string())
     }
 }
 
 impl serde::de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
-        Error::Internal(msg.to_string())
+        Error::InvalidData(msg.to_string())
     }
 }
 
 impl From<Box<bincode::ErrorKind>> for Error {
     fn from(err: Box<bincode::ErrorKind>) -> Self {
-        Error::Internal(err.to_string())
+        Error::InvalidData(err.to_string())
     }
 }
 
