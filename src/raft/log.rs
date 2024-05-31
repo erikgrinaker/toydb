@@ -50,7 +50,16 @@ impl encoding::Key<'_> for KeyPrefix {}
 /// are replicated across nodes and applied sequentially to the local state
 /// machine. Each entry contains an index, command, and the term in which the
 /// leader proposed it. Commands may be noops (None), which are added when a
-/// leader is elected (see section 5.4.2 in the Raft paper).
+/// leader is elected (see section 5.4.2 in the Raft paper). For example:
+///
+/// Index | Term | Command
+/// ------|------|------------------------------------------------------
+///   1   |   1  | None
+///   2   |   1  | CREATE TABLE table (id INT PRIMARY KEY, value STRING)
+///   3   |   1  | INSERT INTO table VALUES (1, 'foo')
+///   4   |   2  | None
+///   5   |   2  | UPDATE table SET value = 'bar' WHERE id = 1
+///   6   |   2  | DELETE FROM table WHERE id = 1
 ///
 /// A key/value store is used to store the log entries on disk, keyed by index,
 /// along with a few other metadata keys (e.g. who we voted for in this term).
