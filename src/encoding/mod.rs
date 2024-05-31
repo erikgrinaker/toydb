@@ -57,8 +57,8 @@ pub trait Value: Serialize + DeserializeOwned {
 }
 
 /// Blanket implementations for various types wrapping a value type.
-impl<V: Value + std::cmp::Eq + std::hash::Hash> Value for std::collections::HashSet<V> {}
 impl<V: Value> Value for Option<V> {}
 impl<V: Value> Value for Result<V> {}
 impl<V: Value> Value for Vec<V> {}
-impl<V: Value + std::cmp::Eq + std::hash::Hash> Value for Vec<(V, std::collections::HashSet<V>)> {}
+impl<V1: Value, V2: Value> Value for (V1, V2) {}
+impl<V: Value + std::cmp::Eq + std::hash::Hash> Value for std::collections::HashSet<V> {}
