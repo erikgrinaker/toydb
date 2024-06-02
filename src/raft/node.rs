@@ -681,16 +681,13 @@ impl RawNode<Follower> {
     }
 }
 
-/// Peer replication progress.
+/// Follower replication progress.
 #[derive(Clone, Debug, PartialEq)]
 struct Progress {
-    /// The next index to replicate to the peer.
-    next: Index,
-    /// The last index known to be replicated to the peer.
-    ///
-    /// TODO: rename to match. It needs to track the position where the
-    /// follower's log matches the leader's, not its last position.
-    last: Index,
+    /// The next index to replicate to the follower.
+    next_index: Index,
+    /// The last index where the follower's log matches the leader.
+    match_index: Index,
     /// The last read sequence number confirmed by the peer.
     read_seq: ReadSequence,
 }
@@ -720,7 +717,7 @@ struct Read {
 // A leader serves requests and replicates the log to followers.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Leader {
-    /// Peer replication progress.
+    /// Follower replication progress.
     progress: HashMap<NodeID, Progress>,
     /// Keeps track of pending write requests, keyed by log index. These are
     /// added when the write is proposed and appended to the leader's log, and
@@ -749,9 +746,11 @@ pub struct Leader {
 impl Leader {
     /// Creates a new leader role.
     fn new(peers: HashSet<NodeID>, last_index: Index) -> Self {
-        let next = last_index + 1;
-        let progress =
-            peers.into_iter().map(|p| (p, Progress { next, last: 0, read_seq: 0 })).collect();
+        let next_index = last_index + 1;
+        let progress = peers
+            .into_iter()
+            .map(|p| (p, Progress { next_index, match_index: 0, read_seq: 0 }))
+            .collect();
         Self {
             progress,
             writes: HashMap::new(),
@@ -859,11 +858,12 @@ impl RawNode<Leader> {
             Message::AppendResponse { reject_index: 0, last_index, last_term } => {
                 let (li, lt) = self.log.get_last_index();
                 assert!(last_index <= li && last_term <= lt, "follower appended future entries");
+                debug_assert!(self.log.has(last_index, last_term)?, "follower has unknown tail");
 
                 let progress = self.role.progress.get_mut(&msg.from).expect("unknown node");
-                if last_index > progress.last {
-                    progress.last = last_index;
-                    progress.next = last_index + 1;
+                if last_index > progress.match_index {
+                    progress.match_index = last_index;
+                    progress.next_index = last_index + 1;
                     self.maybe_commit_and_apply()?;
                 }
             }
@@ -880,8 +880,8 @@ impl RawNode<Leader> {
                 // If the next index was rejected, try the previous one.
                 // Otherwise, the rejection is stale and can be ignored. If the
                 // follower's log is shorter, skip straight to its last index.
-                if progress.next == reject_index + 1 {
-                    progress.next = std::cmp::min(progress.next - 1, last_index + 1);
+                if progress.next_index == reject_index + 1 {
+                    progress.next_index = std::cmp::min(progress.next_index - 1, last_index + 1);
                     self.send_log(msg.from)?;
                 }
             }
@@ -918,11 +918,11 @@ impl RawNode<Leader> {
                 let status = Status {
                     leader: self.id,
                     term: self.term,
-                    last_index: self
+                    match_index: self
                         .role
                         .progress
                         .iter()
-                        .map(|(id, p)| (*id, p.last))
+                        .map(|(id, p)| (*id, p.match_index))
                         .chain(std::iter::once((self.id, self.log.get_last_index().0)))
                         .sorted()
                         .collect(),
@@ -993,7 +993,7 @@ impl RawNode<Leader> {
             self.role
                 .progress
                 .values()
-                .map(|p| p.last)
+                .map(|p| p.match_index)
                 .chain(std::iter::once(self.log.get_last_index().0))
                 .collect(),
         );
@@ -1073,10 +1073,12 @@ impl RawNode<Leader> {
     /// Sends pending log entries to a peer.
     fn send_log(&mut self, peer: NodeID) -> Result<()> {
         let (base_index, base_term) = match self.role.progress.get(&peer) {
-            Some(Progress { next, .. }) if *next > 1 => match self.log.get(next - 1)? {
-                Some(entry) => (entry.index, entry.term),
-                None => panic!("missing base entry {}", next - 1),
-            },
+            Some(Progress { next_index, .. }) if *next_index > 1 => {
+                match self.log.get(next_index - 1)? {
+                    Some(entry) => (entry.index, entry.term),
+                    None => panic!("missing base entry {}", next_index - 1),
+                }
+            }
             Some(_) => (0, 0),
             None => panic!("unknown peer {}", peer),
         };
@@ -1643,7 +1645,7 @@ mod tests {
                             .progress
                             .iter()
                             .sorted_by_key(|(id, _)| *id)
-                            .map(|(id, pr)| format!("{id}:{}→{}", pr.last, pr.next))
+                            .map(|(id, pr)| format!("{id}:{}→{}", pr.match_index, pr.next_index))
                             .join(" ")
                     ))
                 }

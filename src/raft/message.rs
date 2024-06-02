@@ -175,11 +175,9 @@ pub struct Status {
     pub leader: NodeID,
     /// The current Raft term.
     pub term: Term,
-    /// The last log indexes of all nodes. Use a BTreeMap for deterministic
+    /// The match indexes of all nodes. Use a BTreeMap for deterministic
     /// debug output.
-    ///
-    /// TODO: rename to match.
-    pub last_index: BTreeMap<NodeID, Index>,
+    pub match_index: BTreeMap<NodeID, Index>,
     /// The current commit index.
     pub commit_index: Index,
     /// The current applied index.

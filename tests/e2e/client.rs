@@ -126,7 +126,7 @@ fn status() -> Result<()> {
             raft: raft::Status {
                 leader: 1,
                 term: 1,
-                last_index: [(1, 27)].into(),
+                match_index: [(1, 27)].into(),
                 commit_index: 27,
                 apply_index: 27,
                 storage: storage::engine::Status {

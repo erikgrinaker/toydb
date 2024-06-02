@@ -25,11 +25,11 @@ status request=true 1
 stabilize
 ---
 c1@1 → n1 ClientRequest id=0x02 status
-n1@1 → c1 ClientResponse id=0x02 status Status { leader: 1, term: 1, last_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
+n1@1 → c1 ClientResponse id=0x02 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
 c1@1 status ⇒ Status {
     leader: 1,
     term: 1,
-    last_index: {
+    match_index: {
         1: 2,
         2: 2,
         3: 1,
@@ -52,12 +52,12 @@ stabilize
 ---
 c2@1 → n2 ClientRequest id=0x03 status
 n2@1 → n1 ClientRequest id=0x03 status
-n1@1 → n2 ClientResponse id=0x03 status Status { leader: 1, term: 1, last_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
-n2@1 → c2 ClientResponse id=0x03 status Status { leader: 1, term: 1, last_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
+n1@1 → n2 ClientResponse id=0x03 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
+n2@1 → c2 ClientResponse id=0x03 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
 c2@1 status ⇒ Status {
     leader: 1,
     term: 1,
-    last_index: {
+    match_index: {
         1: 2,
         2: 2,
         3: 1,
