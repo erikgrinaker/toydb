@@ -1,5 +1,5 @@
 Query: UPDATE test SET value = 'abc'
-Error: Value("Invalid datatype STRING for INTEGER column value")
+Error: InvalidInput("invalid datatype STRING for INTEGER column value")
 
 Storage:
 CREATE TABLE test (

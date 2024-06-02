@@ -1,5 +1,5 @@
 Query: SELECT * FROM movies LIMIT 3, 4
 
-Error: Unexpected token ,
+Error: invalid input: unexpected token ,
 
-AST: Parse("Unexpected token ,")
+AST: InvalidInput("unexpected token ,")

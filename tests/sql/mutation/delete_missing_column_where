@@ -1,5 +1,5 @@
 Query: DELETE FROM test WHERE missing = TRUE
-Error: Value("Unknown field missing")
+Error: InvalidInput("unknown field missing")
 
 Storage:
 CREATE TABLE other (

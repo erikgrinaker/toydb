@@ -1,5 +1,5 @@
 Query: UPDATE "string" SET pk = NULL WHERE pk = 'foo'
-Error: Value("NULL value not allowed for column pk")
+Error: InvalidInput("NULL value not allowed for column pk")
 
 Storage:
 CREATE TABLE "string" (

@@ -2,7 +2,8 @@ use super::super::engine::Transaction;
 use super::super::schema::Table;
 use super::super::types::{Expression, Row, Value};
 use super::{Executor, ResultSet};
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::{errdata, errinput};
 
 use std::collections::{HashMap, HashSet};
 
@@ -21,13 +22,13 @@ impl Insert {
     // Builds a row from a set of column names and values, padding it with default values.
     pub fn make_row(table: &Table, columns: &[String], values: Vec<Value>) -> Result<Row> {
         if columns.len() != values.len() {
-            return Err(Error::Value("Column and value counts do not match".into()));
+            return errinput!("column and value counts do not match");
         }
         let mut inputs = HashMap::new();
         for (c, v) in columns.iter().zip(values.into_iter()) {
             table.get_column(c)?;
             if inputs.insert(c.clone(), v).is_some() {
-                return Err(Error::Value(format!("Column {} given multiple times", c)));
+                return errinput!("column {c} given multiple times");
             }
         }
         let mut row = Row::new();
@@ -37,7 +38,7 @@ impl Insert {
             } else if let Some(value) = &column.default {
                 row.push(value.clone())
             } else {
-                return Err(Error::Value(format!("No value given for column {}", column.name)));
+                return errinput!("no value given for column {}", column.name);
             }
         }
         Ok(row)
@@ -49,7 +50,7 @@ impl Insert {
             if let Some(default) = &column.default {
                 row.push(default.clone())
             } else {
-                return Err(Error::Value(format!("No default value for column {}", column.name)));
+                return errinput!("no default value for column {}", column.name);
             }
         }
         Ok(row)
@@ -120,7 +121,7 @@ impl<T: Transaction> Executor<T> for Update<T> {
                 }
                 Ok(ResultSet::Update { count: updated.len() as u64 })
             }
-            r => Err(Error::Internal(format!("Unexpected response {:?}", r))),
+            r => errdata!("unexpected response {r:?}"),
         }
     }
 }
@@ -149,7 +150,7 @@ impl<T: Transaction> Executor<T> for Delete<T> {
                 }
                 Ok(ResultSet::Delete { count })
             }
-            r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
+            r => errdata!("unexpected result {r:?}"),
         }
     }
 }

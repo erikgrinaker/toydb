@@ -2,7 +2,8 @@
 //! human-readable form. It only prints live BitCask data, not garbage entries.
 #![warn(clippy::all)]
 
-use toydb::error::{Error, Result};
+use toydb::errdata;
+use toydb::error::Result;
 use toydb::storage::debug;
 use toydb::storage::{BitCask, Engine};
 
@@ -17,9 +18,9 @@ fn main() -> Result<()> {
     let mut scan = engine.scan(..);
     while let Some((key, value)) = scan.next().transpose()? {
         let (fkey, Some(fvalue)) = debug::format_key_value(&key, &Some(value)) else {
-            return Err(Error::Internal(format!("Unexpected missing value at key {:?}", key)));
+            return errdata!("unexpected missing value at key {:?}", key);
         };
-        println!("{} → {}", fkey, fvalue);
+        println!("{fkey} → {fvalue}");
     }
     Ok(())
 }

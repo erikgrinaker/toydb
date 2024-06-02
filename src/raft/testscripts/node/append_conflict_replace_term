@@ -82,7 +82,7 @@ n1@1 leader ⇨ n1@2 follower(n5)
 n1@2 append 3@2 put b=2
 n1@2 append 4@2 put c=3
 n1@1 → c1 ClientResponse id=0x01 Error::Abort
-c1@1 put a=1 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=1 ⇒ Error::Abort (operation aborted)
 n1@2 → n5 AppendResponse last=4@2 reject=false
 n2@1 follower(n1) ⇨ n2@2 follower(n5)
 n2@2 append 3@2 put b=2

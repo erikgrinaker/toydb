@@ -1,5 +1,5 @@
 Query: INSERT INTO types (id, "string") VALUES (0, FALSE)
-Error: Value("Invalid datatype BOOLEAN for STRING column string")
+Error: InvalidInput("invalid datatype BOOLEAN for STRING column string")
 
 Storage:
 CREATE TABLE types (

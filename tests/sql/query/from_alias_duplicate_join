@@ -1,6 +1,6 @@
 Query: SELECT * FROM movies a JOIN genres a ON TRUE
 
-Error: Duplicate table name a
+Error: invalid input: duplicate table name a
 
 AST: Select {
     select: [],
@@ -36,4 +36,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Duplicate table name a")
+Plan: InvalidInput("duplicate table name a")

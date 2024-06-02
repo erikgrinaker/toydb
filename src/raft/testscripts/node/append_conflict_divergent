@@ -113,23 +113,23 @@ deliver 1 2
 ---
 n1@1 leader ⇨ n1@4 follower(n5)
 n1@1 → c1 ClientResponse id=0x04 Error::Abort
-c1@1 put a=1 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=1 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x05 Error::Abort
-c1@1 put a=2 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=2 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x06 Error::Abort
-c1@1 put a=3 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=3 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x07 Error::Abort
-c1@1 put a=4 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=4 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x08 Error::Abort
-c1@1 put a=5 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=5 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x09 Error::Abort
-c1@1 put a=6 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=6 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x0a Error::Abort
-c1@1 put a=7 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=7 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x0b Error::Abort
-c1@1 put a=8 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=8 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x0c Error::Abort
-c1@1 put a=9 ⇒ Error::Abort (Operation aborted)
+c1@1 put a=9 ⇒ Error::Abort (operation aborted)
 n1@4 → n5 AppendResponse last=10@1 reject=true
 n2@1 follower(n1) ⇨ n2@4 follower(n5)
 n2@4 → n5 AppendResponse last=10@1 reject=true

@@ -173,12 +173,8 @@ impl<R: Role> RawNode<R> {
 
         let mut scan = log.scan((applied_index + 1)..=commit_index)?;
         while let Some(entry) = scan.next().transpose()? {
-            let index = entry.index;
             debug!("Applying {:?}", entry);
-            match state.apply(entry) {
-                Err(error @ Error::Internal(_)) => return Err(error),
-                result => on_apply(index, result)?,
-            }
+            on_apply(entry.index, state.apply(entry))?;
         }
         Ok(())
     }
@@ -1108,6 +1104,7 @@ fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
 mod tests {
     use super::*;
     use crate::encoding::{self, bincode, Value as _};
+    use crate::errassert;
     use crate::raft::{
         Entry, Request, RequestID, Response, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL,
     };
@@ -1347,9 +1344,7 @@ mod tests {
                     Ok(node.into())
                 }
                 Node::Follower(node) => Ok(node.into_candidate()?.into()),
-                Node::Leader(node) => {
-                    Err(crate::error::Error::Internal(format!("{} is a leader", node.id)))
-                }
+                Node::Leader(node) => errassert!("{} is a leader", node.id),
             };
             for id in ids.iter().copied() {
                 self.transition(id, campaign, output)?;

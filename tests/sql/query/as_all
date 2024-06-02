@@ -1,5 +1,5 @@
 Query: SELECT * AS all FROM movies
 
-Error: Unexpected token AS
+Error: invalid input: unexpected token AS
 
-AST: Parse("Unexpected token AS")
+AST: InvalidInput("unexpected token AS")

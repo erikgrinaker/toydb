@@ -1,5 +1,5 @@
 Query: INSERT INTO test, other VALUES (1)
-Error: Parse("Expected token VALUES, found ,")
+Error: InvalidInput("expected token VALUES, found ,")
 
 Storage:
 CREATE TABLE other (

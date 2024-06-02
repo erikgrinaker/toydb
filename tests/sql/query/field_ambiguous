@@ -1,6 +1,6 @@
 Query: SELECT id FROM movies, genres
 
-Error: Ambiguous field id
+Error: invalid input: ambiguous field id
 
 AST: Select {
     select: [
@@ -30,4 +30,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Ambiguous field id")
+Plan: InvalidInput("ambiguous field id")

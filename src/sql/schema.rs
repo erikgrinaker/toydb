@@ -2,6 +2,7 @@ use super::engine::Transaction;
 use super::parser::format_ident;
 use super::types::{DataType, Value};
 use crate::encoding;
+use crate::errinput;
 use crate::error::{Error, Result};
 
 use serde_derive::{Deserialize, Serialize};
@@ -20,8 +21,7 @@ pub trait Catalog {
 
     /// Reads a table, and errors if it does not exist
     fn must_read_table(&self, table: &str) -> Result<Table> {
-        self.read_table(table)?
-            .ok_or_else(|| Error::Value(format!("Table {} does not exist", table)))
+        self.read_table(table)?.ok_or(errinput!("table {table} does not exist"))
     }
 
     /// Returns all references to a table, as table,column pairs.
@@ -65,16 +65,18 @@ impl Table {
 
     /// Fetches a column by name
     pub fn get_column(&self, name: &str) -> Result<&Column> {
-        self.columns.iter().find(|c| c.name == name).ok_or_else(|| {
-            Error::Value(format!("Column {} not found in table {}", name, self.name))
-        })
+        self.columns
+            .iter()
+            .find(|c| c.name == name)
+            .ok_or(errinput!("column {name} not found in table {}", self.name))
     }
 
     /// Fetches a column index by name
     pub fn get_column_index(&self, name: &str) -> Result<usize> {
-        self.columns.iter().position(|c| c.name == name).ok_or_else(|| {
-            Error::Value(format!("Column {} not found in table {}", name, self.name))
-        })
+        self.columns
+            .iter()
+            .position(|c| c.name == name)
+            .ok_or(errinput!("column {name} not found in table {}", self.name))
     }
 
     /// Returns the primary key column of the table
@@ -82,7 +84,7 @@ impl Table {
         self.columns
             .iter()
             .find(|c| c.primary_key)
-            .ok_or_else(|| Error::Value(format!("Primary key not found in table {}", self.name)))
+            .ok_or(errinput!("primary key not found in table {}", self.name))
     }
 
     /// Returns the primary key value of a row
@@ -91,21 +93,21 @@ impl Table {
             self.columns
                 .iter()
                 .position(|c| c.primary_key)
-                .ok_or_else(|| Error::Value("Primary key not found".into()))?,
+                .ok_or::<Error>(errinput!("primary key not found"))?,
         )
         .cloned()
-        .ok_or_else(|| Error::Value("Primary key value not found for row".into()))
+        .ok_or(errinput!("primary key value not found for row"))
     }
 
     /// Validates the table schema
     pub fn validate(&self, txn: &mut dyn Transaction) -> Result<()> {
         if self.columns.is_empty() {
-            return Err(Error::Value(format!("Table {} has no columns", self.name)));
+            return errinput!("table {} has no columns", self.name);
         }
         match self.columns.iter().filter(|c| c.primary_key).count() {
             1 => {}
-            0 => return Err(Error::Value(format!("No primary key in table {}", self.name))),
-            _ => return Err(Error::Value(format!("Multiple primary keys in table {}", self.name))),
+            0 => return errinput!("no primary key in table {}", self.name),
+            _ => return errinput!("multiple primary keys in table {}", self.name),
         };
         for column in &self.columns {
             column.validate(self, txn)?;
@@ -116,7 +118,7 @@ impl Table {
     /// Validates a row
     pub fn validate_row(&self, row: &[Value], txn: &mut dyn Transaction) -> Result<()> {
         if row.len() != self.columns.len() {
-            return Err(Error::Value(format!("Invalid row size for table {}", self.name)));
+            return errinput!("invalid row size for table {}", self.name);
         }
         let pk = self.get_row_key(row)?;
         for (column, value) in self.columns.iter().zip(row.iter()) {
@@ -163,32 +165,30 @@ impl Column {
     pub fn validate(&self, table: &Table, txn: &mut dyn Transaction) -> Result<()> {
         // Validate primary key
         if self.primary_key && self.nullable {
-            return Err(Error::Value(format!("Primary key {} cannot be nullable", self.name)));
+            return errinput!("primary key {} cannot be nullable", self.name);
         }
         if self.primary_key && !self.unique {
-            return Err(Error::Value(format!("Primary key {} must be unique", self.name)));
+            return errinput!("primary key {} must be unique", self.name);
         }
 
         // Validate default value
         if let Some(default) = &self.default {
             if let Some(datatype) = default.datatype() {
                 if datatype != self.datatype {
-                    return Err(Error::Value(format!(
-                        "Default value for column {} has datatype {}, must be {}",
-                        self.name, datatype, self.datatype
-                    )));
+                    return errinput!(
+                        "default value for column {} has datatype {datatype}, must be {}",
+                        self.name,
+                        self.datatype
+                    );
                 }
             } else if !self.nullable {
-                return Err(Error::Value(format!(
-                    "Can't use NULL as default value for non-nullable column {}",
+                return errinput!(
+                    "can't use NULL as default value for non-nullable column {}",
                     self.name
-                )));
+                );
             }
         } else if self.nullable {
-            return Err(Error::Value(format!(
-                "Nullable column {} must have a default value",
-                self.name
-            )));
+            return errinput!("nullable column {} must have a default value", self.name);
         }
 
         // Validate references
@@ -198,19 +198,19 @@ impl Column {
             } else if let Some(table) = txn.read_table(reference)? {
                 table
             } else {
-                return Err(Error::Value(format!(
-                    "Table {} referenced by column {} does not exist",
-                    reference, self.name
-                )));
+                return errinput!(
+                    "table {reference} referenced by column {} does not exist",
+                    self.name
+                );
             };
             if self.datatype != target.get_primary_key()?.datatype {
-                return Err(Error::Value(format!(
-                    "Can't reference {} primary key of table {} from {} column {}",
+                return errinput!(
+                    "can't reference {} primary key of table {} from {} column {}",
                     target.get_primary_key()?.datatype,
                     target.name,
                     self.datatype,
                     self.name
-                )));
+                );
             }
         }
 
@@ -228,18 +228,20 @@ impl Column {
         // Validate datatype
         match value.datatype() {
             None if self.nullable => Ok(()),
-            None => Err(Error::Value(format!("NULL value not allowed for column {}", self.name))),
-            Some(ref datatype) if datatype != &self.datatype => Err(Error::Value(format!(
-                "Invalid datatype {} for {} column {}",
-                datatype, self.datatype, self.name
-            ))),
+            None => errinput!("NULL value not allowed for column {}", self.name),
+            Some(ref datatype) if datatype != &self.datatype => errinput!(
+                "invalid datatype {} for {} column {}",
+                datatype,
+                self.datatype,
+                self.name
+            ),
             _ => Ok(()),
         }?;
 
         // Validate value
         match value {
             Value::String(s) if s.len() > 1024 => {
-                Err(Error::Value("Strings cannot be more than 1024 bytes".into()))
+                errinput!("strings cannot be more than 1024 bytes")
             }
             _ => Ok(()),
         }?;
@@ -250,10 +252,9 @@ impl Column {
                 Value::Null => Ok(()),
                 Value::Float(f) if f.is_nan() => Ok(()),
                 v if target == &table.name && v == pk => Ok(()),
-                v if txn.read(target, v)?.is_none() => Err(Error::Value(format!(
-                    "Referenced primary key {} in table {} does not exist",
-                    v, target,
-                ))),
+                v if txn.read(target, v)?.is_none() => {
+                    errinput!("referenced primary key {v} in table {target} does not exist",)
+                }
                 _ => Ok(()),
             }?;
         }
@@ -266,10 +267,10 @@ impl Column {
                 if row.get(index).unwrap_or(&Value::Null) == value
                     && &table.get_row_key(&row)? != pk
                 {
-                    return Err(Error::Value(format!(
-                        "Unique value {} already exists for column {}",
-                        value, self.name
-                    )));
+                    return errinput!(
+                        "unique value {value} already exists for column {}",
+                        self.name
+                    );
                 }
             }
         }

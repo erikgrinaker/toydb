@@ -10,7 +10,7 @@
 
 use crate::error::{Error, Result};
 
-use bincode::Options;
+use bincode::Options as _;
 
 /// Returns the default Bincode options, initialized on first use.
 fn bincode() -> &'static bincode::DefaultOptions {

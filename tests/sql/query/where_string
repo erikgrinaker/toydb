@@ -3,4 +3,4 @@ Query: SELECT * FROM movies WHERE 'abc'
 Explain:
 Scan: movies (abc)
 
- Value("Filter returned abc, expected boolean")
+ InvalidData("filter returned abc, expected boolean")

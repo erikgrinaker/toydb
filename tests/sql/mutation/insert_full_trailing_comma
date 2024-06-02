@@ -1,5 +1,5 @@
 Query: INSERT INTO test (id, name, value) VALUES (1, 'a', 101), (2, 'b', 102),
-Error: Parse("Unexpected end of input")
+Error: InvalidInput("unexpected end of input")
 
 Storage:
 CREATE TABLE other (

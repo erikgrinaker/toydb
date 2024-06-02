@@ -2,7 +2,8 @@ use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::{Engine as _, IndexScan, Scan, Transaction as _};
 use crate::encoding::{self, bincode, Value as _};
-use crate::error::{Error, Result};
+use crate::errdata;
+use crate::error::Result;
 use crate::raft::{self, Entry};
 use crate::storage::{self, mvcc::TransactionState};
 
@@ -95,7 +96,7 @@ impl Client {
     fn mutate<V: DeserializeOwned>(&self, mutation: Mutation) -> Result<V> {
         match self.execute(raft::Request::Write(mutation.encode()?))? {
             raft::Response::Write(response) => Ok(bincode::deserialize(&response)?),
-            resp => Err(Error::Internal(format!("Unexpected Raft mutation response {:?}", resp))),
+            resp => errdata!("unexpected Raft mutation response {resp:?}"),
         }
     }
 
@@ -104,7 +105,7 @@ impl Client {
     fn query<V: DeserializeOwned>(&self, query: Query) -> Result<V> {
         match self.execute(raft::Request::Read(query.encode()?))? {
             raft::Response::Read(response) => Ok(bincode::deserialize(&response)?),
-            resp => Err(Error::Internal(format!("Unexpected Raft query response {:?}", resp))),
+            resp => errdata!("unexpected Raft query response {resp:?}"),
         }
     }
 
@@ -112,7 +113,7 @@ impl Client {
     fn status(&self) -> Result<raft::Status> {
         match self.execute(raft::Request::Status)? {
             raft::Response::Status(status) => Ok(status),
-            resp => Err(Error::Internal(format!("Unexpected Raft status response {:?}", resp))),
+            resp => errdata!("unexpected Raft status response {resp:?}"),
         }
     }
 }
@@ -344,7 +345,10 @@ impl<E: storage::Engine> raft::State for State<E> {
 
         let result = match &entry.command {
             Some(command) => match self.mutate(Mutation::decode(command)?) {
-                error @ Err(Error::Internal(_)) => return error, // don't record as applied
+                // We must panic on non-deterministic apply failures to prevent
+                // replica divergence. See [`raft::State`] documentation for
+                // details.
+                Err(e) if !e.is_deterministic() => panic!("non-deterministic apply failure: {e}"),
                 result => result,
             },
             None => Ok(Vec::new()),

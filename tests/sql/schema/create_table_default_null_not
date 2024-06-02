@@ -1,4 +1,4 @@
 Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NOT NULL DEFAULT NULL)
-Error: Value("Can't use NULL as default value for non-nullable column value")
+Error: InvalidInput("can't use NULL as default value for non-nullable column value")
 
 Storage:

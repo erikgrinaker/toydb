@@ -1,6 +1,7 @@
 use std::io::Write as _;
 
 use crate::encoding::Value as _;
+use crate::errdata;
 use crate::error::{Error, Result};
 use crate::server::{Request, Response, Status};
 use crate::sql::execution::ResultSet;
@@ -35,7 +36,7 @@ impl Client {
     pub fn execute(&mut self, query: &str) -> Result<ResultSet> {
         let mut resultset = match self.call(Request::Execute(query.into()))? {
             Response::Execute(rs) => rs,
-            resp => return Err(Error::Internal(format!("Unexpected response {:?}", resp))),
+            response => return errdata!("unexpected response {response:?}"),
         };
         if let ResultSet::Query { columns, .. } = resultset {
             // FIXME We buffer rows for now to avoid lifetime hassles
@@ -44,9 +45,7 @@ impl Client {
                 match Result::<Response>::decode_from(&mut self.reader)?? {
                     Response::Row(Some(row)) => rows.push(row),
                     Response::Row(None) => break,
-                    response => {
-                        return Err(Error::Internal(format!("Unexpected response {:?}", response)))
-                    }
+                    response => return errdata!("unexpected response {response:?}"),
                 }
             }
             resultset = ResultSet::Query { columns, rows: Box::new(rows.into_iter().map(Ok)) }
@@ -64,7 +63,7 @@ impl Client {
     pub fn get_table(&mut self, table: &str) -> Result<Table> {
         match self.call(Request::GetTable(table.into()))? {
             Response::GetTable(t) => Ok(t),
-            resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
+            resp => errdata!("unexpected response: {resp:?}"),
         }
     }
 
@@ -72,7 +71,7 @@ impl Client {
     pub fn list_tables(&mut self) -> Result<Vec<String>> {
         match self.call(Request::ListTables)? {
             Response::ListTables(t) => Ok(t),
-            resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
+            resp => errdata!("unexpected response: {resp:?}"),
         }
     }
 
@@ -80,7 +79,7 @@ impl Client {
     pub fn status(&mut self) -> Result<Status> {
         match self.call(Request::Status)? {
             Response::Status(s) => Ok(s),
-            resp => Err(Error::Value(format!("Unexpected response: {:?}", resp))),
+            resp => errdata!("unexpected response: {resp:?}"),
         }
     }
 

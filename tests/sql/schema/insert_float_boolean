@@ -1,5 +1,5 @@
 Query: INSERT INTO types (id, "float") VALUES (0, FALSE)
-Error: Value("Invalid datatype BOOLEAN for FLOAT column float")
+Error: InvalidInput("invalid datatype BOOLEAN for FLOAT column float")
 
 Storage:
 CREATE TABLE types (

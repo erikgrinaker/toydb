@@ -1,4 +1,4 @@
 Query: CREATE TABLE 👋 (🆔 INTEGER PRIMARY KEY)
-Error: Parse("Unexpected character 👋")
+Error: InvalidInput("unexpected character 👋")
 
 Storage:

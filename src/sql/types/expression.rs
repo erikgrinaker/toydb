@@ -1,4 +1,5 @@
 use super::{Row, Value};
+use crate::errinput;
 use crate::error::{Error, Result};
 
 use regex::Regex;
@@ -56,12 +57,12 @@ impl Expression {
                 (Null, Boolean(rhs)) if !rhs => Boolean(false),
                 (Null, Boolean(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => return Err(Error::Value(format!("Can't and {} and {}", lhs, rhs))),
+                (lhs, rhs) => return errinput!("can't and {lhs} and {rhs}"),
             },
             Self::Not(expr) => match expr.evaluate(row)? {
                 Boolean(b) => Boolean(!b),
                 Null => Null,
-                value => return Err(Error::Value(format!("Can't negate {}", value))),
+                value => return errinput!("can't negate {value}"),
             },
             Self::Or(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
@@ -70,7 +71,7 @@ impl Expression {
                 (Null, Boolean(rhs)) if rhs => Boolean(true),
                 (Null, Boolean(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => return Err(Error::Value(format!("Can't or {} and {}", lhs, rhs))),
+                (lhs, rhs) => return errinput!("can't or {lhs} and {rhs}"),
             },
 
             // Comparison operations
@@ -83,9 +84,7 @@ impl Expression {
                 (Float(lhs), Float(rhs)) => Boolean(lhs == rhs),
                 (String(lhs), String(rhs)) => Boolean(lhs == rhs),
                 (Null, _) | (_, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
             Self::GreaterThan(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 #[allow(clippy::bool_comparison)]
@@ -96,9 +95,7 @@ impl Expression {
                 (Float(lhs), Float(rhs)) => Boolean(lhs > rhs),
                 (String(lhs), String(rhs)) => Boolean(lhs > rhs),
                 (Null, _) | (_, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
             Self::LessThan(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 #[allow(clippy::bool_comparison)]
@@ -109,9 +106,7 @@ impl Expression {
                 (Float(lhs), Float(rhs)) => Boolean(lhs < rhs),
                 (String(lhs), String(rhs)) => Boolean(lhs < rhs),
                 (Null, _) | (_, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't compare {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
             Self::IsNull(expr) => match expr.evaluate(row)? {
                 Null => Boolean(true),
@@ -120,9 +115,9 @@ impl Expression {
 
             // Mathematical operations
             Self::Add(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) => Integer(
-                    lhs.checked_add(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
-                ),
+                (Integer(lhs), Integer(rhs)) => {
+                    Integer(lhs.checked_add(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+                }
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 + rhs),
                 (Integer(_), Null) => Null,
                 (Float(lhs), Float(rhs)) => Float(lhs + rhs),
@@ -131,18 +126,16 @@ impl Expression {
                 (Null, Float(_)) => Null,
                 (Null, Integer(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => return Err(Error::Value(format!("Can't add {} and {}", lhs, rhs))),
+                (lhs, rhs) => return errinput!("can't add {lhs} and {rhs}"),
             },
             Self::Assert(expr) => match expr.evaluate(row)? {
                 Float(f) => Float(f),
                 Integer(i) => Integer(i),
                 Null => Null,
-                expr => return Err(Error::Value(format!("Can't take the positive of {}", expr))),
+                expr => return errinput!("can't take the positive of {expr}"),
             },
             Self::Divide(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(_), Integer(0)) => {
-                    return Err(Error::Value("Can't divide by zero".into()))
-                }
+                (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
                 (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 / rhs),
                 (Integer(_), Null) => Null,
@@ -152,14 +145,11 @@ impl Expression {
                 (Null, Float(_)) => Null,
                 (Null, Integer(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't divide {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't divide {lhs} and {rhs}"),
             },
             Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(lhs), Integer(rhs)) if rhs >= 0 => Integer(
-                    lhs.checked_pow(rhs as u32)
-                        .ok_or_else(|| Error::Value("Integer overflow".into()))?,
+                    lhs.checked_pow(rhs as u32).ok_or::<Error>(errinput!("integer overflow"))?,
                 ),
                 (Integer(lhs), Integer(rhs)) => Float((lhs as f64).powf(rhs as f64)),
                 (Integer(lhs), Float(rhs)) => Float((lhs as f64).powf(rhs)),
@@ -170,23 +160,17 @@ impl Expression {
                 (Null, Float(_)) => Null,
                 (Null, Integer(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't exponentiate {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't exponentiate {lhs} and {rhs}"),
             },
             Self::Factorial(expr) => match expr.evaluate(row)? {
-                Integer(i) if i < 0 => {
-                    return Err(Error::Value("Can't take factorial of negative number".into()))
-                }
+                Integer(i) if i < 0 => return errinput!("can't take factorial of negative number"),
                 Integer(i) => Integer((1..=i).product()),
                 Null => Null,
-                value => return Err(Error::Value(format!("Can't take factorial of {}", value))),
+                value => return errinput!("can't take factorial of {value}"),
             },
             Self::Modulo(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 // This uses remainder semantics, like Postgres.
-                (Integer(_), Integer(0)) => {
-                    return Err(Error::Value("Can't divide by zero".into()))
-                }
+                (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
                 (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 % rhs),
                 (Integer(_), Null) => Null,
@@ -196,14 +180,12 @@ impl Expression {
                 (Null, Float(_)) => Null,
                 (Null, Integer(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't take modulo of {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't take modulo of {lhs} and {rhs}"),
             },
             Self::Multiply(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) => Integer(
-                    lhs.checked_mul(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
-                ),
+                (Integer(lhs), Integer(rhs)) => {
+                    Integer(lhs.checked_mul(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+                }
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 * rhs),
                 (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs * rhs as f64),
@@ -212,20 +194,18 @@ impl Expression {
                 (Null, Float(_)) => Null,
                 (Null, Integer(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't multiply {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't multiply {lhs} and {rhs}"),
             },
             Self::Negate(expr) => match expr.evaluate(row)? {
                 Integer(i) => Integer(-i),
                 Float(f) => Float(-f),
                 Null => Null,
-                value => return Err(Error::Value(format!("Can't negate {}", value))),
+                value => return errinput!("can't negate {value}"),
             },
             Self::Subtract(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) => Integer(
-                    lhs.checked_sub(rhs).ok_or_else(|| Error::Value("Integer overflow".into()))?,
-                ),
+                (Integer(lhs), Integer(rhs)) => {
+                    Integer(lhs.checked_sub(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+                }
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 - rhs),
                 (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs - rhs as f64),
@@ -234,9 +214,7 @@ impl Expression {
                 (Null, Float(_)) => Null,
                 (Null, Integer(_)) => Null,
                 (Null, Null) => Null,
-                (lhs, rhs) => {
-                    return Err(Error::Value(format!("Can't subtract {} and {}", lhs, rhs)))
-                }
+                (lhs, rhs) => return errinput!("can't subtract {lhs} and {rhs}"),
             },
 
             // String operations
@@ -254,7 +232,7 @@ impl Expression {
                 ),
                 (String(_), Null) => Null,
                 (Null, String(_)) => Null,
-                (lhs, rhs) => return Err(Error::Value(format!("Can't LIKE {} and {}", lhs, rhs))),
+                (lhs, rhs) => return errinput!("can't LIKE {lhs} and {rhs}"),
             },
         })
     }

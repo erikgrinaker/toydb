@@ -1,4 +1,5 @@
-use crate::error::{Error, Result};
+use crate::errinput;
+use crate::error::Result;
 
 use std::iter::Peekable;
 use std::str::Chars;
@@ -306,9 +307,7 @@ impl<'a> Iterator for Lexer<'a> {
     fn next(&mut self) -> Option<Result<Token>> {
         match self.scan() {
             Ok(Some(token)) => Some(Ok(token)),
-            Ok(None) => {
-                self.iter.peek().map(|c| Err(Error::Parse(format!("Unexpected character {}", c))))
-            }
+            Ok(None) => self.iter.peek().map(|c| errinput!("unexpected character {c}")),
             Err(err) => Some(Err(err)),
         }
     }
@@ -383,7 +382,7 @@ impl<'a> Lexer<'a> {
                 Some('"') if self.next_if(|c| c == '"').is_some() => ident.push('"'),
                 Some('"') => break,
                 Some(c) => ident.push(c),
-                None => return Err(Error::Parse("Unexpected end of quoted identifier".into())),
+                None => return errinput!("unexpected end of quoted identifier"),
             }
         }
         Ok(Some(Token::Ident(ident)))
@@ -421,7 +420,7 @@ impl<'a> Lexer<'a> {
                 Some('\'') if self.next_if(|c| c == '\'').is_some() => s.push('\''),
                 Some('\'') => break,
                 Some(c) => s.push(c),
-                None => return Err(Error::Parse("Unexpected end of string literal".into())),
+                None => return errinput!("unexpected end of string literal"),
             }
         }
         Ok(Some(Token::String(s)))

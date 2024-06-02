@@ -1,4 +1,4 @@
 Query: CREATE TABLE name (id)
-Error: Parse("Unexpected token )")
+Error: InvalidInput("unexpected token )")
 
 Storage:

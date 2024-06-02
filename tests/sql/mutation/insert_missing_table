@@ -1,5 +1,5 @@
 Query: INSERT INTO missing (id) VALUES (0)
-Error: Value("Table missing does not exist")
+Error: InvalidInput("table missing does not exist")
 
 Storage:
 CREATE TABLE other (

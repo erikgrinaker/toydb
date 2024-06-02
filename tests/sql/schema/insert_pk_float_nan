@@ -1,5 +1,5 @@
 Query: INSERT INTO "float" VALUES (NAN)
-Error: Value("Primary key NaN already exists for table float")
+Error: InvalidInput("primary key NaN already exists for table float")
 
 Storage:
 CREATE TABLE "float" (

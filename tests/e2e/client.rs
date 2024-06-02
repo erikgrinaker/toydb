@@ -18,7 +18,10 @@ fn get_table() -> Result<()> {
     let tc = TestCluster::run_with(5, dataset::MOVIES)?;
     let mut c = tc.connect_any()?;
 
-    assert_eq!(c.get_table("unknown"), Err(Error::Value("Table unknown does not exist".into())));
+    assert_eq!(
+        c.get_table("unknown"),
+        Err(Error::InvalidInput("table unknown does not exist".into()))
+    );
     assert_eq!(
         c.get_table("movies")?,
         schema::Table {
@@ -186,12 +189,15 @@ fn execute() -> Result<()> {
     );
     assert_rows(result, Vec::new());
 
-    assert_eq!(c.execute("SELECT * FROM x"), Err(Error::Value("Table x does not exist".into())));
+    assert_eq!(
+        c.execute("SELECT * FROM x"),
+        Err(Error::InvalidInput("table x does not exist".into()))
+    );
 
     // INSERT
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (1, 'Western')"),
-        Err(Error::Value("Primary key 1 already exists for table genres".into())),
+        Err(Error::InvalidInput("primary key 1 already exists for table genres".into())),
     );
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (9, 'Western')"),
@@ -199,7 +205,7 @@ fn execute() -> Result<()> {
     );
     assert_eq!(
         c.execute("INSERT INTO x VALUES (9, 'Western')"),
-        Err(Error::Value("Table x does not exist".into()))
+        Err(Error::InvalidInput("table x does not exist".into()))
     );
 
     // UPDATE
@@ -213,7 +219,7 @@ fn execute() -> Result<()> {
     );
     assert_eq!(
         c.execute("UPDATE genres SET id = 1 WHERE id = 9"),
-        Err(Error::Value("Primary key 1 already exists for table genres".into()))
+        Err(Error::InvalidInput("primary key 1 already exists for table genres".into()))
     );
 
     // DELETE
@@ -221,7 +227,7 @@ fn execute() -> Result<()> {
     assert_eq!(c.execute("DELETE FROM genres WHERE id = 9"), Ok(ResultSet::Delete { count: 1 }),);
     assert_eq!(
         c.execute("DELETE FROM genres WHERE x = 1"),
-        Err(Error::Value("Unknown field x".into()))
+        Err(Error::InvalidInput("unknown field x".into()))
     );
 
     Ok(())
@@ -296,7 +302,7 @@ fn execute_txn() -> Result<()> {
     c.execute("INSERT INTO genres VALUES (5, 'Horror')")?;
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (5, 'Musical')"),
-        Err(Error::Value("Primary key 5 already exists for table genres".into()))
+        Err(Error::InvalidInput("primary key 5 already exists for table genres".into()))
     );
     assert_eq!(c.txn(), Some((4, false)));
     c.execute("INSERT INTO genres VALUES (6, 'Western')")?;

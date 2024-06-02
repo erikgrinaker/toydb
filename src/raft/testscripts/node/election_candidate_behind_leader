@@ -55,7 +55,7 @@ n5@2 → n3 Campaign last=1@1
 n5@2 → n4 Campaign last=1@1
 n1@1 leader ⇨ n1@2 follower()
 n1@1 → c1 ClientResponse id=0x01 Error::Abort
-c1@1 put foo=bar ⇒ Error::Abort (Operation aborted)
+c1@1 put foo=bar ⇒ Error::Abort (operation aborted)
 n1@2 → n5 CampaignResponse vote=false
 n2@1 follower(n1) ⇨ n2@2 follower()
 n2@2 → n5 CampaignResponse vote=false

@@ -2,7 +2,8 @@ use super::super::parser::ast;
 use super::super::schema::{Catalog, Column, Table};
 use super::super::types::{Expression, Value};
 use super::{Aggregate, Direction, Node, Plan};
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::{errassert, errinput};
 
 use std::collections::{HashMap, HashSet};
 use std::mem::replace;
@@ -28,15 +29,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
         Ok(match statement {
             // Transaction control and explain statements should have been handled by session.
             ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
-                return Err(Error::Internal(format!(
-                    "Unexpected transaction statement {:?}",
-                    statement
-                )))
+                return errassert!("unexpected transaction statement {statement:?}")
             }
 
-            ast::Statement::Explain(_) => {
-                return Err(Error::Internal("Unexpected explain statement".into()))
-            }
+            ast::Statement::Explain(_) => return errassert!("unexpected explain statement"),
 
             // DDL statements (schema changes).
             ast::Statement::CreateTable { name, columns } => Node::CreateTable {
@@ -136,7 +132,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let mut node = if !from.is_empty() {
                     self.build_from_clause(scope, from)?
                 } else if select.is_empty() {
-                    return Err(Error::Value("Can't select * without a table".into()));
+                    return errinput!("can't select * without a table");
                 } else {
                     Node::Nothing
                 };
@@ -225,7 +221,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                         source: Box::new(node),
                         offset: match self.evaluate_constant(expr)? {
                             Value::Integer(i) if i >= 0 => Ok(i as u64),
-                            v => Err(Error::Value(format!("Invalid offset {}", v))),
+                            v => errinput!("invalid offset {v}"),
                         }?,
                     }
                 }
@@ -236,7 +232,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                         source: Box::new(node),
                         limit: match self.evaluate_constant(expr)? {
                             Value::Integer(i) if i >= 0 => Ok(i as u64),
-                            v => Err(Error::Value(format!("Invalid limit {}", v))),
+                            v => errinput!("invalid limit {v}"),
                         }?,
                     }
                 }
@@ -264,7 +260,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         let mut items = from.into_iter();
         let mut node = match items.next() {
             Some(item) => self.build_from_item(scope, item)?,
-            None => return Err(Error::Value("No from items given".into())),
+            None => return errinput!("no from items given"),
         };
         for item in items {
             let mut right_scope = base_scope.clone();
@@ -392,7 +388,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         }
         for (_, expr) in &aggregates {
             if self.is_aggregate(expr) {
-                return Err(Error::Value("Aggregate functions can't be nested".into()));
+                return errinput!("aggregate functions can't be nested");
             }
         }
         Ok(aggregates)
@@ -438,7 +434,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // during extract_aggregates().
         for (expr, _) in &groups {
             if self.is_aggregate(expr) {
-                return Err(Error::Value("Group expression cannot contain aggregates".into()));
+                return errinput!("group expression cannot contain aggregates");
             }
         }
         Ok(groups)
@@ -480,9 +476,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Expression::Function(f, a) if self.aggregate_from_name(f).is_some() => {
                     if let ast::Expression::Column(c) = a[0] {
                         if self.is_aggregate(&select[c].0) {
-                            return Err(Error::Value(
-                                "Aggregate function cannot reference aggregate".into(),
-                            ));
+                            return errinput!("aggregate function cannot reference aggregate");
                         }
                     }
                     select.push((e, None));
@@ -537,9 +531,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             ast::Expression::Field(table, name) => {
                 Field(scope.resolve(table.as_deref(), &name)?, Some((table, name)))
             }
-            ast::Expression::Function(name, _) => {
-                return Err(Error::Value(format!("Unknown function {}", name,)))
-            }
+            ast::Expression::Function(name, _) => return errinput!("unknown function {name}"),
             ast::Expression::Operation(op) => match op {
                 // Logical operators
                 ast::Operation::And(lhs, rhs) => And(
@@ -706,10 +698,10 @@ impl Scope {
     /// Adds a table to the scope.
     fn add_table(&mut self, label: String, table: Table) -> Result<()> {
         if self.constant {
-            return Err(Error::Internal("Can't modify constant scope".into()));
+            return errassert!("can't modify constant scope");
         }
         if self.tables.contains_key(&label) {
-            return Err(Error::Value(format!("Duplicate table name {}", label)));
+            return errinput!("duplicate table name {label}");
         }
         for column in &table.columns {
             self.add_column(Some(label.clone()), Some(column.name.clone()));
@@ -721,15 +713,9 @@ impl Scope {
     /// Fetches a column from the scope by index.
     fn get_column(&self, index: usize) -> Result<(Option<String>, Option<String>)> {
         if self.constant {
-            return Err(Error::Value(format!(
-                "Expression must be constant, found column {}",
-                index
-            )));
+            return errinput!("expression must be constant, found column {index}");
         }
-        self.columns
-            .get(index)
-            .cloned()
-            .ok_or_else(|| Error::Value(format!("Column index {} not found", index)))
+        self.columns.get(index).cloned().ok_or(errinput!("column index {index} not found"))
     }
 
     /// Fetches a column label by index, if any.
@@ -743,11 +729,11 @@ impl Scope {
     /// Merges two scopes, by appending the given scope to self.
     fn merge(&mut self, scope: Scope) -> Result<()> {
         if self.constant {
-            return Err(Error::Internal("Can't modify constant scope".into()));
+            return errassert!("can't modify constant scope");
         }
         for (label, table) in scope.tables {
             if self.tables.contains_key(&label) {
-                return Err(Error::Value(format!("Duplicate table name {}", label)));
+                return errinput!("duplicate table name {label}");
             }
             self.tables.insert(label, table);
         }
@@ -760,26 +746,23 @@ impl Scope {
     /// Resolves a name, optionally qualified by a table name.
     fn resolve(&self, table: Option<&str>, name: &str) -> Result<usize> {
         if self.constant {
-            return Err(Error::Value(format!(
-                "Expression must be constant, found field {}",
+            return errinput!(
+                "expression must be constant, found field {}",
                 if let Some(table) = table { format!("{}.{}", table, name) } else { name.into() }
-            )));
+            );
         }
         if let Some(table) = table {
             if !self.tables.contains_key(table) {
-                return Err(Error::Value(format!("Unknown table {}", table)));
+                return errinput!("unknown table {table}");
             }
             self.qualified
                 .get(&(table.into(), name.into()))
                 .copied()
-                .ok_or_else(|| Error::Value(format!("Unknown field {}.{}", table, name)))
+                .ok_or(errinput!("Unknown field {table}.{name}"))
         } else if self.ambiguous.contains(name) {
-            Err(Error::Value(format!("Ambiguous field {}", name)))
+            errinput!("ambiguous field {name}")
         } else {
-            self.unqualified
-                .get(name)
-                .copied()
-                .ok_or_else(|| Error::Value(format!("Unknown field {}", name)))
+            self.unqualified.get(name).copied().ok_or(errinput!("unknown field {name}"))
         }
     }
 
@@ -792,7 +775,7 @@ impl Scope {
     /// and returns a new scope for the projection.
     fn project(&mut self, projection: &[(Expression, Option<String>)]) -> Result<()> {
         if self.constant {
-            return Err(Error::Internal("Can't modify constant scope".into()));
+            return errassert!("can't modify constant scope");
         }
         let mut new = Self::new();
         new.tables = self.tables.clone();

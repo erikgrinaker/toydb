@@ -8,7 +8,8 @@
 
 use serde_derive::Deserialize;
 use std::collections::HashMap;
-use toydb::error::{Error, Result};
+use toydb::errinput;
+use toydb::error::Result;
 use toydb::raft;
 use toydb::sql;
 use toydb::storage;
@@ -43,7 +44,7 @@ fn main() -> Result<()> {
             COMPACT_MIN_BYTES,
         )?)?,
         "memory" => raft::Log::new(storage::Memory::new())?,
-        name => return Err(Error::Config(format!("Unknown Raft storage engine {}", name))),
+        name => return errinput!("invalid Raft storage engine {name}"),
     };
     let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
         "bitcask" | "" => {
@@ -58,7 +59,7 @@ fn main() -> Result<()> {
             let engine = storage::Memory::new();
             Box::new(sql::engine::Raft::new_state(engine)?)
         }
-        name => return Err(Error::Config(format!("Unknown SQL storage engine {}", name))),
+        name => return errinput!("invalid SQL storage engine {name}"),
     };
 
     Server::new(cfg.id, cfg.peers, raft_log, raft_state)?.serve(&cfg.listen_raft, &cfg.listen_sql)

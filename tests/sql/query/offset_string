@@ -1,6 +1,6 @@
 Query: SELECT * FROM movies OFFSET 'abc'
 
-Error: Invalid offset abc
+Error: invalid input: invalid offset abc
 
 AST: Select {
     select: [],
@@ -24,4 +24,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Invalid offset abc")
+Plan: InvalidInput("invalid offset abc")

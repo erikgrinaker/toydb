@@ -1,5 +1,5 @@
 Query: SELECT 1,
 
-Error: Unexpected end of input
+Error: invalid input: unexpected end of input
 
-AST: Parse("Unexpected end of input")
+AST: InvalidInput("unexpected end of input")

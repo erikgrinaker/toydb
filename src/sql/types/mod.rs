@@ -1,8 +1,8 @@
 mod expression;
 pub use expression::Expression;
 
-use crate::encoding;
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::{encoding, errdata};
 
 use serde_derive::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -85,7 +85,7 @@ impl Value {
     pub fn boolean(self) -> Result<bool> {
         match self {
             Self::Boolean(b) => Ok(b),
-            v => Err(Error::Value(format!("Not a boolean: {:?}", v))),
+            v => errdata!("not a boolean: {v:?}"),
         }
     }
 
@@ -93,7 +93,7 @@ impl Value {
     pub fn float(self) -> Result<f64> {
         match self {
             Self::Float(f) => Ok(f),
-            v => Err(Error::Value(format!("Not a float: {:?}", v))),
+            v => errdata!("not a float: {v:?}"),
         }
     }
 
@@ -101,7 +101,7 @@ impl Value {
     pub fn integer(self) -> Result<i64> {
         match self {
             Self::Integer(i) => Ok(i),
-            v => Err(Error::Value(format!("Not an integer: {:?}", v))),
+            v => errdata!("not an integer: {v:?}"),
         }
     }
 
@@ -109,7 +109,7 @@ impl Value {
     pub fn string(self) -> Result<String> {
         match self {
             Self::String(s) => Ok(s),
-            v => Err(Error::Value(format!("Not a string: {:?}", v))),
+            v => errdata!("not a string: {v:?}"),
         }
     }
 }

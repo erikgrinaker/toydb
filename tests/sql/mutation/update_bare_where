@@ -1,5 +1,5 @@
 Query: UPDATE test SET name = 'x' WHERE
-Error: Parse("Unexpected end of input")
+Error: InvalidInput("unexpected end of input")
 
 Storage:
 CREATE TABLE other (

@@ -1,4 +1,4 @@
 Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT 7)
-Error: Value("Default value for column value has datatype INTEGER, must be STRING")
+Error: InvalidInput("default value for column value has datatype INTEGER, must be STRING")
 
 Storage:

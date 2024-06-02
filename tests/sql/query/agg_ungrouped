@@ -1,6 +1,6 @@
 Query: SELECT studio_id, COUNT(*) FROM movies
 
-Error: Unknown field studio_id
+Error: invalid input: unknown field studio_id
 
 AST: Select {
     select: [
@@ -39,4 +39,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Unknown field studio_id")
+Plan: InvalidInput("unknown field studio_id")

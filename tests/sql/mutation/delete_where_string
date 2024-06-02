@@ -1,5 +1,5 @@
 Query: DELETE FROM test WHERE 'a'
-Error: Value("Filter returned a, expected boolean")
+Error: InvalidData("filter returned a, expected boolean")
 
 Storage:
 CREATE TABLE other (

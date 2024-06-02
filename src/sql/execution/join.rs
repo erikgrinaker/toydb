@@ -1,7 +1,8 @@
 use super::super::engine::Transaction;
 use super::super::types::{Expression, Rows};
 use super::{Executor, ResultSet, Row, Value};
-use crate::error::{Error, Result};
+use crate::errdata;
+use crate::error::Result;
 
 use std::collections::HashMap;
 
@@ -46,7 +47,7 @@ impl<T: Transaction> Executor<T> for NestedLoopJoin<T> {
                 });
             }
         }
-        Err(Error::Internal("Unexpected result set".into()))
+        errdata!("unexpected result set")
     }
 }
 
@@ -117,12 +118,7 @@ impl NestedLoopRows {
                     Value::Boolean(true) => return Ok(Some(row)),
                     Value::Boolean(false) => {}
                     Value::Null => {}
-                    value => {
-                        return Err(Error::Value(format!(
-                            "Join predicate returned {}, expected boolean",
-                            value
-                        )))
-                    }
+                    value => return errdata!("join predicate returned {value}, expected boolean"),
                 }
             } else {
                 return Ok(Some(row));
@@ -168,9 +164,7 @@ impl<T: Transaction> Executor<T> for HashJoin<T> {
                 let (l, r, outer) = (self.left_field, self.right_field, self.outer);
                 let right: HashMap<Value, Row> = rrows
                     .map(|res| match res {
-                        Ok(row) if row.len() <= r => {
-                            Err(Error::Internal(format!("Right index {} out of bounds", r)))
-                        }
+                        Ok(row) if row.len() <= r => errdata!("right index {r} out of bounds"),
                         Ok(row) => Ok((row[r].clone(), row)),
                         Err(err) => Err(err),
                     })
@@ -178,9 +172,7 @@ impl<T: Transaction> Executor<T> for HashJoin<T> {
                 let empty = std::iter::repeat(Value::Null).take(rcolumns.len());
                 columns.extend(rcolumns);
                 let rows = Box::new(rows.filter_map(move |res| match res {
-                    Ok(row) if row.len() <= l => {
-                        Some(Err(Error::Value(format!("Left index {} out of bounds", l))))
-                    }
+                    Ok(row) if row.len() <= l => Some(errdata!("left index {l} out of bounds")),
                     Ok(mut row) => match right.get(&row[l]) {
                         Some(hit) => {
                             row.extend(hit.clone());
@@ -197,6 +189,6 @@ impl<T: Transaction> Executor<T> for HashJoin<T> {
                 return Ok(ResultSet::Query { columns, rows });
             }
         }
-        Err(Error::Internal("Unexpected result set".into()))
+        errdata!("unexpected result set")
     }
 }

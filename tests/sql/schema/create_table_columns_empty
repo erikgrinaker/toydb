@@ -1,4 +1,4 @@
 Query: CREATE TABLE name ()
-Error: Parse("Expected identifier, got )")
+Error: InvalidInput("expected identifier, got )")
 
 Storage:

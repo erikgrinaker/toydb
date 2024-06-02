@@ -1,6 +1,6 @@
 Query: SELECT * FROM movies LIMIT 'abc'
 
-Error: Invalid limit abc
+Error: invalid input: invalid limit abc
 
 AST: Select {
     select: [],
@@ -24,4 +24,4 @@ AST: Select {
     ),
 }
 
-Plan: Value("Invalid limit abc")
+Plan: InvalidInput("invalid limit abc")

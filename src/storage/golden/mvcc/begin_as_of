@@ -75,9 +75,9 @@ T7: scan ..
     "key" = 0x03
     "other" = 0x01
 
-T8: begin as of 5 → Error::Value("Version 5 does not exist")
+T8: begin as of 5 → Error::InvalidInput("version 5 does not exist")
 
-T9: begin as of 9 → Error::Value("Version 9 does not exist")
+T9: begin as of 9 → Error::InvalidInput("version 9 does not exist")
 
 Engine state:
 NextVersion = 5

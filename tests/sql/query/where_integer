@@ -3,4 +3,4 @@ Query: SELECT * FROM movies WHERE 7
 Explain:
 Scan: movies (7)
 
- Value("Filter returned 7, expected boolean")
+ InvalidData("filter returned 7, expected boolean")

@@ -1,5 +1,5 @@
 Query: CREATE TABLE test (id INTEGER PRIMARY KEY)
-Error: Value("Table test already exists")
+Error: InvalidInput("table test already exists")
 
 Storage:
 CREATE TABLE test (

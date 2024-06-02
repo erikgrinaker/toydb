@@ -142,6 +142,7 @@
 use super::engine::Engine;
 use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::{Error, Result};
+use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -399,7 +400,7 @@ impl<E: Engine> Transaction<E> {
         let mut active = HashSet::new();
         if let Some(as_of) = as_of {
             if as_of >= version {
-                return Err(Error::Value(format!("Version {} does not exist", as_of)));
+                return errinput!("version {as_of} does not exist");
             }
             version = as_of;
             if let Some(value) = session.get(&Key::TxnActiveSnapshot(version).encode()?)? {
@@ -419,7 +420,7 @@ impl<E: Engine> Transaction<E> {
         // For read-write transactions, verify that the transaction is still
         // active before making further writes.
         if !s.read_only && engine.lock()?.get(&Key::TxnActive(s.version).encode()?)?.is_none() {
-            return Err(Error::Internal(format!("No active transaction at version {}", s.version)));
+            return errinput!("no active transaction at version {}", s.version);
         }
         Ok(Self { engine, st: s })
     }
@@ -431,7 +432,7 @@ impl<E: Engine> Transaction<E> {
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnActive(version) => active.insert(version),
-                _ => return Err(Error::Internal(format!("Expected TxnActive key, got {:?}", key))),
+                key => return errdata!("expected TxnActive key, got {key:?}"),
             };
         }
         Ok(active)
@@ -489,7 +490,7 @@ impl<E: Engine> Transaction<E> {
                 Key::TxnWrite(_, key) => {
                     rollback.push(Key::Version(key, self.st.version).encode()?) // the version
                 }
-                key => return Err(Error::Internal(format!("Expected TxnWrite, got {:?}", key))),
+                key => return errdata!("expected TxnWrite, got {key:?}"),
             };
             rollback.push(key); // the TxnWrite record
         }
@@ -537,7 +538,7 @@ impl<E: Engine> Transaction<E> {
                         return Err(Error::Serialization);
                     }
                 }
-                key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
+                key => return errdata!("expected Key::Version got {key:?}"),
             }
         }
 
@@ -563,7 +564,7 @@ impl<E: Engine> Transaction<E> {
                         return bincode::deserialize(&value);
                     }
                 }
-                key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
+                key => return errdata!("expected Key::Version got {key:?}"),
             };
         }
         Ok(None)
@@ -738,7 +739,7 @@ impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
     fn decode_visible(&self, key: &[u8]) -> Result<Option<(Vec<u8>, Version)>> {
         let (key, version) = match Key::decode(key)? {
             Key::Version(key, version) => (key.into_owned(), version),
-            key => return Err(Error::Internal(format!("Expected Key::Version got {:?}", key))),
+            key => return errdata!("expected Key::Version got {key:?}"),
         };
         if self.txn.is_visible(version) {
             Ok(Some((key, version)))
@@ -1271,11 +1272,11 @@ pub mod tests {
         // Check that future versions are invalid, including the next.
         assert_eq!(
             mvcc.begin_as_of(5).err(),
-            Some(Error::Value("Version 5 does not exist".into()))
+            Some(Error::InvalidInput("version 5 does not exist".into()))
         );
         assert_eq!(
             mvcc.begin_as_of(9).err(),
-            Some(Error::Value("Version 9 does not exist".into()))
+            Some(Error::InvalidInput("version 9 does not exist".into()))
         );
 
         Ok(())
@@ -1345,7 +1346,7 @@ pub mod tests {
         // Resuming an inactive transaction should error.
         assert_eq!(
             mvcc.resume(state).err(),
-            Some(Error::Internal("No active transaction at version 3".into()))
+            Some(Error::InvalidInput("no active transaction at version 3".into()))
         );
 
         // It should also be possible to start a snapshot transaction in t3

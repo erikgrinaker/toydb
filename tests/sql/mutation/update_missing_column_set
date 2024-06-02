@@ -1,5 +1,5 @@
 Query: UPDATE test SET missing = 0
-Error: Value("Unknown field missing")
+Error: InvalidInput("unknown field missing")
 
 Storage:
 CREATE TABLE other (

@@ -1,6 +1,6 @@
 Query: SELECT MAX(MIN(rating)) FROM movies
 
-Error: Aggregate functions can't be nested
+Error: invalid input: aggregate functions can't be nested
 
 AST: Select {
     select: [
@@ -36,4 +36,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Aggregate functions can't be nested")
+Plan: InvalidInput("aggregate functions can't be nested")

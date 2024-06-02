@@ -1,6 +1,6 @@
 Query: SELECT * FROM movies, movies
 
-Error: Duplicate table name movies
+Error: invalid input: duplicate table name movies
 
 AST: Select {
     select: [],
@@ -22,4 +22,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Duplicate table name movies")
+Plan: InvalidInput("duplicate table name movies")

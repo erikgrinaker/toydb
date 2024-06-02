@@ -1,6 +1,6 @@
 Query: SELECT studio_id, MAX(rating) AS best FROM movies GROUP BY studio_id HAVING MIN(best) > 7 ORDER BY studio_id
 
-Error: Aggregate function cannot reference aggregate
+Error: invalid input: aggregate function cannot reference aggregate
 
 AST: Select {
     select: [
@@ -72,4 +72,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Aggregate function cannot reference aggregate")
+Plan: InvalidInput("aggregate function cannot reference aggregate")

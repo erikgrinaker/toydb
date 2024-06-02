@@ -84,7 +84,7 @@ T7: scan ..
 T7: rollback
     del TxnActive(6)
 
-T8: resume → Error::Internal("No active transaction at version 3")
+T8: resume → Error::InvalidInput("no active transaction at version 3")
 
 T9: begin as of 3 → v3 read-only active={2}
 

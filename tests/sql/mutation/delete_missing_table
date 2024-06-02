@@ -1,5 +1,5 @@
 Query: DELETE FROM missing
-Error: Value("Table missing does not exist")
+Error: InvalidInput("table missing does not exist")
 
 Storage:
 CREATE TABLE other (

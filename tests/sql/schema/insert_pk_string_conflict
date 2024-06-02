@@ -1,5 +1,5 @@
 Query: INSERT INTO "string" VALUES ('foo')
-Error: Value("Primary key foo already exists for table string")
+Error: InvalidInput("primary key foo already exists for table string")
 
 Storage:
 CREATE TABLE "string" (

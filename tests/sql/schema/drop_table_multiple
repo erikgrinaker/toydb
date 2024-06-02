@@ -1,5 +1,5 @@
 Query: DROP TABLE a, c
-Error: Parse("Unexpected token ,")
+Error: InvalidInput("unexpected token ,")
 
 Storage:
 CREATE TABLE a (

@@ -1,5 +1,5 @@
 Query: INSERT INTO types (id, "boolean") VALUES (0, 3.14)
-Error: Value("Invalid datatype FLOAT for BOOLEAN column boolean")
+Error: InvalidInput("invalid datatype FLOAT for BOOLEAN column boolean")
 
 Storage:
 CREATE TABLE types (

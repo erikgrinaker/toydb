@@ -1,5 +1,5 @@
 Query: SELECT * FROM movies ORDER BY id X
 
-Error: Unexpected token x
+Error: invalid input: unexpected token x
 
-AST: Parse("Unexpected token x")
+AST: InvalidInput("unexpected token x")

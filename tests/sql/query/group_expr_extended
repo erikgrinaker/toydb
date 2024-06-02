@@ -1,6 +1,6 @@
 Query: SELECT studio_id * 2 + 1, MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY rating
 
-Error: Unknown field studio_id
+Error: invalid input: unknown field studio_id
 
 AST: Select {
     select: [
@@ -80,4 +80,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Unknown field studio_id")
+Plan: InvalidInput("unknown field studio_id")

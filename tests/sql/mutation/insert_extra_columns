@@ -1,5 +1,5 @@
 Query: INSERT INTO test (id, name) VALUES (1, 'a', 100)
-Error: Value("Column and value counts do not match")
+Error: InvalidInput("column and value counts do not match")
 
 Storage:
 CREATE TABLE other (

@@ -1,6 +1,6 @@
 Query: SELECT movies.id FROM movies AS m
 
-Error: Unknown table movies
+Error: invalid input: unknown table movies
 
 AST: Select {
     select: [
@@ -30,4 +30,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Unknown table movies")
+Plan: InvalidInput("unknown table movies")

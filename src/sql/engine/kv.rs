@@ -2,8 +2,9 @@ use super::super::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
 use crate::encoding::{self, Key as _, Value as _};
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::storage;
+use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -129,10 +130,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         table.validate_row(&row, self)?;
         let id = table.get_row_key(&row)?;
         if self.read(&table.name, &id)?.is_some() {
-            return Err(Error::Value(format!(
-                "Primary key {} already exists for table {}",
-                id, table.name
-            )));
+            return errinput!("primary key {id} already exists for table {}", table.name);
         }
         self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode()?, row.encode()?)?;
 
@@ -157,10 +155,10 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             while let Some(row) = scan.next().transpose()? {
                 for (i, c) in &cs {
                     if &row[*i] == id && (table.name != t.name || id != &table.get_row_key(&row)?) {
-                        return Err(Error::Value(format!(
-                            "Primary key {} is referenced by table {} column {}",
-                            id, t.name, c
-                        )));
+                        return errinput!(
+                            "primary key {id} referenced by table {} column {c}",
+                            t.name
+                        );
                     }
                 }
             }
@@ -188,7 +186,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 
     fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
         if !self.must_read_table(table)?.get_column(column)?.index {
-            return Err(Error::Value(format!("No index on {}.{}", table, column)));
+            return errinput!("no index on {table}.{column}");
         }
         self.index_load(table, column, value)
     }
@@ -205,10 +203,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                         Some(filter) => match filter.evaluate(Some(&row)) {
                             Ok(Value::Boolean(b)) if b => Some(Ok(row)),
                             Ok(Value::Boolean(_)) | Ok(Value::Null) => None,
-                            Ok(v) => Some(Err(Error::Value(format!(
-                                "Filter returned {}, expected boolean",
-                                v
-                            )))),
+                            Ok(v) => Some(errdata!("filter returned {v}, expected boolean")),
                             Err(err) => Some(Err(err)),
                         },
                         None => Some(Ok(row)),
@@ -224,7 +219,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         let table = self.must_read_table(table)?;
         let column = table.get_column(column)?;
         if !column.index {
-            return Err(Error::Value(format!("No index for {}.{}", table.name, column.name)));
+            return errinput!("no index for {}.{}", table.name, column.name);
         }
         Ok(Box::new(
             self.txn
@@ -236,7 +231,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                     let (k, v) = r?;
                     let value = match Key::decode(&k)? {
                         Key::Index(_, _, pk) => pk.into_owned(),
-                        _ => return Err(Error::Internal("Invalid index key".into())),
+                        _ => return errdata!("invalid index key"),
                     };
                     Ok((value, HashSet::<Value>::decode(&v)?))
                 })
@@ -280,7 +275,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 impl<E: storage::Engine> Catalog for Transaction<E> {
     fn create_table(&mut self, table: Table) -> Result<()> {
         if self.read_table(&table.name)?.is_some() {
-            return Err(Error::Value(format!("Table {} already exists", table.name)));
+            return errinput!("table {} already exists", table.name);
         }
         table.validate(self)?;
         self.txn.set(&Key::Table((&table.name).into()).encode()?, table.encode()?)
@@ -289,10 +284,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
     fn delete_table(&mut self, table: &str) -> Result<()> {
         let table = self.must_read_table(table)?;
         if let Some((t, cs)) = self.table_references(&table.name, false)?.first() {
-            return Err(Error::Value(format!(
-                "Table {} is referenced by table {} column {}",
-                table.name, t, cs[0]
-            )));
+            return errinput!("table {} is referenced by table {} column {}", table.name, t, cs[0]);
         }
         let mut scan = self.scan(&table.name, None)?;
         while let Some(row) = scan.next().transpose()? {

@@ -27,7 +27,7 @@ deliver 2 from=3
 ---
 n2@1 follower(n1) ⇨ n2@2 follower()
 n2@1 → c2 ClientResponse id=0x01 Error::Abort
-c2@1 put foo=bar ⇒ Error::Abort (Operation aborted)
+c2@1 put foo=bar ⇒ Error::Abort (operation aborted)
 n2@1 → c2 ClientResponse id=0x02 Error::Abort
-c2@1 get foo ⇒ Error::Abort (Operation aborted)
+c2@1 get foo ⇒ Error::Abort (operation aborted)
 n2@2 → n3 CampaignResponse vote=true

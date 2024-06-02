@@ -1,5 +1,5 @@
 Query: DELETE FROM self
-Error: Value("Primary key 1 is referenced by table self column self_id")
+Error: InvalidInput("primary key 1 referenced by table self column self_id")
 
 Storage:
 CREATE TABLE self (

@@ -1,5 +1,5 @@
 Query: CREATE TABLE other (id INTEGER PRIMARY KEY, self_id STRING REFERENCES other)
-Error: Value("Can't reference INTEGER primary key of table other from STRING column self_id")
+Error: InvalidInput("can't reference INTEGER primary key of table other from STRING column self_id")
 
 Storage:
 CREATE TABLE test (

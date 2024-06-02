@@ -1,5 +1,5 @@
 Query: INSERT INTO test () VALUES ()
-Error: Parse("Expected identifier, got )")
+Error: InvalidInput("expected identifier, got )")
 
 Storage:
 CREATE TABLE other (

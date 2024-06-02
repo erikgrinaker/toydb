@@ -1,5 +1,5 @@
 Query: DELETE FROM test, other WHERE id = 1
-Error: Parse("Unexpected token ,")
+Error: InvalidInput("unexpected token ,")
 
 Storage:
 CREATE TABLE other (

@@ -1,5 +1,5 @@
 Query: INSERT INTO types (id, "boolean") VALUES (0, 'abc')
-Error: Value("Invalid datatype STRING for BOOLEAN column boolean")
+Error: InvalidInput("invalid datatype STRING for BOOLEAN column boolean")
 
 Storage:
 CREATE TABLE types (

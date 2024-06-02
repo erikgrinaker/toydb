@@ -1,5 +1,5 @@
 Query: DELETE FROM test WHERE 3.14
-Error: Value("Filter returned 3.14, expected boolean")
+Error: InvalidData("filter returned 3.14, expected boolean")
 
 Storage:
 CREATE TABLE other (

@@ -1,5 +1,5 @@
 Query: SELECT 1 AS a.b FROM movies
 
-Error: Unexpected token .
+Error: invalid input: unexpected token .
 
-AST: Parse("Unexpected token .")
+AST: InvalidInput("unexpected token .")

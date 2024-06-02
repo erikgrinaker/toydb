@@ -1,5 +1,5 @@
 Query: INSERT INTO types (id, "integer") VALUES (0, INFINITY)
-Error: Value("Invalid datatype FLOAT for INTEGER column integer")
+Error: InvalidInput("invalid datatype FLOAT for INTEGER column integer")
 
 Storage:
 CREATE TABLE types (

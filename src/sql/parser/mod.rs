@@ -3,7 +3,8 @@ mod lexer;
 pub use lexer::{Keyword, Lexer, Token};
 
 use super::types::DataType;
-use crate::error::{Error, Result};
+use crate::errinput;
+use crate::error::Result;
 
 use regex::Regex;
 use std::collections::BTreeMap;
@@ -29,7 +30,7 @@ impl<'a> Parser<'a> {
 
     /// Grabs the next lexer token, or throws an error if none is found.
     fn next(&mut self) -> Result<Token> {
-        self.lexer.next().unwrap_or_else(|| Err(Error::Parse("Unexpected end of input".into())))
+        self.lexer.next().unwrap_or_else(|| errinput!("unexpected end of input"))
     }
 
     /// Grabs the next lexer token, and returns it if it was expected or
@@ -40,10 +41,10 @@ impl<'a> Parser<'a> {
             if token == t {
                 Ok(Some(token))
             } else {
-                Err(Error::Parse(format!("Expected token {}, found {}", t, token)))
+                errinput!("expected token {t}, found {token}")
             }
         } else if let Some(token) = self.peek()? {
-            Err(Error::Parse(format!("Unexpected token {}", token)))
+            errinput!("unexpected token {token}")
         } else {
             Ok(None)
         }
@@ -53,7 +54,7 @@ impl<'a> Parser<'a> {
     fn next_ident(&mut self) -> Result<String> {
         match self.next()? {
             Token::Ident(ident) => Ok(ident),
-            token => Err(Error::Parse(format!("Expected identifier, got {}", token))),
+            token => errinput!("expected identifier, got {token}"),
         }
     }
 
@@ -112,8 +113,8 @@ impl<'a> Parser<'a> {
 
             Some(Token::Keyword(Keyword::Explain)) => self.parse_statement_explain(),
 
-            Some(token) => Err(Error::Parse(format!("Unexpected token {}", token))),
-            None => Err(Error::Parse("Unexpected end of input".into())),
+            Some(token) => errinput!("unexpected token {token}"),
+            None => errinput!("unexpected end of input"),
         }
     }
 
@@ -122,13 +123,13 @@ impl<'a> Parser<'a> {
         match self.next()? {
             Token::Keyword(Keyword::Create) => match self.next()? {
                 Token::Keyword(Keyword::Table) => self.parse_ddl_create_table(),
-                token => Err(Error::Parse(format!("Unexpected token {}", token))),
+                token => errinput!("unexpected token {token}"),
             },
             Token::Keyword(Keyword::Drop) => match self.next()? {
                 Token::Keyword(Keyword::Table) => self.parse_ddl_drop_table(),
-                token => Err(Error::Parse(format!("Unexpected token {}", token))),
+                token => errinput!("unexpected token {token}"),
             },
-            token => Err(Error::Parse(format!("Unexpected token {}", token))),
+            token => errinput!("Unexpected token {token}"),
         }
     }
 
@@ -176,7 +177,7 @@ impl<'a> Parser<'a> {
                 Token::Keyword(Keyword::String) => DataType::String,
                 Token::Keyword(Keyword::Text) => DataType::String,
                 Token::Keyword(Keyword::Varchar) => DataType::String,
-                token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+                token => return errinput!("unexpected token {token}"),
             },
             primary_key: false,
             nullable: None,
@@ -193,20 +194,20 @@ impl<'a> Parser<'a> {
                 }
                 Keyword::Null => {
                     if let Some(false) = column.nullable {
-                        return Err(Error::Value(format!(
-                            "Column {} can't be both not nullable and nullable",
+                        return errinput!(
+                            "column {} can't be both not nullable and nullable",
                             column.name
-                        )));
+                        );
                     }
                     column.nullable = Some(true)
                 }
                 Keyword::Not => {
                     self.next_expect(Some(Keyword::Null.into()))?;
                     if let Some(true) = column.nullable {
-                        return Err(Error::Value(format!(
-                            "Column {} can't be both not nullable and nullable",
+                        return errinput!(
+                            "column {} can't be both not nullable and nullable",
                             column.name
-                        )));
+                        );
                     }
                     column.nullable = Some(false)
                 }
@@ -214,7 +215,7 @@ impl<'a> Parser<'a> {
                 Keyword::Unique => column.unique = true,
                 Keyword::Index => column.index = true,
                 Keyword::References => column.references = Some(self.next_ident()?),
-                keyword => return Err(Error::Parse(format!("Unexpected keyword {}", keyword))),
+                keyword => return errinput!("unexpected keyword {keyword}"),
             }
         }
         Ok(column)
@@ -232,7 +233,7 @@ impl<'a> Parser<'a> {
     fn parse_statement_explain(&mut self) -> Result<ast::Statement> {
         self.next_expect(Some(Keyword::Explain.into()))?;
         if let Some(Token::Keyword(Keyword::Explain)) = self.peek()? {
-            return Err(Error::Parse("Cannot nest EXPLAIN statements".into()));
+            return errinput!("cannot nest EXPLAIN statements");
         }
         Ok(ast::Statement::Explain(Box::new(self.parse_statement()?)))
     }
@@ -250,7 +251,7 @@ impl<'a> Parser<'a> {
                 match self.next()? {
                     Token::CloseParen => break,
                     Token::Comma => {}
-                    token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+                    token => return errinput!("Unexpected token {token}"),
                 }
             }
             Some(cols)
@@ -268,7 +269,7 @@ impl<'a> Parser<'a> {
                 match self.next()? {
                     Token::CloseParen => break,
                     Token::Comma => {}
-                    token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+                    token => return errinput!("unexpected token {token}"),
                 }
             }
             values.push(exprs);
@@ -314,7 +315,7 @@ impl<'a> Parser<'a> {
             self.next_expect(Some(Token::Equal))?;
             let expr = self.parse_expression(0)?;
             if set.contains_key(&column) {
-                return Err(Error::Value(format!("Duplicate values given for column {}", column)));
+                return errinput!("duplicate values given for column {column}");
             }
             set.insert(column, expr);
             if self.next_if_token(Token::Comma).is_none() {
@@ -336,7 +337,7 @@ impl<'a> Parser<'a> {
                     match self.next()? {
                         Token::Keyword(Keyword::Only) => readonly = true,
                         Token::Keyword(Keyword::Write) => readonly = false,
-                        token => return Err(Error::Parse(format!("Unexpected token {}", token))),
+                        token => return errinput!("unexpected token {token}"),
                     }
                 }
                 if self.next_if_token(Keyword::As.into()).is_some() {
@@ -345,19 +346,14 @@ impl<'a> Parser<'a> {
                     self.next_expect(Some(Keyword::Time.into()))?;
                     match self.next()? {
                         Token::Number(n) => version = Some(n.parse::<u64>()?),
-                        token => {
-                            return Err(Error::Parse(format!(
-                                "Unexpected token {}, wanted number",
-                                token
-                            )))
-                        }
+                        token => return errinput!("unexpected token {token}, wanted number"),
                     }
                 }
                 Ok(ast::Statement::Begin { read_only: readonly, as_of: version })
             }
             Token::Keyword(Keyword::Commit) => Ok(ast::Statement::Commit),
             Token::Keyword(Keyword::Rollback) => Ok(ast::Statement::Rollback),
-            token => Err(Error::Parse(format!("Unexpected token {}", token))),
+            token => errinput!("unexpected token {token}"),
         }
     }
 
@@ -578,7 +574,7 @@ impl<'a> Parser<'a> {
             Token::Keyword(Keyword::NaN) => ast::Literal::Float(std::f64::NAN).into(),
             Token::Keyword(Keyword::Null) => ast::Literal::Null.into(),
             Token::Keyword(Keyword::True) => ast::Literal::Boolean(true).into(),
-            t => return Err(Error::Parse(format!("Expected expression atom, found {}", t))),
+            token => return errinput!("expected expression atom, found {token}"),
         })
     }
 }

@@ -48,6 +48,7 @@ use de::IntoDeserializer;
 use serde::{de, ser};
 
 use crate::error::{Error, Result};
+use crate::{errassert, errdata};
 
 // Serializes a key to a binary KeyCode representation.
 pub fn serialize<T: serde::Serialize>(key: &T) -> Result<Vec<u8>> {
@@ -61,10 +62,10 @@ pub fn deserialize<'a, T: serde::Deserialize<'a>>(input: &'a [u8]) -> Result<T> 
     let mut deserializer = Deserializer::from_bytes(input);
     let t = T::deserialize(&mut deserializer)?;
     if !deserializer.input.is_empty() {
-        return Err(Error::Internal(format!(
-            "Unexpected trailing bytes {:x?} at end of key {:x?}",
-            deserializer.input, input
-        )));
+        return errdata!(
+            "unexpected trailing bytes {:x?} at end of key {input:x?}",
+            deserializer.input,
+        );
     }
     Ok(t)
 }
@@ -329,10 +330,7 @@ impl<'de> Deserializer<'de> {
     // there aren't enough bytes left.
     fn take_bytes(&mut self, len: usize) -> Result<&[u8]> {
         if self.input.len() < len {
-            return Err(Error::Internal(format!(
-                "Insufficient bytes, expected {} bytes for {:x?}",
-                len, self.input
-            )));
+            return errdata!("insufficient bytes, expected {len} bytes for {:x?}", self.input);
         }
         let bytes = &self.input[..len];
         self.input = &self.input[len..];
@@ -351,10 +349,10 @@ impl<'de> Deserializer<'de> {
                 Some((_, 0x00)) => match iter.next() {
                     Some((i, 0x00)) => break i + 1,        // terminator
                     Some((_, 0xff)) => decoded.push(0x00), // escaped 0x00
-                    _ => return Err(Error::Value("Invalid escape sequence".to_string())),
+                    _ => return errdata!("invalid escape sequence"),
                 },
                 Some((_, b)) => decoded.push(*b),
-                None => return Err(Error::Value("Unexpected end of input".to_string())),
+                None => return errdata!("unexpected end of input"),
             }
         };
         self.input = &self.input[taken..];
@@ -367,14 +365,14 @@ impl<'de, 'a> serde::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
-        Err(Error::Internal("Must provide type, KeyCode is not self-describing".to_string()))
+        errassert!("must provide type, KeyCode is not self-describing")
     }
 
     fn deserialize_bool<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         visitor.visit_bool(match self.take_bytes(1)?[0] {
             0x00 => false,
             0x01 => true,
-            b => return Err(Error::Internal(format!("Invalid boolean value {:?}", b))),
+            b => return errdata!("Invalid boolean value {b:?}"),
         })
     }
 

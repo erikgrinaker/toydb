@@ -1,4 +1,4 @@
 Query: CREATE TABLE "name (id INTEGER PRIMARY KEY)
-Error: Parse("Unexpected end of quoted identifier")
+Error: InvalidInput("unexpected end of quoted identifier")
 
 Storage:

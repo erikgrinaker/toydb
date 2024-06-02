@@ -2,7 +2,8 @@ use super::super::engine::Transaction;
 use super::super::plan::Aggregate;
 use super::super::types::{Column, Value};
 use super::{Executor, ResultSet};
-use crate::error::{Error, Result};
+use crate::errdata;
+use crate::error::Result;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -53,7 +54,7 @@ impl<T: Transaction> Executor<T> for Aggregation<T> {
                     })),
                 })
             }
-            r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
+            r => errdata!("unexpected result {r:?}"),
         }
     }
 }

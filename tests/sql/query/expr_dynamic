@@ -1,6 +1,6 @@
 Query: SELECT 2020 - year AS age FROM movies
 
-Error: Unknown field year
+Error: invalid input: unknown field year
 
 AST: Select {
     select: [
@@ -37,4 +37,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Unknown field year")
+Plan: InvalidInput("unknown field year")

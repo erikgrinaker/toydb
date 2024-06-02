@@ -1,5 +1,5 @@
 Query: UPDATE test, other SET id = 9 WHERE id = 1
-Error: Parse("Expected token SET, found ,")
+Error: InvalidInput("expected token SET, found ,")
 
 Storage:
 CREATE TABLE other (

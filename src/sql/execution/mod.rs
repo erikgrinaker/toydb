@@ -15,7 +15,8 @@ use source::{IndexLookup, KeyLookup, Nothing, Scan};
 use super::engine::Transaction;
 use super::plan::Node;
 use super::types::{Columns, Row, Rows, Value};
-use crate::error::{Error, Result};
+use crate::errdata;
+use crate::error::Result;
 
 use derivative::Derivative;
 use serde_derive::{Deserialize, Serialize};
@@ -129,7 +130,7 @@ impl ResultSet {
 
     /// Converts the ResultSet into a row, or errors if not a query result with rows.
     pub fn into_row(self) -> Result<Row> {
-        self.into_rows()?.next().transpose()?.ok_or_else(|| Error::Value("No rows returned".into()))
+        self.into_rows()?.next().transpose()?.ok_or(errdata!("no rows returned"))
     }
 
     /// Converts the ResultSet into a row iterator, or errors if not a query
@@ -138,12 +139,12 @@ impl ResultSet {
         if let ResultSet::Query { rows, .. } = self {
             Ok(rows)
         } else {
-            Err(Error::Value(format!("Not a query result: {:?}", self)))
+            errdata!("not a query result: {self:?}")
         }
     }
 
     /// Converts the ResultSet into a value, if possible.
     pub fn into_value(self) -> Result<Value> {
-        self.into_row()?.into_iter().next().ok_or_else(|| Error::Value("No value returned".into()))
+        self.into_row()?.into_iter().next().ok_or(errdata!("no value returned"))
     }
 }

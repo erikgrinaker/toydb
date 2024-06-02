@@ -2,7 +2,8 @@ use super::super::engine::Transaction;
 use super::super::plan::Direction;
 use super::super::types::{Column, Expression, Row, Value};
 use super::{Executor, ResultSet};
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::{errdata, errinput};
 
 /// A filter executor
 pub struct Filter<T: Transaction> {
@@ -27,16 +28,13 @@ impl<T: Transaction> Executor<T> for Filter<T> {
                         Value::Boolean(true) => Ok(Some(row)),
                         Value::Boolean(false) => Ok(None),
                         Value::Null => Ok(None),
-                        value => Err(Error::Value(format!(
-                            "Filter returned {}, expected boolean",
-                            value
-                        ))),
+                        value => errinput!("filter returned {value}, expected boolean",),
                     })
                     .transpose()
                 })),
             })
         } else {
-            Err(Error::Internal("Unexpected result".into()))
+            errdata!("unexpected result")
         }
     }
 }
@@ -81,7 +79,7 @@ impl<T: Transaction> Executor<T> for Projection<T> {
             }));
             Ok(ResultSet::Query { columns, rows })
         } else {
-            Err(Error::Internal("Unexpected result".into()))
+            errdata!("unexpected result")
         }
     }
 }
@@ -141,7 +139,7 @@ impl<T: Transaction> Executor<T> for Order<T> {
                     rows: Box::new(items.into_iter().map(|i| Ok(i.row))),
                 })
             }
-            r => Err(Error::Internal(format!("Unexpected result {:?}", r))),
+            r => errdata!("unexpected result {r:?}"),
         }
     }
 }
@@ -163,7 +161,7 @@ impl<T: Transaction> Executor<T> for Limit<T> {
         if let ResultSet::Query { columns, rows } = self.source.execute(txn)? {
             Ok(ResultSet::Query { columns, rows: Box::new(rows.take(self.limit as usize)) })
         } else {
-            Err(Error::Internal("Unexpected result".into()))
+            errdata!("unexpected result")
         }
     }
 }
@@ -185,7 +183,7 @@ impl<T: Transaction> Executor<T> for Offset<T> {
         if let ResultSet::Query { columns, rows } = self.source.execute(txn)? {
             Ok(ResultSet::Query { columns, rows: Box::new(rows.skip(self.offset as usize)) })
         } else {
-            Err(Error::Internal("Unexpected result".into()))
+            errdata!("unexpected result")
         }
     }
 }

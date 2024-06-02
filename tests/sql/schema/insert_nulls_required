@@ -1,5 +1,5 @@
 Query: INSERT INTO nulls (id, "null", not_null, "default") VALUES (1, NULL, NULL, NULL)
-Error: Value("NULL value not allowed for column not_null")
+Error: InvalidInput("NULL value not allowed for column not_null")
 
 Storage:
 CREATE TABLE nulls (

@@ -1,5 +1,5 @@
 Query: INSERT INTO types (id, "integer") VALUES (0, '')
-Error: Value("Invalid datatype STRING for INTEGER column integer")
+Error: InvalidInput("invalid datatype STRING for INTEGER column integer")
 
 Storage:
 CREATE TABLE types (

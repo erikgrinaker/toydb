@@ -1,6 +1,7 @@
 //! Tests for the SQL query engine. Runs SQL queries against an in-memory database,
 //! and compares the results with golden files stored under tests/sql/query/
-use toydb::error::{Error, Result};
+use toydb::errdata;
+use toydb::error::Result;
 use toydb::sql::engine::{Engine, Transaction};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::parser::Parser;
@@ -109,10 +110,8 @@ macro_rules! test_query {
                         write!(f, " <none>\n")?;
                     }
                 }
-                Ok(r) => return Err(Error::Internal(format!("Unexpected result {:?}\n", r))),
-                Err(err) => {
-                    write!(f, "Error: {}\n", err)?;
-                }
+                Ok(r) => return errdata!("unexpected result {r:?}\n"),
+                Err(err) => write!(f, "Error: {err}\n")?,
             }
             write!(f, "\n")?;
 

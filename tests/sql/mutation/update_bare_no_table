@@ -1,5 +1,5 @@
 Query: UPDATE
-Error: Parse("Unexpected end of input")
+Error: InvalidInput("unexpected end of input")
 
 Storage:
 CREATE TABLE other (

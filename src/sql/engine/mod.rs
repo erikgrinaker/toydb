@@ -9,7 +9,8 @@ use super::parser::{ast, Parser};
 use super::plan::Plan;
 use super::schema::Catalog;
 use super::types::{Expression, Row, Value};
-use crate::error::{Error, Result};
+use crate::errinput;
+use crate::error::Result;
 
 use std::collections::HashSet;
 
@@ -77,7 +78,7 @@ impl<E: Engine + 'static> Session<E> {
         // ...which seems like an arbitrary compiler limitation
         match Parser::new(query).parse()? {
             ast::Statement::Begin { .. } if self.txn.is_some() => {
-                Err(Error::Value("Already in a transaction".into()))
+                errinput!("already in a transaction")
             }
             ast::Statement::Begin { read_only: true, as_of: None } => {
                 let txn = self.engine.begin_read_only()?;
@@ -92,7 +93,7 @@ impl<E: Engine + 'static> Session<E> {
                 Ok(result)
             }
             ast::Statement::Begin { read_only: false, as_of: Some(_) } => {
-                Err(Error::Value("Can't start read-write transaction in a given version".into()))
+                errinput!("can't start read-write transaction in a given version")
             }
             ast::Statement::Begin { read_only: false, as_of: None } => {
                 let txn = self.engine.begin()?;
@@ -101,7 +102,7 @@ impl<E: Engine + 'static> Session<E> {
                 Ok(result)
             }
             ast::Statement::Commit | ast::Statement::Rollback if self.txn.is_none() => {
-                Err(Error::Value("Not in a transaction".into()))
+                errinput!("not in a transaction")
             }
             ast::Statement::Commit => {
                 let txn = self.txn.take().unwrap();

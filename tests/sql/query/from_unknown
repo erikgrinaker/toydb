@@ -1,6 +1,6 @@
 Query: SELECT * FROM unknown
 
-Error: Table unknown does not exist
+Error: invalid input: table unknown does not exist
 
 AST: Select {
     select: [],
@@ -18,4 +18,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: Value("Table unknown does not exist")
+Plan: InvalidInput("table unknown does not exist")

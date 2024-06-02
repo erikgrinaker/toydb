@@ -1,5 +1,5 @@
 Query: UPDATE "integer" SET pk = 1 WHERE pk = 2
-Error: Value("Primary key 1 already exists for table integer")
+Error: InvalidInput("primary key 1 already exists for table integer")
 
 Storage:
 CREATE TABLE "integer" (

@@ -1,5 +1,5 @@
 Query: INSERT INTO "unique" (id, "string") VALUES (2, 'foo')
-Error: Value("Unique value foo already exists for column string")
+Error: InvalidInput("unique value foo already exists for column string")
 
 Storage:
 CREATE TABLE "unique" (

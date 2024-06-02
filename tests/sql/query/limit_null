@@ -1,6 +1,6 @@
 Query: SELECT * FROM movies LIMIT NULL
 
-Error: Invalid limit NULL
+Error: invalid input: invalid limit NULL
 
 AST: Select {
     select: [],
@@ -22,4 +22,4 @@ AST: Select {
     ),
 }
 
-Plan: Value("Invalid limit NULL")
+Plan: InvalidInput("invalid limit NULL")

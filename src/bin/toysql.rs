@@ -9,6 +9,7 @@ use rustyline::history::DefaultHistory;
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{error::ReadlineError, Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
+use toydb::errinput;
 use toydb::error::{Error, Result};
 use toydb::sql::execution::ResultSet;
 use toydb::sql::parser::{Lexer, Token};
@@ -78,12 +79,12 @@ impl ToySQL {
     /// Handles a REPL command (prefixed by !, e.g. !help)
     fn execute_command(&mut self, input: &str) -> Result<()> {
         let mut input = input.split_ascii_whitespace();
-        let command = input.next().ok_or_else(|| Error::Parse("Expected command.".to_string()))?;
+        let command = input.next().ok_or::<Error>(errinput!("expected command"))?;
 
         let getargs = |n| {
             let args: Vec<&str> = input.collect();
             if args.len() != n {
-                Err(Error::Parse(format!("{}: expected {} args, got {}", command, n, args.len())))
+                errinput!("{command}: expected {n} args, got {}", args.len())
             } else {
                 Ok(args)
             }
@@ -99,7 +100,7 @@ impl ToySQL {
                     self.show_headers = false;
                     println!("Headers disabled");
                 }
-                v => return Err(Error::Parse(format!("Invalid value {}, expected on or off", v))),
+                v => return errinput!("invalid value {v}, expected on or off"),
             },
             "!help" => println!(
                 r#"
@@ -172,7 +173,7 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
                     println!("{}", table)
                 }
             }
-            c => return Err(Error::Parse(format!("Unknown command {}", c))),
+            c => return errinput!("unknown command {c}"),
         }
         Ok(())
     }
@@ -254,11 +255,9 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
         println!("Connected to toyDB node \"{}\". Enter !help for instructions.", status.server);
 
         while let Some(input) = self.prompt()? {
-            match self.execute(&input) {
-                Ok(()) => {}
-                error @ Err(Error::Internal(_)) => return error,
-                Err(error) => println!("Error: {}", error),
-            }
+            if let Err(error) = self.execute(&input) {
+                println!("Error: {error}");
+            };
         }
 
         if let Some(path) = &self.history_path {
