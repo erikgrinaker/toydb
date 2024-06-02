@@ -29,7 +29,7 @@ n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 n2@1 append 2@1 put a=1
-n2@1 → n1 AppendResponse last=2@1 reject=false
+n2@1 → n1 AppendResponse last=2@1 reject=0
 
 status
 ---
@@ -59,7 +59,7 @@ n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@�
 n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@̶1̶]̶
 n3@1 append 2@1 put a=1
 n3@1 append 3@1 put b=2
-n3@1 → n1 AppendResponse last=3@1 reject=false
+n3@1 → n1 AppendResponse last=3@1 reject=0
 
 status
 ---
@@ -90,7 +90,7 @@ n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@�
 n4@1 append 2@1 put a=1
 n4@1 append 3@1 put b=2
 n4@1 append 4@1 put c=3
-n4@1 → n1 AppendResponse last=4@1 reject=false
+n4@1 → n1 AppendResponse last=4@1 reject=0
 n1@1 commit 2@1
 n1@1 apply 2@1 put a=1
 n1@1 → c1 ClientResponse id=0x01 write 0x0102
@@ -126,7 +126,7 @@ n5@1 append 2@1 put a=1
 n5@1 append 3@1 put b=2
 n5@1 append 4@1 put c=3
 n5@1 append 5@1 put d=4
-n5@1 → n1 AppendResponse last=5@1 reject=false
+n5@1 → n1 AppendResponse last=5@1 reject=0
 n1@1 commit 3@1
 n1@1 apply 3@1 put b=2
 n1@1 → c1 ClientResponse id=0x02 write 0x0103
@@ -163,7 +163,7 @@ n6@1 append 3@1 put b=2
 n6@1 append 4@1 put c=3
 n6@1 append 5@1 put d=4
 n6@1 append 6@1 put e=5
-n6@1 → n1 AppendResponse last=6@1 reject=false
+n6@1 → n1 AppendResponse last=6@1 reject=0
 n1@1 commit 4@1
 n1@1 apply 4@1 put c=3
 n1@1 → c1 ClientResponse id=0x03 write 0x0104
@@ -199,21 +199,21 @@ n2@1 append 4@1 put c=3
 n2@1 append 5@1 put d=4
 n2@1 append 6@1 put e=5
 n2@1 append 7@1 put f=6
-n2@1 → n1 AppendResponse last=7@1 reject=false
+n2@1 → n1 AppendResponse last=7@1 reject=0
 n3@1 append 4@1 put c=3
 n3@1 append 5@1 put d=4
 n3@1 append 6@1 put e=5
 n3@1 append 7@1 put f=6
-n3@1 → n1 AppendResponse last=7@1 reject=false
+n3@1 → n1 AppendResponse last=7@1 reject=0
 n4@1 append 5@1 put d=4
 n4@1 append 6@1 put e=5
 n4@1 append 7@1 put f=6
-n4@1 → n1 AppendResponse last=7@1 reject=false
+n4@1 → n1 AppendResponse last=7@1 reject=0
 n5@1 append 6@1 put e=5
 n5@1 append 7@1 put f=6
-n5@1 → n1 AppendResponse last=7@1 reject=false
+n5@1 → n1 AppendResponse last=7@1 reject=0
 n6@1 append 7@1 put f=6
-n6@1 → n1 AppendResponse last=7@1 reject=false
+n6@1 → n1 AppendResponse last=7@1 reject=0
 n1@1 commit 5@1
 n1@1 apply 5@1 put d=4
 n1@1 → c1 ClientResponse id=0x04 write 0x0105

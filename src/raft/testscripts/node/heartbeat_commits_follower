@@ -15,9 +15,9 @@ n1@1 append 2@1 put foo=bar
 n1@1 → n2 Append base=1@1 [2@1]
 n1@1 → n3 Append base=1@1 [2@1]
 n2@1 append 2@1 put foo=bar
-n2@1 → n1 AppendResponse last=2@1 reject=false
+n2@1 → n1 AppendResponse last=2@1 reject=0
 n3@1 append 2@1 put foo=bar
-n3@1 → n1 AppendResponse last=2@1 reject=false
+n3@1 → n1 AppendResponse last=2@1 reject=0
 n1@1 commit 2@1
 n1@1 apply 2@1 put foo=bar
 n1@1 → c1 ClientResponse id=0x01 write 0x0102

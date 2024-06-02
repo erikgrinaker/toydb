@@ -38,7 +38,7 @@ deliver 3 from=1
 ---
 n3@1 follower() ⇨ n3@1 follower(n1)
 n3@1 append 1@1 None
-n3@1 → n1 AppendResponse last=1@1 reject=false
+n3@1 → n1 AppendResponse last=1@1 reject=0
 n3@1 → n1 HeartbeatResponse last=1@1 read_seq=0
 
 status

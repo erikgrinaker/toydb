@@ -76,9 +76,9 @@ c2@2 get b ⇒ None
 n2@2 → n1 Append base=3@1 [4@2]
 n2@2 → n3 Append base=3@1 [4@2]
 n1@2 append 4@2 None
-n1@2 → n2 AppendResponse last=4@2 reject=false
+n1@2 → n2 AppendResponse last=4@2 reject=0
 n3@2 append 4@2 None
-n3@2 → n2 AppendResponse last=4@2 reject=false
+n3@2 → n2 AppendResponse last=4@2 reject=0
 n2@2 commit 4@2
 n2@2 apply 3@1 put b=2
 n2@2 apply 4@2 None

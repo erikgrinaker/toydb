@@ -329,7 +329,7 @@ impl RawNode<Candidate> {
 
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
-        // AppendEntries from the leader, stepping it will follow the leader.
+        // Append from the leader, stepping it will follow the leader.
         if msg.term > self.term {
             return self.into_follower(msg.term, None)?.step(msg);
         }
@@ -529,7 +529,7 @@ impl RawNode<Follower> {
 
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
-        // AppendEntries from the leader, stepping it will follow the leader.
+        // Append from the leader, stepping it will follow the leader.
         if msg.term > self.term {
             return self.into_follower(None, msg.term)?.step(msg);
         }
@@ -566,23 +566,29 @@ impl RawNode<Follower> {
                 }
             }
 
-            // Replicate entries from the leader. If we don't have a leader in
-            // this term yet, follow it.
+            // Append log entries from the leader to the local log.
             Message::Append { base_index, base_term, entries } => {
-                // Check that the entries are from our leader.
-                let from = msg.from;
+                let Some(first) = entries.first() else { panic!("empty append message") };
+                assert_eq!(base_index, first.index - 1, "base index mismatch");
+
+                // Make sure the message comes from our leader.
                 match self.role.leader {
-                    Some(leader) => assert_eq!(from, leader, "multiple leaders in term"),
-                    None => self = self.into_follower(Some(from), msg.term)?,
+                    Some(leader) => assert_eq!(msg.from, leader, "multiple leaders in term"),
+                    None => self = self.into_follower(Some(msg.from), msg.term)?,
                 }
 
-                // Append the entries, if possible.
-                let reject = base_index > 0 && !self.log.has(base_index, base_term)?;
-                if !reject {
+                // If the base entry is in our log, append the entries.
+                let mut reject_index = 0;
+                if base_index == 0 || self.log.has(base_index, base_term)? {
                     self.log.splice(entries)?;
+                } else {
+                    reject_index = base_index;
                 }
                 let (last_index, last_term) = self.log.get_last_index();
-                self.send(msg.from, Message::AppendResponse { reject, last_index, last_term })?;
+                self.send(
+                    msg.from,
+                    Message::AppendResponse { reject_index, last_index, last_term },
+                )?;
             }
 
             // A candidate in this term is requesting our vote.
@@ -814,7 +820,7 @@ impl RawNode<Leader> {
 
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
-        // AppendEntries from the leader, stepping it will follow the leader.
+        // Append from the leader, stepping it will follow the leader.
         if msg.term > self.term {
             return self.into_follower(msg.term)?.step(msg);
         }
@@ -848,19 +854,13 @@ impl RawNode<Leader> {
                 }
             }
 
-            // A follower appended log entries we sent it. Record its progress
-            // and attempt to commit new entries.
-            Message::AppendResponse { reject: false, last_index, last_term } => {
-                assert!(
-                    last_index <= self.log.get_last_index().0,
-                    "follower accepted entries after last index"
-                );
-                assert!(
-                    last_term <= self.log.get_last_index().1,
-                    "follower accepted entries after last term"
-                );
+            // A follower appended our log entries. Record its progress and
+            // attempt to commit.
+            Message::AppendResponse { reject_index: 0, last_index, last_term } => {
+                let (li, lt) = self.log.get_last_index();
+                assert!(last_index <= li && last_term <= lt, "follower appended future entries");
 
-                let progress = self.role.progress.get_mut(&msg.from).unwrap();
+                let progress = self.role.progress.get_mut(&msg.from).expect("unknown node");
                 if last_index > progress.last {
                     progress.last = last_index;
                     progress.next = last_index + 1;
@@ -868,21 +868,22 @@ impl RawNode<Leader> {
                 }
             }
 
-            // A follower rejected log entries we sent it, typically because it
-            // does not have the base index in its log. Try to replicate from
-            // the previous entry.
+            // A follower rejected the log entries because the base entry in
+            // reject_index did not match its log. Try the previous entry until
+            // we find a common base.
             //
-            // This linear probing, as described in the Raft paper, can be very
-            // slow with long divergent logs, but we keep it simple.
-            //
-            // TODO: make use of last_index and last_term here.
-            Message::AppendResponse { reject: true, last_index: _, last_term: _ } => {
-                self.role.progress.entry(msg.from).and_modify(|p| {
-                    if p.next > 1 {
-                        p.next -= 1
-                    }
-                });
-                self.send_log(msg.from)?;
+            // This linear probing can be slow with long divergent logs, but we
+            // keep it simple.
+            Message::AppendResponse { reject_index, last_index, last_term: _ } => {
+                let progress = self.role.progress.get_mut(&msg.from).expect("unknown node");
+
+                // If the next index was rejected, try the previous one.
+                // Otherwise, the rejection is stale and can be ignored. If the
+                // follower's log is shorter, skip straight to its last index.
+                if progress.next == reject_index + 1 {
+                    progress.next = std::cmp::min(progress.next - 1, last_index + 1);
+                    self.send_log(msg.from)?;
+                }
             }
 
             // A client submitted a read command. To ensure linearizability, we
@@ -1859,8 +1860,8 @@ mod tests {
                         entries.iter().map(|e| format!("{}@{}", e.index, e.term)).join(" ")
                     )
                 }
-                Message::AppendResponse { reject, last_index, last_term } => {
-                    format!("AppendResponse last={last_index}@{last_term} reject={reject}")
+                Message::AppendResponse { reject_index, last_index, last_term } => {
+                    format!("AppendResponse last={last_index}@{last_term} reject={reject_index}")
                 }
                 Message::ClientRequest { id, request } => {
                     format!(

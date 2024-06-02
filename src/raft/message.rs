@@ -80,24 +80,34 @@ pub enum Message {
         vote: bool,
     },
 
-    /// Leaders replicate log entries to followers by appending to their logs.
+    /// Leaders replicate log entries to followers by appending to their logs
+    /// after the given base entry. If the base entry matches the follower's log
+    /// then their logs are identical up to it (see section 5.3 in the Raft
+    /// paper), and the entries can be appended. Otherwise, the append is
+    /// rejected and the leader must retry an earlier base index until a common
+    /// base is found.
     Append {
-        /// The index of the log entry immediately preceding the submitted commands.
-        ///
-        /// TODO: this isn't needed -- determine it from the first entry, and
-        /// require it to be included.
+        /// The index of the log entry to append after.
         base_index: Index,
-        /// The term of the log entry immediately preceding the submitted commands.
+        /// The term of the log entry to append after.
         base_term: Term,
-        /// Commands to replicate.
+        /// Log entries to append.
         entries: Vec<Entry>,
     },
 
-    /// Followers may accept or reject appending entries from the leader.
+    /// Followers accept or reject appends from the leader depending on whether
+    /// the base entry matches in both logs.
     AppendResponse {
-        /// If true, the follower rejected the leader's entries.
-        reject: bool,
+        /// If non-zero, the follower rejected an append at this base index
+        /// because the base index/term did not match its log.
+        reject_index: Index,
         /// The index of the follower's last log entry.
+        ///
+        /// NB: if the entries already existed in the follower's log, the append
+        /// is a noop and the last_index may be greater than the latest entry in
+        /// the append. That's fine -- if we're still the leader then our logs
+        /// must be consistent, otherwise the follower will have stopped
+        /// accepting our appends anyway.
         last_index: Index,
         /// The term of the follower's last log entry.
         last_term: Term,
@@ -146,10 +156,6 @@ pub enum Request {
 impl encoding::Value for Request {}
 
 /// A client response. This will be wrapped in a Result to handle errors.
-///
-/// TODO: consider a separate error kind here, or a wrapped Result, to separate
-/// fallible state machine operations (returned to the caller) from apply errors
-/// (fatal).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Response {
     /// A state machine read result.

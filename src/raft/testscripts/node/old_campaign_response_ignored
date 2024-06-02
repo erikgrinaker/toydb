@@ -70,7 +70,7 @@ deliver 2 from=1
 n2@1 → n1 CampaignResponse vote=false
 n2@1 candidate ⇨ n2@1 follower(n1)
 n2@1 append 1@1 None
-n2@1 → n1 AppendResponse last=1@1 reject=false
+n2@1 → n1 AppendResponse last=1@1 reject=0
 n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
 
 # n1 (leader) receives n6's vote and ignores it. n2 (follower) receives n7's

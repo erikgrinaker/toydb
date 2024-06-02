@@ -16,6 +16,6 @@ n1@1 → n2 Append base=1@1 [2@1]
 n1@1 → n3 Append base=1@1 [2@1]
 
 # An AppendResponse beyond leader's last term should panic.
-!step 1 '{"from":2, "to":1, "term":1, "message":{"AppendResponse":{"last_index":2,"last_term":2,"reject":false}}}'
+!step 1 '{"from":2, "to":1, "term":1, "message":{"AppendResponse":{"last_index":2,"last_term":2,"reject_index":0}}}'
 ---
-Panic: follower accepted entries after last term
+Panic: follower appended future entries

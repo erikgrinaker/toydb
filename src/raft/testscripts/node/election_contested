@@ -63,19 +63,19 @@ stabilize
 ---
 n2@1 follower() ⇨ n2@1 follower(n1)
 n2@1 append 1@1 None
-n2@1 → n1 AppendResponse last=1@1 reject=false
+n2@1 → n1 AppendResponse last=1@1 reject=0
 n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
 n3@1 follower() ⇨ n3@1 follower(n1)
 n3@1 append 1@1 None
-n3@1 → n1 AppendResponse last=1@1 reject=false
+n3@1 → n1 AppendResponse last=1@1 reject=0
 n3@1 → n1 HeartbeatResponse last=1@1 read_seq=0
 n4@1 follower() ⇨ n4@1 follower(n1)
 n4@1 append 1@1 None
-n4@1 → n1 AppendResponse last=1@1 reject=false
+n4@1 → n1 AppendResponse last=1@1 reject=0
 n4@1 → n1 HeartbeatResponse last=1@1 read_seq=0
 n5@1 candidate ⇨ n5@1 follower(n1)
 n5@1 append 1@1 None
-n5@1 → n1 AppendResponse last=1@1 reject=false
+n5@1 → n1 AppendResponse last=1@1 reject=0
 n5@1 → n1 HeartbeatResponse last=1@1 read_seq=0
 n1@1 commit 1@1
 n1@1 apply 1@1 None

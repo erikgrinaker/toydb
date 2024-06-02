@@ -130,9 +130,9 @@ n1@1 → c1 ClientResponse id=0x0b Error::Abort
 c1@1 put a=8 ⇒ Error::Abort (operation aborted)
 n1@1 → c1 ClientResponse id=0x0c Error::Abort
 c1@1 put a=9 ⇒ Error::Abort (operation aborted)
-n1@4 → n5 AppendResponse last=10@1 reject=true
+n1@4 → n5 AppendResponse last=10@1 reject=5
 n2@1 follower(n1) ⇨ n2@4 follower(n5)
-n2@4 → n5 AppendResponse last=10@1 reject=true
+n2@4 → n5 AppendResponse last=10@1 reject=5
 
 # n5 will send the previous entry, which is again rejected.
 deliver 5
@@ -141,8 +141,8 @@ status 5
 ---
 n5@4 → n1 Append base=4@3 [5@3 6@4 7@4 8@4]
 n5@4 → n2 Append base=4@3 [5@3 6@4 7@4 8@4]
-n1@4 → n5 AppendResponse last=10@1 reject=true
-n2@4 → n5 AppendResponse last=10@1 reject=true
+n1@4 → n5 AppendResponse last=10@1 reject=4
+n2@4 → n5 AppendResponse last=10@1 reject=4
 n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→5 2:0→5 3:7→8 4:7→8}
 
 # This repeats until they find a common base at 1@1.
@@ -152,8 +152,8 @@ status 5
 ---
 n5@4 → n1 Append base=3@2 [4@3 5@3 6@4 7@4 8@4]
 n5@4 → n2 Append base=3@2 [4@3 5@3 6@4 7@4 8@4]
-n1@4 → n5 AppendResponse last=10@1 reject=true
-n2@4 → n5 AppendResponse last=10@1 reject=true
+n1@4 → n5 AppendResponse last=10@1 reject=3
+n2@4 → n5 AppendResponse last=10@1 reject=3
 n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→4 2:0→4 3:7→8 4:7→8}
 
 deliver 5
@@ -162,8 +162,8 @@ status 5
 ---
 n5@4 → n1 Append base=2@2 [3@2 4@3 5@3 6@4 7@4 8@4]
 n5@4 → n2 Append base=2@2 [3@2 4@3 5@3 6@4 7@4 8@4]
-n1@4 → n5 AppendResponse last=10@1 reject=true
-n2@4 → n5 AppendResponse last=10@1 reject=true
+n1@4 → n5 AppendResponse last=10@1 reject=2
+n2@4 → n5 AppendResponse last=10@1 reject=2
 n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→3 2:0→3 3:7→8 4:7→8}
 
 deliver 5
@@ -173,8 +173,8 @@ status 5
 ---
 n5@4 → n1 Append base=1@1 [2@2 3@2 4@3 5@3 6@4 7@4 8@4]
 n5@4 → n2 Append base=1@1 [2@2 3@2 4@3 5@3 6@4 7@4 8@4]
-n1@4 → n5 AppendResponse last=8@4 reject=false
-n2@4 → n5 AppendResponse last=8@4 reject=false
+n1@4 → n5 AppendResponse last=8@4 reject=0
+n2@4 → n5 AppendResponse last=8@4 reject=0
 n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→2 2:0→2 3:7→8 4:7→8}
 
 # The new write can now commit and apply.
@@ -197,9 +197,9 @@ n5@4 leader last=8@4 commit=8@4 apply=8 progress={1:8→9 2:8→9 3:7→8 4:7→
 stabilize heartbeat=true
 ---
 n3@4 append 8@4 put d=4
-n3@4 → n5 AppendResponse last=8@4 reject=false
+n3@4 → n5 AppendResponse last=8@4 reject=0
 n4@4 append 8@4 put d=4
-n4@4 → n5 AppendResponse last=8@4 reject=false
+n4@4 → n5 AppendResponse last=8@4 reject=0
 n5@4 → n1 Heartbeat commit=8@4 read_seq=0
 n5@4 → n2 Heartbeat commit=8@4 read_seq=0
 n5@4 → n3 Heartbeat commit=8@4 read_seq=0

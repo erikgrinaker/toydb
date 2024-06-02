@@ -37,7 +37,7 @@ n2@1 follower(n1) ⇨ n2@2 follower(n3)
 n2@2 → n3 HeartbeatResponse last=1@1 read_seq=0
 n3@2 → n2 Append base=1@1 [2@2]
 n2@2 append 2@2 None
-n2@2 → n3 AppendResponse last=2@2 reject=false
+n2@2 → n3 AppendResponse last=2@2 reject=0
 n3@2 → n1 Heartbeat commit=2@2 read_seq=0
 n3@2 → n2 Heartbeat commit=2@2 read_seq=0
 n1@2 → n3 HeartbeatResponse last=2@2 read_seq=0

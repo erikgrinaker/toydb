@@ -64,11 +64,11 @@ stabilize
 ---
 n1@2 follower() ⇨ n1@2 follower(n2)
 n1@2 append 1@2 None
-n1@2 → n2 AppendResponse last=1@2 reject=false
+n1@2 → n2 AppendResponse last=1@2 reject=0
 n1@2 → n2 HeartbeatResponse last=1@2 read_seq=0
 n3@2 follower() ⇨ n3@2 follower(n2)
 n3@2 append 1@2 None
-n3@2 → n2 AppendResponse last=1@2 reject=false
+n3@2 → n2 AppendResponse last=1@2 reject=0
 n3@2 → n2 HeartbeatResponse last=1@2 read_seq=0
 n2@2 commit 1@2
 n2@2 apply 1@2 None

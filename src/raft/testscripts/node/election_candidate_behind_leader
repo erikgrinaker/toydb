@@ -78,18 +78,18 @@ n5@2 → n2 Heartbeat commit=1@1 read_seq=0
 n5@2 → n3 Heartbeat commit=1@1 read_seq=0
 n5@2 → n4 Heartbeat commit=1@1 read_seq=0
 n1@2 follower() ⇨ n1@2 follower(n5)
-n1@2 → n5 AppendResponse last=2@2 reject=false
+n1@2 → n5 AppendResponse last=2@2 reject=0
 n1@2 → n5 HeartbeatResponse last=2@2 read_seq=0
 n2@2 follower() ⇨ n2@2 follower(n5)
-n2@2 → n5 AppendResponse last=2@2 reject=false
+n2@2 → n5 AppendResponse last=2@2 reject=0
 n2@2 → n5 HeartbeatResponse last=2@2 read_seq=0
 n3@2 follower() ⇨ n3@2 follower(n5)
 n3@2 append 2@2 None
-n3@2 → n5 AppendResponse last=2@2 reject=false
+n3@2 → n5 AppendResponse last=2@2 reject=0
 n3@2 → n5 HeartbeatResponse last=2@2 read_seq=0
 n4@2 follower() ⇨ n4@2 follower(n5)
 n4@2 append 2@2 None
-n4@2 → n5 AppendResponse last=2@2 reject=false
+n4@2 → n5 AppendResponse last=2@2 reject=0
 n4@2 → n5 HeartbeatResponse last=2@2 read_seq=0
 n5@2 commit 2@2
 n5@2 apply 2@2 None
