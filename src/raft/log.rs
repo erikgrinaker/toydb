@@ -208,6 +208,14 @@ impl Log {
 
     /// Checks if the log contains an entry with the given index and term.
     pub fn has(&mut self, index: Index, term: Term) -> Result<bool> {
+        // Fast path: check against last_index. This is the common case when
+        // followers process appends or heartbeats.
+        if index == 0 || index > self.last_index {
+            return Ok(false);
+        }
+        if (index, term) == (self.last_index, self.last_term) {
+            return Ok(true);
+        }
         Ok(self.get(index)?.map(|e| e.term == term).unwrap_or(false))
     }
 
