@@ -18,3 +18,6 @@ pub const HEARTBEAT_INTERVAL: Ticks = 3;
 /// The default election timeout range, in ticks. This is randomized in this
 /// interval, to avoid election ties.
 pub const ELECTION_TIMEOUT_RANGE: std::ops::Range<Ticks> = 10..20;
+
+/// The maximum number of entries to send in a single append message.
+pub const MAX_APPEND_ENTRIES: usize = 100;

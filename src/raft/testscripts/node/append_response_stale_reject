@@ -1,0 +1,61 @@
+# A successful AppendResponse with a reject_index below the match index
+# should be ignored.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Replicate a write.
+(put 1 a=1)
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:2→3}
+n2@1 follower(n1) last=2@1 commit=2@1 apply=2
+n3@1 follower(n1) last=2@1 commit=2@1 apply=2
+
+# Propose a few writes.
+(put 1 b=2)
+(put 1 c=3)
+status
+---
+n1@1 leader last=4@1 commit=2@1 apply=2 progress={2:2→5 3:2→5}
+n2@1 follower(n1) last=2@1 commit=2@1 apply=2
+n3@1 follower(n1) last=2@1 commit=2@1 apply=2
+
+# A reject_index below the follower's progress match index is ignored.
+step 1 '{"from":2,"to":1,"term":1,"message":{"AppendResponse":{"match_index":0,"reject_index":2}}}'
+status
+---
+n1@1 leader last=4@1 commit=2@1 apply=2 progress={2:2→5 3:2→5}
+n2@1 follower(n1) last=2@1 commit=2@1 apply=2
+n3@1 follower(n1) last=2@1 commit=2@1 apply=2
+
+step 1 '{"from":2,"to":1,"term":1,"message":{"AppendResponse":{"match_index":0,"reject_index":1}}}'
+status
+---
+n1@1 leader last=4@1 commit=2@1 apply=2 progress={2:2→5 3:2→5}
+n2@1 follower(n1) last=2@1 commit=2@1 apply=2
+n3@1 follower(n1) last=2@1 commit=2@1 apply=2
+
+# The writes are still replicated without any probes.
+stabilize
+---
+n2@1 append 3@1 put b=2
+n2@1 → n1 AppendResponse match_index=3
+n2@1 append 4@1 put c=3
+n2@1 → n1 AppendResponse match_index=4
+n3@1 append 3@1 put b=2
+n3@1 → n1 AppendResponse match_index=3
+n3@1 append 4@1 put c=3
+n3@1 → n1 AppendResponse match_index=4
+n1@1 commit 3@1
+n1@1 apply 3@1 put b=2
+n1@1 → c1 ClientResponse id=0x02 write 0x0103
+c1@1 put b=2 ⇒ 3
+n1@1 commit 4@1
+n1@1 apply 4@1 put c=3
+n1@1 → c1 ClientResponse id=0x03 write 0x0104
+c1@1 put c=3 ⇒ 4

@@ -34,14 +34,17 @@ pub enum Node {
 impl Node {
     /// Creates a new Raft node, starting as a leaderless follower, or leader if
     /// there are no peers.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: NodeID,
         peers: HashSet<NodeID>,
         log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
+        // TODO: these don't need to be passed in, mutate the fields instead.
         heartbeat_interval: Ticks,
         election_timeout_range: std::ops::Range<Ticks>,
+        max_append_entries: usize,
     ) -> Result<Self> {
         let node = RawNode::new(
             id,
@@ -51,6 +54,7 @@ impl Node {
             node_tx,
             heartbeat_interval,
             election_timeout_range,
+            max_append_entries,
         )?;
         if node.peers.is_empty() {
             // If there are no peers, become leader immediately.
@@ -131,6 +135,7 @@ pub struct RawNode<R: Role = Follower> {
     node_tx: crossbeam::channel::Sender<Envelope>,
     heartbeat_interval: Ticks,
     election_timeout_range: std::ops::Range<Ticks>,
+    max_append_entries: usize,
     role: R,
 }
 
@@ -146,6 +151,7 @@ impl<R: Role> RawNode<R> {
             node_tx: self.node_tx,
             heartbeat_interval: self.heartbeat_interval,
             election_timeout_range: self.election_timeout_range,
+            max_append_entries: self.max_append_entries,
             role,
         }
     }
@@ -426,6 +432,7 @@ impl Role for Follower {}
 
 impl RawNode<Follower> {
     /// Creates a new node as a leaderless follower.
+    #[allow(clippy::too_many_arguments)]
     fn new(
         id: NodeID,
         peers: HashSet<NodeID>,
@@ -434,6 +441,7 @@ impl RawNode<Follower> {
         node_tx: crossbeam::channel::Sender<Envelope>,
         heartbeat_interval: Ticks,
         election_timeout_range: std::ops::Range<Ticks>,
+        max_append_entries: usize,
     ) -> Result<Self> {
         let (term, vote) = log.get_term()?;
         let role = Follower::new(None, vote, 0);
@@ -446,6 +454,7 @@ impl RawNode<Follower> {
             node_tx,
             heartbeat_interval,
             election_timeout_range,
+            max_append_entries,
             role,
         };
         node.role.election_timeout = node.gen_election_timeout();
@@ -543,19 +552,17 @@ impl RawNode<Follower> {
             // The leader will send periodic heartbeats. If we don't have a
             // leader in this term yet, follow it. If the commit_index advances,
             // apply state transitions.
-            Message::Heartbeat { commit_index, commit_term, read_seq } => {
+            Message::Heartbeat { last_index, commit_index, commit_term, read_seq } => {
                 // Check that the heartbeat is from our leader.
                 match self.role.leader {
                     Some(leader) => assert_eq!(msg.from, leader, "multiple leaders in term"),
                     None => self = self.into_follower(Some(msg.from), msg.term)?,
                 }
 
-                // Respond to the heartbeat.
-                let (last_index, last_term) = self.log.get_last_index();
-                self.send(
-                    msg.from,
-                    Message::HeartbeatResponse { last_index, last_term, read_seq },
-                )?;
+                // Attempt to match the leader's log and respond to the
+                // heartbeat. last_index always has the leader's term.
+                let match_index = if self.log.has(last_index, msg.term)? { last_index } else { 0 };
+                self.send(msg.from, Message::HeartbeatResponse { match_index, read_seq })?;
 
                 // Advance commit index and apply entries.
                 if commit_index > self.log.get_commit_index().0
@@ -568,8 +575,9 @@ impl RawNode<Follower> {
 
             // Append log entries from the leader to the local log.
             Message::Append { base_index, base_term, entries } => {
-                let Some(first) = entries.first() else { panic!("empty append message") };
-                assert_eq!(base_index, first.index - 1, "base index mismatch");
+                if let Some(first) = entries.first() {
+                    assert_eq!(base_index, first.index - 1, "base index mismatch");
+                }
 
                 // Make sure the message comes from our leader.
                 match self.role.leader {
@@ -578,17 +586,17 @@ impl RawNode<Follower> {
                 }
 
                 // If the base entry is in our log, append the entries.
-                let mut reject_index = 0;
+                let (mut reject_index, mut match_index) = (0, 0);
                 if base_index == 0 || self.log.has(base_index, base_term)? {
+                    match_index = entries.last().map(|e| e.index).unwrap_or(base_index);
                     self.log.splice(entries)?;
                 } else {
-                    reject_index = base_index;
+                    // Otherwise, reject the base index. If the local log is
+                    // shorter than the base index, lower the reject index to
+                    // skip all the missing entries.
+                    reject_index = std::cmp::min(base_index, self.log.get_last_index().0 + 1);
                 }
-                let (last_index, last_term) = self.log.get_last_index();
-                self.send(
-                    msg.from,
-                    Message::AppendResponse { reject_index, last_index, last_term },
-                )?;
+                self.send(msg.from, Message::AppendResponse { reject_index, match_index })?;
             }
 
             // A candidate in this term is requesting our vote.
@@ -690,6 +698,39 @@ struct Progress {
     match_index: Index,
     /// The last read sequence number confirmed by the peer.
     read_seq: ReadSequence,
+}
+
+impl Progress {
+    /// Attempts to advance a follower's match index, returning true if it did.
+    /// If next_index is below it, it is advanced to the following index, but
+    /// is otherwise left as is to avoid regressing it unnecessarily.
+    fn advance(&mut self, match_index: Index) -> bool {
+        if match_index <= self.match_index {
+            return false;
+        }
+        self.match_index = match_index;
+        self.next_index = std::cmp::max(self.next_index, match_index + 1);
+        true
+    }
+
+    /// Attempts to advance a follower's read_seq, returning true if it did.
+    fn advance_read(&mut self, read_seq: ReadSequence) -> bool {
+        if read_seq <= self.read_seq {
+            return false;
+        }
+        self.read_seq = read_seq;
+        true
+    }
+
+    /// Regresses the next index to the given index, if it's currently greater.
+    /// Can't regress below match_index + 1. Returns true if next_index changes.
+    fn regress_next(&mut self, next_index: Index) -> bool {
+        if next_index >= self.next_index || self.next_index <= self.match_index + 1 {
+            return false;
+        }
+        self.next_index = std::cmp::max(next_index, self.match_index + 1);
+        true
+    }
 }
 
 /// A pending client write request.
@@ -830,61 +871,83 @@ impl RawNode<Leader> {
                 panic!("saw other leader {} in term {}", msg.from, msg.term);
             }
 
-            // A follower received one of our heartbeats and confirms that we
-            // are its leader. If its log is incomplete, append entries. If the
-            // peer's read sequence number increased, process any pending reads.
+            // A follower received our heartbeat and confirms our leadership.
             //
             // TODO: this needs to commit and apply entries following a leader
             // change too, otherwise we can serve stale reads if the new leader
             // hadn't fully committed and applied entries yet.
-            Message::HeartbeatResponse { last_index, last_term, read_seq } => {
-                assert!(read_seq <= self.role.read_seq, "Future read sequence number");
+            Message::HeartbeatResponse { match_index, read_seq } => {
+                let (last_index, _) = self.log.get_last_index();
+                assert!(match_index <= last_index, "future match index");
+                assert!(read_seq <= self.role.read_seq, "future read sequence number");
 
-                let progress = self.role.progress.get_mut(&msg.from).unwrap();
-                if read_seq > progress.read_seq {
-                    progress.read_seq = read_seq;
+                // If the read sequence number advances, try to execute reads.
+                if self.progress(msg.from).advance_read(read_seq) {
                     self.maybe_read()?;
                 }
 
-                if last_index < self.log.get_last_index().0
-                    || (last_index > 0 && !self.log.has(last_index, last_term)?)
-                {
-                    self.send_log(msg.from)?;
+                if match_index == 0 {
+                    // If the follower didn't match our last index, an append to
+                    // it must have failed (or it's catching up). Probe it to
+                    // discover a matching entry and start replicating. Move
+                    // next_index back to last_index since the follower just
+                    // told us it doesn't have it.
+                    self.progress(msg.from).regress_next(last_index);
+                    self.maybe_send_append(msg.from, true)?;
+                } else if self.progress(msg.from).advance(match_index) {
+                    // If the follower's match index advanced, an append
+                    // response got lost. Try to commit.
+                    //
+                    // We don't need to eagerly send any pending entries, since
+                    // any proposals made after this heartbeat was sent should
+                    // have been eagerly replicated in steady state. If not, the
+                    // next heartbeat will trigger a probe above.
+                    self.maybe_commit_and_apply()?;
                 }
             }
 
             // A follower appended our log entries. Record its progress and
             // attempt to commit.
-            Message::AppendResponse { reject_index: 0, last_index, last_term } => {
-                let (li, lt) = self.log.get_last_index();
-                assert!(last_index <= li && last_term <= lt, "follower appended future entries");
-                debug_assert!(self.log.has(last_index, last_term)?, "follower has unknown tail");
+            Message::AppendResponse { match_index, reject_index: 0 } if match_index > 0 => {
+                let (last_index, _) = self.log.get_last_index();
+                assert!(match_index <= last_index, "follower matched unknown index");
 
-                let progress = self.role.progress.get_mut(&msg.from).expect("unknown node");
-                if last_index > progress.match_index {
-                    progress.match_index = last_index;
-                    progress.next_index = last_index + 1;
+                if self.progress(msg.from).advance(match_index) {
                     self.maybe_commit_and_apply()?;
                 }
+
+                // Eagerly send any further pending entries. The peer may be
+                // lagging behind the leader, and we're catching it up one
+                // MAX_APPEND_ENTRIES batch at a time. Or we may have received a
+                // probe response at the known match index, in which case
+                // advance() above would have returned false.
+                self.maybe_send_append(msg.from, false)?;
             }
 
             // A follower rejected the log entries because the base entry in
-            // reject_index did not match its log. Try the previous entry until
-            // we find a common base.
+            // reject_index did not match its log. Try a previous entry until we
+            // find a common base.
             //
             // This linear probing can be slow with long divergent logs, but we
             // keep it simple.
-            Message::AppendResponse { reject_index, last_index, last_term: _ } => {
-                let progress = self.role.progress.get_mut(&msg.from).expect("unknown node");
+            Message::AppendResponse { reject_index, match_index: 0 } if reject_index > 0 => {
+                let (last_index, _) = self.log.get_last_index();
+                assert!(reject_index <= last_index, "follower rejected unknown index");
 
-                // If the next index was rejected, try the previous one.
-                // Otherwise, the rejection is stale and can be ignored. If the
-                // follower's log is shorter, skip straight to its last index.
-                if progress.next_index == reject_index + 1 {
-                    progress.next_index = std::cmp::min(progress.next_index - 1, last_index + 1);
-                    self.send_log(msg.from)?;
+                // If the rejected base index is at or below the match index,
+                // the rejection is stale and can be ignored.
+                if reject_index <= self.progress(msg.from).match_index {
+                    return Ok(self.into());
+                }
+
+                // Probe below the reject index, if we haven't already moved
+                // next_index below it.
+                if self.progress(msg.from).regress_next(reject_index) {
+                    self.maybe_send_append(msg.from, true)?;
                 }
             }
+
+            Message::AppendResponse { .. } => panic!("invalid message {msg:?}"),
 
             // A client submitted a read command. To ensure linearizability, we
             // must confirm that we are still the leader by sending a heartbeat
@@ -966,12 +1029,22 @@ impl RawNode<Leader> {
 
     /// Broadcasts a heartbeat to all peers.
     fn heartbeat(&mut self) -> Result<()> {
+        let (last_index, last_term) = self.log.get_last_index();
         let (commit_index, commit_term) = self.log.get_commit_index();
         let read_seq = self.role.read_seq;
-        self.broadcast(Message::Heartbeat { commit_index, commit_term, read_seq })?;
+
+        assert_eq!(last_term, self.term, "leader has stale last_term");
+
+        let msg = Message::Heartbeat { last_index, commit_index, commit_term, read_seq };
+        self.broadcast(msg)?;
         // NB: We don't reset self.since_heartbeat here, because we want to send
         // periodic heartbeats regardless of any on-demand heartbeats.
         Ok(())
+    }
+
+    /// Returns a mutable borrow of a node's progress.
+    fn progress(&mut self, id: NodeID) -> &mut Progress {
+        self.role.progress.get_mut(&id).expect("unknown node")
     }
 
     /// Proposes a command for consensus by appending it to our log and
@@ -980,7 +1053,13 @@ impl RawNode<Leader> {
     fn propose(&mut self, command: Option<Vec<u8>>) -> Result<Index> {
         let index = self.log.append(self.term, command)?;
         for peer in self.peers.iter().copied().sorted() {
-            self.send_log(peer)?;
+            // Eagerly send the entry to the peer, but only if it is in steady
+            // state where we've already sent the previous entries. Otherwise,
+            // we're probing a lagging or divergent peer, and there's no point
+            // sending this entry since it will likely be rejected.
+            if index == self.progress(peer).next_index {
+                self.maybe_send_append(peer, false)?;
+            }
         }
         Ok(index)
     }
@@ -1070,21 +1149,59 @@ impl RawNode<Leader> {
         Ok(())
     }
 
-    /// Sends pending log entries to a peer.
-    fn send_log(&mut self, peer: NodeID) -> Result<()> {
-        let (base_index, base_term) = match self.role.progress.get(&peer) {
-            Some(Progress { next_index, .. }) if *next_index > 1 => {
-                match self.log.get(next_index - 1)? {
-                    Some(entry) => (entry.index, entry.term),
-                    None => panic!("missing base entry {}", next_index - 1),
-                }
-            }
-            Some(_) => (0, 0),
-            None => panic!("unknown peer {}", peer),
+    // Sends pending log entries to a peer, according to its next_index. Does
+    // not send an append if the peer is already caught up. Sends an empty
+    // append with the last entry as a base if all pending entries are already
+    // in flight, to probe whether they've made it to the follower or not.
+    fn maybe_send_append(&mut self, peer: NodeID, mut probe: bool) -> Result<()> {
+        let (last_index, _) = self.log.get_last_index();
+        let progress = self.role.progress.get_mut(&peer).expect("unknown node");
+        assert_ne!(progress.next_index, 0, "invalid next_index");
+        assert!(progress.next_index > progress.match_index, "invalid next_index <= match_index");
+        assert!(progress.match_index <= last_index, "invalid match_index > last_index");
+        assert!(progress.next_index <= last_index + 1, "invalid next_index > last_index + 1");
+
+        // If the peer is already caught up, there's no point sending an append.
+        if progress.match_index == last_index {
+            return Ok(());
+        }
+
+        // If a probe was requested, but next_index is immediately after
+        // match_index (even when 0), there is no point in probing because the
+        // entry must be accepted. Send the entries instead.
+        if probe && progress.next_index == progress.match_index + 1 {
+            probe = false;
+        }
+
+        // If there are no pending entries and this is not a probe, there's
+        // nothing more to send.
+        if progress.next_index > last_index && !probe {
+            return Ok(());
+        }
+
+        // Fetch the base and entries.
+        let (base_index, base_term) = match progress.next_index {
+            0 => panic!("next_index=0 for node {peer}"),
+            1 => (0, 0),
+            next => self.log.get(next - 1)?.map(|e| (e.index, e.term)).expect("missing base entry"),
         };
 
-        let entries = self.log.scan((base_index + 1)..)?.collect::<Result<Vec<_>>>()?;
-        debug!("Replicating {} entries at base {} to {}", entries.len(), base_index, peer);
+        let entries = if !probe {
+            self.log
+                .scan(progress.next_index..)?
+                .take(self.max_append_entries)
+                .collect::<Result<_>>()?
+        } else {
+            Vec::new()
+        };
+
+        // Optimistically assume the entries will be accepted by the follower,
+        // and bump the next_index to avoid resending them until a response.
+        if let Some(last) = entries.last() {
+            progress.next_index = last.index + 1;
+        }
+
+        debug!("Replicating {} entries with base {base_index} to {peer}", entries.len());
         self.send(peer, Message::Append { base_index, base_term, entries })?;
         Ok(())
     }
@@ -1110,6 +1227,7 @@ mod tests {
     use crate::errassert;
     use crate::raft::{
         Entry, Request, RequestID, Response, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL,
+        MAX_APPEND_ENTRIES,
     };
     use crossbeam::channel::{Receiver, Sender};
     use pretty_assertions::assert_eq;
@@ -1177,7 +1295,7 @@ mod tests {
                     self.campaign(&ids, &mut output)?;
                 }
 
-                // cluster nodes=N [leader=ID] [heartbeat_interval=N] [election_timeout=N]
+                // cluster nodes=N [leader=ID] [heartbeat_interval=N] [election_timeout=N] [max_append_entries=N]
                 //
                 // Creates a new Raft cluster.
                 "cluster" => {
@@ -1189,8 +1307,17 @@ mod tests {
                     let election_timeout = args
                         .lookup_parse("election_timeout")?
                         .unwrap_or(ELECTION_TIMEOUT_RANGE.start);
+                    let max_append_entries =
+                        args.lookup_parse("max_append_entries")?.unwrap_or(MAX_APPEND_ENTRIES);
                     args.reject_rest()?;
-                    self.cluster(nodes, leader, heartbeat_interval, election_timeout, &mut output)?;
+                    self.cluster(
+                        nodes,
+                        leader,
+                        heartbeat_interval,
+                        election_timeout,
+                        max_append_entries,
+                        &mut output,
+                    )?;
                 }
 
                 // deliver [from=ID] [ID...]
@@ -1362,6 +1489,7 @@ mod tests {
             leader: Option<NodeID>,
             heartbeat_interval: Ticks,
             election_timeout: Ticks,
+            max_append_entries: usize,
             output: &mut String,
         ) -> Result<(), Box<dyn Error>> {
             if !self.ids.is_empty() {
@@ -1389,6 +1517,7 @@ mod tests {
                         node_tx,
                         heartbeat_interval,
                         election_timeout..election_timeout + 1,
+                        max_append_entries,
                     )?,
                 );
                 self.nodes_rx.insert(id, node_rx);
@@ -1675,6 +1804,8 @@ mod tests {
 
             let log = Self::borrow_log_mut(&mut node);
             let (commit_index, commit_term) = log.get_commit_index();
+            // TODO: this doesn't handle replaced indexes. It needs to fetch the
+            // index/term of all entries and compare them.
             let appended: Vec<_> =
                 log.scan(old_last_index + 1..)?.collect::<crate::error::Result<_>>()?;
 
@@ -1850,11 +1981,11 @@ mod tests {
                 Message::CampaignResponse { vote } => {
                     format!("CampaignResponse vote={vote}")
                 }
-                Message::Heartbeat { commit_index, commit_term, read_seq } => {
-                    format!("Heartbeat commit={commit_index}@{commit_term} read_seq={read_seq}")
+                Message::Heartbeat { last_index, commit_index, commit_term, read_seq } => {
+                    format!("Heartbeat last_index={last_index} commit={commit_index}@{commit_term} read_seq={read_seq}")
                 }
-                Message::HeartbeatResponse { last_index, last_term, read_seq } => {
-                    format!("HeartbeatResponse last={last_index}@{last_term} read_seq={read_seq}")
+                Message::HeartbeatResponse { match_index, read_seq } => {
+                    format!("HeartbeatResponse match_index={match_index} read_seq={read_seq}")
                 }
                 Message::Append { base_index, base_term, entries } => {
                     format!(
@@ -1862,8 +1993,13 @@ mod tests {
                         entries.iter().map(|e| format!("{}@{}", e.index, e.term)).join(" ")
                     )
                 }
-                Message::AppendResponse { reject_index, last_index, last_term } => {
-                    format!("AppendResponse last={last_index}@{last_term} reject={reject_index}")
+                Message::AppendResponse { match_index, reject_index } => {
+                    match (match_index, reject_index) {
+                        (0, 0) => panic!("match_index and reject_index both 0"),
+                        (match_index, 0) => format!("AppendResponse match_index={match_index}"),
+                        (0, reject_index) => format!("AppendResponse reject_index={reject_index}"),
+                        (_, _) => panic!("match_index and reject_index both non-zero"),
+                    }
                 }
                 Message::ClientRequest { id, request } => {
                     format!(

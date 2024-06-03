@@ -46,39 +46,43 @@ n2@2 candidate ⇨ n2@2 leader
 n2@2 append 4@2 None
 n2@2 ⇥ n1 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶2̶]̶
 n2@2 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶2̶]̶
-n2@2 ⇥ n1 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶0̶
-n2@2 ⇥ n3 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶0̶
+n2@2 ⇥ n1 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶l̶a̶s̶t̶_̶i̶n̶d̶e̶x̶=̶4̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶0̶
+n2@2 ⇥ n3 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶l̶a̶s̶t̶_̶i̶n̶d̶e̶x̶=̶4̶ ̶c̶o̶m̶m̶i̶t̶=̶2̶@̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶0̶
 
 heal
 status
 ---
 n1 n2 n3 fully connected
 n1@2 follower() last=3@1 commit=3@1 apply=3
-n2@2 leader last=4@2 commit=2@1 apply=2 progress={1:0→4 3:0→4}
+n2@2 leader last=4@2 commit=2@1 apply=2 progress={1:0→5 3:0→5}
 n3@2 follower() last=3@1 commit=2@1 apply=2
 
 # Reading from n2 should not result in a stale read.
 #
-# TODO: this currently results in a stale read, since n2 does not commit and
-# apply in response to heartbeat messages.
+# TODO: this currently results in a stale read, since n2 does not wait to commit
+# and apply an entry from its own term before serving reads.
 get 2 b
 stabilize
 ---
 c2@2 → n2 ClientRequest id=0x03 read 0x000162
-n2@2 → n1 Heartbeat commit=2@1 read_seq=1
-n2@2 → n3 Heartbeat commit=2@1 read_seq=1
+n2@2 → n1 Heartbeat last_index=4 commit=2@1 read_seq=1
+n2@2 → n3 Heartbeat last_index=4 commit=2@1 read_seq=1
 n1@2 follower() ⇨ n1@2 follower(n2)
-n1@2 → n2 HeartbeatResponse last=3@1 read_seq=1
+n1@2 → n2 HeartbeatResponse match_index=0 read_seq=1
 n3@2 follower() ⇨ n3@2 follower(n2)
-n3@2 → n2 HeartbeatResponse last=3@1 read_seq=1
+n3@2 → n2 HeartbeatResponse match_index=0 read_seq=1
 n2@2 → c2 ClientResponse id=0x03 read 0x0000
 c2@2 get b ⇒ None
+n2@2 → n1 Append base=3@1 []
+n2@2 → n3 Append base=3@1 []
+n1@2 → n2 AppendResponse match_index=3
+n3@2 → n2 AppendResponse match_index=3
 n2@2 → n1 Append base=3@1 [4@2]
 n2@2 → n3 Append base=3@1 [4@2]
 n1@2 append 4@2 None
-n1@2 → n2 AppendResponse last=4@2 reject=0
+n1@2 → n2 AppendResponse match_index=4
 n3@2 append 4@2 None
-n3@2 → n2 AppendResponse last=4@2 reject=0
+n3@2 → n2 AppendResponse match_index=4
 n2@2 commit 4@2
 n2@2 apply 3@1 put b=2
 n2@2 apply 4@2 None

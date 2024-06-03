@@ -7,12 +7,12 @@ n2@1 follower(n1) last=1@1 commit=1@1 apply=1
 n3@1 follower(n1) last=1@1 commit=1@1 apply=1
 
 # Leader panics if it sees another leader in the same term.
-!step 1 '{"from":2, "to":1, "term":1, "message": {"Heartbeat":{"commit_index":0, "commit_term":0, "read_seq":0}}}'
+!step 1 '{"from":2, "to":1, "term":1, "message": {"Heartbeat":{"last_index":1,"commit_index":0, "commit_term":0, "read_seq":0}}}'
 ---
 Panic: saw other leader 2 in term 1
 
 # Follower panics too.
-!step 2 '{"from":3, "to":2, "term":1, "message": {"Heartbeat":{"commit_index":0, "commit_term":0, "read_seq":0}}}'
+!step 2 '{"from":3, "to":2, "term":1, "message": {"Heartbeat":{"last_index":1,"commit_index":0, "commit_term":0, "read_seq":0}}}'
 ---
 Panic: assertion `left == right` failed: multiple leaders in term
   left: 3

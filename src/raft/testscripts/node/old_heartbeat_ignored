@@ -17,7 +17,7 @@ n3 ⇹ n1 n2
 (stabilize heartbeat=true)
 status
 ---
-n1@2 leader last=2@2 commit=2@2 apply=2 progress={2:2→3 3:0→2}
+n1@2 leader last=2@2 commit=2@2 apply=2 progress={2:2→3 3:0→3}
 n2@2 follower(n1) last=2@2 commit=2@2 apply=2
 n3@1 leader last=1@1 commit=1@1 apply=1 progress={1:1→2 2:1→2}
 
@@ -30,11 +30,11 @@ n1 n2 n3 fully connected
 heartbeat 3
 stabilize
 ---
-n3@1 → n1 Heartbeat commit=1@1 read_seq=0
-n3@1 → n2 Heartbeat commit=1@1 read_seq=0
+n3@1 → n1 Heartbeat last_index=1 commit=1@1 read_seq=0
+n3@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
 
 status
 ---
-n1@2 leader last=2@2 commit=2@2 apply=2 progress={2:2→3 3:0→2}
+n1@2 leader last=2@2 commit=2@2 apply=2 progress={2:2→3 3:0→3}
 n2@2 follower(n1) last=2@2 commit=2@2 apply=2
 n3@1 leader last=1@1 commit=1@1 apply=1 progress={1:1→2 2:1→2}

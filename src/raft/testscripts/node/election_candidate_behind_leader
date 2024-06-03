@@ -20,7 +20,7 @@ n1 n2 ⇹ n3 n4 n5
 (stabilize)
 status
 ---
-n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→2 4:1→2 5:1→2}
+n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→3 4:1→3 5:1→3}
 n2@1 follower(n1) last=2@1 commit=1@1 apply=1
 n3@1 follower(n1) last=1@1 commit=1@1 apply=1
 n4@1 follower(n1) last=1@1 commit=1@1 apply=1
@@ -73,42 +73,42 @@ n5@2 → n1 Append base=1@1 [2@2]
 n5@2 → n2 Append base=1@1 [2@2]
 n5@2 → n3 Append base=1@1 [2@2]
 n5@2 → n4 Append base=1@1 [2@2]
-n5@2 → n1 Heartbeat commit=1@1 read_seq=0
-n5@2 → n2 Heartbeat commit=1@1 read_seq=0
-n5@2 → n3 Heartbeat commit=1@1 read_seq=0
-n5@2 → n4 Heartbeat commit=1@1 read_seq=0
+n5@2 → n1 Heartbeat last_index=2 commit=1@1 read_seq=0
+n5@2 → n2 Heartbeat last_index=2 commit=1@1 read_seq=0
+n5@2 → n3 Heartbeat last_index=2 commit=1@1 read_seq=0
+n5@2 → n4 Heartbeat last_index=2 commit=1@1 read_seq=0
 n1@2 follower() ⇨ n1@2 follower(n5)
-n1@2 → n5 AppendResponse last=2@2 reject=0
-n1@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n1@2 → n5 AppendResponse match_index=2
+n1@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n2@2 follower() ⇨ n2@2 follower(n5)
-n2@2 → n5 AppendResponse last=2@2 reject=0
-n2@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n2@2 → n5 AppendResponse match_index=2
+n2@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n3@2 follower() ⇨ n3@2 follower(n5)
 n3@2 append 2@2 None
-n3@2 → n5 AppendResponse last=2@2 reject=0
-n3@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n3@2 → n5 AppendResponse match_index=2
+n3@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n4@2 follower() ⇨ n4@2 follower(n5)
 n4@2 append 2@2 None
-n4@2 → n5 AppendResponse last=2@2 reject=0
-n4@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n4@2 → n5 AppendResponse match_index=2
+n4@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n5@2 commit 2@2
 n5@2 apply 2@2 None
-n5@2 → n1 Heartbeat commit=2@2 read_seq=0
-n5@2 → n2 Heartbeat commit=2@2 read_seq=0
-n5@2 → n3 Heartbeat commit=2@2 read_seq=0
-n5@2 → n4 Heartbeat commit=2@2 read_seq=0
+n5@2 → n1 Heartbeat last_index=2 commit=2@2 read_seq=0
+n5@2 → n2 Heartbeat last_index=2 commit=2@2 read_seq=0
+n5@2 → n3 Heartbeat last_index=2 commit=2@2 read_seq=0
+n5@2 → n4 Heartbeat last_index=2 commit=2@2 read_seq=0
 n1@2 commit 2@2
 n1@2 apply 2@2 None
-n1@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n1@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n2@2 commit 2@2
 n2@2 apply 2@2 None
-n2@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n2@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n3@2 commit 2@2
 n3@2 apply 2@2 None
-n3@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n3@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n4@2 commit 2@2
 n4@2 apply 2@2 None
-n4@2 → n5 HeartbeatResponse last=2@2 read_seq=0
+n4@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 
 # n1+n2's in-flight write at log position 2 has been replaced by the
 # empty log entry appended by n5 when it became leader.

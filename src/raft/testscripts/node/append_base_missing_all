@@ -1,17 +1,25 @@
-# Appends with a base beyond the node's last log entry should result in a
-# rejection at the index following the last entry, and the leader appending
-# the tail of the log.
+# Appends to a node with an empty log should result in a rejection of index 1,
+# allowing the leader to send the entire log.
 
-cluster nodes=3 leader=1
+cluster nodes=3
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@0 follower() last=0@0 commit=0@0 apply=0
+n2@0 follower() last=0@0 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
 
 # Partition n3 so that it does not receive writes.
 partition 3
 ---
 n3 ⇹ n1 n2
+
+# Elect n1 as leader.
+(campaign 1)
+(stabilize)
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:0→2}
+n2@1 follower(n1) last=1@1 commit=0@0 apply=0
+n3@0 follower() last=0@0 commit=0@0 apply=0
 
 # Replicate a couple of writes.
 (put 1 a=1)
@@ -20,9 +28,9 @@ n3 ⇹ n1 n2
 (stabilize heartbeat=true)
 status
 ---
-n1@1 leader last=4@1 commit=4@1 apply=4 progress={2:4→5 3:1→5}
+n1@1 leader last=4@1 commit=4@1 apply=4 progress={2:4→5 3:0→5}
 n2@1 follower(n1) last=4@1 commit=4@1 apply=4
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@0 follower() last=0@0 commit=0@0 apply=0
 
 # Heal the partition, and propose another write.
 heal
@@ -34,23 +42,22 @@ n1@1 append 5@1 put c=3
 n1@1 → n2 Append base=4@1 [5@1]
 n1@1 → n3 Append base=4@1 [5@1]
 
-# The 4@1 base is beyond n3's last index 1@1, so the append is rejected.
-# However, the follower returns reject_index=2 immediately after its
-# last index, rather than the original base index 4.
+# n3 has no entries, so it rejects with reject_index=1.
 deliver 3
 ---
-n3@1 → n1 AppendResponse reject_index=2
+n3@0 follower() ⇨ n3@1 follower(n1)
+n3@1 → n1 AppendResponse reject_index=1
 
-# Because index 1 is already matched with the leader, it doesn't have to probe
-# and simply sends the entire tail, which is accepted.
+# This allows n1 to send the entire log, without having to probe.
 deliver 1
 status 1
 ---
-n1@1 → n3 Append base=1@1 [2@1 3@1 4@1 5@1]
-n1@1 leader last=5@1 commit=4@1 apply=4 progress={2:4→6 3:1→6}
+n1@1 → n3 Append base=0@0 [1@1 2@1 3@1 4@1 5@1]
+n1@1 leader last=5@1 commit=4@1 apply=4 progress={2:4→6 3:0→6}
 
 deliver 3
 ---
+n3@1 append 1@1 None
 n3@1 append 2@1 put a=1
 n3@1 append 3@1 put b=2
 n3@1 append 4@1 put c=3
@@ -70,4 +77,4 @@ status
 ---
 n1@1 leader last=5@1 commit=5@1 apply=5 progress={2:4→6 3:5→6}
 n2@1 follower(n1) last=4@1 commit=4@1 apply=4
-n3@1 follower(n1) last=5@1 commit=1@1 apply=1
+n3@1 follower(n1) last=5@1 commit=0@0 apply=0

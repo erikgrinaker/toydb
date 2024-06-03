@@ -57,12 +57,12 @@ n1@1 → n4 Append base=0@0 [1@1]
 n1@1 → n5 Append base=0@0 [1@1]
 n1@1 → n6 Append base=0@0 [1@1]
 n1@1 → n7 Append base=0@0 [1@1]
-n1@1 → n2 Heartbeat commit=0@0 read_seq=0
-n1@1 → n3 Heartbeat commit=0@0 read_seq=0
-n1@1 → n4 Heartbeat commit=0@0 read_seq=0
-n1@1 → n5 Heartbeat commit=0@0 read_seq=0
-n1@1 → n6 Heartbeat commit=0@0 read_seq=0
-n1@1 → n7 Heartbeat commit=0@0 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit=0@0 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit=0@0 read_seq=0
+n1@1 → n4 Heartbeat last_index=1 commit=0@0 read_seq=0
+n1@1 → n5 Heartbeat last_index=1 commit=0@0 read_seq=0
+n1@1 → n6 Heartbeat last_index=1 commit=0@0 read_seq=0
+n1@1 → n7 Heartbeat last_index=1 commit=0@0 read_seq=0
 
 # n2 receives n1's heartbeats and becomes follower.
 deliver 2 from=1
@@ -70,8 +70,8 @@ deliver 2 from=1
 n2@1 → n1 CampaignResponse vote=false
 n2@1 candidate ⇨ n2@1 follower(n1)
 n2@1 append 1@1 None
-n2@1 → n1 AppendResponse last=1@1 reject=0
-n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n2@1 → n1 AppendResponse match_index=1
+n2@1 → n1 HeartbeatResponse match_index=1 read_seq=0
 
 # n1 (leader) receives n6's vote and ignores it. n2 (follower) receives n7's
 # vote and ignores it. They remain leader and follower.
@@ -79,7 +79,7 @@ deliver 1 from=6
 deliver 2 from=7
 status
 ---
-n1@1 leader last=1@1 commit=0@0 apply=0 progress={2:0→1 3:0→1 4:0→1 5:0→1 6:0→1 7:0→1}
+n1@1 leader last=1@1 commit=0@0 apply=0 progress={2:0→2 3:0→2 4:0→2 5:0→2 6:0→2 7:0→2}
 n2@1 follower(n1) last=1@1 commit=0@0 apply=0
 n3@1 follower() last=0@0 commit=0@0 apply=0
 n4@1 follower() last=0@0 commit=0@0 apply=0

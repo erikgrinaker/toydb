@@ -1,0 +1,95 @@
+# A heartbeat response triggers a probe and resend of lost appends.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Partition the leader, submit three writes whose appends are dropped, then heal
+# the partition again.
+partition 1
+---
+n1 ⇹ n2 n3
+
+put 1 a=1
+put 1 b=2
+put 1 c=3
+---
+c1@1 → n1 ClientRequest id=0x01 write 0x0101610131
+n1@1 append 2@1 put a=1
+n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
+n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
+c1@1 → n1 ClientRequest id=0x02 write 0x0101620132
+n1@1 append 3@1 put b=2
+n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶]̶
+n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶]̶
+c1@1 → n1 ClientRequest id=0x03 write 0x0101630133
+n1@1 append 4@1 put c=3
+n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶]̶
+n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶]̶
+
+heal
+status
+---
+n1 n2 n3 fully connected
+n1@1 leader last=4@1 commit=1@1 apply=1 progress={2:1→5 3:1→5}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# The next heartbeat will result in match_index=0 since the followers
+# don't have the last_index.
+heartbeat 1
+deliver
+---
+n1@1 → n2 Heartbeat last_index=4 commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat last_index=4 commit=1@1 read_seq=0
+n2@1 → n1 HeartbeatResponse match_index=0 read_seq=0
+n3@1 → n1 HeartbeatResponse match_index=0 read_seq=0
+
+# The leader has previously matched the followers at index 1.
+status 1
+---
+n1@1 leader last=4@1 commit=1@1 apply=1 progress={2:1→5 3:1→5}
+
+# When it receives the heartbeat response, it probes the previous index 3.
+deliver
+---
+n1@1 → n2 Append base=3@1 []
+n1@1 → n3 Append base=3@1 []
+
+# The followers don't have index 3. They don't have index 2 either, but they
+# do have 1, so they respond with a reject_index=2.
+deliver
+---
+n2@1 → n1 AppendResponse reject_index=2
+n3@1 → n1 AppendResponse reject_index=2
+
+# The leader has already matched index 1, so it doesn't have to probe for it,
+# and can simply send the tail of the log.
+deliver
+---
+n1@1 → n2 Append base=1@1 [2@1 3@1 4@1]
+n1@1 → n3 Append base=1@1 [2@1 3@1 4@1]
+
+# The followers accept the append and the leader commits and applies.
+stabilize
+---
+n2@1 append 2@1 put a=1
+n2@1 append 3@1 put b=2
+n2@1 append 4@1 put c=3
+n2@1 → n1 AppendResponse match_index=4
+n3@1 append 2@1 put a=1
+n3@1 append 3@1 put b=2
+n3@1 append 4@1 put c=3
+n3@1 → n1 AppendResponse match_index=4
+n1@1 commit 4@1
+n1@1 apply 2@1 put a=1
+n1@1 apply 3@1 put b=2
+n1@1 apply 4@1 put c=3
+n1@1 → c1 ClientResponse id=0x01 write 0x0102
+c1@1 put a=1 ⇒ 2
+n1@1 → c1 ClientResponse id=0x02 write 0x0103
+c1@1 put b=2 ⇒ 3
+n1@1 → c1 ClientResponse id=0x03 write 0x0104
+c1@1 put c=3 ⇒ 4

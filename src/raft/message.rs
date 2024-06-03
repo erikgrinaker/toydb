@@ -28,18 +28,21 @@ pub enum Message {
     /// serves several purposes:
     ///
     /// * Inform nodes about the leader, and prevent elections.
-    /// * Probe follower log progress.
+    /// * Probe follower log progress, and trigger append/ack retries.
     /// * Advance followers' commit indexes, so they can apply entries.
     /// * Confirm leadership for client reads, to avoid stale reads.
     ///
     /// While some of this could be split out to other messages, the heartbeat
-    /// periodicity also implicitly provides retries, so it is convenient to
+    /// periodicity implicitly provides retries, so it is convenient to
     /// piggyback on it.
     ///
     /// The Raft paper does not have a distinct heartbeat message, and instead
     /// uses an empty AppendEntries RPC, but we choose to add one for better
     /// separation of concerns.
     Heartbeat {
+        /// The index of the leader's last log entry. The term is the leader's
+        /// current term, since it appends a noop entry on election win.
+        last_index: Index,
         /// The index of the leader's last committed log entry.
         commit_index: Index,
         /// The term of the leader's last committed log entry.
@@ -57,10 +60,10 @@ pub enum Message {
 
     /// Followers respond to leader heartbeats if they still consider it leader.
     HeartbeatResponse {
-        /// The index of the follower's last log entry.
-        last_index: Index,
-        /// The term of the follower's last log entry.
-        last_term: Term,
+        /// If non-zero, the heartbeat's last_index which was matched in the
+        /// follower's log. Otherwise, the follower is either divergent or
+        /// lagging behind the leader.
+        match_index: Index,
         /// The heartbeat's read sequence number.
         read_seq: ReadSequence,
     },
@@ -81,36 +84,39 @@ pub enum Message {
     },
 
     /// Leaders replicate log entries to followers by appending to their logs
-    /// after the given base entry. If the base entry matches the follower's log
-    /// then their logs are identical up to it (see section 5.3 in the Raft
-    /// paper), and the entries can be appended. Otherwise, the append is
-    /// rejected and the leader must retry an earlier base index until a common
-    /// base is found.
+    /// after the given base entry.
+    ///
+    /// If the base entry matches the follower's log then their logs are
+    /// identical up to it (see section 5.3 in the Raft paper), and the entries
+    /// can be appended -- possibly replacing conflicting entries. Otherwise,
+    /// the append is rejected and the leader must retry an earlier base index
+    /// until a common base is found.
+    ///
+    /// Empty appends messages (no entries) are used to probe follower logs for
+    /// a common match index in the case of divergent logs, restarted nodes, or
+    /// dropped messages. This is typically done by sending probes with a
+    /// decrementing base index until a match is found, at which point the
+    /// subsequent entries can be sent.
     Append {
         /// The index of the log entry to append after.
         base_index: Index,
         /// The term of the log entry to append after.
         base_term: Term,
-        /// Log entries to append.
+        /// Log entries to append. Must start at base_index + 1.
         entries: Vec<Entry>,
     },
 
     /// Followers accept or reject appends from the leader depending on whether
-    /// the base entry matches in both logs.
+    /// the base entry matches their log.
     AppendResponse {
+        /// If non-zero, the follower accepted entries to this index. The entire
+        /// log up to this index is consistent with the leader.
+        match_index: Index,
         /// If non-zero, the follower rejected an append at this base index
-        /// because the base index/term did not match its log.
+        /// because the base index/term did not match its log. This may be
+        /// lowered by the follower if its log is shorter than the base index,
+        /// to avoid trying each missing entry.
         reject_index: Index,
-        /// The index of the follower's last log entry.
-        ///
-        /// NB: if the entries already existed in the follower's log, the append
-        /// is a noop and the last_index may be greater than the latest entry in
-        /// the append. That's fine -- if we're still the leader then our logs
-        /// must be consistent, otherwise the follower will have stopped
-        /// accepting our appends anyway.
-        last_index: Index,
-        /// The term of the follower's last log entry.
-        last_term: Term,
     },
 
     /// A client request. This can be submitted to the leader, or to a follower

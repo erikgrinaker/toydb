@@ -59,6 +59,7 @@ impl Server {
                 node_tx,
                 raft::HEARTBEAT_INTERVAL,
                 raft::ELECTION_TIMEOUT_RANGE,
+                raft::MAX_APPEND_ENTRIES,
             )?,
             peers,
             node_rx,

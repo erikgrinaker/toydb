@@ -1,0 +1,224 @@
+# Appends to a previous leader and follower with a divergent tail all
+# the way back to the first entry works.
+
+cluster nodes=5 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n4@1 follower(n1) last=1@1 commit=1@1 apply=1
+n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Partition n1-n2
+partition 1 2
+---
+n1 n2 ⇹ n3 n4 n5
+
+# Elect new leaders in the majority partition and replicate a few writes.
+# Multiple leaders ensures the log has multiple terms.
+(campaign 3)
+(stabilize)
+(put 3 a=1)
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@2 leader last=3@2 commit=3@2 apply=3 progress={1:0→4 2:0→4 4:3→4 5:3→4}
+n4@2 follower(n3) last=3@2 commit=3@2 apply=3
+n5@2 follower(n3) last=3@2 commit=3@2 apply=3
+
+(campaign 4)
+(stabilize)
+(put 4 b=2)
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@3 follower(n4) last=5@3 commit=5@3 apply=5
+n4@3 leader last=5@3 commit=5@3 apply=5 progress={1:0→6 2:0→6 3:5→6 5:5→6}
+n5@3 follower(n4) last=5@3 commit=5@3 apply=5
+
+(campaign 5)
+(stabilize)
+(put 5 c=3)
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@4 follower(n5) last=7@4 commit=7@4 apply=7
+n4@4 follower(n5) last=7@4 commit=7@4 apply=7
+n5@4 leader last=7@4 commit=7@4 apply=7 progress={1:0→8 2:0→8 3:7→8 4:7→8}
+
+# Propose writes in the minority partition as well.
+(put 1 a=2)
+(put 1 a=3)
+(put 1 a=4)
+(put 1 a=5)
+(put 1 a=6)
+(put 1 a=7)
+(stabilize)
+status
+---
+n1@1 leader last=7@1 commit=1@1 apply=1 progress={2:7→8 3:1→8 4:1→8 5:1→8}
+n2@1 follower(n1) last=7@1 commit=1@1 apply=1
+n3@4 follower(n5) last=7@4 commit=7@4 apply=7
+n4@4 follower(n5) last=7@4 commit=7@4 apply=7
+n5@4 leader last=7@4 commit=7@4 apply=7 progress={1:0→8 2:0→8 3:7→8 4:7→8}
+
+log 1 5
+---
+n1@1 last=7@1 commit=1@1
+n1@1 entry 1@1 None
+n1@1 entry 2@1 put a=2
+n1@1 entry 3@1 put a=3
+n1@1 entry 4@1 put a=4
+n1@1 entry 5@1 put a=5
+n1@1 entry 6@1 put a=6
+n1@1 entry 7@1 put a=7
+n5@4 last=7@4 commit=7@4
+n5@4 entry 1@1 None
+n5@4 entry 2@2 None
+n5@4 entry 3@2 put a=1
+n5@4 entry 4@3 None
+n5@4 entry 5@3 put b=2
+n5@4 entry 6@4 None
+n5@4 entry 7@4 put c=3
+
+# Heal the partition.
+heal
+---
+n1 n2 n3 n4 n5 fully connected
+
+# Propose another write on the majority leader.
+put 5 d=4
+---
+c5@4 → n5 ClientRequest id=0x0a write 0x0101640134
+n5@4 append 8@4 put d=4
+n5@4 → n1 Append base=7@4 [8@4]
+n5@4 → n2 Append base=7@4 [8@4]
+n5@4 → n3 Append base=7@4 [8@4]
+n5@4 → n4 Append base=7@4 [8@4]
+
+# Delivering the appends to n1 and n2 should reject them. It also cancels the
+# in-flight write requests on n1.
+deliver 1 2
+---
+n1@1 leader ⇨ n1@4 follower(n5)
+n1@1 → c1 ClientResponse id=0x04 Error::Abort
+c1@1 put a=2 ⇒ Error::Abort (operation aborted)
+n1@1 → c1 ClientResponse id=0x05 Error::Abort
+c1@1 put a=3 ⇒ Error::Abort (operation aborted)
+n1@1 → c1 ClientResponse id=0x06 Error::Abort
+c1@1 put a=4 ⇒ Error::Abort (operation aborted)
+n1@1 → c1 ClientResponse id=0x07 Error::Abort
+c1@1 put a=5 ⇒ Error::Abort (operation aborted)
+n1@1 → c1 ClientResponse id=0x08 Error::Abort
+c1@1 put a=6 ⇒ Error::Abort (operation aborted)
+n1@1 → c1 ClientResponse id=0x09 Error::Abort
+c1@1 put a=7 ⇒ Error::Abort (operation aborted)
+n1@4 → n5 AppendResponse reject_index=7
+n2@1 follower(n1) ⇨ n2@4 follower(n5)
+n2@4 → n5 AppendResponse reject_index=7
+
+# n5 will probe the previous base, which is again rejected. This repeats until
+# a common base is found at 1@1.
+deliver 5
+status 5
+deliver 1 2
+---
+n5@4 → n1 Append base=6@4 []
+n5@4 → n2 Append base=6@4 []
+n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→7 2:0→7 3:7→9 4:7→9}
+n1@4 → n5 AppendResponse reject_index=6
+n2@4 → n5 AppendResponse reject_index=6
+
+deliver 5
+deliver 1 2
+status 5
+---
+n5@4 → n1 Append base=5@3 []
+n5@4 → n2 Append base=5@3 []
+n1@4 → n5 AppendResponse reject_index=5
+n2@4 → n5 AppendResponse reject_index=5
+n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→6 2:0→6 3:7→9 4:7→9}
+
+deliver 5
+status 5
+deliver 1 2
+---
+n5@4 → n1 Append base=4@3 []
+n5@4 → n2 Append base=4@3 []
+n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→5 2:0→5 3:7→9 4:7→9}
+n1@4 → n5 AppendResponse reject_index=4
+n2@4 → n5 AppendResponse reject_index=4
+
+deliver 5
+status 5
+deliver 1 2
+---
+n5@4 → n1 Append base=3@2 []
+n5@4 → n2 Append base=3@2 []
+n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→4 2:0→4 3:7→9 4:7→9}
+n1@4 → n5 AppendResponse reject_index=3
+n2@4 → n5 AppendResponse reject_index=3
+
+deliver 5
+status 5
+deliver 1 2
+---
+n5@4 → n1 Append base=2@2 []
+n5@4 → n2 Append base=2@2 []
+n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→3 2:0→3 3:7→9 4:7→9}
+n1@4 → n5 AppendResponse reject_index=2
+n2@4 → n5 AppendResponse reject_index=2
+
+deliver 5
+status 5
+deliver 1 2
+---
+n5@4 → n1 Append base=1@1 []
+n5@4 → n2 Append base=1@1 []
+n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:0→2 2:0→2 3:7→9 4:7→9}
+n1@4 → n5 AppendResponse match_index=1
+n2@4 → n5 AppendResponse match_index=1
+
+# n5 can now replicate the tail to n1 and n2, allowing n5 to commit it.
+deliver 5
+status 5
+deliver 1 2
+---
+n5@4 → n1 Append base=1@1 [2@2 3@2 4@3 5@3 6@4 7@4 8@4]
+n5@4 → n2 Append base=1@1 [2@2 3@2 4@3 5@3 6@4 7@4 8@4]
+n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:1→9 2:1→9 3:7→9 4:7→9}
+n1@4 append 8@4 put d=4
+n1@4 → n5 AppendResponse match_index=8
+n2@4 append 8@4 put d=4
+n2@4 → n5 AppendResponse match_index=8
+
+deliver 5
+---
+n5@4 commit 8@4
+n5@4 apply 8@4 put d=4
+n5@4 → c5 ClientResponse id=0x0a write 0x0108
+c5@4 put d=4 ⇒ 8
+
+status
+---
+n1@4 follower(n5) last=8@4 commit=1@1 apply=1
+n2@4 follower(n5) last=8@4 commit=1@1 apply=1
+n3@4 follower(n5) last=7@4 commit=7@4 apply=7
+n4@4 follower(n5) last=7@4 commit=7@4 apply=7
+n5@4 leader last=8@4 commit=8@4 apply=8 progress={1:8→9 2:8→9 3:7→9 4:7→9}
+
+# Stabilize the cluster.
+(stabilize heartbeat=true)
+status
+---
+n1@4 follower(n5) last=8@4 commit=8@4 apply=8
+n2@4 follower(n5) last=8@4 commit=8@4 apply=8
+n3@4 follower(n5) last=8@4 commit=8@4 apply=8
+n4@4 follower(n5) last=8@4 commit=8@4 apply=8
+n5@4 leader last=8@4 commit=8@4 apply=8 progress={1:8→9 2:8→9 3:8→9 4:8→9}

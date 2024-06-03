@@ -16,6 +16,6 @@ n1@1 → n2 Append base=1@1 [2@1]
 n1@1 → n3 Append base=1@1 [2@1]
 
 # An AppendResponse beyond leader's last log should panic.
-!step 1 '{"from":2, "to":1, "term":1, "message":{"AppendResponse":{"last_index":3,"last_term":1,"reject_index":0}}}'
+!step 1 '{"from":2, "to":1, "term":1, "message":{"AppendResponse":{"match_index":3,"reject_index":0}}}'
 ---
-Panic: follower appended future entries
+Panic: follower matched unknown index

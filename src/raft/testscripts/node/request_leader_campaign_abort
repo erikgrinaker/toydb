@@ -15,8 +15,8 @@ n1@1 append 2@1 put foo=bar
 n1@1 → n2 Append base=1@1 [2@1]
 n1@1 → n3 Append base=1@1 [2@1]
 c1@1 → n1 ClientRequest id=0x02 read 0x0003666f6f
-n1@1 → n2 Heartbeat commit=1@1 read_seq=1
-n1@1 → n3 Heartbeat commit=1@1 read_seq=1
+n1@1 → n2 Heartbeat last_index=2 commit=1@1 read_seq=1
+n1@1 → n3 Heartbeat last_index=2 commit=1@1 read_seq=1
 
 # n2 campaigns before n1's requests achieve quorum.
 campaign 2

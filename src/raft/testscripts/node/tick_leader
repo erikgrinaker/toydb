@@ -10,8 +10,8 @@ n3@1 follower(n1) last=1@1 commit=1@1 apply=1
 # Ticking n1 will emit a heartbeat.
 tick 1
 ---
-n1@1 → n2 Heartbeat commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat commit=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit=1@1 read_seq=0
 
 # Ticking n1 again will emit further heartbeats, even when it hasn't heard from
 # any followers.
@@ -19,9 +19,9 @@ tick 1
 tick 1
 tick 1
 ---
-n1@1 → n2 Heartbeat commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat commit=1@1 read_seq=0
-n1@1 → n2 Heartbeat commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat commit=1@1 read_seq=0
-n1@1 → n2 Heartbeat commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat commit=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit=1@1 read_seq=0

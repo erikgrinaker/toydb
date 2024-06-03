@@ -29,7 +29,7 @@ n1 n2 n3 fully connected
 
 stabilize heartbeat=true
 ---
-n1@1 → n2 Heartbeat commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat commit=1@1 read_seq=0
-n2@1 → n1 HeartbeatResponse last=1@1 read_seq=0
-n3@1 → n1 HeartbeatResponse last=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit=1@1 read_seq=0
+n2@1 → n1 HeartbeatResponse match_index=1 read_seq=0
+n3@1 → n1 HeartbeatResponse match_index=1 read_seq=0

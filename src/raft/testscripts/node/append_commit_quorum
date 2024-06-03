@@ -29,11 +29,11 @@ n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 n2@1 append 2@1 put a=1
-n2@1 → n1 AppendResponse last=2@1 reject=0
+n2@1 → n1 AppendResponse match_index=2
 
 status
 ---
-n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→2 4:1→2 5:1→2 6:1→2}
+n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→3 4:1→3 5:1→3 6:1→3}
 n2@1 follower(n1) last=2@1 commit=1@1 apply=1
 n3@1 follower(n1) last=1@1 commit=1@1 apply=1
 n4@1 follower(n1) last=1@1 commit=1@1 apply=1
@@ -53,17 +53,19 @@ stabilize
 c1@1 → n1 ClientRequest id=0x02 write 0x0101620132
 n1@1 append 3@1 put b=2
 n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶]̶
+n1@1 → n3 Append base=2@1 [3@1]
+n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶]̶
+n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶]̶
+n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶]̶
+n3@1 → n1 AppendResponse reject_index=2
 n1@1 → n3 Append base=1@1 [2@1 3@1]
-n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@̶1̶]̶
-n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@̶1̶]̶
-n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@̶1̶]̶
 n3@1 append 2@1 put a=1
 n3@1 append 3@1 put b=2
-n3@1 → n1 AppendResponse last=3@1 reject=0
+n3@1 → n1 AppendResponse match_index=3
 
 status
 ---
-n1@1 leader last=3@1 commit=1@1 apply=1 progress={2:2→3 3:3→4 4:1→2 5:1→2 6:1→2}
+n1@1 leader last=3@1 commit=1@1 apply=1 progress={2:2→4 3:3→4 4:1→4 5:1→4 6:1→4}
 n2@1 follower(n1) last=2@1 commit=1@1 apply=1
 n3@1 follower(n1) last=3@1 commit=1@1 apply=1
 n4@1 follower(n1) last=1@1 commit=1@1 apply=1
@@ -82,15 +84,17 @@ stabilize
 ---
 c1@1 → n1 ClientRequest id=0x03 write 0x0101630133
 n1@1 append 4@1 put c=3
-n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶ ̶4̶@̶1̶]̶
+n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶]̶
 n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶]̶
+n1@1 → n4 Append base=3@1 [4@1]
+n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶]̶
+n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶]̶
+n4@1 → n1 AppendResponse reject_index=2
 n1@1 → n4 Append base=1@1 [2@1 3@1 4@1]
-n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@̶1̶ ̶4̶@̶1̶]̶
-n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@̶1̶ ̶4̶@̶1̶]̶
 n4@1 append 2@1 put a=1
 n4@1 append 3@1 put b=2
 n4@1 append 4@1 put c=3
-n4@1 → n1 AppendResponse last=4@1 reject=0
+n4@1 → n1 AppendResponse match_index=4
 n1@1 commit 2@1
 n1@1 apply 2@1 put a=1
 n1@1 → c1 ClientResponse id=0x01 write 0x0102
@@ -98,7 +102,7 @@ c1@1 put a=1 ⇒ 2
 
 status
 ---
-n1@1 leader last=4@1 commit=2@1 apply=2 progress={2:2→3 3:3→4 4:4→5 5:1→2 6:1→2}
+n1@1 leader last=4@1 commit=2@1 apply=2 progress={2:2→5 3:3→5 4:4→5 5:1→5 6:1→5}
 n2@1 follower(n1) last=2@1 commit=1@1 apply=1
 n3@1 follower(n1) last=3@1 commit=1@1 apply=1
 n4@1 follower(n1) last=4@1 commit=1@1 apply=1
@@ -117,16 +121,18 @@ stabilize
 ---
 c1@1 → n1 ClientRequest id=0x04 write 0x0101640134
 n1@1 append 5@1 put d=4
-n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶ ̶4̶@̶1̶ ̶5̶@̶1̶]̶
-n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶ ̶5̶@̶1̶]̶
+n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶4̶@̶1̶ ̶[̶5̶@̶1̶]̶
+n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶4̶@̶1̶ ̶[̶5̶@̶1̶]̶
 n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶4̶@̶1̶ ̶[̶5̶@̶1̶]̶
+n1@1 → n5 Append base=4@1 [5@1]
+n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶4̶@̶1̶ ̶[̶5̶@̶1̶]̶
+n5@1 → n1 AppendResponse reject_index=2
 n1@1 → n5 Append base=1@1 [2@1 3@1 4@1 5@1]
-n1@1 ⇥ n6 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶ ̶3̶@̶1̶ ̶4̶@̶1̶ ̶5̶@̶1̶]̶
 n5@1 append 2@1 put a=1
 n5@1 append 3@1 put b=2
 n5@1 append 4@1 put c=3
 n5@1 append 5@1 put d=4
-n5@1 → n1 AppendResponse last=5@1 reject=0
+n5@1 → n1 AppendResponse match_index=5
 n1@1 commit 3@1
 n1@1 apply 3@1 put b=2
 n1@1 → c1 ClientResponse id=0x02 write 0x0103
@@ -134,7 +140,7 @@ c1@1 put b=2 ⇒ 3
 
 status
 ---
-n1@1 leader last=5@1 commit=3@1 apply=3 progress={2:2→3 3:3→4 4:4→5 5:5→6 6:1→2}
+n1@1 leader last=5@1 commit=3@1 apply=3 progress={2:2→6 3:3→6 4:4→6 5:5→6 6:1→6}
 n2@1 follower(n1) last=2@1 commit=1@1 apply=1
 n3@1 follower(n1) last=3@1 commit=1@1 apply=1
 n4@1 follower(n1) last=4@1 commit=1@1 apply=1
@@ -153,17 +159,19 @@ stabilize
 ---
 c1@1 → n1 ClientRequest id=0x05 write 0x0101650135
 n1@1 append 6@1 put e=5
-n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶2̶@̶1̶ ̶[̶3̶@̶1̶ ̶4̶@̶1̶ ̶5̶@̶1̶ ̶6̶@̶1̶]̶
-n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶3̶@̶1̶ ̶[̶4̶@̶1̶ ̶5̶@̶1̶ ̶6̶@̶1̶]̶
-n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶4̶@̶1̶ ̶[̶5̶@̶1̶ ̶6̶@̶1̶]̶
+n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶5̶@̶1̶ ̶[̶6̶@̶1̶]̶
+n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶5̶@̶1̶ ̶[̶6̶@̶1̶]̶
+n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶5̶@̶1̶ ̶[̶6̶@̶1̶]̶
 n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶5̶@̶1̶ ̶[̶6̶@̶1̶]̶
+n1@1 → n6 Append base=5@1 [6@1]
+n6@1 → n1 AppendResponse reject_index=2
 n1@1 → n6 Append base=1@1 [2@1 3@1 4@1 5@1 6@1]
 n6@1 append 2@1 put a=1
 n6@1 append 3@1 put b=2
 n6@1 append 4@1 put c=3
 n6@1 append 5@1 put d=4
 n6@1 append 6@1 put e=5
-n6@1 → n1 AppendResponse last=6@1 reject=0
+n6@1 → n1 AppendResponse match_index=6
 n1@1 commit 4@1
 n1@1 apply 4@1 put c=3
 n1@1 → c1 ClientResponse id=0x03 write 0x0104
@@ -171,7 +179,7 @@ c1@1 put c=3 ⇒ 4
 
 status
 ---
-n1@1 leader last=6@1 commit=4@1 apply=4 progress={2:2→3 3:3→4 4:4→5 5:5→6 6:6→7}
+n1@1 leader last=6@1 commit=4@1 apply=4 progress={2:2→7 3:3→7 4:4→7 5:5→7 6:6→7}
 n2@1 follower(n1) last=2@1 commit=1@1 apply=1
 n3@1 follower(n1) last=3@1 commit=1@1 apply=1
 n4@1 follower(n1) last=4@1 commit=1@1 apply=1
@@ -189,41 +197,48 @@ stabilize
 ---
 c1@1 → n1 ClientRequest id=0x06 write 0x0101660136
 n1@1 append 7@1 put f=6
+n1@1 → n2 Append base=6@1 [7@1]
+n1@1 → n3 Append base=6@1 [7@1]
+n1@1 → n4 Append base=6@1 [7@1]
+n1@1 → n5 Append base=6@1 [7@1]
+n1@1 → n6 Append base=6@1 [7@1]
+n2@1 → n1 AppendResponse reject_index=3
+n3@1 → n1 AppendResponse reject_index=4
+n4@1 → n1 AppendResponse reject_index=5
+n5@1 → n1 AppendResponse reject_index=6
+n6@1 append 7@1 put f=6
+n6@1 → n1 AppendResponse match_index=7
 n1@1 → n2 Append base=2@1 [3@1 4@1 5@1 6@1 7@1]
 n1@1 → n3 Append base=3@1 [4@1 5@1 6@1 7@1]
 n1@1 → n4 Append base=4@1 [5@1 6@1 7@1]
 n1@1 → n5 Append base=5@1 [6@1 7@1]
-n1@1 → n6 Append base=6@1 [7@1]
 n2@1 append 3@1 put b=2
 n2@1 append 4@1 put c=3
 n2@1 append 5@1 put d=4
 n2@1 append 6@1 put e=5
 n2@1 append 7@1 put f=6
-n2@1 → n1 AppendResponse last=7@1 reject=0
+n2@1 → n1 AppendResponse match_index=7
 n3@1 append 4@1 put c=3
 n3@1 append 5@1 put d=4
 n3@1 append 6@1 put e=5
 n3@1 append 7@1 put f=6
-n3@1 → n1 AppendResponse last=7@1 reject=0
+n3@1 → n1 AppendResponse match_index=7
 n4@1 append 5@1 put d=4
 n4@1 append 6@1 put e=5
 n4@1 append 7@1 put f=6
-n4@1 → n1 AppendResponse last=7@1 reject=0
+n4@1 → n1 AppendResponse match_index=7
 n5@1 append 6@1 put e=5
 n5@1 append 7@1 put f=6
-n5@1 → n1 AppendResponse last=7@1 reject=0
-n6@1 append 7@1 put f=6
-n6@1 → n1 AppendResponse last=7@1 reject=0
+n5@1 → n1 AppendResponse match_index=7
 n1@1 commit 5@1
 n1@1 apply 5@1 put d=4
 n1@1 → c1 ClientResponse id=0x04 write 0x0105
 c1@1 put d=4 ⇒ 5
-n1@1 commit 6@1
+n1@1 commit 7@1
 n1@1 apply 6@1 put e=5
+n1@1 apply 7@1 put f=6
 n1@1 → c1 ClientResponse id=0x05 write 0x0106
 c1@1 put e=5 ⇒ 6
-n1@1 commit 7@1
-n1@1 apply 7@1 put f=6
 n1@1 → c1 ClientResponse id=0x06 write 0x0107
 c1@1 put f=6 ⇒ 7
 

@@ -1,0 +1,82 @@
+# Multiple appends are pipelined before acks are received, without
+# retransmitting the unacked entries.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Propose a single write. The progress next index increases to 3.
+put 1 a=1
+---
+c1@1 → n1 ClientRequest id=0x01 write 0x0101610131
+n1@1 append 2@1 put a=1
+n1@1 → n2 Append base=1@1 [2@1]
+n1@1 → n3 Append base=1@1 [2@1]
+
+status
+---
+n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:1→3 3:1→3}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Propose two more writes. Appends are sent without past duplicates.
+put 1 b=2
+put 1 c=3
+---
+c1@1 → n1 ClientRequest id=0x02 write 0x0101620132
+n1@1 append 3@1 put b=2
+n1@1 → n2 Append base=2@1 [3@1]
+n1@1 → n3 Append base=2@1 [3@1]
+c1@1 → n1 ClientRequest id=0x03 write 0x0101630133
+n1@1 append 4@1 put c=3
+n1@1 → n2 Append base=3@1 [4@1]
+n1@1 → n3 Append base=3@1 [4@1]
+
+status
+---
+n1@1 leader last=4@1 commit=1@1 apply=1 progress={2:1→5 3:1→5}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# The appends are received and acked sequentially.
+deliver
+---
+n2@1 append 2@1 put a=1
+n2@1 → n1 AppendResponse match_index=2
+n2@1 append 3@1 put b=2
+n2@1 → n1 AppendResponse match_index=3
+n2@1 append 4@1 put c=3
+n2@1 → n1 AppendResponse match_index=4
+n3@1 append 2@1 put a=1
+n3@1 → n1 AppendResponse match_index=2
+n3@1 append 3@1 put b=2
+n3@1 → n1 AppendResponse match_index=3
+n3@1 append 4@1 put c=3
+n3@1 → n1 AppendResponse match_index=4
+
+# The leader receives the acks and commits the writes one by one,
+# without retransmitting the in-flight (to it) entries.
+deliver
+---
+n1@1 commit 2@1
+n1@1 apply 2@1 put a=1
+n1@1 → c1 ClientResponse id=0x01 write 0x0102
+c1@1 put a=1 ⇒ 2
+n1@1 commit 3@1
+n1@1 apply 3@1 put b=2
+n1@1 → c1 ClientResponse id=0x02 write 0x0103
+c1@1 put b=2 ⇒ 3
+n1@1 commit 4@1
+n1@1 apply 4@1 put c=3
+n1@1 → c1 ClientResponse id=0x03 write 0x0104
+c1@1 put c=3 ⇒ 4
+
+# All nodes are now caught up on logs (but not commit/apply, which needs a
+# heartbeat).
+status
+---
+n1@1 leader last=4@1 commit=4@1 apply=4 progress={2:4→5 3:4→5}
+n2@1 follower(n1) last=4@1 commit=1@1 apply=1
+n3@1 follower(n1) last=4@1 commit=1@1 apply=1

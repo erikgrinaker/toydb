@@ -1,4 +1,4 @@
-# A heartbeat with an old commit index is ignored by a follower.
+# A heartbeat with an old last index is matched by a follower.
 
 cluster nodes=3 leader=1
 ---
@@ -15,8 +15,8 @@ n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:2→3}
 n2@1 follower(n1) last=2@1 commit=2@1 apply=2
 n3@1 follower(n1) last=2@1 commit=2@1 apply=2
 
-# Step a heartbeat with an outdated commit index.
-step 2 '{"from":1, "to":2, "term":1, "message":{"Heartbeat":{"last_index":2,"commit_index":1,"commit_term":1,"read_seq":0}}}'
+# Step a heartbeat with an outdated last index.
+step 2 '{"from":1, "to":2, "term":1, "message":{"Heartbeat":{"last_index":1,"commit_index":1,"commit_term":1,"read_seq":0}}}'
 stabilize
 ---
-n2@1 → n1 HeartbeatResponse match_index=2 read_seq=0
+n2@1 → n1 HeartbeatResponse match_index=1 read_seq=0

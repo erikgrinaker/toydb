@@ -1,0 +1,120 @@
+# An append replaces a conflict at the tail for a single term.
+
+cluster nodes=5 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 apply=1
+n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n4@1 follower(n1) last=1@1 commit=1@1 apply=1
+n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+
+# Partition n3-n5.
+partition 3 4 5
+---
+n1 n2 ⇹ n3 n4 n5
+
+# Propose and replicate a write in the minority partition.
+put 1 a=1
+stabilize
+---
+c1@1 → n1 ClientRequest id=0x01 write 0x0101610131
+n1@1 append 2@1 put a=1
+n1@1 → n2 Append base=1@1 [2@1]
+n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
+n1@1 ⇥ n4 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
+n1@1 ⇥ n5 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
+n2@1 append 2@1 put a=1
+n2@1 → n1 AppendResponse match_index=2
+
+log 1 2
+---
+n1@1 last=2@1 commit=1@1
+n1@1 entry 1@1 None
+n1@1 entry 2@1 put a=1
+n2@1 last=2@1 commit=1@1
+n2@1 entry 1@1 None
+n2@1 entry 2@1 put a=1
+
+# Elect n5 as a new majority partition leader. It appends an empty entry.
+(campaign 5)
+(stabilize heartbeat=true)
+status
+---
+n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→3 4:1→3 5:1→3}
+n2@1 follower(n1) last=2@1 commit=1@1 apply=1
+n3@2 follower(n5) last=2@2 commit=2@2 apply=2
+n4@2 follower(n5) last=2@2 commit=2@2 apply=2
+n5@2 leader last=2@2 commit=2@2 apply=2 progress={1:0→3 2:0→3 3:2→3 4:2→3}
+
+# Heal the partition and propose a new write.
+heal
+put 5 b=2
+---
+n1 n2 n3 n4 n5 fully connected
+c5@2 → n5 ClientRequest id=0x02 write 0x0101620132
+n5@2 append 3@2 put b=2
+n5@2 → n1 Append base=2@2 [3@2]
+n5@2 → n2 Append base=2@2 [3@2]
+n5@2 → n3 Append base=2@2 [3@2]
+n5@2 → n4 Append base=2@2 [3@2]
+
+# Delivering the append messages to n1,n2 will make them follow n5 and
+# reject the appends due to a log mismatch.
+deliver 1 2
+---
+n1@1 leader ⇨ n1@2 follower(n5)
+n1@1 → c1 ClientResponse id=0x01 Error::Abort
+c1@1 put a=1 ⇒ Error::Abort (operation aborted)
+n1@2 → n5 AppendResponse reject_index=2
+n2@1 follower(n1) ⇨ n2@2 follower(n5)
+n2@2 → n5 AppendResponse reject_index=2
+
+# n5 probes index 1, which succeeds. 1 and 2 still has the old logs.
+deliver 5
+deliver 1 2
+---
+n5@2 → n1 Append base=1@1 []
+n5@2 → n2 Append base=1@1 []
+n1@2 → n5 AppendResponse match_index=1
+n2@2 → n5 AppendResponse match_index=1
+
+log 1 2
+---
+n1@2 last=2@1 commit=1@1
+n1@2 entry 1@1 None
+n1@2 entry 2@1 put a=1
+n2@2 last=2@1 commit=1@1
+n2@2 entry 1@1 None
+n2@2 entry 2@1 put a=1
+
+# n5 now replicates the tail of its log, which replaces the old logs.
+deliver 5
+deliver 1 2
+---
+n5@2 → n1 Append base=1@1 [2@2 3@2]
+n5@2 → n2 Append base=1@1 [2@2 3@2]
+n1@2 append 3@2 put b=2
+n1@2 → n5 AppendResponse match_index=3
+n2@2 append 3@2 put b=2
+n2@2 → n5 AppendResponse match_index=3
+
+log 1 2
+---
+n1@2 last=3@2 commit=1@1
+n1@2 entry 1@1 None
+n1@2 entry 2@2 None
+n1@2 entry 3@2 put b=2
+n2@2 last=3@2 commit=1@1
+n2@2 entry 1@1 None
+n2@2 entry 2@2 None
+n2@2 entry 3@2 put b=2
+
+# Stabilize the cluster.
+(stabilize heartbeat=true)
+status
+---
+n1@2 follower(n5) last=3@2 commit=3@2 apply=3
+n2@2 follower(n5) last=3@2 commit=3@2 apply=3
+n3@2 follower(n5) last=3@2 commit=3@2 apply=3
+n4@2 follower(n5) last=3@2 commit=3@2 apply=3
+n5@2 leader last=3@2 commit=3@2 apply=3 progress={1:3→4 2:3→4 3:3→4 4:3→4}
