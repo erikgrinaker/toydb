@@ -1,5 +1,6 @@
 /cluster/toydb*/data
 /data
 /target
+.DS_Store
 .vscode/
 **/*.rs.bk
