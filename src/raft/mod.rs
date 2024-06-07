@@ -5,7 +5,7 @@ mod state;
 
 pub use log::{Entry, Index, Log};
 pub use message::{Envelope, Message, ReadSequence, Request, RequestID, Response, Status};
-pub use node::{Node, NodeID, Term, Ticks};
+pub use node::{Node, NodeID, Options, Term, Ticks};
 pub use state::State;
 
 /// The interval between Raft ticks. This is the unit of time for heartbeats and
@@ -13,11 +13,11 @@ pub use state::State;
 pub const TICK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
 
 /// The interval between leader heartbeats, in ticks.
-pub const HEARTBEAT_INTERVAL: Ticks = 3;
+const HEARTBEAT_INTERVAL: Ticks = 3;
 
 /// The default election timeout range, in ticks. This is randomized in this
 /// interval, to avoid election ties.
-pub const ELECTION_TIMEOUT_RANGE: std::ops::Range<Ticks> = 10..20;
+const ELECTION_TIMEOUT_RANGE: std::ops::Range<Ticks> = 10..20;
 
 /// The maximum number of entries to send in a single append message.
-pub const MAX_APPEND_ENTRIES: usize = 100;
+const MAX_APPEND_ENTRIES: usize = 100;

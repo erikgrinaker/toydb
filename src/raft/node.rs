@@ -17,6 +17,26 @@ pub type Term = u64;
 /// A logical clock interval as number of ticks.
 pub type Ticks = u8;
 
+/// Raft node options.
+pub struct Options {
+    /// The number of ticks between leader heartbeats.
+    pub heartbeat_interval: Ticks,
+    /// The range of randomized election timeouts for followers and candidates.
+    pub election_timeout_range: std::ops::Range<Ticks>,
+    /// Maximum number of entries to send in a single Append message.
+    pub max_append_entries: usize,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            heartbeat_interval: super::HEARTBEAT_INTERVAL,
+            election_timeout_range: super::ELECTION_TIMEOUT_RANGE,
+            max_append_entries: super::MAX_APPEND_ENTRIES,
+        }
+    }
+}
+
 /// A Raft node, with a dynamic role. The node is driven synchronously by
 /// processing inbound messages via step() or by advancing time via tick().
 /// These methods consume the current node, and return a new one with a possibly
@@ -34,28 +54,15 @@ pub enum Node {
 impl Node {
     /// Creates a new Raft node, starting as a leaderless follower, or leader if
     /// there are no peers.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: NodeID,
         peers: HashSet<NodeID>,
         log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
-        // TODO: these don't need to be passed in, mutate the fields instead.
-        heartbeat_interval: Ticks,
-        election_timeout_range: std::ops::Range<Ticks>,
-        max_append_entries: usize,
+        opts: Options,
     ) -> Result<Self> {
-        let node = RawNode::new(
-            id,
-            peers,
-            log,
-            state,
-            node_tx,
-            heartbeat_interval,
-            election_timeout_range,
-            max_append_entries,
-        )?;
+        let node = RawNode::new(id, peers, log, state, node_tx, opts)?;
         if node.peers.is_empty() {
             // If there are no peers, become leader immediately.
             return Ok(node.into_candidate()?.into_leader()?.into());
@@ -133,9 +140,7 @@ pub struct RawNode<R: Role = Follower> {
     log: Log,
     state: Box<dyn State>,
     node_tx: crossbeam::channel::Sender<Envelope>,
-    heartbeat_interval: Ticks,
-    election_timeout_range: std::ops::Range<Ticks>,
-    max_append_entries: usize,
+    opts: Options,
     role: R,
 }
 
@@ -149,9 +154,7 @@ impl<R: Role> RawNode<R> {
             log: self.log,
             state: self.state,
             node_tx: self.node_tx,
-            heartbeat_interval: self.heartbeat_interval,
-            election_timeout_range: self.election_timeout_range,
-            max_append_entries: self.max_append_entries,
+            opts: self.opts,
             role,
         }
     }
@@ -220,7 +223,7 @@ impl<R: Role> RawNode<R> {
 
     /// Generates a randomized election timeout.
     fn gen_election_timeout(&self) -> Ticks {
-        rand::thread_rng().gen_range(self.election_timeout_range.clone())
+        rand::thread_rng().gen_range(self.opts.election_timeout_range.clone())
     }
 
     /// Asserts common node invariants.
@@ -432,31 +435,17 @@ impl Role for Follower {}
 
 impl RawNode<Follower> {
     /// Creates a new node as a leaderless follower.
-    #[allow(clippy::too_many_arguments)]
     fn new(
         id: NodeID,
         peers: HashSet<NodeID>,
         mut log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
-        heartbeat_interval: Ticks,
-        election_timeout_range: std::ops::Range<Ticks>,
-        max_append_entries: usize,
+        opts: Options,
     ) -> Result<Self> {
         let (term, vote) = log.get_term()?;
         let role = Follower::new(None, vote, 0);
-        let mut node = Self {
-            id,
-            peers,
-            term,
-            log,
-            state,
-            node_tx,
-            heartbeat_interval,
-            election_timeout_range,
-            max_append_entries,
-            role,
-        };
+        let mut node = Self { id, peers, term, log, state, node_tx, opts, role };
         node.role.election_timeout = node.gen_election_timeout();
         Ok(node)
     }
@@ -1023,7 +1012,7 @@ impl RawNode<Leader> {
         self.assert()?;
 
         self.role.since_heartbeat += 1;
-        if self.role.since_heartbeat >= self.heartbeat_interval {
+        if self.role.since_heartbeat >= self.opts.heartbeat_interval {
             self.heartbeat()?;
             self.role.since_heartbeat = 0;
         }
@@ -1191,7 +1180,7 @@ impl RawNode<Leader> {
         let entries = if !probe {
             self.log
                 .scan(progress.next_index..)?
-                .take(self.max_append_entries)
+                .take(self.opts.max_append_entries)
                 .collect::<Result<_>>()?
         } else {
             Vec::new()
@@ -1509,19 +1498,13 @@ mod tests {
                 let peers = self.ids.iter().copied().filter(|i| *i != id).collect();
                 let log = Log::new(crate::storage::Memory::new())?;
                 let state = Box::new(TestState::new(applied_tx));
-                self.nodes.insert(
-                    id,
-                    Node::new(
-                        id,
-                        peers,
-                        log,
-                        state,
-                        node_tx,
-                        heartbeat_interval,
-                        election_timeout..election_timeout + 1,
-                        max_append_entries,
-                    )?,
-                );
+                let opts = Options {
+                    heartbeat_interval,
+                    election_timeout_range: election_timeout..election_timeout + 1,
+                    max_append_entries,
+                };
+                self.nodes.insert(id, Node::new(id, peers, log, state, node_tx, opts)?);
+
                 self.nodes_rx.insert(id, node_rx);
                 self.nodes_pending.insert(id, Vec::new());
                 self.applied_rx.insert(id, applied_rx);
