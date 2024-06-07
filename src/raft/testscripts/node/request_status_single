@@ -2,7 +2,7 @@
 
 cluster nodes=1
 ---
-n1@1 leader last=1@1 commit=0@0 apply=0 progress={}
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={}
 
 # Perform a write.
 (put 1 foo=bar)

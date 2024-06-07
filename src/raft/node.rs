@@ -320,6 +320,7 @@ impl RawNode<Candidate> {
         // We do this prior to the heartbeat, to avoid a wasted replication
         // roundtrip if the heartbeat response indicates the peer is behind.
         node.propose(None)?;
+        node.maybe_commit_and_apply()?;
         node.heartbeat()?;
 
         Ok(node)
@@ -1504,6 +1505,8 @@ mod tests {
                     max_append_entries,
                 };
                 self.nodes.insert(id, Node::new(id, peers, log, state, node_tx, opts)?);
+
+                while applied_rx.try_recv().is_ok() {} // drain first apply
 
                 self.nodes_rx.insert(id, node_rx);
                 self.nodes_pending.insert(id, Vec::new());

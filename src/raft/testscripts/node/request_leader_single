@@ -2,7 +2,7 @@
 
 cluster nodes=1
 ---
-n1@1 leader last=1@1 commit=0@0 apply=0 progress={}
+n1@1 leader last=1@1 commit=1@1 apply=1 progress={}
 
 # An initial get on the leader yields None.
 get 1 foo
@@ -19,7 +19,6 @@ stabilize heartbeat=true
 c1@1 → n1 ClientRequest id=0x02 write 0x0103666f6f03626172
 n1@1 append 2@1 put foo=bar
 n1@1 commit 2@1
-n1@1 apply 1@1 None
 n1@1 apply 2@1 put foo=bar
 n1@1 → c1 ClientResponse id=0x02 write 0x0102
 c1@1 put foo=bar ⇒ 2
