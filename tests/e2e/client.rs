@@ -133,9 +133,9 @@ fn status() -> Result<()> {
                     name: "bitcask".to_string(),
                     keys: 29,
                     size: 1349,
-                    total_disk_size: 1856,
+                    total_disk_size: 1867,
                     live_disk_size: 1581,
-                    garbage_disk_size: 275
+                    garbage_disk_size: 286
                 },
             },
             mvcc: mvcc::Status {
