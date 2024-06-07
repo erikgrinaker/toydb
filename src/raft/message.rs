@@ -43,16 +43,10 @@ pub enum Message {
         /// The index of the leader's last log entry. The term is the leader's
         /// current term, since it appends a noop entry on election win.
         last_index: Index,
-        /// The index of the leader's last committed log entry.
+        /// The index of the leader's last committed log entry. It's only safe
+        /// to commit this if the local log matches last_index, such that the
+        /// follower's log is identical to the leader at the commit index.
         commit_index: Index,
-        /// The term of the leader's last committed log entry.
-        ///
-        /// The Raft paper does not propagate this, because it uses the
-        /// AppendEntries RPC for heartbeats and commit index propagation, which
-        /// includes a base index/term check guaranteeing that the commit index
-        /// is consistent with the leader. We need it to ensure a divergent
-        /// follower doesn't commit a stale entry from a different term.
-        commit_term: Term,
         /// The leader's latest read sequence number in this term. Read requests
         /// are served once the sequence number has been confirmed by a quorum.
         read_seq: ReadSequence,

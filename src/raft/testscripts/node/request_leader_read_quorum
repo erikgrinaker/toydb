@@ -25,10 +25,10 @@ ok
 get 1 foo
 ---
 c1@1 → n1 ClientRequest id=0x03 read 0x0003666f6f
-n1@1 → n2 Heartbeat last_index=2 commit=2@1 read_seq=2
-n1@1 → n3 Heartbeat last_index=2 commit=2@1 read_seq=2
-n1@1 → n4 Heartbeat last_index=2 commit=2@1 read_seq=2
-n1@1 → n5 Heartbeat last_index=2 commit=2@1 read_seq=2
+n1@1 → n2 Heartbeat last_index=2 commit_index=2 read_seq=2
+n1@1 → n3 Heartbeat last_index=2 commit_index=2 read_seq=2
+n1@1 → n4 Heartbeat last_index=2 commit_index=2 read_seq=2
+n1@1 → n5 Heartbeat last_index=2 commit_index=2 read_seq=2
 
 deliver 2
 deliver 1

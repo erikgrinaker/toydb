@@ -28,8 +28,8 @@ n1@1 candidate ⇨ n1@1 leader
 n1@1 append 1@1 None
 n1@1 → n2 Append base=0@0 [1@1]
 n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶0̶@̶0̶ ̶[̶1̶@̶1̶]̶
-n1@1 → n2 Heartbeat last_index=1 commit=0@0 read_seq=0
-n1@1 ⇥ n3 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶l̶a̶s̶t̶_̶i̶n̶d̶e̶x̶=̶1̶ ̶c̶o̶m̶m̶i̶t̶=̶0̶@̶0̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶0̶
+n1@1 → n2 Heartbeat last_index=1 commit_index=0 read_seq=0
+n1@1 ⇥ n3 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶l̶a̶s̶t̶_̶i̶n̶d̶e̶x̶=̶1̶ ̶c̶o̶m̶m̶i̶t̶_̶i̶n̶d̶e̶x̶=̶0̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶0̶
 n2@1 follower() ⇨ n2@1 follower(n1)
 n2@1 append 1@1 None
 n2@1 → n1 AppendResponse match_index=1

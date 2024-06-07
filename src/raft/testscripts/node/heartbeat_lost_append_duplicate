@@ -31,12 +31,12 @@ heartbeat 1
 heartbeat 1
 deliver
 ---
-n1@1 → n2 Heartbeat last_index=2 commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat last_index=2 commit=1@1 read_seq=0
-n1@1 → n2 Heartbeat last_index=2 commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat last_index=2 commit=1@1 read_seq=0
-n1@1 → n2 Heartbeat last_index=2 commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat last_index=2 commit=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=2 commit_index=1 read_seq=0
+n1@1 → n3 Heartbeat last_index=2 commit_index=1 read_seq=0
+n1@1 → n2 Heartbeat last_index=2 commit_index=1 read_seq=0
+n1@1 → n3 Heartbeat last_index=2 commit_index=1 read_seq=0
+n1@1 → n2 Heartbeat last_index=2 commit_index=1 read_seq=0
+n1@1 → n3 Heartbeat last_index=2 commit_index=1 read_seq=0
 n2@1 → n1 HeartbeatResponse match_index=0 read_seq=0
 n2@1 → n1 HeartbeatResponse match_index=0 read_seq=0
 n2@1 → n1 HeartbeatResponse match_index=0 read_seq=0

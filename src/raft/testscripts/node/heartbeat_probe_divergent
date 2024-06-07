@@ -104,8 +104,8 @@ deliver 1
 status 3
 ---
 n3@3 → n1 Append base=8@3 []
-n3@3 → n1 Heartbeat last_index=10 commit=9@3 read_seq=0
-n3@3 → n2 Heartbeat last_index=10 commit=9@3 read_seq=0
+n3@3 → n1 Heartbeat last_index=10 commit_index=9 read_seq=0
+n3@3 → n2 Heartbeat last_index=10 commit_index=9 read_seq=0
 n1@3 → n3 AppendResponse reject_index=8
 n1@3 → n3 HeartbeatResponse match_index=0 read_seq=0
 n3@3 leader last=10@3 commit=9@3 apply=9 progress={1:0→9 2:9→11}
@@ -140,8 +140,8 @@ n1@3 → n3 AppendResponse reject_index=6
 heartbeat 3
 deliver 3
 ---
-n3@3 → n1 Heartbeat last_index=10 commit=9@3 read_seq=0
-n3@3 → n2 Heartbeat last_index=10 commit=9@3 read_seq=0
+n3@3 → n1 Heartbeat last_index=10 commit_index=9 read_seq=0
+n3@3 → n2 Heartbeat last_index=10 commit_index=9 read_seq=0
 n3@3 → n1 Append base=5@2 []
 
 deliver 1

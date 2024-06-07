@@ -42,8 +42,8 @@ n1 n2 n3 fully connected
 heartbeat 1
 stabilize
 ---
-n1@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit_index=1 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit_index=1 read_seq=0
 n2@1 → n1 HeartbeatResponse match_index=1 read_seq=0
 n3@1 candidate ⇨ n3@1 follower(n1)
 n3@1 → n1 HeartbeatResponse match_index=0 read_seq=0

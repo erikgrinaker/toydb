@@ -57,8 +57,8 @@ n2@2 candidate ⇨ n2@2 leader
 n2@2 append 1@2 None
 n2@2 → n1 Append base=0@0 [1@2]
 n2@2 → n3 Append base=0@0 [1@2]
-n2@2 → n1 Heartbeat last_index=1 commit=0@0 read_seq=0
-n2@2 → n3 Heartbeat last_index=1 commit=0@0 read_seq=0
+n2@2 → n1 Heartbeat last_index=1 commit_index=0 read_seq=0
+n2@2 → n3 Heartbeat last_index=1 commit_index=0 read_seq=0
 
 stabilize
 ---

@@ -33,8 +33,8 @@ n1@1 candidate ⇨ n1@1 leader
 n1@1 append 1@1 None
 n1@1 → n2 Append base=0@0 [1@1]
 n1@1 → n3 Append base=0@0 [1@1]
-n1@1 → n2 Heartbeat last_index=1 commit=0@0 read_seq=0
-n1@1 → n3 Heartbeat last_index=1 commit=0@0 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit_index=0 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit_index=0 read_seq=0
 
 # All nodes become n1 followers.
 stabilize
@@ -53,8 +53,8 @@ n1@1 apply 1@1 None
 # n1's heartbeats are accepted by followers, who commit and apply the entry.
 tick 1
 ---
-n1@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
-n1@1 → n3 Heartbeat last_index=1 commit=1@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=1 commit_index=1 read_seq=0
+n1@1 → n3 Heartbeat last_index=1 commit_index=1 read_seq=0
 
 stabilize
 ---

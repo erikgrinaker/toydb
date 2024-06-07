@@ -30,8 +30,8 @@ n1 n2 n3 fully connected
 heartbeat 3
 stabilize
 ---
-n3@1 → n1 Heartbeat last_index=1 commit=1@1 read_seq=0
-n3@1 → n2 Heartbeat last_index=1 commit=1@1 read_seq=0
+n3@1 → n1 Heartbeat last_index=1 commit_index=1 read_seq=0
+n3@1 → n2 Heartbeat last_index=1 commit_index=1 read_seq=0
 
 status
 ---

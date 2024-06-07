@@ -182,15 +182,14 @@ impl Log {
     }
 
     /// Commits entries up to and including the given index. The index must
-    /// exist, be at or after the current commit index, and have the given term.
-    pub fn commit(&mut self, index: Index, term: Term) -> Result<Index> {
-        match self.get(index)? {
+    /// exist and be at or after the current commit index.
+    pub fn commit(&mut self, index: Index) -> Result<Index> {
+        let term = match self.get(index)? {
             Some(e) if e.index < self.commit_index => {
                 return errassert!("commit index regression {} → {}", self.commit_index, e.index);
             }
-            Some(e) if e.term != term => return errassert!("commit term {term} != {}", e.term),
             Some(e) if e.index == self.commit_index => return Ok(index),
-            Some(_) => {}
+            Some(e) => e.term,
             None => return errassert!("commit index {index} does not exist"),
         };
         self.engine.set(&Key::CommitIndex.encode()?, bincode::serialize(&(index, term))?)?;
@@ -352,15 +351,13 @@ mod tests {
                     output.push_str(&format!("append → {}\n", Self::format_entry(&entry)));
                 }
 
-                // commit INDEX@TERM [oplog=BOOL]
+                // commit INDEX [oplog=BOOL]
                 "commit" => {
                     let mut args = command.consume_args();
-                    let (index, term) = Self::parse_index_term(
-                        &args.next_pos().ok_or("index/term not given")?.value,
-                    )?;
+                    let index = args.next_pos().ok_or("index not given")?.parse()?;
                     let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
-                    let index = self.log.commit(index, term)?;
+                    let index = self.log.commit(index)?;
                     let entry = self.log.get(index)?.expect("entry not found");
                     self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("commit → {}\n", Self::format_entry(&entry)));

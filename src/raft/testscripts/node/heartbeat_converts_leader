@@ -30,8 +30,8 @@ n1 n2 n3 fully connected
 heartbeat 1
 stabilize heartbeat=true
 ---
-n1@2 → n2 Heartbeat last_index=2 commit=2@2 read_seq=0
-n1@2 → n3 Heartbeat last_index=2 commit=2@2 read_seq=0
+n1@2 → n2 Heartbeat last_index=2 commit_index=2 read_seq=0
+n1@2 → n3 Heartbeat last_index=2 commit_index=2 read_seq=0
 n2@2 → n1 HeartbeatResponse match_index=2 read_seq=0
 n3@1 leader ⇨ n3@2 follower(n1)
 n3@2 → n1 HeartbeatResponse match_index=0 read_seq=0
@@ -40,8 +40,8 @@ n3@2 → n1 AppendResponse match_index=1
 n1@2 → n3 Append base=1@1 [2@2]
 n3@2 append 2@2 None
 n3@2 → n1 AppendResponse match_index=2
-n1@2 → n2 Heartbeat last_index=2 commit=2@2 read_seq=0
-n1@2 → n3 Heartbeat last_index=2 commit=2@2 read_seq=0
+n1@2 → n2 Heartbeat last_index=2 commit_index=2 read_seq=0
+n1@2 → n3 Heartbeat last_index=2 commit_index=2 read_seq=0
 n2@2 → n1 HeartbeatResponse match_index=2 read_seq=0
 n3@2 commit 2@2
 n3@2 apply 2@2 None

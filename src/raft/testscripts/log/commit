@@ -1,5 +1,5 @@
 # Committing fails on an empty engine.
-!commit 1@1
+!commit 1
 ---
 Error: assertion failed: commit index 1 does not exist
 
@@ -9,7 +9,7 @@ splice 1@1= 2@1=foo 3@2=bar
 splice → 3@2 bar
 
 # Committing entry 0 fails.
-!commit 0@0
+!commit 0
 ---
 Error: assertion failed: commit index 0 does not exist
 
@@ -17,7 +17,7 @@ Error: assertion failed: commit index 0 does not exist
 #
 # Show the engine operations too, and notice that the commit index isn't flushed
 # to durable storage (it can be recovered from the durable quorum logs).
-commit 1@1 oplog=true
+commit 1 oplog=true
 status
 ---
 engine: set CommitIndex 0x02 = 0x0101
@@ -33,37 +33,28 @@ Entry(3) 0x000000000000000003 = 0x03020103626172
 CommitIndex 0x02 = 0x0101
 
 # Commits are idempotent, which doesn't incur an engine set.
-commit 1@1 oplog=true
+commit 1 oplog=true
 status
 ---
 commit → 1@1 None
 last=3@2 commit=1@1
 
-# Commit term conflicts error, both for the current and next index.
-!commit 1@2
-!commit 2@2
-status
----
-Error: assertion failed: commit term 2 != 1
-Error: assertion failed: commit term 2 != 1
-last=3@2 commit=1@1
-
 # Commits can skip an entry.
-commit 3@2
+commit 3
 status
 ---
 commit → 3@2 bar
 last=3@2 commit=3@2
 
 # Commit regressions error.
-!commit 2@1
+!commit 2
 status
 ---
 Error: assertion failed: commit index regression 3 → 2
 last=3@2 commit=3@2
 
 # Committing non-existant indexes error.
-!commit 4@2
+!commit 4
 status
 ---
 Error: assertion failed: commit index 4 does not exist

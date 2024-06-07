@@ -552,7 +552,9 @@ impl RawNode<Follower> {
             // The leader will send periodic heartbeats. If we don't have a
             // leader in this term yet, follow it. If the commit_index advances,
             // apply state transitions.
-            Message::Heartbeat { last_index, commit_index, commit_term, read_seq } => {
+            Message::Heartbeat { last_index, commit_index, read_seq } => {
+                assert!(commit_index <= last_index, "commit_index after last_index");
+
                 // Check that the heartbeat is from our leader.
                 match self.role.leader {
                     Some(leader) => assert_eq!(msg.from, leader, "multiple leaders in term"),
@@ -564,11 +566,12 @@ impl RawNode<Follower> {
                 let match_index = if self.log.has(last_index, msg.term)? { last_index } else { 0 };
                 self.send(msg.from, Message::HeartbeatResponse { match_index, read_seq })?;
 
-                // Advance commit index and apply entries.
-                if commit_index > self.log.get_commit_index().0
-                    && self.log.has(commit_index, commit_term)?
-                {
-                    self.log.commit(commit_index, commit_term)?;
+                // Advance commit index and apply entries. We can only do this
+                // if the last_index matches the leader, which implies that
+                // the logs are identical up to match_index. This also implies
+                // that the commit_index is present in our log.
+                if match_index != 0 && commit_index > self.log.get_commit_index().0 {
+                    self.log.commit(commit_index)?;
                     self.maybe_apply()?;
                 }
             }
@@ -1030,13 +1033,12 @@ impl RawNode<Leader> {
     /// Broadcasts a heartbeat to all peers.
     fn heartbeat(&mut self) -> Result<()> {
         let (last_index, last_term) = self.log.get_last_index();
-        let (commit_index, commit_term) = self.log.get_commit_index();
+        let (commit_index, _) = self.log.get_commit_index();
         let read_seq = self.role.read_seq;
 
         assert_eq!(last_term, self.term, "leader has stale last_term");
 
-        let msg = Message::Heartbeat { last_index, commit_index, commit_term, read_seq };
-        self.broadcast(msg)?;
+        self.broadcast(Message::Heartbeat { last_index, commit_index, read_seq })?;
         // NB: We don't reset self.since_heartbeat here, because we want to send
         // periodic heartbeats regardless of any on-demand heartbeats.
         Ok(())
@@ -1090,11 +1092,11 @@ impl RawNode<Leader> {
         commit_index = match self.log.get(quorum_index)? {
             Some(entry) if entry.term == self.term => quorum_index,
             Some(_) => return Ok(commit_index),
-            None => panic!("Commit index {} missing", quorum_index),
+            None => panic!("missing commit index {quorum_index} missing"),
         };
 
         // Commit the new entries.
-        self.log.commit(commit_index, self.term)?;
+        self.log.commit(commit_index)?;
 
         // Apply entries and respond to client writers.
         Self::maybe_apply_with(&mut self.log, &mut self.state, |index, result| -> Result<()> {
@@ -1981,8 +1983,8 @@ mod tests {
                 Message::CampaignResponse { vote } => {
                     format!("CampaignResponse vote={vote}")
                 }
-                Message::Heartbeat { last_index, commit_index, commit_term, read_seq } => {
-                    format!("Heartbeat last_index={last_index} commit={commit_index}@{commit_term} read_seq={read_seq}")
+                Message::Heartbeat { last_index, commit_index, read_seq } => {
+                    format!("Heartbeat last_index={last_index} commit_index={commit_index} read_seq={read_seq}")
                 }
                 Message::HeartbeatResponse { match_index, read_seq } => {
                     format!("HeartbeatResponse match_index={match_index} read_seq={read_seq}")

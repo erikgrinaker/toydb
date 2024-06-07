@@ -38,8 +38,8 @@ deliver
 deliver
 deliver
 ---
-n1@1 → n2 Heartbeat last_index=8 commit=8@1 read_seq=0
-n1@1 → n3 Heartbeat last_index=8 commit=8@1 read_seq=0
+n1@1 → n2 Heartbeat last_index=8 commit_index=8 read_seq=0
+n1@1 → n3 Heartbeat last_index=8 commit_index=8 read_seq=0
 n2@1 → n1 HeartbeatResponse match_index=8 read_seq=0
 n3@1 → n1 HeartbeatResponse match_index=0 read_seq=0
 n1@1 → n3 Append base=7@1 []

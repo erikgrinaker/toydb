@@ -70,9 +70,9 @@ n3@2 append 1@2 None
 n3@2 → n1 Append base=0@0 [1@2]
 n3@2 → n2 Append base=0@0 [1@2]
 n3@2 → n4 Append base=0@0 [1@2]
-n3@2 → n1 Heartbeat last_index=1 commit=0@0 read_seq=0
-n3@2 → n2 Heartbeat last_index=1 commit=0@0 read_seq=0
-n3@2 → n4 Heartbeat last_index=1 commit=0@0 read_seq=0
+n3@2 → n1 Heartbeat last_index=1 commit_index=0 read_seq=0
+n3@2 → n2 Heartbeat last_index=1 commit_index=0 read_seq=0
+n3@2 → n4 Heartbeat last_index=1 commit_index=0 read_seq=0
 
 stabilize
 ---
