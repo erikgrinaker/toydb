@@ -865,10 +865,6 @@ impl RawNode<Leader> {
             }
 
             // A follower received our heartbeat and confirms our leadership.
-            //
-            // TODO: this needs to commit and apply entries following a leader
-            // change too, otherwise we can serve stale reads if the new leader
-            // hadn't fully committed and applied entries yet.
             Message::HeartbeatResponse { match_index, read_seq } => {
                 let (last_index, _) = self.log.get_last_index();
                 assert!(match_index <= last_index, "future match index");
@@ -1072,7 +1068,7 @@ impl RawNode<Leader> {
         // If the commit index doesn't advance, do nothing. We don't assert on
         // this, since the quorum value may regress e.g. following a restart or
         // leader change where followers are initialized with log index 0.
-        let mut commit_index = self.log.get_commit_index().0;
+        let (mut commit_index, old_commit_term) = self.log.get_commit_index();
         if quorum_index <= commit_index {
             return Ok(commit_index);
         }
@@ -1105,6 +1101,12 @@ impl RawNode<Leader> {
             Ok(())
         })?;
 
+        // If the commit term changed, there may be pending reads waiting for us
+        // to commit an entry from our own term. Execute them.
+        if old_commit_term != self.term {
+            self.maybe_read()?;
+        }
+
         Ok(commit_index)
     }
 
@@ -1112,6 +1114,16 @@ impl RawNode<Leader> {
     /// confirmation of their sequence number.
     fn maybe_read(&mut self) -> Result<()> {
         if self.role.reads.is_empty() {
+            return Ok(());
+        }
+
+        // It's only safe to read if we've committed and applied an entry from
+        // our own term (the leader appends an entry when elected). Otherwise we
+        // may be behind on application and serve stale reads, violating
+        // linearizability.
+        let (commit_index, commit_term) = self.log.get_commit_index();
+        let applied_index = self.state.get_applied_index();
+        if commit_term < self.term || applied_index < commit_index {
             return Ok(());
         }
 
