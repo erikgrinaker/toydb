@@ -1228,7 +1228,6 @@ fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
 mod tests {
     use super::*;
     use crate::encoding::{self, bincode, Value as _};
-    use crate::errassert;
     use crate::raft::{
         Entry, Request, RequestID, Response, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL,
         MAX_APPEND_ENTRIES,
@@ -1478,7 +1477,7 @@ mod tests {
                     Ok(node.into())
                 }
                 Node::Follower(node) => Ok(node.into_candidate()?.into()),
-                Node::Leader(node) => errassert!("{} is a leader", node.id),
+                Node::Leader(node) => panic!("{} is a leader", node.id),
             };
             for id in ids.iter().copied() {
                 self.transition(id, campaign, output)?;

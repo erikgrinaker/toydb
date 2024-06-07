@@ -2,8 +2,8 @@ use super::super::parser::ast;
 use super::super::schema::{Catalog, Column, Table};
 use super::super::types::{Expression, Value};
 use super::{Aggregate, Direction, Node, Plan};
+use crate::errinput;
 use crate::error::Result;
-use crate::{errassert, errinput};
 
 use std::collections::{HashMap, HashSet};
 use std::mem::replace;
@@ -29,10 +29,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
         Ok(match statement {
             // Transaction control and explain statements should have been handled by session.
             ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
-                return errassert!("unexpected transaction statement {statement:?}")
+                panic!("unexpected transaction statement {statement:?}")
             }
 
-            ast::Statement::Explain(_) => return errassert!("unexpected explain statement"),
+            ast::Statement::Explain(_) => panic!("unexpected explain statement"),
 
             // DDL statements (schema changes).
             ast::Statement::CreateTable { name, columns } => Node::CreateTable {
@@ -698,7 +698,7 @@ impl Scope {
     /// Adds a table to the scope.
     fn add_table(&mut self, label: String, table: Table) -> Result<()> {
         if self.constant {
-            return errassert!("can't modify constant scope");
+            panic!("can't modify constant scope");
         }
         if self.tables.contains_key(&label) {
             return errinput!("duplicate table name {label}");
@@ -729,7 +729,7 @@ impl Scope {
     /// Merges two scopes, by appending the given scope to self.
     fn merge(&mut self, scope: Scope) -> Result<()> {
         if self.constant {
-            return errassert!("can't modify constant scope");
+            panic!("can't modify constant scope");
         }
         for (label, table) in scope.tables {
             if self.tables.contains_key(&label) {
@@ -775,7 +775,7 @@ impl Scope {
     /// and returns a new scope for the projection.
     fn project(&mut self, projection: &[(Expression, Option<String>)]) -> Result<()> {
         if self.constant {
-            return errassert!("can't modify constant scope");
+            panic!("can't modify constant scope");
         }
         let mut new = Self::new();
         new.tables = self.tables.clone();

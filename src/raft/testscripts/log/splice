@@ -1,12 +1,12 @@
 # Splicing at index 0 should fail.
 !splice 0@1=foo
 ---
-Error: assertion failed: spliced entry has index or term 0
+Panic: spliced entry has index or term 0
 
 # Splicing at index 2 should fail (creates gap).
 !splice 2@1=foo
 ---
-Error: assertion failed: first index 2 must touch existing log
+Panic: first index 2 must touch existing log
 
 # Splicing entries at start should work, both with and without commands, and
 # starting at a term after 1. They should be written to the engine and flushed
@@ -36,27 +36,27 @@ last=2@2 commit=0@0
 # Splicing multiple duplicate entries should fail.
 !splice 3@2= 3@2=
 ---
-Error: assertion failed: spliced entries are not contiguous
+Panic: spliced entries are not contiguous
 
 # Splicing entries with a gap should fail.
 !splice 3@2= 5@2=
 ---
-Error: assertion failed: spliced entries are not contiguous
+Panic: spliced entries are not contiguous
 
 # Splicing entries with a term regression should fail.
 !splice 3@2= 4@1=
 ---
-Error: assertion failed: spliced entries have term regression
+Panic: spliced entries have term regression
 
 # Splicing entries with a gap from the base should fail.
 !splice 4@2=
 ---
-Error: assertion failed: first index 4 must touch existing log
+Panic: first index 4 must touch existing log
 
 # Splicing with a term regression from the base should fail.
 !splice 3@1=
 ---
-Error: assertion failed: splice term regression 2 → 1
+Panic: splice term regression 2 → 1
 
 # Fully overlapping entries is a noop.
 splice 1@2= 2@2=command oplog=true
@@ -86,7 +86,7 @@ splice → 2@2 command
 !splice 2@2=foo
 scan
 ---
-Error: assertion failed: command mismatch at Entry { index: 2, term: 2, command: Some([99, 111, 109, 109, 97, 110, 100]) }
+Panic: command mismatch at Entry { index: 2, term: 2, command: Some([99, 111, 109, 109, 97, 110, 100]) }
 1@2 None
 2@2 command
 
@@ -180,8 +180,8 @@ last=4@6 commit=2@5
 !splice 2@7=
 !splice 1@7=
 ---
-Error: assertion failed: spliced entries below commit index
-Error: assertion failed: spliced entries below commit index
+Panic: spliced entries below commit index
+Panic: spliced entries below commit index
 
 # Dump the raw data.
 dump

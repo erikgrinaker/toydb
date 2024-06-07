@@ -1,7 +1,7 @@
 # Appending an entry with term 0 fails, even on an empty log.
 !append 0 foo
 ---
-Error: assertion failed: can't append entry with term 0
+Panic: can't append entry with term 0
 
 # Appending to an empty log works. The term doesn't have to be 1, and doesn't
 # have to match get_term(). The entry is written to the engine and flushed
@@ -43,8 +43,8 @@ append → 4@5 None
 !append 4 old
 !append 0
 ---
-Error: assertion failed: term regression 5 → 4
-Error: assertion failed: term regression 5 → 0
+Panic: term regression 5 → 4
+Panic: term regression 5 → 0
 
 # Dump the final status and data.
 status

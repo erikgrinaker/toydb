@@ -1,7 +1,7 @@
 # Committing fails on an empty engine.
 !commit 1
 ---
-Error: assertion failed: commit index 1 does not exist
+Panic: commit index 1 does not exist
 
 # Add some entries.
 splice 1@1= 2@1=foo 3@2=bar
@@ -11,7 +11,7 @@ splice → 3@2 bar
 # Committing entry 0 fails.
 !commit 0
 ---
-Error: assertion failed: commit index 0 does not exist
+Panic: commit index 0 does not exist
 
 # Committing entry 1 works, and updates the commit index.
 #
@@ -50,14 +50,14 @@ last=3@2 commit=3@2
 !commit 2
 status
 ---
-Error: assertion failed: commit index regression 3 → 2
+Panic: commit index regression 3 → 2
 last=3@2 commit=3@2
 
 # Committing non-existant indexes error.
 !commit 4
 status
 ---
-Error: assertion failed: commit index 4 does not exist
+Panic: commit index 4 does not exist
 last=3@2 commit=3@2
 
 # Dump the raw values.

@@ -6,9 +6,6 @@ pub enum Error {
     /// The operation was aborted and must be retried. This typically happens
     /// with e.g. Raft leader changes.
     Abort,
-    /// An assertion failure. Should never happen.
-    /// TODO: include backtrace.
-    Assert(String),
     /// Invalid data, typically decoding errors or unexpected internal values.
     InvalidData(String),
     /// Invalid user input, typically parser or query errors.
@@ -28,7 +25,6 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::Abort => write!(f, "operation aborted"),
-            Error::Assert(msg) => write!(f, "assertion failed: {msg}"),
             Error::InvalidData(msg) => write!(f, "invalid data: {msg}"),
             Error::InvalidInput(msg) => write!(f, "invalid input: {msg}"),
             Error::IO(msg) => write!(f, "io error: {msg}"),
@@ -48,9 +44,6 @@ impl Error {
         match self {
             // Aborts don't happen during application, only leader changes.
             Error::Abort => true,
-            // Assertion failures typically indicate invariant violations or
-            // data corruption, so we should assume it's unsafe to continue.
-            Error::Assert(_) => false,
             // Possible data corruption local to this node.
             Error::InvalidData(_) => false,
             // Input errors are (likely) deterministic. We could employ command
@@ -66,12 +59,6 @@ impl Error {
     }
 }
 
-/// Constructs an Error::Assert via format!() and into().
-#[macro_export]
-macro_rules! errassert {
-    ($($args:tt)*) => { $crate::error::Error::Assert(format!($($args)*)).into() };
-}
-
 /// Constructs an Error::InvalidData via format!() and into().
 #[macro_export]
 macro_rules! errdata {
@@ -82,15 +69,6 @@ macro_rules! errdata {
 #[macro_export]
 macro_rules! errinput {
     ($($args:tt)*) => { $crate::error::Error::InvalidInput(format!($($args)*)).into() };
-}
-
-/// Returns an Error::Assert if the given condition is false.
-/// TODO: use this instead of assert! where appropriate.
-#[macro_export]
-macro_rules! asserterr {
-    ($cond:expr, $($args:tt)*) => {
-        if !$cond { return errassert!($($args)*) }
-    };
 }
 
 /// Result returning Error.
@@ -152,7 +130,7 @@ impl<T> From<crossbeam::channel::TrySendError<T>> for Error {
 
 impl From<hdrhistogram::CreationError> for Error {
     fn from(err: hdrhistogram::CreationError) -> Self {
-        Error::Assert(err.to_string())
+        panic!("{err}")
     }
 }
 
@@ -170,13 +148,13 @@ impl From<log::ParseLevelError> for Error {
 
 impl From<log::SetLoggerError> for Error {
     fn from(err: log::SetLoggerError) -> Self {
-        Error::Assert(err.to_string())
+        panic!("{err}")
     }
 }
 
 impl From<regex::Error> for Error {
     fn from(err: regex::Error) -> Self {
-        Error::Assert(err.to_string())
+        panic!("{err}")
     }
 }
 

@@ -47,8 +47,8 @@
 use de::IntoDeserializer;
 use serde::{de, ser};
 
+use crate::errdata;
 use crate::error::{Error, Result};
-use crate::{errassert, errdata};
 
 // Serializes a key to a binary KeyCode representation.
 pub fn serialize<T: serde::Serialize>(key: &T) -> Result<Vec<u8>> {
@@ -365,7 +365,7 @@ impl<'de, 'a> serde::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
-        errassert!("must provide type, KeyCode is not self-describing")
+        panic!("must provide type, KeyCode is not self-describing")
     }
 
     fn deserialize_bool<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {

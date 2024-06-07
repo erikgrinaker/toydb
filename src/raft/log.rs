@@ -2,7 +2,6 @@ use super::{NodeID, Term};
 use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::Result;
 use crate::storage;
-use crate::{asserterr, errassert};
 
 use serde::{Deserialize, Serialize};
 
@@ -148,12 +147,12 @@ impl Log {
     /// term does not regress, and that we only vote for one node in a term.
     pub fn set_term(&mut self, term: Term, vote: Option<NodeID>) -> Result<()> {
         match self.get_term()? {
-            (t, _) if term < t => return errassert!("term regression {t} → {term}"),
+            (t, _) if term < t => panic!("term regression {t} → {term}"),
             (t, _) if term > t => {} // below, term == t
-            (0, _) => return errassert!("can't set term 0"),
+            (0, _) => panic!("can't set term 0"),
             (t, v) if t == term && v == vote => return Ok(()),
             (_, None) => {}
-            (_, v) if vote != v => return errassert!("can't change vote {v:?} → {vote:?}"),
+            (_, v) if vote != v => panic!("can't change vote {v:?} → {vote:?}"),
             (_, _) => {}
         };
         self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, vote))?)?;
@@ -166,9 +165,9 @@ impl Log {
     /// The term must be equal to or greater than the previous entry.
     pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
         match self.get(self.last_index)? {
-            Some(e) if term < e.term => return errassert!("term regression {} → {term}", e.term),
-            None if self.last_index > 0 => return errassert!("log gap at {}", self.last_index),
-            None if term == 0 => return errassert!("can't append entry with term 0"),
+            Some(e) if term < e.term => panic!("term regression {} → {term}", e.term),
+            None if self.last_index > 0 => panic!("log gap at {}", self.last_index),
+            None if term == 0 => panic!("can't append entry with term 0"),
             Some(_) | None => {}
         }
         // We could omit the index in the encoded value, since it's also stored
@@ -186,11 +185,11 @@ impl Log {
     pub fn commit(&mut self, index: Index) -> Result<Index> {
         let term = match self.get(index)? {
             Some(e) if e.index < self.commit_index => {
-                return errassert!("commit index regression {} → {}", self.commit_index, e.index);
+                panic!("commit index regression {} → {}", self.commit_index, e.index);
             }
             Some(e) if e.index == self.commit_index => return Ok(index),
             Some(e) => e.term,
-            None => return errassert!("commit index {index} does not exist"),
+            None => panic!("commit index {index} does not exist"),
         };
         self.engine.set(&Key::CommitIndex.encode()?, bincode::serialize(&(index, term))?)?;
         // NB: the commit index doesn't need to be fsynced, since the entries
@@ -251,24 +250,24 @@ impl Log {
 
         // Check that the entries are well-formed.
         if first.index == 0 || first.term == 0 {
-            return errassert!("spliced entry has index or term 0");
+            panic!("spliced entry has index or term 0");
         }
         if !entries.windows(2).all(|w| w[0].index + 1 == w[1].index) {
-            return errassert!("spliced entries are not contiguous");
+            panic!("spliced entries are not contiguous");
         }
         if !entries.windows(2).all(|w| w[0].term <= w[1].term) {
-            return errassert!("spliced entries have term regression");
+            panic!("spliced entries have term regression");
         }
 
         // Check that the entries connect to the existing log (if any), and that the
         // term doesn't regress.
         match self.get(first.index - 1)? {
             Some(base) if first.term < base.term => {
-                return errassert!("splice term regression {} → {}", base.term, first.term)
+                panic!("splice term regression {} → {}", base.term, first.term)
             }
             Some(_) => {}
             None if first.index == 1 => {}
-            None => return errassert!("first index {} must touch existing log", first.index),
+            None => panic!("first index {} must touch existing log", first.index),
         }
 
         // Skip entries that are already in the log.
@@ -276,11 +275,11 @@ impl Log {
         let mut scan = self.scan(first.index..=last.index)?;
         while let Some(entry) = scan.next().transpose()? {
             // [0] is ok, because the scan has the same size as entries.
-            asserterr!(entry.index == entries[0].index, "index mismatch at {entry:?}");
+            assert!(entry.index == entries[0].index, "index mismatch at {entry:?}");
             if entry.term != entries[0].term {
                 break;
             }
-            asserterr!(entry.command == entries[0].command, "command mismatch at {entry:?}");
+            assert!(entry.command == entries[0].command, "command mismatch at {entry:?}");
             entries = &entries[1..];
         }
         drop(scan);
@@ -293,7 +292,7 @@ impl Log {
         // Write the entries that weren't already in the log, and remove the
         // tail of the old log if any. We can't write below the commit index,
         // since these entries must be immutable.
-        asserterr!(first.index > self.commit_index, "spliced entries below commit index");
+        assert!(first.index > self.commit_index, "spliced entries below commit index");
 
         for entry in entries {
             self.engine.set(&Key::Entry(entry.index).encode()?, entry.encode()?)?;
