@@ -149,6 +149,7 @@ deliver 1 2
 ---
 n5@4 → n1 Append base=3@1 [4@2 5@2 6@3 7@3 8@4 9@4 10@4]
 n5@4 → n2 Append base=3@1 [4@2 5@2 6@3 7@3 8@4 9@4 10@4]
+n1@4 append 4@2 None
 n1@4 append 5@2 put c=3
 n1@4 append 6@3 None
 n1@4 append 7@3 put d=4
@@ -156,6 +157,7 @@ n1@4 append 8@4 None
 n1@4 append 9@4 put e=5
 n1@4 append 10@4 put f=6
 n1@4 → n5 AppendResponse match_index=10
+n2@4 append 4@2 None
 n2@4 append 5@2 put c=3
 n2@4 append 6@3 None
 n2@4 append 7@3 put d=4

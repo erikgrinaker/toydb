@@ -78,9 +78,11 @@ n5@2 → n2 Heartbeat last_index=2 commit_index=1 read_seq=0
 n5@2 → n3 Heartbeat last_index=2 commit_index=1 read_seq=0
 n5@2 → n4 Heartbeat last_index=2 commit_index=1 read_seq=0
 n1@2 follower() ⇨ n1@2 follower(n5)
+n1@2 append 2@2 None
 n1@2 → n5 AppendResponse match_index=2
 n1@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n2@2 follower() ⇨ n2@2 follower(n5)
+n2@2 append 2@2 None
 n2@2 → n5 AppendResponse match_index=2
 n2@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 n3@2 follower() ⇨ n3@2 follower(n5)

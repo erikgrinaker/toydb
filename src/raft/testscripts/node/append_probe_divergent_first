@@ -193,8 +193,20 @@ deliver 1 2
 n5@4 → n1 Append base=1@1 [2@2 3@2 4@3 5@3 6@4 7@4 8@4]
 n5@4 → n2 Append base=1@1 [2@2 3@2 4@3 5@3 6@4 7@4 8@4]
 n5@4 leader last=8@4 commit=7@4 apply=7 progress={1:1→9 2:1→9 3:7→9 4:7→9}
+n1@4 append 2@2 None
+n1@4 append 3@2 put a=1
+n1@4 append 4@3 None
+n1@4 append 5@3 put b=2
+n1@4 append 6@4 None
+n1@4 append 7@4 put c=3
 n1@4 append 8@4 put d=4
 n1@4 → n5 AppendResponse match_index=8
+n2@4 append 2@2 None
+n2@4 append 3@2 put a=1
+n2@4 append 4@3 None
+n2@4 append 5@3 put b=2
+n2@4 append 6@4 None
+n2@4 append 7@4 put c=3
 n2@4 append 8@4 put d=4
 n2@4 → n5 AppendResponse match_index=8
 

@@ -93,8 +93,10 @@ deliver 1 2
 ---
 n5@2 → n1 Append base=1@1 [2@2 3@2]
 n5@2 → n2 Append base=1@1 [2@2 3@2]
+n1@2 append 2@2 None
 n1@2 append 3@2 put b=2
 n1@2 → n5 AppendResponse match_index=3
+n2@2 append 2@2 None
 n2@2 append 3@2 put b=2
 n2@2 → n5 AppendResponse match_index=3
 

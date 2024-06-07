@@ -176,6 +176,13 @@ n3@3 → n1 Append base=3@1 [4@2 5@2 6@2 7@3 8@3 9@3 10@3]
 
 deliver 1
 ---
+n1@3 append 4@2 None
+n1@3 append 5@2 put c=3
+n1@3 append 6@2 put d=4
+n1@3 append 7@3 None
+n1@3 append 8@3 put e=5
+n1@3 append 9@3 put f=6
+n1@3 append 10@3 put g=7
 n1@3 → n3 AppendResponse match_index=10
 
 deliver 3

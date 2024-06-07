@@ -1793,8 +1793,9 @@ mod tests {
             let mut node = self.nodes.remove(&id).ok_or(format!("unknown node {id}"))?;
 
             let old_noderole = Self::format_node_role(&node);
-            let old_commit_index = Self::borrow_log(&node).get_commit_index().0;
-            let old_last_index = Self::borrow_log(&node).get_last_index().0;
+            let log = Self::borrow_log_mut(&mut node);
+            let old_commit_index = log.get_commit_index().0;
+            let entries = log.scan(..)?.collect::<crate::error::Result<Vec<_>>>()?;
 
             // Apply the transition.
             node = f(node)?;
@@ -1804,10 +1805,11 @@ mod tests {
 
             let log = Self::borrow_log_mut(&mut node);
             let (commit_index, commit_term) = log.get_commit_index();
-            // TODO: this doesn't handle replaced indexes. It needs to fetch the
-            // index/term of all entries and compare them.
-            let appended: Vec<_> =
-                log.scan(old_last_index + 1..)?.collect::<crate::error::Result<_>>()?;
+            let mut appended = log.scan(..)?.collect::<crate::error::Result<Vec<_>>>()?;
+            match appended.iter().zip(entries.iter()).position(|(a, e)| a.term != e.term) {
+                Some(i) => appended = appended[i..].to_vec(),
+                None => appended = appended[entries.len()..].to_vec(),
+            }
 
             self.nodes.insert(id, node);
 
