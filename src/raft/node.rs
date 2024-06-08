@@ -127,7 +127,7 @@ impl From<RawNode<Leader>> for Node {
 }
 
 /// A Raft role: leader, follower, or candidate.
-pub trait Role: Clone + std::fmt::Debug + PartialEq {}
+pub trait Role {}
 
 /// A Raft node with the concrete role R.
 ///
@@ -247,7 +247,6 @@ impl<R: Role> RawNode<R> {
 }
 
 /// A candidate is campaigning to become a leader.
-#[derive(Clone, Debug, PartialEq)]
 pub struct Candidate {
     /// Votes received (including ourself).
     votes: HashSet<NodeID>,
@@ -410,7 +409,6 @@ impl RawNode<Candidate> {
 }
 
 // A follower replicates state from a leader.
-#[derive(Clone, Debug, PartialEq)]
 pub struct Follower {
     /// The leader, or None if just initialized.
     leader: Option<NodeID>,
@@ -682,7 +680,6 @@ impl RawNode<Follower> {
 }
 
 /// Follower replication progress.
-#[derive(Clone, Debug, PartialEq)]
 struct Progress {
     /// The next index to replicate to the follower.
     next_index: Index,
@@ -726,7 +723,6 @@ impl Progress {
 }
 
 /// A pending client write request.
-#[derive(Clone, Debug, PartialEq)]
 struct Write {
     /// The node which submitted the write.
     from: NodeID,
@@ -735,7 +731,6 @@ struct Write {
 }
 
 /// A pending client read request.
-#[derive(Clone, Debug, PartialEq)]
 struct Read {
     /// The sequence number of this read.
     seq: ReadSequence,
@@ -748,7 +743,6 @@ struct Read {
 }
 
 // A leader serves requests and replicates the log to followers.
-#[derive(Clone, Debug, PartialEq)]
 pub struct Leader {
     /// Follower replication progress.
     progress: HashMap<NodeID, Progress>,
