@@ -976,7 +976,6 @@ impl RawNode<Leader> {
                         .iter()
                         .map(|(id, p)| (*id, p.match_index))
                         .chain(std::iter::once((self.id, self.log.get_last_index().0)))
-                        .sorted()
                         .collect(),
                     commit_index: self.log.get_commit_index().0,
                     apply_index: self.state.get_applied_index(),
