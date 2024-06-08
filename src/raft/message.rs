@@ -197,7 +197,7 @@ pub struct Status {
     /// The current commit index.
     pub commit_index: Index,
     /// The current applied index.
-    pub apply_index: Index,
+    pub applied_index: Index,
     /// The log storage engine status.
     pub storage: storage::Status,
 }

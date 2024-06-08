@@ -3,11 +3,11 @@
 
 cluster nodes=5 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Make a couple of writes to ensure a common log prefix.
 (put 1 a=1)
@@ -15,11 +15,11 @@ n5@1 follower(n1) last=1@1 commit=1@1 apply=1
 (stabilize)
 status
 ---
-n1@1 leader last=3@1 commit=3@1 apply=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
-n2@1 follower(n1) last=3@1 commit=1@1 apply=1
-n3@1 follower(n1) last=3@1 commit=1@1 apply=1
-n4@1 follower(n1) last=3@1 commit=1@1 apply=1
-n5@1 follower(n1) last=3@1 commit=1@1 apply=1
+n1@1 leader last=3@1 commit=3@1 applied=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
+n2@1 follower(n1) last=3@1 commit=1@1 applied=1
+n3@1 follower(n1) last=3@1 commit=1@1 applied=1
+n4@1 follower(n1) last=3@1 commit=1@1 applied=1
+n5@1 follower(n1) last=3@1 commit=1@1 applied=1
 
 # Partition n1-n2
 partition 1 2
@@ -34,11 +34,11 @@ n1 n2 ⇹ n3 n4 n5
 (stabilize heartbeat=true)
 status
 ---
-n1@1 leader last=3@1 commit=3@1 apply=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
-n2@1 follower(n1) last=3@1 commit=1@1 apply=1
-n3@2 leader last=5@2 commit=5@2 apply=5 progress={1:0→6 2:0→6 4:5→6 5:5→6}
-n4@2 follower(n3) last=5@2 commit=5@2 apply=5
-n5@2 follower(n3) last=5@2 commit=5@2 apply=5
+n1@1 leader last=3@1 commit=3@1 applied=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
+n2@1 follower(n1) last=3@1 commit=1@1 applied=1
+n3@2 leader last=5@2 commit=5@2 applied=5 progress={1:0→6 2:0→6 4:5→6 5:5→6}
+n4@2 follower(n3) last=5@2 commit=5@2 applied=5
+n5@2 follower(n3) last=5@2 commit=5@2 applied=5
 
 (campaign 4)
 (stabilize)
@@ -46,11 +46,11 @@ n5@2 follower(n3) last=5@2 commit=5@2 apply=5
 (stabilize heartbeat=true)
 status
 ---
-n1@1 leader last=3@1 commit=3@1 apply=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
-n2@1 follower(n1) last=3@1 commit=1@1 apply=1
-n3@3 follower(n4) last=7@3 commit=7@3 apply=7
-n4@3 leader last=7@3 commit=7@3 apply=7 progress={1:0→8 2:0→8 3:7→8 5:7→8}
-n5@3 follower(n4) last=7@3 commit=7@3 apply=7
+n1@1 leader last=3@1 commit=3@1 applied=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
+n2@1 follower(n1) last=3@1 commit=1@1 applied=1
+n3@3 follower(n4) last=7@3 commit=7@3 applied=7
+n4@3 leader last=7@3 commit=7@3 applied=7 progress={1:0→8 2:0→8 3:7→8 5:7→8}
+n5@3 follower(n4) last=7@3 commit=7@3 applied=7
 
 (campaign 5)
 (stabilize)
@@ -58,11 +58,11 @@ n5@3 follower(n4) last=7@3 commit=7@3 apply=7
 (stabilize heartbeat=true)
 status
 ---
-n1@1 leader last=3@1 commit=3@1 apply=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
-n2@1 follower(n1) last=3@1 commit=1@1 apply=1
-n3@4 follower(n5) last=9@4 commit=9@4 apply=9
-n4@4 follower(n5) last=9@4 commit=9@4 apply=9
-n5@4 leader last=9@4 commit=9@4 apply=9 progress={1:0→10 2:0→10 3:9→10 4:9→10}
+n1@1 leader last=3@1 commit=3@1 applied=3 progress={2:3→4 3:3→4 4:3→4 5:3→4}
+n2@1 follower(n1) last=3@1 commit=1@1 applied=1
+n3@4 follower(n5) last=9@4 commit=9@4 applied=9
+n4@4 follower(n5) last=9@4 commit=9@4 applied=9
+n5@4 leader last=9@4 commit=9@4 applied=9 progress={1:0→10 2:0→10 3:9→10 4:9→10}
 
 # Propose a single write in the minority partition. The divergent minority log
 # is much shorter than the majority log.
@@ -70,20 +70,20 @@ n5@4 leader last=9@4 commit=9@4 apply=9 progress={1:0→10 2:0→10 3:9→10 4:9
 (stabilize)
 status
 ---
-n1@1 leader last=4@1 commit=3@1 apply=3 progress={2:4→5 3:3→5 4:3→5 5:3→5}
-n2@1 follower(n1) last=4@1 commit=1@1 apply=1
-n3@4 follower(n5) last=9@4 commit=9@4 apply=9
-n4@4 follower(n5) last=9@4 commit=9@4 apply=9
-n5@4 leader last=9@4 commit=9@4 apply=9 progress={1:0→10 2:0→10 3:9→10 4:9→10}
+n1@1 leader last=4@1 commit=3@1 applied=3 progress={2:4→5 3:3→5 4:3→5 5:3→5}
+n2@1 follower(n1) last=4@1 commit=1@1 applied=1
+n3@4 follower(n5) last=9@4 commit=9@4 applied=9
+n4@4 follower(n5) last=9@4 commit=9@4 applied=9
+n5@4 leader last=9@4 commit=9@4 applied=9 progress={1:0→10 2:0→10 3:9→10 4:9→10}
 
 log 1 5
 ---
-n1@1 last=4@1 commit=3@1
+n1@1 term=1 last=4@1 commit=3@1 vote=Some(1)
 n1@1 entry 1@1 None
 n1@1 entry 2@1 put a=1
 n1@1 entry 3@1 put b=2
 n1@1 entry 4@1 put a=2
-n5@4 last=9@4 commit=9@4
+n5@4 term=4 last=9@4 commit=9@4 vote=Some(5)
 n5@4 entry 1@1 None
 n5@4 entry 2@1 put a=1
 n5@4 entry 3@1 put b=2
@@ -129,7 +129,7 @@ deliver 1 2
 ---
 n5@4 → n1 Append base=4@2 []
 n5@4 → n2 Append base=4@2 []
-n5@4 leader last=10@4 commit=9@4 apply=9 progress={1:0→5 2:0→5 3:9→11 4:9→11}
+n5@4 leader last=10@4 commit=9@4 applied=9 progress={1:0→5 2:0→5 3:9→11 4:9→11}
 n1@4 → n5 AppendResponse reject_index=4
 n2@4 → n5 AppendResponse reject_index=4
 
@@ -141,7 +141,7 @@ n5@4 → n1 Append base=3@1 []
 n5@4 → n2 Append base=3@1 []
 n1@4 → n5 AppendResponse match_index=3
 n2@4 → n5 AppendResponse match_index=3
-n5@4 leader last=10@4 commit=9@4 apply=9 progress={1:0→4 2:0→4 3:9→11 4:9→11}
+n5@4 leader last=10@4 commit=9@4 applied=9 progress={1:0→4 2:0→4 3:9→11 4:9→11}
 
 # n5 can now replicate the tail to n1 and n2, allowing n5 to commit it.
 deliver 5
@@ -175,18 +175,18 @@ c5@4 put f=6 ⇒ 10
 
 status
 ---
-n1@4 follower(n5) last=10@4 commit=3@1 apply=3
-n2@4 follower(n5) last=10@4 commit=1@1 apply=1
-n3@4 follower(n5) last=9@4 commit=9@4 apply=9
-n4@4 follower(n5) last=9@4 commit=9@4 apply=9
-n5@4 leader last=10@4 commit=10@4 apply=10 progress={1:10→11 2:10→11 3:9→11 4:9→11}
+n1@4 follower(n5) last=10@4 commit=3@1 applied=3
+n2@4 follower(n5) last=10@4 commit=1@1 applied=1
+n3@4 follower(n5) last=9@4 commit=9@4 applied=9
+n4@4 follower(n5) last=9@4 commit=9@4 applied=9
+n5@4 leader last=10@4 commit=10@4 applied=10 progress={1:10→11 2:10→11 3:9→11 4:9→11}
 
 # Stabilize the cluster.
 (stabilize heartbeat=true)
 status
 ---
-n1@4 follower(n5) last=10@4 commit=10@4 apply=10
-n2@4 follower(n5) last=10@4 commit=10@4 apply=10
-n3@4 follower(n5) last=10@4 commit=10@4 apply=10
-n4@4 follower(n5) last=10@4 commit=10@4 apply=10
-n5@4 leader last=10@4 commit=10@4 apply=10 progress={1:10→11 2:10→11 3:10→11 4:10→11}
+n1@4 follower(n5) last=10@4 commit=10@4 applied=10
+n2@4 follower(n5) last=10@4 commit=10@4 applied=10
+n3@4 follower(n5) last=10@4 commit=10@4 applied=10
+n4@4 follower(n5) last=10@4 commit=10@4 applied=10
+n5@4 leader last=10@4 commit=10@4 applied=10 progress={1:10→11 2:10→11 3:10→11 4:10→11}

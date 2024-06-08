@@ -2,9 +2,9 @@
 
 cluster nodes=3 heartbeat_interval=1 election_timeout=2
 ---
-n1@0 follower() last=0@0 commit=0@0 apply=0
-n2@0 follower() last=0@0 commit=0@0 apply=0
-n3@0 follower() last=0@0 commit=0@0 apply=0
+n1@0 follower() last=0@0 commit=0@0 applied=0
+n2@0 follower() last=0@0 commit=0@0 applied=0
+n3@0 follower() last=0@0 commit=0@0 applied=0
 
 # A single follower tick does nothing.
 tick 2
@@ -20,6 +20,6 @@ n2@1 → n3 Campaign last=0@0
 
 status
 ---
-n1@0 follower() last=0@0 commit=0@0 apply=0
-n2@1 candidate last=0@0 commit=0@0 apply=0
-n3@0 follower() last=0@0 commit=0@0 apply=0
+n1@0 follower() last=0@0 commit=0@0 applied=0
+n2@1 candidate last=0@0 commit=0@0 applied=0
+n3@0 follower() last=0@0 commit=0@0 applied=0

@@ -3,9 +3,9 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Propose a single write. The progress next index increases to 3.
 put 1 a=1
@@ -17,9 +17,9 @@ n1@1 → n3 Append base=1@1 [2@1]
 
 status
 ---
-n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:1→3 3:1→3}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=2@1 commit=1@1 applied=1 progress={2:1→3 3:1→3}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Propose two more writes. Appends are sent without past duplicates.
 put 1 b=2
@@ -36,9 +36,9 @@ n1@1 → n3 Append base=3@1 [4@1]
 
 status
 ---
-n1@1 leader last=4@1 commit=1@1 apply=1 progress={2:1→5 3:1→5}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=4@1 commit=1@1 applied=1 progress={2:1→5 3:1→5}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # The appends are received and acked sequentially.
 deliver
@@ -77,6 +77,6 @@ c1@1 put c=3 ⇒ 4
 # heartbeat).
 status
 ---
-n1@1 leader last=4@1 commit=4@1 apply=4 progress={2:4→5 3:4→5}
-n2@1 follower(n1) last=4@1 commit=1@1 apply=1
-n3@1 follower(n1) last=4@1 commit=1@1 apply=1
+n1@1 leader last=4@1 commit=4@1 applied=4 progress={2:4→5 3:4→5}
+n2@1 follower(n1) last=4@1 commit=1@1 applied=1
+n3@1 follower(n1) last=4@1 commit=1@1 applied=1

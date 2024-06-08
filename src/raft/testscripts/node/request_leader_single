@@ -2,7 +2,7 @@
 
 cluster nodes=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={}
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={}
 
 # An initial get on the leader yields None.
 get 1 foo

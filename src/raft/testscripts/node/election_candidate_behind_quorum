@@ -2,11 +2,11 @@
 
 cluster nodes=5 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Partition n4+n5 away from the cluster.
 partition 4 5
@@ -20,11 +20,11 @@ n4 n5 ⇹ n1 n2 n3
 (stabilize)
 status
 ---
-n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:2→3 4:1→3 5:1→3}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=2@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=2@1 commit=2@1 applied=2 progress={2:2→3 3:2→3 4:1→3 5:1→3}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=2@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Heal the partition.
 heal
@@ -55,19 +55,19 @@ n4@2 → n5 CampaignResponse vote=true
 
 status
 ---
-n1@2 follower() last=2@1 commit=2@1 apply=2
-n2@2 follower() last=2@1 commit=1@1 apply=1
-n3@2 follower() last=2@1 commit=1@1 apply=1
-n4@2 follower() last=1@1 commit=1@1 apply=1
-n5@2 candidate last=1@1 commit=1@1 apply=1
+n1@2 follower() last=2@1 commit=2@1 applied=2
+n2@2 follower() last=2@1 commit=1@1 applied=1
+n3@2 follower() last=2@1 commit=1@1 applied=1
+n4@2 follower() last=1@1 commit=1@1 applied=1
+n5@2 candidate last=1@1 commit=1@1 applied=1
 
 # n2 can campaign and win the election.
 (campaign 2)
 (stabilize heartbeat=true)
 status
 ---
-n1@3 follower(n2) last=3@3 commit=3@3 apply=3
-n2@3 leader last=3@3 commit=3@3 apply=3 progress={1:3→4 3:3→4 4:3→4 5:3→4}
-n3@3 follower(n2) last=3@3 commit=3@3 apply=3
-n4@3 follower(n2) last=3@3 commit=3@3 apply=3
-n5@3 follower(n2) last=3@3 commit=3@3 apply=3
+n1@3 follower(n2) last=3@3 commit=3@3 applied=3
+n2@3 leader last=3@3 commit=3@3 applied=3 progress={1:3→4 3:3→4 4:3→4 5:3→4}
+n3@3 follower(n2) last=3@3 commit=3@3 applied=3
+n4@3 follower(n2) last=3@3 commit=3@3 applied=3
+n5@3 follower(n2) last=3@3 commit=3@3 applied=3

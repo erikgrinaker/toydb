@@ -3,9 +3,9 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Partition n2 away from the cluster.
 partition 2
@@ -17,9 +17,9 @@ n2 ⇹ n1 n3
 (stabilize heartbeat=true)
 status
 ---
-n1@2 follower(n3) last=2@2 commit=2@2 apply=2
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@2 leader last=2@2 commit=2@2 apply=2 progress={1:2→3 2:0→3}
+n1@2 follower(n3) last=2@2 commit=2@2 applied=2
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@2 leader last=2@2 commit=2@2 applied=2 progress={1:2→3 2:0→3}
 
 # Heal the partition.
 heal
@@ -49,6 +49,6 @@ n2@2 → n3 HeartbeatResponse match_index=2 read_seq=0
 
 status
 ---
-n1@2 follower(n3) last=2@2 commit=2@2 apply=2
-n2@2 follower(n3) last=2@2 commit=2@2 apply=2
-n3@2 leader last=2@2 commit=2@2 apply=2 progress={1:2→3 2:2→3}
+n1@2 follower(n3) last=2@2 commit=2@2 applied=2
+n2@2 follower(n3) last=2@2 commit=2@2 applied=2
+n3@2 leader last=2@2 commit=2@2 applied=2 progress={1:2→3 2:2→3}

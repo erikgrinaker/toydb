@@ -2,9 +2,9 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Partition away n3, so not all nodes have the same log position.
 partition 3
@@ -16,16 +16,16 @@ n3 ⇹ n1 n2
 (stabilize)
 status
 ---
-n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:1→3}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=2@1 commit=2@1 applied=2 progress={2:2→3 3:1→3}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Run a status request on the leader.
 status request=true 1
 stabilize
 ---
 c1@1 → n1 ClientRequest id=0x02 status
-n1@1 → c1 ClientResponse id=0x02 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
+n1@1 → c1 ClientResponse id=0x02 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, applied_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
 c1@1 status ⇒ Status {
     leader: 1,
     term: 1,
@@ -35,7 +35,7 @@ c1@1 status ⇒ Status {
         3: 1,
     },
     commit_index: 2,
-    apply_index: 2,
+    applied_index: 2,
     storage: Status {
         name: "memory",
         keys: 4,
@@ -52,8 +52,8 @@ stabilize
 ---
 c2@1 → n2 ClientRequest id=0x03 status
 n2@1 → n1 ClientRequest id=0x03 status
-n1@1 → n2 ClientResponse id=0x03 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
-n2@1 → c2 ClientResponse id=0x03 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
+n1@1 → n2 ClientResponse id=0x03 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, applied_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
+n2@1 → c2 ClientResponse id=0x03 status Status { leader: 1, term: 1, match_index: {1: 2, 2: 2, 3: 1}, commit_index: 2, applied_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
 c2@1 status ⇒ Status {
     leader: 1,
     term: 1,
@@ -63,7 +63,7 @@ c2@1 status ⇒ Status {
         3: 1,
     },
     commit_index: 2,
-    apply_index: 2,
+    applied_index: 2,
     storage: Status {
         name: "memory",
         keys: 4,

@@ -136,7 +136,7 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
                     term = status.raft.term,
                     nodes = status.raft.match_index.len(),
                     committed = status.raft.commit_index,
-                    applied = status.raft.apply_index,
+                    applied = status.raft.applied_index,
                     raft_storage = status.raft.storage.name,
                     raft_size =
                         format_args!("{:.3}", status.raft.storage.size as f64 / 1000.0 / 1000.0),

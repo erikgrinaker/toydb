@@ -2,9 +2,9 @@
 
 cluster nodes=3
 ---
-n1@0 follower() last=0@0 commit=0@0 apply=0
-n2@0 follower() last=0@0 commit=0@0 apply=0
-n3@0 follower() last=0@0 commit=0@0 apply=0
+n1@0 follower() last=0@0 commit=0@0 applied=0
+n2@0 follower() last=0@0 commit=0@0 applied=0
+n3@0 follower() last=0@0 commit=0@0 applied=0
 
 # n1 campaigns.
 campaign 1

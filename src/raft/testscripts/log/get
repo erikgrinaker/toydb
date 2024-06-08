@@ -21,7 +21,6 @@ get 1 2
 2@1 foo
 
 # get returns None for missing entries, and for index 0.
-# TODO: consider erroring on index 0.
 get 4 0
 ---
 None

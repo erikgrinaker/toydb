@@ -3,9 +3,9 @@
 
 cluster nodes=3 heartbeat_interval=1 election_timeout=2
 ---
-n1@0 follower() last=0@0 commit=0@0 apply=0
-n2@0 follower() last=0@0 commit=0@0 apply=0
-n3@0 follower() last=0@0 commit=0@0 apply=0
+n1@0 follower() last=0@0 commit=0@0 applied=0
+n2@0 follower() last=0@0 commit=0@0 applied=0
+n3@0 follower() last=0@0 commit=0@0 applied=0
 
 # Tick all nodes. Then tick n1 again to make it campaign.
 tick
@@ -67,6 +67,6 @@ n3@1 → n1 HeartbeatResponse match_index=1 read_seq=0
 
 status
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1

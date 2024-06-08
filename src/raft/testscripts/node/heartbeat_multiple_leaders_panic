@@ -2,9 +2,9 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Leader panics if it sees another leader in the same term.
 !step 1 '{"from":2, "to":1, "term":1, "message": {"Heartbeat":{"last_index":1,"commit_index":0, "commit_term":0, "read_seq":0}}}'

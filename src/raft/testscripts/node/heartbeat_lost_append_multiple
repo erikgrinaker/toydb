@@ -2,9 +2,9 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Partition the leader, submit three writes whose appends are dropped, then heal
 # the partition again.
@@ -33,9 +33,9 @@ heal
 status
 ---
 n1 n2 n3 fully connected
-n1@1 leader last=4@1 commit=1@1 apply=1 progress={2:1→5 3:1→5}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=4@1 commit=1@1 applied=1 progress={2:1→5 3:1→5}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # The next heartbeat will result in match_index=0 since the followers
 # don't have the last_index.
@@ -50,7 +50,7 @@ n3@1 → n1 HeartbeatResponse match_index=0 read_seq=0
 # The leader has previously matched the followers at index 1.
 status 1
 ---
-n1@1 leader last=4@1 commit=1@1 apply=1 progress={2:1→5 3:1→5}
+n1@1 leader last=4@1 commit=1@1 applied=1 progress={2:1→5 3:1→5}
 
 # When it receives the heartbeat response, it probes the previous index 3.
 deliver

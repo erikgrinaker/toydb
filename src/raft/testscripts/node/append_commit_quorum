@@ -3,12 +3,12 @@
 
 cluster nodes=6 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2 6:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
-n6@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2 4:1→2 5:1→2 6:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
+n6@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Incrementally disconnect all nodes except one and then propose a write, to
 # generate an increasing quorum index.
@@ -33,12 +33,12 @@ n2@1 → n1 AppendResponse match_index=2
 
 status
 ---
-n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→3 4:1→3 5:1→3 6:1→3}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
-n6@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=2@1 commit=1@1 applied=1 progress={2:2→3 3:1→3 4:1→3 5:1→3 6:1→3}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
+n6@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Replicating 2-3 to n3 does not commit.
 heal
@@ -65,12 +65,12 @@ n3@1 → n1 AppendResponse match_index=3
 
 status
 ---
-n1@1 leader last=3@1 commit=1@1 apply=1 progress={2:2→4 3:3→4 4:1→4 5:1→4 6:1→4}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=3@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
-n6@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=3@1 commit=1@1 applied=1 progress={2:2→4 3:3→4 4:1→4 5:1→4 6:1→4}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=3@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
+n6@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Replicating 2-4 to n4 commits 2.
 heal
@@ -102,12 +102,12 @@ c1@1 put a=1 ⇒ 2
 
 status
 ---
-n1@1 leader last=4@1 commit=2@1 apply=2 progress={2:2→5 3:3→5 4:4→5 5:1→5 6:1→5}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=3@1 commit=1@1 apply=1
-n4@1 follower(n1) last=4@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
-n6@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=4@1 commit=2@1 applied=2 progress={2:2→5 3:3→5 4:4→5 5:1→5 6:1→5}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=3@1 commit=1@1 applied=1
+n4@1 follower(n1) last=4@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
+n6@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Replicating 2-5 to n5 commits 3.
 heal
@@ -140,12 +140,12 @@ c1@1 put b=2 ⇒ 3
 
 status
 ---
-n1@1 leader last=5@1 commit=3@1 apply=3 progress={2:2→6 3:3→6 4:4→6 5:5→6 6:1→6}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=3@1 commit=1@1 apply=1
-n4@1 follower(n1) last=4@1 commit=1@1 apply=1
-n5@1 follower(n1) last=5@1 commit=1@1 apply=1
-n6@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=5@1 commit=3@1 applied=3 progress={2:2→6 3:3→6 4:4→6 5:5→6 6:1→6}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=3@1 commit=1@1 applied=1
+n4@1 follower(n1) last=4@1 commit=1@1 applied=1
+n5@1 follower(n1) last=5@1 commit=1@1 applied=1
+n6@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Replicating 2-6 to n6 commits 4.
 heal
@@ -179,12 +179,12 @@ c1@1 put c=3 ⇒ 4
 
 status
 ---
-n1@1 leader last=6@1 commit=4@1 apply=4 progress={2:2→7 3:3→7 4:4→7 5:5→7 6:6→7}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=3@1 commit=1@1 apply=1
-n4@1 follower(n1) last=4@1 commit=1@1 apply=1
-n5@1 follower(n1) last=5@1 commit=1@1 apply=1
-n6@1 follower(n1) last=6@1 commit=1@1 apply=1
+n1@1 leader last=6@1 commit=4@1 applied=4 progress={2:2→7 3:3→7 4:4→7 5:5→7 6:6→7}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=3@1 commit=1@1 applied=1
+n4@1 follower(n1) last=4@1 commit=1@1 applied=1
+n5@1 follower(n1) last=5@1 commit=1@1 applied=1
+n6@1 follower(n1) last=6@1 commit=1@1 applied=1
 
 # Healing the partition and proposing another write replicates and commits all
 # entries.
@@ -244,9 +244,9 @@ c1@1 put f=6 ⇒ 7
 
 status
 ---
-n1@1 leader last=7@1 commit=7@1 apply=7 progress={2:7→8 3:7→8 4:7→8 5:7→8 6:7→8}
-n2@1 follower(n1) last=7@1 commit=1@1 apply=1
-n3@1 follower(n1) last=7@1 commit=1@1 apply=1
-n4@1 follower(n1) last=7@1 commit=1@1 apply=1
-n5@1 follower(n1) last=7@1 commit=1@1 apply=1
-n6@1 follower(n1) last=7@1 commit=1@1 apply=1
+n1@1 leader last=7@1 commit=7@1 applied=7 progress={2:7→8 3:7→8 4:7→8 5:7→8 6:7→8}
+n2@1 follower(n1) last=7@1 commit=1@1 applied=1
+n3@1 follower(n1) last=7@1 commit=1@1 applied=1
+n4@1 follower(n1) last=7@1 commit=1@1 applied=1
+n5@1 follower(n1) last=7@1 commit=1@1 applied=1
+n6@1 follower(n1) last=7@1 commit=1@1 applied=1

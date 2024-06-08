@@ -2,9 +2,9 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Submit a write to the leader.
 put 1 foo=bar
@@ -34,9 +34,9 @@ n1 n2 n3 fully connected
 # The write has been replicated, but not yet committed and applied.
 status
 ---
-n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:1→3 3:1→3}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=2@1 commit=1@1 apply=1
+n1@1 leader last=2@1 commit=1@1 applied=1 progress={2:1→3 3:1→3}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=2@1 commit=1@1 applied=1
 
 # The leader heartbeats. The followers confirm they are caught up.
 heartbeat 1
@@ -58,13 +58,13 @@ c1@1 put foo=bar ⇒ 2
 
 status 1
 ---
-n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:1→3}
+n1@1 leader last=2@1 commit=2@1 applied=2 progress={2:2→3 3:1→3}
 
 # Delivery of the second heartbeat advances the match index, but
 # there is nothing more to do.
 deliver
 status
 ---
-n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:2→3}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=2@1 commit=1@1 apply=1
+n1@1 leader last=2@1 commit=2@1 applied=2 progress={2:2→3 3:2→3}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=2@1 commit=1@1 applied=1

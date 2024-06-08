@@ -3,11 +3,11 @@
 
 cluster nodes=5 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Partition n1+n2 away from the cluster.
 partition 1 2
@@ -20,22 +20,22 @@ n1 n2 ⇹ n3 n4 n5
 (stabilize)
 status
 ---
-n1@1 leader last=2@1 commit=1@1 apply=1 progress={2:2→3 3:1→3 4:1→3 5:1→3}
-n2@1 follower(n1) last=2@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=2@1 commit=1@1 applied=1 progress={2:2→3 3:1→3 4:1→3 5:1→3}
+n2@1 follower(n1) last=2@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # List the logs on n1 n2 n3 to show the replicated but uncommitted entry.
 log 1 2 3
 ---
-n1@1 last=2@1 commit=1@1
+n1@1 term=1 last=2@1 commit=1@1 vote=Some(1)
 n1@1 entry 1@1 None
 n1@1 entry 2@1 put foo=bar
-n2@1 last=2@1 commit=1@1
+n2@1 term=1 last=2@1 commit=1@1 vote=Some(1)
 n2@1 entry 1@1 None
 n2@1 entry 2@1 put foo=bar
-n3@1 last=1@1 commit=1@1
+n3@1 term=1 last=1@1 commit=1@1 vote=Some(1)
 n3@1 entry 1@1 None
 
 # Heal the partition.
@@ -116,17 +116,17 @@ n4@2 → n5 HeartbeatResponse match_index=2 read_seq=0
 # empty log entry appended by n5 when it became leader.
 log 1 2
 ---
-n1@2 last=2@2 commit=2@2
+n1@2 term=2 last=2@2 commit=2@2 vote=None
 n1@2 entry 1@1 None
 n1@2 entry 2@2 None
-n2@2 last=2@2 commit=2@2
+n2@2 term=2 last=2@2 commit=2@2 vote=None
 n2@2 entry 1@1 None
 n2@2 entry 2@2 None
 
 status
 ---
-n1@2 follower(n5) last=2@2 commit=2@2 apply=2
-n2@2 follower(n5) last=2@2 commit=2@2 apply=2
-n3@2 follower(n5) last=2@2 commit=2@2 apply=2
-n4@2 follower(n5) last=2@2 commit=2@2 apply=2
-n5@2 leader last=2@2 commit=2@2 apply=2 progress={1:2→3 2:2→3 3:2→3 4:2→3}
+n1@2 follower(n5) last=2@2 commit=2@2 applied=2
+n2@2 follower(n5) last=2@2 commit=2@2 applied=2
+n3@2 follower(n5) last=2@2 commit=2@2 applied=2
+n4@2 follower(n5) last=2@2 commit=2@2 applied=2
+n5@2 leader last=2@2 commit=2@2 applied=2 progress={1:2→3 2:2→3 3:2→3 4:2→3}

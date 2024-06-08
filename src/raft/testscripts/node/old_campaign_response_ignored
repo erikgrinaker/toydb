@@ -3,13 +3,13 @@
 
 cluster nodes=7
 ---
-n1@0 follower() last=0@0 commit=0@0 apply=0
-n2@0 follower() last=0@0 commit=0@0 apply=0
-n3@0 follower() last=0@0 commit=0@0 apply=0
-n4@0 follower() last=0@0 commit=0@0 apply=0
-n5@0 follower() last=0@0 commit=0@0 apply=0
-n6@0 follower() last=0@0 commit=0@0 apply=0
-n7@0 follower() last=0@0 commit=0@0 apply=0
+n1@0 follower() last=0@0 commit=0@0 applied=0
+n2@0 follower() last=0@0 commit=0@0 applied=0
+n3@0 follower() last=0@0 commit=0@0 applied=0
+n4@0 follower() last=0@0 commit=0@0 applied=0
+n5@0 follower() last=0@0 commit=0@0 applied=0
+n6@0 follower() last=0@0 commit=0@0 applied=0
+n7@0 follower() last=0@0 commit=0@0 applied=0
 
 # n1 and n2 campaign.
 campaign 1 2
@@ -79,22 +79,22 @@ deliver 1 from=6
 deliver 2 from=7
 status
 ---
-n1@1 leader last=1@1 commit=0@0 apply=0 progress={2:0→2 3:0→2 4:0→2 5:0→2 6:0→2 7:0→2}
-n2@1 follower(n1) last=1@1 commit=0@0 apply=0
-n3@1 follower() last=0@0 commit=0@0 apply=0
-n4@1 follower() last=0@0 commit=0@0 apply=0
-n5@1 follower() last=0@0 commit=0@0 apply=0
-n6@1 follower() last=0@0 commit=0@0 apply=0
-n7@1 follower() last=0@0 commit=0@0 apply=0
+n1@1 leader last=1@1 commit=0@0 applied=0 progress={2:0→2 3:0→2 4:0→2 5:0→2 6:0→2 7:0→2}
+n2@1 follower(n1) last=1@1 commit=0@0 applied=0
+n3@1 follower() last=0@0 commit=0@0 applied=0
+n4@1 follower() last=0@0 commit=0@0 applied=0
+n5@1 follower() last=0@0 commit=0@0 applied=0
+n6@1 follower() last=0@0 commit=0@0 applied=0
+n7@1 follower() last=0@0 commit=0@0 applied=0
 
 # Stabilizing the cluster results in everyone following n1.
 (stabilize heartbeat=true)
 status
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2 4:1→2 5:1→2 6:1→2 7:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
-n4@1 follower(n1) last=1@1 commit=1@1 apply=1
-n5@1 follower(n1) last=1@1 commit=1@1 apply=1
-n6@1 follower(n1) last=1@1 commit=1@1 apply=1
-n7@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2 4:1→2 5:1→2 6:1→2 7:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
+n6@1 follower(n1) last=1@1 commit=1@1 applied=1
+n7@1 follower(n1) last=1@1 commit=1@1 applied=1

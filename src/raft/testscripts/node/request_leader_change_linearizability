@@ -2,27 +2,27 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Write an initial value, and propagate the commit index.
 (put 1 a=1)
 (stabilize heartbeat=true)
 status
 ---
-n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:2→3}
-n2@1 follower(n1) last=2@1 commit=2@1 apply=2
-n3@1 follower(n1) last=2@1 commit=2@1 apply=2
+n1@1 leader last=2@1 commit=2@1 applied=2 progress={2:2→3 3:2→3}
+n2@1 follower(n1) last=2@1 commit=2@1 applied=2
+n3@1 follower(n1) last=2@1 commit=2@1 applied=2
 
 # Write another value, but don't propagate the commit index.
 (put 1 b=2)
 (stabilize)
 status
 ---
-n1@1 leader last=3@1 commit=3@1 apply=3 progress={2:3→4 3:3→4}
-n2@1 follower(n1) last=3@1 commit=2@1 apply=2
-n3@1 follower(n1) last=3@1 commit=2@1 apply=2
+n1@1 leader last=3@1 commit=3@1 applied=3 progress={2:3→4 3:3→4}
+n2@1 follower(n1) last=3@1 commit=2@1 applied=2
+n3@1 follower(n1) last=3@1 commit=2@1 applied=2
 
 # n2 now campaigns and wins, while being behind on commit/apply.
 campaign 2
@@ -53,9 +53,9 @@ heal
 status
 ---
 n1 n2 n3 fully connected
-n1@2 follower() last=3@1 commit=3@1 apply=3
-n2@2 leader last=4@2 commit=2@1 apply=2 progress={1:0→5 3:0→5}
-n3@2 follower() last=3@1 commit=2@1 apply=2
+n1@2 follower() last=3@1 commit=3@1 applied=3
+n2@2 leader last=4@2 commit=2@1 applied=2 progress={1:0→5 3:0→5}
+n3@2 follower() last=3@1 commit=2@1 applied=2
 
 # Reading from n2 should not result in a stale read even if followers
 # confirm the read sequence.

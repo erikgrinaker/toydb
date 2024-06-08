@@ -2,9 +2,9 @@
 
 cluster nodes=3 election_timeout=2
 ---
-n1@0 follower() last=0@0 commit=0@0 apply=0
-n2@0 follower() last=0@0 commit=0@0 apply=0
-n3@0 follower() last=0@0 commit=0@0 apply=0
+n1@0 follower() last=0@0 commit=0@0 applied=0
+n2@0 follower() last=0@0 commit=0@0 applied=0
+n3@0 follower() last=0@0 commit=0@0 applied=0
 
 # Tick all nodes twice to make them all campaign.
 tick
@@ -32,9 +32,9 @@ n3@1 → n2 CampaignResponse vote=false
 
 status
 ---
-n1@1 candidate last=0@0 commit=0@0 apply=0
-n2@1 candidate last=0@0 commit=0@0 apply=0
-n3@1 candidate last=0@0 commit=0@0 apply=0
+n1@1 candidate last=0@0 commit=0@0 applied=0
+n2@1 candidate last=0@0 commit=0@0 applied=0
+n3@1 candidate last=0@0 commit=0@0 applied=0
 
 # A node can call another election in a new term and win.
 tick 2
@@ -75,6 +75,6 @@ n2@2 apply 1@2 None
 
 status
 ---
-n1@2 follower(n2) last=1@2 commit=0@0 apply=0
-n2@2 leader last=1@2 commit=1@2 apply=1 progress={1:1→2 3:1→2}
-n3@2 follower(n2) last=1@2 commit=0@0 apply=0
+n1@2 follower(n2) last=1@2 commit=0@0 applied=0
+n2@2 leader last=1@2 commit=1@2 applied=1 progress={1:1→2 3:1→2}
+n3@2 follower(n2) last=1@2 commit=0@0 applied=0

@@ -128,7 +128,7 @@ fn status() -> Result<()> {
                 term: 1,
                 match_index: [(1, 27)].into(),
                 commit_index: 27,
-                apply_index: 27,
+                applied_index: 27,
                 storage: storage::engine::Status {
                     name: "bitcask".to_string(),
                     keys: 29,

@@ -60,6 +60,9 @@ impl encoding::Key<'_> for KeyPrefix {}
 ///   5   |   2  | UPDATE table SET value = 'bar' WHERE id = 1
 ///   6   |   2  | DELETE FROM table WHERE id = 1
 ///
+/// Note that this is for illustration only, and the actual toyDB Raft commands
+/// are not SQL statements but lower-level write operations.
+///
 /// A key/value store is used to store the log entries on disk, keyed by index,
 /// along with a few other metadata keys (e.g. who we voted for in this term).
 ///

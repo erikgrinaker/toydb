@@ -2,21 +2,21 @@
 
 cluster nodes=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={}
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={}
 
 # Perform a write.
 (put 1 foo=bar)
 (stabilize)
 status
 ---
-n1@1 leader last=2@1 commit=2@1 apply=2 progress={}
+n1@1 leader last=2@1 commit=2@1 applied=2 progress={}
 
 # Run a status request on the leader.
 status request=true 1
 stabilize
 ---
 c1@1 → n1 ClientRequest id=0x02 status
-n1@1 → c1 ClientResponse id=0x02 status Status { leader: 1, term: 1, match_index: {1: 2}, commit_index: 2, apply_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
+n1@1 → c1 ClientResponse id=0x02 status Status { leader: 1, term: 1, match_index: {1: 2}, commit_index: 2, applied_index: 2, storage: Status { name: "memory", keys: 4, size: 41, total_disk_size: 0, live_disk_size: 0, garbage_disk_size: 0 } }
 c1@1 status ⇒ Status {
     leader: 1,
     term: 1,
@@ -24,7 +24,7 @@ c1@1 status ⇒ Status {
         1: 2,
     },
     commit_index: 2,
-    apply_index: 2,
+    applied_index: 2,
     storage: Status {
         name: "memory",
         keys: 4,

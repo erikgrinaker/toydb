@@ -2,18 +2,18 @@
 
 cluster nodes=3 leader=1
 ---
-n1@1 leader last=1@1 commit=1@1 apply=1 progress={2:1→2 3:1→2}
-n2@1 follower(n1) last=1@1 commit=1@1 apply=1
-n3@1 follower(n1) last=1@1 commit=1@1 apply=1
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
 
 # Replicate a write.
 (put 1 foo=bar)
 (stabilize heartbeat=true)
 status
 ---
-n1@1 leader last=2@1 commit=2@1 apply=2 progress={2:2→3 3:2→3}
-n2@1 follower(n1) last=2@1 commit=2@1 apply=2
-n3@1 follower(n1) last=2@1 commit=2@1 apply=2
+n1@1 leader last=2@1 commit=2@1 applied=2 progress={2:2→3 3:2→3}
+n2@1 follower(n1) last=2@1 commit=2@1 applied=2
+n3@1 follower(n1) last=2@1 commit=2@1 applied=2
 
 # Step a heartbeat with an outdated last index.
 step 2 '{"from":1, "to":2, "term":1, "message":{"Heartbeat":{"last_index":1,"commit_index":1,"commit_term":1,"read_seq":0}}}'
