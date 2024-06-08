@@ -235,12 +235,12 @@ impl Server {
                 // Track inbound client requests and step them into the node.
                 recv(request_rx) -> result => {
                     let (request, response_tx) = result.expect("request_rx disconnected");
-                    let id = uuid::Uuid::new_v4().into_bytes().to_vec();
+                    let id = uuid::Uuid::new_v4();
                     let msg = raft::Envelope{
                         from: node.id(),
                         to: node.id(),
                         term: node.term(),
-                        message: raft::Message::ClientRequest{id: id.clone(), request},
+                        message: raft::Message::ClientRequest{id, request},
                     };
                     node = node.step(msg).expect("step failed");
                     response_txs.insert(id, response_tx);

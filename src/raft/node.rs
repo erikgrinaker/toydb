@@ -622,10 +622,9 @@ impl RawNode<Follower> {
 
             // Forward client requests to the leader, or abort them if there is
             // none (the client must retry).
-            Message::ClientRequest { ref id, .. } => {
+            Message::ClientRequest { id, .. } => {
                 assert_eq!(msg.from, self.id, "Client request from other node");
 
-                let id = id.clone();
                 if let Some(leader) = self.role.leader {
                     debug!("Forwarding request to leader {}: {:?}", leader, msg);
                     self.role.forwarded.insert(id);
@@ -818,16 +817,13 @@ impl RawNode<Leader> {
         info!("Discovered new term {}", term);
 
         // Cancel in-flight requests.
-        for write in
-            std::mem::take(&mut self.role.writes).into_values().sorted_by_key(|w| w.id.clone())
-        {
+        for write in std::mem::take(&mut self.role.writes).into_values().sorted_by_key(|w| w.id) {
             self.send(
                 write.from,
                 Message::ClientResponse { id: write.id, response: Err(Error::Abort) },
             )?;
         }
-        for read in std::mem::take(&mut self.role.reads).into_iter().sorted_by_key(|r| r.id.clone())
-        {
+        for read in std::mem::take(&mut self.role.reads).into_iter().sorted_by_key(|r| r.id) {
             self.send(
                 read.from,
                 Message::ClientResponse { id: read.id, response: Err(Error::Abort) },
@@ -960,7 +956,7 @@ impl RawNode<Leader> {
             // until it's applied and the response is returned to the client.
             Message::ClientRequest { id, request: Request::Write(command) } => {
                 let index = self.propose(Some(command))?;
-                self.role.writes.insert(index, Write { from: msg.from, id: id.clone() });
+                self.role.writes.insert(index, Write { from: msg.from, id });
                 if self.peers.is_empty() {
                     self.maybe_commit_and_apply()?;
                 }
@@ -1281,7 +1277,7 @@ mod tests {
         /// In-flight client requests.
         requests: HashMap<RequestID, Request>,
         /// The request ID to use for the next client request.
-        next_request_id: u8,
+        next_request_id: u64,
     }
 
     impl goldenscript::Runner for TestRunner {
@@ -1687,9 +1683,9 @@ mod tests {
             output: &mut String,
         ) -> Result<(), Box<dyn Error>> {
             let node = self.nodes.get(&id).ok_or(format!("unknown node {id}"))?;
-            let request_id = vec![self.next_request_id];
+            let request_id = uuid::Uuid::from_u64_pair(0, self.next_request_id);
             self.next_request_id += 1;
-            self.requests.insert(request_id.clone(), request.clone());
+            self.requests.insert(request_id, request.clone());
 
             let msg = Envelope {
                 from: node.id(),
@@ -2004,7 +2000,7 @@ mod tests {
                 Message::ClientRequest { id, request } => {
                     format!(
                         "ClientRequest id=0x{} {}",
-                        hex::encode(id),
+                        hex::encode(id).trim_start_matches("00"),
                         match request {
                             Request::Read(v) => format!("read 0x{}", hex::encode(v)),
                             Request::Write(v) => format!("write 0x{}", hex::encode(v)),
@@ -2015,7 +2011,7 @@ mod tests {
                 Message::ClientResponse { id, response } => {
                     format!(
                         "ClientResponse id=0x{} {}",
-                        hex::encode(id),
+                        hex::encode(id).trim_start_matches("00"),
                         match response {
                             Ok(Response::Read(v)) => format!("read 0x{}", hex::encode(v)),
                             Ok(Response::Write(v)) => format!("write 0x{}", hex::encode(v)),

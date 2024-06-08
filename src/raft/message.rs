@@ -132,24 +132,26 @@ pub enum Message {
     /// leader or term changes, the request is aborted with an Error::Abort
     /// ClientResponse and the client must retry.
     ClientRequest {
-        /// The request ID. This is arbitrary, but must be globally unique for
-        /// the duration of the request.
+        /// The request ID. Must be globally unique for the request duration.
         id: RequestID,
-        /// The request.
+        /// The request itself.
         request: Request,
     },
 
     /// A client response.
     ClientResponse {
-        /// The response ID. This matches the ID of the ClientRequest.
+        /// The ID of the original ClientRequest.
         id: RequestID,
         /// The response, or an error.
         response: Result<Response>,
     },
 }
 
-/// A client request ID.
-pub type RequestID = Vec<u8>;
+/// A client request ID. Must be globally unique for the duration of the
+/// request. For simplicity, a random UUIDv4 is used -- the node ID and process
+/// ID could be incorporated for further collision avoidance, but it does not
+/// matter at this scale.
+pub type RequestID = uuid::Uuid;
 
 /// A read sequence number, used to confirm leadership for linearizable reads.
 pub type ReadSequence = u64;
