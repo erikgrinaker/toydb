@@ -11,10 +11,11 @@ term=0 last=0@0 commit=0@0 vote=None engine=Status {
 }
 
 # Write some data.
+set_term 1
+append
+append foo
 set_term 2 1
-append 1
-append 1 foo
-append 2 bar
+append bar
 commit 2
 ---
 append → 1@1 None

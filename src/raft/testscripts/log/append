@@ -1,19 +1,19 @@
-# Appending an entry with term 0 fails, even on an empty log.
-!append 0 foo
+# Appending an entry with term 0 fails.
+!append foo
 ---
-Panic: can't append entry with term 0
+Panic: can't append entry in term 0
 
-# Appending to an empty log works. The term doesn't have to be 1, and doesn't
-# have to match get_term(). The entry is written to the engine and flushed
-# to durable storage.
-append 2 foo oplog=true
+# Appending to an empty log works. The term doesn't have to be 1. The entry is
+# written to the engine and flushed to durable storage.
+set_term 2
+append foo oplog=true
 ---
 engine: set Entry(1) 0x000000000000000001 = 0x01020103666f6f
 engine: flush
 append → 1@2 foo
 
 # Appending a noop entry (no command) also works.
-append 2 oplog=true
+append oplog=true
 ---
 engine: set Entry(2) 0x000000000000000002 = 0x020200
 engine: flush
@@ -25,33 +25,28 @@ status
 scan
 dump
 ---
-term=0 last=2@2 commit=0@0 vote=None
+term=2 last=2@2 commit=0@0 vote=None
 1@2 foo
 2@2 None
 Entry(1) 0x000000000000000001 = 0x01020103666f6f
 Entry(2) 0x000000000000000002 = 0x020200
+TermVote 0x01 = 0x0200
 
-# Bumping the term with a command is allowed. Skipping a term and omitting the
-# command is also allowed.
-append 3 command
-append 5
+# Skipping a term then appending is allowed.
+set_term 3
+append command
+set_term 5
+append
 ---
 append → 3@3 command
 append → 4@5 None
-
-# A term regression fails, as does a 0 term.
-!append 4 old
-!append 0
----
-Panic: term regression 5 → 4
-Panic: term regression 5 → 0
 
 # Dump the final status and data.
 status
 scan
 dump
 ---
-term=0 last=4@5 commit=0@0 vote=None
+term=5 last=4@5 commit=0@0 vote=None
 1@2 foo
 2@2 None
 3@3 command
@@ -60,3 +55,4 @@ Entry(1) 0x000000000000000001 = 0x01020103666f6f
 Entry(2) 0x000000000000000002 = 0x020200
 Entry(3) 0x000000000000000003 = 0x03030107636f6d6d616e64
 Entry(4) 0x000000000000000004 = 0x040500
+TermVote 0x01 = 0x0500

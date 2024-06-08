@@ -1028,7 +1028,7 @@ impl RawNode<Leader> {
     /// replicating it to peers. If successful, it will eventually be committed
     /// and applied to the state machine.
     fn propose(&mut self, command: Option<Vec<u8>>) -> Result<Index> {
-        let index = self.log.append(self.term, command)?;
+        let index = self.log.append(command)?;
         for peer in self.peers.iter().copied().sorted() {
             // Eagerly send the entry to the peer, but only if it is in steady
             // state where we've already sent the previous entries. Otherwise,

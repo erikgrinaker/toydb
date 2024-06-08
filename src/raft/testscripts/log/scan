@@ -6,9 +6,11 @@ scan 3..7
 <empty>
 
 # Append a few entries.
-append 1
-append 1 foo
-append 2 bar
+set_term 1
+append
+append foo
+set_term 2
+append bar
 ---
 append → 1@1 None
 append → 2@1 foo

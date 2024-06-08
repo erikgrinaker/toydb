@@ -83,7 +83,9 @@ impl encoding::Key<'_> for KeyPrefix {}
 ///
 /// * Entry indexes are contiguous starting at 1 (no index gaps).
 /// * Entry terms never decrease from the previous entry.
+/// * Entry terms are at or below the current term.
 /// * Appended entries are durable (flushed to disk).
+/// * Appended entries use the current term.
 /// * Committed entries are never changed or removed (no log truncation).
 /// * Committed entries will eventually be replicated to all nodes.
 /// * Entries with the same index/term contain the same command.
@@ -153,8 +155,9 @@ impl Log {
         (self.term, self.vote)
     }
 
-    /// Stores the most recent term and cast vote (if any). Enforces that the
-    /// term does not regress, and that we only vote for one node in a term.
+    /// Stores the current term and cast vote (if any). Enforces that the term
+    /// does not regress, and that we only vote for one node in a term. append()
+    /// will use this term, and splice() can't write entries beyond it.
     pub fn set_term(&mut self, term: Term, vote: Option<NodeID>) -> Result<()> {
         assert!(term > 0, "can't set term 0");
         assert!(term >= self.term, "term regression {} → {}", self.term, term);
@@ -169,20 +172,14 @@ impl Log {
         Ok(())
     }
 
-    /// Appends a command to the log and flushes it to disk, returning its
-    /// index. None implies a noop command, typically after Raft leader changes.
-    /// The term must be equal to or greater than the previous entry.
-    /// TODO: use self.term for the term.
-    pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
-        match self.get(self.last_index)? {
-            Some(e) if term < e.term => panic!("term regression {} → {term}", e.term),
-            None if self.last_index > 0 => panic!("log gap at {}", self.last_index),
-            None if term == 0 => panic!("can't append entry with term 0"),
-            Some(_) | None => {}
-        }
+    /// Appends a command to the log at the current term, and flushes it to
+    /// disk, returning its index. None implies a noop command, typically after
+    /// Raft leader changes.
+    pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<Index> {
+        assert!(self.term > 0, "can't append entry in term 0");
         // We could omit the index in the encoded value, since it's also stored
         // in the key, but we keep it simple.
-        let entry = Entry { index: self.last_index + 1, term, command };
+        let entry = Entry { index: self.last_index + 1, term: self.term, command };
         self.engine.set(&Key::Entry(entry.index).encode()?, entry.encode()?)?;
         self.engine.flush()?;
         self.last_index = entry.index;
@@ -249,11 +246,11 @@ impl Log {
     /// Splices a set of entries into the log and flushes it to disk. The
     /// entries must have contiguous indexes and equal/increasing terms, and the
     /// first entry must be in the range [1,last_index+1] with a term at or
-    /// equal to the previous (base) entry's term. New indexes will be appended.
-    /// Overlapping indexes with the same term must be equal and will be
-    /// ignored. Overlapping indexes with different terms will truncate the
-    /// existing log at the first conflict and then splice the new entries.
-    /// TODO: check against self.term.
+    /// above the previous (base) entry's term and at or below the current term.
+    /// New indexes will be appended. Overlapping indexes with the same term
+    /// must be equal and will be ignored. Overlapping indexes with different
+    /// terms will truncate the existing log at the first conflict and then
+    /// splice the new entries.
     pub fn splice(&mut self, entries: Vec<Entry>) -> Result<Index> {
         let (Some(first), Some(last)) = (entries.first(), entries.last()) else {
             return Ok(self.last_index); // empty input is noop
@@ -272,6 +269,7 @@ impl Log {
 
         // Check that the entries connect to the existing log (if any), and that the
         // term doesn't regress.
+        assert!(last.term <= self.term, "splice term {} beyond current {}", last.term, self.term);
         match self.get(first.index - 1)? {
             Some(base) if first.term < base.term => {
                 panic!("splice term regression {} → {}", base.term, first.term)
@@ -349,14 +347,13 @@ mod tests {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
             match command.name.as_str() {
-                // append TERM [COMMAND] [oplog=BOOL]
+                // append [COMMAND] [oplog=BOOL]
                 "append" => {
                     let mut args = command.consume_args();
-                    let term = args.next_pos().ok_or("term not given")?.parse()?;
                     let command = args.next_pos().map(|a| a.value.as_bytes().to_vec());
                     let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
-                    let index = self.log.append(term, command)?;
+                    let index = self.log.append(command)?;
                     let entry = self.log.get(index)?.expect("entry not found");
                     self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("append → {}\n", Self::format_entry(&entry)));

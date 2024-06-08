@@ -1,11 +1,12 @@
 # Tests that the log correctly initializes cached state when opened.
 
-set_term 1 7
+set_term 1
 ---
 ok
 
-append 1 foo
-append 2 bar
+append foo
+set_term 2 7
+append bar
 commit 1
 ---
 append → 1@1 foo
@@ -14,7 +15,7 @@ commit → 1@1 foo
 
 status
 ---
-term=1 last=2@2 commit=1@1 vote=7
+term=2 last=2@2 commit=1@1 vote=7
 
 reload
 ---
@@ -22,7 +23,7 @@ ok
 
 status
 ---
-term=1 last=2@2 commit=1@1 vote=7
+term=2 last=2@2 commit=1@1 vote=7
 
 scan
 ---
