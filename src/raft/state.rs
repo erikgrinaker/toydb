@@ -11,11 +11,11 @@ use crate::error::Result;
 /// Otherwise, the replicas will diverge, and different replicas will produce
 /// different results.
 ///
-/// Write commands ([`Request::Write`]) are replicated and applied on all
-/// replicas via [`State::apply`]. The state machine must keep track of the last
-/// applied index and return it via [`State::get_applied_index`]. Read commands
-/// ([`Request::Read`]) are only executed on a single replica via
-/// [`State::read`] and must not make any state changes.
+/// Write commands (`Request::Write`) are replicated and applied on all replicas
+/// via `State::apply`. The state machine must keep track of the last applied
+/// index and return it via `State::get_applied_index`. Read commands
+/// (`Request::Read`) are only executed on a single replica via `State::read`
+/// and must not make any state changes.
 pub trait State: Send {
     /// Returns the last applied index from the state machine.
     ///
@@ -48,4 +48,161 @@ pub trait State: Send {
     /// This is only executed on a single replica/node, so it must not result in
     /// any state changes (i.e. it must not write).
     fn read(&self, command: Vec<u8>) -> Result<Vec<u8>>;
+}
+
+/// Test helper state machines.
+#[allow(dead_code)]
+#[cfg(test)]
+pub mod test {
+    use super::*;
+    use crate::encoding::{self, Value as _};
+    use crossbeam::channel::Sender;
+    use itertools::Itertools as _;
+    use serde::{Deserialize, Serialize};
+    use std::collections::BTreeMap;
+
+    /// Wraps a state machine and emits applied entries to the provided channel.
+    pub struct Emit {
+        inner: Box<dyn State>,
+        tx: Sender<Entry>,
+    }
+
+    impl Emit {
+        pub fn new(inner: Box<dyn State>, tx: Sender<Entry>) -> Box<Self> {
+            Box::new(Self { inner, tx })
+        }
+    }
+
+    impl State for Emit {
+        fn get_applied_index(&self) -> Index {
+            self.inner.get_applied_index()
+        }
+
+        fn apply(&mut self, entry: Entry) -> Result<Vec<u8>> {
+            let response = self.inner.apply(entry.clone())?;
+            self.tx.send(entry)?;
+            Ok(response)
+        }
+
+        fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+            self.inner.read(command)
+        }
+    }
+
+    /// A simple string key/value store. Takes KVCommands.
+    pub struct KV {
+        applied_index: Index,
+        data: BTreeMap<String, String>,
+    }
+
+    impl KV {
+        pub fn new() -> Box<Self> {
+            Box::new(Self { applied_index: 0, data: BTreeMap::new() })
+        }
+    }
+
+    impl State for KV {
+        fn get_applied_index(&self) -> Index {
+            self.applied_index
+        }
+
+        fn apply(&mut self, entry: Entry) -> Result<Vec<u8>> {
+            let command = entry.command.as_deref().map(KVCommand::decode).transpose()?;
+            let response = match command {
+                Some(KVCommand::Put { key, value }) => {
+                    self.data.insert(key, value);
+                    KVResponse::Put(entry.index).encode()?
+                }
+                Some(c @ (KVCommand::Get { .. } | KVCommand::Scan)) => {
+                    panic!("{c} submitted as write command")
+                }
+                None => Vec::new(),
+            };
+            self.applied_index = entry.index;
+            Ok(response)
+        }
+
+        fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
+            match KVCommand::decode(&command)? {
+                KVCommand::Get { key } => KVResponse::Get(self.data.get(&key).cloned()).encode(),
+                KVCommand::Scan => KVResponse::Scan(self.data.clone()).encode(),
+                c @ KVCommand::Put { .. } => panic!("{c} submitted as read command"),
+            }
+        }
+    }
+
+    /// A KV command. Returns the corresponding KVResponse.
+    #[derive(Serialize, Deserialize)]
+    pub enum KVCommand {
+        /// Fetches the value of the given key.
+        Get { key: String },
+        /// Stores the given key/value pair, returning the applied index.
+        Put { key: String, value: String },
+        /// Returns all key/value pairs.
+        Scan,
+    }
+
+    impl encoding::Value for KVCommand {}
+
+    impl std::fmt::Display for KVCommand {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Get { key } => write!(f, "get {key}"),
+                Self::Put { key, value } => write!(f, "put {key}={value}"),
+                Self::Scan => write!(f, "scan"),
+            }
+        }
+    }
+
+    /// A KVCommand response.
+    #[derive(Serialize, Deserialize)]
+    pub enum KVResponse {
+        /// Get returns the key's value, or None if it does not exist.
+        Get(Option<String>),
+        /// Put returns the applied index of the command.
+        Put(Index),
+        /// Scan returns the key/value pairs.
+        Scan(BTreeMap<String, String>),
+    }
+
+    impl encoding::Value for KVResponse {}
+
+    impl std::fmt::Display for KVResponse {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Get(Some(value)) => write!(f, "{value}"),
+                Self::Get(None) => write!(f, "None"),
+                Self::Put(applied_index) => write!(f, "{applied_index}"),
+                Self::Scan(kvs) => {
+                    write!(f, "{}", kvs.iter().map(|(k, v)| format!("{k}={v}")).join(","))
+                }
+            }
+        }
+    }
+
+    /// A state machine which does nothing. All commands are ignored.
+    pub struct Noop {
+        applied_index: Index,
+    }
+
+    impl Noop {
+        pub fn new() -> Box<Self> {
+            Box::new(Self { applied_index: 0 })
+        }
+    }
+
+    impl State for Noop {
+        fn get_applied_index(&self) -> Index {
+            self.applied_index
+        }
+
+        fn apply(&mut self, entry: Entry) -> Result<Vec<u8>> {
+            self.applied_index = entry.index;
+            Ok(Vec::new())
+        }
+
+        fn read(&self, _: Vec<u8>) -> Result<Vec<u8>> {
+            Ok(Vec::new())
+        }
+    }
 }

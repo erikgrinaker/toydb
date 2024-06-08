@@ -1222,16 +1222,16 @@ fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encoding::{self, bincode, Value as _};
+    use crate::encoding::{bincode, Value as _};
+    use crate::raft::state::test::{self as teststate, KVCommand, KVResponse};
     use crate::raft::{
         Entry, Request, RequestID, Response, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL,
         MAX_APPEND_ENTRIES,
     };
-    use crossbeam::channel::{Receiver, Sender};
+    use crossbeam::channel::Receiver;
     use pretty_assertions::assert_eq;
-    use serde::{Deserialize, Serialize};
     use std::borrow::Borrow;
-    use std::collections::{BTreeMap, HashMap, HashSet};
+    use std::collections::{HashMap, HashSet};
     use std::error::Error;
     use std::result::Result;
     use test_each_file::test_each_path;
@@ -1270,7 +1270,7 @@ mod tests {
         nodes_rx: HashMap<NodeID, Receiver<Envelope>>,
         /// Inbound receive queues to each node, to be stepped.
         nodes_pending: HashMap<NodeID, Vec<Envelope>>,
-        /// Applied log entries for each node, after TestState application.
+        /// Applied log entries for each node, after state machine application.
         applied_rx: HashMap<NodeID, Receiver<Entry>>,
         /// Network partitions, sender → receivers.
         disconnected: HashMap<NodeID, HashSet<NodeID>>,
@@ -1339,7 +1339,7 @@ mod tests {
                     let id = args.next_pos().ok_or("must specify node ID")?.parse()?;
                     let key = args.next_pos().ok_or("must specify key")?.value.clone();
                     args.reject_rest()?;
-                    let request = Request::Read(TestCommand::Get { key }.encode()?);
+                    let request = Request::Read(KVCommand::Get { key }.encode()?);
                     self.request(id, request, &mut output)?;
                 }
 
@@ -1387,7 +1387,7 @@ mod tests {
                     let kv = args.next_key().ok_or("must specify key/value pair")?.clone();
                     let (key, value) = (kv.key.unwrap(), kv.value);
                     args.reject_rest()?;
-                    let request = Request::Write(TestCommand::Put { key, value }.encode()?);
+                    let request = Request::Write(KVCommand::Put { key, value }.encode()?);
                     self.request(id, request, &mut output)?;
                 }
 
@@ -1504,7 +1504,7 @@ mod tests {
                 let (applied_tx, applied_rx) = crossbeam::channel::unbounded();
                 let peers = self.ids.iter().copied().filter(|i| *i != id).collect();
                 let log = Log::new(crate::storage::Memory::new())?;
-                let state = Box::new(TestState::new(applied_tx));
+                let state = teststate::Emit::new(teststate::KV::new(), applied_tx);
                 let opts = Options {
                     heartbeat_interval,
                     election_timeout_range: election_timeout..election_timeout + 1,
@@ -1740,7 +1740,7 @@ mod tests {
                 let nodefmt = Self::format_node(node);
                 output.push_str(&format!("{nodefmt} applied={applied_index}\n"));
 
-                let raw = state.read(TestCommand::Scan.encode()?)?;
+                let raw = state.read(KVCommand::Scan.encode()?)?;
                 let kvs: Vec<(String, String)> = bincode::deserialize(&raw)?;
                 for (key, value) in kvs {
                     output.push_str(&format!("{nodefmt} state {key}={value}\n"));
@@ -1962,7 +1962,7 @@ mod tests {
         /// Formats an entry.
         fn format_entry(entry: &Entry) -> String {
             let command = match entry.command.as_ref() {
-                Some(raw) => TestCommand::decode(raw).expect("invalid command").to_string(),
+                Some(raw) => KVCommand::decode(raw).expect("invalid command").to_string(),
                 None => "None".to_string(),
             };
             format!("{}@{} {command}", entry.index, entry.term)
@@ -2046,7 +2046,7 @@ mod tests {
         /// Formats a request.
         fn format_request(request: &Request) -> String {
             match request {
-                Request::Read(c) | Request::Write(c) => TestCommand::decode(c).unwrap().to_string(),
+                Request::Read(c) | Request::Write(c) => KVCommand::decode(c).unwrap().to_string(),
                 Request::Status => "status".to_string(),
             }
         }
@@ -2055,7 +2055,7 @@ mod tests {
         fn format_response(response: &crate::error::Result<Response>) -> String {
             match response {
                 Ok(Response::Read(r) | Response::Write(r)) => {
-                    TestResponse::decode(r).unwrap().to_string()
+                    KVResponse::decode(r).unwrap().to_string()
                 }
                 Ok(Response::Status(status)) => format!("{status:#?}"),
                 Err(e) => format!("Error::{e:?} ({e})"),
@@ -2092,107 +2092,6 @@ mod tests {
                 Node::Follower(n) => n.state.as_ref(),
                 Node::Leader(n) => n.state.as_ref(),
             }
-        }
-    }
-
-    /// A test state machine which stores key/value pairs. See TestCommand.
-    struct TestState {
-        /// The current applied index.
-        applied_index: Index,
-        /// The stored data.
-        data: BTreeMap<String, String>,
-        /// Sends applied entries, for output.
-        applied_tx: Sender<Entry>,
-    }
-
-    impl TestState {
-        fn new(applied_tx: Sender<Entry>) -> Self {
-            Self { applied_index: 0, data: BTreeMap::new(), applied_tx }
-        }
-    }
-
-    impl State for TestState {
-        fn get_applied_index(&self) -> Index {
-            self.applied_index
-        }
-
-        fn apply(&mut self, entry: Entry) -> crate::error::Result<Vec<u8>> {
-            let response = entry
-                .command
-                .as_deref()
-                .map(TestCommand::decode)
-                .transpose()?
-                .map(|c| match c {
-                    TestCommand::Put { key, value } => {
-                        self.data.insert(key, value);
-                        TestResponse::Put(entry.index)
-                    }
-                    TestCommand::Get { .. } => panic!("get submitted as write command"),
-                    TestCommand::Scan => panic!("scan submitted as write command"),
-                })
-                .map_or(Ok(Vec::new()), |r| r.encode())?;
-            self.applied_index = entry.index;
-            self.applied_tx.send(entry)?;
-            Ok(response)
-        }
-
-        fn read(&self, command: Vec<u8>) -> crate::error::Result<Vec<u8>> {
-            let response = match TestCommand::decode(&command)? {
-                TestCommand::Get { key } => TestResponse::Get(self.data.get(&key).cloned()),
-                TestCommand::Scan => TestResponse::Scan(self.data.clone()),
-                TestCommand::Put { .. } => panic!("put submitted as read command"),
-            };
-            response.encode()
-        }
-    }
-
-    /// A TestState command. Each command returns a corresponding TestResponse.
-    #[derive(Serialize, Deserialize)]
-    enum TestCommand {
-        /// Fetches the value of the given key.
-        Get { key: String },
-        /// Stores the given key/value pair, returning the applied index.
-        Put { key: String, value: String },
-        /// Returns all key/value pairs.
-        Scan,
-    }
-
-    impl encoding::Value for TestCommand {}
-
-    impl std::fmt::Display for TestCommand {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Self::Get { key } => write!(f, "get {key}"),
-                Self::Put { key, value } => write!(f, "put {key}={value}"),
-                Self::Scan => write!(f, "scan"),
-            }
-        }
-    }
-
-    /// A TestCommand response.
-    #[derive(Serialize, Deserialize)]
-    enum TestResponse {
-        /// The value for the TestCommand::Get key, or None if it does not exist.
-        Get(Option<String>),
-        /// The applied index of a TestCommand::Put command.
-        Put(Index),
-        /// The scanned key/value pairs.
-        Scan(BTreeMap<String, String>),
-    }
-
-    impl encoding::Value for TestResponse {}
-
-    impl std::fmt::Display for TestResponse {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Self::Get(Some(value)) => write!(f, "{value}")?,
-                Self::Get(None) => write!(f, "None")?,
-                Self::Put(applied_index) => write!(f, "{applied_index}")?,
-                Self::Scan(scan) => {
-                    write!(f, "{}", scan.iter().map(|(k, v)| format!("{k}={v}")).join(","))?
-                }
-            };
-            Ok(())
         }
     }
 }
