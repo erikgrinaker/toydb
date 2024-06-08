@@ -188,21 +188,21 @@ impl<R: Role> RawNode<R> {
         Ok(())
     }
 
-    /// Returns the size of the cluster.
-    fn cluster_size(&self) -> u8 {
-        self.peers.len() as u8 + 1
+    /// Returns the cluster size as number of nodes.
+    fn cluster_size(&self) -> usize {
+        self.peers.len() + 1
     }
 
-    /// Returns the quorum size of the cluster.
-    fn quorum_size(&self) -> u8 {
-        quorum_size(self.cluster_size())
+    /// Returns the cluster quorum size (strict majority).
+    fn quorum_size(&self) -> usize {
+        self.cluster_size() / 2 + 1
     }
 
-    /// Returns the quorum value of the given unsorted slice, in descending
+    /// Returns the quorum value of the given unsorted vector, in descending
     /// order. The slice must have the same size as the cluster.
-    fn quorum_value<T: Ord + Copy>(&self, values: Vec<T>) -> T {
-        assert!(values.len() == self.cluster_size() as usize, "values must match cluster size");
-        quorum_value(values)
+    fn quorum_value<T: Ord + Copy>(&self, mut values: Vec<T>) -> T {
+        assert_eq!(values.len(), self.cluster_size(), "vector size must match cluster size");
+        *values.select_nth_unstable_by(self.quorum_size() - 1, |a, b: &T| a.cmp(b).reverse()).1
     }
 
     /// Sends a message.
@@ -354,7 +354,7 @@ impl RawNode<Candidate> {
             // assume leadership.
             Message::CampaignResponse { vote: true } => {
                 self.role.votes.insert(msg.from);
-                if self.role.votes.len() as u8 >= self.quorum_size() {
+                if self.role.votes.len() >= self.quorum_size() {
                     return Ok(self.into_leader()?.into());
                 }
             }
@@ -1206,19 +1206,6 @@ impl RawNode<Leader> {
     }
 }
 
-/// Returns the size of a quorum (strict majority), given a total size.
-fn quorum_size(size: u8) -> u8 {
-    size / 2 + 1
-}
-
-/// Returns the quorum (median) value of the given unsorted slice, in descending
-/// order. The slice cannot be empty.
-fn quorum_value<T: Ord + Copy>(mut values: Vec<T>) -> T {
-    assert!(!values.is_empty(), "no values provided");
-    let index = quorum_size(values.len() as u8) as usize - 1;
-    *values.select_nth_unstable_by(index, |a, b: &T| a.cmp(b).reverse()).1
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1228,28 +1215,24 @@ mod tests {
         Entry, Request, RequestID, Response, ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL,
         MAX_APPEND_ENTRIES,
     };
+    use crate::storage;
     use crossbeam::channel::Receiver;
-    use pretty_assertions::assert_eq;
     use std::borrow::Borrow;
     use std::collections::{HashMap, HashSet};
     use std::error::Error;
     use std::result::Result;
+    use test_case::test_case;
     use test_each_file::test_each_path;
 
-    #[test]
-    fn quorum_size() {
-        for (size, quorum) in [(1, 1), (2, 2), (3, 2), (4, 3), (5, 3), (6, 4), (7, 4), (8, 5)] {
-            assert_eq!(super::quorum_size(size), quorum);
+    /// Test helpers for RawNode.
+    impl RawNode<Follower> {
+        /// Creates a noop node, with a noop state machine and transport.
+        fn new_noop(id: NodeID, peers: HashSet<NodeID>) -> Self {
+            let log = Log::new(storage::Memory::new()).expect("log failed");
+            let state = teststate::Noop::new();
+            let (node_tx, _) = crossbeam::channel::unbounded();
+            RawNode::new(id, peers, log, state, node_tx, Options::default()).expect("node failed")
         }
-    }
-
-    #[test]
-    fn quorum_value() {
-        assert_eq!(super::quorum_value(vec![1]), 1);
-        assert_eq!(super::quorum_value(vec![1, 3, 2]), 2);
-        assert_eq!(super::quorum_value(vec![4, 1, 3, 2]), 2);
-        assert_eq!(super::quorum_value(vec![1, 1, 1, 2, 2]), 1);
-        assert_eq!(super::quorum_value(vec![1, 1, 2, 2, 2]), 2);
     }
 
     // Run goldenscript tests in src/raft/testscripts/node.
@@ -1257,6 +1240,34 @@ mod tests {
 
     fn test_goldenscript(path: &std::path::Path) {
         goldenscript::run(&mut TestRunner::new(), path).expect("goldenscript failed")
+    }
+
+    /// Tests RawNode.quorum_size() and cluster_size().
+    #[test_case(1 => 1)]
+    #[test_case(2 => 2)]
+    #[test_case(3 => 2)]
+    #[test_case(4 => 3)]
+    #[test_case(5 => 3)]
+    #[test_case(6 => 4)]
+    #[test_case(7 => 4)]
+    #[test_case(8 => 5)]
+    fn quorum_size(size: usize) -> usize {
+        let node = RawNode::new_noop(1, (2..=size as NodeID).collect());
+        assert_eq!(node.cluster_size(), size);
+        node.quorum_size()
+    }
+
+    /// Tests RawNode.quorum_value().
+    #[test_case(vec![1] => 1)]
+    #[test_case(vec![1,3,2] => 2)]
+    #[test_case(vec![4,1,3,2] => 2)]
+    #[test_case(vec![1,1,1,2,2] => 1)]
+    #[test_case(vec![1,1,2,2,2] => 2)]
+    fn quorum_value(values: Vec<i8>) -> i8 {
+        let size = values.len();
+        let node = RawNode::new_noop(1, (2..=size as NodeID).collect());
+        assert_eq!(node.cluster_size(), size);
+        node.quorum_value(values)
     }
 
     /// Runs Raft goldenscript tests. For available commands, see run().
@@ -1503,7 +1514,7 @@ mod tests {
                 let (node_tx, node_rx) = crossbeam::channel::unbounded();
                 let (applied_tx, applied_rx) = crossbeam::channel::unbounded();
                 let peers = self.ids.iter().copied().filter(|i| *i != id).collect();
-                let log = Log::new(crate::storage::Memory::new())?;
+                let log = Log::new(storage::Memory::new())?;
                 let state = teststate::Emit::new(teststate::KV::new(), applied_tx);
                 let opts = Options {
                     heartbeat_interval,

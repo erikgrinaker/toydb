@@ -51,7 +51,6 @@ pub trait State: Send {
 }
 
 /// Test helper state machines.
-#[allow(dead_code)]
 #[cfg(test)]
 pub mod test {
     use super::*;
