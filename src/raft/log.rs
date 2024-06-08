@@ -145,13 +145,8 @@ impl Log {
         (self.last_index, self.last_term)
     }
 
-    /// Returns the current term (0 if none).
-    pub fn get_term(&self) -> Term {
-        self.term
-    }
-
-    /// Returns the current term and vote.
-    pub fn get_term_vote(&self) -> (Term, Option<NodeID>) {
+    /// Returns the current term (0 if none) and vote.
+    pub fn get_term(&self) -> (Term, Option<NodeID>) {
         (self.term, self.vote)
     }
 
@@ -402,7 +397,7 @@ mod tests {
                 // get_term
                 "get_term" => {
                     command.consume_args().reject_rest()?;
-                    let (term, vote) = self.log.get_term_vote();
+                    let (term, vote) = self.log.get_term();
                     output.push_str(&format!(
                         "term={term} vote={}\n",
                         vote.map(|v| v.to_string()).unwrap_or("None".to_string())
@@ -489,7 +484,7 @@ mod tests {
                     let mut args = command.consume_args();
                     let engine = args.lookup_parse("engine")?.unwrap_or(false);
                     args.reject_rest()?;
-                    let (term, vote) = self.log.get_term_vote();
+                    let (term, vote) = self.log.get_term();
                     let (last_index, last_term) = self.log.get_last_index();
                     let (commit_index, commit_term) = self.log.get_commit_index();
                     output.push_str(&format!(

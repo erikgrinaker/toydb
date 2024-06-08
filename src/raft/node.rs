@@ -82,9 +82,9 @@ impl Node {
     /// Returns the node term.
     pub fn term(&self) -> Term {
         match self {
-            Node::Candidate(n) => n.term,
-            Node::Follower(n) => n.term,
-            Node::Leader(n) => n.term,
+            Node::Candidate(n) => n.term(),
+            Node::Follower(n) => n.term(),
+            Node::Leader(n) => n.term(),
         }
     }
 
@@ -136,7 +136,6 @@ pub trait Role {}
 pub struct RawNode<R: Role = Follower> {
     id: NodeID,
     peers: HashSet<NodeID>,
-    term: Term,
     log: Log,
     state: Box<dyn State>,
     node_tx: crossbeam::channel::Sender<Envelope>,
@@ -150,13 +149,17 @@ impl<R: Role> RawNode<R> {
         RawNode {
             id: self.id,
             peers: self.peers,
-            term: self.term,
             log: self.log,
             state: self.state,
             node_tx: self.node_tx,
             opts: self.opts,
             role,
         }
+    }
+
+    /// Returns the node's current term. Convenience wrapper for Log.get_term().
+    fn term(&self) -> Term {
+        self.log.get_term().0
     }
 
     /// Applies any pending, committed entries to the state machine. The command
@@ -207,7 +210,7 @@ impl<R: Role> RawNode<R> {
 
     /// Sends a message.
     fn send(&self, to: NodeID, message: Message) -> Result<()> {
-        let msg = Envelope { from: self.id, to, term: self.term, message };
+        let msg = Envelope { from: self.id, to, term: self.term(), message };
         debug!("Sending {msg:?}");
         Ok(self.node_tx.send(msg)?)
     }
@@ -224,12 +227,6 @@ impl<R: Role> RawNode<R> {
     /// Generates a randomized election timeout.
     fn gen_election_timeout(&self) -> Ticks {
         rand::thread_rng().gen_range(self.opts.election_timeout_range.clone())
-    }
-
-    /// Asserts common node invariants.
-    fn assert_node(&mut self) -> Result<()> {
-        debug_assert_eq!(self.term, self.log.get_term(), "Term does not match log");
-        Ok(())
     }
 
     /// Asserts message invariants when stepping.
@@ -268,11 +265,9 @@ impl Role for Candidate {}
 impl RawNode<Candidate> {
     /// Asserts internal invariants.
     fn assert(&mut self) -> Result<()> {
-        self.assert_node()?;
-
-        assert_ne!(self.term, 0, "Candidates can't have term 0");
-        assert!(self.role.votes.contains(&self.id), "Candidate did not vote for self");
-        debug_assert_eq!(Some(self.id), self.log.get_term_vote().1, "Log vote does not match self");
+        assert_ne!(self.term(), 0, "candidates can't have term 0");
+        assert!(self.role.votes.contains(&self.id), "candidate did not vote for self");
+        debug_assert_eq!(Some(self.id), self.log.get_term().1, "log vote does not match self");
 
         assert!(
             self.role.election_duration < self.role.election_timeout,
@@ -286,20 +281,19 @@ impl RawNode<Candidate> {
     /// follow the winner, or we discovered a new term in which case we step
     /// into it as a leaderless follower.
     fn into_follower(mut self, term: Term, leader: Option<NodeID>) -> Result<RawNode<Follower>> {
-        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+        assert!(term >= self.term(), "term regression {} → {}", self.term(), term);
 
         let election_timeout = self.gen_election_timeout();
         if let Some(leader) = leader {
             // We lost the election, follow the winner.
-            assert_eq!(term, self.term, "Can't follow leader in different term");
+            assert_eq!(term, self.term(), "can't follow leader in different term");
             info!("Lost election, following leader {} in term {}", leader, term);
             Ok(self.into_role(Follower::new(Some(leader), election_timeout)))
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
-            assert_ne!(term, self.term, "Can't become leaderless follower in current term");
+            assert_ne!(term, self.term(), "can't be leaderless follower in current term");
             info!("Discovered new term {}", term);
-            self.term = term;
             self.log.set_term(term, None)?;
             Ok(self.into_role(Follower::new(None, election_timeout)))
         }
@@ -307,7 +301,7 @@ impl RawNode<Candidate> {
 
     /// Transitions the candidate to a leader. We won the election.
     fn into_leader(self) -> Result<RawNode<Leader>> {
-        info!("Won election for term {}, becoming leader", self.term);
+        info!("Won election for term {}, becoming leader", self.term());
         let peers = self.peers.clone();
         let (last_index, _) = self.log.get_last_index();
         let mut node = self.into_role(Leader::new(peers, last_index));
@@ -330,7 +324,7 @@ impl RawNode<Candidate> {
         self.assert_step(&msg);
 
         // Drop messages from past terms.
-        if msg.term < self.term {
+        if msg.term < self.term() {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
         }
@@ -338,7 +332,7 @@ impl RawNode<Candidate> {
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
         // Append from the leader, stepping it will follow the leader.
-        if msg.term > self.term {
+        if msg.term > self.term() {
             return self.into_follower(msg.term, None)?.step(msg);
         }
 
@@ -394,11 +388,10 @@ impl RawNode<Candidate> {
     /// Campaign for leadership by increasing the term, voting for ourself, and
     /// soliciting votes from all peers.
     fn campaign(&mut self) -> Result<()> {
-        let term = self.term + 1;
-        info!("Starting new election for term {}", term);
+        let term = self.term() + 1;
+        info!("Starting new election for term {term}");
         self.role = Candidate::new(self.gen_election_timeout());
         self.role.votes.insert(self.id); // vote for ourself
-        self.term = term;
         self.log.set_term(term, Some(self.id))?;
 
         let (last_index, last_term) = self.log.get_last_index();
@@ -439,21 +432,18 @@ impl RawNode<Follower> {
         node_tx: crossbeam::channel::Sender<Envelope>,
         opts: Options,
     ) -> Result<Self> {
-        let term = log.get_term();
         let role = Follower::new(None, 0);
-        let mut node = Self { id, peers, term, log, state, node_tx, opts, role };
+        let mut node = Self { id, peers, log, state, node_tx, opts, role };
         node.role.election_timeout = node.gen_election_timeout();
         Ok(node)
     }
 
     /// Asserts internal invariants.
     fn assert(&mut self) -> Result<()> {
-        self.assert_node()?;
-
         if let Some(leader) = self.role.leader {
             assert_ne!(leader, self.id, "Can't follow self");
             assert!(self.peers.contains(&leader), "Leader not in peers");
-            assert_ne!(self.term, 0, "Followers with leaders can't have term 0");
+            assert_ne!(self.term(), 0, "Followers with leaders can't have term 0");
         } else {
             assert!(self.role.forwarded.is_empty(), "Leaderless follower has forwarded requests");
         }
@@ -485,7 +475,7 @@ impl RawNode<Follower> {
     /// in a new term (e.g. if someone holds a new election) or following a
     /// leader in the current term once someone wins the election.
     fn into_follower(mut self, leader: Option<NodeID>, term: Term) -> Result<RawNode<Follower>> {
-        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
+        assert!(term >= self.term(), "term regression {} → {}", self.term(), term);
 
         // Abort any forwarded requests. These must be retried with new leader.
         self.abort_forwarded()?;
@@ -493,15 +483,14 @@ impl RawNode<Follower> {
         if let Some(leader) = leader {
             // We found a leader in the current term.
             assert_eq!(self.role.leader, None, "Already have leader in term");
-            assert_eq!(term, self.term, "Can't follow leader in different term");
-            info!("Following leader {} in term {}", leader, term);
+            assert_eq!(term, self.term(), "Can't follow leader in different term");
+            info!("Following leader {leader} in term {term}");
             self.role = Follower::new(Some(leader), self.role.election_timeout);
         } else {
             // We found a new term, but we don't necessarily know who the leader
             // is yet. We'll find out when we step a message from it.
-            assert_ne!(term, self.term, "Can't become leaderless follower in current term");
-            info!("Discovered new term {}", term);
-            self.term = term;
+            assert_ne!(term, self.term(), "can't be leaderless follower in current term");
+            info!("Discovered new term {term}");
             self.log.set_term(term, None)?;
             self.role = Follower::new(None, self.gen_election_timeout());
         }
@@ -514,7 +503,7 @@ impl RawNode<Follower> {
         self.assert_step(&msg);
 
         // Drop messages from past terms.
-        if msg.term < self.term {
+        if msg.term < self.term() {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
         }
@@ -522,7 +511,7 @@ impl RawNode<Follower> {
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
         // Append from the leader, stepping it will follow the leader.
-        if msg.term > self.term {
+        if msg.term > self.term() {
             return self.into_follower(None, msg.term)?.step(msg);
         }
 
@@ -588,7 +577,7 @@ impl RawNode<Follower> {
             // A candidate in this term is requesting our vote.
             Message::Campaign { last_index, last_term } => {
                 // Don't vote if we already voted for someone else in this term.
-                if let (_, Some(vote)) = self.log.get_term_vote() {
+                if let (_, Some(vote)) = self.log.get_term() {
                     if msg.from != vote {
                         self.send(msg.from, Message::CampaignResponse { vote: false })?;
                         return Ok(self.into());
@@ -603,8 +592,8 @@ impl RawNode<Follower> {
                 }
 
                 // Grant the vote.
-                info!("Voting for {} in term {} election", msg.from, self.term);
-                self.log.set_term(self.term, Some(msg.from))?;
+                info!("Voting for {} in term {} election", msg.from, msg.term);
+                self.log.set_term(msg.term, Some(msg.from))?;
                 self.send(msg.from, Message::CampaignResponse { vote: true })?;
             }
 
@@ -787,11 +776,8 @@ impl Role for Leader {}
 impl RawNode<Leader> {
     /// Asserts internal invariants.
     fn assert(&mut self) -> Result<()> {
-        self.assert_node()?;
-
-        assert_ne!(self.term, 0, "Leaders can't have term 0");
-        debug_assert_eq!(Some(self.id), self.log.get_term_vote().1, "Log vote does not match self");
-
+        assert_ne!(self.term(), 0, "leaders can't have term 0");
+        debug_assert_eq!(Some(self.id), self.log.get_term().1, "vote does not match self");
         Ok(())
     }
 
@@ -799,10 +785,10 @@ impl RawNode<Leader> {
     /// discover a new term, so we become a leaderless follower. Subsequently
     /// stepping the received message may discover the leader, if there is one.
     fn into_follower(mut self, term: Term) -> Result<RawNode<Follower>> {
-        assert!(term >= self.term, "Term regression {} -> {}", self.term, term);
-        assert!(term > self.term, "Can only become follower in later term");
+        assert!(term >= self.term(), "term regression {} → {}", self.term(), term);
+        assert!(term > self.term(), "can only become follower in later term");
 
-        info!("Discovered new term {}", term);
+        info!("Discovered new term {term}");
 
         // Cancel in-flight requests.
         for write in std::mem::take(&mut self.role.writes).into_values().sorted_by_key(|w| w.id) {
@@ -818,7 +804,6 @@ impl RawNode<Leader> {
             )?;
         }
 
-        self.term = term;
         self.log.set_term(term, None)?;
         let election_timeout = self.gen_election_timeout();
         Ok(self.into_role(Follower::new(None, election_timeout)))
@@ -830,7 +815,7 @@ impl RawNode<Leader> {
         self.assert_step(&msg);
 
         // Drop messages from past terms.
-        if msg.term < self.term {
+        if msg.term < self.term() {
             debug!("Dropping message from past term ({:?})", msg);
             return Ok(self.into());
         }
@@ -838,7 +823,7 @@ impl RawNode<Leader> {
         // If we receive a message for a future term, become a leaderless
         // follower in it and step the message. If the message is a Heartbeat or
         // Append from the leader, stepping it will follow the leader.
-        if msg.term > self.term {
+        if msg.term > self.term() {
             return self.into_follower(msg.term)?.step(msg);
         }
 
@@ -953,7 +938,7 @@ impl RawNode<Leader> {
             Message::ClientRequest { id, request: Request::Status } => {
                 let status = Status {
                     leader: self.id,
-                    term: self.term,
+                    term: self.term(),
                     match_index: self
                         .role
                         .progress
@@ -1005,7 +990,7 @@ impl RawNode<Leader> {
         let (commit_index, _) = self.log.get_commit_index();
         let read_seq = self.role.read_seq;
 
-        assert_eq!(last_term, self.term, "leader has stale last_term");
+        assert_eq!(last_term, self.term(), "leader has stale last_term");
 
         self.broadcast(Message::Heartbeat { last_index, commit_index, read_seq })?;
         // NB: We don't reset self.since_heartbeat here, because we want to send
@@ -1059,7 +1044,7 @@ impl RawNode<Leader> {
         // We can only safely commit an entry from our own term (see figure 8 in
         // Raft paper).
         commit_index = match self.log.get(quorum_index)? {
-            Some(entry) if entry.term == self.term => quorum_index,
+            Some(entry) if entry.term == self.term() => quorum_index,
             Some(_) => return Ok(commit_index),
             None => panic!("missing commit index {quorum_index} missing"),
         };
@@ -1068,13 +1053,14 @@ impl RawNode<Leader> {
         self.log.commit(commit_index)?;
 
         // Apply entries and respond to client writers.
+        let term = self.term();
         Self::maybe_apply_with(&mut self.log, &mut self.state, |index, result| -> Result<()> {
             if let Some(write) = self.role.writes.remove(&index) {
                 // TODO: use self.send() or something.
                 self.node_tx.send(Envelope {
                     from: self.id,
                     to: write.from,
-                    term: self.term,
+                    term,
                     message: Message::ClientResponse {
                         id: write.id,
                         response: result.map(Response::Write),
@@ -1086,7 +1072,7 @@ impl RawNode<Leader> {
 
         // If the commit term changed, there may be pending reads waiting for us
         // to commit an entry from our own term. Execute them.
-        if old_commit_term != self.term {
+        if old_commit_term != self.term() {
             self.maybe_read()?;
         }
 
@@ -1106,7 +1092,7 @@ impl RawNode<Leader> {
         // linearizability.
         let (commit_index, commit_term) = self.log.get_commit_index();
         let applied_index = self.state.get_applied_index();
-        if commit_term < self.term || applied_index < commit_index {
+        if commit_term < self.term() || applied_index < commit_index {
             return Ok(());
         }
 
