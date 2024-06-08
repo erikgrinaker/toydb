@@ -22,7 +22,7 @@ status
 ---
 engine: set CommitIndex 0x02 = 0x0101
 commit → 1@1 None
-last=3@2 commit=1@1
+term=0 last=3@2 commit=1@1 vote=None
 
 # Dump the raw engine contents tdump
 dump
@@ -37,28 +37,28 @@ commit 1 oplog=true
 status
 ---
 commit → 1@1 None
-last=3@2 commit=1@1
+term=0 last=3@2 commit=1@1 vote=None
 
 # Commits can skip an entry.
 commit 3
 status
 ---
 commit → 3@2 bar
-last=3@2 commit=3@2
+term=0 last=3@2 commit=3@2 vote=None
 
 # Commit regressions error.
 !commit 2
 status
 ---
 Panic: commit index regression 3 → 2
-last=3@2 commit=3@2
+term=0 last=3@2 commit=3@2 vote=None
 
 # Committing non-existant indexes error.
 !commit 4
 status
 ---
 Panic: commit index 4 does not exist
-last=3@2 commit=3@2
+term=0 last=3@2 commit=3@2 vote=None
 
 # Dump the raw values.
 dump

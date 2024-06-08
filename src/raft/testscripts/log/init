@@ -1,0 +1,30 @@
+# Tests that the log correctly initializes cached state when opened.
+
+set_term 1 7
+---
+ok
+
+append 1 foo
+append 2 bar
+commit 1
+---
+append → 1@1 foo
+append → 2@2 bar
+commit → 1@1 foo
+
+status
+---
+term=1 last=2@2 commit=1@1 vote=7
+
+reload
+---
+ok
+
+status
+---
+term=1 last=2@2 commit=1@1 vote=7
+
+scan
+---
+1@1 foo
+2@2 bar

@@ -1,7 +1,7 @@
 # Status on empty engine works.
 status engine=true
 ---
-last=0@0 commit=0@0 engine=Status {
+term=0 last=0@0 commit=0@0 vote=None engine=Status {
     name: "memory",
     keys: 0,
     size: 0,
@@ -25,7 +25,7 @@ commit → 2@1 foo
 # Status gives correct info.
 status engine=true
 ---
-last=3@2 commit=2@1 engine=Status {
+term=2 last=3@2 commit=2@1 vote=1 engine=Status {
     name: "memory",
     keys: 5,
     size: 51,

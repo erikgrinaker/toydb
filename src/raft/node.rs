@@ -228,7 +228,7 @@ impl<R: Role> RawNode<R> {
 
     /// Asserts common node invariants.
     fn assert_node(&mut self) -> Result<()> {
-        debug_assert_eq!(self.term, self.log.get_term()?.0, "Term does not match log");
+        debug_assert_eq!(self.term, self.log.get_term(), "Term does not match log");
         Ok(())
     }
 
@@ -272,7 +272,7 @@ impl RawNode<Candidate> {
 
         assert_ne!(self.term, 0, "Candidates can't have term 0");
         assert!(self.role.votes.contains(&self.id), "Candidate did not vote for self");
-        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+        debug_assert_eq!(Some(self.id), self.log.get_term_vote().1, "Log vote does not match self");
 
         assert!(
             self.role.election_duration < self.role.election_timeout,
@@ -437,12 +437,12 @@ impl RawNode<Follower> {
     fn new(
         id: NodeID,
         peers: HashSet<NodeID>,
-        mut log: Log,
+        log: Log,
         state: Box<dyn State>,
         node_tx: crossbeam::channel::Sender<Envelope>,
         opts: Options,
     ) -> Result<Self> {
-        let (term, vote) = log.get_term()?;
+        let (term, vote) = log.get_term_vote();
         let role = Follower::new(None, vote, 0);
         let mut node = Self { id, peers, term, log, state, node_tx, opts, role };
         node.role.election_timeout = node.gen_election_timeout();
@@ -465,7 +465,7 @@ impl RawNode<Follower> {
         // nodes from the cluster via a cold restart. We also allow vote for
         // self, which can happen if we lose an election.
 
-        debug_assert_eq!(self.role.vote, self.log.get_term()?.1, "Vote does not match log");
+        debug_assert_eq!(self.role.vote, self.log.get_term_vote().1, "Vote does not match log");
         assert!(self.role.leader_seen < self.role.election_timeout, "Election timeout passed");
 
         Ok(())
@@ -796,7 +796,7 @@ impl RawNode<Leader> {
         self.assert_node()?;
 
         assert_ne!(self.term, 0, "Leaders can't have term 0");
-        debug_assert_eq!(Some(self.id), self.log.get_term()?.1, "Log vote does not match self");
+        debug_assert_eq!(Some(self.id), self.log.get_term_vote().1, "Log vote does not match self");
 
         Ok(())
     }

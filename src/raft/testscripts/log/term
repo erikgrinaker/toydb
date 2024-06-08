@@ -51,12 +51,12 @@ Panic: term regression 9 → 8
 # Clearing the vote errors.
 !set_term 9
 ---
-Panic: can't change vote Some(1) → None
+Panic: can't change vote
 
 # Changing the vote errors.
 !set_term 9 2
 ---
-Panic: can't change vote Some(1) → Some(2)
+Panic: can't change vote
 
 # The above errors should not have changed the term/vote.
 get_term

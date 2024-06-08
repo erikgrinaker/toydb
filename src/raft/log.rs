@@ -94,6 +94,10 @@ pub struct Log {
     /// to allow runtime selection of the engine and avoid propagating the
     /// generic type parameters throughout Raft.
     engine: Box<dyn storage::Engine>,
+    /// The current term.
+    term: Term,
+    /// Our leader vote in the current term, if any.
+    vote: Option<NodeID>,
     /// The index of the last stored entry.
     last_index: Index,
     /// The term of the last stored entry.
@@ -107,6 +111,11 @@ pub struct Log {
 impl Log {
     /// Initializes a log using the given storage engine.
     pub fn new(mut engine: impl storage::Engine + 'static) -> Result<Self> {
+        let (term, vote) = engine
+            .get(&Key::TermVote.encode()?)?
+            .map(|v| bincode::deserialize(&v))
+            .transpose()?
+            .unwrap_or((0, None));
         let (last_index, last_term) = engine
             .scan_prefix(&KeyPrefix::Entry.encode()?)
             .last()
@@ -120,7 +129,8 @@ impl Log {
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, 0));
-        Ok(Self { engine: Box::new(engine), last_index, last_term, commit_index, commit_term })
+        let engine = Box::new(engine);
+        Ok(Self { engine, term, vote, last_index, last_term, commit_index, commit_term })
     }
 
     /// Returns the commit index and term.
@@ -133,36 +143,36 @@ impl Log {
         (self.last_index, self.last_term)
     }
 
-    /// Returns the last known term (0 if none) and cast vote (if any).
-    pub fn get_term(&mut self) -> Result<(Term, Option<NodeID>)> {
-        Ok(self
-            .engine
-            .get(&Key::TermVote.encode()?)?
-            .map(|v| bincode::deserialize(&v))
-            .transpose()?
-            .unwrap_or((0, None)))
+    /// Returns the current term (0 if none).
+    pub fn get_term(&self) -> Term {
+        self.term
+    }
+
+    /// Returns the current term and vote.
+    pub fn get_term_vote(&self) -> (Term, Option<NodeID>) {
+        (self.term, self.vote)
     }
 
     /// Stores the most recent term and cast vote (if any). Enforces that the
     /// term does not regress, and that we only vote for one node in a term.
     pub fn set_term(&mut self, term: Term, vote: Option<NodeID>) -> Result<()> {
-        match self.get_term()? {
-            (t, _) if term < t => panic!("term regression {t} → {term}"),
-            (t, _) if term > t => {} // below, term == t
-            (0, _) => panic!("can't set term 0"),
-            (t, v) if t == term && v == vote => return Ok(()),
-            (_, None) => {}
-            (_, v) if vote != v => panic!("can't change vote {v:?} → {vote:?}"),
-            (_, _) => {}
-        };
+        assert!(term > 0, "can't set term 0");
+        assert!(term >= self.term, "term regression {} → {}", self.term, term);
+        assert!(term > self.term || self.vote.is_none() || vote == self.vote, "can't change vote");
+        if term == self.term && vote == self.vote {
+            return Ok(());
+        }
         self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, vote))?)?;
         self.engine.flush()?;
+        self.term = term;
+        self.vote = vote;
         Ok(())
     }
 
     /// Appends a command to the log and flushes it to disk, returning its
     /// index. None implies a noop command, typically after Raft leader changes.
     /// The term must be equal to or greater than the previous entry.
+    /// TODO: use self.term for the term.
     pub fn append(&mut self, term: Term, command: Option<Vec<u8>>) -> Result<Index> {
         match self.get(self.last_index)? {
             Some(e) if term < e.term => panic!("term regression {} → {term}", e.term),
@@ -243,6 +253,7 @@ impl Log {
     /// Overlapping indexes with the same term must be equal and will be
     /// ignored. Overlapping indexes with different terms will truncate the
     /// existing log at the first conflict and then splice the new entries.
+    /// TODO: check against self.term.
     pub fn splice(&mut self, entries: Vec<Entry>) -> Result<Index> {
         let (Some(first), Some(last)) = (entries.first(), entries.last()) else {
             return Ok(self.last_index); // empty input is noop
@@ -318,6 +329,7 @@ mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
     use std::{error::Error, result::Result};
+    use storage::Engine as _;
     use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/raft/testscripts/log.
@@ -393,7 +405,7 @@ mod tests {
                 // get_term
                 "get_term" => {
                     command.consume_args().reject_rest()?;
-                    let (term, vote) = self.log.get_term()?;
+                    let (term, vote) = self.log.get_term_vote();
                     output.push_str(&format!(
                         "term={term} vote={}\n",
                         vote.map(|v| v.to_string()).unwrap_or("None".to_string())
@@ -413,6 +425,19 @@ mod tests {
                         let has = self.log.has(index, term)?;
                         output.push_str(&format!("{has}\n"));
                     }
+                }
+
+                // reload
+                "reload" => {
+                    use std::ops::Bound::Unbounded;
+                    command.consume_args().reject_rest()?;
+                    let mut engine = storage::Memory::new();
+                    let mut scan = self.log.engine.scan_dyn((Unbounded, Unbounded));
+                    while let Some((key, value)) = scan.next().transpose()? {
+                        engine.set(&key, value)?
+                    }
+                    drop(scan);
+                    *self = TestRunner::new_with_engine(engine)
                 }
 
                 // scan [RANGE]
@@ -467,10 +492,12 @@ mod tests {
                     let mut args = command.consume_args();
                     let engine = args.lookup_parse("engine")?.unwrap_or(false);
                     args.reject_rest()?;
-                    let (commit_index, commit_term) = self.log.get_commit_index();
+                    let (term, vote) = self.log.get_term_vote();
                     let (last_index, last_term) = self.log.get_last_index();
+                    let (commit_index, commit_term) = self.log.get_commit_index();
                     output.push_str(&format!(
-                        "last={last_index}@{last_term} commit={commit_index}@{commit_term}"
+                        "term={term} last={last_index}@{last_term} commit={commit_index}@{commit_term} vote={}",
+                        vote.map(|id| id.to_string()).unwrap_or("None".to_string())
                     ));
                     if engine {
                         output.push_str(&format!(" engine={:#?}", self.log.status()?));
@@ -492,7 +519,11 @@ mod tests {
 
     impl TestRunner {
         fn new() -> Self {
-            let engine = storage::Debug::new(storage::Memory::new());
+            Self::new_with_engine(storage::Memory::new())
+        }
+
+        fn new_with_engine(engine: impl storage::Engine + 'static) -> Self {
+            let engine = storage::Debug::new(engine);
             let op_rx = engine.op_rx();
             let log = Log::new(engine).expect("log init failed");
             Self { log, op_rx }
