@@ -261,22 +261,22 @@ impl<E: Engine> MVCC<E> {
 
     /// Fetches the value of an unversioned key.
     pub fn get_unversioned(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.engine.lock()?.get(&Key::Unversioned(key.into()).encode()?)
+        self.engine.lock()?.get(&Key::Unversioned(key.into()).encode())
     }
 
     /// Sets the value of an unversioned key.
     pub fn set_unversioned(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.engine.lock()?.set(&Key::Unversioned(key.into()).encode()?, value)
+        self.engine.lock()?.set(&Key::Unversioned(key.into()).encode(), value)
     }
 
     /// Returns the status of the MVCC and storage engines.
     pub fn status(&self) -> Result<Status> {
         let mut engine = self.engine.lock()?;
-        let versions = match engine.get(&Key::NextVersion.encode()?)? {
+        let versions = match engine.get(&Key::NextVersion.encode())? {
             Some(ref v) => Version::decode(v)? - 1,
             None => 0,
         };
-        let active_txns = engine.scan_prefix(&KeyPrefix::TxnActive.encode()?).count() as u64;
+        let active_txns = engine.scan_prefix(&KeyPrefix::TxnActive.encode()).count() as u64;
         Ok(Status { versions, active_txns, storage: engine.status()? })
     }
 }
@@ -363,19 +363,19 @@ impl<E: Engine> Transaction<E> {
         let mut session = engine.lock()?;
 
         // Allocate a new version to write at.
-        let version = match session.get(&Key::NextVersion.encode()?)? {
+        let version = match session.get(&Key::NextVersion.encode())? {
             Some(ref v) => Version::decode(v)?,
             None => 1,
         };
-        session.set(&Key::NextVersion.encode()?, (version + 1).encode()?)?;
+        session.set(&Key::NextVersion.encode(), (version + 1).encode())?;
 
         // Fetch the current set of active transactions, persist it for
         // time-travel queries if non-empty, then add this txn to it.
         let active = Self::scan_active(&mut session)?;
         if !active.is_empty() {
-            session.set(&Key::TxnActiveSnapshot(version).encode()?, active.encode()?)?
+            session.set(&Key::TxnActiveSnapshot(version).encode(), active.encode())?
         }
-        session.set(&Key::TxnActive(version).encode()?, vec![])?;
+        session.set(&Key::TxnActive(version).encode(), vec![])?;
         drop(session);
 
         Ok(Self { engine, st: TransactionState { version, read_only: false, active } })
@@ -389,7 +389,7 @@ impl<E: Engine> Transaction<E> {
         let mut session = engine.lock()?;
 
         // Fetch the latest version.
-        let mut version = match session.get(&Key::NextVersion.encode()?)? {
+        let mut version = match session.get(&Key::NextVersion.encode())? {
             Some(ref v) => Version::decode(v)?,
             None => 1,
         };
@@ -403,7 +403,7 @@ impl<E: Engine> Transaction<E> {
                 return errinput!("version {as_of} does not exist");
             }
             version = as_of;
-            if let Some(value) = session.get(&Key::TxnActiveSnapshot(version).encode()?)? {
+            if let Some(value) = session.get(&Key::TxnActiveSnapshot(version).encode())? {
                 active = HashSet::<Version>::decode(&value)?;
             }
         } else {
@@ -419,7 +419,7 @@ impl<E: Engine> Transaction<E> {
     fn resume(engine: Arc<Mutex<E>>, s: TransactionState) -> Result<Self> {
         // For read-write transactions, verify that the transaction is still
         // active before making further writes.
-        if !s.read_only && engine.lock()?.get(&Key::TxnActive(s.version).encode()?)?.is_none() {
+        if !s.read_only && engine.lock()?.get(&Key::TxnActive(s.version).encode())?.is_none() {
             return errinput!("no active transaction at version {}", s.version);
         }
         Ok(Self { engine, st: s })
@@ -428,7 +428,7 @@ impl<E: Engine> Transaction<E> {
     /// Fetches the set of currently active transactions.
     fn scan_active(session: &mut MutexGuard<E>) -> Result<HashSet<Version>> {
         let mut active = HashSet::new();
-        let mut scan = session.scan_prefix(&KeyPrefix::TxnActive.encode()?);
+        let mut scan = session.scan_prefix(&KeyPrefix::TxnActive.encode());
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnActive(version) => active.insert(version),
@@ -466,13 +466,13 @@ impl<E: Engine> Transaction<E> {
         }
         let mut session = self.engine.lock()?;
         let remove = session
-            .scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode()?)
+            .scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode())
             .map(|r| r.map(|(k, _)| k))
             .collect::<Result<Vec<_>>>()?;
         for key in remove {
             session.delete(&key)?
         }
-        session.delete(&Key::TxnActive(self.st.version).encode()?)
+        session.delete(&Key::TxnActive(self.st.version).encode())
     }
 
     /// Rolls back the transaction, by undoing all written versions and removing
@@ -484,11 +484,11 @@ impl<E: Engine> Transaction<E> {
         }
         let mut session = self.engine.lock()?;
         let mut rollback = Vec::new();
-        let mut scan = session.scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode()?);
+        let mut scan = session.scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode());
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnWrite(_, key) => {
-                    rollback.push(Key::Version(key, self.st.version).encode()?) // the version
+                    rollback.push(Key::Version(key, self.st.version).encode()) // the version
                 }
                 key => return errdata!("expected TxnWrite, got {key:?}"),
             };
@@ -498,7 +498,7 @@ impl<E: Engine> Transaction<E> {
         for key in rollback.into_iter() {
             session.delete(&key)?;
         }
-        session.delete(&Key::TxnActive(self.st.version).encode()?) // remove from active set
+        session.delete(&Key::TxnActive(self.st.version).encode()) // remove from active set
     }
 
     /// Deletes a key.
@@ -529,8 +529,8 @@ impl<E: Engine> Transaction<E> {
             key.into(),
             self.st.active.iter().min().copied().unwrap_or(self.st.version + 1),
         )
-        .encode()?;
-        let to = Key::Version(key.into(), u64::MAX).encode()?;
+        .encode();
+        let to = Key::Version(key.into(), u64::MAX).encode();
         if let Some((key, _)) = session.scan(from..=to).last().transpose()? {
             match Key::decode(&key)? {
                 Key::Version(_, version) => {
@@ -546,16 +546,15 @@ impl<E: Engine> Transaction<E> {
         //
         // NB: TxnWrite contains the provided user key, not the encoded engine
         // key, since we can construct the engine key using the version.
-        session.set(&Key::TxnWrite(self.st.version, key.into()).encode()?, vec![])?;
-        session
-            .set(&Key::Version(key.into(), self.st.version).encode()?, bincode::serialize(&value)?)
+        session.set(&Key::TxnWrite(self.st.version, key.into()).encode(), vec![])?;
+        session.set(&Key::Version(key.into(), self.st.version).encode(), bincode::serialize(&value))
     }
 
     /// Fetches a key's value, or None if it does not exist.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         let mut session = self.engine.lock()?;
-        let from = Key::Version(key.into(), 0).encode()?;
-        let to = Key::Version(key.into(), self.st.version).encode()?;
+        let from = Key::Version(key.into(), 0).encode();
+        let to = Key::Version(key.into(), self.st.version).encode();
         let mut scan = session.scan(from..=to).rev();
         while let Some((key, value)) = scan.next().transpose()? {
             match Key::decode(&key)? {
@@ -574,14 +573,14 @@ impl<E: Engine> Transaction<E> {
     /// transaction's version.
     pub fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Result<Scan<E>> {
         let start = match range.start_bound() {
-            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), u64::MAX).encode()?),
-            Bound::Included(k) => Bound::Included(Key::Version(k.into(), 0).encode()?),
-            Bound::Unbounded => Bound::Included(Key::Version(vec![].into(), 0).encode()?),
+            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), u64::MAX).encode()),
+            Bound::Included(k) => Bound::Included(Key::Version(k.into(), 0).encode()),
+            Bound::Unbounded => Bound::Included(Key::Version(vec![].into(), 0).encode()),
         };
         let end = match range.end_bound() {
-            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), 0).encode()?),
-            Bound::Included(k) => Bound::Included(Key::Version(k.into(), u64::MAX).encode()?),
-            Bound::Unbounded => Bound::Excluded(KeyPrefix::Unversioned.encode()?),
+            Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), 0).encode()),
+            Bound::Included(k) => Bound::Included(Key::Version(k.into(), u64::MAX).encode()),
+            Bound::Unbounded => Bound::Excluded(KeyPrefix::Unversioned.encode()),
         };
         Ok(Scan::new(self.engine.lock()?, self.state(), start, end))
     }
@@ -591,7 +590,7 @@ impl<E: Engine> Transaction<E> {
         // Normally, KeyPrefix::Version will only match all versions of the
         // exact given key. We want all keys maching the prefix, so we chop off
         // the KeyCode byte slice terminator 0x0000 at the end.
-        let mut prefix = KeyPrefix::Version(prefix.into()).encode()?;
+        let mut prefix = KeyPrefix::Version(prefix.into()).encode();
         prefix.truncate(prefix.len() - 2);
         Ok(Scan::new_prefix(self.engine.lock()?, self.state(), prefix))
     }
@@ -1137,8 +1136,8 @@ pub mod tests {
         ];
 
         for (prefix, key) in cases {
-            let prefix = prefix.encode()?;
-            let key = key.encode()?;
+            let prefix = prefix.encode();
+            let key = key.encode();
             assert_eq!(prefix, key[..prefix.len()])
         }
         Ok(())

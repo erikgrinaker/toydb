@@ -85,7 +85,7 @@ impl<E: storage::Engine> Transaction<E> {
     fn index_load(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
         Ok(self
             .txn
-            .get(&Key::Index(table.into(), column.into(), value.into()).encode()?)?
+            .get(&Key::Index(table.into(), column.into(), value.into()).encode())?
             .map(|v| HashSet::<Value>::decode(&v))
             .transpose()?
             .unwrap_or_default())
@@ -99,11 +99,11 @@ impl<E: storage::Engine> Transaction<E> {
         value: &Value,
         index: HashSet<Value>,
     ) -> Result<()> {
-        let key = Key::Index(table.into(), column.into(), value.into()).encode()?;
+        let key = Key::Index(table.into(), column.into(), value.into()).encode();
         if index.is_empty() {
             self.txn.delete(&key)
         } else {
-            self.txn.set(&key, index.encode()?)
+            self.txn.set(&key, index.encode())
         }
     }
 }
@@ -132,7 +132,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         if self.read(&table.name, &id)?.is_some() {
             return errinput!("primary key {id} already exists for table {}", table.name);
         }
-        self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode()?, row.encode()?)?;
+        self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode(), row.encode())?;
 
         // Update indexes
         for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
@@ -174,12 +174,12 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                 }
             }
         }
-        self.txn.delete(&Key::Row(table.name.into(), id.into()).encode()?)
+        self.txn.delete(&Key::Row(table.name.into(), id.into()).encode())
     }
 
     fn read(&self, table: &str, id: &Value) -> Result<Option<Row>> {
         self.txn
-            .get(&Key::Row(table.into(), id.into()).encode()?)?
+            .get(&Key::Row(table.into(), id.into()).encode())?
             .map(|v| Row::decode(&v))
             .transpose()
     }
@@ -195,7 +195,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         let table = self.must_read_table(table)?;
         Ok(Box::new(
             self.txn
-                .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode()?)?
+                .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode())?
                 .iter()
                 .map(|r| r.and_then(|(_, v)| Row::decode(&v)))
                 .filter_map(move |r| match r {
@@ -224,7 +224,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         Ok(Box::new(
             self.txn
                 .scan_prefix(
-                    &KeyPrefix::Index((&table.name).into(), (&column.name).into()).encode()?,
+                    &KeyPrefix::Index((&table.name).into(), (&column.name).into()).encode(),
                 )?
                 .iter()
                 .map(|r| -> Result<(Value, HashSet<Value>)> {
@@ -268,7 +268,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         }
 
         table.validate_row(&row, self)?;
-        self.txn.set(&Key::Row(table.name.into(), id.into()).encode()?, row.encode()?)
+        self.txn.set(&Key::Row(table.name.into(), id.into()).encode(), row.encode())
     }
 }
 
@@ -278,7 +278,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
             return errinput!("table {} already exists", table.name);
         }
         table.validate(self)?;
-        self.txn.set(&Key::Table((&table.name).into()).encode()?, table.encode()?)
+        self.txn.set(&Key::Table((&table.name).into()).encode(), table.encode())
     }
 
     fn delete_table(&mut self, table: &str) -> Result<()> {
@@ -290,17 +290,17 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         while let Some(row) = scan.next().transpose()? {
             self.delete(&table.name, &table.get_row_key(&row)?)?
         }
-        self.txn.delete(&Key::Table(table.name.into()).encode()?)
+        self.txn.delete(&Key::Table(table.name.into()).encode())
     }
 
     fn read_table(&self, table: &str) -> Result<Option<Table>> {
-        self.txn.get(&Key::Table(table.into()).encode()?)?.map(|v| Table::decode(&v)).transpose()
+        self.txn.get(&Key::Table(table.into()).encode())?.map(|v| Table::decode(&v)).transpose()
     }
 
     fn scan_tables(&self) -> Result<Tables> {
         Ok(Box::new(
             self.txn
-                .scan_prefix(&KeyPrefix::Table.encode()?)?
+                .scan_prefix(&KeyPrefix::Table.encode())?
                 .iter()
                 .map(|r| r.and_then(|(_, v)| Table::decode(&v)))
                 .collect::<Result<Vec<_>>>()?

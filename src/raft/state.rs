@@ -110,7 +110,7 @@ pub mod test {
             let response = match command {
                 Some(KVCommand::Put { key, value }) => {
                     self.data.insert(key, value);
-                    KVResponse::Put(entry.index).encode()?
+                    KVResponse::Put(entry.index).encode()
                 }
                 Some(c @ (KVCommand::Get { .. } | KVCommand::Scan)) => {
                     panic!("{c} submitted as write command")
@@ -123,8 +123,10 @@ pub mod test {
 
         fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
             match KVCommand::decode(&command)? {
-                KVCommand::Get { key } => KVResponse::Get(self.data.get(&key).cloned()).encode(),
-                KVCommand::Scan => KVResponse::Scan(self.data.clone()).encode(),
+                KVCommand::Get { key } => {
+                    Ok(KVResponse::Get(self.data.get(&key).cloned()).encode())
+                }
+                KVCommand::Scan => Ok(KVResponse::Scan(self.data.clone()).encode()),
                 c @ KVCommand::Put { .. } => panic!("{c} submitted as read command"),
             }
         }

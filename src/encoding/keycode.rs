@@ -51,10 +51,12 @@ use crate::errdata;
 use crate::error::{Error, Result};
 
 // Serializes a key to a binary KeyCode representation.
-pub fn serialize<T: serde::Serialize>(key: &T) -> Result<Vec<u8>> {
+pub fn serialize<T: serde::Serialize>(key: &T) -> Vec<u8> {
     let mut serializer = Serializer { output: Vec::new() };
-    key.serialize(&mut serializer)?;
-    Ok(serializer.output)
+    // Panic on serialization failures, as this is typically an issue with the
+    // provided data structure.
+    key.serialize(&mut serializer).expect("keycode serialization failed");
+    serializer.output
 }
 
 // Deserializes a key from a binary KeyCode representation.
@@ -609,7 +611,7 @@ mod tests {
             fn $name() -> Result<()> {
                 let mut input = $input;
                 let expect = $expect;
-                let output = serialize(&input)?;
+                let output = serialize(&input);
                 assert_eq!(hex::encode(&output), expect, "encode failed");
 
                 let expect = input;
@@ -647,7 +649,7 @@ mod tests {
             #[should_panic]
             fn [< $name _serialize_error >]() {
                 let input = $input;
-                serialize(&input).unwrap();
+                serialize(&input);
             }
         )*
         }

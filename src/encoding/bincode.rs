@@ -47,8 +47,10 @@ pub fn maybe_deserialize_from<R: std::io::Read, T: serde::de::DeserializeOwned>(
 }
 
 /// Serializes a value using Bincode.
-pub fn serialize<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
-    Ok(bincode().serialize(value)?)
+pub fn serialize<T: serde::Serialize>(value: &T) -> Vec<u8> {
+    // Panic on serialization failures, as this is typically an issue with the
+    // provided data structure.
+    bincode().serialize(value).expect("bincode serialization failed")
 }
 
 /// Serializes a value to a writer using Bincode.

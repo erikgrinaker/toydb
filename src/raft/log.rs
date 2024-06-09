@@ -114,12 +114,12 @@ impl Log {
     /// Initializes a log using the given storage engine.
     pub fn new(mut engine: impl storage::Engine + 'static) -> Result<Self> {
         let (term, vote) = engine
-            .get(&Key::TermVote.encode()?)?
+            .get(&Key::TermVote.encode())?
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, None));
         let (last_index, last_term) = engine
-            .scan_prefix(&KeyPrefix::Entry.encode()?)
+            .scan_prefix(&KeyPrefix::Entry.encode())
             .last()
             .transpose()?
             .map(|(_, v)| Entry::decode(&v))
@@ -127,7 +127,7 @@ impl Log {
             .map(|e| (e.index, e.term))
             .unwrap_or((0, 0));
         let (commit_index, commit_term) = engine
-            .get(&Key::CommitIndex.encode()?)?
+            .get(&Key::CommitIndex.encode())?
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, 0));
@@ -160,7 +160,7 @@ impl Log {
         if term == self.term && vote == self.vote {
             return Ok(());
         }
-        self.engine.set(&Key::TermVote.encode()?, bincode::serialize(&(term, vote))?)?;
+        self.engine.set(&Key::TermVote.encode(), bincode::serialize(&(term, vote)))?;
         self.engine.flush()?;
         self.term = term;
         self.vote = vote;
@@ -175,7 +175,7 @@ impl Log {
         // We could omit the index in the encoded value, since it's also stored
         // in the key, but we keep it simple.
         let entry = Entry { index: self.last_index + 1, term: self.term, command };
-        self.engine.set(&Key::Entry(entry.index).encode()?, entry.encode()?)?;
+        self.engine.set(&Key::Entry(entry.index).encode(), entry.encode())?;
         self.engine.flush()?;
         self.last_index = entry.index;
         self.last_term = entry.term;
@@ -193,7 +193,7 @@ impl Log {
             Some(e) => e.term,
             None => panic!("commit index {index} does not exist"),
         };
-        self.engine.set(&Key::CommitIndex.encode()?, bincode::serialize(&(index, term))?)?;
+        self.engine.set(&Key::CommitIndex.encode(), bincode::serialize(&(index, term)))?;
         // NB: the commit index doesn't need to be fsynced, since the entries
         // are fsynced and the commit index can be recovered from a log quorum.
         self.commit_index = index;
@@ -203,7 +203,7 @@ impl Log {
 
     /// Fetches an entry at an index, or None if it does not exist.
     pub fn get(&mut self, index: Index) -> Result<Option<Entry>> {
-        self.engine.get(&Key::Entry(index).encode()?)?.map(|v| Entry::decode(&v)).transpose()
+        self.engine.get(&Key::Entry(index).encode())?.map(|v| Entry::decode(&v)).transpose()
     }
 
     /// Checks if the log contains an entry with the given index and term.
@@ -220,29 +220,29 @@ impl Log {
     }
 
     /// Returns an iterator over log entries in the given index range.
-    pub fn scan(&mut self, range: impl std::ops::RangeBounds<Index>) -> Result<Iterator> {
+    pub fn scan(&mut self, range: impl std::ops::RangeBounds<Index>) -> Iterator {
         use std::ops::Bound;
         let from = match range.start_bound() {
-            Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()?),
-            Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()?),
-            Bound::Unbounded => Bound::Included(Key::Entry(0).encode()?),
+            Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()),
+            Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()),
+            Bound::Unbounded => Bound::Included(Key::Entry(0).encode()),
         };
         let to = match range.end_bound() {
-            Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()?),
-            Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()?),
-            Bound::Unbounded => Bound::Included(Key::Entry(Index::MAX).encode()?),
+            Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()),
+            Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()),
+            Bound::Unbounded => Bound::Included(Key::Entry(Index::MAX).encode()),
         };
-        Ok(Iterator::new(self.engine.scan_dyn((from, to))))
+        Iterator::new(self.engine.scan_dyn((from, to)))
     }
 
     /// Returns an iterator over entries that are ready to apply, starting after
     /// the current applied index up to the commit index.
-    pub fn scan_apply(&mut self, applied_index: Index) -> Result<Iterator> {
+    pub fn scan_apply(&mut self, applied_index: Index) -> Iterator {
         // NB: we don't assert that commit_index >= applied_index, because the
         // local commit index is not flushed to durable storage -- if lost on
         // restart, it can be recovered from a quorum of logs.
         if applied_index >= self.commit_index {
-            return Ok(Iterator::new(Box::new(std::iter::empty())));
+            return Iterator::new(Box::new(std::iter::empty()));
         }
         self.scan(applied_index + 1..=self.commit_index)
     }
@@ -285,7 +285,7 @@ impl Log {
 
         // Skip entries that are already in the log.
         let mut entries = entries.as_slice();
-        let mut scan = self.scan(first.index..=last.index)?;
+        let mut scan = self.scan(first.index..=last.index);
         while let Some(entry) = scan.next().transpose()? {
             // [0] is ok, because the scan has the same size as entries.
             assert!(entry.index == entries[0].index, "index mismatch at {entry:?}");
@@ -308,10 +308,10 @@ impl Log {
         assert!(first.index > self.commit_index, "spliced entries below commit index");
 
         for entry in entries {
-            self.engine.set(&Key::Entry(entry.index).encode()?, entry.encode()?)?;
+            self.engine.set(&Key::Entry(entry.index).encode(), entry.encode())?;
         }
         for index in last.index + 1..=self.last_index {
-            self.engine.delete(&Key::Entry(index).encode()?)?;
+            self.engine.delete(&Key::Entry(index).encode())?;
         }
         self.engine.flush()?;
 
@@ -467,7 +467,7 @@ mod tests {
                         args.next_pos().map_or("..", |a| a.value.as_str()),
                     )?;
                     args.reject_rest()?;
-                    let mut scan = self.log.scan(range)?;
+                    let mut scan = self.log.scan(range);
                     while let Some(entry) = scan.next().transpose()? {
                         output.push_str(&format!("{}\n", Self::format_entry(&entry)));
                     }
@@ -479,7 +479,7 @@ mod tests {
                     let applied_index =
                         args.next_pos().ok_or("applied index not given")?.parse()?;
                     args.reject_rest()?;
-                    let mut scan = self.log.scan_apply(applied_index)?;
+                    let mut scan = self.log.scan_apply(applied_index);
                     while let Some(entry) = scan.next().transpose()? {
                         output.push_str(&format!("{}\n", Self::format_entry(&entry)));
                     }

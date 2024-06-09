@@ -633,7 +633,7 @@ impl RawNode<Follower> {
 
     /// Applies any pending log entries.
     fn maybe_apply(&mut self) -> Result<()> {
-        let mut iter = self.log.scan_apply(self.state.get_applied_index())?;
+        let mut iter = self.log.scan_apply(self.state.get_applied_index());
         while let Some(entry) = iter.next().transpose()? {
             debug!("Applying {entry:?}");
             // Throw away the result, since there is no client waiting for it.
@@ -1042,7 +1042,7 @@ impl RawNode<Leader> {
 
         // Apply entries and respond to client writers.
         let term = self.term();
-        let mut iter = self.log.scan_apply(self.state.get_applied_index())?;
+        let mut iter = self.log.scan_apply(self.state.get_applied_index());
         while let Some(entry) = iter.next().transpose()? {
             debug!("Applying {entry:?}");
             let write = self.role.writes.remove(&entry.index);
@@ -1146,7 +1146,7 @@ impl RawNode<Leader> {
 
         let entries = if !probe {
             self.log
-                .scan(progress.next_index..)?
+                .scan(progress.next_index..)
                 .take(self.opts.max_append_entries)
                 .collect::<Result<_>>()?
         } else {
@@ -1309,7 +1309,7 @@ mod tests {
                     let id = args.next_pos().ok_or("must specify node ID")?.parse()?;
                     let key = args.next_pos().ok_or("must specify key")?.value.clone();
                     args.reject_rest()?;
-                    let request = Request::Read(KVCommand::Get { key }.encode()?);
+                    let request = Request::Read(KVCommand::Get { key }.encode());
                     self.request(id, request, &mut output)?;
                 }
 
@@ -1357,7 +1357,7 @@ mod tests {
                     let kv = args.next_key().ok_or("must specify key/value pair")?.clone();
                     let (key, value) = (kv.key.unwrap(), kv.value);
                     args.reject_rest()?;
-                    let request = Request::Write(KVCommand::Put { key, value }.encode()?);
+                    let request = Request::Write(KVCommand::Put { key, value }.encode());
                     self.request(id, request, &mut output)?;
                 }
 
@@ -1575,7 +1575,7 @@ mod tests {
                     "{nodefmt} last={last_index}@{last_term} commit={commit_index}@{commit_term}\n",
                 ));
 
-                let mut scan = log.scan(..)?;
+                let mut scan = log.scan(..);
                 while let Some(entry) = scan.next().transpose()? {
                     output.push_str(&format!("{nodefmt} entry {}\n", &Self::format_entry(&entry)));
                 }
@@ -1710,7 +1710,7 @@ mod tests {
                 let nodefmt = Self::format_node(node);
                 output.push_str(&format!("{nodefmt} applied={applied_index}\n"));
 
-                let raw = state.read(KVCommand::Scan.encode()?)?;
+                let raw = state.read(KVCommand::Scan.encode())?;
                 let kvs: Vec<(String, String)> = bincode::deserialize(&raw)?;
                 for (key, value) in kvs {
                     output.push_str(&format!("{nodefmt} state {key}={value}\n"));
@@ -1759,7 +1759,7 @@ mod tests {
             let old_noderole = Self::format_node_role(&node);
             let log = Self::borrow_log_mut(&mut node);
             let old_commit_index = log.get_commit_index().0;
-            let entries = log.scan(..)?.collect::<crate::error::Result<Vec<_>>>()?;
+            let entries = log.scan(..).collect::<crate::error::Result<Vec<_>>>()?;
 
             // Apply the transition.
             node = f(node)?;
@@ -1769,7 +1769,7 @@ mod tests {
 
             let log = Self::borrow_log_mut(&mut node);
             let (commit_index, commit_term) = log.get_commit_index();
-            let mut appended = log.scan(..)?.collect::<crate::error::Result<Vec<_>>>()?;
+            let mut appended = log.scan(..).collect::<crate::error::Result<Vec<_>>>()?;
             match appended.iter().zip(entries.iter()).position(|(a, e)| a.term != e.term) {
                 Some(i) => appended = appended[i..].to_vec(),
                 None => appended = appended[entries.len()..].to_vec(),

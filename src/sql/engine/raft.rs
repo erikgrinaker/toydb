@@ -94,7 +94,7 @@ impl Client {
     /// Mutates the Raft state machine, deserializing the response into the
     /// return type.
     fn mutate<V: DeserializeOwned>(&self, mutation: Mutation) -> Result<V> {
-        match self.execute(raft::Request::Write(mutation.encode()?))? {
+        match self.execute(raft::Request::Write(mutation.encode()))? {
             raft::Response::Write(response) => Ok(bincode::deserialize(&response)?),
             resp => errdata!("unexpected Raft mutation response {resp:?}"),
         }
@@ -103,7 +103,7 @@ impl Client {
     /// Queries the Raft state machine, deserializing the response into the
     /// return type.
     fn query<V: DeserializeOwned>(&self, query: Query) -> Result<V> {
-        match self.execute(raft::Request::Read(query.encode()?))? {
+        match self.execute(raft::Request::Read(query.encode()))? {
             raft::Response::Read(response) => Ok(bincode::deserialize(&response)?),
             resp => errdata!("unexpected Raft query response {resp:?}"),
         }
@@ -310,7 +310,7 @@ impl<E: storage::Engine> State<E> {
 
     /// Mutates the state machine.
     fn mutate(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
-        match mutation {
+        let response = match mutation {
             Mutation::Begin => self.engine.begin()?.state().encode(),
             Mutation::Commit(txn) => bincode::serialize(&self.engine.resume(txn)?.commit()?),
             Mutation::Rollback(txn) => bincode::serialize(&self.engine.resume(txn)?.rollback()?),
@@ -331,7 +331,8 @@ impl<E: storage::Engine> State<E> {
             Mutation::DeleteTable { txn, table } => {
                 bincode::serialize(&self.engine.resume(txn)?.delete_table(&table)?)
             }
-        }
+        };
+        Ok(response)
     }
 }
 
@@ -354,12 +355,12 @@ impl<E: storage::Engine> raft::State for State<E> {
             None => Ok(Vec::new()),
         };
         self.applied_index = entry.index;
-        self.engine.set_metadata(b"applied_index", bincode::serialize(&entry.index)?)?;
+        self.engine.set_metadata(b"applied_index", bincode::serialize(&entry.index))?;
         result
     }
 
     fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
-        match Query::decode(&command)? {
+        let response = match Query::decode(&command)? {
             Query::BeginReadOnly { as_of } => {
                 let txn = if let Some(version) = as_of {
                     self.engine.begin_as_of(version)?
@@ -390,6 +391,7 @@ impl<E: storage::Engine> raft::State for State<E> {
             Query::ScanTables { txn } => {
                 self.engine.resume(txn)?.scan_tables()?.collect::<Vec<_>>().encode()
             }
-        }
+        };
+        Ok(response)
     }
 }

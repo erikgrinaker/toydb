@@ -20,7 +20,7 @@ pub trait Key<'de>: Serialize + Deserialize<'de> {
     }
 
     /// Encodes a key to a byte vector using Keycode.
-    fn encode(&self) -> Result<Vec<u8>> {
+    fn encode(&self) -> Vec<u8> {
         keycode::serialize(self)
     }
 }
@@ -46,7 +46,7 @@ pub trait Value: Serialize + DeserializeOwned {
     }
 
     /// Encodes a value to a byte vector using Bincode.
-    fn encode(&self) -> Result<Vec<u8>> {
+    fn encode(&self) -> Vec<u8> {
         bincode::serialize(self)
     }
 
