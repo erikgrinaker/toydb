@@ -219,11 +219,8 @@ impl Log {
         Ok(self.get(index)?.map(|e| e.term == term).unwrap_or(false))
     }
 
-    /// Iterates over log entries in the given index range.
-    pub fn scan(
-        &mut self,
-        range: impl std::ops::RangeBounds<Index>,
-    ) -> Result<impl Iterator<Item = Result<Entry>> + '_> {
+    /// Returns an iterator over log entries in the given index range.
+    pub fn scan(&mut self, range: impl std::ops::RangeBounds<Index>) -> Result<Iterator> {
         use std::ops::Bound;
         let from = match range.start_bound() {
             Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()?),
@@ -235,7 +232,19 @@ impl Log {
             Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()?),
             Bound::Unbounded => Bound::Included(Key::Entry(Index::MAX).encode()?),
         };
-        Ok(self.engine.scan_dyn((from, to)).map(|r| r.and_then(|(_, v)| Entry::decode(&v))))
+        Ok(Iterator::new(self.engine.scan_dyn((from, to))))
+    }
+
+    /// Returns an iterator over entries that are ready to apply, starting after
+    /// the current applied index up to the commit index.
+    pub fn scan_apply(&mut self, applied_index: Index) -> Result<Iterator> {
+        // NB: we don't assert that commit_index >= applied_index, because the
+        // local commit index is not flushed to durable storage -- if lost on
+        // restart, it can be recovered from a quorum of logs.
+        if applied_index >= self.commit_index {
+            return Ok(Iterator::new(Box::new(std::iter::empty())));
+        }
+        self.scan(applied_index + 1..=self.commit_index)
     }
 
     /// Splices a set of entries into the log and flushes it to disk. The
@@ -314,6 +323,25 @@ impl Log {
     /// Returns log engine status.
     pub fn status(&mut self) -> Result<storage::Status> {
         self.engine.status()
+    }
+}
+
+/// A log entry iterator.
+pub struct Iterator<'a> {
+    inner: Box<dyn storage::ScanIterator + 'a>,
+}
+
+impl<'a> Iterator<'a> {
+    fn new(inner: Box<dyn storage::ScanIterator + 'a>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<'a> std::iter::Iterator for Iterator<'a> {
+    type Item = Result<Entry>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|r| r.and_then(|(_, v)| Entry::decode(&v)))
     }
 }
 
@@ -443,8 +471,17 @@ mod tests {
                     while let Some(entry) = scan.next().transpose()? {
                         output.push_str(&format!("{}\n", Self::format_entry(&entry)));
                     }
-                    if output.is_empty() {
-                        output.push_str("<empty>");
+                }
+
+                // scan_apply APPLIED_INDEX
+                "scan_apply" => {
+                    let mut args = command.consume_args();
+                    let applied_index =
+                        args.next_pos().ok_or("applied index not given")?.parse()?;
+                    args.reject_rest()?;
+                    let mut scan = self.log.scan_apply(applied_index)?;
+                    while let Some(entry) = scan.next().transpose()? {
+                        output.push_str(&format!("{}\n", Self::format_entry(&entry)));
                     }
                 }
 

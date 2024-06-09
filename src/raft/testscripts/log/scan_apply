@@ -1,0 +1,59 @@
+# scan_apply works on an empty engine, even when given an applied index.
+scan_apply 0
+scan_apply 3
+---
+ok
+
+# Append a few entries.
+set_term 1
+append
+append foo
+set_term 2
+append bar
+---
+append → 1@1 None
+append → 2@1 foo
+append → 3@2 bar
+
+# Nothing is committed, so scan_applied yields nothing.
+scan_apply 0
+---
+ok
+
+# Commit the first two entries and apply them.
+commit 2
+scan_apply 0
+---
+commit → 2@1 foo
+1@1 None
+2@1 foo
+
+# Passing the commit index yields nothing.
+scan_apply 2
+---
+ok
+
+# Passing an applied_index after the commit index is ok, and yields nothing.
+scan_apply 3
+scan_apply 10
+---
+ok
+
+# Committing and applying the last entry works.
+commit 3
+scan_apply 2
+---
+commit → 3@2 bar
+3@2 bar
+
+# Scanning from a lower commit index again works.
+scan_apply 1
+---
+2@1 foo
+3@2 bar
+
+scan_apply 0
+---
+1@1 None
+2@1 foo
+3@2 bar

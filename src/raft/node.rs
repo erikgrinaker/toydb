@@ -162,35 +162,6 @@ impl<R: Role> RawNode<R> {
         self.log.get_term().0
     }
 
-    /// Applies any pending, committed entries to the state machine. The command
-    /// responses are discarded, use maybe_apply_with() instead to access them.
-    fn maybe_apply(&mut self) -> Result<()> {
-        Self::maybe_apply_with(&mut self.log, &mut self.state, |_, _| Ok(()))
-    }
-
-    /// Like maybe_apply(), but calls the given closure with the result of every
-    /// applied command. Not a method, so that the closure can mutate the node.
-    fn maybe_apply_with<F>(log: &mut Log, state: &mut Box<dyn State>, mut on_apply: F) -> Result<()>
-    where
-        F: FnMut(Index, Result<Vec<u8>>) -> Result<()>,
-    {
-        let applied_index = state.get_applied_index();
-        let commit_index = log.get_commit_index().0;
-        // NB: we don't assert that commit_index >= applied_index, because the
-        // local commit index is not synced to durable storage -- on restart, it
-        // can be recovered from a quorum of logs.
-        if applied_index >= commit_index {
-            return Ok(());
-        }
-
-        let mut scan = log.scan((applied_index + 1)..=commit_index)?;
-        while let Some(entry) = scan.next().transpose()? {
-            debug!("Applying {:?}", entry);
-            on_apply(entry.index, state.apply(entry))?;
-        }
-        Ok(())
-    }
-
     /// Returns the cluster size as number of nodes.
     fn cluster_size(&self) -> usize {
         self.peers.len() + 1
@@ -210,9 +181,13 @@ impl<R: Role> RawNode<R> {
 
     /// Sends a message.
     fn send(&self, to: NodeID, message: Message) -> Result<()> {
-        let msg = Envelope { from: self.id, to, term: self.term(), message };
+        Self::send_with(&self.node_tx, Envelope { from: self.id, to, term: self.term(), message })
+    }
+
+    /// Sends a message without borrowing self, to allow partial borrows.
+    fn send_with(tx: &crossbeam::channel::Sender<Envelope>, msg: Envelope) -> Result<()> {
         debug!("Sending {msg:?}");
-        Ok(self.node_tx.send(msg)?)
+        Ok(tx.send(msg)?)
     }
 
     /// Broadcasts a message to all peers.
@@ -656,6 +631,19 @@ impl RawNode<Follower> {
         Ok(())
     }
 
+    /// Applies any pending log entries.
+    fn maybe_apply(&mut self) -> Result<()> {
+        let mut iter = self.log.scan_apply(self.state.get_applied_index())?;
+        while let Some(entry) = iter.next().transpose()? {
+            debug!("Applying {entry:?}");
+            // Throw away the result, since there is no client waiting for it.
+            // This includes errors -- any non-deterministic errors (e.g. IO
+            // errors) must panic instead to avoid replica divergence.
+            _ = self.state.apply(entry);
+        }
+        Ok(())
+    }
+
     /// Checks if an address is the current leader.
     fn is_leader(&self, from: NodeID) -> bool {
         self.role.leader == Some(from)
@@ -1054,21 +1042,18 @@ impl RawNode<Leader> {
 
         // Apply entries and respond to client writers.
         let term = self.term();
-        Self::maybe_apply_with(&mut self.log, &mut self.state, |index, result| -> Result<()> {
-            if let Some(write) = self.role.writes.remove(&index) {
-                // TODO: use self.send() or something.
-                self.node_tx.send(Envelope {
-                    from: self.id,
-                    to: write.from,
-                    term,
-                    message: Message::ClientResponse {
-                        id: write.id,
-                        response: result.map(Response::Write),
-                    },
-                })?;
+        let mut iter = self.log.scan_apply(self.state.get_applied_index())?;
+        while let Some(entry) = iter.next().transpose()? {
+            debug!("Applying {entry:?}");
+            let write = self.role.writes.remove(&entry.index);
+            let result = self.state.apply(entry);
+
+            if let Some(Write { id, from: to }) = write {
+                let message = Message::ClientResponse { id, response: result.map(Response::Write) };
+                Self::send_with(&self.node_tx, Envelope { from: self.id, term, to, message })?;
             }
-            Ok(())
-        })?;
+        }
+        drop(iter);
 
         // If the commit term changed, there may be pending reads waiting for us
         // to commit an entry from our own term. Execute them.

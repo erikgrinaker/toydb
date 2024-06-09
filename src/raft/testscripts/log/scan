@@ -2,8 +2,7 @@
 scan
 scan 3..7
 ---
-<empty>
-<empty>
+ok
 
 # Append a few entries.
 set_term 1
@@ -31,7 +30,7 @@ scan 2..
 
 scan 4..
 ---
-<empty>
+ok
 
 scan 0..
 ---
@@ -57,11 +56,11 @@ scan "..7"
 
 scan "..1"
 ---
-<empty>
+ok
 
 scan "..0"
 ---
-<empty>
+ok
 
 # Both bounds.
 scan 1..2
@@ -81,7 +80,7 @@ scan 0..7
 
 scan 1..1
 ---
-<empty>
+ok
 
 # Bounds panics.
 !scan 1..0
