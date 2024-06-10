@@ -1176,7 +1176,7 @@ mod tests {
     impl RawNode<Follower> {
         /// Creates a noop node, with a noop state machine and transport.
         fn new_noop(id: NodeID, peers: HashSet<NodeID>) -> Self {
-            let log = Log::new(storage::Memory::new()).expect("log failed");
+            let log = Log::new(Box::new(storage::Memory::new())).expect("log failed");
             let state = teststate::Noop::new();
             let (tx, _) = crossbeam::channel::unbounded();
             RawNode::new(id, peers, log, state, tx, Options::default()).expect("node failed")
@@ -1438,7 +1438,7 @@ mod tests {
                 let (node_tx, node_rx) = crossbeam::channel::unbounded();
                 let (applied_tx, applied_rx) = crossbeam::channel::unbounded();
                 let peers = self.ids.iter().copied().filter(|i| i != &id).collect();
-                let log = Log::new(storage::Memory::new())?;
+                let log = Log::new(Box::new(storage::Memory::new()))?;
                 let state = teststate::Emit::new(teststate::KV::new(), applied_tx);
                 self.nodes.insert(id, Node::new(id, peers, log, state, node_tx, opts.clone())?);
 

@@ -38,12 +38,12 @@ fn main() -> Result<()> {
 
     let path = std::path::Path::new(&cfg.data_dir);
     let raft_log = match cfg.storage_raft.as_str() {
-        "bitcask" | "" => raft::Log::new(storage::BitCask::new_compact(
+        "bitcask" | "" => raft::Log::new(Box::new(storage::BitCask::new_compact(
             path.join("log"),
             cfg.compact_threshold,
             COMPACT_MIN_BYTES,
-        )?)?,
-        "memory" => raft::Log::new(storage::Memory::new())?,
+        )?))?,
+        "memory" => raft::Log::new(Box::new(storage::Memory::new()))?,
         name => return errinput!("invalid Raft storage engine {name}"),
     };
     let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {

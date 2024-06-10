@@ -35,16 +35,6 @@ pub enum Key {
 
 impl encoding::Key<'_> for Key {}
 
-/// Log key prefixes used for prefix scans. Must match the Key structure.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-enum KeyPrefix {
-    Entry,
-    TermVote,
-    CommitIndex,
-}
-
-impl encoding::Key<'_> for KeyPrefix {}
-
 /// The Raft log stores a sequence of arbitrary commands (typically writes) that
 /// are replicated across nodes and applied sequentially to the local state
 /// machine. Each entry contains an index, command, and the term in which the
@@ -115,14 +105,15 @@ pub struct Log {
 
 impl Log {
     /// Initializes a log using the given storage engine.
-    pub fn new(mut engine: impl storage::Engine + 'static) -> Result<Self> {
+    pub fn new(mut engine: Box<dyn storage::Engine>) -> Result<Self> {
+        use std::ops::Bound::Included;
         let (term, vote) = engine
             .get(&Key::TermVote.encode())?
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, None));
         let (last_index, last_term) = engine
-            .scan_prefix(&KeyPrefix::Entry.encode())
+            .scan_dyn((Included(Key::Entry(0).encode()), Included(Key::Entry(u64::MAX).encode())))
             .last()
             .transpose()?
             .map(|(_, v)| Entry::decode(&v))
@@ -134,7 +125,6 @@ impl Log {
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, 0));
-        let engine = Box::new(engine);
         Ok(Self { engine, term, vote, last_index, last_term, commit_index, commit_term })
     }
 
@@ -557,7 +547,7 @@ mod tests {
         fn new_with_engine(engine: impl storage::Engine + 'static) -> Self {
             let engine = storage::Debug::new(engine);
             let op_rx = engine.op_rx();
-            let log = Log::new(engine).expect("log init failed");
+            let log = Log::new(Box::new(engine)).expect("log init failed");
             Self { log, op_rx }
         }
 
