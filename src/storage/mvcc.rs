@@ -784,8 +784,10 @@ impl<'a, E: Engine> DoubleEndedIterator for VersionIterator<'a, E> {
 #[cfg(test)]
 pub mod tests {
     use super::super::debug;
-    use super::super::{Debug, Memory};
+    use super::super::engine::test::{self as testengine, Emit};
+    use super::super::Memory;
     use super::*;
+    use crossbeam::channel::Receiver;
     use std::collections::HashMap;
     use std::io::Write as _;
 
@@ -794,7 +796,8 @@ pub mod tests {
     /// An MVCC wrapper that records transaction schedules to golden masters.
     /// TODO: migrate this to goldenscript.
     struct Schedule {
-        mvcc: MVCC<Debug<Memory>>,
+        mvcc: MVCC<Emit<Memory>>,
+        op_rx: Receiver<testengine::Operation>,
         mint: goldenfile::Mint,
         file: Arc<Mutex<std::fs::File>>,
         next_id: u8,
@@ -803,10 +806,11 @@ pub mod tests {
     impl Schedule {
         /// Creates a new schedule using the given golden master filename.
         fn new(name: &str) -> Result<Self> {
-            let mvcc = MVCC::new(Debug::new(Memory::new()));
+            let (op_tx, op_rx) = crossbeam::channel::unbounded();
+            let mvcc = MVCC::new(Emit::new(Memory::new(), op_tx));
             let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
             let file = Arc::new(Mutex::new(mint.new_goldenfile(name)?));
-            Ok(Self { mvcc, mint, file, next_id: 1 })
+            Ok(Self { mvcc, op_rx, mint, file, next_id: 1 })
         }
 
         /// Sets up an initial, versioned dataset from the given data as a
@@ -836,7 +840,7 @@ pub mod tests {
                 txn.commit()?;
             }
             // Flush the write log, but dump the engine contents.
-            while self.mvcc.engine.lock()?.op_rx().try_recv().is_ok() {}
+            while self.op_rx.try_recv().is_ok() {}
             self.print_engine()?;
             writeln!(&mut self.file.lock()?)?;
             Ok(())
@@ -862,12 +866,17 @@ pub mod tests {
         fn new_txn(
             &mut self,
             name: &str,
-            result: Result<Transaction<Debug<Memory>>>,
+            result: Result<Transaction<Emit<Memory>>>,
         ) -> Result<ScheduleTransaction> {
             let id = self.next_id;
             self.next_id += 1;
             self.print_begin(id, name, &result)?;
-            result.map(|txn| ScheduleTransaction { id, txn, file: self.file.clone() })
+            result.map(|txn| ScheduleTransaction {
+                id,
+                txn,
+                file: self.file.clone(),
+                op_rx: self.op_rx.clone(),
+            })
         }
 
         /// Prints a transaction begin to the golden file.
@@ -875,7 +884,7 @@ pub mod tests {
             &mut self,
             id: u8,
             name: &str,
-            result: &Result<Transaction<Debug<Memory>>>,
+            result: &Result<Transaction<Emit<Memory>>>,
         ) -> Result<()> {
             let mut f = self.file.lock()?;
             write!(f, "T{}: {} → ", id, name)?;
@@ -883,24 +892,23 @@ pub mod tests {
                 Ok(txn) => writeln!(f, "{}", debug::format_txn(txn.state()))?,
                 Err(err) => writeln!(f, "Error::{:?}", err)?,
             };
-            Self::print_log(&mut f, &mut self.mvcc.engine.lock()?)?;
+            Self::print_log(&mut f, &self.op_rx)?;
             writeln!(f)?;
             Ok(())
         }
-
         /// Prints the engine write log since the last call to the golden file.
         fn print_log(
             f: &mut MutexGuard<'_, std::fs::File>,
-            engine: &mut MutexGuard<'_, Debug<Memory>>,
+            op_rx: &Receiver<testengine::Operation>,
         ) -> Result<()> {
-            while let Ok(op) = engine.op_rx().try_recv() {
+            while let Ok(op) = op_rx.try_recv() {
                 match op {
-                    debug::Operation::Delete(key) => {
+                    testengine::Operation::Delete { key } => {
                         let (fkey, _) = debug::format_key_value(&key, &None);
                         writeln!(f, "    del {fkey}")
                     }
-                    debug::Operation::Flush => writeln!(f, "    flush"),
-                    debug::Operation::Set(key, value) => {
+                    testengine::Operation::Flush => writeln!(f, "    flush"),
+                    testengine::Operation::Set { key, value } => {
                         let (fkey, fvalue) = debug::format_key_value(&key, &Some(value));
                         writeln!(f, "    set {} = {}", fkey, fvalue.unwrap())
                     }
@@ -951,7 +959,7 @@ pub mod tests {
                 Ok(_) => writeln!(f)?,
                 Err(err) => writeln!(f, " → Error::{:?}", err)?,
             }
-            Schedule::print_log(&mut f, &mut self.mvcc.engine.lock()?)?;
+            Schedule::print_log(&mut f, &self.op_rx)?;
             writeln!(f)?;
             result
         }
@@ -967,8 +975,9 @@ pub mod tests {
 
     struct ScheduleTransaction {
         id: u8,
-        txn: Transaction<Debug<Memory>>,
+        txn: Transaction<Emit<Memory>>,
         file: Arc<Mutex<std::fs::File>>,
+        op_rx: Receiver<testengine::Operation>,
     }
 
     impl Clone for ScheduleTransaction {
@@ -977,7 +986,7 @@ pub mod tests {
         /// since a commit/rollback will invalidate the cloned transactions.
         fn clone(&self) -> Self {
             let txn = Transaction { engine: self.txn.engine.clone(), st: self.txn.st.clone() };
-            Self { id: self.id, txn, file: self.file.clone() }
+            Self { id: self.id, op_rx: self.op_rx.clone(), txn, file: self.file.clone() }
         }
     }
 
@@ -1029,7 +1038,7 @@ pub mod tests {
             Ok(value)
         }
 
-        fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Result<Scan<Debug<Memory>>> {
+        fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Result<Scan<Emit<Memory>>> {
             let name = format!(
                 "scan {}..{}",
                 match range.start_bound() {
@@ -1048,7 +1057,7 @@ pub mod tests {
             Ok(scan)
         }
 
-        fn scan_prefix(&self, prefix: &[u8]) -> Result<Scan<Debug<Memory>>> {
+        fn scan_prefix(&self, prefix: &[u8]) -> Result<Scan<Emit<Memory>>> {
             let mut scan = self.txn.scan_prefix(prefix)?;
             self.print_scan(&format!("scan prefix {}", debug::format_raw(prefix)), scan.to_vec()?)?;
             Ok(scan)
@@ -1062,7 +1071,7 @@ pub mod tests {
                 Ok(_) => writeln!(f)?,
                 Err(err) => writeln!(f, " → Error::{:?}", err)?,
             }
-            Schedule::print_log(&mut f, &mut self.txn.engine.lock()?)?;
+            Schedule::print_log(&mut f, &self.op_rx)?;
             writeln!(f)?;
             Ok(())
         }
@@ -1092,7 +1101,7 @@ pub mod tests {
 
     // Asserts scan invariants.
     #[track_caller]
-    fn assert_scan_invariants(scan: &mut Scan<Debug<Memory>>) -> Result<()> {
+    fn assert_scan_invariants(scan: &mut Scan<Emit<Memory>>) -> Result<()> {
         // Iterator and vec should yield same results.
         let result = scan.to_vec()?;
         assert_eq!(scan.iter().collect::<Result<Vec<_>>>()?, result);

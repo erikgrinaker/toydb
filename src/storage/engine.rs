@@ -81,6 +81,82 @@ pub struct Status {
 }
 
 #[cfg(test)]
+/// Test helper engines.
+pub mod test {
+    use super::*;
+    use crossbeam::channel::Sender;
+
+    /// Wraps another engine and emits write events to the given channel.
+    pub struct Emit<E: Engine> {
+        /// The wrapped engine.
+        inner: E,
+        /// Sends operation events.
+        tx: Sender<Operation>,
+    }
+
+    /// An engine operation emitted by the Emit engine.
+    pub enum Operation {
+        Delete { key: Vec<u8> },
+        Flush,
+        Set { key: Vec<u8>, value: Vec<u8> },
+    }
+
+    impl<E: Engine> std::fmt::Display for Emit<E> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            // Just dispatch to the inner engine.
+            self.inner.fmt(f)
+        }
+    }
+
+    impl<E: Engine> Emit<E> {
+        pub fn new(inner: E, tx: Sender<Operation>) -> Self {
+            Self { inner, tx }
+        }
+    }
+
+    impl<E: Engine> Engine for Emit<E> {
+        type ScanIterator<'a> = E::ScanIterator<'a> where E: 'a;
+
+        fn flush(&mut self) -> Result<()> {
+            self.inner.flush()?;
+            self.tx.send(Operation::Flush)?;
+            Ok(())
+        }
+
+        fn delete(&mut self, key: &[u8]) -> Result<()> {
+            self.inner.delete(key)?;
+            self.tx.send(Operation::Delete { key: key.to_vec() })?;
+            Ok(())
+        }
+
+        fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            self.inner.get(key)
+        }
+
+        fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
+            self.inner.scan(range)
+        }
+
+        fn scan_dyn(
+            &mut self,
+            range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+        ) -> Box<dyn ScanIterator + '_> {
+            Box::new(self.scan(range))
+        }
+
+        fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
+            self.inner.set(key, value.clone())?;
+            self.tx.send(Operation::Set { key: key.to_vec(), value })?;
+            Ok(())
+        }
+
+        fn status(&mut self) -> Result<Status> {
+            self.inner.status()
+        }
+    }
+}
+
+#[cfg(test)]
 pub(crate) mod tests {
     /// Generates common tests for any Engine implementation.
     macro_rules! test_engine {

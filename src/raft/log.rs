@@ -343,6 +343,7 @@ mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
     use std::{error::Error, result::Result};
+    use storage::engine::test as testengine;
     use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/raft/testscripts/log.
@@ -355,7 +356,7 @@ mod tests {
     /// Runs Raft log goldenscript tests. For available commands, see run().
     struct TestRunner {
         log: Log,
-        op_rx: Receiver<storage::debug::Operation>,
+        op_rx: Receiver<testengine::Operation>,
     }
 
     impl goldenscript::Runner for TestRunner {
@@ -535,8 +536,8 @@ mod tests {
 
     impl TestRunner {
         fn new() -> Self {
-            let engine = storage::Debug::new(storage::Memory::new());
-            let op_rx = engine.op_rx();
+            let (op_tx, op_rx) = crossbeam::channel::unbounded();
+            let engine = testengine::Emit::new(storage::Memory::new(), op_tx);
             let log = Log::new(Box::new(engine)).expect("log init failed");
             Self { log, op_rx }
         }
@@ -566,11 +567,13 @@ mod tests {
                 return;
             }
             while let Ok(op) = self.op_rx.try_recv() {
-                use storage::debug::Operation;
+                use testengine::Operation;
                 let s = match op {
-                    Operation::Delete(k) => format!("delete {}", Self::format_key(&k)),
+                    Operation::Delete { key } => format!("delete {}", Self::format_key(&key)),
                     Operation::Flush => "flush".to_string(),
-                    Operation::Set(k, v) => format!("set {}", Self::format_key_value(&k, &v)),
+                    Operation::Set { key, value } => {
+                        format!("set {}", Self::format_key_value(&key, &value))
+                    }
                 };
                 output.push_str(&format!("engine: {s}\n"));
             }

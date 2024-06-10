@@ -1,13 +1,11 @@
 //! Storage debug helpers, primarily formatting of raw engine data.
 
-use std::collections::HashSet;
+// TODO: consider moving these elsewhere.
 
-use crossbeam::channel::{Receiver, Sender};
-
-use super::engine::{self, ScanIterator, Status};
 use super::mvcc::{self, TransactionState};
 use crate::encoding::{bincode, Key as _};
-use crate::error::Result;
+
+use std::collections::HashSet;
 
 /// Formats a raw byte string, either as a UTF-8 string (if valid and
 /// printable), otherwise hex-encoded.
@@ -91,79 +89,4 @@ pub fn format_key_value(key: &[u8], value: &Option<Vec<u8>>) -> (String, Option<
     }
 
     (fkey, fvalue)
-}
-
-/// A debug storage engine, which wraps another engine and emits events.
-pub struct Engine<E: engine::Engine> {
-    /// The wrapped engine.
-    inner: E,
-    /// Sends engine operations.
-    op_tx: Sender<Operation>,
-    /// Receives engine operations.
-    op_rx: Receiver<Operation>,
-}
-
-impl<E: engine::Engine> std::fmt::Display for Engine<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "debug:{}", self.inner)
-    }
-}
-
-impl<E: engine::Engine> Engine<E> {
-    pub fn new(inner: E) -> Self {
-        let (op_tx, op_rx) = crossbeam::channel::unbounded();
-        Self { inner, op_tx, op_rx }
-    }
-
-    pub fn op_rx(&self) -> Receiver<Operation> {
-        self.op_rx.clone()
-    }
-}
-
-impl<E: engine::Engine> engine::Engine for Engine<E> {
-    type ScanIterator<'a> = E::ScanIterator<'a> where E: 'a;
-
-    fn flush(&mut self) -> Result<()> {
-        self.inner.flush()?;
-        self.op_tx.send(Operation::Flush)?;
-        Ok(())
-    }
-
-    fn delete(&mut self, key: &[u8]) -> Result<()> {
-        self.inner.delete(key)?;
-        self.op_tx.send(Operation::Delete(key.to_vec()))?;
-        Ok(())
-    }
-
-    fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.inner.get(key)
-    }
-
-    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
-        self.inner.scan(range)
-    }
-
-    fn scan_dyn(
-        &mut self,
-        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
-    ) -> Box<dyn ScanIterator + '_> {
-        Box::new(self.scan(range))
-    }
-
-    fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.inner.set(key, value.clone())?;
-        self.op_tx.send(Operation::Set(key.to_vec(), value))?;
-        Ok(())
-    }
-
-    fn status(&mut self) -> Result<Status> {
-        self.inner.status()
-    }
-}
-
-/// An engine operation, emitted by the debug engine.
-pub enum Operation {
-    Delete(Vec<u8>),
-    Flush,
-    Set(Vec<u8>, Vec<u8>),
 }
