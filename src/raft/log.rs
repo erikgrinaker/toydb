@@ -343,7 +343,6 @@ mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
     use std::{error::Error, result::Result};
-    use storage::Engine as _;
     use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/raft/testscripts/log.
@@ -442,15 +441,10 @@ mod tests {
 
                 // reload
                 "reload" => {
-                    use std::ops::Bound::Unbounded;
                     command.consume_args().reject_rest()?;
-                    let mut engine = storage::Memory::new();
-                    let mut scan = self.log.engine.scan_dyn((Unbounded, Unbounded));
-                    while let Some((key, value)) = scan.next().transpose()? {
-                        engine.set(&key, value)?
-                    }
-                    drop(scan);
-                    *self = TestRunner::new_with_engine(engine)
+                    let engine =
+                        std::mem::replace(&mut self.log.engine, Box::new(storage::Memory::new()));
+                    self.log = Log::new(engine)?;
                 }
 
                 // scan [RANGE]
@@ -541,11 +535,7 @@ mod tests {
 
     impl TestRunner {
         fn new() -> Self {
-            Self::new_with_engine(storage::Memory::new())
-        }
-
-        fn new_with_engine(engine: impl storage::Engine + 'static) -> Self {
-            let engine = storage::Debug::new(engine);
+            let engine = storage::Debug::new(storage::Memory::new());
             let op_rx = engine.op_rx();
             let log = Log::new(Box::new(engine)).expect("log init failed");
             Self { log, op_rx }
