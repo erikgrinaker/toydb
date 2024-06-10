@@ -1,0 +1,48 @@
+# The term/vote is retained across a restart.
+
+cluster nodes=3
+---
+n1@0 follower() last=0@0 commit=0@0 applied=0
+n2@0 follower() last=0@0 commit=0@0 applied=0
+n3@0 follower() last=0@0 commit=0@0 applied=0
+
+# Start a new election on n1.
+campaign 1
+---
+n1@0 follower() ⇨ n1@1 candidate
+n1@1 → n2 Campaign last=0@0
+n1@1 → n3 Campaign last=0@0
+
+# n3 votes for n1, and then restarts.
+deliver 3
+---
+n3@0 follower() ⇨ n3@1 follower()
+n3@1 → n1 CampaignResponse vote=true
+
+restart 3
+---
+n3@1 follower() last=0@0 commit=0@0 applied=0
+
+# n3 still has a record of the term and vote in the log.
+log 3
+---
+n3@1 term=1 last=0@0 commit=0@0 vote=Some(1)
+
+# n2 also campaigns. n3 does not grant its vote.
+campaign 2
+---
+n2@0 follower() ⇨ n2@1 candidate
+n2@1 → n1 Campaign last=0@0
+n2@1 → n3 Campaign last=0@0
+
+deliver 3
+---
+n3@1 → n2 CampaignResponse vote=false
+
+# n1 wins leadership.
+(stabilize)
+status
+---
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=0@0 applied=0
+n3@1 follower(n1) last=1@1 commit=0@0 applied=0

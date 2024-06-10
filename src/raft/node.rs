@@ -289,6 +289,11 @@ impl RawNode<Follower> {
         let role = Follower::new(None, 0);
         let mut node = Self { id, peers, log, state, tx, opts, role };
         node.role.election_timeout = node.random_election_timeout();
+
+        // Apply any pending entries following restart. Unlike the Raft log,
+        // state machines writes are not flushed to durable storage, so a tail
+        // of writes may be lost if the OS crashes or restarts.
+        node.maybe_apply()?;
         Ok(node)
     }
 
@@ -1125,7 +1130,7 @@ impl RawNode<Leader> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encoding::Value as _;
+    use crate::encoding::{bincode, Key as _, Value as _};
     use crate::raft::state::test::{self as teststate, KVCommand, KVResponse};
     use crate::raft::Entry;
     use crate::storage;
@@ -1185,6 +1190,10 @@ mod tests {
 
     /// Test helpers for Node.
     impl Node {
+        fn dismantle(self) -> (Log, Box<dyn State>) {
+            with_rawnode!(self, |n| (n.log, n.state))
+        }
+
         fn get_applied_index(&self) -> Index {
             with_rawnode!(ref self, |n| n.state.get_applied_index())
         }
@@ -1199,6 +1208,14 @@ mod tests {
 
         fn get_term_vote(&self) -> (Term, Option<NodeID>) {
             with_rawnode!(ref self, |n| n.log.get_term())
+        }
+
+        fn options(&self) -> Options {
+            with_rawnode!(ref self, |n| n.opts.clone())
+        }
+
+        fn peers(&self) -> HashSet<NodeID> {
+            with_rawnode!(ref self, |n| n.peers.clone())
         }
 
         fn read(&self, command: Vec<u8>) -> crate::error::Result<Vec<u8>> {
@@ -1330,6 +1347,20 @@ mod tests {
                     self.request(id, request, &mut output)?;
                 }
 
+                // restart [commit_index=INDEX] [applied_index=INDEX] [ID...]
+                // Restarts the given nodes (or all nodes). They retain their
+                // log and state, unless applied_index is given (which reverts
+                // the state machine to the given index, or 0 if empty).
+                // commit_index may be given to regress the commit index (it
+                // is not flushed to durable storage).
+                "restart" => {
+                    let mut args = command.consume_args();
+                    let applied_index = args.lookup_parse("applied_index")?;
+                    let commit_index = args.lookup_parse("commit_index")?;
+                    let ids = self.parse_ids_or_all(&args.rest())?;
+                    self.restart(&ids, commit_index, applied_index, &mut output)?;
+                }
+
                 // stabilize [heartbeat=BOOL] [ID...]
                 // Stabilizes the given nodes by repeatedly delivering messages
                 // until no more messages are pending. If heartbeat is true, also
@@ -1398,6 +1429,38 @@ mod tests {
             Self { next_request_id: 1, ..Default::default() }
         }
 
+        /// Creates a new empty node and inserts it.
+        fn add_node(
+            &mut self,
+            id: NodeID,
+            peers: HashSet<NodeID>,
+            opts: Options,
+        ) -> Result<(), Box<dyn Error>> {
+            let log = Log::new(Box::new(storage::Memory::new()))?;
+            let state = teststate::KV::new();
+            self.add_node_with(id, peers, log, state, opts)
+        }
+
+        /// Creates a new node with the given log and state and inserts it.
+        fn add_node_with(
+            &mut self,
+            id: NodeID,
+            peers: HashSet<NodeID>,
+            log: Log,
+            state: Box<dyn State>,
+            opts: Options,
+        ) -> Result<(), Box<dyn Error>> {
+            let (node_tx, node_rx) = crossbeam::channel::unbounded();
+            let (applied_tx, applied_rx) = crossbeam::channel::unbounded();
+            let state = teststate::Emit::new(state, applied_tx);
+            self.nodes.insert(id, Node::new(id, peers, log, state, node_tx, opts)?);
+            self.nodes_rx.insert(id, node_rx);
+            self.nodes_pending.insert(id, Vec::new());
+            self.applied_rx.insert(id, applied_rx);
+            self.disconnected.insert(id, HashSet::new());
+            Ok(())
+        }
+
         /// Transitions nodes to candidates and campaign in a new term.
         fn campaign(&mut self, ids: &[NodeID], output: &mut String) -> Result<(), Box<dyn Error>> {
             let campaign = |node| match node {
@@ -1434,20 +1497,9 @@ mod tests {
 
             self.ids = (1..=nodes).collect();
 
-            for id in self.ids.iter().copied() {
-                let (node_tx, node_rx) = crossbeam::channel::unbounded();
-                let (applied_tx, applied_rx) = crossbeam::channel::unbounded();
+            for id in self.ids.clone() {
                 let peers = self.ids.iter().copied().filter(|i| i != &id).collect();
-                let log = Log::new(Box::new(storage::Memory::new()))?;
-                let state = teststate::Emit::new(teststate::KV::new(), applied_tx);
-                self.nodes.insert(id, Node::new(id, peers, log, state, node_tx, opts.clone())?);
-
-                while applied_rx.try_recv().is_ok() {} // drain first apply
-
-                self.nodes_rx.insert(id, node_rx);
-                self.nodes_pending.insert(id, Vec::new());
-                self.applied_rx.insert(id, applied_rx);
-                self.disconnected.insert(id, HashSet::new());
+                self.add_node(id, peers, opts.clone())?;
             }
 
             // Promote leader if requested. Suppress output.
@@ -1459,6 +1511,11 @@ mod tests {
                 self.nodes.insert(id, node.into_candidate()?.into_leader()?.into());
                 self.receive(id, quiet)?;
                 self.stabilize(&self.ids.clone(), true, quiet)?;
+            }
+
+            // Drain any initial applied entries.
+            for applied_rx in self.applied_rx.values_mut() {
+                while applied_rx.try_recv().is_ok() {}
             }
 
             // Output final cluster status.
@@ -1618,6 +1675,62 @@ mod tests {
             };
             writeln!(output, "c{id}@{term} → n{id} {}", Self::format_message(&msg.message))?;
             self.transition(id, |n| n.step(msg), output)
+        }
+
+        /// Restarts the given nodes. If commit_index or applied_index are
+        /// given, the log commit index or state machine will regress.
+        fn restart(
+            &mut self,
+            ids: &[NodeID],
+            commit_index: Option<Index>,
+            applied_index: Option<Index>,
+            output: &mut String,
+        ) -> Result<(), Box<dyn Error>> {
+            for id in ids.iter().copied() {
+                let node = self.nodes.remove(&id).ok_or(format!("unknown node {id}"))?;
+                let peers = node.peers();
+                let opts = node.options();
+                let (log, mut state) = node.dismantle();
+                let mut log = Log::new(log.engine)?; // reset log
+
+                // If requested, regress the commit index.
+                if let Some(commit_index) = commit_index {
+                    if commit_index > log.get_commit_index().0 {
+                        return Err(format!("commit_index={commit_index} beyond current").into());
+                    }
+                    let commit_term = match log.get(commit_index)? {
+                        Some(e) => e.term,
+                        None if commit_index == 0 => 0,
+                        None => return Err(format!("unknown commit_index={commit_index}").into()),
+                    };
+                    log.engine.set(
+                        &crate::raft::log::Key::CommitIndex.encode(),
+                        bincode::serialize(&(commit_index, commit_term)),
+                    )?;
+                    // Reset the log again.
+                    log = Log::new(log.engine)?;
+                }
+
+                // If requested, wipe the state machine and reapply up to the
+                // requested applied index.
+                if let Some(applied_index) = applied_index {
+                    if applied_index > log.get_commit_index().0 {
+                        return Err(format!("applied_index={applied_index} beyond commit").into());
+                    }
+                    state = teststate::KV::new();
+                    let mut scan = log.scan(..=applied_index);
+                    while let Some(entry) = scan.next().transpose()? {
+                        _ = state.apply(entry); // apply errors are returned to client
+                    }
+                    assert_eq!(state.get_applied_index(), applied_index, "wrong applied index");
+                }
+
+                // Add node, and run a noop transition to output applied entries.
+                self.add_node_with(id, peers, log, state, opts)?;
+                self.transition(id, Ok, output)?;
+            }
+            // Output restarted node status.
+            self.status(ids, output)
         }
 
         /// Stabilizes the given nodes by repeatedly delivering pending messages

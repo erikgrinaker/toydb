@@ -1,0 +1,41 @@
+# Restarting a node and wiping its state machine will reapply the state.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+
+# Replicate a couple of writes.
+(put 1 a=1)
+(put 1 b=2)
+(stabilize heartbeat=true)
+---
+ok
+
+# Restart n3 and clear its state machine. The node will apply all pending
+# entries when restarting.
+restart 3 applied_index=0
+---
+n3@1 apply 1@1 None
+n3@1 apply 2@1 put a=1
+n3@1 apply 3@1 put b=2
+n3@1 follower() last=3@1 commit=3@1 applied=3
+
+state 3
+---
+n3@1 applied=3
+n3@1 state a=1
+n3@1 state b=2
+
+# Restart n3 and lose the last write. It will also be reapplied.
+restart 3 applied_index=2
+---
+n3@1 apply 3@1 put b=2
+n3@1 follower() last=3@1 commit=3@1 applied=3
+
+state 3
+---
+n3@1 applied=3
+n3@1 state a=1
+n3@1 state b=2

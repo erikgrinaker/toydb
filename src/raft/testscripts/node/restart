@@ -1,0 +1,122 @@
+# Restarting a cluster that's fully caught up retains the existing state and
+# allows trivially electing a new leader.
+
+cluster nodes=3 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+
+# Replicate a couple of writes.
+(put 1 a=1)
+(put 1 b=2)
+(stabilize heartbeat=true)
+---
+ok
+
+# Dump the current status, log, and state.
+status
+---
+n1@1 leader last=3@1 commit=3@1 applied=3 progress={2:3→4 3:3→4}
+n2@1 follower(n1) last=3@1 commit=3@1 applied=3
+n3@1 follower(n1) last=3@1 commit=3@1 applied=3
+
+log
+---
+n1@1 term=1 last=3@1 commit=3@1 vote=Some(1)
+n1@1 entry 1@1 None
+n1@1 entry 2@1 put a=1
+n1@1 entry 3@1 put b=2
+n2@1 term=1 last=3@1 commit=3@1 vote=Some(1)
+n2@1 entry 1@1 None
+n2@1 entry 2@1 put a=1
+n2@1 entry 3@1 put b=2
+n3@1 term=1 last=3@1 commit=3@1 vote=Some(1)
+n3@1 entry 1@1 None
+n3@1 entry 2@1 put a=1
+n3@1 entry 3@1 put b=2
+
+state
+---
+n1@1 applied=3
+n1@1 state a=1
+n1@1 state b=2
+n2@1 applied=3
+n2@1 state a=1
+n2@1 state b=2
+n3@1 applied=3
+n3@1 state a=1
+n3@1 state b=2
+
+# Restart the nodes. They retain the same status, logs, and state.
+restart
+---
+n1@1 follower() last=3@1 commit=3@1 applied=3
+n2@1 follower() last=3@1 commit=3@1 applied=3
+n3@1 follower() last=3@1 commit=3@1 applied=3
+
+log
+---
+n1@1 term=1 last=3@1 commit=3@1 vote=Some(1)
+n1@1 entry 1@1 None
+n1@1 entry 2@1 put a=1
+n1@1 entry 3@1 put b=2
+n2@1 term=1 last=3@1 commit=3@1 vote=Some(1)
+n2@1 entry 1@1 None
+n2@1 entry 2@1 put a=1
+n2@1 entry 3@1 put b=2
+n3@1 term=1 last=3@1 commit=3@1 vote=Some(1)
+n3@1 entry 1@1 None
+n3@1 entry 2@1 put a=1
+n3@1 entry 3@1 put b=2
+
+state
+---
+n1@1 applied=3
+n1@1 state a=1
+n1@1 state b=2
+n2@1 applied=3
+n2@1 state a=1
+n2@1 state b=2
+n3@1 applied=3
+n3@1 state a=1
+n3@1 state b=2
+
+# Elect a new leader.
+campaign 3
+stabilize heartbeat=true
+---
+n3@1 follower() ⇨ n3@2 candidate
+n3@2 → n1 Campaign last=3@1
+n3@2 → n2 Campaign last=3@1
+n1@1 follower() ⇨ n1@2 follower()
+n1@2 → n3 CampaignResponse vote=true
+n2@1 follower() ⇨ n2@2 follower()
+n2@2 → n3 CampaignResponse vote=true
+n3@2 candidate ⇨ n3@2 leader
+n3@2 append 4@2 None
+n3@2 → n1 Append base=3@1 [4@2]
+n3@2 → n2 Append base=3@1 [4@2]
+n3@2 → n1 Heartbeat last_index=4 commit_index=3 read_seq=0
+n3@2 → n2 Heartbeat last_index=4 commit_index=3 read_seq=0
+n1@2 follower() ⇨ n1@2 follower(n3)
+n1@2 append 4@2 None
+n1@2 → n3 AppendResponse match_index=4
+n1@2 → n3 HeartbeatResponse match_index=4 read_seq=0
+n2@2 follower() ⇨ n2@2 follower(n3)
+n2@2 append 4@2 None
+n2@2 → n3 AppendResponse match_index=4
+n2@2 → n3 HeartbeatResponse match_index=4 read_seq=0
+n3@2 commit 4@2
+n3@2 → n1 Heartbeat last_index=4 commit_index=4 read_seq=0
+n3@2 → n2 Heartbeat last_index=4 commit_index=4 read_seq=0
+n1@2 commit 4@2
+n1@2 → n3 HeartbeatResponse match_index=4 read_seq=0
+n2@2 commit 4@2
+n2@2 → n3 HeartbeatResponse match_index=4 read_seq=0
+
+status
+---
+n1@2 follower(n3) last=4@2 commit=4@2 applied=4
+n2@2 follower(n3) last=4@2 commit=4@2 applied=4
+n3@2 leader last=4@2 commit=4@2 applied=4 progress={1:4→5 2:4→5}
