@@ -14,12 +14,6 @@ impl Memory {
     }
 }
 
-impl std::fmt::Display for Memory {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "memory")
-    }
-}
-
 impl Engine for Memory {
     type ScanIterator<'a> = ScanIterator<'a>;
 
@@ -54,7 +48,7 @@ impl Engine for Memory {
 
     fn status(&mut self) -> Result<Status> {
         Ok(Status {
-            name: self.to_string(),
+            name: "memory".to_string(),
             keys: self.data.len() as u64,
             size: self.data.iter().fold(0, |size, (k, v)| size + k.len() as u64 + v.len() as u64),
             total_disk_size: 0,

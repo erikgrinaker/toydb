@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Only supports single-threaded use since all methods (including reads) take a
 /// mutable reference -- serialized access can't be avoided anyway, since both
 /// Raft execution and file access is serial.
-pub trait Engine: std::fmt::Display + Send {
+pub trait Engine: Send {
     /// The iterator returned by scan().
     type ScanIterator<'a>: ScanIterator + 'a
     where
@@ -99,13 +99,6 @@ pub mod test {
         Delete { key: Vec<u8> },
         Flush,
         Set { key: Vec<u8>, value: Vec<u8> },
-    }
-
-    impl<E: Engine> std::fmt::Display for Emit<E> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            // Just dispatch to the inner engine.
-            self.inner.fmt(f)
-        }
     }
 
     impl<E: Engine> Emit<E> {

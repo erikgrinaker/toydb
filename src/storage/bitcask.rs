@@ -95,12 +95,6 @@ impl BitCask {
     }
 }
 
-impl std::fmt::Display for BitCask {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "bitcask")
-    }
-}
-
 impl Engine for BitCask {
     type ScanIterator<'a> = ScanIterator<'a>;
 
@@ -150,7 +144,7 @@ impl Engine for BitCask {
         let live_disk_size = size + 8 * keys; // account for length prefixes
         let garbage_disk_size = total_disk_size - live_disk_size;
         Ok(Status {
-            name: self.to_string(),
+            name: "bitcask".to_string(),
             keys,
             size,
             total_disk_size,
