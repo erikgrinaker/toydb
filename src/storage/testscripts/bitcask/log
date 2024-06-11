@@ -1,0 +1,118 @@
+# Assert the raw structure of the BitCask log.
+
+# Write some initial data out of order, with some overwrites and deletes.
+set foo=bar
+set b=1
+set b=2
+set e=5
+delete e
+set c=0
+delete c
+set c=3
+set ""=""
+set a=1
+delete f
+delete d
+set d=4
+scan
+---
+ → 
+a → 1
+b → 2
+c → 3
+d → 4
+foo → bar
+
+# Dump the log.
+dump
+---
+0@0     keylen=3 [00000003] valuelen=3 [00000003]
+14b     key="foo" [666f6f] value="bar" [626172]
+--------
+1@14    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="1" [31]
+--------
+2@24    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="2" [32]
+--------
+3@34    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="e" [65] value="5" [35]
+--------
+4@44    keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="e" [65] tombstone
+--------
+5@53    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="0" [30]
+--------
+6@63    keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="c" [63] tombstone
+--------
+7@72    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="3" [33]
+--------
+8@82    keylen=0 [00000000] valuelen=0 [00000000]
+8b      key="" [] value="" []
+--------
+9@90    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="a" [61] value="1" [31]
+--------
+10@100  keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="f" [66] tombstone
+--------
+11@109  keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="d" [64] tombstone
+--------
+12@118  keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="d" [64] value="4" [34]
+
+# Reopen the log, which shows the same data.
+reopen
+scan
+---
+ → 
+a → 1
+b → 2
+c → 3
+d → 4
+foo → bar
+
+dump
+---
+0@0     keylen=3 [00000003] valuelen=3 [00000003]
+14b     key="foo" [666f6f] value="bar" [626172]
+--------
+1@14    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="1" [31]
+--------
+2@24    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="2" [32]
+--------
+3@34    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="e" [65] value="5" [35]
+--------
+4@44    keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="e" [65] tombstone
+--------
+5@53    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="0" [30]
+--------
+6@63    keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="c" [63] tombstone
+--------
+7@72    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="3" [33]
+--------
+8@82    keylen=0 [00000000] valuelen=0 [00000000]
+8b      key="" [] value="" []
+--------
+9@90    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="a" [61] value="1" [31]
+--------
+10@100  keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="f" [66] tombstone
+--------
+11@109  keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="d" [64] tombstone
+--------
+12@118  keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="d" [64] value="4" [34]

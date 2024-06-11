@@ -80,11 +80,159 @@ pub struct Status {
     pub garbage_disk_size: u64,
 }
 
+/// Test helpers for engines.
 #[cfg(test)]
-/// Test helper engines.
 pub mod test {
     use super::*;
     use crossbeam::channel::Sender;
+    use regex::Regex;
+    use std::error::Error as StdError;
+    use std::fmt::Write as _;
+    use std::result::Result as StdResult;
+
+    /// Goldenscript runner for engines. All engines use a common set of
+    /// goldenscripts in src/storage/testscripts/engine, as well as their own
+    /// engine-specific tests.
+    pub struct Runner<E: Engine> {
+        pub engine: E,
+    }
+
+    impl<E: Engine> goldenscript::Runner for Runner<E> {
+        fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
+            let mut output = String::new();
+            match command.name.as_str() {
+                // delete KEY
+                "delete" => {
+                    let mut args = command.consume_args();
+                    let key = Self::decode_binary(&args.next_pos().ok_or("key not given")?.value);
+                    args.reject_rest()?;
+                    self.engine.delete(&key)?;
+                }
+
+                // get KEY
+                "get" => {
+                    let mut args = command.consume_args();
+                    let key = Self::decode_binary(&args.next_pos().ok_or("key not given")?.value);
+                    args.reject_rest()?;
+                    let value = self.engine.get(&key)?;
+                    output.push_str(&Self::format_key_value(&key, value.as_deref()))
+                }
+
+                // scan [reverse=BOOL] RANGE
+                "scan" => {
+                    let mut args = command.consume_args();
+                    let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
+                    let range = Self::parse_key_range(
+                        args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."),
+                    )?;
+                    args.reject_rest()?;
+                    let items: Vec<_> = if reverse {
+                        self.engine.scan(range).rev().collect::<Result<_>>()?
+                    } else {
+                        self.engine.scan(range).collect::<Result<_>>()?
+                    };
+                    for (key, value) in items {
+                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                    }
+                }
+
+                // scan_prefix PREFIX
+                "scan_prefix" => {
+                    let mut args = command.consume_args();
+                    let prefix =
+                        Self::decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
+                    args.reject_rest()?;
+                    let mut scan = self.engine.scan_prefix(&prefix);
+                    while let Some((key, value)) = scan.next().transpose()? {
+                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                    }
+                }
+
+                // set KEY=VALUE
+                "set" => {
+                    let mut args = command.consume_args();
+                    let kv = args.next_key().ok_or("key=value not given")?.clone();
+                    let key = Self::decode_binary(&kv.key.unwrap());
+                    let value = Self::decode_binary(&kv.value);
+                    args.reject_rest()?;
+                    self.engine.set(&key, value)?;
+                }
+
+                // status
+                "status" => {
+                    command.consume_args().reject_rest()?;
+                    writeln!(output, "{:#?}", self.engine.status()?)?;
+                }
+
+                name => return Err(format!("invalid command {name}").into()),
+            }
+            Ok(output)
+        }
+    }
+
+    impl<E: Engine> Runner<E> {
+        pub fn new(engine: E) -> Self {
+            Self { engine }
+        }
+
+        /// Decodes a raw byte vector from a Unicode string. Code points in the
+        /// range U+0080 to U+00FF are converted back to bytes 0x80 to 0xff.
+        /// This allows using e.g. \xff in the input string literal, and getting
+        /// back a 0xff byte in the byte vector. Otherwise, char(0xff) yields
+        /// the UTF-8 bytes 0xc3bf, which is the U+00FF code point as UTF-8.
+        /// These characters are effectively represented as ISO-8859-1 rather
+        /// than UTF-8, but it allows precise use of the entire u8 value range.
+        pub fn decode_binary(s: &str) -> Vec<u8> {
+            let mut buf = [0; 4];
+            let mut bytes = Vec::new();
+            for c in s.chars() {
+                // u32 is the Unicode code point, not the UTF-8 encoding.
+                match c as u32 {
+                    b @ 0x80..=0xff => bytes.push(b as u8),
+                    _ => bytes.extend(c.encode_utf8(&mut buf).as_bytes()),
+                }
+            }
+            bytes
+        }
+
+        /// Formats a raw binary byte vector, escaping special characters.
+        /// TODO: find a better way to manage and share formatting functions.
+        pub fn format_bytes(bytes: &[u8]) -> String {
+            let b: Vec<u8> = bytes.iter().copied().flat_map(std::ascii::escape_default).collect();
+            String::from_utf8_lossy(&b).to_string()
+        }
+
+        /// Formats a key/value pair, or None if the value does not exist.
+        pub fn format_key_value(key: &[u8], value: Option<&[u8]>) -> String {
+            format!(
+                "{} → {}",
+                Self::format_bytes(key),
+                value.map(|v| Self::format_bytes(v)).unwrap_or("None".to_string())
+            )
+        }
+
+        /// Parses an binary key range, using Rust range syntax.
+        fn parse_key_range(
+            s: &str,
+        ) -> StdResult<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn StdError>> {
+            use std::ops::Bound;
+            let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
+            let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
+            let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
+            if let Some(start) = groups.get(1) {
+                bound.0 = Bound::Included(Self::decode_binary(start.as_str()));
+            }
+            if let Some(end) = groups.get(3) {
+                let end = Self::decode_binary(end.as_str());
+                if groups.get(2).is_some() {
+                    bound.1 = Bound::Included(end)
+                } else {
+                    bound.1 = Bound::Excluded(end)
+                }
+            }
+            Ok(bound)
+        }
+    }
 
     /// Wraps another engine and emits write events to the given channel.
     pub struct Emit<E: Engine> {
@@ -150,74 +298,14 @@ pub mod test {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub mod tests {
     /// Generates common tests for any Engine implementation.
+    ///
+    /// TODO: split these out. In particular, the randomized runner should be
+    /// rewritten as a Mirror engine that mirrors operations on multiple engines
+    /// and compares them.
     macro_rules! test_engine {
         ($setup:expr) => {
-            #[track_caller]
-            /// Asserts that a scan yields the expected items.
-            fn assert_scan<I>(iter: I, expect: Vec<(&[u8], Vec<u8>)>) -> Result<()>
-            where
-                I: Iterator<Item = Result<(Vec<u8>, Vec<u8>)>>,
-            {
-                assert_eq!(
-                    iter.collect::<Result<Vec<_>>>()?,
-                    expect.into_iter().map(|(k, v)| (k.to_vec(), v)).collect::<Vec<_>>()
-                );
-                Ok(())
-            }
-
-            /// Tests Engine point operations, i.e. set, get, and delete.
-            #[test]
-            fn point_ops() -> Result<()> {
-                let mut s = $setup;
-
-                // Getting a missing key should return None.
-                assert_eq!(s.get(b"a")?, None);
-
-                // Setting and getting a key should return its value.
-                s.set(b"a", vec![1])?;
-                assert_eq!(s.get(b"a")?, Some(vec![1]));
-
-                // Setting a different key should not affect the first.
-                s.set(b"b", vec![2])?;
-                assert_eq!(s.get(b"b")?, Some(vec![2]));
-                assert_eq!(s.get(b"a")?, Some(vec![1]));
-
-                // Getting a different missing key should return None. The
-                // comparison is case-insensitive for strings.
-                assert_eq!(s.get(b"c")?, None);
-                assert_eq!(s.get(b"A")?, None);
-
-                // Setting an existing key should replace its value.
-                s.set(b"a", vec![0])?;
-                assert_eq!(s.get(b"a")?, Some(vec![0]));
-
-                // Deleting a key should remove it, but not affect others.
-                s.delete(b"a")?;
-                assert_eq!(s.get(b"a")?, None);
-                assert_eq!(s.get(b"b")?, Some(vec![2]));
-
-                // Deletes are idempotent.
-                s.delete(b"a")?;
-                assert_eq!(s.get(b"a")?, None);
-
-                Ok(())
-            }
-
-            #[test]
-            /// Tests Engine point operations on empty keys and values. These
-            /// are as valid as any other key/value.
-            fn point_ops_empty() -> Result<()> {
-                let mut s = $setup;
-                assert_eq!(s.get(b"")?, None);
-                s.set(b"", vec![])?;
-                assert_eq!(s.get(b"")?, Some(vec![]));
-                s.delete(b"")?;
-                assert_eq!(s.get(b"")?, None);
-                Ok(())
-            }
-
             #[test]
             /// Tests Engine point operations on keys and values of increasing
             /// sizes, up to 16 MB.
@@ -236,170 +324,6 @@ pub(crate) mod tests {
                     s.delete(key)?;
                     assert_eq!(s.get(key)?, None);
                 }
-
-                Ok(())
-            }
-
-            #[test]
-            /// Tests various Engine scans.
-            fn scan() -> Result<()> {
-                let mut s = $setup;
-                s.set(b"a", vec![1])?;
-                s.set(b"b", vec![2])?;
-                s.set(b"ba", vec![2, 1])?;
-                s.set(b"bb", vec![2, 2])?;
-                s.set(b"c", vec![3])?;
-                s.set(b"C", vec![3])?;
-
-                // Forward/reverse scans.
-                assert_scan(
-                    s.scan(b"b".to_vec()..b"bz".to_vec()),
-                    vec![(b"b", vec![2]), (b"ba", vec![2, 1]), (b"bb", vec![2, 2])],
-                )?;
-                assert_scan(
-                    s.scan(b"b".to_vec()..b"bz".to_vec()).rev(),
-                    vec![(b"bb", vec![2, 2]), (b"ba", vec![2, 1]), (b"b", vec![2])],
-                )?;
-
-                // Inclusive/exclusive ranges.
-                assert_scan(
-                    s.scan(b"b".to_vec()..b"bb".to_vec()),
-                    vec![(b"b", vec![2]), (b"ba", vec![2, 1])],
-                )?;
-                assert_scan(
-                    s.scan(b"b".to_vec()..=b"bb".to_vec()),
-                    vec![(b"b", vec![2]), (b"ba", vec![2, 1]), (b"bb", vec![2, 2])],
-                )?;
-
-                // Open ranges.
-                assert_scan(s.scan(b"bb".to_vec()..), vec![(b"bb", vec![2, 2]), (b"c", vec![3])])?;
-                assert_scan(
-                    s.scan(..=b"b".to_vec()),
-                    vec![(b"C", vec![3]), (b"a", vec![1]), (b"b", vec![2])],
-                )?;
-
-                // Full range.
-                assert_scan(
-                    s.scan(..),
-                    vec![
-                        (b"C", vec![3]),
-                        (b"a", vec![1]),
-                        (b"b", vec![2]),
-                        (b"ba", vec![2, 1]),
-                        (b"bb", vec![2, 2]),
-                        (b"c", vec![3]),
-                    ],
-                )?;
-                Ok(())
-            }
-
-            #[test]
-            /// Tests prefix scans.
-            fn scan_prefix() -> Result<()> {
-                let mut s = $setup;
-                s.set(b"a", vec![1])?;
-                s.set(b"b", vec![2])?;
-                s.set(b"ba", vec![2, 1])?;
-                s.set(b"bb", vec![2, 2])?;
-                s.set(b"b\xff", vec![2, 0xff])?;
-                s.set(b"b\xff\x00", vec![2, 0xff, 0x00])?;
-                s.set(b"b\xffb", vec![2, 0xff, 2])?;
-                s.set(b"b\xff\xff", vec![2, 0xff, 0xff])?;
-                s.set(b"c", vec![3])?;
-                s.set(b"\xff", vec![0xff])?;
-                s.set(b"\xff\xff", vec![0xff, 0xff])?;
-                s.set(b"\xff\xff\xff", vec![0xff, 0xff, 0xff])?;
-                s.set(b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff])?;
-
-                assert_scan(
-                    s.scan_prefix(b""),
-                    vec![
-                        (b"a", vec![1]),
-                        (b"b", vec![2]),
-                        (b"ba", vec![2, 1]),
-                        (b"bb", vec![2, 2]),
-                        (b"b\xff", vec![2, 0xff]),
-                        (b"b\xff\x00", vec![2, 0xff, 0x00]),
-                        (b"b\xffb", vec![2, 0xff, 2]),
-                        (b"b\xff\xff", vec![2, 0xff, 0xff]),
-                        (b"c", vec![3]),
-                        (b"\xff", vec![0xff]),
-                        (b"\xff\xff", vec![0xff, 0xff]),
-                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
-                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
-                    ],
-                )?;
-
-                assert_scan(
-                    s.scan_prefix(b"b"),
-                    vec![
-                        (b"b", vec![2]),
-                        (b"ba", vec![2, 1]),
-                        (b"bb", vec![2, 2]),
-                        (b"b\xff", vec![2, 0xff]),
-                        (b"b\xff\x00", vec![2, 0xff, 0x00]),
-                        (b"b\xffb", vec![2, 0xff, 2]),
-                        (b"b\xff\xff", vec![2, 0xff, 0xff]),
-                    ],
-                )?;
-
-                assert_scan(s.scan_prefix(b"bb"), vec![(b"bb", vec![2, 2])])?;
-
-                assert_scan(s.scan_prefix(b"bq"), vec![])?;
-
-                assert_scan(
-                    s.scan_prefix(b"b\xff"),
-                    vec![
-                        (b"b\xff", vec![2, 0xff]),
-                        (b"b\xff\x00", vec![2, 0xff, 0x00]),
-                        (b"b\xffb", vec![2, 0xff, 2]),
-                        (b"b\xff\xff", vec![2, 0xff, 0xff]),
-                    ],
-                )?;
-
-                assert_scan(
-                    s.scan_prefix(b"b\xff\x00"),
-                    vec![(b"b\xff\x00", vec![2, 0xff, 0x00])],
-                )?;
-
-                assert_scan(
-                    s.scan_prefix(b"b\xff\xff"),
-                    vec![(b"b\xff\xff", vec![2, 0xff, 0xff])],
-                )?;
-
-                assert_scan(
-                    s.scan_prefix(b"\xff"),
-                    vec![
-                        (b"\xff", vec![0xff]),
-                        (b"\xff\xff", vec![0xff, 0xff]),
-                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
-                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
-                    ],
-                )?;
-
-                assert_scan(
-                    s.scan_prefix(b"\xff\xff"),
-                    vec![
-                        (b"\xff\xff", vec![0xff, 0xff]),
-                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
-                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
-                    ],
-                )?;
-
-                assert_scan(
-                    s.scan_prefix(b"\xff\xff\xff"),
-                    vec![
-                        (b"\xff\xff\xff", vec![0xff, 0xff, 0xff]),
-                        (b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff]),
-                    ],
-                )?;
-
-                assert_scan(
-                    s.scan_prefix(b"\xff\xff\xff\xff"),
-                    vec![(b"\xff\xff\xff\xff", vec![0xff, 0xff, 0xff, 0xff])],
-                )?;
-
-                assert_scan(s.scan_prefix(b"\xff\xff\xff\xff\xff"), vec![])?;
 
                 Ok(())
             }
@@ -509,26 +433,6 @@ pub(crate) mod tests {
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect::<Vec<_>>();
                 assert_eq!(state, expect);
-
-                Ok(())
-            }
-
-            #[test]
-            /// Tests implementation-independent aspects of Status.
-            fn status() -> Result<()> {
-                let mut s = $setup;
-                s.set(b"foo", vec![1, 2, 3])?;
-                s.set(b"bar", vec![1])?;
-                s.delete(b"bar")?;
-                s.set(b"baz", vec![1])?;
-                s.set(b"baz", vec![2])?;
-                s.set(b"baz", vec![3])?;
-                s.delete(b"qux")?;
-
-                let status = s.status()?;
-                assert!(status.name.len() > 0);
-                assert_eq!(status.keys, 2);
-                assert_eq!(status.size, 10);
 
                 Ok(())
             }

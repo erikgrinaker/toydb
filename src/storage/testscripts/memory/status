@@ -1,0 +1,22 @@
+# Tests status for Memory engine.
+
+set foo=123
+set bar=1
+delete bar
+set baz=1
+set baz=2
+set baz=3
+delete qux
+---
+ok
+
+status
+---
+Status {
+    name: "memory",
+    keys: 2,
+    size: 10,
+    total_disk_size: 0,
+    live_disk_size: 0,
+    garbage_disk_size: 0,
+}

@@ -1,0 +1,53 @@
+# Tests basic point operations.
+
+# Getting a missing key in an empty store should return None.
+get a
+---
+a → None
+
+# Write a couple of keys.
+set a=1
+set b=2
+---
+ok
+
+# Reading the value back should return it. An unknown key should return None.
+get a
+get b
+get c
+---
+a → 1
+b → 2
+c → None
+
+# Replacing a key should return the new value.
+set a=foo
+get a
+---
+a → foo
+
+# Deleting a key should remove it, but not affect other keys.
+delete a
+get a
+get b
+---
+a → None
+b → 2
+
+# Deletes are idempotent.
+delete a
+get a
+---
+a → None
+
+# Writing a deleted key works fine.
+set a=1
+get a
+---
+a → 1
+
+# Scan the final state.
+scan
+---
+a → 1
+b → 2

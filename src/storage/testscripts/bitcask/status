@@ -1,0 +1,40 @@
+# Tests status for BitCask engine.
+
+set foo=123
+set bar=1
+delete bar
+set baz=1
+set baz=2
+set baz=3
+delete qux
+---
+ok
+
+scan
+---
+baz → 3
+foo → 123
+
+status
+---
+Status {
+    name: "bitcask",
+    keys: 2,
+    size: 10,
+    total_disk_size: 84,
+    live_disk_size: 26,
+    garbage_disk_size: 58,
+}
+
+# Compact the log and show status again.
+compact
+status
+---
+Status {
+    name: "bitcask",
+    keys: 2,
+    size: 10,
+    total_disk_size: 26,
+    live_disk_size: 26,
+    garbage_disk_size: 0,
+}

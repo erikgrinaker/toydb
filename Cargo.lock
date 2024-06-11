@@ -614,9 +614,9 @@ dependencies = [
 
 [[package]]
 name = "goldenscript"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55ca7296b5d8221d19ba6c21483871e2c89fd198d4dd275d63cb36329c5219da"
+checksum = "cfece0a141db386f13437cae6b9707c2069fc39b08485cdf92ba9f4f1e55923a"
 dependencies = [
  "goldenfile",
  "nom",

@@ -63,6 +63,8 @@ impl BitCask {
 
     /// Opens a BitCask database, and automatically compacts it if the amount
     /// of garbage exceeds the given ratio and byte size when opened.
+    ///
+    /// TODO rename garbage_min_ratio to fraction throughout.
     pub fn new_compact(
         path: PathBuf,
         garbage_min_ratio: f64,
@@ -71,15 +73,16 @@ impl BitCask {
         let mut s = Self::new(path)?;
 
         let status = s.status()?;
-        let garbage_ratio = status.garbage_disk_size as f64 / status.total_disk_size as f64;
-        if status.garbage_disk_size > 0
-            && status.garbage_disk_size >= garbage_min_bytes
-            && garbage_ratio >= garbage_min_ratio
-        {
+        if Self::should_compact(
+            status.garbage_disk_size,
+            status.total_disk_size,
+            garbage_min_ratio,
+            garbage_min_bytes,
+        ) {
             log::info!(
                 "Compacting {} to remove {:.0}% garbage ({} MB out of {} MB)",
                 s.log.path.display(),
-                garbage_ratio * 100.0,
+                status.garbage_disk_size as f64 / status.total_disk_size as f64 * 100.0,
                 status.garbage_disk_size / 1024 / 1024,
                 status.total_disk_size / 1024 / 1024
             );
@@ -92,6 +95,12 @@ impl BitCask {
         }
 
         Ok(s)
+    }
+
+    /// Returns true if the log file should be compacted.
+    fn should_compact(garbage_size: u64, total_size: u64, min_ratio: f64, min_bytes: u64) -> bool {
+        let garbage_ratio = garbage_size as f64 / total_size as f64;
+        garbage_size > 0 && garbage_size >= min_bytes && garbage_ratio >= min_ratio
     }
 }
 
@@ -343,216 +352,160 @@ impl Log {
 
         Ok((pos, len))
     }
-
-    #[cfg(test)]
-    /// Prints the entire log file to the given writer in human-readable form.
-    fn print<W: Write>(&mut self, w: &mut W) -> Result<()> {
-        let mut len_buf = [0u8; 4];
-        let file_len = self.file.metadata()?.len();
-        let mut r = BufReader::new(&mut self.file);
-        let mut pos = r.seek(SeekFrom::Start(0))?;
-        let mut idx = 0;
-
-        while pos < file_len {
-            writeln!(w, "entry = {}, offset {}", idx, pos)?;
-
-            r.read_exact(&mut len_buf)?;
-            let key_len = u32::from_be_bytes(len_buf);
-            writeln!(w, "klen  = {} {:x?}", key_len, len_buf)?;
-
-            r.read_exact(&mut len_buf)?;
-            let value_len_or_tombstone = i32::from_be_bytes(len_buf); // NB: -1 for tombstones
-            let value_len = value_len_or_tombstone.max(0) as u32;
-            writeln!(w, "vlen  = {} {:x?}", value_len_or_tombstone, len_buf)?;
-
-            let mut key = vec![0; key_len as usize];
-            r.read_exact(&mut key)?;
-            write!(w, "key   = ")?;
-            if let Ok(str) = std::str::from_utf8(&key) {
-                write!(w, r#""{}" "#, str)?;
-            }
-            writeln!(w, "{:x?}", key)?;
-
-            let mut value = vec![0; value_len as usize];
-            r.read_exact(&mut value)?;
-            write!(w, "value = ")?;
-            if value_len_or_tombstone < 0 {
-                write!(w, "tombstone ")?;
-            } else if let Ok(str) = std::str::from_utf8(&value) {
-                if str.chars().all(|c| !c.is_control()) {
-                    write!(w, r#""{}" "#, str)?;
-                }
-            }
-            write!(w, "{:x?}\n\n", value)?;
-
-            pos += 4 + 4 + key_len as u64 + value_len as u64;
-            idx += 1;
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::engine::test::Runner;
     use super::*;
+    use std::error::Error as StdError;
+    use std::fmt::Write as _;
+    use std::result::Result as StdResult;
+    use test_case::test_case;
+    use test_each_file::test_each_path;
 
-    const GOLDEN_DIR: &str = "src/storage/golden/bitcask";
+    // Run common goldenscript tests in src/storage/testscripts/engine.
+    test_each_path! { in "src/storage/testscripts/engine" as engine => test_goldenscript }
+
+    // Also run BitCask-specific tests in src/storage/testscripts/bitcask.
+    test_each_path! { in "src/storage/testscripts/bitcask" as scripts => test_goldenscript }
+
+    fn test_goldenscript(path: &std::path::Path) {
+        goldenscript::run(&mut BitCaskRunner::new(), path).expect("goldenscript failed")
+    }
 
     super::super::engine::tests::test_engine!({
         let path = tempdir::TempDir::new("toydb")?.path().join("toydb");
         BitCask::new(path)?
     });
 
-    /// Creates a new BitCask engine for testing.
-    fn setup() -> Result<BitCask> {
-        BitCask::new(tempdir::TempDir::new("toydb")?.path().join("toydb"))
+    /// Tests that should_compact() handles parameters correctly.
+    #[test_case(100, 100, -01.0, 0 => true; "ratio negative all garbage")]
+    #[test_case(100, 100, 0.0, 0 => true; "ratio 0 all garbage")]
+    #[test_case(100, 100, 1.0, 0 => true; "ratio 1 all garbage")]
+    #[test_case(100, 100, 2.0, 0 => false; "ratio 2 all garbage")]
+    #[test_case(0, 100, 0.0, 0 => false; "ratio 0 no garbage")]
+    #[test_case(1, 100, 0.0, 0 => true; "ratio 0 tiny garbage")]
+    #[test_case(49, 100, 0.5, 0 => false; "below ratio")]
+    #[test_case(50, 100, 0.5, 0 => true; "at ratio")]
+    #[test_case(51, 100, 0.5, 0 => true; "above ratio")]
+    #[test_case(49, 100, 0.0, 50 => false; "below min bytes")]
+    #[test_case(50, 100, 0.0, 50 => true; "at min bytes")]
+    #[test_case(51, 100, 0.0, 50 => true; "above min bytes")]
+    fn should_compact(garbage_size: u64, total_size: u64, min_ratio: f64, min_bytes: u64) -> bool {
+        BitCask::should_compact(garbage_size, total_size, min_ratio, min_bytes)
     }
 
-    /// Writes various values primarily for testing log file handling.
-    ///
-    /// - '': empty key and value
-    /// - a: write
-    /// - b: write, write
-    /// - c: write, delete, write
-    /// - d: delete, write
-    /// - e: write, delete
-    /// - f: delete
-    fn setup_log(s: &mut BitCask) -> Result<()> {
-        s.set(b"b", vec![0x01])?;
-        s.set(b"b", vec![0x02])?;
-
-        s.set(b"e", vec![0x05])?;
-        s.delete(b"e")?;
-
-        s.set(b"c", vec![0x00])?;
-        s.delete(b"c")?;
-        s.set(b"c", vec![0x03])?;
-
-        s.set(b"", vec![])?;
-
-        s.set(b"a", vec![0x01])?;
-
-        s.delete(b"f")?;
-
-        s.delete(b"d")?;
-        s.set(b"d", vec![0x04])?;
-
-        // Make sure the scan yields the expected results.
-        assert_eq!(
-            vec![
-                (b"".to_vec(), vec![]),
-                (b"a".to_vec(), vec![0x01]),
-                (b"b".to_vec(), vec![0x02]),
-                (b"c".to_vec(), vec![0x03]),
-                (b"d".to_vec(), vec![0x04]),
-            ],
-            s.scan(..).collect::<Result<Vec<_>>>()?,
-        );
-
-        Ok(())
+    /// A BitCask-specific goldenscript runner, which dispatches through to the
+    /// standard Engine runner.
+    struct BitCaskRunner {
+        inner: Runner<BitCask>,
+        tempdir: tempdir::TempDir,
     }
 
-    #[test]
-    /// Tests that logs are written correctly using a golden file.
-    fn log() -> Result<()> {
-        let mut s = setup()?;
-        setup_log(&mut s)?;
+    impl goldenscript::Runner for BitCaskRunner {
+        fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
+            let mut output = String::new();
+            match command.name.as_str() {
+                // compact
+                // Compacts the BitCask entry log.
+                "compact" => {
+                    command.consume_args().reject_rest()?;
+                    self.inner.engine.compact()?;
+                }
 
-        let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
-        s.log.print(&mut mint.new_goldenfile("log")?)?;
-        Ok(())
-    }
+                // dump
+                // Dumps the full BitCask entry log.
+                "dump" => {
+                    command.consume_args().reject_rest()?;
+                    self.dump(&mut output)?;
+                }
 
-    #[test]
-    /// Tests that writing and then reading a file yields the same results.
-    fn reopen() -> Result<()> {
-        // NB: Don't use setup(), because the tempdir will be removed when
-        // the path falls out of scope.
-        let path = tempdir::TempDir::new("toydb")?.path().join("toydb");
-        let mut s = BitCask::new(path.clone())?;
-        setup_log(&mut s)?;
+                // reopen [compact_fraction=FLOAT]
+                // Closes and reopens the BitCask database. If compact_ratio is
+                // given, it specifies a garbage ratio beyond which the log
+                // should be auto-compacted on open.
+                "reopen" => {
+                    let mut args = command.consume_args();
+                    let compact_fraction = args.lookup_parse("compact_fraction")?;
+                    args.reject_rest()?;
+                    // We need to close the file before we can reopen it, which
+                    // happens when the database is dropped. Replace the engine
+                    // with a temporary empty engine then reopen the file.
+                    let path = self.inner.engine.log.path.clone();
+                    self.inner.engine = BitCask::new(self.tempdir.path().join("empty"))?;
+                    if let Some(garbage_ratio) = compact_fraction {
+                        self.inner.engine = BitCask::new_compact(path, garbage_ratio, 0)?;
+                    } else {
+                        self.inner.engine = BitCask::new(path)?;
+                    }
+                }
 
-        let expect = s.scan(..).collect::<Result<Vec<_>>>()?;
-        drop(s);
-        let mut s = BitCask::new(path)?;
-        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?,);
-
-        Ok(())
-    }
-
-    #[test]
-    /// Tests log compaction, by writing golden files of the before/after state,
-    /// and checking that the database contains the same results, even after
-    /// reopening the file.
-    fn compact() -> Result<()> {
-        // NB: Don't use setup(), because the tempdir will be removed when
-        // the path falls out of scope.
-        let path = tempdir::TempDir::new("toydb")?.path().join("toydb");
-        let mut s = BitCask::new(path.clone())?;
-        setup_log(&mut s)?;
-
-        // Dump the initial log file.
-        let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
-        s.log.print(&mut mint.new_goldenfile("compact-before")?)?;
-        let expect = s.scan(..).collect::<Result<Vec<_>>>()?;
-
-        // Compact the log file and assert the new log file contents.
-        s.compact()?;
-        assert_eq!(path, s.log.path);
-        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?,);
-        s.log.print(&mut mint.new_goldenfile("compact-after")?)?;
-
-        // Reopen the log file and assert that the contents are the same.
-        drop(s);
-        let mut s = BitCask::new(path)?;
-        assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?,);
-
-        Ok(())
-    }
-
-    #[test]
-    /// Tests that new_compact() will automatically compact the file when appropriate.
-    fn new_compact() -> Result<()> {
-        // Create an initial log file with a few entries.
-        let dir = tempdir::TempDir::new("toydb")?;
-        let path = dir.path().join("orig");
-        let compactpath = dir.path().join("compact");
-
-        let mut s = BitCask::new_compact(path.clone(), 0.2, 0)?;
-        setup_log(&mut s)?;
-        let status = s.status()?;
-        let garbage_ratio = status.garbage_disk_size as f64 / status.total_disk_size as f64;
-        let garbage_size = status.garbage_disk_size;
-        drop(s);
-
-        // Test a few ratio/size thresholds and assert whether it should trigger compaction.
-        let cases = vec![
-            (-1.0, 0, true),
-            (0.0, 0, true),
-            (garbage_ratio - 0.001, 0, true),
-            (garbage_ratio, 0, true),
-            (garbage_ratio + 0.001, 0, false),
-            (1.0, 0, false),
-            (2.0, 0, false),
-            (0.0, 1, true),
-            (0.0, garbage_size - 1, true),
-            (0.0, garbage_size, true),
-            (0.0, garbage_size + 1, false),
-        ];
-        for (min_ratio, min_size, expect_compact) in cases.into_iter() {
-            std::fs::copy(&path, &compactpath)?;
-            let mut s = BitCask::new_compact(compactpath.clone(), min_ratio, min_size)?;
-            let new_status = s.status()?;
-            assert_eq!(new_status.live_disk_size, status.live_disk_size);
-            if expect_compact {
-                assert_eq!(new_status.total_disk_size, status.live_disk_size);
-                assert_eq!(new_status.garbage_disk_size, 0);
-            } else {
-                assert_eq!(new_status, status);
+                // Pass other commands to the standard engine runner.
+                _ => return self.inner.run(command),
             }
+            Ok(output)
+        }
+    }
+
+    impl BitCaskRunner {
+        fn new() -> Self {
+            let tempdir = tempdir::TempDir::new("toydb").expect("tempdir failed");
+            let engine = BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
+            let inner = Runner::new(engine);
+            Self { inner, tempdir }
         }
 
-        Ok(())
+        /// Dumps the full BitCask entry log.
+        fn dump(&mut self, output: &mut String) -> StdResult<(), Box<dyn StdError>> {
+            let file = &mut self.inner.engine.log.file;
+            let file_len = file.metadata()?.len();
+            let mut r = BufReader::new(file);
+            let mut pos = r.seek(SeekFrom::Start(0))?;
+            let mut len_buf = [0; 4];
+            let mut idx = 0;
+
+            while pos < file_len {
+                if idx > 0 {
+                    writeln!(output, "--------")?;
+                }
+                write!(output, "{:<7}", format!("{idx}@{pos}"))?;
+
+                r.read_exact(&mut len_buf)?;
+                let key_len = u32::from_be_bytes(len_buf);
+                write!(output, " keylen={key_len} [{}]", hex::encode(len_buf))?;
+
+                r.read_exact(&mut len_buf)?;
+                let value_len_or_tombstone = i32::from_be_bytes(len_buf); // NB: -1 for tombstones
+                let value_len = value_len_or_tombstone.max(0) as u32;
+                writeln!(output, " valuelen={value_len_or_tombstone} [{}]", hex::encode(len_buf))?;
+
+                let mut key = vec![0; key_len as usize];
+                r.read_exact(&mut key)?;
+                let mut value = vec![0; value_len as usize];
+                r.read_exact(&mut value)?;
+                let size = 4 + 4 + key_len as u64 + value_len as u64;
+                writeln!(
+                    output,
+                    "{:<7} key=\"{}\" [{}] {}",
+                    format!("{size}b"),
+                    Runner::<BitCask>::format_bytes(&key),
+                    hex::encode(key),
+                    match value_len_or_tombstone {
+                        -1 => "tombstone".to_string(),
+                        _ => format!(
+                            "value=\"{}\" [{}]",
+                            Runner::<BitCask>::format_bytes(&value),
+                            hex::encode(&value)
+                        ),
+                    },
+                )?;
+
+                pos += size;
+                idx += 1;
+            }
+            Ok(())
+        }
     }
 
     #[test]
@@ -622,43 +575,6 @@ mod tests {
             let mut s = BitCask::new(truncpath.clone())?;
             assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?);
         }
-
-        Ok(())
-    }
-
-    #[test]
-    /// Tests status(), both for a log file with known garbage, and
-    /// after compacting it when the live size must equal the file size.
-    fn status_full() -> Result<()> {
-        let mut s = setup()?;
-        setup_log(&mut s)?;
-
-        // Before compaction.
-        assert_eq!(
-            s.status()?,
-            Status {
-                name: "bitcask".to_string(),
-                keys: 5,
-                size: 8,
-                total_disk_size: 114,
-                live_disk_size: 48,
-                garbage_disk_size: 66
-            }
-        );
-
-        // After compaction.
-        s.compact()?;
-        assert_eq!(
-            s.status()?,
-            Status {
-                name: "bitcask".to_string(),
-                keys: 5,
-                size: 8,
-                total_disk_size: 48,
-                live_disk_size: 48,
-                garbage_disk_size: 0,
-            }
-        );
 
         Ok(())
     }

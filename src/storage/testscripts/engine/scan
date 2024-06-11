@@ -1,0 +1,60 @@
+# Tests range scans.
+
+# Write some initial data.
+set a=1
+set b=2
+set ba=21
+set bb=22
+set c=3
+set C=3
+---
+ok
+
+# Forward and reverse scans.
+scan
+---
+C → 3
+a → 1
+b → 2
+ba → 21
+bb → 22
+c → 3
+
+scan reverse=true
+---
+c → 3
+bb → 22
+ba → 21
+b → 2
+a → 1
+C → 3
+
+# Inclusive and exclusive ranges.
+scan b..bb
+---
+b → 2
+ba → 21
+
+scan "b..=bb"
+---
+b → 2
+ba → 21
+bb → 22
+
+scan "b..=bb" reverse=true
+---
+bb → 22
+ba → 21
+b → 2
+
+# Open ranges.
+scan bb..
+---
+bb → 22
+c → 3
+
+scan "..=b"
+---
+C → 3
+a → 1
+b → 2

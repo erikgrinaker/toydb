@@ -85,7 +85,19 @@ impl<'a> DoubleEndedIterator for ScanIterator<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::engine::test::Runner;
     use super::*;
+    use test_each_file::test_each_path;
+
+    // Run common goldenscript tests in src/storage/testscripts/engine.
+    test_each_path! { in "src/storage/testscripts/engine" as engine => test_goldenscript }
+
+    // Also run Memory-specific tests in src/storage/testscripts/memory.
+    test_each_path! { in "src/storage/testscripts/memory" as scripts => test_goldenscript }
+
+    fn test_goldenscript(path: &std::path::Path) {
+        goldenscript::run(&mut Runner::new(Memory::new()), path).expect("goldenscript failed")
+    }
 
     super::super::engine::tests::test_engine!(Memory::new());
 }

@@ -342,6 +342,7 @@ impl<'a> std::iter::Iterator for Iterator<'a> {
 mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
+    use regex::Regex;
     use std::{error::Error, result::Result};
     use storage::engine::test as testengine;
     use test_each_file::test_each_path;
@@ -581,7 +582,7 @@ mod tests {
 
         /// Parses an index@term pair.
         fn parse_index_term(s: &str) -> Result<(Index, Term), Box<dyn Error>> {
-            let re = regex::Regex::new(r"^(\d+)@(\d+)$").expect("invalid regex");
+            let re = Regex::new(r"^(\d+)@(\d+)$").expect("invalid regex");
             let groups = re.captures(s).ok_or_else(|| format!("invalid index/term {s}"))?;
             let index = groups.get(1).unwrap().as_str().parse()?;
             let term = groups.get(2).unwrap().as_str().parse()?;
@@ -590,19 +591,19 @@ mod tests {
 
         /// Parses an index range, in Rust range syntax.
         fn parse_index_range(s: &str) -> Result<impl std::ops::RangeBounds<Index>, Box<dyn Error>> {
-            let mut bound =
-                (std::ops::Bound::<Index>::Unbounded, std::ops::Bound::<Index>::Unbounded);
-            let re = regex::Regex::new(r"^(\d+)?\.\.(=)?(\d+)?").expect("invalid regex");
+            use std::ops::Bound;
+            let mut bound = (Bound::<Index>::Unbounded, Bound::<Index>::Unbounded);
+            let re = Regex::new(r"^(\d+)?\.\.(=)?(\d+)?").expect("invalid regex");
             let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
             if let Some(start) = groups.get(1) {
-                bound.0 = std::ops::Bound::Included(start.as_str().parse()?);
+                bound.0 = Bound::Included(start.as_str().parse()?);
             }
             if let Some(end) = groups.get(3) {
                 let end = end.as_str().parse()?;
                 if groups.get(2).is_some() {
-                    bound.1 = std::ops::Bound::Included(end)
+                    bound.1 = Bound::Included(end)
                 } else {
-                    bound.1 = std::ops::Bound::Excluded(end)
+                    bound.1 = Bound::Excluded(end)
                 }
             }
             Ok(bound)

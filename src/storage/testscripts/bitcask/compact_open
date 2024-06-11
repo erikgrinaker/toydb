@@ -1,0 +1,83 @@
+# Tests that the log is auto-compacted on startup if the fraction of garbage
+# exceeds the given threshold.
+
+# Write some initial data out of order, with some overwrites and deletes.
+set foo=bar
+set b=1
+set b=2
+set e=5
+delete e
+set c=0
+delete c
+set c=3
+set ""=""
+set a=1
+delete f
+delete d
+set d=4
+scan
+---
+ → 
+a → 1
+b → 2
+c → 3
+d → 4
+foo → bar
+
+# Status shows the garbage fraction is 0.51.
+status
+---
+Status {
+    name: "bitcask",
+    keys: 6,
+    size: 14,
+    total_disk_size: 128,
+    live_disk_size: 62,
+    garbage_disk_size: 66,
+}
+
+# Reopening with a garbage fraction of 0.6 does not compact.
+reopen compact_fraction=0.6
+status
+---
+Status {
+    name: "bitcask",
+    keys: 6,
+    size: 14,
+    total_disk_size: 128,
+    live_disk_size: 62,
+    garbage_disk_size: 66,
+}
+
+# Reopening with a fraction of 0.5 does compact.
+reopen compact_fraction=0.5
+status
+---
+Status {
+    name: "bitcask",
+    keys: 6,
+    size: 14,
+    total_disk_size: 62,
+    live_disk_size: 62,
+    garbage_disk_size: 0,
+}
+
+dump
+---
+0@0     keylen=0 [00000000] valuelen=0 [00000000]
+8b      key="" [] value="" []
+--------
+1@8     keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="a" [61] value="1" [31]
+--------
+2@18    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="2" [32]
+--------
+3@28    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="3" [33]
+--------
+4@38    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="d" [64] value="4" [34]
+--------
+5@48    keylen=3 [00000003] valuelen=3 [00000003]
+14b     key="foo" [666f6f] value="bar" [626172]

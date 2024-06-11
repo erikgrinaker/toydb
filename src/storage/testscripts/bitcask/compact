@@ -1,0 +1,137 @@
+# Tests compaction.
+
+# Write some initial data out of order, with some overwrites and deletes.
+set foo=bar
+set b=1
+set b=2
+set e=5
+delete e
+set c=0
+delete c
+set c=3
+set ""=""
+set a=1
+delete f
+delete d
+set d=4
+scan
+---
+ → 
+a → 1
+b → 2
+c → 3
+d → 4
+foo → bar
+
+# Show status.
+status
+---
+Status {
+    name: "bitcask",
+    keys: 6,
+    size: 14,
+    total_disk_size: 128,
+    live_disk_size: 62,
+    garbage_disk_size: 66,
+}
+
+# Dump the log.
+dump
+---
+0@0     keylen=3 [00000003] valuelen=3 [00000003]
+14b     key="foo" [666f6f] value="bar" [626172]
+--------
+1@14    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="1" [31]
+--------
+2@24    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="2" [32]
+--------
+3@34    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="e" [65] value="5" [35]
+--------
+4@44    keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="e" [65] tombstone
+--------
+5@53    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="0" [30]
+--------
+6@63    keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="c" [63] tombstone
+--------
+7@72    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="3" [33]
+--------
+8@82    keylen=0 [00000000] valuelen=0 [00000000]
+8b      key="" [] value="" []
+--------
+9@90    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="a" [61] value="1" [31]
+--------
+10@100  keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="f" [66] tombstone
+--------
+11@109  keylen=1 [00000001] valuelen=-1 [ffffffff]
+9b      key="d" [64] tombstone
+--------
+12@118  keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="d" [64] value="4" [34]
+
+# Compact it.
+compact
+---
+ok
+
+# Scan should still give same results.
+scan
+---
+ → 
+a → 1
+b → 2
+c → 3
+d → 4
+foo → bar
+
+# Status should show no garbage.
+status
+---
+Status {
+    name: "bitcask",
+    keys: 6,
+    size: 14,
+    total_disk_size: 62,
+    live_disk_size: 62,
+    garbage_disk_size: 0,
+}
+
+# Dump the compacted log.
+dump
+---
+0@0     keylen=0 [00000000] valuelen=0 [00000000]
+8b      key="" [] value="" []
+--------
+1@8     keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="a" [61] value="1" [31]
+--------
+2@18    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="b" [62] value="2" [32]
+--------
+3@28    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="c" [63] value="3" [33]
+--------
+4@38    keylen=1 [00000001] valuelen=1 [00000001]
+10b     key="d" [64] value="4" [34]
+--------
+5@48    keylen=3 [00000003] valuelen=3 [00000003]
+14b     key="foo" [666f6f] value="bar" [626172]
+
+# Reopening the file works and shows the same data.
+reopen
+scan
+---
+ → 
+a → 1
+b → 2
+c → 3
+d → 4
+foo → bar
