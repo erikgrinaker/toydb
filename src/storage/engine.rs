@@ -398,10 +398,6 @@ pub mod test {
 #[cfg(test)]
 pub mod tests {
     /// Generates common tests for any Engine implementation.
-    ///
-    /// TODO: split these out. In particular, the randomized runner should be
-    /// rewritten as a Mirror engine that mirrors operations on multiple engines
-    /// and compares them.
     macro_rules! test_engine {
         ($setup:expr) => {
             #[test]
@@ -422,115 +418,6 @@ pub mod tests {
                     s.delete(key)?;
                     assert_eq!(s.get(key)?, None);
                 }
-
-                Ok(())
-            }
-
-            #[test]
-            /// Runs random operations both on a Engine and a known-good
-            /// BTreeMap, comparing the results of each operation as well as the
-            /// final state.
-            fn random_ops() -> Result<()> {
-                const NUM_OPS: u64 = 1000;
-
-                use rand::{seq::SliceRandom, Rng, RngCore};
-                let seed: u64 = rand::thread_rng().gen();
-                let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(seed);
-                println!("seed = {}", seed);
-
-                #[derive(Debug)]
-                enum Op {
-                    Set,
-                    Delete,
-                    Get,
-                    Scan,
-                }
-
-                impl rand::distributions::Distribution<Op> for rand::distributions::Standard {
-                    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Op {
-                        match rng.gen_range(0..=3) {
-                            0 => Op::Set,
-                            1 => Op::Delete,
-                            2 => Op::Get,
-                            3 => Op::Scan,
-                            _ => panic!("unexpected value"),
-                        }
-                    }
-                }
-
-                let mut s = $setup;
-                let mut keys: Vec<Vec<u8>> = Vec::new();
-                let mut m = std::collections::BTreeMap::new();
-
-                // Pick an already-used key with 80% probability, or generate a
-                // new key.
-                let mut random_key = |mut rng: &mut rand::rngs::StdRng| -> Vec<u8> {
-                    if rng.gen::<f64>() < 0.8 && !keys.is_empty() {
-                        keys.choose(&mut rng).unwrap().clone()
-                    } else {
-                        let mut key = vec![0; rng.gen_range(0..=16)];
-                        rng.fill_bytes(&mut key);
-                        keys.push(key.clone());
-                        key
-                    }
-                };
-
-                let random_value = |rng: &mut rand::rngs::StdRng| -> Vec<u8> {
-                    let mut value = vec![0; rng.gen_range(0..=16)];
-                    rng.fill_bytes(&mut value);
-                    value
-                };
-
-                // Run random operations.
-                for _ in 0..NUM_OPS {
-                    match rng.gen::<Op>() {
-                        Op::Set => {
-                            let key = random_key(&mut rng);
-                            let value = random_value(&mut rng);
-                            println!("set {:?} = {:?}", key, value);
-                            s.set(&key, value.clone())?;
-                            m.insert(key, value);
-                        }
-                        Op::Delete => {
-                            let key = random_key(&mut rng);
-                            println!("delete {:?}", key);
-                            s.delete(&key)?;
-                            m.remove(&key);
-                        }
-                        Op::Get => {
-                            let key = random_key(&mut rng);
-                            let value = s.get(&key)?;
-                            let expect = m.get(&key).cloned();
-                            println!("get {:?} => {:?}", key, value);
-                            assert_eq!(value, expect);
-                        }
-                        Op::Scan => {
-                            let mut from = random_key(&mut rng);
-                            let mut to = random_key(&mut rng);
-                            if (to < from) {
-                                (from, to) = (to, from)
-                            }
-                            println!("scan {:?} .. {:?}", from, to);
-                            let result =
-                                s.scan(from.clone()..to.clone()).collect::<Result<Vec<_>>>()?;
-                            let expect = m
-                                .range(from..to)
-                                .map(|(k, v)| (k.clone(), v.clone()))
-                                .collect::<Vec<_>>();
-                            assert_eq!(result, expect);
-                        }
-                    }
-                }
-
-                // Compare the final states.
-                println!("comparing final state");
-
-                let state = s.scan(..).collect::<Result<Vec<_>>>()?;
-                let expect = m
-                    .range::<Vec<u8>, _>(..)
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect::<Vec<_>>();
-                assert_eq!(state, expect);
 
                 Ok(())
             }
