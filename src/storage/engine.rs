@@ -295,6 +295,104 @@ pub mod test {
             self.inner.status()
         }
     }
+
+    /// An engine that wraps two others and mirrors operations across them,
+    /// panicking if they produce different results. Engine implementations
+    /// should not have any observable differences in behavior.
+    ///
+    /// TODO: use this in more tests, e.g. MVCC tests.
+    pub struct Mirror<A: Engine, B: Engine> {
+        pub a: A,
+        pub b: B,
+    }
+
+    impl<A: Engine, B: Engine> Mirror<A, B> {
+        pub fn new(a: A, b: B) -> Self {
+            Self { a, b }
+        }
+    }
+
+    impl<A: Engine, B: Engine> Engine for Mirror<A, B> {
+        type ScanIterator<'a> = MirrorIterator<'a, A, B>
+        where
+            Self: Sized,
+            A: 'a,
+            B: 'a;
+
+        fn delete(&mut self, key: &[u8]) -> Result<()> {
+            self.a.delete(key)?;
+            self.b.delete(key)
+        }
+
+        fn flush(&mut self) -> Result<()> {
+            self.a.flush()?;
+            self.b.flush()
+        }
+
+        fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            let a = self.a.get(key)?;
+            let b = self.b.get(key)?;
+            assert_eq!(a, b);
+            Ok(a)
+        }
+
+        fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>
+        where
+            Self: Sized,
+        {
+            let a = self.a.scan((range.start_bound().cloned(), range.end_bound().cloned()));
+            let b = self.b.scan(range);
+            MirrorIterator { a, b }
+        }
+
+        fn scan_dyn(
+            &mut self,
+            range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+        ) -> Box<dyn ScanIterator + '_> {
+            let a = self.a.scan(range.clone());
+            let b = self.b.scan(range);
+            Box::new(MirrorIterator::<A, B> { a, b })
+        }
+
+        fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
+            self.a.set(key, value.clone())?;
+            self.b.set(key, value)
+        }
+
+        fn status(&mut self) -> Result<Status> {
+            let a = self.a.status()?;
+            let b = self.b.status()?;
+            // Only some items are comparable.
+            assert_eq!(a.keys, b.keys);
+            assert_eq!(a.size, b.size);
+            Ok(a)
+        }
+    }
+
+    pub struct MirrorIterator<'a, A: Engine + 'a, B: Engine + 'a> {
+        a: A::ScanIterator<'a>,
+        b: B::ScanIterator<'a>,
+    }
+
+    impl<'a, A: Engine, B: Engine> Iterator for MirrorIterator<'a, A, B> {
+        type Item = Result<(Vec<u8>, Vec<u8>)>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let a = self.a.next();
+            let b = self.b.next();
+            assert_eq!(a, b);
+            a
+        }
+    }
+
+    impl<'a, A: Engine, B: Engine> DoubleEndedIterator for MirrorIterator<'a, A, B> {
+        fn next_back(&mut self) -> Option<Self::Item> {
+            let a = self.a.next_back();
+            let b = self.b.next_back();
+            assert_eq!(a, b);
+            a
+        }
+    }
 }
 
 #[cfg(test)]

@@ -358,6 +358,8 @@ mod tests {
     struct TestRunner {
         log: Log,
         op_rx: Receiver<testengine::Operation>,
+        #[allow(dead_code)]
+        tempdir: tempdir::TempDir, // deleted when dropped
     }
 
     impl goldenscript::Runner for TestRunner {
@@ -444,6 +446,8 @@ mod tests {
                 // reload
                 "reload" => {
                     command.consume_args().reject_rest()?;
+                    // To get owned access to the inner engine, temporarily
+                    // replace it with an empty memory engine.
                     let engine =
                         std::mem::replace(&mut self.log.engine, Box::new(storage::Memory::new()));
                     self.log = Log::new(engine)?;
@@ -537,10 +541,16 @@ mod tests {
 
     impl TestRunner {
         fn new() -> Self {
+            // Use both a BitCask and a Memory engine, and mirror operations
+            // across them. Emit write events to op_tx.
             let (op_tx, op_rx) = crossbeam::channel::unbounded();
-            let engine = testengine::Emit::new(storage::Memory::new(), op_tx);
+            let tempdir = tempdir::TempDir::new("toydb").expect("tempdir failed");
+            let bitcask =
+                storage::BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
+            let memory = storage::Memory::new();
+            let engine = testengine::Emit::new(testengine::Mirror::new(bitcask, memory), op_tx);
             let log = Log::new(Box::new(engine)).expect("log init failed");
-            Self { log, op_rx }
+            Self { log, op_rx, tempdir }
         }
 
         /// Formats a log entry.

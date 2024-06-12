@@ -1136,6 +1136,7 @@ mod tests {
     use crate::raft::state::test::{self as teststate, KVCommand, KVResponse};
     use crate::raft::Entry;
     use crate::storage;
+    use crate::storage::engine::test as testengine;
     use crossbeam::channel::Receiver;
     use std::borrow::Borrow;
     use std::error::Error;
@@ -1230,7 +1231,6 @@ mod tests {
     }
 
     /// Runs Raft goldenscript tests. See run() for available commands.
-    #[derive(Default)]
     struct TestRunner {
         /// IDs of all cluster nodes, in order.
         ids: Vec<NodeID>,
@@ -1249,6 +1249,9 @@ mod tests {
         requests: HashMap<RequestID, Request>,
         /// The request ID to use for the next client request.
         next_request_id: u64,
+        /// Temporary directory (deleted when dropped).
+        #[allow(dead_code)]
+        tempdir: tempdir::TempDir,
     }
 
     impl goldenscript::Runner for TestRunner {
@@ -1428,7 +1431,17 @@ mod tests {
 
     impl TestRunner {
         fn new() -> Self {
-            Self { next_request_id: 1, ..Default::default() }
+            Self {
+                ids: Vec::new(),
+                nodes: HashMap::new(),
+                nodes_rx: HashMap::new(),
+                nodes_pending: HashMap::new(),
+                applied_rx: HashMap::new(),
+                disconnected: HashMap::new(),
+                requests: HashMap::new(),
+                next_request_id: 1,
+                tempdir: tempdir::TempDir::new("toydb").expect("tempdir failed"),
+            }
         }
 
         /// Creates a new empty node and inserts it.
@@ -1438,7 +1451,13 @@ mod tests {
             peers: HashSet<NodeID>,
             opts: Options,
         ) -> Result<(), Box<dyn Error>> {
-            let log = Log::new(Box::new(storage::Memory::new()))?;
+            // Use both a BitCask and a Memory engine, and mirror operations
+            // across them, for added engine test coverage.
+            let path = self.tempdir.path().join(format!("{id}.log"));
+            let bitcask = storage::BitCask::new(path).expect("bitcask failed");
+            let memory = storage::Memory::new();
+            let engine = testengine::Mirror::new(bitcask, memory);
+            let log = Log::new(Box::new(engine))?;
             let state = teststate::KV::new();
             self.add_node_with(id, peers, log, state, opts)
         }
