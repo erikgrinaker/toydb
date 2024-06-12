@@ -39,8 +39,6 @@ paste = "1.0.14"
 pretty_assertions = "1.4.0"
 serde_json = "1.0.117"
 serial_test = "3.1.1"
-# TODO: tempdir crate is replaced by tempfile.
-tempdir = "0.3.7"
 tempfile = "3.10.1"
 test-case = "3.3.1"
 test_each_file = "0.3.2"

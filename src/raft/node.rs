@@ -1251,7 +1251,7 @@ mod tests {
         next_request_id: u64,
         /// Temporary directory (deleted when dropped).
         #[allow(dead_code)]
-        tempdir: tempdir::TempDir,
+        tempdir: tempfile::TempDir,
     }
 
     impl goldenscript::Runner for TestRunner {
@@ -1440,7 +1440,7 @@ mod tests {
                 disconnected: HashMap::new(),
                 requests: HashMap::new(),
                 next_request_id: 1,
-                tempdir: tempdir::TempDir::new("toydb").expect("tempdir failed"),
+                tempdir: tempfile::TempDir::with_prefix("toydb").expect("tempdir failed"),
             }
         }
 

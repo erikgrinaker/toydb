@@ -359,7 +359,7 @@ mod tests {
         log: Log,
         op_rx: Receiver<testengine::Operation>,
         #[allow(dead_code)]
-        tempdir: tempdir::TempDir, // deleted when dropped
+        tempdir: tempfile::TempDir, // deleted when dropped
     }
 
     impl goldenscript::Runner for TestRunner {
@@ -544,7 +544,7 @@ mod tests {
             // Use both a BitCask and a Memory engine, and mirror operations
             // across them. Emit write events to op_tx.
             let (op_tx, op_rx) = crossbeam::channel::unbounded();
-            let tempdir = tempdir::TempDir::new("toydb").expect("tempdir failed");
+            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
             let bitcask =
                 storage::BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
             let memory = storage::Memory::new();

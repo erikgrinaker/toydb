@@ -378,7 +378,7 @@ mod tests {
     }
 
     super::super::engine::tests::test_engine!({
-        let path = tempdir::TempDir::new("toydb")?.path().join("toydb");
+        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("toydb");
         BitCask::new(path)?
     });
 
@@ -403,7 +403,7 @@ mod tests {
     /// standard Engine runner.
     struct BitCaskRunner {
         inner: Runner<BitCask>,
-        tempdir: tempdir::TempDir,
+        tempdir: tempfile::TempDir,
     }
 
     impl goldenscript::Runner for BitCaskRunner {
@@ -453,7 +453,7 @@ mod tests {
 
     impl BitCaskRunner {
         fn new() -> Self {
-            let tempdir = tempdir::TempDir::new("toydb").expect("tempdir failed");
+            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
             let engine = BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
             let inner = Runner::new(engine);
             Self { inner, tempdir }
@@ -516,7 +516,7 @@ mod tests {
     /// database is closed, and that an error is returned if a lock is already
     /// held.
     fn log_lock() -> Result<()> {
-        let path = tempdir::TempDir::new("toydb")?.path().join("toydb");
+        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("bitcask");
         let s = BitCask::new(path.clone())?;
 
         assert!(BitCask::new(path.clone()).is_err());
@@ -531,7 +531,7 @@ mod tests {
     /// recovered by discarding the last entry.
     fn recovery() -> Result<()> {
         // Create an initial log file with a few entries.
-        let dir = tempdir::TempDir::new("toydb")?;
+        let dir = tempfile::TempDir::with_prefix("toydb")?;
         let path = dir.path().join("complete");
         let truncpath = dir.path().join("truncated");
 

@@ -13,7 +13,7 @@ use toydb::Client;
 /// server (and eventually the toySQL client) end-to-end.
 pub struct TestCluster {
     nodes: u8,
-    dir: tempdir::TempDir,
+    dir: tempfile::TempDir,
     children: std::collections::HashMap<NodeID, std::process::Child>,
 }
 
@@ -25,7 +25,7 @@ impl TestCluster {
     pub fn new(nodes: u8) -> Result<Self> {
         Ok(Self {
             nodes,
-            dir: tempdir::TempDir::new("toydb")?,
+            dir: tempfile::TempDir::with_prefix("toydb")?,
             children: std::collections::HashMap::new(),
         })
     }
