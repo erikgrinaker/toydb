@@ -40,11 +40,13 @@ impl Default for Options {
     }
 }
 
-/// A Raft node, with a dynamic role. The node is driven synchronously by
-/// processing inbound messages via `step()` or by advancing time via `tick()`.
-/// These methods consume the node and return a new one with a possibly
-/// different role. Outbound messages are sent via the given `tx` channel, and
-/// must be delivered to the remote peers.
+/// A Raft node with a dynamic role. This implements the Raft distributed
+/// consensus protocol, see the `raft` module documentation for more info.
+///
+/// The node is driven synchronously by processing inbound messages via `step()`
+/// and by advancing time via `tick()`. These methods consume the node and
+/// return a new one with a possibly different role. Outbound messages are sent
+/// via the given `tx` channel, and must be delivered to peers or clients.
 ///
 /// This enum is the public interface to the node, with a closed set of roles.
 /// It wraps the `RawNode<Role>` types, which implement the actual node logic.
@@ -291,8 +293,8 @@ impl RawNode<Follower> {
         node.role.election_timeout = node.random_election_timeout();
 
         // Apply any pending entries following restart. Unlike the Raft log,
-        // state machines writes are not flushed to durable storage, so a tail
-        // of writes may be lost if the OS crashes or restarts.
+        // state machine writes are not flushed to durable storage, so a tail of
+        // writes may be lost if the OS crashes or restarts.
         node.maybe_apply()?;
         Ok(node)
     }
