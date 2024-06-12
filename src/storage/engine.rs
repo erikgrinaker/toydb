@@ -394,35 +394,3 @@ pub mod test {
         }
     }
 }
-
-#[cfg(test)]
-pub mod tests {
-    /// Generates common tests for any Engine implementation.
-    macro_rules! test_engine {
-        ($setup:expr) => {
-            #[test]
-            /// Tests Engine point operations on keys and values of increasing
-            /// sizes, up to 16 MB.
-            fn point_ops_sizes() -> Result<()> {
-                let mut s = $setup;
-
-                // Generate keys/values for increasing powers of two.
-                for size in (1..=24).map(|i| 1 << i) {
-                    let bytes = "x".repeat(size);
-                    let key = bytes.as_bytes();
-                    let value = bytes.clone().into_bytes();
-
-                    assert_eq!(s.get(key)?, None);
-                    s.set(key, value.clone())?;
-                    assert_eq!(s.get(key)?, Some(value));
-                    s.delete(key)?;
-                    assert_eq!(s.get(key)?, None);
-                }
-
-                Ok(())
-            }
-        };
-    }
-
-    pub(crate) use test_engine; // export for use in submodules
-}

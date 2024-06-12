@@ -98,6 +98,4 @@ mod tests {
     fn test_goldenscript(path: &std::path::Path) {
         goldenscript::run(&mut Runner::new(Memory::new()), path).expect("goldenscript failed")
     }
-
-    super::super::engine::tests::test_engine!(Memory::new());
 }

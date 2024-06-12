@@ -377,10 +377,92 @@ mod tests {
         goldenscript::run(&mut BitCaskRunner::new(), path).expect("goldenscript failed")
     }
 
-    super::super::engine::tests::test_engine!({
-        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("toydb");
-        BitCask::new(path)?
-    });
+    /// Tests that exclusive locks are taken out on log files, erroring if held,
+    /// and released when the database is closed.
+    #[test]
+    fn lock() -> Result<()> {
+        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("bitcask");
+        let engine = BitCask::new(path.clone()).expect("bitcask failed");
+
+        // Opening another database with the same file should error.
+        assert!(BitCask::new(path.clone()).is_err());
+
+        // Opening another database after the current is closed works.
+        drop(engine);
+        assert!(BitCask::new(path).is_ok());
+        Ok(())
+    }
+
+    /// Tests that a log with an incomplete write at the end can be recovered by
+    /// discarding the last entry.
+    #[test]
+    fn recovery() -> Result<()> {
+        // Create an initial log file with a few entries. Keep track of where
+        // each entry ends.
+        let dir = tempfile::TempDir::with_prefix("toydb")?;
+        let path = dir.path().join("complete");
+        let mut log = Log::new(path.clone())?;
+
+        let mut ends = vec![];
+        let (pos, len) = log.write_entry("deleted".as_bytes(), Some(&[1, 2, 3]))?;
+        ends.push(pos + len as u64);
+        let (pos, len) = log.write_entry("deleted".as_bytes(), None)?;
+        ends.push(pos + len as u64);
+        let (pos, len) = log.write_entry(&[], Some(&[]))?;
+        ends.push(pos + len as u64);
+        let (pos, len) = log.write_entry("key".as_bytes(), Some(&[1, 2, 3, 4, 5]))?;
+        ends.push(pos + len as u64);
+        drop(log);
+
+        // Copy the file, and truncate it at each byte, then try to open it
+        // and assert that we always retain a prefix of entries.
+        let truncpath = dir.path().join("truncated");
+        let size = std::fs::metadata(&path)?.len();
+        for pos in 0..=size {
+            std::fs::copy(&path, &truncpath)?;
+            let f = std::fs::OpenOptions::new().write(true).open(&truncpath)?;
+            f.set_len(pos)?;
+            drop(f);
+
+            let mut expect = vec![];
+            if pos >= ends[0] {
+                expect.push((b"deleted".to_vec(), vec![1, 2, 3]))
+            }
+            if pos >= ends[1] {
+                expect.pop(); // "deleted" key removed
+            }
+            if pos >= ends[2] {
+                expect.push((b"".to_vec(), vec![]))
+            }
+            if pos >= ends[3] {
+                expect.push((b"key".to_vec(), vec![1, 2, 3, 4, 5]))
+            }
+
+            let mut engine = BitCask::new(truncpath.clone())?;
+            assert_eq!(expect, engine.scan(..).collect::<Result<Vec<_>>>()?);
+        }
+        Ok(())
+    }
+
+    /// Tests key/value sizes up to 64 MB.
+    #[test]
+    fn point_ops_sizes() -> Result<()> {
+        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("bitcask");
+        let mut engine = BitCask::new(path.clone()).expect("bitcask failed");
+
+        // Generate keys/values for increasing powers of two.
+        for size in (1..=26).map(|i| 1 << i) {
+            let value = vec![b'x'; size];
+            let key = value.as_slice();
+
+            assert_eq!(engine.get(key)?, None);
+            engine.set(key, value.clone())?;
+            assert_eq!(engine.get(key)?.as_ref(), Some(&value));
+            engine.delete(key)?;
+            assert_eq!(engine.get(key)?, None);
+        }
+        Ok(())
+    }
 
     /// Tests that should_compact() handles parameters correctly.
     #[test_case(100, 100, -01.0, 0 => true; "ratio negative all garbage")]
@@ -509,76 +591,5 @@ mod tests {
             }
             Ok(())
         }
-    }
-
-    #[test]
-    /// Tests that exclusive locks are taken out on log files, released when the
-    /// database is closed, and that an error is returned if a lock is already
-    /// held.
-    fn log_lock() -> Result<()> {
-        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("bitcask");
-        let s = BitCask::new(path.clone())?;
-
-        assert!(BitCask::new(path.clone()).is_err());
-        drop(s);
-        assert!(BitCask::new(path.clone()).is_ok());
-
-        Ok(())
-    }
-
-    #[test]
-    /// Tests that an incomplete write at the end of the log file can be
-    /// recovered by discarding the last entry.
-    fn recovery() -> Result<()> {
-        // Create an initial log file with a few entries.
-        let dir = tempfile::TempDir::with_prefix("toydb")?;
-        let path = dir.path().join("complete");
-        let truncpath = dir.path().join("truncated");
-
-        let mut log = Log::new(path.clone())?;
-        let mut ends = vec![];
-
-        let (pos, len) = log.write_entry("deleted".as_bytes(), Some(&[1, 2, 3]))?;
-        ends.push(pos + len as u64);
-
-        let (pos, len) = log.write_entry("deleted".as_bytes(), None)?;
-        ends.push(pos + len as u64);
-
-        let (pos, len) = log.write_entry(&[], Some(&[]))?;
-        ends.push(pos + len as u64);
-
-        let (pos, len) = log.write_entry("key".as_bytes(), Some(&[1, 2, 3, 4, 5]))?;
-        ends.push(pos + len as u64);
-
-        drop(log);
-
-        // Copy the file, and truncate it at each byte, then try to open it
-        // and assert that we always retain a prefix of entries.
-        let size = std::fs::metadata(&path)?.len();
-        for pos in 0..=size {
-            std::fs::copy(&path, &truncpath)?;
-            let f = std::fs::OpenOptions::new().write(true).open(&truncpath)?;
-            f.set_len(pos)?;
-            drop(f);
-
-            let mut expect = vec![];
-            if pos >= ends[0] {
-                expect.push((b"deleted".to_vec(), vec![1, 2, 3]))
-            }
-            if pos >= ends[1] {
-                expect.pop(); // "deleted" key removed
-            }
-            if pos >= ends[2] {
-                expect.push((b"".to_vec(), vec![]))
-            }
-            if pos >= ends[3] {
-                expect.push((b"key".to_vec(), vec![1, 2, 3, 4, 5]))
-            }
-
-            let mut s = BitCask::new(truncpath.clone())?;
-            assert_eq!(expect, s.scan(..).collect::<Result<Vec<_>>>()?);
-        }
-
-        Ok(())
     }
 }
