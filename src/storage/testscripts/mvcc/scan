@@ -1,0 +1,101 @@
+# Scans should use correct key and time bounds. Sets up this dataset:
+# 
+# T
+# 4             x    ba4
+# 3   x    a3   b3        x
+# 2        x         ba2  bb2  bc2
+# 1   B1   a1   x                   c1
+#     B    a    b    ba   bb   bc   c
+
+import 1 B=B1 a=a1 b= c=c1
+import 2 a= ba=ba2 bb=bb2 bc=bc2
+import 3 B= a=a3 b=b3 bb=
+import 4 b= ba=ba4
+---
+ok
+
+# Full scans at all timestamps.
+t1: begin readonly as_of=1
+t1: scan
+---
+ok
+
+t2: begin readonly as_of=2
+t2: scan
+---
+t2: B → B1
+t2: a → a1
+t2: c → c1
+
+t3: begin readonly as_of=3
+t3: scan
+---
+t3: B → B1
+t3: ba → ba2
+t3: bb → bb2
+t3: bc → bc2
+t3: c → c1
+
+t4: begin readonly as_of=4
+t4: scan
+---
+t4: a → a3
+t4: b → b3
+t4: ba → ba2
+t4: bc → bc2
+t4: c → c1
+
+t5: begin readonly
+t5: scan
+---
+t5: a → a3
+t5: ba → ba4
+t5: bc → bc2
+t5: c → c1
+
+# Full reverse scan at version 3.
+t3: scan reverse=true
+---
+t3: c → c1
+t3: bc → bc2
+t3: bb → bb2
+t3: ba → ba2
+t3: B → B1
+
+# Various bounded scans around ba-bc at version 3.
+t3: scan ba..bc
+---
+t3: ba → ba2
+t3: bb → bb2
+
+t3: scan "ba..=bc"
+---
+t3: ba → ba2
+t3: bb → bb2
+t3: bc → bc2
+
+t3: scan "ba..=bc" reverse=true
+---
+t3: bc → bc2
+t3: bb → bb2
+t3: ba → ba2
+
+t3: scan ba..
+---
+t3: ba → ba2
+t3: bb → bb2
+t3: bc → bc2
+t3: c → c1
+
+t3: scan "..bc"
+---
+t3: B → B1
+t3: ba → ba2
+t3: bb → bb2
+
+t3: scan "..=bc"
+---
+t3: B → B1
+t3: ba → ba2
+t3: bb → bb2
+t3: bc → bc2

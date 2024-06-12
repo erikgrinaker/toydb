@@ -365,6 +365,7 @@ mod tests {
     impl goldenscript::Runner for TestRunner {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
+            // TODO: use [ops] tag instead of oplog= parameters. See MVCC runner.
             match command.name.as_str() {
                 // append [COMMAND] [oplog=BOOL]
                 "append" => {

@@ -1,0 +1,31 @@
+# A phantom read is when t1 reads entries matching some predicate, but a
+# modification by t2 changes which entries match the predicate such that a later
+# read by t1 returns them. Snapshot isolation prevents this.
+#
+# We use a prefix scan as our predicate.
+
+# Write some initial data.
+import a=0 ba=0 bb=0
+---
+ok
+
+t1: begin
+t2: begin
+---
+ok
+
+t1: scan_prefix b
+---
+t1: ba → 0
+t1: bb → 0
+
+t2: delete ba
+t2: set bc=2
+t2: commit
+---
+ok
+
+t1: scan_prefix b
+---
+t1: ba → 0
+t1: bb → 0

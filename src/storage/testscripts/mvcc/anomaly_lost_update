@@ -1,0 +1,17 @@
+# A lost update is when t1 and t2 both read a value and update it, where
+# t2's update replaces t1. Snapshot isolation prevents this.
+
+t1: begin
+t1: get key
+---
+t1: key → None
+
+t2: begin
+t2: get key
+---
+t2: key → None
+
+t1: set key=1
+t2: !set key=2
+---
+t2: Error: serialization failure, retry transaction

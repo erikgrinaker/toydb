@@ -1,0 +1,108 @@
+# Begin read-only as-of should provide a view of a historical version.
+
+# Start a concurrent transaction at v1 that should be invisible.
+t1: begin
+t1: set other=1
+---
+ok
+
+# Write and commit a key at v2.
+t2: begin
+t2: set key=2
+t2: commit
+---
+ok
+
+# Write another version at v3, but don't commit it yet.
+t3: begin
+t3: set key=3
+---
+ok
+
+dump
+---
+NextVersion → 4
+TxnActive(1) → []
+TxnActive(3) → []
+TxnActiveSnapshot(2) → {1}
+TxnActiveSnapshot(3) → {1}
+TxnWrite(1, "other") → []
+TxnWrite(3, "key") → []
+Version("key", 2) → "2"
+Version("key", 3) → "3"
+Version("other", 1) → "1"
+
+# Start a read-only transaction as-of version 3. It should only see key=2
+# because t1 and t3 haven't committed yet. It shouldn't write any state.
+t4: begin readonly as_of=3 [ops]
+t4: state
+---
+t4: v3 ro active={1}
+
+t4: scan
+---
+t4: key → 2
+
+# Writes should error.
+t4: !set foo=bar
+t4: !delete foo
+---
+t4: Error: read-only transaction
+t4: Error: read-only transaction
+
+# t1 and t3 commit. Their writes still shouldn't be visible to t4, since
+# versions must be stable.
+t1: commit
+t3: commit
+---
+ok
+
+t4: scan
+---
+t4: key → 2
+
+# A new transaction t5 running as-of v3 shouldn't see them either.
+t5: begin readonly as_of=3
+t5: state
+---
+t5: v3 ro active={1}
+
+t5: scan
+---
+t5: key → 2
+
+# Committing and rolling back readonly txns is a noop.
+t4: commit [ops]
+t5: rollback [ops]
+---
+ok
+
+# Commit a new value at version 4.
+t6: begin
+t6: state
+t6: set key=4
+t6: commit
+---
+t6: v4 rw active={}
+
+# A snapshot at version 4 should see the old writes, but not those of t6 at v4
+# because as_of is at the start of the version.
+t7: begin readonly as_of=4
+t7: scan
+---
+t7: key → 3
+t7: other → 1
+
+# Running as_of future versions should error, including the next version.
+t8: !begin readonly as_of=5
+t8: !begin readonly as_of=9
+---
+t8: Error: invalid input: version 5 does not exist
+t8: Error: invalid input: version 9 does not exist
+
+# Version 0 works though, but doesn't show anything.
+t8: begin readonly as_of=0
+t8: state
+t8: scan
+---
+t8: v0 ro active={}

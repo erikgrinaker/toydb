@@ -207,7 +207,7 @@ pub mod test {
             format!(
                 "{} → {}",
                 Self::format_bytes(key),
-                value.map(|v| Self::format_bytes(v)).unwrap_or("None".to_string())
+                value.map(Self::format_bytes).unwrap_or("None".to_string())
             )
         }
 
@@ -300,7 +300,7 @@ pub mod test {
     /// panicking if they produce different results. Engine implementations
     /// should not have any observable differences in behavior.
     ///
-    /// TODO: use this in more tests, e.g. MVCC tests.
+    /// TODO: use this in more tests, e.g. SQL tests.
     pub struct Mirror<A: Engine, B: Engine> {
         pub a: A,
         pub b: B,

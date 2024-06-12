@@ -1,0 +1,12 @@
+# A dirty read is when t2 can read an uncommitted value set by t1.Snapshot
+# isolation prevents this.
+
+t1: begin
+t1: set key=1
+---
+ok
+
+t2: begin
+t2: get key
+---
+t2: key → None

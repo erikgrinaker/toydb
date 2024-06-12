@@ -1,0 +1,39 @@
+# Delete should return serialization errors both for uncommitted versions
+# (past and future), and future committed versions.
+
+t1: begin
+t2: begin
+t3: begin
+t4: begin
+---
+ok
+
+t1: set a=1
+t3: set c=3
+t4: set d=4
+t4: commit
+---
+ok
+
+t2: !delete a # past uncommitted
+t2: !delete c # future uncommitted
+t2: !delete d # future committed
+---
+t2: Error: serialization failure, retry transaction
+t2: Error: serialization failure, retry transaction
+t2: Error: serialization failure, retry transaction
+
+dump
+---
+NextVersion → 5
+TxnActive(1) → []
+TxnActive(2) → []
+TxnActive(3) → []
+TxnActiveSnapshot(2) → {1}
+TxnActiveSnapshot(3) → {1,2}
+TxnActiveSnapshot(4) → {1,2,3}
+TxnWrite(1, "a") → []
+TxnWrite(3, "c") → []
+Version("a", 1) → "1"
+Version("c", 3) → "3"
+Version("d", 4) → "4"

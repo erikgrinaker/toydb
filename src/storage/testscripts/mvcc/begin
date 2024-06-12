@@ -1,0 +1,49 @@
+# Begin creates new transactions at increasing versions, with concurrent
+# transactions in their active sets.
+
+# Start t1 at v1, with an empty active set. Dump raw engine operations to ensure
+# it bumps the next version and registers itself as active.
+t1: begin [ops]
+t1: state
+---
+t1: engine set NextVersion → 2
+t1: engine set TxnActive(1) → []
+t1: v1 rw active={}
+
+# t2 should have v2, and t1 in its active set. It should persist a snapshot of
+# its active set.
+t2: begin [ops]
+t2: state
+---
+t2: engine set NextVersion → 3
+t2: engine set TxnActiveSnapshot(2) → {1}
+t2: engine set TxnActive(2) → []
+t2: v2 rw active={1}
+
+# Similarly for t3.
+t3: begin [ops]
+t3: state
+---
+t3: engine set NextVersion → 4
+t3: engine set TxnActiveSnapshot(3) → {1,2}
+t3: engine set TxnActive(3) → []
+t3: v3 rw active={1,2}
+
+# Now, commit t2, which unregisters it.
+t2: commit [ops]
+---
+t2: engine delete TxnActive(2)
+
+# It should still be in t3's active set.
+t3: state
+---
+t3: v3 rw active={1,2}
+
+# But not in a new t4.
+t4: begin [ops]
+t4: state
+---
+t4: engine set NextVersion → 5
+t4: engine set TxnActiveSnapshot(4) → {1,3}
+t4: engine set TxnActive(4) → []
+t4: v4 rw active={1,3}

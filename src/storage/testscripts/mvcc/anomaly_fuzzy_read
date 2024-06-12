@@ -1,0 +1,25 @@
+# A fuzzy (or unrepeatable) read is when t2 sees a value change after t1
+# updates it. Snapshot isolation prevents this.
+
+# Set up some initial data.
+import key=0
+---
+ok
+
+t1: begin
+t2: begin
+---
+ok
+
+t2: get key
+---
+t2: key → 0
+
+t1: set key=1
+t1: commit
+---
+ok
+
+t2: get key
+---
+t2: key → 0

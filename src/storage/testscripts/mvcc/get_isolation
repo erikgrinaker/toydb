@@ -1,0 +1,46 @@
+# Get should be isolated from concurrent transactions.
+
+# Past committed.
+t1: begin
+t1: set a=1 b=1 d=1 e=1
+t1: commit
+---
+ok
+
+# Past uncommitted.
+t2: begin
+t2: set a=2 c=2
+t2: delete b
+---
+ok
+
+# Begin the read transaction.
+t3: begin readonly
+---
+ok
+
+# Future committed.
+t4: begin
+t4: set d=3 f=3
+t4: delete e
+t4: commit
+---
+ok
+
+# Future uncommitted.
+t5: begin
+t5: set d=4 g=4
+t5: delete f
+---
+ok
+
+# Get each key.
+t3: get a b c d e f g
+---
+t3: a → 1
+t3: b → 1
+t3: c → None
+t3: d → 1
+t3: e → 1
+t3: f → None
+t3: g → None

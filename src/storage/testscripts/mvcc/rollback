@@ -1,0 +1,95 @@
+# Tests that transaction rollback properly rolls back uncommitted writes
+# allowing other concurrent transactions to write the keys.
+
+import 1 a=0 b=0 c=0 d=0
+---
+ok
+
+# t2 will be rolled back. t1 and t3 are concurrent transactions.
+t1: begin
+t2: begin
+t3: begin
+---
+ok
+
+t1: set a=1
+t2: set b=2
+t2: delete c
+t3: set d=3
+---
+ok
+
+dump
+---
+NextVersion → 5
+TxnActive(2) → []
+TxnActive(3) → []
+TxnActive(4) → []
+TxnActiveSnapshot(3) → {2}
+TxnActiveSnapshot(4) → {2,3}
+TxnWrite(2, "a") → []
+TxnWrite(3, "b") → []
+TxnWrite(3, "c") → []
+TxnWrite(4, "d") → []
+Version("a", 1) → "0"
+Version("a", 2) → "1"
+Version("b", 1) → "0"
+Version("b", 3) → "2"
+Version("c", 1) → "0"
+Version("c", 3) → None
+Version("d", 1) → "0"
+Version("d", 4) → "3"
+
+# Both t1 and t3 will conflict with t2.
+t1: !set b=1
+t3: !set c=3
+---
+t1: Error: serialization failure, retry transaction
+t3: Error: serialization failure, retry transaction
+
+# When t2 is rolled back, none of its writes will be visible, and t1 and t3 can
+# perform their writes and successfully commit.
+t2: rollback [ops]
+---
+t2: engine delete Version("b", 3)
+t2: engine delete TxnWrite(3, "b")
+t2: engine delete Version("c", 3)
+t2: engine delete TxnWrite(3, "c")
+t2: engine delete TxnActive(3)
+
+t4: begin readonly
+t4: scan
+---
+t4: a → 0
+t4: b → 0
+t4: c → 0
+t4: d → 0
+
+t1: set b=1
+t1: commit
+t3: set c=3
+t3: commit
+---
+ok
+
+t5: begin readonly
+t5: scan
+---
+t5: a → 1
+t5: b → 1
+t5: c → 3
+t5: d → 3
+
+dump
+---
+NextVersion → 5
+TxnActiveSnapshot(3) → {2}
+TxnActiveSnapshot(4) → {2,3}
+Version("a", 1) → "0"
+Version("a", 2) → "1"
+Version("b", 1) → "0"
+Version("b", 2) → "1"
+Version("c", 1) → "0"
+Version("c", 4) → "3"
+Version("d", 1) → "0"
+Version("d", 4) → "3"

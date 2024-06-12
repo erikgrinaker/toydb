@@ -1,0 +1,40 @@
+# Begin read-only should not create a new version, it should run in the next
+# version but using the current active set.
+
+# Start t1 read-only at v1. It shouldn't bump the version nor write any state.
+t1: begin readonly [ops]
+t1: state
+---
+t1: v1 ro active={}
+
+# Writes should error.
+t1: !set foo=bar
+t1: !delete foo
+---
+t1: Error: read-only transaction
+t1: Error: read-only transaction
+
+# Start a new read-write transaction, then another read-only transaction which
+# should have it in its active set. t1 should not be in the active set, because
+# it's read-only.
+t2: begin
+t2: state
+---
+t2: v1 rw active={}
+
+t3: begin readonly [ops]
+t3: state
+---
+t3: v2 ro active={1}
+
+# t2 also shouldn't be in t1's active set. Visibility for t2's writes are
+# handled explicitly for t1.
+t2: state
+---
+t2: v1 rw active={}
+
+# Both committing and rolling back read-only transactions are noops.
+t1: commit [ops]
+t3: commit [ops]
+---
+ok

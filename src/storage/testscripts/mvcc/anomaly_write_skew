@@ -1,0 +1,36 @@
+# Write skew is when t1 reads a and writes it to b while t2 reads b and writes
+# it to a. Snapshot isolation does prevent this, which is expected, so we assert
+# the anomalous behavior. Fixing this would require implementing serializable
+# snapshot isolation.
+
+# Write some initial data.
+import a=1 b=2
+---
+ok
+
+t1: begin
+t2: begin
+---
+ok
+
+t1: get a
+t2: get b
+---
+t1: a → 1
+t2: b → 2
+
+t1: set b=1
+t2: set a=2
+---
+ok
+
+t1: commit
+t2: commit
+---
+ok
+
+t3: begin readonly
+t3: scan
+---
+t3: a → 2
+t3: b → 1

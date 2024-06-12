@@ -1,0 +1,21 @@
+# Get should return the correct latest value.
+
+import 1 key=1 updated=1 deleted=1 tombstone=
+import 2 updated=2 deleted=
+---
+ok
+
+t1: begin readonly
+t1: scan
+---
+t1: key → 1
+t1: updated → 2
+
+# Get results should mirror scan.
+t1: get key updated deleted tombstone missing
+---
+t1: key → 1
+t1: updated → 2
+t1: deleted → None
+t1: tombstone → None
+t1: missing → None

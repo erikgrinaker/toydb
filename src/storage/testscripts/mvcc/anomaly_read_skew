@@ -1,0 +1,26 @@
+# Read skew is when t1 reads a and b, but t2 modifies b in between the
+# reads. Snapshot isolation prevents this.
+
+# Set up some initial data.
+import a=0 b=0
+---
+ok
+
+t1: begin
+t2: begin
+---
+ok
+
+t1: get a
+---
+t1: a → 0
+
+t2: set a=2
+t2: set b=2
+t2: commit
+---
+ok
+
+t1: get b
+---
+t1: b → 0

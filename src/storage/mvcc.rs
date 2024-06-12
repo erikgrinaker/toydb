@@ -783,1150 +783,396 @@ impl<'a, E: Engine> DoubleEndedIterator for VersionIterator<'a, E> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::debug;
-    use super::super::engine::test::{self as testengine, Emit};
-    use super::super::Memory;
+    use super::super::engine::test::{Emit, Mirror, Operation};
+    use super::super::{debug, BitCask, Memory};
     use super::*;
     use crossbeam::channel::Receiver;
+    use itertools::Itertools as _;
+    use regex::Regex;
     use std::collections::HashMap;
-    use std::io::Write as _;
+    use std::error::Error as StdError;
+    use std::fmt::Write as _;
+    use std::result::Result as StdResult;
+    use test_case::test_case;
+    use test_each_file::test_each_path;
 
-    const GOLDEN_DIR: &str = "src/storage/golden/mvcc";
+    // Run goldenscript tests in src/storage/testscripts/mvcc.
+    test_each_path! { in "src/storage/testscripts/mvcc" as scripts => test_goldenscript }
 
-    /// An MVCC wrapper that records transaction schedules to golden masters.
-    /// TODO: migrate this to goldenscript.
-    struct Schedule {
-        mvcc: MVCC<Emit<Memory>>,
-        op_rx: Receiver<testengine::Operation>,
-        mint: goldenfile::Mint,
-        file: Arc<Mutex<std::fs::File>>,
-        next_id: u8,
+    fn test_goldenscript(path: &std::path::Path) {
+        goldenscript::run(&mut MVCCRunner::new(), path).expect("goldenscript failed")
     }
 
-    impl Schedule {
-        /// Creates a new schedule using the given golden master filename.
-        fn new(name: &str) -> Result<Self> {
-            let (op_tx, op_rx) = crossbeam::channel::unbounded();
-            let mvcc = MVCC::new(Emit::new(Memory::new(), op_tx));
-            let mut mint = goldenfile::Mint::new(GOLDEN_DIR);
-            let file = Arc::new(Mutex::new(mint.new_goldenfile(name)?));
-            Ok(Self { mvcc, op_rx, mint, file, next_id: 1 })
-        }
-
-        /// Sets up an initial, versioned dataset from the given data as a
-        /// vector of key,version,value tuples. These transactions are not
-        /// assigned transaction IDs, nor are the writes logged, except for the
-        /// initial engine state.
-        #[allow(clippy::type_complexity)]
-        fn setup(&mut self, data: Vec<(&[u8], Version, Option<&[u8]>)>) -> Result<()> {
-            // Segment the writes by version.
-            let mut writes = HashMap::new();
-            for (key, version, value) in data {
-                writes
-                    .entry(version)
-                    .or_insert(Vec::new())
-                    .push((key.to_vec(), value.map(|v| v.to_vec())));
-            }
-            // Insert the writes with individual transactions.
-            for i in 1..=writes.keys().max().copied().unwrap_or(0) {
-                let txn = self.mvcc.begin()?;
-                for (key, value) in writes.get(&i).unwrap_or(&Vec::new()) {
-                    if let Some(value) = value {
-                        txn.set(key, value.clone())?;
-                    } else {
-                        txn.delete(key)?;
-                    }
-                }
-                txn.commit()?;
-            }
-            // Flush the write log, but dump the engine contents.
-            while self.op_rx.try_recv().is_ok() {}
-            self.print_engine()?;
-            writeln!(&mut self.file.lock()?)?;
-            Ok(())
-        }
-
-        fn begin(&mut self) -> Result<ScheduleTransaction> {
-            self.new_txn("begin", self.mvcc.begin())
-        }
-
-        fn begin_read_only(&mut self) -> Result<ScheduleTransaction> {
-            self.new_txn("begin read-only", self.mvcc.begin_read_only())
-        }
-
-        fn begin_as_of(&mut self, version: Version) -> Result<ScheduleTransaction> {
-            self.new_txn(&format!("begin as of {}", version), self.mvcc.begin_as_of(version))
-        }
-
-        fn resume(&mut self, state: TransactionState) -> Result<ScheduleTransaction> {
-            self.new_txn("resume", self.mvcc.resume(state))
-        }
-
-        /// Processes a begin/resume result.
-        fn new_txn(
-            &mut self,
-            name: &str,
-            result: Result<Transaction<Emit<Memory>>>,
-        ) -> Result<ScheduleTransaction> {
-            let id = self.next_id;
-            self.next_id += 1;
-            self.print_begin(id, name, &result)?;
-            result.map(|txn| ScheduleTransaction {
-                id,
-                txn,
-                file: self.file.clone(),
-                op_rx: self.op_rx.clone(),
-            })
-        }
-
-        /// Prints a transaction begin to the golden file.
-        fn print_begin(
-            &mut self,
-            id: u8,
-            name: &str,
-            result: &Result<Transaction<Emit<Memory>>>,
-        ) -> Result<()> {
-            let mut f = self.file.lock()?;
-            write!(f, "T{}: {} → ", id, name)?;
-            match result {
-                Ok(txn) => writeln!(f, "{}", debug::format_txn(txn.state()))?,
-                Err(err) => writeln!(f, "Error::{:?}", err)?,
-            };
-            Self::print_log(&mut f, &self.op_rx)?;
-            writeln!(f)?;
-            Ok(())
-        }
-        /// Prints the engine write log since the last call to the golden file.
-        fn print_log(
-            f: &mut MutexGuard<'_, std::fs::File>,
-            op_rx: &Receiver<testengine::Operation>,
-        ) -> Result<()> {
-            while let Ok(op) = op_rx.try_recv() {
-                match op {
-                    testengine::Operation::Delete { key } => {
-                        let (fkey, _) = debug::format_key_value(&key, &None);
-                        writeln!(f, "    del {fkey}")
-                    }
-                    testengine::Operation::Flush => writeln!(f, "    flush"),
-                    testengine::Operation::Set { key, value } => {
-                        let (fkey, fvalue) = debug::format_key_value(&key, &Some(value));
-                        writeln!(f, "    set {} = {}", fkey, fvalue.unwrap())
-                    }
-                }?;
-            }
-            Ok(())
-        }
-
-        /// Prints the engine contents to the golden file.
-        fn print_engine(&self) -> Result<()> {
-            let mut f = self.file.lock()?;
-            let mut engine = self.mvcc.engine.lock()?;
-            let mut scan = engine.scan(..);
-            writeln!(f, "Engine state:")?;
-            while let Some((key, value)) = scan.next().transpose()? {
-                if let (fkey, Some(fvalue)) = debug::format_key_value(&key, &Some(value)) {
-                    writeln!(f, "{} = {}", fkey, fvalue)?;
-                }
-            }
-            Ok(())
-        }
-
-        fn get_unversioned(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-            let value = self.mvcc.get_unversioned(key)?;
-            write!(
-                self.file.lock()?,
-                "T_: get unversioned {} → {}\n\n",
-                debug::format_raw(key),
-                if let Some(ref value) = value {
-                    debug::format_raw(value)
-                } else {
-                    String::from("None")
-                }
-            )?;
-            Ok(value)
-        }
-
-        fn set_unversioned(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
-            let mut f = self.file.lock()?;
-            write!(
-                f,
-                "T_: set unversioned {} = {}",
-                debug::format_raw(key),
-                debug::format_raw(&value)
-            )?;
-            let result = self.mvcc.set_unversioned(key, value);
-            match &result {
-                Ok(_) => writeln!(f)?,
-                Err(err) => writeln!(f, " → Error::{:?}", err)?,
-            }
-            Schedule::print_log(&mut f, &self.op_rx)?;
-            writeln!(f)?;
-            result
-        }
-    }
-
-    impl Drop for Schedule {
-        /// Print engine contents when the schedule is dropped.
-        fn drop(&mut self) {
-            _ = self.print_engine();
-            _ = self.mint; // goldenfile assertions run when mint is dropped
-        }
-    }
-
-    struct ScheduleTransaction {
-        id: u8,
-        txn: Transaction<Emit<Memory>>,
-        file: Arc<Mutex<std::fs::File>>,
-        op_rx: Receiver<testengine::Operation>,
-    }
-
-    impl Clone for ScheduleTransaction {
-        /// Allow cloning a schedule transaction, to simplify handling when
-        /// commit/rollback consumes it. We don't want to allow this in general,
-        /// since a commit/rollback will invalidate the cloned transactions.
-        fn clone(&self) -> Self {
-            let txn = Transaction { engine: self.txn.engine.clone(), st: self.txn.st.clone() };
-            Self { id: self.id, op_rx: self.op_rx.clone(), txn, file: self.file.clone() }
-        }
-    }
-
-    impl ScheduleTransaction {
-        fn state(&self) -> TransactionState {
-            self.txn.state().clone()
-        }
-
-        fn commit(self) -> Result<()> {
-            let result = self.clone().txn.commit(); // clone to retain self.txn for printing
-            self.print_mutation("commit", &result)?;
-            result
-        }
-
-        fn rollback(self) -> Result<()> {
-            let result = self.clone().txn.rollback(); // clone to retain self.txn for printing
-            self.print_mutation("rollback", &result)?;
-            result
-        }
-
-        fn delete(&self, key: &[u8]) -> Result<()> {
-            let result = self.txn.delete(key);
-            self.print_mutation(&format!("del {}", debug::format_raw(key)), &result)?;
-            result
-        }
-
-        fn set(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
-            let result = self.txn.set(key, value.clone());
-            self.print_mutation(
-                &format!("set {} = {}", debug::format_raw(key), debug::format_raw(&value)),
-                &result,
-            )?;
-            result
-        }
-
-        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-            let value = self.txn.get(key)?;
-            write!(
-                self.file.lock()?,
-                "T{}: get {} → {}\n\n",
-                self.id,
-                debug::format_raw(key),
-                if let Some(ref value) = value {
-                    debug::format_raw(value)
-                } else {
-                    String::from("None")
-                }
-            )?;
-            Ok(value)
-        }
-
-        fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Result<Scan<Emit<Memory>>> {
-            let name = format!(
-                "scan {}..{}",
-                match range.start_bound() {
-                    Bound::Excluded(k) => format!("({}", debug::format_raw(k)),
-                    Bound::Included(k) => format!("[{}", debug::format_raw(k)),
-                    Bound::Unbounded => "".to_string(),
-                },
-                match range.end_bound() {
-                    Bound::Excluded(k) => format!("{})", debug::format_raw(k)),
-                    Bound::Included(k) => format!("{}]", debug::format_raw(k)),
-                    Bound::Unbounded => "".to_string(),
-                },
-            );
-            let mut scan = self.txn.scan(range)?;
-            self.print_scan(&name, scan.to_vec()?)?;
-            Ok(scan)
-        }
-
-        fn scan_prefix(&self, prefix: &[u8]) -> Result<Scan<Emit<Memory>>> {
-            let mut scan = self.txn.scan_prefix(prefix)?;
-            self.print_scan(&format!("scan prefix {}", debug::format_raw(prefix)), scan.to_vec()?)?;
-            Ok(scan)
-        }
-
-        /// Prints the result of a mutation to the golden file.
-        fn print_mutation(&self, name: &str, result: &Result<()>) -> Result<()> {
-            let mut f = self.file.lock()?;
-            write!(f, "T{}: {}", self.id, name)?;
-            match result {
-                Ok(_) => writeln!(f)?,
-                Err(err) => writeln!(f, " → Error::{:?}", err)?,
-            }
-            Schedule::print_log(&mut f, &self.op_rx)?;
-            writeln!(f)?;
-            Ok(())
-        }
-
-        /// Prints the results of a scan to the golden file.
-        fn print_scan(&self, name: &str, scan: Vec<(Vec<u8>, Vec<u8>)>) -> Result<()> {
-            let mut f = self.file.lock()?;
-            writeln!(f, "T{}: {}", self.id, name)?;
-            for (key, value) in scan {
-                writeln!(f, "    {} = {}", debug::format_raw(&key), debug::format_raw(&value))?
-            }
-            writeln!(f)?;
-            Ok(())
-        }
-    }
-
-    /// Asserts that a scan yields the expected result.
-    macro_rules! assert_scan {
-        ( $scan:expr => { $( $key:expr => $value:expr),* $(,)? } ) => {
-            let result = $scan.to_vec()?;
-            let expect = vec![
-                $( ($key.to_vec(), $value.to_vec()), )*
-            ];
-            assert_eq!(result, expect);
-        };
-    }
-
-    // Asserts scan invariants.
-    #[track_caller]
-    fn assert_scan_invariants(scan: &mut Scan<Emit<Memory>>) -> Result<()> {
-        // Iterator and vec should yield same results.
-        let result = scan.to_vec()?;
-        assert_eq!(scan.iter().collect::<Result<Vec<_>>>()?, result);
-
-        // Forward and reverse scans should give the same results.
-        let mut forward = result.clone();
-        forward.reverse();
-        let reverse = scan.iter().rev().collect::<Result<Vec<_>>>()?;
-        assert_eq!(reverse, forward);
-
-        // Alternating next/next_back calls should give the same results.
-        let mut forward = Vec::new();
-        let mut reverse = Vec::new();
-        let mut iter = scan.iter();
-        while let Some(b) = iter.next().transpose()? {
-            forward.push(b);
-            if let Some(b) = iter.next_back().transpose()? {
-                reverse.push(b);
-            }
-        }
-        reverse.reverse();
-        forward.extend_from_slice(&reverse);
-        assert_eq!(forward, result);
-
-        Ok(())
-    }
-
-    #[test]
     /// Tests that key prefixes are actually prefixes of keys.
-    fn key_prefix() -> Result<()> {
-        let cases = vec![
-            (KeyPrefix::NextVersion, Key::NextVersion),
-            (KeyPrefix::TxnActive, Key::TxnActive(1)),
-            (KeyPrefix::TxnActiveSnapshot, Key::TxnActiveSnapshot(1)),
-            (KeyPrefix::TxnWrite(1), Key::TxnWrite(1, b"foo".as_slice().into())),
-            (
-                KeyPrefix::Version(b"foo".as_slice().into()),
-                Key::Version(b"foo".as_slice().into(), 1),
-            ),
-            (KeyPrefix::Unversioned, Key::Unversioned(b"foo".as_slice().into())),
-        ];
-
-        for (prefix, key) in cases {
-            let prefix = prefix.encode();
-            let key = key.encode();
-            assert_eq!(prefix, key[..prefix.len()])
-        }
-        Ok(())
+    #[test_case(KeyPrefix::NextVersion, Key::NextVersion; "NextVersion")]
+    #[test_case(KeyPrefix::TxnActive, Key::TxnActive(1); "TxnActive")]
+    #[test_case(KeyPrefix::TxnActiveSnapshot, Key::TxnActiveSnapshot(1); "TxnActiveSnapshot")]
+    #[test_case(KeyPrefix::TxnWrite(1), Key::TxnWrite(1, b"foo".as_slice().into()); "TxnWrite")]
+    #[test_case(KeyPrefix::Version(b"foo".as_slice().into()), Key::Version(b"foo".as_slice().into(), 1); "Version")]
+    #[test_case(KeyPrefix::Unversioned, Key::Unversioned(b"foo".as_slice().into()); "Unversioned")]
+    fn key_prefix(prefix: KeyPrefix, key: Key) {
+        let prefix = prefix.encode();
+        let key = key.encode();
+        assert_eq!(prefix, key[..prefix.len()])
     }
 
-    #[test]
-    /// Begin should create txns with new versions and current active sets.
-    fn begin() -> Result<()> {
-        let mut mvcc = Schedule::new("begin")?;
-
-        let t1 = mvcc.begin()?;
-        assert_eq!(
-            t1.state(),
-            TransactionState { version: 1, read_only: false, active: HashSet::new() }
-        );
-
-        let t2 = mvcc.begin()?;
-        assert_eq!(
-            t2.state(),
-            TransactionState { version: 2, read_only: false, active: HashSet::from([1]) }
-        );
-
-        let t3 = mvcc.begin()?;
-        assert_eq!(
-            t3.state(),
-            TransactionState { version: 3, read_only: false, active: HashSet::from([1, 2]) }
-        );
-
-        t2.commit()?; // commit to remove from active set
-
-        let t4 = mvcc.begin()?;
-        assert_eq!(
-            t4.state(),
-            TransactionState { version: 4, read_only: false, active: HashSet::from([1, 3]) }
-        );
-
-        Ok(())
+    /// Runs MVCC goldenscript tests.
+    pub struct MVCCRunner {
+        mvcc: MVCC<TestEngine>,
+        txns: HashMap<String, Transaction<TestEngine>>,
+        op_rx: Receiver<Operation>,
+        #[allow(dead_code)]
+        tempdir: tempfile::TempDir,
     }
 
-    #[test]
-    /// Begin read-only should not create a new version, instead using the
-    /// next one, but it should use the current active set.
-    fn begin_read_only() -> Result<()> {
-        let mut mvcc = Schedule::new("begin_read_only")?;
+    type TestEngine = Emit<Mirror<BitCask, Memory>>;
 
-        // Start an initial read-only transaction, and make sure it's actually
-        // read-only.
-        let t1 = mvcc.begin_read_only()?;
-        assert_eq!(
-            t1.state(),
-            TransactionState { version: 1, read_only: true, active: HashSet::new() }
-        );
-        assert_eq!(t1.set(b"foo", vec![1]), Err(Error::ReadOnly));
-        assert_eq!(t1.delete(b"foo"), Err(Error::ReadOnly));
-
-        // Start a new read-write transaction, then another read-only
-        // transaction which should have it in its active set. t1 should not be
-        // in the active set, because it's read-only.
-        let t2 = mvcc.begin()?;
-        assert_eq!(
-            t2.state(),
-            TransactionState { version: 1, read_only: false, active: HashSet::new() }
-        );
-
-        let t3 = mvcc.begin_read_only()?;
-        assert_eq!(
-            t3.state(),
-            TransactionState { version: 2, read_only: true, active: HashSet::from([1]) }
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    /// Begin as of should provide a read-only view of a historical version.
-    fn begin_as_of() -> Result<()> {
-        let mut mvcc = Schedule::new("begin_as_of")?;
-
-        // Start a concurrent transaction that should be invisible.
-        let t1 = mvcc.begin()?;
-        t1.set(b"other", vec![1])?;
-
-        // Write a couple of versions for a key.
-        let t2 = mvcc.begin()?;
-        t2.set(b"key", vec![2])?;
-        t2.commit()?;
-
-        let t3 = mvcc.begin()?;
-        t3.set(b"key", vec![3])?;
-
-        // Reading as of version 3 should only see key=2, because t1 and
-        // t3 haven't committed yet.
-        let t4 = mvcc.begin_as_of(3)?;
-        assert_eq!(
-            t4.state(),
-            TransactionState { version: 3, read_only: true, active: HashSet::from([1]) }
-        );
-        assert_scan!(t4.scan(..)? => {b"key" => [2]});
-
-        // Writes should error.
-        assert_eq!(t4.set(b"foo", vec![1]), Err(Error::ReadOnly));
-        assert_eq!(t4.delete(b"foo"), Err(Error::ReadOnly));
-
-        // Once we commit t1 and t3, neither the existing as of transaction nor
-        // a new one should see their writes, since versions must be stable.
-        t1.commit()?;
-        t3.commit()?;
-
-        assert_scan!(t4.scan(..)? => {b"key" => [2]});
-
-        let t5 = mvcc.begin_as_of(3)?;
-        assert_scan!(t5.scan(..)? => {b"key" => [2]});
-
-        // Rolling back and committing read-only transactions is noops.
-        t4.rollback()?;
-        t5.commit()?;
-
-        // Commit a new value.
-        let t6 = mvcc.begin()?;
-        t6.set(b"key", vec![4])?;
-        t6.commit()?;
-
-        // A snapshot as of version 4 should see key=3 and other=1.
-        let t7 = mvcc.begin_as_of(4)?;
-        assert_eq!(
-            t7.state(),
-            TransactionState { version: 4, read_only: true, active: HashSet::new() }
-        );
-        assert_scan!(t7.scan(..)? => {b"key" => [3], b"other" => [1]});
-
-        // Check that future versions are invalid, including the next.
-        assert_eq!(
-            mvcc.begin_as_of(5).err(),
-            Some(Error::InvalidInput("version 5 does not exist".into()))
-        );
-        assert_eq!(
-            mvcc.begin_as_of(9).err(),
-            Some(Error::InvalidInput("version 9 does not exist".into()))
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    /// Resume should resume a transaction with the same state.
-    fn resume() -> Result<()> {
-        let mut mvcc = Schedule::new("resume")?;
-
-        // We first write a set of values that should be visible.
-        let t1 = mvcc.begin()?;
-        t1.set(b"a", vec![1])?;
-        t1.set(b"b", vec![1])?;
-        t1.commit()?;
-
-        // We then start three transactions, of which we will resume t3.
-        // We commit t2 and t4's changes, which should not be visible,
-        // and write a change for t3 which should be visible.
-        let t2 = mvcc.begin()?;
-        let t3 = mvcc.begin()?;
-        let t4 = mvcc.begin()?;
-
-        t2.set(b"a", vec![2])?;
-        t3.set(b"b", vec![3])?;
-        t4.set(b"c", vec![4])?;
-
-        t2.commit()?;
-        t4.commit()?;
-
-        // We now resume t3, who should only see its own changes.
-        let state = t3.state().clone();
-        assert_eq!(
-            state,
-            TransactionState { version: 3, read_only: false, active: HashSet::from([2]) }
-        );
-        drop(t3);
-
-        let t5 = mvcc.resume(state.clone())?;
-        assert_eq!(t5.state(), state);
-
-        assert_scan!(t5.scan(..)? => {
-            b"a" => [1],
-            b"b" => [3],
-        });
-
-        // A separate transaction should not see t3's changes.
-        let t6 = mvcc.begin()?;
-        assert_scan!(t6.scan(..)? => {
-            b"a" => [2],
-            b"b" => [1], // not 3
-            b"c" => [4],
-        });
-        t6.rollback()?;
-
-        // Once t5 commits, a separate transaction should see its changes.
-        t5.commit()?;
-
-        let t7 = mvcc.begin()?;
-        assert_scan!(t7.scan(..)? => {
-            b"a" => [2],
-            b"b" => [3], // now 3
-            b"c" => [4],
-        });
-        t7.rollback()?;
-
-        // Resuming an inactive transaction should error.
-        assert_eq!(
-            mvcc.resume(state).err(),
-            Some(Error::InvalidInput("no active transaction at version 3".into()))
-        );
-
-        // It should also be possible to start a snapshot transaction in t3
-        // and resume it. It should not see t3's writes, nor t2's.
-        let t8 = mvcc.begin_as_of(3)?;
-        assert_eq!(
-            t8.state(),
-            TransactionState { version: 3, read_only: true, active: HashSet::from([2]) }
-        );
-
-        assert_scan!(t8.scan(..)? => {
-            b"a" => [1],
-            b"b" => [1],
-        });
-
-        let state = t8.state().clone();
-        drop(t8);
-
-        let t9 = mvcc.resume(state.clone())?;
-        assert_eq!(t9.state(), state);
-        assert_scan!(t9.scan(..)? => {
-            b"a" => [1],
-            b"b" => [1],
-        });
-
-        Ok(())
-    }
-
-    #[test]
-    /// Deletes should work on both existing, missing, and deleted keys, be
-    /// idempotent.
-    fn delete() -> Result<()> {
-        let mut mvcc = Schedule::new("delete")?;
-        mvcc.setup(vec![(b"key", 1, Some(&[1])), (b"tombstone", 1, None)])?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(b"key", vec![2])?;
-        t1.delete(b"key")?; // delete uncommitted version
-        t1.delete(b"key")?; // idempotent
-        t1.delete(b"tombstone")?;
-        t1.delete(b"missing")?;
-        t1.commit()?;
-
-        Ok(())
-    }
-
-    #[test]
-    /// Delete should return serialization errors both for uncommitted versions
-    /// (past and future), and future committed versions.
-    fn delete_conflict() -> Result<()> {
-        let mut mvcc = Schedule::new("delete_conflict")?;
-
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-        let t3 = mvcc.begin()?;
-        let t4 = mvcc.begin()?;
-
-        t1.set(b"a", vec![1])?;
-        t3.set(b"c", vec![3])?;
-        t4.set(b"d", vec![4])?;
-        t4.commit()?;
-
-        assert_eq!(t2.delete(b"a"), Err(Error::Serialization)); // past uncommitted
-        assert_eq!(t2.delete(b"c"), Err(Error::Serialization)); // future uncommitted
-        assert_eq!(t2.delete(b"d"), Err(Error::Serialization)); // future committed
-
-        Ok(())
-    }
-
-    #[test]
-    /// Get should return the correct latest value.
-    fn get() -> Result<()> {
-        let mut mvcc = Schedule::new("get")?;
-        mvcc.setup(vec![
-            (b"key", 1, Some(&[1])),
-            (b"updated", 1, Some(&[1])),
-            (b"updated", 2, Some(&[2])),
-            (b"deleted", 1, Some(&[1])),
-            (b"deleted", 2, None),
-            (b"tombstone", 1, None),
-        ])?;
-
-        let t1 = mvcc.begin_read_only()?;
-        assert_eq!(t1.get(b"key")?, Some(vec![1]));
-        assert_eq!(t1.get(b"updated")?, Some(vec![2]));
-        assert_eq!(t1.get(b"deleted")?, None);
-        assert_eq!(t1.get(b"tombstone")?, None);
-
-        Ok(())
-    }
-
-    #[test]
-    /// Get should be isolated from future and uncommitted transactions.
-    fn get_isolation() -> Result<()> {
-        let mut mvcc = Schedule::new("get_isolation")?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(b"a", vec![1])?;
-        t1.set(b"b", vec![1])?;
-        t1.set(b"d", vec![1])?;
-        t1.set(b"e", vec![1])?;
-        t1.commit()?;
-
-        let t2 = mvcc.begin()?;
-        t2.set(b"a", vec![2])?;
-        t2.delete(b"b")?;
-        t2.set(b"c", vec![2])?;
-
-        let t3 = mvcc.begin_read_only()?;
-
-        let t4 = mvcc.begin()?;
-        t4.set(b"d", vec![3])?;
-        t4.delete(b"e")?;
-        t4.set(b"f", vec![3])?;
-        t4.commit()?;
-
-        assert_eq!(t3.get(b"a")?, Some(vec![1])); // uncommitted update
-        assert_eq!(t3.get(b"b")?, Some(vec![1])); // uncommitted delete
-        assert_eq!(t3.get(b"c")?, None); // uncommitted write
-        assert_eq!(t3.get(b"d")?, Some(vec![1])); // future update
-        assert_eq!(t3.get(b"e")?, Some(vec![1])); // future delete
-        assert_eq!(t3.get(b"f")?, None); // future write
-
-        Ok(())
-    }
-
-    #[test]
-    /// Scans should use correct key and time bounds. Sets up an initial data
-    /// set as follows, and asserts results via the golden file.
-    ///
-    /// T
-    /// 4             x   ba,4
-    /// 3   x   a,3  b,3        x
-    /// 2        x        ba,2 bb,2 bc,2
-    /// 1  0,1  a,1   x                  c,1
-    ///     B    a    b    ba   bb   bc   c
-    fn scan() -> Result<()> {
-        let mut mvcc = Schedule::new("scan")?;
-        mvcc.setup(vec![
-            (b"B", 1, Some(&[0, 1])),
-            (b"B", 3, None),
-            (b"a", 1, Some(&[0x0a, 1])),
-            (b"a", 2, None),
-            (b"a", 3, Some(&[0x0a, 3])),
-            (b"b", 1, None),
-            (b"b", 3, Some(&[0x0b, 3])),
-            (b"b", 4, None),
-            (b"ba", 2, Some(&[0xba, 2])),
-            (b"ba", 4, Some(&[0xba, 4])),
-            (b"bb", 2, Some(&[0xbb, 2])),
-            (b"bb", 3, None),
-            (b"bc", 2, Some(&[0xbc, 2])),
-            (b"c", 1, Some(&[0x0c, 1])),
-        ])?;
-
-        // Full scans at all timestamps.
-        for version in 1..5 {
-            let txn = match version {
-                5 => mvcc.begin_read_only()?,
-                v => mvcc.begin_as_of(v)?,
-            };
-            let mut scan = txn.scan(..)?; // see golden master
-            assert_scan_invariants(&mut scan)?;
-        }
-
-        // All bounded scans around ba-bc at version 3.
-        let txn = mvcc.begin_as_of(3)?;
-        let starts =
-            [Bound::Unbounded, Bound::Included(b"ba".to_vec()), Bound::Excluded(b"ba".to_vec())];
-        let ends =
-            [Bound::Unbounded, Bound::Included(b"bc".to_vec()), Bound::Excluded(b"bc".to_vec())];
-        for start in &starts {
-            for end in &ends {
-                let mut scan = txn.scan((start.to_owned(), end.to_owned()))?; // see golden master
-                assert_scan_invariants(&mut scan)?;
+    impl goldenscript::Runner for MVCCRunner {
+        fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
+            // Validate tags.
+            if let Some(tag) = command.tags.iter().find(|t| *t != "ops") {
+                return Err(format!("invalid tag {tag}").into());
             }
-        }
 
-        Ok(())
-    }
+            // Execute command.
+            let mut output = String::new();
+            match command.name.as_str() {
+                // txn: begin [readonly] [as_of=VERSION]
+                "begin" => {
+                    let name = Self::txn_name(&command.prefix)?;
+                    if self.txns.contains_key(name) {
+                        return Err(format!("txn {name} already exists").into());
+                    }
+                    let mut args = command.consume_args();
+                    let readonly = match args.next_pos().map(|a| a.value.as_str()) {
+                        Some("readonly") => true,
+                        None => false,
+                        Some(v) => return Err(format!("invalid argument {v}").into()),
+                    };
+                    let as_of = args.lookup_parse("as_of")?;
+                    args.reject_rest()?;
+                    let txn = match (readonly, as_of) {
+                        (false, None) => self.mvcc.begin()?,
+                        (true, None) => self.mvcc.begin_read_only()?,
+                        (true, Some(v)) => self.mvcc.begin_as_of(v)?,
+                        (false, Some(_)) => return Err("as_of only valid for read-only txn".into()),
+                    };
+                    self.txns.insert(name.to_string(), txn);
+                }
 
-    #[test]
-    /// Prefix scans should use correct key and time bounds. Sets up an initial
-    /// data set as follows, and asserts results via the golden file.
-    ///
-    /// T
-    /// 4             x   ba,4
-    /// 3   x   a,3  b,3        x
-    /// 2        x        ba,2 bb,2 bc,2
-    /// 1  0,1  a,1   x                  c,1
-    ///     B    a    b    ba   bb   bc   c
-    fn scan_prefix() -> Result<()> {
-        let mut mvcc = Schedule::new("scan_prefix")?;
-        mvcc.setup(vec![
-            (b"B", 1, Some(&[0, 1])),
-            (b"B", 3, None),
-            (b"a", 1, Some(&[0x0a, 1])),
-            (b"a", 2, None),
-            (b"a", 3, Some(&[0x0a, 3])),
-            (b"b", 1, None),
-            (b"b", 3, Some(&[0x0b, 3])),
-            (b"b", 4, None),
-            (b"ba", 2, Some(&[0xba, 2])),
-            (b"ba", 4, Some(&[0xba, 4])),
-            (b"bb", 2, Some(&[0xbb, 2])),
-            (b"bb", 3, None),
-            (b"bc", 2, Some(&[0xbc, 2])),
-            (b"c", 1, Some(&[0x0c, 1])),
-        ])?;
+                // txn: commit
+                "commit" => {
+                    let name = Self::txn_name(&command.prefix)?;
+                    let txn = self.txns.remove(name).ok_or(format!("unknown txn {name}"))?;
+                    command.consume_args().reject_rest()?;
+                    txn.commit()?;
+                }
 
-        // Full scans at all timestamps.
-        for version in 1..5 {
-            let txn = match version {
-                5 => mvcc.begin_read_only()?,
-                v => mvcc.begin_as_of(v)?,
-            };
-            let mut scan = txn.scan_prefix(&[])?; // see golden master
-            assert_scan_invariants(&mut scan)?;
-        }
+                // txn: delete KEY...
+                "delete" => {
+                    let txn = self.get_txn(&command.prefix)?;
+                    let mut args = command.consume_args();
+                    for arg in args.rest_pos() {
+                        let key = Self::decode_binary(&arg.value);
+                        txn.delete(&key)?;
+                    }
+                    args.reject_rest()?;
+                }
 
-        // All prefixes at version 3 and version 4.
-        for version in 3..=4 {
-            let txn = mvcc.begin_as_of(version)?;
-            for prefix in [b"B" as &[u8], b"a", b"b", b"ba", b"bb", b"bbb", b"bc", b"c", b"d"] {
-                let mut scan = txn.scan_prefix(prefix)?; // see golden master
-                assert_scan_invariants(&mut scan)?;
+                // dump
+                "dump" => {
+                    command.consume_args().reject_rest()?;
+                    let mut engine = self.mvcc.engine.lock().unwrap();
+                    let mut scan = engine.scan(..);
+                    while let Some((key, value)) = scan.next().transpose()? {
+                        let (fkey, Some(fvalue)) = debug::format_key_value(&key, &Some(value))
+                        else {
+                            panic!("expected option");
+                        };
+                        writeln!(output, "{fkey} → {fvalue}")?;
+                    }
+                }
+
+                // txn: get KEY...
+                "get" => {
+                    let txn = self.get_txn(&command.prefix)?;
+                    let mut args = command.consume_args();
+                    for arg in args.rest_pos() {
+                        let key = Self::decode_binary(&arg.value);
+                        let value = txn.get(&key)?;
+                        writeln!(output, "{}", Self::format_key_value(&key, value.as_deref()))?;
+                    }
+                    args.reject_rest()?;
+                }
+
+                // get_unversioned KEY...
+                "get_unversioned" => {
+                    Self::no_txn(command)?;
+                    let mut args = command.consume_args();
+                    for arg in args.rest_pos() {
+                        let key = Self::decode_binary(&arg.value);
+                        let value = self.mvcc.get_unversioned(&key)?;
+                        writeln!(output, "{}", Self::format_key_value(&key, value.as_deref()))?;
+                    }
+                    args.reject_rest()?;
+                }
+
+                // import [VERSION] KEY=VALUE...
+                "import" => {
+                    Self::no_txn(command)?;
+                    let mut args = command.consume_args();
+                    let version = args.next_pos().map(|a| a.parse()).transpose()?;
+                    let mut txn = self.mvcc.begin()?;
+                    if let Some(version) = version {
+                        if txn.version() > version {
+                            return Err(format!("version {version} already used").into());
+                        }
+                        while txn.version() < version {
+                            txn = self.mvcc.begin()?;
+                        }
+                    }
+                    for kv in args.rest_key() {
+                        let key = Self::decode_binary(kv.key.as_ref().unwrap());
+                        let value = Self::decode_binary(&kv.value);
+                        if value.is_empty() {
+                            txn.delete(&key)?;
+                        } else {
+                            txn.set(&key, value)?;
+                        }
+                    }
+                    args.reject_rest()?;
+                    txn.commit()?;
+                }
+
+                // txn: resume JSON
+                "resume" => {
+                    let name = Self::txn_name(&command.prefix)?;
+                    let mut args = command.consume_args();
+                    let raw = &args.next_pos().ok_or("state not given")?.value;
+                    args.reject_rest()?;
+                    let state: TransactionState = serde_json::from_str(raw)?;
+                    let txn = self.mvcc.resume(state)?;
+                    self.txns.insert(name.to_string(), txn);
+                }
+
+                // txn: rollback
+                "rollback" => {
+                    let name = Self::txn_name(&command.prefix)?;
+                    let txn = self.txns.remove(name).ok_or(format!("unknown txn {name}"))?;
+                    command.consume_args().reject_rest()?;
+                    txn.rollback()?;
+                }
+
+                // txn: scan [reverse=BOOL] [RANGE]
+                "scan" => {
+                    let txn = self.get_txn(&command.prefix)?;
+                    let mut args = command.consume_args();
+                    let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
+                    let range = Self::parse_key_range(
+                        args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."),
+                    )?;
+                    args.reject_rest()?;
+
+                    let mut scan = txn.scan(range)?;
+                    let kvs: Vec<_> = match reverse {
+                        false => scan.iter().collect::<Result<_>>()?,
+                        true => scan.iter().rev().collect::<Result<_>>()?,
+                    };
+                    for (key, value) in kvs {
+                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                    }
+                }
+
+                // txn: scan_prefix [reverse=BOOL] PREFIX
+                "scan_prefix" => {
+                    let txn = self.get_txn(&command.prefix)?;
+                    let mut args = command.consume_args();
+                    let prefix =
+                        Self::decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
+                    let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
+                    args.reject_rest()?;
+
+                    let mut scan = txn.scan_prefix(&prefix)?;
+                    let kvs: Vec<_> = match reverse {
+                        false => scan.iter().collect::<Result<_>>()?,
+                        true => scan.iter().rev().collect::<Result<_>>()?,
+                    };
+                    for (key, value) in kvs {
+                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                    }
+                }
+
+                // txn: set KEY=VALUE...
+                "set" => {
+                    let txn = self.get_txn(&command.prefix)?;
+                    let mut args = command.consume_args();
+                    for kv in args.rest_key() {
+                        let key = Self::decode_binary(kv.key.as_ref().unwrap());
+                        let value = Self::decode_binary(&kv.value);
+                        txn.set(&key, value)?;
+                    }
+                    args.reject_rest()?;
+                }
+
+                // set_unversioned KEY=VALUE...
+                "set_unversioned" => {
+                    Self::no_txn(command)?;
+                    let mut args = command.consume_args();
+                    for kv in args.rest_key() {
+                        let key = Self::decode_binary(kv.key.as_ref().unwrap());
+                        let value = Self::decode_binary(&kv.value);
+                        self.mvcc.set_unversioned(&key, value)?;
+                    }
+                    args.reject_rest()?;
+                }
+
+                // txn: state
+                "state" => {
+                    command.consume_args().reject_rest()?;
+                    let txn = self.get_txn(&command.prefix)?;
+                    let state = txn.state();
+                    write!(
+                        output,
+                        "v{} {} active={{{}}}",
+                        state.version,
+                        if state.read_only { "ro" } else { "rw" },
+                        state.active.iter().sorted().join(",")
+                    )?;
+                }
+
+                // status
+                "status" => {
+                    let status = self.mvcc.status()?;
+                    writeln!(output, "{status:#?}")?;
+                }
+
+                name => return Err(format!("invalid command {name}").into()),
             }
+            Ok(output)
         }
 
-        Ok(())
+        fn end_command(
+            &mut self,
+            command: &goldenscript::Command,
+        ) -> StdResult<String, Box<dyn StdError>> {
+            let mut output = String::new();
+
+            // Output engine operations, if requested. Otherwise, drain them.
+            let show_ops = command.tags.contains(&"ops".to_string());
+            while let Ok(op) = self.op_rx.try_recv() {
+                if !show_ops {
+                    continue;
+                }
+                match op {
+                    Operation::Delete { key } => {
+                        let (fkey, _) = debug::format_key_value(&key, &None);
+                        writeln!(output, "engine delete {fkey}")?
+                    }
+                    Operation::Flush => writeln!(output, "engine flush")?,
+                    Operation::Set { key, value } => {
+                        let (fkey, fvalue) = debug::format_key_value(&key, &Some(value));
+                        writeln!(output, "engine set {} → {}", fkey, fvalue.unwrap())?
+                    }
+                }
+            }
+            Ok(output)
+        }
     }
 
-    #[test]
-    /// Scan should be isolated from future and uncommitted transactions.
-    fn scan_isolation() -> Result<()> {
-        let mut mvcc = Schedule::new("scan_isolation")?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(b"a", vec![1])?;
-        t1.set(b"b", vec![1])?;
-        t1.set(b"d", vec![1])?;
-        t1.set(b"e", vec![1])?;
-        t1.commit()?;
-
-        let t2 = mvcc.begin()?;
-        t2.set(b"a", vec![2])?;
-        t2.delete(b"b")?;
-        t2.set(b"c", vec![2])?;
-
-        let t3 = mvcc.begin_read_only()?;
-
-        let t4 = mvcc.begin()?;
-        t4.set(b"d", vec![3])?;
-        t4.delete(b"e")?;
-        t4.set(b"f", vec![3])?;
-        t4.commit()?;
-
-        assert_scan!(t3.scan(..)? => {
-            b"a" => [1], // uncommitted update
-            b"b" => [1], // uncommitted delete
-            // b"c" is uncommitted write
-            b"d" => [1], // future update
-            b"e" => [1], // future delete
-            // b"f" is future write
-        });
-
-        Ok(())
-    }
-
-    #[test]
-    /// Tests that the key encoding is resistant to key/version overlap.
-    /// For example, a naïve concatenation of keys and versions would
-    /// produce incorrect ordering in this case:
-    ///
-    // 00|00 00 00 00 00 00 00 01
-    // 00 00 00 00 00 00 00 00 02|00 00 00 00 00 00 00 02
-    // 00|00 00 00 00 00 00 00 03
-    fn scan_key_version_encoding() -> Result<()> {
-        let mut mvcc = Schedule::new("scan_key_version_encoding")?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(&[0], vec![1])?;
-        t1.commit()?;
-
-        let t2 = mvcc.begin()?;
-        t2.set(&[0], vec![2])?;
-        t2.set(&[0, 0, 0, 0, 0, 0, 0, 0, 2], vec![2])?;
-        t2.commit()?;
-
-        let t3 = mvcc.begin()?;
-        t3.set(&[0], vec![3])?;
-        t3.commit()?;
-
-        let t4 = mvcc.begin_read_only()?;
-        assert_scan!(t4.scan(..)? => {
-            b"\x00" => [3],
-            b"\x00\x00\x00\x00\x00\x00\x00\x00\x02" => [2],
-        });
-        Ok(())
-    }
-
-    #[test]
-    /// Sets should work on both existing, missing, and deleted keys, and be
-    /// idempotent.
-    fn set() -> Result<()> {
-        let mut mvcc = Schedule::new("set")?;
-        mvcc.setup(vec![(b"key", 1, Some(&[1])), (b"tombstone", 1, None)])?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(b"key", vec![2])?; // update
-        t1.set(b"tombstone", vec![2])?; // update tombstone
-        t1.set(b"new", vec![1])?; // new write
-        t1.set(b"new", vec![1])?; // idempotent
-        t1.set(b"new", vec![2])?; // update own
-        t1.commit()?;
-
-        Ok(())
-    }
-
-    #[test]
-    /// Set should return serialization errors both for uncommitted versions
-    /// (past and future), and future committed versions.
-    fn set_conflict() -> Result<()> {
-        let mut mvcc = Schedule::new("set_conflict")?;
-
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-        let t3 = mvcc.begin()?;
-        let t4 = mvcc.begin()?;
-
-        t1.set(b"a", vec![1])?;
-        t3.set(b"c", vec![3])?;
-        t4.set(b"d", vec![4])?;
-        t4.commit()?;
-
-        assert_eq!(t2.set(b"a", vec![2]), Err(Error::Serialization)); // past uncommitted
-        assert_eq!(t2.set(b"c", vec![2]), Err(Error::Serialization)); // future uncommitted
-        assert_eq!(t2.set(b"d", vec![2]), Err(Error::Serialization)); // future committed
-
-        Ok(())
-    }
-
-    #[test]
-    /// Tests that transaction rollback properly rolls back uncommitted writes,
-    /// allowing other concurrent transactions to write the keys.
-    fn rollback() -> Result<()> {
-        let mut mvcc = Schedule::new("rollback")?;
-        mvcc.setup(vec![
-            (b"a", 1, Some(&[0])),
-            (b"b", 1, Some(&[0])),
-            (b"c", 1, Some(&[0])),
-            (b"d", 1, Some(&[0])),
-        ])?;
-
-        // t2 will be rolled back. t1 and t3 are concurrent transactions.
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-        let t3 = mvcc.begin()?;
-
-        t1.set(b"a", vec![1])?;
-        t2.set(b"b", vec![2])?;
-        t2.delete(b"c")?;
-        t3.set(b"d", vec![3])?;
-
-        // Both t1 and t3 will get serialization errors with t2.
-        assert_eq!(t1.set(b"b", vec![1]), Err(Error::Serialization));
-        assert_eq!(t3.set(b"c", vec![3]), Err(Error::Serialization));
-
-        // When t2 is rolled back, none of its writes will be visible, and t1
-        // and t3 can perform their writes and successfully commit.
-        t2.rollback()?;
-
-        let t4 = mvcc.begin_read_only()?;
-        assert_scan!(t4.scan(..)? => {
-            b"a" => [0],
-            b"b" => [0],
-            b"c" => [0],
-            b"d" => [0],
-        });
-
-        t1.set(b"b", vec![1])?;
-        t3.set(b"c", vec![3])?;
-        t1.commit()?;
-        t3.commit()?;
-
-        let t5 = mvcc.begin_read_only()?;
-        assert_scan!(t5.scan(..)? => {
-            b"a" => [1],
-            b"b" => [1],
-            b"c" => [3],
-            b"d" => [3],
-        });
-
-        Ok(())
-    }
-
-    #[test]
-    // A dirty write is when t2 overwrites an uncommitted value written by t1.
-    // Snapshot isolation prevents this.
-    fn anomaly_dirty_write() -> Result<()> {
-        let mut mvcc = Schedule::new("anomaly_dirty_write")?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(b"key", vec![1])?;
-
-        let t2 = mvcc.begin()?;
-        assert_eq!(t2.set(b"key", vec![2]), Err(Error::Serialization));
-
-        Ok(())
-    }
-
-    #[test]
-    // A dirty read is when t2 can read an uncommitted value set by t1.
-    // Snapshot isolation prevents this.
-    fn anomaly_dirty_read() -> Result<()> {
-        let mut mvcc = Schedule::new("anomaly_dirty_read")?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(b"key", vec![1])?;
-
-        let t2 = mvcc.begin()?;
-        assert_eq!(t2.get(b"key")?, None);
-
-        Ok(())
-    }
-
-    #[test]
-    // A lost update is when t1 and t2 both read a value and update it, where
-    // t2's update replaces t1. Snapshot isolation prevents this.
-    fn anomaly_lost_update() -> Result<()> {
-        let mut mvcc = Schedule::new("anomaly_lost_update")?;
-        mvcc.setup(vec![(b"key", 1, Some(&[0]))])?;
-
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-
-        t1.get(b"key")?;
-        t2.get(b"key")?;
-
-        t1.set(b"key", vec![1])?;
-        assert_eq!(t2.set(b"key", vec![2]), Err(Error::Serialization));
-        t1.commit()?;
-
-        Ok(())
-    }
-
-    #[test]
-    // A fuzzy (or unrepeatable) read is when t2 sees a value change after t1
-    // updates it. Snapshot isolation prevents this.
-    fn anomaly_fuzzy_read() -> Result<()> {
-        let mut mvcc = Schedule::new("anomaly_fuzzy_read")?;
-        mvcc.setup(vec![(b"key", 1, Some(&[0]))])?;
-
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-
-        assert_eq!(t2.get(b"key")?, Some(vec![0]));
-        t1.set(b"key", b"t1".to_vec())?;
-        t1.commit()?;
-        assert_eq!(t2.get(b"key")?, Some(vec![0]));
-
-        Ok(())
-    }
-
-    #[test]
-    // Read skew is when t1 reads a and b, but t2 modifies b in between the
-    // reads. Snapshot isolation prevents this.
-    fn anomaly_read_skew() -> Result<()> {
-        let mut mvcc = Schedule::new("anomaly_read_skew")?;
-        mvcc.setup(vec![(b"a", 1, Some(&[0])), (b"b", 1, Some(&[0]))])?;
-
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-
-        assert_eq!(t1.get(b"a")?, Some(vec![0]));
-        t2.set(b"a", vec![2])?;
-        t2.set(b"b", vec![2])?;
-        t2.commit()?;
-        assert_eq!(t1.get(b"b")?, Some(vec![0]));
-
-        Ok(())
-    }
-
-    #[test]
-    // A phantom read is when t1 reads entries matching some predicate, but a
-    // modification by t2 changes which entries that match the predicate such
-    // that a later read by t1 returns them. Snapshot isolation prevents this.
-    //
-    // We use a prefix scan as our predicate.
-    fn anomaly_phantom_read() -> Result<()> {
-        let mut mvcc = Schedule::new("anomaly_phantom_read")?;
-        mvcc.setup(vec![(b"a", 1, Some(&[0])), (b"ba", 1, Some(&[0])), (b"bb", 1, Some(&[0]))])?;
-
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-
-        assert_scan!(t1.scan_prefix(b"b")? => {
-            b"ba" => [0],
-            b"bb" => [0],
-        });
-
-        t2.delete(b"ba")?;
-        t2.set(b"bc", vec![2])?;
-        t2.commit()?;
-
-        assert_scan!(t1.scan_prefix(b"b")? => {
-            b"ba" => [0],
-            b"bb" => [0],
-        });
-
-        Ok(())
-    }
-
-    #[test]
-    // Write skew is when t1 reads a and writes it to b while t2 reads b and
-    // writes it to a. Snapshot isolation DOES NOT prevent this, which is
-    // expected, so we assert the current behavior. Fixing this requires
-    // implementing serializable snapshot isolation.
-    fn anomaly_write_skew() -> Result<()> {
-        let mut mvcc = Schedule::new("anomaly_write_skew")?;
-        mvcc.setup(vec![(b"a", 1, Some(&[1])), (b"b", 1, Some(&[2]))])?;
-
-        let t1 = mvcc.begin()?;
-        let t2 = mvcc.begin()?;
-
-        assert_eq!(t1.get(b"a")?, Some(vec![1]));
-        assert_eq!(t2.get(b"b")?, Some(vec![2]));
-
-        t1.set(b"b", vec![1])?;
-        t2.set(b"a", vec![2])?;
-
-        t1.commit()?;
-        t2.commit()?;
-
-        Ok(())
-    }
-
-    #[test]
-    /// Tests unversioned key/value pairs, via set/get_unversioned().
-    fn unversioned() -> Result<()> {
-        let mut mvcc = Schedule::new("unversioned")?;
-
-        // Interleave versioned and unversioned writes.
-        mvcc.set_unversioned(b"a", vec![0])?;
-
-        let t1 = mvcc.begin()?;
-        t1.set(b"a", vec![1])?;
-        t1.set(b"b", vec![1])?;
-        t1.set(b"c", vec![1])?;
-        t1.commit()?;
-
-        mvcc.set_unversioned(b"b", vec![0])?;
-        mvcc.set_unversioned(b"d", vec![0])?;
-
-        // Scans should not see the unversioned writes.
-        let t2 = mvcc.begin_read_only()?;
-        assert_scan!(t2.scan(..)? => {
-            b"a" => [1],
-            b"b" => [1],
-            b"c" => [1],
-        });
-
-        // Unversioned gets should not see MVCC writes.
-        assert_eq!(mvcc.get_unversioned(b"a")?, Some(vec![0]));
-        assert_eq!(mvcc.get_unversioned(b"b")?, Some(vec![0]));
-        assert_eq!(mvcc.get_unversioned(b"c")?, None);
-        assert_eq!(mvcc.get_unversioned(b"d")?, Some(vec![0]));
-
-        // Replacing an unversioned key should be fine.
-        mvcc.set_unversioned(b"a", vec![1])?;
-        assert_eq!(mvcc.get_unversioned(b"a")?, Some(vec![1]));
-
-        Ok(())
+    impl MVCCRunner {
+        fn new() -> Self {
+            // Use both a BitCask and a Memory engine, and mirror operations
+            // across them. Emit engine operations to op_rx.
+            let (op_tx, op_rx) = crossbeam::channel::unbounded();
+            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
+            let bitcask = BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
+            let memory = Memory::new();
+            let engine = Emit::new(Mirror::new(bitcask, memory), op_tx);
+            let mvcc = MVCC::new(engine);
+            Self { mvcc, op_rx, txns: HashMap::new(), tempdir }
+        }
+
+        /// Decodes a raw byte vector from a Unicode string. Code points in the
+        /// range U+0080 to U+00FF are converted back to bytes 0x80 to 0xff.
+        /// This allows using e.g. \xff in the input string literal, and getting
+        /// back a 0xff byte in the byte vector. Otherwise, char(0xff) yields
+        /// the UTF-8 bytes 0xc3bf, which is the U+00FF code point as UTF-8.
+        /// These characters are effectively represented as ISO-8859-1 rather
+        /// than UTF-8, but it allows precise use of the entire u8 value range.
+        ///
+        /// TODO: share this with engine::test::Runner.
+        pub fn decode_binary(s: &str) -> Vec<u8> {
+            let mut buf = [0; 4];
+            let mut bytes = Vec::new();
+            for c in s.chars() {
+                // u32 is the Unicode code point, not the UTF-8 encoding.
+                match c as u32 {
+                    b @ 0x80..=0xff => bytes.push(b as u8),
+                    _ => bytes.extend(c.encode_utf8(&mut buf).as_bytes()),
+                }
+            }
+            bytes
+        }
+
+        /// Formats a raw binary byte vector, escaping special characters.
+        /// TODO: find a better way to manage and share formatting functions.
+        fn format_bytes(bytes: &[u8]) -> String {
+            let b: Vec<u8> = bytes.iter().copied().flat_map(std::ascii::escape_default).collect();
+            String::from_utf8_lossy(&b).to_string()
+        }
+
+        /// Formats a key/value pair, or None if the value does not exist.
+        /// TODO: share with engine::test::Runner.
+        fn format_key_value(key: &[u8], value: Option<&[u8]>) -> String {
+            format!(
+                "{} → {}",
+                Self::format_bytes(key),
+                value.map(Self::format_bytes).unwrap_or("None".to_string())
+            )
+        }
+
+        /// Parses an binary key range, using Rust range syntax.
+        /// TODO: share with engine::test:Runner.
+        fn parse_key_range(
+            s: &str,
+        ) -> StdResult<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn StdError>> {
+            let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
+            let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
+            let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
+            if let Some(start) = groups.get(1) {
+                bound.0 = Bound::Included(Self::decode_binary(start.as_str()));
+            }
+            if let Some(end) = groups.get(3) {
+                let end = Self::decode_binary(end.as_str());
+                if groups.get(2).is_some() {
+                    bound.1 = Bound::Included(end)
+                } else {
+                    bound.1 = Bound::Excluded(end)
+                }
+            }
+            Ok(bound)
+        }
+
+        /// Fetches the named transaction from a command prefix.
+        fn get_txn(
+            &mut self,
+            prefix: &Option<String>,
+        ) -> StdResult<&'_ mut Transaction<TestEngine>, Box<dyn StdError>> {
+            let name = Self::txn_name(prefix)?;
+            self.txns.get_mut(name).ok_or(format!("unknown txn {name}").into())
+        }
+
+        /// Fetches the txn name from a command prefix, or errors.
+        fn txn_name(prefix: &Option<String>) -> StdResult<&str, Box<dyn StdError>> {
+            prefix.as_deref().ok_or("no txn name".into())
+        }
+
+        /// Errors if a txn prefix is given.
+        fn no_txn(command: &goldenscript::Command) -> StdResult<(), Box<dyn StdError>> {
+            if let Some(name) = &command.prefix {
+                return Err(format!("can't run {} with txn {name}", command.name).into());
+            }
+            Ok(())
+        }
     }
 }
