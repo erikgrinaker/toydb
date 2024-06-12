@@ -114,7 +114,10 @@ impl Engine for BitCask {
     }
 
     fn flush(&mut self) -> Result<()> {
-        Ok(self.log.file.sync_all()?)
+        // Don't fsync in tests, to speed them up.
+        #[cfg(not(test))]
+        self.log.file.sync_all()?;
+        Ok(())
     }
 
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
