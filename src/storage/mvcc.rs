@@ -790,9 +790,8 @@ pub mod tests {
     use itertools::Itertools as _;
     use regex::Regex;
     use std::collections::HashMap;
-    use std::error::Error as StdError;
     use std::fmt::Write as _;
-    use std::result::Result as StdResult;
+    use std::{error::Error, result::Result};
     use test_case::test_case;
     use test_each_file::test_each_path;
 
@@ -828,7 +827,7 @@ pub mod tests {
     type TestEngine = Emit<Mirror<BitCask, Memory>>;
 
     impl goldenscript::Runner for MVCCRunner {
-        fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
+        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
             match command.name.as_str() {
                 // txn: begin [readonly] [as_of=VERSION]
@@ -969,8 +968,8 @@ pub mod tests {
 
                     let mut scan = txn.scan(range)?;
                     let kvs: Vec<_> = match reverse {
-                        false => scan.iter().collect::<Result<_>>()?,
-                        true => scan.iter().rev().collect::<Result<_>>()?,
+                        false => scan.iter().collect::<crate::error::Result<_>>()?,
+                        true => scan.iter().rev().collect::<crate::error::Result<_>>()?,
                     };
                     for (key, value) in kvs {
                         writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
@@ -988,8 +987,8 @@ pub mod tests {
 
                     let mut scan = txn.scan_prefix(&prefix)?;
                     let kvs: Vec<_> = match reverse {
-                        false => scan.iter().collect::<Result<_>>()?,
-                        true => scan.iter().rev().collect::<Result<_>>()?,
+                        false => scan.iter().collect::<crate::error::Result<_>>()?,
+                        true => scan.iter().rev().collect::<crate::error::Result<_>>()?,
                     };
                     for (key, value) in kvs {
                         writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
@@ -1049,7 +1048,7 @@ pub mod tests {
         fn end_command(
             &mut self,
             command: &goldenscript::Command,
-        ) -> StdResult<String, Box<dyn StdError>> {
+        ) -> Result<String, Box<dyn Error>> {
             // Parse tags.
             let mut show_ops = false;
             for tag in &command.tags {
@@ -1133,9 +1132,7 @@ pub mod tests {
 
         /// Parses an binary key range, using Rust range syntax.
         /// TODO: share with engine::test:Runner.
-        fn parse_key_range(
-            s: &str,
-        ) -> StdResult<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn StdError>> {
+        fn parse_key_range(s: &str) -> Result<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn Error>> {
             let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
             let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
             let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
@@ -1157,18 +1154,18 @@ pub mod tests {
         fn get_txn(
             &mut self,
             prefix: &Option<String>,
-        ) -> StdResult<&'_ mut Transaction<TestEngine>, Box<dyn StdError>> {
+        ) -> Result<&'_ mut Transaction<TestEngine>, Box<dyn Error>> {
             let name = Self::txn_name(prefix)?;
             self.txns.get_mut(name).ok_or(format!("unknown txn {name}").into())
         }
 
         /// Fetches the txn name from a command prefix, or errors.
-        fn txn_name(prefix: &Option<String>) -> StdResult<&str, Box<dyn StdError>> {
+        fn txn_name(prefix: &Option<String>) -> Result<&str, Box<dyn Error>> {
             prefix.as_deref().ok_or("no txn name".into())
         }
 
         /// Errors if a txn prefix is given.
-        fn no_txn(command: &goldenscript::Command) -> StdResult<(), Box<dyn StdError>> {
+        fn no_txn(command: &goldenscript::Command) -> Result<(), Box<dyn Error>> {
             if let Some(name) = &command.prefix {
                 return Err(format!("can't run {} with txn {name}", command.name).into());
             }
