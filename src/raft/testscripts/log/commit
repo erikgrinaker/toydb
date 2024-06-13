@@ -18,11 +18,11 @@ Panic: commit index 0 does not exist
 #
 # Show the engine operations too, and notice that the commit index isn't flushed
 # to durable storage (it can be recovered from the durable quorum logs).
-commit 1 oplog=true
+commit 1 [ops]
 status
 ---
-engine: set CommitIndex 0x02 = 0x0101
 commit → 1@1 None
+engine set CommitIndex 0x02 = 0x0101
 term=2 last=3@2 commit=1@1 vote=None
 
 # Dump the raw engine contents tdump
@@ -35,7 +35,7 @@ TermVote 0x01 = 0x0200
 CommitIndex 0x02 = 0x0101
 
 # Commits are idempotent, which doesn't incur an engine set.
-commit 1 oplog=true
+commit 1 [ops]
 status
 ---
 commit → 1@1 None

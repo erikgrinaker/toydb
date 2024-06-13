@@ -343,8 +343,9 @@ mod tests {
     use super::*;
     use crossbeam::channel::Receiver;
     use regex::Regex;
+    use std::fmt::Write as _;
     use std::{error::Error, result::Result};
-    use storage::engine::test as testengine;
+    use storage::engine::test::{self as testengine, Operation};
     use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/raft/testscripts/log.
@@ -365,29 +366,24 @@ mod tests {
     impl goldenscript::Runner for TestRunner {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
-            // TODO: use [ops] tag instead of oplog= parameters. See MVCC runner.
             match command.name.as_str() {
-                // append [COMMAND] [oplog=BOOL]
+                // append [COMMAND]
                 "append" => {
                     let mut args = command.consume_args();
                     let command = args.next_pos().map(|a| a.value.as_bytes().to_vec());
-                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
                     let index = self.log.append(command)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("append → {}\n", Self::format_entry(&entry)));
                 }
 
-                // commit INDEX [oplog=BOOL]
+                // commit INDEX
                 "commit" => {
                     let mut args = command.consume_args();
                     let index = args.next_pos().ok_or("index not given")?.parse()?;
-                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
                     let index = self.log.commit(index)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("commit → {}\n", Self::format_entry(&entry)));
                 }
 
@@ -479,21 +475,18 @@ mod tests {
                     }
                 }
 
-                // set_term TERM [VOTE] [oplog=true]
+                // set_term TERM [VOTE]
                 "set_term" => {
                     let mut args = command.consume_args();
                     let term = args.next_pos().ok_or("term not given")?.parse()?;
                     let vote = args.next_pos().map(|a| a.parse()).transpose()?;
-                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     args.reject_rest()?;
                     self.log.set_term(term, vote)?;
-                    self.maybe_oplog(oplog, &mut output);
                 }
 
-                // splice [INDEX@TERM=COMMAND...] [oplog=BOOL]
+                // splice [INDEX@TERM=COMMAND...]
                 "splice" => {
                     let mut args = command.consume_args();
-                    let oplog = args.lookup_parse("oplog")?.unwrap_or(false);
                     let mut entries = Vec::new();
                     for arg in args.rest_key() {
                         let (index, term) = Self::parse_index_term(arg.key.as_deref().unwrap())?;
@@ -506,7 +499,6 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.splice(entries)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    self.maybe_oplog(oplog, &mut output);
                     output.push_str(&format!("splice → {}\n", Self::format_entry(&entry)));
                 }
 
@@ -533,10 +525,35 @@ mod tests {
             Ok(output)
         }
 
-        fn end_command(&mut self, _: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
-            // Drain the oplog, to avoid it leaking to another command.
-            while self.op_rx.try_recv().is_ok() {}
-            Ok(String::new())
+        /// If requested via [ops] tag, output engine operations for the command.
+        fn end_command(
+            &mut self,
+            command: &goldenscript::Command,
+        ) -> Result<String, Box<dyn Error>> {
+            // Parse tags.
+            let mut show_ops = false;
+            for tag in &command.tags {
+                match tag.as_str() {
+                    "ops" => show_ops = true,
+                    tag => return Err(format!("invalid tag {tag}").into()),
+                }
+            }
+
+            // Process engine operations, either output or drain.
+            let mut output = String::new();
+            while let Ok(op) = self.op_rx.try_recv() {
+                match op {
+                    _ if !show_ops => {}
+                    Operation::Delete { key } => {
+                        writeln!(output, "engine delete {}", Self::format_key(&key))?
+                    }
+                    Operation::Flush => writeln!(output, "engine flush")?,
+                    Operation::Set { key, value } => {
+                        writeln!(output, "engine set {}", Self::format_key_value(&key, &value))?
+                    }
+                }
+            }
+            Ok(output)
         }
     }
 
@@ -571,24 +588,6 @@ mod tests {
         /// Formats a raw key/value pair.
         fn format_key_value(key: &[u8], value: &[u8]) -> String {
             format!("{} = 0x{}", Self::format_key(key), hex::encode(value))
-        }
-
-        /// Outputs the oplog if requested.
-        fn maybe_oplog(&self, maybe: bool, output: &mut String) {
-            if !maybe {
-                return;
-            }
-            while let Ok(op) = self.op_rx.try_recv() {
-                use testengine::Operation;
-                let s = match op {
-                    Operation::Delete { key } => format!("delete {}", Self::format_key(&key)),
-                    Operation::Flush => "flush".to_string(),
-                    Operation::Set { key, value } => {
-                        format!("set {}", Self::format_key_value(&key, &value))
-                    }
-                };
-                output.push_str(&format!("engine: {s}\n"));
-            }
         }
 
         /// Parses an index@term pair.

@@ -20,20 +20,20 @@ Panic: first index 2 must touch existing log
 # starting at a term after 1. They should be written to the engine and flushed
 # to durable storage. It should also update the state.
 set_term 2
-splice 1@2= 2@2=command oplog=true
+splice 1@2= 2@2=command [ops]
 status
 scan
 ---
-engine: set Entry(1) 0x000000000000000001 = 0x010200
-engine: set Entry(2) 0x000000000000000002 = 0x02020107636f6d6d616e64
-engine: flush
 splice → 2@2 command
+engine set Entry(1) 0x000000000000000001 = 0x010200
+engine set Entry(2) 0x000000000000000002 = 0x02020107636f6d6d616e64
+engine flush
 term=2 last=2@2 commit=0@0 vote=None
 1@2 None
 2@2 command
 
 # Splicing an empty list should work and be a noop.
-splice oplog=true
+splice [ops]
 status
 scan
 ---
@@ -75,7 +75,7 @@ Panic: splice term 3 beyond current 2
 Panic: splice term 4 beyond current 2
 
 # Fully overlapping entries is a noop.
-splice 1@2= 2@2=command oplog=true
+splice 1@2= 2@2=command [ops]
 scan
 ---
 splice → 2@2 command
@@ -83,7 +83,7 @@ splice → 2@2 command
 2@2 command
 
 # An overlapping prefix is a noop.
-splice 1@2= oplog=true
+splice 1@2= [ops]
 scan
 ---
 splice → 2@2 command
@@ -91,7 +91,7 @@ splice → 2@2 command
 2@2 command
 
 # An overlapping suffix is a noop.
-splice 2@2=command oplog=true
+splice 2@2=command [ops]
 scan
 ---
 splice → 2@2 command
@@ -121,13 +121,13 @@ splice → 4@3 None
 4@3 None
 
 # Splicing with suffix overlap should work, and only write the new entries.
-splice 3@2=bar 4@3= 5@3=foo 6@3=bar oplog=true
+splice 3@2=bar 4@3= 5@3=foo 6@3=bar [ops]
 scan
 ---
-engine: set Entry(5) 0x000000000000000005 = 0x05030103666f6f
-engine: set Entry(6) 0x000000000000000006 = 0x06030103626172
-engine: flush
 splice → 6@3 bar
+engine set Entry(5) 0x000000000000000005 = 0x05030103666f6f
+engine set Entry(6) 0x000000000000000006 = 0x06030103626172
+engine flush
 1@2 None
 2@2 command
 3@2 bar
@@ -137,15 +137,15 @@ splice → 6@3 bar
 
 # Splicing at an existing index with a new term should replace the tail.
 set_term 4
-splice 4@4= oplog=true
+splice 4@4= [ops]
 status
 scan
 ---
-engine: set Entry(4) 0x000000000000000004 = 0x040400
-engine: delete Entry(5) 0x000000000000000005
-engine: delete Entry(6) 0x000000000000000006
-engine: flush
 splice → 4@4 None
+engine set Entry(4) 0x000000000000000004 = 0x040400
+engine delete Entry(5) 0x000000000000000005
+engine delete Entry(6) 0x000000000000000006
+engine flush
 term=4 last=4@4 commit=0@0 vote=None
 1@2 None
 2@2 command
@@ -154,16 +154,16 @@ term=4 last=4@4 commit=0@0 vote=None
 
 # This also holds at the start of the log.
 set_term 5
-splice 1@5= 2@5=foo 3@5=bar oplog=true
+splice 1@5= 2@5=foo 3@5=bar [ops]
 status
 scan
 ---
-engine: set Entry(1) 0x000000000000000001 = 0x010500
-engine: set Entry(2) 0x000000000000000002 = 0x02050103666f6f
-engine: set Entry(3) 0x000000000000000003 = 0x03050103626172
-engine: delete Entry(4) 0x000000000000000004
-engine: flush
 splice → 3@5 bar
+engine set Entry(1) 0x000000000000000001 = 0x010500
+engine set Entry(2) 0x000000000000000002 = 0x02050103666f6f
+engine set Entry(3) 0x000000000000000003 = 0x03050103626172
+engine delete Entry(4) 0x000000000000000004
+engine flush
 term=5 last=3@5 commit=0@0 vote=None
 1@5 None
 2@5 foo

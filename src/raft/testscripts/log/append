@@ -6,18 +6,18 @@ Panic: can't append entry in term 0
 # Appending to an empty log works. The term doesn't have to be 1. The entry is
 # written to the engine and flushed to durable storage.
 set_term 2
-append foo oplog=true
+append foo [ops]
 ---
-engine: set Entry(1) 0x000000000000000001 = 0x01020103666f6f
-engine: flush
 append → 1@2 foo
+engine set Entry(1) 0x000000000000000001 = 0x01020103666f6f
+engine flush
 
 # Appending a noop entry (no command) also works.
-append oplog=true
+append [ops]
 ---
-engine: set Entry(2) 0x000000000000000002 = 0x020200
-engine: flush
 append → 2@2 None
+engine set Entry(2) 0x000000000000000002 = 0x020200
+engine flush
 
 # Check that the last index/term is updated (commit index isn't), and that
 # the engine contains the expected data, both in logical and raw form.

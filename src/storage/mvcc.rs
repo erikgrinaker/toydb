@@ -829,12 +829,6 @@ pub mod tests {
 
     impl goldenscript::Runner for MVCCRunner {
         fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
-            // Validate tags.
-            if let Some(tag) = command.tags.iter().find(|t| *t != "ops") {
-                return Err(format!("invalid tag {tag}").into());
-            }
-
-            // Execute command.
             let mut output = String::new();
             match command.name.as_str() {
                 // txn: begin [readonly] [as_of=VERSION]
@@ -1051,19 +1045,25 @@ pub mod tests {
             Ok(output)
         }
 
+        /// If requested via [ops] tag, output engine operations for the command.
         fn end_command(
             &mut self,
             command: &goldenscript::Command,
         ) -> StdResult<String, Box<dyn StdError>> {
-            let mut output = String::new();
-
-            // Output engine operations, if requested. Otherwise, drain them.
-            let show_ops = command.tags.contains(&"ops".to_string());
-            while let Ok(op) = self.op_rx.try_recv() {
-                if !show_ops {
-                    continue;
+            // Parse tags.
+            let mut show_ops = false;
+            for tag in &command.tags {
+                match tag.as_str() {
+                    "ops" => show_ops = true,
+                    tag => return Err(format!("invalid tag {tag}").into()),
                 }
+            }
+
+            // Process engine operations, either output or drain.
+            let mut output = String::new();
+            while let Ok(op) = self.op_rx.try_recv() {
                 match op {
+                    _ if !show_ops => {}
                     Operation::Delete { key } => {
                         let (fkey, _) = debug::format_key_value(&key, &None);
                         writeln!(output, "engine delete {fkey}")?
