@@ -61,36 +61,6 @@ impl std::hash::Hash for Value {
     }
 }
 
-impl Value {
-    /// Returns the value's datatype, or None for null values.
-    pub fn datatype(&self) -> Option<DataType> {
-        match self {
-            Self::Null => None,
-            Self::Boolean(_) => Some(DataType::Boolean),
-            Self::Integer(_) => Some(DataType::Integer),
-            Self::Float(_) => Some(DataType::Float),
-            Self::String(_) => Some(DataType::String),
-        }
-    }
-}
-
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // TODO: don't allocate here.
-        f.write_str(
-            match self {
-                Self::Null => "NULL".to_string(),
-                Self::Boolean(b) if *b => "TRUE".to_string(),
-                Self::Boolean(_) => "FALSE".to_string(),
-                Self::Integer(i) => i.to_string(),
-                Self::Float(f) => f.to_string(),
-                Self::String(s) => s.clone(),
-            }
-            .as_ref(),
-        )
-    }
-}
-
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
@@ -108,6 +78,32 @@ impl PartialOrd for Value {
             (Self::Integer(a), Self::Integer(b)) => a.partial_cmp(b),
             (Self::String(a), Self::String(b)) => a.partial_cmp(b),
             (_, _) => None,
+        }
+    }
+}
+
+impl Value {
+    /// Returns the value's datatype, or None for null values.
+    pub fn datatype(&self) -> Option<DataType> {
+        match self {
+            Self::Null => None,
+            Self::Boolean(_) => Some(DataType::Boolean),
+            Self::Integer(_) => Some(DataType::Integer),
+            Self::Float(_) => Some(DataType::Float),
+            Self::String(_) => Some(DataType::String),
+        }
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Null => f.write_str("NULL"),
+            Self::Boolean(true) => f.write_str("TRUE"),
+            Self::Boolean(false) => f.write_str("FALSE"),
+            Self::Integer(integer) => integer.fmt(f),
+            Self::Float(float) => float.fmt(f),
+            Self::String(string) => f.write_str(string),
         }
     }
 }
