@@ -4,7 +4,7 @@ use toydb::error::{Error, Result};
 use toydb::raft;
 use toydb::server::Status;
 use toydb::sql::execution::ResultSet;
-use toydb::sql::schema;
+use toydb::sql::types::schema;
 use toydb::sql::types::{Column, DataType, Value};
 use toydb::storage;
 use toydb::storage::{engine, mvcc};

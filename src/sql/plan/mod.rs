@@ -6,7 +6,7 @@ use planner::Planner;
 use super::engine::Transaction;
 use super::execution::{Executor, ResultSet};
 use super::parser::ast;
-use super::schema::{Catalog, Table};
+use super::types::schema::{Catalog, Table};
 use super::types::{Expression, Value};
 use crate::error::Result;
 

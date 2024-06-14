@@ -1,7 +1,7 @@
 //! Mutation tests, using an in-memory database against golden files in tests/sql/mutation/
 use toydb::error::Result;
 use toydb::sql::engine::{Engine as _, Transaction as _};
-use toydb::sql::schema::Catalog as _;
+use toydb::sql::types::schema::Catalog as _;
 
 use goldenfile::Mint;
 use std::io::Write;

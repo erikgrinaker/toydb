@@ -7,7 +7,7 @@ pub use raft::{Raft, Status};
 use super::execution::ResultSet;
 use super::parser::{ast, Parser};
 use super::plan::Plan;
-use super::schema::Catalog;
+use super::types::schema::Catalog;
 use super::types::{Expression, Row, Value};
 use crate::errinput;
 use crate::error::Result;

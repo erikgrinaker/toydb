@@ -1,11 +1,11 @@
-use super::engine::Transaction;
-use super::parser::format_ident;
-use super::types::{DataType, Value};
+use super::{DataType, Value};
 use crate::encoding;
 use crate::errinput;
 use crate::error::{Error, Result};
+use crate::sql::engine::Transaction;
+use crate::sql::parser::format_ident;
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
 /// The catalog stores schema information

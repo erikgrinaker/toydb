@@ -1,4 +1,4 @@
-use super::super::schema::Catalog;
+use super::super::types::schema::Catalog;
 use super::super::types::{Expression, Value};
 use super::Node;
 use crate::error::Result;

@@ -4,7 +4,7 @@ use crate::raft;
 use crate::sql;
 use crate::sql::engine::Engine as _;
 use crate::sql::execution::ResultSet;
-use crate::sql::schema::{Catalog as _, Table};
+use crate::sql::types::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
 use crate::storage;
 

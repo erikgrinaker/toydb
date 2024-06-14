@@ -1,4 +1,4 @@
-use super::super::schema::{Catalog, Table, Tables};
+use super::super::types::schema::{Catalog, Table, Tables};
 use super::super::types::{Expression, Row, Value};
 use super::Transaction as _;
 use crate::encoding::{self, Key as _, Value as _};

@@ -1,5 +1,5 @@
 use super::super::parser::ast;
-use super::super::schema::{Catalog, Column, Table};
+use super::super::types::schema::{Catalog, Column, Table};
 use super::super::types::{Expression, Value};
 use super::{Aggregate, Direction, Node, Plan};
 use crate::errinput;

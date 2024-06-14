@@ -5,7 +5,7 @@ use crate::errdata;
 use crate::error::{Error, Result};
 use crate::server::{Request, Response, Status};
 use crate::sql::execution::ResultSet;
-use crate::sql::schema::Table;
+use crate::sql::types::schema::Table;
 
 use rand::Rng;
 
