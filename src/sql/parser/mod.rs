@@ -786,7 +786,7 @@ pub(super) fn format_ident(ident: &str) -> String {
     static RE_IDENT: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     let re_ident = RE_IDENT.get_or_init(|| Regex::new(r#"^\w[\w_]*$"#).unwrap());
 
-    if re_ident.is_match(ident) && Keyword::from_str(ident).is_none() {
+    if re_ident.is_match(ident) && Keyword::try_from(ident.to_lowercase().as_str()).is_err() {
         ident.to_string()
     } else {
         format!("\"{}\"", ident.replace('\"', "\"\""))

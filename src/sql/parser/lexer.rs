@@ -1,65 +1,79 @@
 use crate::errinput;
 use crate::error::Result;
 
-use std::iter::Peekable;
-use std::str::Chars;
+/// The lexer (lexical analyzer) preprocesses raw SQL strings into a sequence of
+/// lexical tokens (e.g. keyword, number, string, etc) that are passed onto the
+/// SQL parser. In doing so, it strips away basic syntactic noise such as
+/// whitespace, case, and quotes, and performs initial validation of symbols.
+pub struct Lexer<'a> {
+    chars: std::iter::Peekable<std::str::Chars<'a>>,
+}
 
-// A lexer token
+/// A lexical token.
+///
+/// For simplicity, these carry owned String copies rather than &str references
+/// into the original input string. This causes frequent allocations, but that's
+/// fine for our purposes here.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
+    /// A number, with digits, decimal points, and/or exponents. Leading signs
+    /// (e.g. -) are separate tokens.
     Number(String),
+    /// A Unicode string, with quotes stripped and escape sequences resolved.
     String(String),
+    /// An identifier, with any quotes stripped.
     Ident(String),
+    /// A SQL keyword.
     Keyword(Keyword),
-    Period,
-    Equal,
-    GreaterThan,
-    GreaterThanOrEqual,
-    LessThan,
-    LessThanOrEqual,
-    LessOrGreaterThan,
-    Plus,
-    Minus,
-    Asterisk,
-    Slash,
-    Caret,
-    Percent,
-    Exclamation,
-    NotEqual,
-    Question,
-    OpenParen,
-    CloseParen,
-    Comma,
-    Semicolon,
+    Period,             // .
+    Equal,              // =
+    NotEqual,           // !=
+    GreaterThan,        // >
+    GreaterThanOrEqual, // >=
+    LessThan,           // <
+    LessThanOrEqual,    // <=
+    LessOrGreaterThan,  // <>
+    Plus,               // +
+    Minus,              // -
+    Asterisk,           // *
+    Slash,              // /
+    Caret,              // ^
+    Percent,            // %
+    Exclamation,        // !
+    Question,           // ?
+    Comma,              // ,
+    Semicolon,          // ;
+    OpenParen,          // (
+    CloseParen,         // )
 }
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(match self {
-            Token::Number(n) => n,
-            Token::String(s) => s,
-            Token::Ident(s) => s,
-            Token::Keyword(k) => k.to_str(),
-            Token::Period => ".",
-            Token::Equal => "=",
-            Token::GreaterThan => ">",
-            Token::GreaterThanOrEqual => ">=",
-            Token::LessThan => "<",
-            Token::LessThanOrEqual => "<=",
-            Token::LessOrGreaterThan => "<>",
-            Token::Plus => "+",
-            Token::Minus => "-",
-            Token::Asterisk => "*",
-            Token::Slash => "/",
-            Token::Caret => "^",
-            Token::Percent => "%",
-            Token::Exclamation => "!",
-            Token::NotEqual => "!=",
-            Token::Question => "?",
-            Token::OpenParen => "(",
-            Token::CloseParen => ")",
-            Token::Comma => ",",
-            Token::Semicolon => ";",
+            Self::Number(n) => n,
+            Self::String(s) => s,
+            Self::Ident(s) => s,
+            Self::Keyword(k) => return k.fmt(f),
+            Self::Period => ".",
+            Self::Equal => "=",
+            Self::NotEqual => "!=",
+            Self::GreaterThan => ">",
+            Self::GreaterThanOrEqual => ">=",
+            Self::LessThan => "<",
+            Self::LessThanOrEqual => "<=",
+            Self::LessOrGreaterThan => "<>",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Asterisk => "*",
+            Self::Slash => "/",
+            Self::Caret => "^",
+            Self::Percent => "%",
+            Self::Exclamation => "!",
+            Self::Question => "?",
+            Self::Comma => ",",
+            Self::Semicolon => ";",
+            Self::OpenParen => "(",
+            Self::CloseParen => ")",
         })
     }
 }
@@ -70,7 +84,7 @@ impl From<Keyword> for Token {
     }
 }
 
-/// Lexer keywords
+/// Reserved SQL keywords.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Keyword {
     And,
@@ -142,83 +156,91 @@ pub enum Keyword {
     Write,
 }
 
-impl Keyword {
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(ident: &str) -> Option<Self> {
-        Some(match ident.to_uppercase().as_ref() {
-            "AS" => Self::As,
-            "ASC" => Self::Asc,
-            "AND" => Self::And,
-            "BEGIN" => Self::Begin,
-            "BOOL" => Self::Bool,
-            "BOOLEAN" => Self::Boolean,
-            "BY" => Self::By,
-            "CHAR" => Self::Char,
-            "COMMIT" => Self::Commit,
-            "CREATE" => Self::Create,
-            "CROSS" => Self::Cross,
-            "DEFAULT" => Self::Default,
-            "DELETE" => Self::Delete,
-            "DESC" => Self::Desc,
-            "DOUBLE" => Self::Double,
-            "DROP" => Self::Drop,
-            "EXISTS" => Self::Exists,
-            "EXPLAIN" => Self::Explain,
-            "FALSE" => Self::False,
-            "FLOAT" => Self::Float,
-            "FROM" => Self::From,
-            "GROUP" => Self::Group,
-            "HAVING" => Self::Having,
-            "IF" => Self::If,
-            "INDEX" => Self::Index,
-            "INFINITY" => Self::Infinity,
-            "INNER" => Self::Inner,
-            "INSERT" => Self::Insert,
-            "INT" => Self::Int,
-            "INTEGER" => Self::Integer,
-            "INTO" => Self::Into,
-            "IS" => Self::Is,
-            "JOIN" => Self::Join,
-            "KEY" => Self::Key,
-            "LEFT" => Self::Left,
-            "LIKE" => Self::Like,
-            "LIMIT" => Self::Limit,
-            "NAN" => Self::NaN,
-            "NOT" => Self::Not,
-            "NULL" => Self::Null,
-            "OF" => Self::Of,
-            "OFFSET" => Self::Offset,
-            "ON" => Self::On,
-            "ONLY" => Self::Only,
-            "OR" => Self::Or,
-            "ORDER" => Self::Order,
-            "OUTER" => Self::Outer,
-            "PRIMARY" => Self::Primary,
-            "READ" => Self::Read,
-            "REFERENCES" => Self::References,
-            "RIGHT" => Self::Right,
-            "ROLLBACK" => Self::Rollback,
-            "SELECT" => Self::Select,
-            "SET" => Self::Set,
-            "STRING" => Self::String,
-            "SYSTEM" => Self::System,
-            "TABLE" => Self::Table,
-            "TEXT" => Self::Text,
-            "TIME" => Self::Time,
-            "TRANSACTION" => Self::Transaction,
-            "TRUE" => Self::True,
-            "UNIQUE" => Self::Unique,
-            "UPDATE" => Self::Update,
-            "VALUES" => Self::Values,
-            "VARCHAR" => Self::Varchar,
-            "WHERE" => Self::Where,
-            "WRITE" => Self::Write,
-            _ => return None,
+impl TryFrom<&str> for Keyword {
+    // The error just indicates this isn't a keyword, so use a cheap string.
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        // Only compare lowercase, which is enforced by the lexer. This avoids
+        // allocating a string to change the case. Assert this.
+        debug_assert!(value.chars().all(|c| !c.is_uppercase()), "keyword must be lowercase");
+        Ok(match value {
+            "as" => Self::As,
+            "asc" => Self::Asc,
+            "and" => Self::And,
+            "begin" => Self::Begin,
+            "bool" => Self::Bool,
+            "boolean" => Self::Boolean,
+            "by" => Self::By,
+            "char" => Self::Char,
+            "commit" => Self::Commit,
+            "create" => Self::Create,
+            "cross" => Self::Cross,
+            "default" => Self::Default,
+            "delete" => Self::Delete,
+            "desc" => Self::Desc,
+            "double" => Self::Double,
+            "drop" => Self::Drop,
+            "exists" => Self::Exists,
+            "explain" => Self::Explain,
+            "false" => Self::False,
+            "float" => Self::Float,
+            "from" => Self::From,
+            "group" => Self::Group,
+            "having" => Self::Having,
+            "if" => Self::If,
+            "index" => Self::Index,
+            "infinity" => Self::Infinity,
+            "inner" => Self::Inner,
+            "insert" => Self::Insert,
+            "int" => Self::Int,
+            "integer" => Self::Integer,
+            "into" => Self::Into,
+            "is" => Self::Is,
+            "join" => Self::Join,
+            "key" => Self::Key,
+            "left" => Self::Left,
+            "like" => Self::Like,
+            "limit" => Self::Limit,
+            "nan" => Self::NaN,
+            "not" => Self::Not,
+            "null" => Self::Null,
+            "of" => Self::Of,
+            "offset" => Self::Offset,
+            "on" => Self::On,
+            "only" => Self::Only,
+            "or" => Self::Or,
+            "order" => Self::Order,
+            "outer" => Self::Outer,
+            "primary" => Self::Primary,
+            "read" => Self::Read,
+            "references" => Self::References,
+            "right" => Self::Right,
+            "rollback" => Self::Rollback,
+            "select" => Self::Select,
+            "set" => Self::Set,
+            "string" => Self::String,
+            "system" => Self::System,
+            "table" => Self::Table,
+            "text" => Self::Text,
+            "time" => Self::Time,
+            "transaction" => Self::Transaction,
+            "true" => Self::True,
+            "unique" => Self::Unique,
+            "update" => Self::Update,
+            "values" => Self::Values,
+            "varchar" => Self::Varchar,
+            "where" => Self::Where,
+            "write" => Self::Write,
+            _ => return Err("not a keyword"),
         })
     }
+}
 
-    pub fn to_str(&self) -> &str {
-        match self {
+impl std::fmt::Display for Keyword {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // Display keywords as uppercase.
+        f.write_str(match self {
             Self::As => "AS",
             Self::Asc => "ASC",
             Self::And => "AND",
@@ -286,100 +308,90 @@ impl Keyword {
             Self::Varchar => "VARCHAR",
             Self::Where => "WHERE",
             Self::Write => "WRITE",
-        }
+        })
     }
 }
 
-impl std::fmt::Display for Keyword {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(self.to_str())
-    }
-}
-
-/// A lexer tokenizes an input string as an iterator
-pub struct Lexer<'a> {
-    iter: Peekable<Chars<'a>>,
-}
-
+/// The lexer is used as a token iterator.
 impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Result<Token>> {
         match self.scan() {
             Ok(Some(token)) => Some(Ok(token)),
-            Ok(None) => self.iter.peek().map(|c| errinput!("unexpected character {c}")),
+            // If there's any remaining chars, the lexer didn't recognize them.
+            // Otherwise, we're done lexing.
+            Ok(None) => self.chars.peek().map(|c| errinput!("unexpected character {c}")),
             Err(err) => Some(Err(err)),
         }
     }
 }
 
 impl<'a> Lexer<'a> {
-    /// Creates a new lexer for the given input string
-    #[allow(dead_code)]
+    /// Creates a new lexer for the given string.
     pub fn new(input: &'a str) -> Lexer<'a> {
-        Lexer { iter: input.chars().peekable() }
+        Lexer { chars: input.chars().peekable() }
     }
 
-    /// Consumes any whitespace characters
-    fn consume_whitespace(&mut self) {
-        self.next_while(|c| c.is_whitespace());
+    /// Returns the next character if it satisfies the predicate.
+    fn next_if(&mut self, predicate: impl Fn(char) -> bool) -> Option<char> {
+        self.chars.peek().filter(|&&c| predicate(c))?;
+        self.chars.next()
     }
 
-    /// Grabs the next character if it matches the predicate function
-    fn next_if<F: Fn(char) -> bool>(&mut self, predicate: F) -> Option<char> {
-        self.iter.peek().filter(|&c| predicate(*c))?;
-        self.iter.next()
+    /// Applies a function to the next character, returning its result and
+    /// consuming the next character if it's Some.
+    fn next_if_map<T>(&mut self, map: impl Fn(char) -> Option<T>) -> Option<T> {
+        let value = self.chars.peek().and_then(|&c| map(c))?;
+        self.chars.next();
+        Some(value)
     }
 
-    /// Grabs the next single-character token if the tokenizer function returns one
-    fn next_if_token<F: Fn(char) -> Option<Token>>(&mut self, tokenizer: F) -> Option<Token> {
-        let token = self.iter.peek().and_then(|&c| tokenizer(c))?;
-        self.iter.next();
-        Some(token)
+    /// Returns true if the next character is the given character, consuming it.
+    fn next_is(&mut self, c: char) -> bool {
+        self.next_if(|n| n == c).is_some()
     }
 
-    /// Grabs the next characters that match the predicate, as a string
-    fn next_while<F: Fn(char) -> bool>(&mut self, predicate: F) -> Option<String> {
-        let mut value = String::new();
-        while let Some(c) = self.next_if(&predicate) {
-            value.push(c)
-        }
-        Some(value).filter(|v| !v.is_empty())
-    }
-
-    /// Scans the input for the next token if any, ignoring leading whitespace
+    /// Scans the next token, if any.
     fn scan(&mut self) -> Result<Option<Token>> {
-        self.consume_whitespace();
-        match self.iter.peek() {
+        // Ignore whitespace. The first character tells us the token type.
+        self.skip_whitespace();
+        match self.chars.peek() {
             Some('\'') => self.scan_string(),
             Some('"') => self.scan_ident_quoted(),
             Some(c) if c.is_ascii_digit() => Ok(self.scan_number()),
-            Some(c) if c.is_alphabetic() => Ok(self.scan_ident()),
+            Some(c) if c.is_alphabetic() => Ok(self.scan_ident_or_keyword()),
             Some(_) => Ok(self.scan_symbol()),
             None => Ok(None),
         }
     }
 
-    /// Scans the input for the next ident or keyword token, if any
-    fn scan_ident(&mut self) -> Option<Token> {
-        let mut name = self.next_if(|c| c.is_alphabetic())?.to_string();
+    /// Scans the next identifier or keyword, if any. It's converted to
+    /// lowercase, by SQL convention.
+    fn scan_ident_or_keyword(&mut self) -> Option<Token> {
+        // The first character must be alphabetic. The rest can be numeric.
+        let mut name = self.next_if(|c| c.is_alphabetic())?.to_lowercase().to_string();
         while let Some(c) = self.next_if(|c| c.is_alphanumeric() || c == '_') {
-            name.push(c)
+            name.extend(c.to_lowercase())
         }
-        Keyword::from_str(&name)
-            .map(Token::Keyword)
-            .or_else(|| Some(Token::Ident(name.to_lowercase())))
+        // Check if the identifier matches a keyword.
+        match Keyword::try_from(name.as_str()).ok() {
+            Some(keyword) => Some(Token::Keyword(keyword)),
+            None => Some(Token::Ident(name)),
+        }
     }
 
-    /// Scans the input for the next quoted ident, if any
+    /// Scans the next quoted identifier, if any. Case is preserved, keywords
+    /// are ignored.
     fn scan_ident_quoted(&mut self) -> Result<Option<Token>> {
-        if self.next_if(|c| c == '"').is_none() {
+        if !self.next_is('"') {
             return Ok(None);
         }
         let mut ident = String::new();
         loop {
-            match self.iter.next() {
-                Some('"') if self.next_if(|c| c == '"').is_some() => ident.push('"'),
+            match self.chars.next() {
+                // "" is the escape sequence for ".
+                Some('"') if self.next_is('"') => ident.push('"'),
                 Some('"') => break,
                 Some(c) => ident.push(c),
                 None => return errinput!("unexpected end of quoted identifier"),
@@ -388,91 +400,87 @@ impl<'a> Lexer<'a> {
         Ok(Some(Token::Ident(ident)))
     }
 
-    /// Scans the input for the next number token, if any
+    /// Scans the next number, if any.
     fn scan_number(&mut self) -> Option<Token> {
-        let mut num = self.next_while(|c| c.is_ascii_digit())?;
+        // Scan the integer part. There must be one digit.
+        let mut number = self.next_if(|c| c.is_ascii_digit())?.to_string();
+        while let Some(c) = self.next_if(|c| c.is_ascii_digit()) {
+            number.push(c)
+        }
+        // Scan the fractional part, if any.
         if let Some(sep) = self.next_if(|c| c == '.') {
-            num.push(sep);
+            number.push(sep);
             while let Some(dec) = self.next_if(|c| c.is_ascii_digit()) {
-                num.push(dec)
+                number.push(dec)
             }
         }
+        // Scan the exponent, if any.
         if let Some(exp) = self.next_if(|c| c == 'e' || c == 'E') {
-            num.push(exp);
+            number.push(exp);
             if let Some(sign) = self.next_if(|c| c == '+' || c == '-') {
-                num.push(sign)
+                number.push(sign)
             }
             while let Some(c) = self.next_if(|c| c.is_ascii_digit()) {
-                num.push(c)
+                number.push(c)
             }
         }
-        Some(Token::Number(num))
+        Some(Token::Number(number))
     }
 
-    /// Scans the input for the next string literal, if any
+    /// Scans the next string literal, if any.
     fn scan_string(&mut self) -> Result<Option<Token>> {
-        if self.next_if(|c| c == '\'').is_none() {
+        if !self.next_is('\'') {
             return Ok(None);
         }
-        let mut s = String::new();
+        let mut string = String::new();
         loop {
-            match self.iter.next() {
-                Some('\'') if self.next_if(|c| c == '\'').is_some() => s.push('\''),
+            match self.chars.next() {
+                // '' is the escape sequence for '.
+                Some('\'') if self.next_is('\'') => string.push('\''),
                 Some('\'') => break,
-                Some(c) => s.push(c),
+                Some(c) => string.push(c),
                 None => return errinput!("unexpected end of string literal"),
             }
         }
-        Ok(Some(Token::String(s)))
+        Ok(Some(Token::String(string)))
     }
 
-    /// Scans the input for the next symbol token, if any, and
-    /// handle any multi-symbol tokens
+    /// Scans the next symbol token, if any.
     fn scan_symbol(&mut self) -> Option<Token> {
-        self.next_if_token(|c| match c {
-            '.' => Some(Token::Period),
-            '=' => Some(Token::Equal),
-            '>' => Some(Token::GreaterThan),
-            '<' => Some(Token::LessThan),
-            '+' => Some(Token::Plus),
-            '-' => Some(Token::Minus),
-            '*' => Some(Token::Asterisk),
-            '/' => Some(Token::Slash),
-            '^' => Some(Token::Caret),
-            '%' => Some(Token::Percent),
-            '!' => Some(Token::Exclamation),
-            '?' => Some(Token::Question),
-            '(' => Some(Token::OpenParen),
-            ')' => Some(Token::CloseParen),
-            ',' => Some(Token::Comma),
-            ';' => Some(Token::Semicolon),
-            _ => None,
-        })
-        .map(|token| match token {
-            Token::Exclamation => {
-                if self.next_if(|c| c == '=').is_some() {
-                    Token::NotEqual
-                } else {
-                    token
-                }
-            }
-            Token::LessThan => {
-                if self.next_if(|c| c == '>').is_some() {
-                    Token::LessOrGreaterThan
-                } else if self.next_if(|c| c == '=').is_some() {
-                    Token::LessThanOrEqual
-                } else {
-                    token
-                }
-            }
-            Token::GreaterThan => {
-                if self.next_if(|c| c == '=').is_some() {
-                    Token::GreaterThanOrEqual
-                } else {
-                    token
-                }
-            }
-            _ => token,
-        })
+        let mut token = self.next_if_map(|c| {
+            Some(match c {
+                '.' => Token::Period,
+                '=' => Token::Equal,
+                '>' => Token::GreaterThan,
+                '<' => Token::LessThan,
+                '+' => Token::Plus,
+                '-' => Token::Minus,
+                '*' => Token::Asterisk,
+                '/' => Token::Slash,
+                '^' => Token::Caret,
+                '%' => Token::Percent,
+                '!' => Token::Exclamation,
+                '?' => Token::Question,
+                ',' => Token::Comma,
+                ';' => Token::Semicolon,
+                '(' => Token::OpenParen,
+                ')' => Token::CloseParen,
+                _ => return None,
+            })
+        })?;
+        // Handle two-character tokens, e.g. !=.
+        token = match token {
+            Token::Exclamation if self.next_is('=') => Token::NotEqual,
+            Token::GreaterThan if self.next_is('=') => Token::GreaterThanOrEqual,
+            Token::LessThan if self.next_is('>') => Token::LessOrGreaterThan,
+            Token::LessThan if self.next_is('=') => Token::LessThanOrEqual,
+            token => token,
+        };
+        Some(token)
+    }
+
+    /// Skips any whitespace.
+    fn skip_whitespace(&mut self) {
+        while self.next_if(|c| c.is_whitespace()).is_some() {}
     }
 }
