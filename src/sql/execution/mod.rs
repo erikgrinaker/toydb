@@ -144,6 +144,7 @@ impl ResultSet {
     }
 
     /// Converts the ResultSet into a value, if possible.
+    /// TODO: use TryFrom for this, also to primitive types via Value as TryFrom.
     pub fn into_value(self) -> Result<Value> {
         self.into_row()?.into_iter().next().ok_or(errdata!("no value returned"))
     }

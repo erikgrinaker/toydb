@@ -265,8 +265,9 @@ impl Workload for Read {
     }
 
     fn verify(&self, client: &mut Client, _: usize) -> Result<()> {
-        let count = client.execute(r#"SELECT COUNT(*) FROM "read""#)?.into_value()?.integer()?;
-        assert_eq!(count as u64, self.rows, "Unexpected row count");
+        let count: i64 =
+            client.execute(r#"SELECT COUNT(*) FROM "read""#)?.into_value()?.try_into()?;
+        assert_eq!(count, self.rows as i64, "Unexpected row count");
         Ok(())
     }
 }
@@ -345,7 +346,8 @@ impl Workload for Write {
     }
 
     fn verify(&self, client: &mut Client, txns: usize) -> Result<()> {
-        let count = client.execute(r#"SELECT COUNT(*) FROM "write""#)?.into_value()?.integer()?;
+        let count: i64 =
+            client.execute(r#"SELECT COUNT(*) FROM "write""#)?.into_value()?.try_into()?;
         assert_eq!(count as usize, txns * self.batch, "Unexpected row count");
         Ok(())
     }
@@ -473,11 +475,11 @@ impl Workload for Bank {
                 from
             ))?
             .into_row()?;
-        let from_balance = row.pop().unwrap().integer()?;
-        let from_account = row.pop().unwrap().integer()?;
+        let from_balance: i64 = row.pop().unwrap().try_into()?;
+        let from_account: i64 = row.pop().unwrap().try_into()?;
         amount = std::cmp::min(amount, from_balance as u64);
 
-        let to_account = client
+        let to_account: i64 = client
             .execute(&format!(
                 "SELECT a.id, a.balance
                         FROM account a JOIN customer c ON a.customer_id = c.id
@@ -487,7 +489,7 @@ impl Workload for Bank {
                 to
             ))?
             .into_value()?
-            .integer()?;
+            .try_into()?;
 
         client.execute(&format!(
             "UPDATE account SET balance = balance - {} WHERE id = {}",
@@ -504,13 +506,13 @@ impl Workload for Bank {
     }
 
     fn verify(&self, client: &mut Client, _: usize) -> Result<()> {
-        let balance =
-            client.execute("SELECT SUM(balance) FROM account")?.into_value()?.integer()?;
+        let balance: i64 =
+            client.execute("SELECT SUM(balance) FROM account")?.into_value()?.try_into()?;
         assert_eq!(balance as u64, self.customers * self.accounts * self.balance);
-        let negative = client
+        let negative: i64 = client
             .execute("SELECT COUNT(*) FROM account WHERE balance < 0")?
             .into_value()?
-            .integer()?;
+            .try_into()?;
         assert_eq!(negative, 0);
         Ok(())
     }

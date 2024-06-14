@@ -1,6 +1,6 @@
 use crate::encoding;
 use crate::errdata;
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
 
@@ -72,39 +72,6 @@ impl Value {
             Self::String(_) => Some(DataType::String),
         }
     }
-
-    /// Returns the inner boolean, or an error if not a boolean
-    /// TODO: this and below should implement TryFrom instead.
-    pub fn boolean(self) -> Result<bool> {
-        match self {
-            Self::Boolean(b) => Ok(b),
-            v => errdata!("not a boolean: {v:?}"),
-        }
-    }
-
-    /// Returns the inner float, or an error if not a float
-    pub fn float(self) -> Result<f64> {
-        match self {
-            Self::Float(f) => Ok(f),
-            v => errdata!("not a float: {v:?}"),
-        }
-    }
-
-    /// Returns the inner integer, or an error if not an integer
-    pub fn integer(self) -> Result<i64> {
-        match self {
-            Self::Integer(i) => Ok(i),
-            v => errdata!("not an integer: {v:?}"),
-        }
-    }
-
-    /// Returns the inner string, or an error if not a string
-    pub fn string(self) -> Result<String> {
-        match self {
-            Self::String(s) => Ok(s),
-            v => errdata!("not a string: {v:?}"),
-        }
-    }
 }
 
 impl std::fmt::Display for Value {
@@ -172,6 +139,42 @@ impl From<String> for Value {
 impl From<&str> for Value {
     fn from(v: &str) -> Self {
         Value::String(v.to_owned())
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self> {
+        let Value::Boolean(b) = value else { return errdata!("not boolean: {value}") };
+        Ok(b)
+    }
+}
+
+impl TryFrom<Value> for f64 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self> {
+        let Value::Float(f) = value else { return errdata!("not float: {value}") };
+        Ok(f)
+    }
+}
+
+impl TryFrom<Value> for i64 {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self> {
+        let Value::Integer(i) = value else { return errdata!("not integer: {value}") };
+        Ok(i)
+    }
+}
+
+impl TryFrom<Value> for String {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self> {
+        let Value::String(s) = value else { return errdata!("not string: {value}") };
+        Ok(s)
     }
 }
 
