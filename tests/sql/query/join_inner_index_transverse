@@ -71,7 +71,7 @@ AST: Select {
     limit: None,
 }
 
-Plan: Plan(
+Plan: Select(
     NestedLoopJoin {
         left: Scan {
             table: "movies",
@@ -138,7 +138,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     HashJoin {
         left: IndexLookup {
             table: "movies",

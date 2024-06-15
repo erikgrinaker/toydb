@@ -85,7 +85,7 @@ macro_rules! test_query {
                 .and_then(|plan| plan.optimize(&mut txn))
                 .and_then(|plan| {
                     write!(f, "Explain:\n{}\n\n", plan)?;
-                    plan.execute(&mut txn)
+                    plan.execute(&mut txn).map(|r| r.into())
                 });
 
             match result {

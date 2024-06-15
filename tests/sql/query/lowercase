@@ -27,7 +27,7 @@ AST: Select {
     limit: None,
 }
 
-Plan: Plan(
+Plan: Select(
     Projection {
         source: Nothing,
         expressions: [
@@ -43,7 +43,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     Projection {
         source: Nothing,
         expressions: [

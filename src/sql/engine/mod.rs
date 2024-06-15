@@ -116,8 +116,9 @@ impl<E: Engine + 'static> Session<E> {
                 txn.rollback()?;
                 Ok(ResultSet::Rollback { version })
             }
+            // TODO: this needs testing.
             ast::Statement::Explain(statement) => self.with_txn_read_only(|txn| {
-                Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?.0))
+                Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?))
             }),
             statement if self.txn.is_some() => {
                 Self::execute_with(statement, self.txn.as_mut().unwrap())
@@ -146,7 +147,7 @@ impl<E: Engine + 'static> Session<E> {
     ///
     /// TODO: reconsider this.
     fn execute_with(statement: ast::Statement, txn: &mut E::Transaction) -> Result<ResultSet> {
-        Plan::build(statement, txn)?.optimize(txn)?.execute(txn)
+        Ok(Plan::build(statement, txn)?.optimize(txn)?.execute(txn)?.into())
     }
 
     /// Runs a read-only closure in the session's transaction, or a new

@@ -37,7 +37,7 @@ AST: Select {
     ),
 }
 
-Plan: Plan(
+Plan: Select(
     Limit {
         source: Offset {
             source: Scan {
@@ -51,7 +51,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     Limit {
         source: Offset {
             source: Scan {

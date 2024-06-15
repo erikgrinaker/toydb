@@ -1,6 +1,6 @@
 use super::super::engine::Transaction;
 use super::super::types::{Column, Expression, Row, Value};
-use super::{Executor, ResultSet};
+use super::QueryIterator;
 use crate::error::Result;
 
 use std::collections::HashSet;
@@ -12,15 +12,13 @@ pub struct Scan {
 }
 
 impl Scan {
-    pub fn new(table: String, filter: Option<Expression>) -> Box<Self> {
-        Box::new(Self { table, filter })
+    pub fn new(table: String, filter: Option<Expression>) -> Self {
+        Self { table, filter }
     }
-}
 
-impl<T: Transaction> Executor<T> for Scan {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+    pub fn execute(self, txn: &mut impl Transaction) -> Result<QueryIterator> {
         let table = txn.must_read_table(&self.table)?;
-        Ok(ResultSet::Query {
+        Ok(QueryIterator {
             columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
             rows: Box::new(txn.scan(&table.name, self.filter)?),
         })
@@ -34,13 +32,11 @@ pub struct KeyLookup {
 }
 
 impl KeyLookup {
-    pub fn new(table: String, keys: Vec<Value>) -> Box<Self> {
-        Box::new(Self { table, keys })
+    pub fn new(table: String, keys: Vec<Value>) -> Self {
+        Self { table, keys }
     }
-}
 
-impl<T: Transaction> Executor<T> for KeyLookup {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+    pub fn execute(self, txn: &mut impl Transaction) -> Result<QueryIterator> {
         let table = txn.must_read_table(&self.table)?;
 
         // FIXME Is there a way to pass the txn into an iterator closure instead?
@@ -50,7 +46,7 @@ impl<T: Transaction> Executor<T> for KeyLookup {
             .filter_map(|key| txn.read(&table.name, &key).transpose())
             .collect::<Result<Vec<Row>>>()?;
 
-        Ok(ResultSet::Query {
+        Ok(QueryIterator {
             columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
             rows: Box::new(rows.into_iter().map(Ok)),
         })
@@ -65,13 +61,11 @@ pub struct IndexLookup {
 }
 
 impl IndexLookup {
-    pub fn new(table: String, column: String, values: Vec<Value>) -> Box<Self> {
-        Box::new(Self { table, column, values })
+    pub fn new(table: String, column: String, values: Vec<Value>) -> Self {
+        Self { table, column, values }
     }
-}
 
-impl<T: Transaction> Executor<T> for IndexLookup {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+    pub fn execute(self, txn: &mut impl Transaction) -> Result<QueryIterator> {
         let table = txn.must_read_table(&self.table)?;
 
         let mut pks: HashSet<Value> = HashSet::new();
@@ -85,7 +79,7 @@ impl<T: Transaction> Executor<T> for IndexLookup {
             .filter_map(|pk| txn.read(&table.name, &pk).transpose())
             .collect::<Result<Vec<Row>>>()?;
 
-        Ok(ResultSet::Query {
+        Ok(QueryIterator {
             columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
             rows: Box::new(rows.into_iter().map(Ok)),
         })
@@ -96,16 +90,7 @@ impl<T: Transaction> Executor<T> for IndexLookup {
 pub struct Nothing;
 
 impl Nothing {
-    pub fn new() -> Box<Self> {
-        Box::new(Self)
-    }
-}
-
-impl<T: Transaction> Executor<T> for Nothing {
-    fn execute(self: Box<Self>, _: &mut T) -> Result<ResultSet> {
-        Ok(ResultSet::Query {
-            columns: Vec::new(),
-            rows: Box::new(std::iter::once(Ok(Row::new()))),
-        })
+    pub fn execute(self) -> QueryIterator {
+        QueryIterator { columns: Vec::new(), rows: Box::new(std::iter::once(Ok(Row::new()))) }
     }
 }

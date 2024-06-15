@@ -172,7 +172,7 @@ AST: Select {
     limit: None,
 }
 
-Plan: Plan(
+Plan: Select(
     Order {
         source: Projection {
             source: NestedLoopJoin {
@@ -364,7 +364,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     Order {
         source: Projection {
             source: HashJoin {

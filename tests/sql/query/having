@@ -77,7 +77,7 @@ AST: Select {
     limit: None,
 }
 
-Plan: Plan(
+Plan: Select(
     Order {
         source: Filter {
             source: Projection {
@@ -181,7 +181,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     Order {
         source: Filter {
             source: Projection {

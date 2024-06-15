@@ -1,9 +1,9 @@
 use super::super::engine::Transaction;
 use super::super::types::schema::Table;
 use super::super::types::{Expression, Row, Value};
-use super::{Executor, ResultSet};
+use super::QueryIterator;
+use crate::errinput;
 use crate::error::Result;
-use crate::{errdata, errinput};
 
 use std::collections::{HashMap, HashSet};
 
@@ -15,8 +15,25 @@ pub struct Insert {
 }
 
 impl Insert {
-    pub fn new(table: String, columns: Vec<String>, rows: Vec<Vec<Expression>>) -> Box<Self> {
-        Box::new(Self { table, columns, rows })
+    pub fn new(table: String, columns: Vec<String>, rows: Vec<Vec<Expression>>) -> Self {
+        Self { table, columns, rows }
+    }
+
+    pub fn execute(self, txn: &mut impl Transaction) -> Result<u64> {
+        let table = txn.must_read_table(&self.table)?;
+        let mut count = 0;
+        for expressions in self.rows {
+            let mut row =
+                expressions.into_iter().map(|expr| expr.evaluate(None)).collect::<Result<_>>()?;
+            if self.columns.is_empty() {
+                row = Self::pad_row(&table, row)?;
+            } else {
+                row = Self::make_row(&table, &self.columns, row)?;
+            }
+            txn.create(&table.name, row)?;
+            count += 1;
+        }
+        Ok(count)
     }
 
     // Builds a row from a set of column names and values, padding it with default values.
@@ -57,100 +74,68 @@ impl Insert {
     }
 }
 
-impl<T: Transaction> Executor<T> for Insert {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
-        let table = txn.must_read_table(&self.table)?;
-        let mut count = 0;
-        for expressions in self.rows {
-            let mut row =
-                expressions.into_iter().map(|expr| expr.evaluate(None)).collect::<Result<_>>()?;
-            if self.columns.is_empty() {
-                row = Self::pad_row(&table, row)?;
-            } else {
-                row = Self::make_row(&table, &self.columns, row)?;
-            }
-            txn.create(&table.name, row)?;
-            count += 1;
-        }
-        Ok(ResultSet::Create { count })
-    }
-}
-
 /// An UPDATE executor
-pub struct Update<T: Transaction> {
+pub struct Update {
     table: String,
-    source: Box<dyn Executor<T>>,
+    source: QueryIterator,
     expressions: Vec<(usize, Expression)>,
 }
 
-impl<T: Transaction> Update<T> {
+impl Update {
     pub fn new(
         table: String,
-        source: Box<dyn Executor<T>>,
+        source: QueryIterator,
         expressions: Vec<(usize, Expression)>,
-    ) -> Box<Self> {
-        Box::new(Self { table, source, expressions })
+    ) -> Self {
+        Self { table, source, expressions }
     }
-}
 
-impl<T: Transaction> Executor<T> for Update<T> {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
-        match self.source.execute(txn)? {
-            ResultSet::Query { mut rows, .. } => {
-                let table = txn.must_read_table(&self.table)?;
-
-                // The iterator will see our changes, such that the same item may be iterated over
-                // multiple times. We keep track of the primary keys here to avoid that, althought
-                // it may cause ballooning memory usage for large updates.
-                //
-                // FIXME This is not safe for primary key updates, which may still be processed
-                // multiple times - it should be possible to come up with a pathological case that
-                // loops forever (e.g. UPDATE test SET id = id + 1).
-                let mut updated = HashSet::new();
-                while let Some(row) = rows.next().transpose()? {
-                    let id = table.get_row_key(&row)?;
-                    if updated.contains(&id) {
-                        continue;
-                    }
-                    let mut new = row.clone();
-                    for (field, expr) in &self.expressions {
-                        new[*field] = expr.evaluate(Some(&row))?;
-                    }
-                    txn.update(&table.name, &id, new)?;
-                    updated.insert(id);
-                }
-                Ok(ResultSet::Update { count: updated.len() as u64 })
+    pub fn execute(mut self, txn: &mut impl Transaction) -> Result<u64> {
+        let table = txn.must_read_table(&self.table)?;
+        // The iterator will see our changes, such that the same item may be
+        // iterated over multiple times. We keep track of the primary keys here
+        // to avoid that, althought it may cause ballooning memory usage for
+        // large updates.
+        //
+        // FIXME This is not safe for primary key updates, which may still be
+        // processed multiple times - it should be possible to come up with a
+        // pathological case that loops forever (e.g. UPDATE test SET id = id +
+        // 1).
+        let mut updated = HashSet::new();
+        while let Some(row) = self.source.next().transpose()? {
+            let id = table.get_row_key(&row)?;
+            if updated.contains(&id) {
+                continue;
             }
-            r => errdata!("unexpected response {r:?}"),
+            let mut new = row.clone();
+            for (field, expr) in &self.expressions {
+                new[*field] = expr.evaluate(Some(&row))?;
+            }
+            txn.update(&table.name, &id, new)?;
+            updated.insert(id);
         }
+        Ok(updated.len() as u64)
     }
 }
 
 /// A DELETE executor
-pub struct Delete<T: Transaction> {
+pub struct Delete {
     table: String,
-    source: Box<dyn Executor<T>>,
+    source: QueryIterator,
 }
 
-impl<T: Transaction> Delete<T> {
-    pub fn new(table: String, source: Box<dyn Executor<T>>) -> Box<Self> {
-        Box::new(Self { table, source })
+impl Delete {
+    pub fn new(table: String, source: QueryIterator) -> Self {
+        Self { table, source }
     }
-}
 
-impl<T: Transaction> Executor<T> for Delete<T> {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+    pub fn execute(mut self, txn: &mut impl Transaction) -> Result<u64> {
         let table = txn.must_read_table(&self.table)?;
         let mut count = 0;
-        match self.source.execute(txn)? {
-            ResultSet::Query { mut rows, .. } => {
-                while let Some(row) = rows.next().transpose()? {
-                    txn.delete(&table.name, &table.get_row_key(&row)?)?;
-                    count += 1
-                }
-                Ok(ResultSet::Delete { count })
-            }
-            r => errdata!("unexpected result {r:?}"),
+        while let Some(row) = self.source.next().transpose()? {
+            txn.delete(&table.name, &table.get_row_key(&row)?)?;
+            count += 1
         }
+        Ok(count)
     }
 }

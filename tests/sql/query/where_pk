@@ -36,7 +36,7 @@ AST: Select {
     limit: None,
 }
 
-Plan: Plan(
+Plan: Select(
     Filter {
         source: Scan {
             table: "movies",
@@ -62,7 +62,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     KeyLookup {
         table: "movies",
         alias: None,

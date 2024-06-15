@@ -1,6 +1,5 @@
 use super::super::engine::Transaction;
 use super::super::types::schema::Table;
-use super::{Executor, ResultSet};
 use crate::error::Result;
 
 /// A CREATE TABLE executor
@@ -9,16 +8,12 @@ pub struct CreateTable {
 }
 
 impl CreateTable {
-    pub fn new(table: Table) -> Box<Self> {
-        Box::new(Self { table })
+    pub fn new(table: Table) -> Self {
+        Self { table }
     }
-}
 
-impl<T: Transaction> Executor<T> for CreateTable {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
-        let name = self.table.name.clone();
-        txn.create_table(self.table)?;
-        Ok(ResultSet::CreateTable { name })
+    pub fn execute(self, txn: &mut impl Transaction) -> Result<()> {
+        txn.create_table(self.table)
     }
 }
 
@@ -29,17 +24,16 @@ pub struct DropTable {
 }
 
 impl DropTable {
-    pub fn new(table: String, if_exists: bool) -> Box<Self> {
-        Box::new(Self { table, if_exists })
+    pub fn new(table: String, if_exists: bool) -> Self {
+        Self { table, if_exists }
     }
-}
 
-impl<T: Transaction> Executor<T> for DropTable {
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+    pub fn execute(self, txn: &mut impl Transaction) -> Result<bool> {
+        // TODO the planner should deal with this.
         if self.if_exists && txn.read_table(&self.table)?.is_none() {
-            return Ok(ResultSet::DropTable { name: self.table, existed: false });
+            return Ok(false);
         }
         txn.delete_table(&self.table)?;
-        Ok(ResultSet::DropTable { name: self.table, existed: true })
+        Ok(true)
     }
 }

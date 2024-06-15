@@ -1,61 +1,52 @@
-use super::super::engine::Transaction;
 use super::super::plan::Aggregate;
 use super::super::types::{Column, Value};
-use super::{Executor, ResultSet};
-use crate::errdata;
+use super::QueryIterator;
 use crate::error::Result;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
 /// An aggregation executor
-pub struct Aggregation<T: Transaction> {
-    source: Box<dyn Executor<T>>,
+pub struct Aggregation {
+    source: QueryIterator,
     aggregates: Vec<Aggregate>,
     accumulators: HashMap<Vec<Value>, Vec<Box<dyn Accumulator>>>,
 }
 
-impl<T: Transaction> Aggregation<T> {
-    pub fn new(source: Box<dyn Executor<T>>, aggregates: Vec<Aggregate>) -> Box<Self> {
-        Box::new(Self { source, aggregates, accumulators: HashMap::new() })
+impl Aggregation {
+    pub fn new(source: QueryIterator, aggregates: Vec<Aggregate>) -> Self {
+        Self { source, aggregates, accumulators: HashMap::new() }
     }
-}
 
-impl<T: Transaction> Executor<T> for Aggregation<T> {
     #[allow(clippy::or_fun_call)]
-    fn execute(mut self: Box<Self>, txn: &mut T) -> Result<ResultSet> {
+    pub fn execute(mut self) -> Result<QueryIterator> {
         let agg_count = self.aggregates.len();
-        match self.source.execute(txn)? {
-            ResultSet::Query { columns, mut rows } => {
-                while let Some(mut row) = rows.next().transpose()? {
-                    self.accumulators
-                        .entry(row.split_off(self.aggregates.len()))
-                        .or_insert(self.aggregates.iter().map(<dyn Accumulator>::from).collect())
-                        .iter_mut()
-                        .zip(row)
-                        .try_for_each(|(acc, value)| acc.accumulate(&value))?
-                }
-                // If there were no rows and no group-by columns, return a row of empty accumulators:
-                // SELECT COUNT(*) FROM t WHERE FALSE
-                if self.accumulators.is_empty() && self.aggregates.len() == columns.len() {
-                    self.accumulators.insert(
-                        Vec::new(),
-                        self.aggregates.iter().map(<dyn Accumulator>::from).collect(),
-                    );
-                }
-                Ok(ResultSet::Query {
-                    columns: columns
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, c)| if i < agg_count { Column { name: None } } else { c })
-                        .collect(),
-                    rows: Box::new(self.accumulators.into_iter().map(|(bucket, accs)| {
-                        Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())
-                    })),
-                })
-            }
-            r => errdata!("unexpected result {r:?}"),
+        while let Some(mut row) = self.source.next().transpose()? {
+            self.accumulators
+                .entry(row.split_off(self.aggregates.len()))
+                .or_insert(self.aggregates.iter().map(<dyn Accumulator>::from).collect())
+                .iter_mut()
+                .zip(row)
+                .try_for_each(|(acc, value)| acc.accumulate(&value))?
         }
+        // If there were no rows and no group-by columns, return a row of empty accumulators:
+        // SELECT COUNT(*) FROM t WHERE FALSE
+        if self.accumulators.is_empty() && self.aggregates.len() == self.source.columns.len() {
+            self.accumulators
+                .insert(Vec::new(), self.aggregates.iter().map(<dyn Accumulator>::from).collect());
+        }
+        Ok(QueryIterator {
+            columns: self
+                .source
+                .columns
+                .into_iter()
+                .enumerate()
+                .map(|(i, c)| if i < agg_count { Column { name: None } } else { c })
+                .collect(),
+            rows: Box::new(self.accumulators.into_iter().map(|(bucket, accs)| {
+                Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())
+            })),
+        })
     }
 }
 

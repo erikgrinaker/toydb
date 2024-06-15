@@ -1,6 +1,6 @@
 use super::super::types::schema::Catalog;
 use super::super::types::{Expression, Value};
-use super::Node;
+use super::plan::Node;
 use crate::error::Result;
 
 use std::mem::replace;

@@ -31,7 +31,7 @@ AST: Select {
     ),
 }
 
-Plan: Plan(
+Plan: Select(
     Limit {
         source: Scan {
             table: "movies",
@@ -42,7 +42,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     Limit {
         source: Scan {
             table: "movies",

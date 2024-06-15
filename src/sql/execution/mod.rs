@@ -13,66 +13,143 @@ use schema::{CreateTable, DropTable};
 use source::{IndexLookup, KeyLookup, Nothing, Scan};
 
 use super::engine::Transaction;
-use super::plan::Node;
+use super::plan::{Node, Plan};
 use super::types::{Columns, Row, Rows, Value};
 use crate::errdata;
 use crate::error::Result;
 
 use derivative::Derivative;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
-/// A plan executor
-pub trait Executor<T: Transaction> {
-    /// Executes the executor, consuming it and returning a result set
-    fn execute(self: Box<Self>, txn: &mut T) -> Result<ResultSet>;
+/// A plan execution result.
+pub enum ExecutionResult {
+    CreateTable { name: String },
+    DropTable { name: String, existed: bool },
+    Delete { count: u64 },
+    Insert { count: u64 },
+    Update { count: u64 },
+    Select { iter: QueryIterator },
 }
 
-impl<T: Transaction + 'static> dyn Executor<T> {
-    /// Builds an executor for a plan node, consuming it
-    pub fn build(node: Node) -> Box<dyn Executor<T>> {
-        match node {
-            Node::Aggregation { source, aggregates } => {
-                Aggregation::new(Self::build(*source), aggregates)
-            }
-            Node::CreateTable { schema } => CreateTable::new(schema),
-            Node::Delete { table, source } => Delete::new(table, Self::build(*source)),
-            Node::DropTable { table, if_exists } => DropTable::new(table, if_exists),
-            Node::Filter { source, predicate } => Filter::new(Self::build(*source), predicate),
-            Node::HashJoin { left, left_field, right, right_field, outer } => HashJoin::new(
-                Self::build(*left),
-                left_field.0,
-                Self::build(*right),
-                right_field.0,
-                outer,
-            ),
-            Node::IndexLookup { table, alias: _, column, values } => {
-                IndexLookup::new(table, column, values)
-            }
-            Node::Insert { table, columns, expressions } => {
-                Insert::new(table, columns, expressions)
-            }
-            Node::KeyLookup { table, alias: _, keys } => KeyLookup::new(table, keys),
-            Node::Limit { source, limit } => Limit::new(Self::build(*source), limit),
-            Node::NestedLoopJoin { left, left_size: _, right, predicate, outer } => {
-                NestedLoopJoin::new(Self::build(*left), Self::build(*right), predicate, outer)
-            }
-            Node::Nothing => Nothing::new(),
-            Node::Offset { source, offset } => Offset::new(Self::build(*source), offset),
-            Node::Order { source, orders } => Order::new(Self::build(*source), orders),
-            Node::Projection { source, expressions } => {
-                Projection::new(Self::build(*source), expressions)
-            }
-            Node::Scan { table, filter, alias: _ } => Scan::new(table, filter),
-            Node::Update { table, source, expressions } => Update::new(
-                table,
-                Self::build(*source),
-                expressions.into_iter().map(|(i, _, e)| (i, e)).collect(),
-            ),
+/// A query result iterator, containins the columns and row iterator.
+pub struct QueryIterator {
+    // TODO: use a different type here.
+    pub columns: Columns,
+    // TODO: remove Send, it's only needed for the ResultSet conversion.
+    pub rows: Box<dyn Iterator<Item = Result<Row>> + Send>,
+}
+
+impl Iterator for QueryIterator {
+    type Item = Result<Row>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.rows.next()
+    }
+}
+
+/// Executes a plan, returning an execution result.
+pub fn execute_plan(plan: Plan, txn: &mut impl Transaction) -> Result<ExecutionResult> {
+    Ok(match plan {
+        Plan::Select(node) => ExecutionResult::Select { iter: execute(node, txn)? },
+
+        Plan::CreateTable { schema } => {
+            let name = schema.name.clone();
+            CreateTable::new(schema).execute(txn)?;
+            ExecutionResult::CreateTable { name }
         }
+
+        Plan::DropTable { table, if_exists } => {
+            let name = table.clone();
+            let existed = DropTable::new(table, if_exists).execute(txn)?;
+            ExecutionResult::DropTable { name, existed }
+        }
+
+        Plan::Delete { table, source } => {
+            let source = execute(source, txn)?;
+            let count = Delete::new(table, source).execute(txn)?;
+            ExecutionResult::Delete { count }
+        }
+
+        Plan::Insert { table, columns, expressions } => {
+            let count = Insert::new(table, columns, expressions).execute(txn)?;
+            ExecutionResult::Insert { count }
+        }
+
+        Plan::Update { table, source, expressions } => {
+            let source = execute(source, txn)?;
+            let expressions = expressions.into_iter().map(|(i, _, expr)| (i, expr)).collect();
+            let count = Update::new(table, source, expressions).execute(txn)?;
+            ExecutionResult::Update { count }
+        }
+    })
+}
+
+/// Recursively executes a query plan node, returning a row iterator.
+///
+/// TODO: flatten the executor structs into functions where appropriate. Same
+/// goes for all other execute functions.
+///
+/// TODO: since iterators are lazy, make this infallible and move all catalog
+/// lookups to planning.
+pub fn execute(node: Node, txn: &mut impl Transaction) -> Result<QueryIterator> {
+    match node {
+        Node::Aggregation { source, aggregates } => {
+            let source = execute(*source, txn)?;
+            Aggregation::new(source, aggregates).execute()
+        }
+
+        Node::Filter { source, predicate } => {
+            let source = execute(*source, txn)?;
+            Ok(Filter::new(source, predicate).execute())
+        }
+
+        Node::HashJoin { left, left_field, right, right_field, outer } => {
+            let left = execute(*left, txn)?;
+            let right = execute(*right, txn)?;
+            HashJoin::new(left, left_field.0, right, right_field.0, outer).execute()
+        }
+
+        Node::IndexLookup { table, alias: _, column, values } => {
+            IndexLookup::new(table, column, values).execute(txn)
+        }
+
+        Node::KeyLookup { table, alias: _, keys } => KeyLookup::new(table, keys).execute(txn),
+
+        Node::Limit { source, limit } => {
+            let source = execute(*source, txn)?;
+            Ok(Limit::new(source, limit).execute())
+        }
+
+        Node::NestedLoopJoin { left, left_size: _, right, predicate, outer } => {
+            let left = execute(*left, txn)?;
+            let right = execute(*right, txn)?;
+            NestedLoopJoin::new(left, right, predicate, outer).execute()
+        }
+
+        Node::Nothing => Ok(Nothing.execute()),
+
+        Node::Offset { source, offset } => {
+            let source = execute(*source, txn)?;
+            Ok(Offset::new(source, offset).execute())
+        }
+
+        Node::Order { source, orders } => {
+            let source = execute(*source, txn)?;
+            Order::new(source, orders).execute()
+        }
+
+        Node::Projection { source, expressions } => {
+            let source = execute(*source, txn)?;
+            Ok(Projection::new(source, expressions).execute())
+        }
+
+        Node::Scan { table, alias: _, filter } => Scan::new(table, filter).execute(txn),
     }
 }
 
 /// An executor result set
+///
+/// TODO: rename to StatementResult and move to Session.
 #[derive(Derivative, Serialize, Deserialize)]
 #[derivative(Debug, PartialEq)]
 pub enum ResultSet {
@@ -119,7 +196,7 @@ pub enum ResultSet {
         rows: Rows,
     },
     // Explain result
-    Explain(Node),
+    Explain(Plan),
 }
 
 impl ResultSet {
@@ -147,5 +224,33 @@ impl ResultSet {
     /// TODO: use TryFrom for this, also to primitive types via Value as TryFrom.
     pub fn into_value(self) -> Result<Value> {
         self.into_row()?.into_iter().next().ok_or(errdata!("no value returned"))
+    }
+}
+
+// TODO: remove or revisit this.
+impl From<ExecutionResult> for ResultSet {
+    fn from(result: ExecutionResult) -> Self {
+        match result {
+            ExecutionResult::CreateTable { name } => ResultSet::CreateTable { name },
+            ExecutionResult::DropTable { name, existed } => ResultSet::DropTable { name, existed },
+            ExecutionResult::Delete { count } => ResultSet::Delete { count },
+            ExecutionResult::Insert { count } => ResultSet::Create { count },
+            ExecutionResult::Select { iter } => {
+                ResultSet::Query { columns: iter.columns, rows: iter.rows }
+            }
+            ExecutionResult::Update { count } => ResultSet::Update { count },
+        }
+    }
+}
+
+impl From<QueryIterator> for ResultSet {
+    fn from(iter: QueryIterator) -> Self {
+        Self::Query { columns: iter.columns, rows: iter.rows }
+    }
+}
+
+impl From<QueryIterator> for Result<ResultSet> {
+    fn from(value: QueryIterator) -> Self {
+        Ok(value.into())
     }
 }

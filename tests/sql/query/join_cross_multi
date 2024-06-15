@@ -411,7 +411,7 @@ AST: Select {
     limit: None,
 }
 
-Plan: Plan(
+Plan: Select(
     NestedLoopJoin {
         left: NestedLoopJoin {
             left: NestedLoopJoin {
@@ -449,7 +449,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     NestedLoopJoin {
         left: NestedLoopJoin {
             left: NestedLoopJoin {

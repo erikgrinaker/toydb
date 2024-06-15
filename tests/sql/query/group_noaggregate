@@ -56,7 +56,7 @@ AST: Select {
     limit: None,
 }
 
-Plan: Plan(
+Plan: Select(
     Order {
         source: Projection {
             source: Aggregation {
@@ -119,7 +119,7 @@ Plan: Plan(
     },
 )
 
-Optimized plan: Plan(
+Optimized plan: Select(
     Order {
         source: Projection {
             source: Aggregation {

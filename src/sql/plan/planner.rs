@@ -1,7 +1,7 @@
 use super::super::parser::ast;
 use super::super::types::schema::{Catalog, Column, Table};
 use super::super::types::{Expression, Value};
-use super::{Aggregate, Direction, Node, Plan};
+use super::{plan::Node, plan::Plan, Aggregate, Direction};
 use crate::errinput;
 use crate::error::Result;
 
@@ -21,11 +21,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
     /// Builds a plan for an AST statement.
     pub fn build(&mut self, statement: ast::Statement) -> Result<Plan> {
-        Ok(Plan(self.build_statement(statement)?))
+        self.build_statement(statement)
     }
 
-    /// Builds a plan node for a statement.
-    fn build_statement(&self, statement: ast::Statement) -> Result<Node> {
+    /// Builds a plan for a statement.
+    fn build_statement(&self, statement: ast::Statement) -> Result<Plan> {
         Ok(match statement {
             // Transaction control and explain statements should have been handled by session.
             ast::Statement::Begin { .. } | ast::Statement::Commit | ast::Statement::Rollback => {
@@ -35,7 +35,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             ast::Statement::Explain(_) => panic!("unexpected explain statement"),
 
             // DDL statements (schema changes).
-            ast::Statement::CreateTable { name, columns } => Node::CreateTable {
+            ast::Statement::CreateTable { name, columns } => Plan::CreateTable {
                 schema: Table::new(
                     name,
                     columns
@@ -63,23 +63,23 @@ impl<'a, C: Catalog> Planner<'a, C> {
             },
 
             ast::Statement::DropTable { name, if_exists } => {
-                Node::DropTable { table: name, if_exists }
+                Plan::DropTable { table: name, if_exists }
             }
 
             // DML statements (mutations).
             ast::Statement::Delete { table, r#where } => {
                 let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
-                Node::Delete {
+                Plan::Delete {
                     table: table.clone(),
-                    source: Box::new(Node::Scan {
+                    source: Node::Scan {
                         table,
                         alias: None,
                         filter: r#where.map(|e| self.build_expression(scope, e)).transpose()?,
-                    }),
+                    },
                 }
             }
 
-            ast::Statement::Insert { table, columns, values } => Node::Insert {
+            ast::Statement::Insert { table, columns, values } => Plan::Insert {
                 table,
                 columns: columns.unwrap_or_default(),
                 expressions: values
@@ -95,13 +95,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             ast::Statement::Update { table, set, r#where } => {
                 let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
-                Node::Update {
+                Plan::Update {
                     table: table.clone(),
-                    source: Box::new(Node::Scan {
+                    source: Node::Scan {
                         table,
                         alias: None,
                         filter: r#where.map(|e| self.build_expression(scope, e)).transpose()?,
-                    }),
+                    },
                     expressions: set
                         .into_iter()
                         .map(|(c, e)| {
@@ -247,7 +247,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     }
                 }
 
-                node
+                Plan::Select(node)
             }
         })
     }
