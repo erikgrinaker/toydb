@@ -119,30 +119,34 @@ impl<E: Engine + 'static> Session<E> {
             ast::Statement::Explain(statement) => self.with_txn_read_only(|txn| {
                 Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?.0))
             }),
-            statement if self.txn.is_some() => Plan::build(statement, self.txn.as_mut().unwrap())?
-                .optimize(self.txn.as_mut().unwrap())?
-                .execute(self.txn.as_mut().unwrap()),
+            statement if self.txn.is_some() => {
+                Self::execute_with(statement, self.txn.as_mut().unwrap())
+            }
             statement @ ast::Statement::Select { .. } => {
                 let mut txn = self.engine.begin_read_only()?;
-                let result =
-                    Plan::build(statement, &mut txn)?.optimize(&mut txn)?.execute(&mut txn);
+                let result = Self::execute_with(statement, &mut txn);
                 txn.rollback()?;
                 result
             }
             statement => {
                 let mut txn = self.engine.begin()?;
-                match Plan::build(statement, &mut txn)?.optimize(&mut txn)?.execute(&mut txn) {
-                    Ok(result) => {
-                        txn.commit()?;
-                        Ok(result)
-                    }
-                    Err(error) => {
-                        txn.rollback()?;
-                        Err(error)
-                    }
+                let result = Self::execute_with(statement, &mut txn);
+                match &result {
+                    Ok(_) => txn.commit()?,
+                    Err(_) => txn.rollback()?,
                 }
+                result
             }
         }
+    }
+
+    /// Helper function to execute a statement with the given transaction.
+    /// Allows using a mutable borrow either to the session's transaction
+    /// or a temporary read-only or read/write transaction.
+    ///
+    /// TODO: reconsider this.
+    fn execute_with(statement: ast::Statement, txn: &mut E::Transaction) -> Result<ResultSet> {
+        Plan::build(statement, txn)?.optimize(txn)?.execute(txn)
     }
 
     /// Runs a read-only closure in the session's transaction, or a new
