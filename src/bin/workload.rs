@@ -20,7 +20,7 @@ use std::collections::HashSet;
 use std::io::Write as _;
 use std::time::Duration;
 use toydb::error::Result;
-use toydb::{Client, ResultSet};
+use toydb::{Client, StatementResult};
 
 fn main() -> Result<()> {
     let Command { runner, subcommand } = Command::parse();
@@ -337,7 +337,7 @@ impl Workload for Write {
             r#"INSERT INTO "write" (id, value) VALUES {}"#,
             item.iter().map(|(id, value)| format!("({}, '{}')", id, value)).join(", ")
         );
-        if let ResultSet::Create { count } = client.execute(&query)? {
+        if let StatementResult::Create { count } = client.execute(&query)? {
             assert_eq!(count as usize, batch_size, "Unexpected row count");
         } else {
             panic!("Unexpected result")

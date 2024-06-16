@@ -3,4 +3,56 @@ Query: SELECT * FROM movies WHERE 'abc'
 Explain:
 Scan: movies (abc)
 
- InvalidData("filter returned abc, expected boolean")
+Error: invalid data: filter returned abc, expected boolean
+
+AST: Select {
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: Some(
+        Literal(
+            String(
+                "abc",
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [],
+    offset: None,
+    limit: None,
+}
+
+Plan: Select(
+    Filter {
+        source: Scan {
+            table: "movies",
+            alias: None,
+            filter: None,
+        },
+        predicate: Constant(
+            String(
+                "abc",
+            ),
+        ),
+    },
+)
+
+Optimized plan: Select(
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            Constant(
+                String(
+                    "abc",
+                ),
+            ),
+        ),
+    },
+)
+

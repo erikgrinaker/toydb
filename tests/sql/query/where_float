@@ -3,4 +3,56 @@ Query: SELECT * FROM movies WHERE 3.14
 Explain:
 Scan: movies (3.14)
 
- InvalidData("filter returned 3.14, expected boolean")
+Error: invalid data: filter returned 3.14, expected boolean
+
+AST: Select {
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: Some(
+        Literal(
+            Float(
+                3.14,
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [],
+    offset: None,
+    limit: None,
+}
+
+Plan: Select(
+    Filter {
+        source: Scan {
+            table: "movies",
+            alias: None,
+            filter: None,
+        },
+        predicate: Constant(
+            Float(
+                3.14,
+            ),
+        ),
+    },
+)
+
+Optimized plan: Select(
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            Constant(
+                Float(
+                    3.14,
+                ),
+            ),
+        ),
+    },
+)
+

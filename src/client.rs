@@ -4,7 +4,7 @@ use crate::encoding::Value as _;
 use crate::errdata;
 use crate::error::{Error, Result};
 use crate::server::{Request, Response, Status};
-use crate::sql::execution::ResultSet;
+use crate::sql::engine::StatementResult;
 use crate::sql::types::schema::Table;
 
 use rand::Rng;
@@ -33,27 +33,17 @@ impl Client {
     }
 
     /// Executes a query
-    pub fn execute(&mut self, query: &str) -> Result<ResultSet> {
-        let mut resultset = match self.call(Request::Execute(query.into()))? {
+    pub fn execute(&mut self, query: &str) -> Result<StatementResult> {
+        let resultset = match self.call(Request::Execute(query.into()))? {
             Response::Execute(rs) => rs,
             response => return errdata!("unexpected response {response:?}"),
         };
-        if let ResultSet::Query { columns, .. } = resultset {
-            // FIXME We buffer rows for now to avoid lifetime hassles
-            let mut rows = Vec::new();
-            loop {
-                match Result::<Response>::decode_from(&mut self.reader)?? {
-                    Response::Row(Some(row)) => rows.push(row),
-                    Response::Row(None) => break,
-                    response => return errdata!("unexpected response {response:?}"),
-                }
-            }
-            resultset = ResultSet::Query { columns, rows: Box::new(rows.into_iter().map(Ok)) }
-        };
         match &resultset {
-            ResultSet::Begin { version, read_only } => self.txn = Some((*version, *read_only)),
-            ResultSet::Commit { .. } => self.txn = None,
-            ResultSet::Rollback { .. } => self.txn = None,
+            StatementResult::Begin { version, read_only } => {
+                self.txn = Some((*version, *read_only))
+            }
+            StatementResult::Commit { .. } => self.txn = None,
+            StatementResult::Rollback { .. } => self.txn = None,
             _ => {}
         }
         Ok(resultset)

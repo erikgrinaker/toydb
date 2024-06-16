@@ -12,4 +12,4 @@ pub mod storage;
 
 pub use client::Client;
 pub use server::Server;
-pub use sql::execution::ResultSet;
+pub use sql::engine::StatementResult;

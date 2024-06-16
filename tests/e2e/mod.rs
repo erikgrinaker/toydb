@@ -12,16 +12,18 @@ mod testcluster;
 use testcluster::TestCluster;
 
 /// Asserts that a resultset contains the expected rows.
-fn assert_rows(result: toydb::ResultSet, expect: Vec<toydb::sql::types::Row>) {
+///
+/// TODO: get rid of these.
+fn assert_rows(result: toydb::StatementResult, expect: Vec<toydb::sql::types::Row>) {
     match result {
-        toydb::ResultSet::Query { rows, .. } => {
-            pretty_assertions::assert_eq!(rows.collect::<Result<Vec<_>, _>>().unwrap(), expect)
+        toydb::StatementResult::Query { rows, .. } => {
+            pretty_assertions::assert_eq!(rows, expect)
         }
         r => panic!("Unexpected result {:?}", r),
     }
 }
 
 /// Asserts that a resultset contains the single expected row.
-fn assert_row(result: toydb::ResultSet, expect: toydb::sql::types::Row) {
+fn assert_row(result: toydb::StatementResult, expect: toydb::sql::types::Row) {
     assert_rows(result, vec![expect])
 }

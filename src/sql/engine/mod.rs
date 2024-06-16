@@ -3,14 +3,15 @@ mod kv;
 pub mod raft;
 pub use kv::KV;
 pub use raft::{Raft, Status};
+use serde::{Deserialize, Serialize};
 
-use super::execution::ResultSet;
+use super::execution::ExecutionResult;
 use super::parser::{ast, Parser};
 use super::plan::Plan;
 use super::types::schema::Catalog;
-use super::types::{Expression, Row, Value};
-use crate::errinput;
-use crate::error::Result;
+use super::types::{Columns, Expression, Row, Rows, Value};
+use crate::error::{Error, Result};
+use crate::{errdata, errinput};
 
 use std::collections::HashSet;
 
@@ -72,7 +73,7 @@ pub struct Session<E: Engine + 'static> {
 
 impl<E: Engine + 'static> Session<E> {
     /// Executes a query, managing transaction status for the session
-    pub fn execute(&mut self, query: &str) -> Result<ResultSet> {
+    pub fn execute(&mut self, query: &str) -> Result<StatementResult> {
         // FIXME We should match on self.txn as well, but get this error:
         // error[E0009]: cannot bind by-move and by-ref in the same pattern
         // ...which seems like an arbitrary compiler limitation
@@ -82,13 +83,13 @@ impl<E: Engine + 'static> Session<E> {
             }
             ast::Statement::Begin { read_only: true, as_of: None } => {
                 let txn = self.engine.begin_read_only()?;
-                let result = ResultSet::Begin { version: txn.version(), read_only: true };
+                let result = StatementResult::Begin { version: txn.version(), read_only: true };
                 self.txn = Some(txn);
                 Ok(result)
             }
             ast::Statement::Begin { read_only: true, as_of: Some(version) } => {
                 let txn = self.engine.begin_as_of(version)?;
-                let result = ResultSet::Begin { version, read_only: true };
+                let result = StatementResult::Begin { version, read_only: true };
                 self.txn = Some(txn);
                 Ok(result)
             }
@@ -97,7 +98,7 @@ impl<E: Engine + 'static> Session<E> {
             }
             ast::Statement::Begin { read_only: false, as_of: None } => {
                 let txn = self.engine.begin()?;
-                let result = ResultSet::Begin { version: txn.version(), read_only: false };
+                let result = StatementResult::Begin { version: txn.version(), read_only: false };
                 self.txn = Some(txn);
                 Ok(result)
             }
@@ -108,17 +109,17 @@ impl<E: Engine + 'static> Session<E> {
                 let txn = self.txn.take().unwrap();
                 let version = txn.version();
                 txn.commit()?;
-                Ok(ResultSet::Commit { version })
+                Ok(StatementResult::Commit { version })
             }
             ast::Statement::Rollback => {
                 let txn = self.txn.take().unwrap();
                 let version = txn.version();
                 txn.rollback()?;
-                Ok(ResultSet::Rollback { version })
+                Ok(StatementResult::Rollback { version })
             }
             // TODO: this needs testing.
             ast::Statement::Explain(statement) => self.with_txn_read_only(|txn| {
-                Ok(ResultSet::Explain(Plan::build(*statement, txn)?.optimize(txn)?))
+                Ok(StatementResult::Explain(Plan::build(*statement, txn)?.optimize(txn)?))
             }),
             statement if self.txn.is_some() => {
                 Self::execute_with(statement, self.txn.as_mut().unwrap())
@@ -146,8 +147,11 @@ impl<E: Engine + 'static> Session<E> {
     /// or a temporary read-only or read/write transaction.
     ///
     /// TODO: reconsider this.
-    fn execute_with(statement: ast::Statement, txn: &mut E::Transaction) -> Result<ResultSet> {
-        Ok(Plan::build(statement, txn)?.optimize(txn)?.execute(txn)?.into())
+    fn execute_with(
+        statement: ast::Statement,
+        txn: &mut E::Transaction,
+    ) -> Result<StatementResult> {
+        Plan::build(statement, txn)?.optimize(txn)?.execute(txn)?.try_into()
     }
 
     /// Runs a read-only closure in the session's transaction, or a new
@@ -185,3 +189,77 @@ pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row>> + Send>;
 
 /// An index scan iterator
 pub type IndexScan = Box<dyn DoubleEndedIterator<Item = Result<(Value, HashSet<Value>)>> + Send>;
+
+/// A session statement result. This is also sent across the wire to SQL
+/// clients.
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum StatementResult {
+    // Transaction started
+    Begin { version: u64, read_only: bool },
+    // Transaction committed
+    Commit { version: u64 },
+    // Transaction rolled back
+    Rollback { version: u64 },
+    // Rows created
+    Create { count: u64 },
+    // Rows deleted
+    Delete { count: u64 },
+    // Rows updated
+    Update { count: u64 },
+    // Table created
+    CreateTable { name: String },
+    // Table dropped
+    DropTable { name: String, existed: bool },
+    // Query result.
+    //
+    // For simplicity, buffer and send the entire result as a vector instead of
+    // streaming it to the client. Streaming reads haven't been implemented from
+    // Raft either.
+    Query { columns: Columns, rows: Vec<Row> },
+    // Explain result
+    Explain(Plan),
+}
+
+impl StatementResult {
+    /// Converts the ResultSet into a row, or errors if not a query result with rows.
+    pub fn into_row(self) -> Result<Row> {
+        self.into_rows()?.next().transpose()?.ok_or(errdata!("no rows returned"))
+    }
+
+    /// Converts the ResultSet into a row iterator, or errors if not a query
+    /// result with rows.
+    pub fn into_rows(self) -> Result<Rows> {
+        if let StatementResult::Query { rows, .. } = self {
+            Ok(Box::new(rows.into_iter().map(Ok)))
+        } else {
+            errdata!("not a query result: {self:?}")
+        }
+    }
+
+    /// Converts the ResultSet into a value, if possible.
+    /// TODO: use TryFrom for this, also to primitive types via Value as TryFrom.
+    pub fn into_value(self) -> Result<Value> {
+        self.into_row()?.into_iter().next().ok_or(errdata!("no value returned"))
+    }
+}
+
+// TODO: remove or revisit this.
+impl TryFrom<ExecutionResult> for StatementResult {
+    type Error = Error;
+
+    fn try_from(result: ExecutionResult) -> Result<Self> {
+        Ok(match result {
+            ExecutionResult::CreateTable { name } => StatementResult::CreateTable { name },
+            ExecutionResult::DropTable { name, existed } => {
+                StatementResult::DropTable { name, existed }
+            }
+            ExecutionResult::Delete { count } => StatementResult::Delete { count },
+            ExecutionResult::Insert { count } => StatementResult::Create { count },
+            ExecutionResult::Select { iter } => StatementResult::Query {
+                columns: iter.columns,
+                rows: iter.rows.collect::<Result<_>>()?,
+            },
+            ExecutionResult::Update { count } => StatementResult::Update { count },
+        })
+    }
+}

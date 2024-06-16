@@ -2,8 +2,7 @@ use crate::encoding::{self, Value as _};
 use crate::error::{Error, Result};
 use crate::raft;
 use crate::sql;
-use crate::sql::engine::Engine as _;
-use crate::sql::execution::ResultSet;
+use crate::sql::engine::{Engine as _, StatementResult};
 use crate::sql::types::schema::{Catalog as _, Table};
 use crate::sql::types::Row;
 use crate::storage;
@@ -288,7 +287,7 @@ impl Server {
         while let Some(request) = Request::maybe_decode_from(&mut reader)? {
             // Execute request.
             debug!("Received request {request:?}");
-            let mut response = match request {
+            let response = match request {
                 Request::Execute(query) => session.execute(&query).map(Response::Execute),
                 Request::GetTable(table) => session
                     .with_txn_read_only(|txn| txn.must_read_table(&table))
@@ -304,32 +303,7 @@ impl Server {
 
             // Process response.
             debug!("Returning response {response:?}");
-            let mut rows: Box<dyn Iterator<Item = Result<Response>> + Send> =
-                Box::new(std::iter::empty());
-            if let Ok(Response::Execute(ResultSet::Query { rows: ref mut resultrows, .. })) =
-                &mut response
-            {
-                // TODO: don't stream results, for simplicity.
-                rows = Box::new(
-                    std::mem::replace(resultrows, Box::new(std::iter::empty()))
-                        .map(|result| result.map(|row| Response::Row(Some(row))))
-                        .chain(std::iter::once(Ok(Response::Row(None))))
-                        .scan(false, |err_sent, response| match (&err_sent, &response) {
-                            (true, _) => None,
-                            (_, Err(error)) => {
-                                *err_sent = true;
-                                Some(Err(error.clone()))
-                            }
-                            _ => Some(response),
-                        })
-                        .fuse(),
-                );
-            }
-
             response.encode_into(&mut writer)?;
-            for row in rows {
-                row.encode_into(&mut writer)?;
-            }
             writer.flush()?;
         }
         Ok(())
@@ -354,7 +328,7 @@ impl encoding::Value for Request {}
 /// A SQL server response.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Response {
-    Execute(ResultSet),
+    Execute(StatementResult),
     Row(Option<Row>),
     GetTable(Table),
     ListTables(Vec<String>),

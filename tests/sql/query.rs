@@ -2,11 +2,9 @@
 //! and compares the results with golden files stored under tests/sql/query/
 use toydb::errdata;
 use toydb::error::Result;
-use toydb::sql::engine::{Engine, Transaction};
-use toydb::sql::execution::ResultSet;
+use toydb::sql::engine::{Engine, StatementResult, Transaction};
 use toydb::sql::parser::Parser;
 use toydb::sql::plan::Plan;
-use toydb::sql::types::Row;
 
 use goldenfile::Mint;
 use std::io::Write;
@@ -85,18 +83,11 @@ macro_rules! test_query {
                 .and_then(|plan| plan.optimize(&mut txn))
                 .and_then(|plan| {
                     write!(f, "Explain:\n{}\n\n", plan)?;
-                    plan.execute(&mut txn).map(|r| r.into())
+                    plan.execute(&mut txn).and_then(|r| r.try_into())
                 });
 
             match result {
-                Ok(ResultSet::Query{columns, rows}) => {
-                    let rows: Vec<Row> = match rows.collect() {
-                        Ok(rows) => rows,
-                        Err(err) => {
-                            write!(f, " {:?}", err)?;
-                            return Ok(())
-                        }
-                    };
+                Ok(StatementResult::Query{columns, rows}) => {
                     write!(f, "Result:")?;
                     if !columns.is_empty() || !rows.is_empty() {
                         write!(f, " {:?}\n", columns

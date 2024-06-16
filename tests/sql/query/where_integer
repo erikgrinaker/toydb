@@ -3,4 +3,56 @@ Query: SELECT * FROM movies WHERE 7
 Explain:
 Scan: movies (7)
 
- InvalidData("filter returned 7, expected boolean")
+Error: invalid data: filter returned 7, expected boolean
+
+AST: Select {
+    select: [],
+    from: [
+        Table {
+            name: "movies",
+            alias: None,
+        },
+    ],
+    where: Some(
+        Literal(
+            Integer(
+                7,
+            ),
+        ),
+    ),
+    group_by: [],
+    having: None,
+    order: [],
+    offset: None,
+    limit: None,
+}
+
+Plan: Select(
+    Filter {
+        source: Scan {
+            table: "movies",
+            alias: None,
+            filter: None,
+        },
+        predicate: Constant(
+            Integer(
+                7,
+            ),
+        ),
+    },
+)
+
+Optimized plan: Select(
+    Scan {
+        table: "movies",
+        alias: None,
+        filter: Some(
+            Constant(
+                Integer(
+                    7,
+                ),
+            ),
+        ),
+    },
+)
+

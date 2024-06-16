@@ -14,12 +14,8 @@ use source::{IndexLookup, KeyLookup, Nothing, Scan};
 
 use super::engine::Transaction;
 use super::plan::{Node, Plan};
-use super::types::{Columns, Row, Rows, Value};
-use crate::errdata;
+use super::types::{Columns, Row, Value};
 use crate::error::Result;
-
-use derivative::Derivative;
-use serde::{Deserialize, Serialize};
 
 /// A plan execution result.
 pub enum ExecutionResult {
@@ -144,113 +140,5 @@ pub fn execute(node: Node, txn: &mut impl Transaction) -> Result<QueryIterator> 
         }
 
         Node::Scan { table, alias: _, filter } => Scan::new(table, filter).execute(txn),
-    }
-}
-
-/// An executor result set
-///
-/// TODO: rename to StatementResult and move to Session.
-#[derive(Derivative, Serialize, Deserialize)]
-#[derivative(Debug, PartialEq)]
-pub enum ResultSet {
-    // Transaction started
-    Begin {
-        version: u64,
-        read_only: bool,
-    },
-    // Transaction committed
-    Commit {
-        version: u64,
-    },
-    // Transaction rolled back
-    Rollback {
-        version: u64,
-    },
-    // Rows created
-    Create {
-        count: u64,
-    },
-    // Rows deleted
-    Delete {
-        count: u64,
-    },
-    // Rows updated
-    Update {
-        count: u64,
-    },
-    // Table created
-    CreateTable {
-        name: String,
-    },
-    // Table dropped
-    DropTable {
-        name: String,
-        existed: bool,
-    },
-    // Query result
-    Query {
-        columns: Columns,
-        #[derivative(Debug = "ignore")]
-        #[derivative(PartialEq = "ignore")]
-        #[serde(skip, default = "ResultSet::empty_rows")]
-        rows: Rows,
-    },
-    // Explain result
-    Explain(Plan),
-}
-
-impl ResultSet {
-    /// Creates an empty row iterator, for use by serde(default).
-    fn empty_rows() -> Rows {
-        Box::new(std::iter::empty())
-    }
-
-    /// Converts the ResultSet into a row, or errors if not a query result with rows.
-    pub fn into_row(self) -> Result<Row> {
-        self.into_rows()?.next().transpose()?.ok_or(errdata!("no rows returned"))
-    }
-
-    /// Converts the ResultSet into a row iterator, or errors if not a query
-    /// result with rows.
-    pub fn into_rows(self) -> Result<Rows> {
-        if let ResultSet::Query { rows, .. } = self {
-            Ok(rows)
-        } else {
-            errdata!("not a query result: {self:?}")
-        }
-    }
-
-    /// Converts the ResultSet into a value, if possible.
-    /// TODO: use TryFrom for this, also to primitive types via Value as TryFrom.
-    pub fn into_value(self) -> Result<Value> {
-        self.into_row()?.into_iter().next().ok_or(errdata!("no value returned"))
-    }
-}
-
-// TODO: remove or revisit this.
-impl From<ExecutionResult> for ResultSet {
-    fn from(result: ExecutionResult) -> Self {
-        match result {
-            ExecutionResult::CreateTable { name } => ResultSet::CreateTable { name },
-            ExecutionResult::DropTable { name, existed } => ResultSet::DropTable { name, existed },
-            ExecutionResult::Delete { count } => ResultSet::Delete { count },
-            ExecutionResult::Insert { count } => ResultSet::Create { count },
-            ExecutionResult::Select { iter } => {
-                ResultSet::Query { columns: iter.columns, rows: iter.rows }
-            }
-            ExecutionResult::Update { count } => ResultSet::Update { count },
-        }
-    }
-}
-
-impl From<QueryIterator> for ResultSet {
-    fn from(iter: QueryIterator) -> Self {
-        Self::Query { columns: iter.columns, rows: iter.rows }
-    }
-}
-
-impl From<QueryIterator> for Result<ResultSet> {
-    fn from(value: QueryIterator) -> Self {
-        Ok(value.into())
     }
 }
