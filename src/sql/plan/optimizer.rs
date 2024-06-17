@@ -181,7 +181,7 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
     fn optimize(&self, node: Node) -> Result<Node> {
         node.transform(&Ok, &|n| match n {
             Node::Scan { table, alias, filter: Some(filter) } => {
-                let columns = self.catalog.must_read_table(&table)?.columns;
+                let columns = self.catalog.must_get_table(&table)?.columns;
                 let pk = columns.iter().position(|c| c.primary_key).unwrap();
 
                 // Convert the filter into conjunctive normal form, and try to convert each

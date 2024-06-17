@@ -199,7 +199,7 @@ impl super::Transaction for Transaction {
         Ok(())
     }
 
-    fn create(&mut self, table: &str, row: Row) -> Result<()> {
+    fn insert(&mut self, table: &str, row: Row) -> Result<()> {
         self.client.mutate(Mutation::Create {
             txn: self.state.clone(),
             table: table.to_string(),
@@ -215,7 +215,7 @@ impl super::Transaction for Transaction {
         })
     }
 
-    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>> {
+    fn get(&self, table: &str, id: &Value) -> Result<Option<Row>> {
         self.client.query(Query::Read {
             txn: self.state.clone(),
             table: table.to_string(),
@@ -223,7 +223,7 @@ impl super::Transaction for Transaction {
         })
     }
 
-    fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
+    fn lookup_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
         self.client.query(Query::ReadIndex {
             txn: self.state.clone(),
             table: table.to_string(),
@@ -273,12 +273,12 @@ impl Catalog for Transaction {
         self.client.mutate(Mutation::CreateTable { txn: self.state.clone(), schema: table })
     }
 
-    fn delete_table(&mut self, table: &str) -> Result<()> {
+    fn drop_table(&mut self, table: &str) -> Result<()> {
         self.client
             .mutate(Mutation::DeleteTable { txn: self.state.clone(), table: table.to_string() })
     }
 
-    fn read_table(&self, table: &str) -> Result<Option<Table>> {
+    fn get_table(&self, table: &str) -> Result<Option<Table>> {
         self.client.query(Query::ReadTable { txn: self.state.clone(), table: table.to_string() })
     }
 
@@ -314,7 +314,7 @@ impl<E: storage::Engine> State<E> {
             Mutation::Rollback(txn) => bincode::serialize(&self.engine.resume(txn)?.rollback()?),
 
             Mutation::Create { txn, table, row } => {
-                bincode::serialize(&self.engine.resume(txn)?.create(&table, row)?)
+                bincode::serialize(&self.engine.resume(txn)?.insert(&table, row)?)
             }
             Mutation::Delete { txn, table, id } => {
                 bincode::serialize(&self.engine.resume(txn)?.delete(&table, &id)?)
@@ -327,7 +327,7 @@ impl<E: storage::Engine> State<E> {
                 bincode::serialize(&self.engine.resume(txn)?.create_table(schema)?)
             }
             Mutation::DeleteTable { txn, table } => {
-                bincode::serialize(&self.engine.resume(txn)?.delete_table(&table)?)
+                bincode::serialize(&self.engine.resume(txn)?.drop_table(&table)?)
             }
         };
         Ok(response)
@@ -367,9 +367,9 @@ impl<E: storage::Engine> raft::State for State<E> {
                 };
                 txn.state().encode()
             }
-            Query::Read { txn, table, id } => self.engine.resume(txn)?.read(&table, &id)?.encode(),
+            Query::Read { txn, table, id } => self.engine.resume(txn)?.get(&table, &id)?.encode(),
             Query::ReadIndex { txn, table, column, value } => {
-                self.engine.resume(txn)?.read_index(&table, &column, &value)?.encode()
+                self.engine.resume(txn)?.lookup_index(&table, &column, &value)?.encode()
             }
             // FIXME These need to stream rows somehow
             Query::Scan { txn, table, filter } => {
@@ -383,9 +383,7 @@ impl<E: storage::Engine> raft::State for State<E> {
                 .encode(),
             Query::Status => self.engine.kv.status()?.encode(),
 
-            Query::ReadTable { txn, table } => {
-                self.engine.resume(txn)?.read_table(&table)?.encode()
-            }
+            Query::ReadTable { txn, table } => self.engine.resume(txn)?.get_table(&table)?.encode(),
             Query::ScanTables { txn } => self.engine.resume(txn)?.list_tables()?.encode(),
         };
         Ok(response)

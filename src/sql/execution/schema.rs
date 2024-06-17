@@ -30,10 +30,10 @@ impl DropTable {
 
     pub fn execute(self, txn: &mut impl Transaction) -> Result<bool> {
         // TODO the planner should deal with this.
-        if self.if_exists && txn.read_table(&self.table)?.is_none() {
+        if self.if_exists && txn.get_table(&self.table)?.is_none() {
             return Ok(false);
         }
-        txn.delete_table(&self.table)?;
+        txn.drop_table(&self.table)?;
         Ok(true)
     }
 }

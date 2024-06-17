@@ -69,7 +69,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             // DML statements (mutations).
             ast::Statement::Delete { table, r#where } => {
-                let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
+                let scope = &mut Scope::from_table(self.catalog.must_get_table(&table)?)?;
                 Plan::Delete {
                     table: table.clone(),
                     source: Node::Scan {
@@ -95,7 +95,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             },
 
             ast::Statement::Update { table, set, r#where } => {
-                let scope = &mut Scope::from_table(self.catalog.must_read_table(&table)?)?;
+                let scope = &mut Scope::from_table(self.catalog.must_get_table(&table)?)?;
                 Plan::Update {
                     table: table.clone(),
                     source: Node::Scan {
@@ -287,7 +287,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             ast::FromItem::Table { name, alias } => {
                 scope.add_table(
                     alias.clone().unwrap_or_else(|| name.clone()),
-                    self.catalog.must_read_table(&name)?,
+                    self.catalog.must_get_table(&name)?,
                 )?;
                 Node::Scan { table: name, alias, filter: None }
             }

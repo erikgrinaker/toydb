@@ -152,7 +152,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 /// An MVCC version represents a logical timestamp. The latest version
 /// is incremented when beginning each read-write transaction.
-type Version = u64;
+pub type Version = u64;
 
 impl encoding::Value for Version {}
 

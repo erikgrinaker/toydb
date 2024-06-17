@@ -125,11 +125,11 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         self.txn.rollback()
     }
 
-    fn create(&mut self, table: &str, row: Row) -> Result<()> {
-        let table = self.must_read_table(table)?;
+    fn insert(&mut self, table: &str, row: Row) -> Result<()> {
+        let table = self.must_get_table(table)?;
         table.validate_row(&row, self)?;
         let id = table.get_row_key(&row)?;
-        if self.read(&table.name, &id)?.is_some() {
+        if self.get(&table.name, &id)?.is_some() {
             return errinput!("primary key {id} already exists for table {}", table.name);
         }
         self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode(), row.encode())?;
@@ -144,9 +144,9 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     }
 
     fn delete(&mut self, table: &str, id: &Value) -> Result<()> {
-        let table = self.must_read_table(table)?;
-        for (t, cs) in self.table_references(&table.name, true)? {
-            let t = self.must_read_table(&t)?;
+        let table = self.must_get_table(table)?;
+        for (t, cs) in self.references(&table.name, true)? {
+            let t = self.must_get_table(&t)?;
             let cs = cs
                 .into_iter()
                 .map(|c| Ok((t.get_column_index(&c)?, c)))
@@ -166,7 +166,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 
         let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
         if !indexes.is_empty() {
-            if let Some(row) = self.read(&table.name, id)? {
+            if let Some(row) = self.get(&table.name, id)? {
                 for (i, column) in indexes {
                     let mut index = self.index_load(&table.name, &column.name, &row[i])?;
                     index.remove(id);
@@ -177,22 +177,22 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         self.txn.delete(&Key::Row(table.name.into(), id.into()).encode())
     }
 
-    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>> {
+    fn get(&self, table: &str, id: &Value) -> Result<Option<Row>> {
         self.txn
             .get(&Key::Row(table.into(), id.into()).encode())?
             .map(|v| Row::decode(&v))
             .transpose()
     }
 
-    fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
-        if !self.must_read_table(table)?.get_column(column)?.index {
+    fn lookup_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
+        if !self.must_get_table(table)?.get_column(column)?.index {
             return errinput!("no index on {table}.{column}");
         }
         self.index_load(table, column, value)
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
-        let table = self.must_read_table(table)?;
+        let table = self.must_get_table(table)?;
         Ok(Box::new(
             self.txn
                 .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode())?
@@ -216,7 +216,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     }
 
     fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan> {
-        let table = self.must_read_table(table)?;
+        let table = self.must_get_table(table)?;
         let column = table.get_column(column)?;
         if !column.index {
             return errinput!("no index for {}.{}", table.name, column.name);
@@ -241,18 +241,18 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     }
 
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()> {
-        let table = self.must_read_table(table)?;
+        let table = self.must_get_table(table)?;
         // If the primary key changes we do a delete and create, otherwise we replace the row
         if id != &table.get_row_key(&row)? {
             self.delete(&table.name, id)?;
-            self.create(&table.name, row)?;
+            self.insert(&table.name, row)?;
             return Ok(());
         }
 
         // Update indexes, knowing that the primary key has not changed
         let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
         if !indexes.is_empty() {
-            let old = self.read(&table.name, id)?.unwrap();
+            let old = self.get(&table.name, id)?.unwrap();
             for (i, column) in indexes {
                 if old[i] == row[i] {
                     continue;
@@ -274,16 +274,16 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 
 impl<E: storage::Engine> Catalog for Transaction<E> {
     fn create_table(&mut self, table: Table) -> Result<()> {
-        if self.read_table(&table.name)?.is_some() {
+        if self.get_table(&table.name)?.is_some() {
             return errinput!("table {} already exists", table.name);
         }
         table.validate(self)?;
         self.txn.set(&Key::Table((&table.name).into()).encode(), table.encode())
     }
 
-    fn delete_table(&mut self, table: &str) -> Result<()> {
-        let table = self.must_read_table(table)?;
-        if let Some((t, cs)) = self.table_references(&table.name, false)?.first() {
+    fn drop_table(&mut self, table: &str) -> Result<()> {
+        let table = self.must_get_table(table)?;
+        if let Some((t, cs)) = self.references(&table.name, false)?.first() {
             return errinput!("table {} is referenced by table {} column {}", table.name, t, cs[0]);
         }
         let mut scan = self.scan(&table.name, None)?;
@@ -293,7 +293,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         self.txn.delete(&Key::Table(table.name.into()).encode())
     }
 
-    fn read_table(&self, table: &str) -> Result<Option<Table>> {
+    fn get_table(&self, table: &str) -> Result<Option<Table>> {
         self.txn.get(&Key::Table(table.into()).encode())?.map(|v| Table::decode(&v)).transpose()
     }
 

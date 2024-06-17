@@ -5,24 +5,28 @@ use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::schema::Table;
 use crate::sql::types::{Expression, Row, Rows, Value};
+use crate::storage::mvcc;
 
 use std::collections::HashSet;
 
-/// The SQL engine interface
+/// The SQL engine interface.
 pub trait Engine: Clone {
-    /// The transaction type
+    /// The transaction type.
+    ///
+    /// TODO: consider letting transactions and sessions have a shared borrow to
+    /// the engine rather than cloning the arc/mutex.
     type Transaction: Transaction;
 
     /// Begins a read-write transaction.
     fn begin(&self) -> Result<Self::Transaction>;
-
     /// Begins a read-only transaction.
     fn begin_read_only(&self) -> Result<Self::Transaction>;
-
     /// Begins a read-only transaction as of a historical version.
     fn begin_as_of(&self, version: u64) -> Result<Self::Transaction>;
 
-    /// Begins a session for executing individual statements
+    /// Creates a client session for executing SQL statements.
+    ///
+    /// TODO: the session should have a borrow to the engine.
     fn session(&self) -> Session<Self> {
         Session::new(self.clone())
     }
@@ -34,30 +38,31 @@ pub trait Engine: Clone {
 /// enforces cleaner separation of when catalog access is valid (i.e. during
 /// planning but not execution).
 pub trait Transaction: Catalog {
-    /// The transaction's version
-    fn version(&self) -> u64;
-    /// Whether the transaction is read-only
+    /// The transaction's MVCC version.
+    fn version(&self) -> mvcc::Version;
+    /// Whether the transaction is read-only.
     fn read_only(&self) -> bool;
 
-    /// Commits the transaction
+    /// Commits the transaction.
     fn commit(self) -> Result<()>;
-    /// Rolls back the transaction
+    /// Rolls back the transaction.
     fn rollback(self) -> Result<()>;
 
-    /// Creates a new table row
-    fn create(&mut self, table: &str, row: Row) -> Result<()>;
-    /// Deletes a table row
+    /// Deletes a table row by primary key.
     fn delete(&mut self, table: &str, id: &Value) -> Result<()>;
-    /// Reads a table row, if it exists
-    fn read(&self, table: &str, id: &Value) -> Result<Option<Row>>;
-    /// Reads an index entry, if it exists
-    fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>>;
-    /// Scans a table's rows
+    /// Fetches a table row by primary key.
+    fn get(&self, table: &str, id: &Value) -> Result<Option<Row>>;
+    /// Inserts a new table row.
+    fn insert(&mut self, table: &str, row: Row) -> Result<()>;
+    /// Looks up a set of table primary keys by an index value.
+    /// TODO: should this just return a Vec instead?
+    fn lookup_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>>;
+    /// Scans a table's rows, optionally applying the given filter.
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
     /// Scans a column's index entries.
     /// TODO: this is only used for tests. Remove it?
     fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
-    /// Updates a table row
+    /// Updates a table row by primary key.
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()>;
 }
 
@@ -66,22 +71,26 @@ pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, HashSet<Value>)>>>;
 
 /// The catalog stores schema information
 pub trait Catalog {
-    /// Creates a new table
+    /// Creates a new table.
     fn create_table(&mut self, table: Table) -> Result<()>;
-    /// Deletes an existing table, or errors if it does not exist
-    fn delete_table(&mut self, table: &str) -> Result<()>;
-    /// Reads a table, if it exists
-    fn read_table(&self, table: &str) -> Result<Option<Table>>;
+    /// Drops a table. Errors if it does not exist.
+    ///
+    /// TODO: consider taking an if_exists parameter, but that will incur a Raft
+    /// roundtrip.
+    fn drop_table(&mut self, table: &str) -> Result<()>;
+    /// Fetches a table schema.
+    fn get_table(&self, table: &str) -> Result<Option<Table>>;
     /// Lists tables.
     fn list_tables(&self) -> Result<Vec<Table>>;
 
-    /// Reads a table, and errors if it does not exist
-    fn must_read_table(&self, table: &str) -> Result<Table> {
-        self.read_table(table)?.ok_or(errinput!("table {table} does not exist"))
+    /// Reads a table, errors if it does not exist.
+    fn must_get_table(&self, table: &str) -> Result<Table> {
+        self.get_table(table)?.ok_or(errinput!("table {table} does not exist"))
     }
 
     /// Returns all references to a table, as table,column pairs.
-    fn table_references(&self, table: &str, with_self: bool) -> Result<Vec<(String, Vec<String>)>> {
+    /// TODO: make this actually be table,column, instead of a column vec.
+    fn references(&self, table: &str, with_self: bool) -> Result<Vec<(String, Vec<String>)>> {
         Ok(self
             .list_tables()?
             .into_iter()

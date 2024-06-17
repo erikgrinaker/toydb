@@ -20,7 +20,7 @@ impl Insert {
     }
 
     pub fn execute(self, txn: &mut impl Transaction) -> Result<u64> {
-        let table = txn.must_read_table(&self.table)?;
+        let table = txn.must_get_table(&self.table)?;
         let mut count = 0;
         for expressions in self.rows {
             let mut row =
@@ -30,7 +30,7 @@ impl Insert {
             } else {
                 row = Self::make_row(&table, &self.columns, row)?;
             }
-            txn.create(&table.name, row)?;
+            txn.insert(&table.name, row)?;
             count += 1;
         }
         Ok(count)
@@ -91,7 +91,7 @@ impl Update {
     }
 
     pub fn execute(mut self, txn: &mut impl Transaction) -> Result<u64> {
-        let table = txn.must_read_table(&self.table)?;
+        let table = txn.must_get_table(&self.table)?;
         // The iterator will see our changes, such that the same item may be
         // iterated over multiple times. We keep track of the primary keys here
         // to avoid that, althought it may cause ballooning memory usage for
@@ -130,7 +130,7 @@ impl Delete {
     }
 
     pub fn execute(mut self, txn: &mut impl Transaction) -> Result<u64> {
-        let table = txn.must_read_table(&self.table)?;
+        let table = txn.must_get_table(&self.table)?;
         let mut count = 0;
         while let Some(row) = self.source.next().transpose()? {
             txn.delete(&table.name, &table.get_row_key(&row)?)?;

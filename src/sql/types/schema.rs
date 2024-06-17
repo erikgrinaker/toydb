@@ -156,7 +156,7 @@ impl Column {
         if let Some(reference) = &self.references {
             let target = if reference == &table.name {
                 table.clone()
-            } else if let Some(table) = txn.read_table(reference)? {
+            } else if let Some(table) = txn.get_table(reference)? {
                 table
             } else {
                 return errinput!(
@@ -213,7 +213,7 @@ impl Column {
                 Value::Null => Ok(()),
                 Value::Float(f) if f.is_nan() => Ok(()),
                 v if target == &table.name && v == pk => Ok(()),
-                v if txn.read(target, v)?.is_none() => {
+                v if txn.get(target, v)?.is_none() => {
                     errinput!("referenced primary key {v} in table {target} does not exist",)
                 }
                 _ => Ok(()),

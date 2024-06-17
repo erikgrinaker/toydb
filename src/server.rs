@@ -290,7 +290,7 @@ impl Server {
             let response = match request {
                 Request::Execute(query) => session.execute(&query).map(Response::Execute),
                 Request::GetTable(table) => session
-                    .with_txn_read_only(|txn| txn.must_read_table(&table))
+                    .with_txn_read_only(|txn| txn.must_get_table(&table))
                     .map(Response::GetTable),
                 Request::ListTables => session
                     .with_txn_read_only(|txn| {
