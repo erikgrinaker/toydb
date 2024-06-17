@@ -2,8 +2,8 @@ use crate::encoding::{self, Value as _};
 use crate::error::{Error, Result};
 use crate::raft;
 use crate::sql;
-use crate::sql::engine::{Engine as _, StatementResult};
-use crate::sql::types::schema::{Catalog as _, Table};
+use crate::sql::engine::{Catalog as _, Engine as _, StatementResult};
+use crate::sql::types::schema::Table;
 use crate::sql::types::Row;
 use crate::storage;
 
@@ -293,7 +293,9 @@ impl Server {
                     .with_txn_read_only(|txn| txn.must_read_table(&table))
                     .map(Response::GetTable),
                 Request::ListTables => session
-                    .with_txn_read_only(|txn| Ok(txn.scan_tables()?.map(|t| t.name).collect()))
+                    .with_txn_read_only(|txn| {
+                        Ok(txn.list_tables()?.into_iter().map(|t| t.name).collect())
+                    })
                     .map(Response::ListTables),
                 Request::Status => session
                     .status()

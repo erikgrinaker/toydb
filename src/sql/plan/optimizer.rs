@@ -1,7 +1,7 @@
-use super::super::types::schema::Catalog;
 use super::super::types::{Expression, Value};
 use super::plan::Node;
 use crate::error::Result;
+use crate::sql::engine::Catalog;
 
 use std::mem::replace;
 

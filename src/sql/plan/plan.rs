@@ -3,10 +3,10 @@
 use super::optimizer::{self, Optimizer as _};
 use super::planner::Planner;
 use crate::error::Result;
-use crate::sql::engine::Transaction;
+use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::execution::{self, ExecutionResult};
 use crate::sql::parser::ast;
-use crate::sql::types::schema::{Catalog, Table};
+use crate::sql::types::schema::Table;
 use crate::sql::types::{Expression, Value};
 
 use serde::{Deserialize, Serialize};

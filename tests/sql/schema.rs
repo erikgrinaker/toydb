@@ -1,7 +1,6 @@
 //! Schema-related tests, using an in-memory database against golden files in tests/sql/chema/
 use toydb::error::Result;
-use toydb::sql::engine::{Engine as _, Transaction as _};
-use toydb::sql::types::schema::Catalog as _;
+use toydb::sql::engine::{Catalog as _, Engine as _, Transaction as _};
 
 use goldenfile::Mint;
 use std::io::Write;
@@ -29,7 +28,7 @@ macro_rules! test_schema {
 
                 write!(f, "Storage:")?;
                 let txn = engine.begin()?;
-                for table in txn.scan_tables()? {
+                for table in txn.list_tables()? {
                     write!(f, "\n{}\n", table)?;
                     for row in txn.scan(&table.name, None)? {
                         write!(f, "{:?}\n", row?)?;

@@ -1,9 +1,10 @@
 use super::super::parser::ast;
-use super::super::types::schema::{Catalog, Column, Table};
+use super::super::types::schema::{Column, Table};
 use super::super::types::{Expression, Value};
 use super::{plan::Node, plan::Plan, Aggregate, Direction};
 use crate::errinput;
 use crate::error::Result;
+use crate::sql::engine::Catalog;
 
 use std::collections::{HashMap, HashSet};
 use std::mem::replace;

@@ -1,6 +1,6 @@
-use super::super::types::schema::{Catalog, Table, Tables};
+use super::super::types::schema::Table;
 use super::super::types::{Expression, Row, Value};
-use super::{Engine as _, IndexScan, Scan, Transaction as _};
+use super::{Catalog, Engine as _, IndexScan, Scan, Transaction as _};
 use crate::encoding::{self, bincode, Value as _};
 use crate::errdata;
 use crate::error::Result;
@@ -282,10 +282,8 @@ impl Catalog for Transaction {
         self.client.query(Query::ReadTable { txn: self.state.clone(), table: table.to_string() })
     }
 
-    fn scan_tables(&self) -> Result<Tables> {
-        Ok(Box::new(
-            self.client.query::<Vec<_>>(Query::ScanTables { txn: self.state.clone() })?.into_iter(),
-        ))
+    fn list_tables(&self) -> Result<Vec<Table>> {
+        self.client.query(Query::ScanTables { txn: self.state.clone() })
     }
 }
 
@@ -388,9 +386,7 @@ impl<E: storage::Engine> raft::State for State<E> {
             Query::ReadTable { txn, table } => {
                 self.engine.resume(txn)?.read_table(&table)?.encode()
             }
-            Query::ScanTables { txn } => {
-                self.engine.resume(txn)?.scan_tables()?.collect::<Vec<_>>().encode()
-            }
+            Query::ScanTables { txn } => self.engine.resume(txn)?.list_tables()?.encode(),
         };
         Ok(response)
     }

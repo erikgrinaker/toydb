@@ -1,6 +1,6 @@
-use super::super::types::schema::{Catalog, Table, Tables};
+use super::super::types::schema::Table;
 use super::super::types::{Expression, Row, Value};
-use super::Transaction as _;
+use super::{Catalog, Transaction as _};
 use crate::encoding::{self, Key as _, Value as _};
 use crate::error::Result;
 use crate::storage;
@@ -297,15 +297,12 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         self.txn.get(&Key::Table(table.into()).encode())?.map(|v| Table::decode(&v)).transpose()
     }
 
-    fn scan_tables(&self) -> Result<Tables> {
-        Ok(Box::new(
-            self.txn
-                .scan_prefix(&KeyPrefix::Table.encode())?
-                .iter()
-                .map(|r| r.and_then(|(_, v)| Table::decode(&v)))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter(),
-        ))
+    fn list_tables(&self) -> Result<Vec<Table>> {
+        self.txn
+            .scan_prefix(&KeyPrefix::Table.encode())?
+            .iter()
+            .map(|r| r.and_then(|(_, v)| Table::decode(&v)))
+            .collect()
     }
 }
 

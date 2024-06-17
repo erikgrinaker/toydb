@@ -8,45 +8,6 @@ use crate::sql::parser::format_ident;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
-/// The catalog stores schema information
-pub trait Catalog {
-    /// Creates a new table
-    fn create_table(&mut self, table: Table) -> Result<()>;
-    /// Deletes an existing table, or errors if it does not exist
-    fn delete_table(&mut self, table: &str) -> Result<()>;
-    /// Reads a table, if it exists
-    fn read_table(&self, table: &str) -> Result<Option<Table>>;
-    /// Iterates over all tables
-    fn scan_tables(&self) -> Result<Tables>;
-
-    /// Reads a table, and errors if it does not exist
-    fn must_read_table(&self, table: &str) -> Result<Table> {
-        self.read_table(table)?.ok_or(errinput!("table {table} does not exist"))
-    }
-
-    /// Returns all references to a table, as table,column pairs.
-    fn table_references(&self, table: &str, with_self: bool) -> Result<Vec<(String, Vec<String>)>> {
-        Ok(self
-            .scan_tables()?
-            .filter(|t| with_self || t.name != table)
-            .map(|t| {
-                (
-                    t.name,
-                    t.columns
-                        .iter()
-                        .filter(|c| c.references.as_deref() == Some(table))
-                        .map(|c| c.name.clone())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .filter(|(_, cs)| !cs.is_empty())
-            .collect())
-    }
-}
-
-/// A table scan iterator
-pub type Tables = Box<dyn DoubleEndedIterator<Item = Table> + Send>;
-
 /// A table schema
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Table {
