@@ -11,20 +11,20 @@ use std::borrow::Cow;
 use std::clone::Clone;
 use std::collections::HashSet;
 
-/// A SQL engine based on an underlying MVCC key/value store.
-pub struct KV<E: storage::Engine> {
+/// A SQL engine using a local storage engine.
+pub struct Local<E: storage::Engine> {
     /// The underlying key/value store.
     pub(super) kv: storage::mvcc::MVCC<E>,
 }
 
 // FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl<E: storage::Engine> Clone for KV<E> {
+impl<E: storage::Engine> Clone for Local<E> {
     fn clone(&self) -> Self {
-        KV { kv: self.kv.clone() }
+        Local { kv: self.kv.clone() }
     }
 }
 
-impl<E: storage::Engine> KV<E> {
+impl<E: storage::Engine> Local<E> {
     /// Creates a new key/value-based SQL engine
     pub fn new(engine: E) -> Self {
         Self { kv: storage::mvcc::MVCC::new(engine) }
@@ -49,7 +49,7 @@ impl<E: storage::Engine> KV<E> {
     }
 }
 
-impl<E: storage::Engine> super::Engine for KV<E> {
+impl<E: storage::Engine> super::Engine for Local<E> {
     type Transaction = Transaction<E>;
 
     fn begin(&self) -> Result<Self::Transaction> {

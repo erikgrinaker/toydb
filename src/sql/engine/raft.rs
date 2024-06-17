@@ -291,8 +291,8 @@ impl Catalog for Transaction {
 
 /// The Raft state machine for the Raft-based SQL engine, using a KV SQL engine
 pub struct State<E: storage::Engine> {
-    /// The underlying KV SQL engine
-    engine: super::KV<E>,
+    /// The underlying local SQL engine.
+    engine: super::Local<E>,
     /// The last applied index
     applied_index: u64,
 }
@@ -300,7 +300,7 @@ pub struct State<E: storage::Engine> {
 impl<E: storage::Engine> State<E> {
     /// Creates a new Raft state maching using the given storage engine.
     pub fn new(engine: E) -> Result<Self> {
-        let engine = super::KV::new(engine);
+        let engine = super::Local::new(engine);
         let applied_index = engine
             .get_metadata(b"applied_index")?
             .map(|b| bincode::deserialize(&b))
