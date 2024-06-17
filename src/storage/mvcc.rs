@@ -227,12 +227,6 @@ pub struct MVCC<E: Engine> {
     engine: Arc<Mutex<E>>,
 }
 
-impl<E: Engine> Clone for MVCC<E> {
-    fn clone(&self) -> Self {
-        MVCC { engine: self.engine.clone() }
-    }
-}
-
 impl<E: Engine> MVCC<E> {
     /// Creates a new MVCC engine with the given storage engine.
     pub fn new(engine: E) -> Self {

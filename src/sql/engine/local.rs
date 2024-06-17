@@ -17,13 +17,6 @@ pub struct Local<E: storage::Engine> {
     pub(super) kv: storage::mvcc::MVCC<E>,
 }
 
-// FIXME Implement Clone manually due to https://github.com/rust-lang/rust/issues/26925
-impl<E: storage::Engine> Clone for Local<E> {
-    fn clone(&self) -> Self {
-        Local { kv: self.kv.clone() }
-    }
-}
-
 impl<E: storage::Engine> Local<E> {
     /// Creates a new key/value-based SQL engine
     pub fn new(engine: E) -> Self {
@@ -49,7 +42,7 @@ impl<E: storage::Engine> Local<E> {
     }
 }
 
-impl<E: storage::Engine> super::Engine for Local<E> {
+impl<'a, E: storage::Engine + 'a> super::Engine<'a> for Local<E> {
     type Transaction = Transaction<E>;
 
     fn begin(&self) -> Result<Self::Transaction> {

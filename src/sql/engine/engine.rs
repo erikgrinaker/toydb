@@ -10,25 +10,20 @@ use crate::storage::mvcc;
 use std::collections::HashSet;
 
 /// The SQL engine interface.
-pub trait Engine: Clone {
+pub trait Engine<'a>: Sized {
     /// The transaction type.
-    ///
-    /// TODO: consider letting transactions and sessions have a shared borrow to
-    /// the engine rather than cloning the arc/mutex.
-    type Transaction: Transaction;
+    type Transaction: Transaction + 'a;
 
     /// Begins a read-write transaction.
     fn begin(&self) -> Result<Self::Transaction>;
     /// Begins a read-only transaction.
     fn begin_read_only(&self) -> Result<Self::Transaction>;
     /// Begins a read-only transaction as of a historical version.
-    fn begin_as_of(&self, version: u64) -> Result<Self::Transaction>;
+    fn begin_as_of(&self, version: mvcc::Version) -> Result<Self::Transaction>;
 
     /// Creates a client session for executing SQL statements.
-    ///
-    /// TODO: the session should have a borrow to the engine.
-    fn session(&self) -> Session<Self> {
-        Session::new(self.clone())
+    fn session(&'a self) -> Session<'a, Self> {
+        Session::new(self)
     }
 }
 

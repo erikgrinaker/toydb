@@ -5,7 +5,7 @@ use crate::encoding::{self, bincode, Value as _};
 use crate::errdata;
 use crate::error::Result;
 use crate::raft::{self, Entry};
-use crate::storage::{self, mvcc::TransactionState};
+use crate::storage::{self, mvcc, mvcc::TransactionState};
 
 use crossbeam::channel::Sender;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -69,11 +69,10 @@ impl encoding::Value for Query {}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Status {
     pub raft: raft::Status,
-    pub mvcc: storage::mvcc::Status,
+    pub mvcc: mvcc::Status,
 }
 
 /// A client for the local Raft node.
-#[derive(Clone)]
 struct Client {
     tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
 }
@@ -119,15 +118,14 @@ impl Client {
 }
 
 /// A SQL engine using a Raft state machine.
-#[derive(Clone)]
 pub struct Raft {
-    client: Client,
+    tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
 }
 
 impl Raft {
     /// Creates a new Raft-based SQL engine.
     pub fn new(tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>) -> Self {
-        Self { client: Client::new(tx) }
+        Self { tx }
     }
 
     /// Creates an underlying state machine for a Raft engine.
@@ -137,28 +135,28 @@ impl Raft {
 
     /// Returns Raft SQL engine status.
     pub fn status(&self) -> Result<Status> {
-        Ok(Status { raft: self.client.status()?, mvcc: self.client.query(Query::Status)? })
+        let client = Client::new(self.tx.clone());
+        Ok(Status { raft: client.status()?, mvcc: client.query(Query::Status)? })
     }
 }
 
-impl super::Engine for Raft {
+impl<'a> super::Engine<'a> for Raft {
     type Transaction = Transaction;
 
     fn begin(&self) -> Result<Self::Transaction> {
-        Transaction::begin(self.client.clone(), false, None)
+        Transaction::begin(Client::new(self.tx.clone()), false, None)
     }
 
     fn begin_read_only(&self) -> Result<Self::Transaction> {
-        Transaction::begin(self.client.clone(), true, None)
+        Transaction::begin(Client::new(self.tx.clone()), true, None)
     }
 
     fn begin_as_of(&self, version: u64) -> Result<Self::Transaction> {
-        Transaction::begin(self.client.clone(), true, Some(version))
+        Transaction::begin(Client::new(self.tx.clone()), true, Some(version))
     }
 }
 
 /// A Raft-based SQL transaction.
-#[derive(Clone)]
 pub struct Transaction {
     client: Client,
     state: TransactionState,
@@ -177,7 +175,7 @@ impl Transaction {
 }
 
 impl super::Transaction for Transaction {
-    fn version(&self) -> u64 {
+    fn version(&self) -> mvcc::Version {
         self.state.version
     }
 

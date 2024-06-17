@@ -103,7 +103,8 @@ impl Server {
             });
 
             // Serve inbound SQL connections.
-            s.spawn(move || Self::sql_accept(id, sql_listener, raft_request_tx));
+            let sql_engine = sql::engine::Raft::new(raft_request_tx);
+            s.spawn(move || Self::sql_accept(id, sql_listener, sql_engine));
         });
 
         Ok(())
@@ -249,11 +250,7 @@ impl Server {
     }
 
     /// Accepts new SQL client connections and spawns session threads for them.
-    fn sql_accept(
-        id: raft::NodeID,
-        listener: TcpListener,
-        raft_request_tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
-    ) {
+    fn sql_accept(id: raft::NodeID, listener: TcpListener, sql_engine: sql::engine::Raft) {
         std::thread::scope(|s| loop {
             let (socket, peer) = match listener.accept() {
                 Ok(sp) => sp,
@@ -262,10 +259,10 @@ impl Server {
                     continue;
                 }
             };
-            let raft_request_tx = raft_request_tx.clone();
+            let session = sql_engine.session();
             s.spawn(move || {
                 debug!("Client {peer} connected");
-                match Self::sql_session(id, socket, raft_request_tx) {
+                match Self::sql_session(id, socket, session) {
                     Ok(()) => debug!("Client {peer} disconnected"),
                     Err(err) => error!("Client {peer} error: {err}"),
                 }
@@ -278,9 +275,8 @@ impl Server {
     fn sql_session(
         id: raft::NodeID,
         socket: TcpStream,
-        raft_request_tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
+        mut session: sql::engine::Session<sql::engine::Raft>,
     ) -> Result<()> {
-        let mut session = sql::engine::Raft::new(raft_request_tx).session();
         let mut reader = std::io::BufReader::new(socket.try_clone()?);
         let mut writer = std::io::BufWriter::new(socket);
 

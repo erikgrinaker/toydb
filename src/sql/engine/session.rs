@@ -10,15 +10,15 @@ use crate::{errdata, errinput};
 use serde::{Deserialize, Serialize};
 
 /// An SQL session, which handles transaction control and simplified query execution
-pub struct Session<E: Engine + 'static> {
+pub struct Session<'a, E: Engine<'a>> {
     /// The underlying engine
-    engine: E,
+    engine: &'a E,
     /// The current session transaction, if any
     txn: Option<E::Transaction>,
 }
 
-impl<E: Engine + 'static> Session<E> {
-    pub fn new(engine: E) -> Self {
+impl<'a, E: Engine<'a>> Session<'a, E> {
+    pub fn new(engine: &'a E) -> Self {
         Self { engine, txn: None }
     }
 
@@ -122,13 +122,13 @@ impl<E: Engine + 'static> Session<E> {
     }
 }
 
-impl Session<Raft> {
+impl<'a> Session<'a, Raft> {
     pub fn status(&self) -> Result<Status> {
         self.engine.status()
     }
 }
 
-impl<E: Engine + 'static> Drop for Session<E> {
+impl<'a, E: Engine<'a>> Drop for Session<'a, E> {
     fn drop(&mut self) {
         self.execute("ROLLBACK").ok();
     }

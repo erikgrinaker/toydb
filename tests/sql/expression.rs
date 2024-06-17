@@ -5,7 +5,8 @@ use toydb::sql::types::Value;
 
 fn eval_expr(expr: &str) -> Result<Value> {
     let engine = super::setup(Vec::new())?;
-    engine.session().execute(&format!("SELECT {}", expr))?.into_value()
+    let mut session = engine.session();
+    session.execute(&format!("SELECT {}", expr))?.into_value()
 }
 
 macro_rules! test_expr {
