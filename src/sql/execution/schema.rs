@@ -1,6 +1,6 @@
-use super::super::engine::Transaction;
-use super::super::types::schema::Table;
 use crate::error::Result;
+use crate::sql::engine::Transaction;
+use crate::sql::types::schema::Table;
 
 /// A CREATE TABLE executor
 pub struct CreateTable {

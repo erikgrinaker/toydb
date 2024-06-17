@@ -1,8 +1,8 @@
-use super::super::plan::Direction;
-use super::super::types::{Column, Expression, Row, Value};
 use super::QueryIterator;
 use crate::errinput;
 use crate::error::Result;
+use crate::sql::plan::Direction;
+use crate::sql::types::{Column, Expression, Row, Value};
 
 /// A filter executor
 pub struct Filter {

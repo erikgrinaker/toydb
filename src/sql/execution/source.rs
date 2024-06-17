@@ -1,7 +1,7 @@
-use super::super::engine::Transaction;
-use super::super::types::{Column, Expression, Row, Value};
 use super::QueryIterator;
 use crate::error::Result;
+use crate::sql::engine::Transaction;
+use crate::sql::types::{Column, Expression, Row, Value};
 
 use std::collections::HashSet;
 

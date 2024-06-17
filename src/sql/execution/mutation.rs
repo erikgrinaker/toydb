@@ -1,9 +1,9 @@
-use super::super::engine::Transaction;
-use super::super::types::schema::Table;
-use super::super::types::{Expression, Row, Value};
 use super::QueryIterator;
 use crate::errinput;
 use crate::error::Result;
+use crate::sql::engine::Transaction;
+use crate::sql::types::schema::Table;
+use crate::sql::types::{Expression, Row, Value};
 
 use std::collections::{HashMap, HashSet};
 

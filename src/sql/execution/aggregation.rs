@@ -1,7 +1,7 @@
-use super::super::plan::Aggregate;
-use super::super::types::{Column, Value};
 use super::QueryIterator;
 use crate::error::Result;
+use crate::sql::plan::Aggregate;
+use crate::sql::types::{Column, Value};
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
