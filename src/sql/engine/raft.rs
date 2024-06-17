@@ -1,6 +1,6 @@
 use super::super::types::schema::Table;
-use super::super::types::{Expression, Row, Value};
-use super::{Catalog, Engine as _, IndexScan, Scan, Transaction as _};
+use super::super::types::{Expression, Row, Rows, Value};
+use super::{Catalog, Engine as _, IndexScan, Transaction as _};
 use crate::encoding::{self, bincode, Value as _};
 use crate::errdata;
 use crate::error::Result;
@@ -232,7 +232,7 @@ impl super::Transaction for Transaction {
         })
     }
 
-    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan> {
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
         Ok(Box::new(
             self.client
                 .query::<Vec<_>>(Query::Scan {

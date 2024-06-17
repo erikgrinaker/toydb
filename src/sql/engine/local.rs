@@ -1,5 +1,5 @@
 use super::super::types::schema::Table;
-use super::super::types::{Expression, Row, Value};
+use super::super::types::{Expression, Row, Rows, Value};
 use super::{Catalog, Transaction as _};
 use crate::encoding::{self, Key as _, Value as _};
 use crate::error::Result;
@@ -191,7 +191,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         self.index_load(table, column, value)
     }
 
-    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<super::Scan> {
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
         let table = self.must_read_table(table)?;
         Ok(Box::new(
             self.txn

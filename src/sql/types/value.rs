@@ -193,7 +193,7 @@ pub type Row = Vec<Value>;
 /// A row iterator.
 ///
 /// TODO: try to avoid boxing here.
-pub type Rows = Box<dyn Iterator<Item = Result<Row>> + Send>;
+pub type Rows = Box<dyn Iterator<Item = Result<Row>>>;
 
 /// A column (in a result set, see schema::Column for table columns).
 ///

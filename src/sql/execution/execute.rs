@@ -7,7 +7,7 @@ use super::source::{IndexLookup, KeyLookup, Nothing, Scan};
 use crate::error::Result;
 use crate::sql::engine::Transaction;
 use crate::sql::plan::{Node, Plan};
-use crate::sql::types::{Columns, Row};
+use crate::sql::types::{Columns, Row, Rows};
 
 /// A plan execution result.
 pub enum ExecutionResult {
@@ -23,8 +23,7 @@ pub enum ExecutionResult {
 pub struct QueryIterator {
     // TODO: use a different type here.
     pub columns: Columns,
-    // TODO: remove Send, it's only needed for the ResultSet conversion.
-    pub rows: Box<dyn Iterator<Item = Result<Row>> + Send>,
+    pub rows: Rows,
 }
 
 impl Iterator for QueryIterator {

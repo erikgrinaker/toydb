@@ -4,7 +4,7 @@ use super::Session;
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::schema::Table;
-use crate::sql::types::{Expression, Row, Value};
+use crate::sql::types::{Expression, Row, Rows, Value};
 
 use std::collections::HashSet;
 
@@ -53,18 +53,16 @@ pub trait Transaction: Catalog {
     /// Reads an index entry, if it exists
     fn read_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>>;
     /// Scans a table's rows
-    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Scan>;
-    /// Scans a column's index entries
+    fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
+    /// Scans a column's index entries.
+    /// TODO: this is only used for tests. Remove it?
     fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
     /// Updates a table row
     fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()>;
 }
 
-/// A row scan iterator
-pub type Scan = Box<dyn DoubleEndedIterator<Item = Result<Row>> + Send>;
-
-/// An index scan iterator
-pub type IndexScan = Box<dyn DoubleEndedIterator<Item = Result<(Value, HashSet<Value>)>> + Send>;
+/// An index scan iterator.
+pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, HashSet<Value>)>>>;
 
 /// The catalog stores schema information
 pub trait Catalog {
