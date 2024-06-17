@@ -119,6 +119,7 @@ test_expr! {
     op_eq_float_nan: "NAN = NAN" => Ok(Boolean(false)),
     op_eq_float_int: "3.0 = 3" => Ok(Boolean(true)),
     op_eq_float_int_not: "3.01 = 3" => Ok(Boolean(false)),
+    op_eq_float_zeroes: "0.0 = -0.0" => Ok(Boolean(true)),
     op_eq_int: "1 = 1" => Ok(Boolean(true)),
     op_eq_int_not: "1 = 2" => Ok(Boolean(false)),
     op_eq_int_float: "3 = 3.0" => Ok(Boolean(true)),

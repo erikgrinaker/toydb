@@ -1,9 +1,9 @@
-mod aggregation;
+mod aggregate;
 mod execute;
 mod join;
-mod mutation;
-mod query;
 mod schema;
 mod source;
+mod transform;
+mod write;
 
 pub use execute::{execute_plan, ExecutionResult, QueryIterator};

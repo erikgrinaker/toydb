@@ -1,13 +1,109 @@
-use super::aggregation::Aggregation;
-use super::join::{HashJoin, NestedLoopJoin};
-use super::mutation::{Delete, Insert, Update};
-use super::query::{Filter, Limit, Offset, Order, Projection};
-use super::schema::{CreateTable, DropTable};
-use super::source::{IndexLookup, KeyLookup, Nothing, Scan};
+use super::aggregate;
+use super::join;
+use super::schema;
+use super::source;
+use super::transform;
+use super::write;
 use crate::error::Result;
 use crate::sql::engine::Transaction;
 use crate::sql::plan::{Node, Plan};
 use crate::sql::types::{Columns, Row, Rows};
+
+/// Executes a plan, returning an execution result.
+pub fn execute_plan(plan: Plan, txn: &mut impl Transaction) -> Result<ExecutionResult> {
+    Ok(match plan {
+        Plan::CreateTable { schema } => {
+            let name = schema.name.clone();
+            schema::create_table(txn, schema)?;
+            ExecutionResult::CreateTable { name }
+        }
+
+        Plan::DropTable { table, if_exists } => {
+            let existed = schema::drop_table(txn, &table, if_exists)?;
+            ExecutionResult::DropTable { name: table, existed }
+        }
+
+        Plan::Delete { table, source } => {
+            let source = execute(source, txn)?;
+            let count = write::delete(txn, &table, source)?;
+            ExecutionResult::Delete { count }
+        }
+
+        Plan::Insert { table, columns, expressions } => {
+            let count = write::insert(txn, &table, columns, expressions)?;
+            ExecutionResult::Insert { count }
+        }
+
+        Plan::Select(node) => ExecutionResult::Select { iter: execute(node, txn)? },
+
+        Plan::Update { table, source, expressions } => {
+            let source = execute(source, txn)?;
+            let expressions = expressions.into_iter().map(|(i, _, expr)| (i, expr)).collect();
+            let count = write::update(txn, &table, source, expressions)?;
+            ExecutionResult::Update { count }
+        }
+    })
+}
+
+/// Recursively executes a query plan node, returning a query iterator.
+///
+/// TODO: since iterators are lazy, make this infallible and move all catalog
+/// lookups to planning.
+pub fn execute(node: Node, txn: &mut impl Transaction) -> Result<QueryIterator> {
+    match node {
+        Node::Aggregation { source, aggregates } => {
+            let source = execute(*source, txn)?;
+            aggregate::aggregate(source, aggregates)
+        }
+
+        Node::Filter { source, predicate } => {
+            let source = execute(*source, txn)?;
+            Ok(transform::filter(source, predicate))
+        }
+
+        Node::HashJoin { left, left_field, right, right_field, outer } => {
+            let left = execute(*left, txn)?;
+            let right = execute(*right, txn)?;
+            join::hash(left, left_field.0, right, right_field.0, outer)
+        }
+
+        Node::IndexLookup { table, alias: _, column, values } => {
+            source::lookup_index(txn, &table, &column, values)
+        }
+
+        Node::KeyLookup { table, alias: _, keys } => source::lookup_key(txn, &table, keys),
+
+        Node::Limit { source, limit } => {
+            let source = execute(*source, txn)?;
+            Ok(transform::limit(source, limit))
+        }
+
+        Node::NestedLoopJoin { left, left_size: _, right, predicate, outer } => {
+            let left = execute(*left, txn)?;
+            let right = execute(*right, txn)?;
+            join::nested_loop(left, right, predicate, outer)
+        }
+
+        Node::Nothing => Ok(source::nothing()),
+
+        Node::Offset { source, offset } => {
+            let source = execute(*source, txn)?;
+            Ok(transform::offset(source, offset))
+        }
+
+        Node::Order { source, orders } => {
+            let source = execute(*source, txn)?;
+            Ok(transform::order(source, orders))
+        }
+
+        Node::Projection { source, expressions } => {
+            let source = execute(*source, txn)?;
+            Ok(transform::project(source, expressions))
+        }
+
+        Node::Scan { table, alias: _, filter } => source::scan(txn, &table, filter),
+    }
+}
 
 /// A plan execution result.
 pub enum ExecutionResult {
@@ -19,7 +115,7 @@ pub enum ExecutionResult {
     Select { iter: QueryIterator },
 }
 
-/// A query result iterator, containins the columns and row iterator.
+/// A query result iterator, containing the columns and row iterator.
 pub struct QueryIterator {
     // TODO: use a different type here.
     pub columns: Columns,
@@ -34,102 +130,34 @@ impl Iterator for QueryIterator {
     }
 }
 
-/// Executes a plan, returning an execution result.
-pub fn execute_plan(plan: Plan, txn: &mut impl Transaction) -> Result<ExecutionResult> {
-    Ok(match plan {
-        Plan::Select(node) => ExecutionResult::Select { iter: execute(node, txn)? },
+impl QueryIterator {
+    /// Replaces the columns with the result of the closure.
+    pub fn map_columns(mut self, f: impl FnOnce(Columns) -> Columns) -> Self {
+        self.columns = f(self.columns);
+        self
+    }
 
-        Plan::CreateTable { schema } => {
-            let name = schema.name.clone();
-            CreateTable::new(schema).execute(txn)?;
-            ExecutionResult::CreateTable { name }
-        }
+    /// Replaces the rows iterator with the result of the closure.
+    pub fn map_rows<F, I>(mut self, f: F) -> Self
+    where
+        I: Iterator<Item = Result<Row>> + 'static,
+        F: FnOnce(Rows) -> I,
+    {
+        self.rows = Box::new(f(self.rows));
+        self
+    }
 
-        Plan::DropTable { table, if_exists } => {
-            let name = table.clone();
-            let existed = DropTable::new(table, if_exists).execute(txn)?;
-            ExecutionResult::DropTable { name, existed }
-        }
-
-        Plan::Delete { table, source } => {
-            let source = execute(source, txn)?;
-            let count = Delete::new(table, source).execute(txn)?;
-            ExecutionResult::Delete { count }
-        }
-
-        Plan::Insert { table, columns, expressions } => {
-            let count = Insert::new(table, columns, expressions).execute(txn)?;
-            ExecutionResult::Insert { count }
-        }
-
-        Plan::Update { table, source, expressions } => {
-            let source = execute(source, txn)?;
-            let expressions = expressions.into_iter().map(|(i, _, expr)| (i, expr)).collect();
-            let count = Update::new(table, source, expressions).execute(txn)?;
-            ExecutionResult::Update { count }
-        }
-    })
-}
-
-/// Recursively executes a query plan node, returning a row iterator.
-///
-/// TODO: flatten the executor structs into functions where appropriate. Same
-/// goes for all other execute functions.
-///
-/// TODO: since iterators are lazy, make this infallible and move all catalog
-/// lookups to planning.
-pub fn execute(node: Node, txn: &mut impl Transaction) -> Result<QueryIterator> {
-    match node {
-        Node::Aggregation { source, aggregates } => {
-            let source = execute(*source, txn)?;
-            Aggregation::new(source, aggregates).execute()
-        }
-
-        Node::Filter { source, predicate } => {
-            let source = execute(*source, txn)?;
-            Ok(Filter::new(source, predicate).execute())
-        }
-
-        Node::HashJoin { left, left_field, right, right_field, outer } => {
-            let left = execute(*left, txn)?;
-            let right = execute(*right, txn)?;
-            HashJoin::new(left, left_field.0, right, right_field.0, outer).execute()
-        }
-
-        Node::IndexLookup { table, alias: _, column, values } => {
-            IndexLookup::new(table, column, values).execute(txn)
-        }
-
-        Node::KeyLookup { table, alias: _, keys } => KeyLookup::new(table, keys).execute(txn),
-
-        Node::Limit { source, limit } => {
-            let source = execute(*source, txn)?;
-            Ok(Limit::new(source, limit).execute())
-        }
-
-        Node::NestedLoopJoin { left, left_size: _, right, predicate, outer } => {
-            let left = execute(*left, txn)?;
-            let right = execute(*right, txn)?;
-            NestedLoopJoin::new(left, right, predicate, outer).execute()
-        }
-
-        Node::Nothing => Ok(Nothing.execute()),
-
-        Node::Offset { source, offset } => {
-            let source = execute(*source, txn)?;
-            Ok(Offset::new(source, offset).execute())
-        }
-
-        Node::Order { source, orders } => {
-            let source = execute(*source, txn)?;
-            Order::new(source, orders).execute()
-        }
-
-        Node::Projection { source, expressions } => {
-            let source = execute(*source, txn)?;
-            Ok(Projection::new(source, expressions).execute())
-        }
-
-        Node::Scan { table, alias: _, filter } => Scan::new(table, filter).execute(txn),
+    /// Like map_rows, but if the closure errors the row iterator will yield a
+    /// single error item.
+    pub fn try_map_rows<F, I>(mut self, f: F) -> Self
+    where
+        I: Iterator<Item = Result<Row>> + 'static,
+        F: FnOnce(Rows) -> Result<I>,
+    {
+        self.rows = match f(self.rows) {
+            Ok(rows) => Box::new(rows),
+            Err(e) => Box::new(std::iter::once(Err(e))),
+        };
+        self
     }
 }

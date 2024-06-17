@@ -5,45 +5,29 @@ use crate::sql::types::{Expression, Row, Rows, Value};
 
 use std::collections::HashMap;
 
-/// A nested loop join executor, which checks each row in the left source against every row in
-/// the right source using the given predicate.
-pub struct NestedLoopJoin {
+/// A nested loop join. Iterates over the right result for every row in the left
+/// result, optionally filtering on the join predicate.
+///
+/// TODO: revisit this and clean it up.
+pub(super) fn nested_loop(
     left: QueryIterator,
     right: QueryIterator,
     predicate: Option<Expression>,
     outer: bool,
-}
-
-impl NestedLoopJoin {
-    pub fn new(
-        left: QueryIterator,
-        right: QueryIterator,
-        predicate: Option<Expression>,
-        outer: bool,
-    ) -> Self {
-        Self { left, right, predicate, outer }
-    }
-
-    pub fn execute(self) -> Result<QueryIterator> {
-        let QueryIterator { mut columns, rows } = self.left;
-        let QueryIterator { columns: rcolumns, rows: rrows } = self.right;
-        let right_width = rcolumns.len();
-
-        columns.extend(rcolumns);
-        // FIXME Since making the iterators or sources clonable is non-trivial (requiring
-        // either avoiding Rust standard iterators or making sources generic), we simply
-        // fetch the entire right result as a vector.
-        Ok(QueryIterator {
-            rows: Box::new(NestedLoopRows::new(
-                rows,
-                rrows.collect::<Result<Vec<_>>>()?,
-                right_width,
-                self.predicate,
-                self.outer,
-            )),
-            columns,
-        })
-    }
+) -> Result<QueryIterator> {
+    // TODO Since making the iterators or sources clonable is non-trivial (requiring
+    // either avoiding Rust standard iterators or making sources generic), we simply
+    // fetch the entire right result as a vector.
+    let rows = Box::new(NestedLoopRows::new(
+        left.rows,
+        right.rows.collect::<Result<Vec<_>>>()?,
+        right.columns.len(),
+        predicate,
+        outer,
+    ));
+    let mut columns = left.columns;
+    columns.extend(right.columns);
+    Ok(QueryIterator { rows, columns })
 }
 
 struct NestedLoopRows {
@@ -131,54 +115,42 @@ impl Iterator for NestedLoopRows {
     }
 }
 
-/// A hash join executor
-pub struct HashJoin {
+/// Executes a hash join.
+///
+/// TODO: clean this up.
+pub(super) fn hash(
     left: QueryIterator,
     left_field: usize,
     right: QueryIterator,
     right_field: usize,
     outer: bool,
-}
-
-impl HashJoin {
-    pub fn new(
-        left: QueryIterator,
-        left_field: usize,
-        right: QueryIterator,
-        right_field: usize,
-        outer: bool,
-    ) -> Self {
-        Self { left, left_field, right, right_field, outer }
-    }
-
-    pub fn execute(self) -> Result<QueryIterator> {
-        let QueryIterator { mut columns, rows } = self.left;
-        let QueryIterator { columns: rcolumns, rows: rrows } = self.right;
-        let (l, r, outer) = (self.left_field, self.right_field, self.outer);
-        let right: HashMap<Value, Row> = rrows
-            .map(|res| match res {
-                Ok(row) if row.len() <= r => errdata!("right index {r} out of bounds"),
-                Ok(row) => Ok((row[r].clone(), row)),
-                Err(err) => Err(err),
-            })
-            .collect::<Result<_>>()?;
-        let empty = std::iter::repeat(Value::Null).take(rcolumns.len());
-        columns.extend(rcolumns);
-        let rows = Box::new(rows.filter_map(move |res| match res {
-            Ok(row) if row.len() <= l => Some(errdata!("left index {l} out of bounds")),
-            Ok(mut row) => match right.get(&row[l]) {
-                Some(hit) => {
-                    row.extend(hit.clone());
-                    Some(Ok(row))
-                }
-                None if outer => {
-                    row.extend(empty.clone());
-                    Some(Ok(row))
-                }
-                None => None,
-            },
-            Err(err) => Some(Err(err)),
-        }));
-        Ok(QueryIterator { columns, rows })
-    }
+) -> Result<QueryIterator> {
+    let QueryIterator { mut columns, rows } = left;
+    let QueryIterator { columns: rcolumns, rows: rrows } = right;
+    let (l, r, outer) = (left_field, right_field, outer);
+    let right: HashMap<Value, Row> = rrows
+        .map(|res| match res {
+            Ok(row) if row.len() <= r => errdata!("right index {r} out of bounds"),
+            Ok(row) => Ok((row[r].clone(), row)),
+            Err(err) => Err(err),
+        })
+        .collect::<Result<_>>()?;
+    let empty = std::iter::repeat(Value::Null).take(rcolumns.len());
+    columns.extend(rcolumns);
+    let rows = Box::new(rows.filter_map(move |res| match res {
+        Ok(row) if row.len() <= l => Some(errdata!("left index {l} out of bounds")),
+        Ok(mut row) => match right.get(&row[l]) {
+            Some(hit) => {
+                row.extend(hit.clone());
+                Some(Ok(row))
+            }
+            None if outer => {
+                row.extend(empty.clone());
+                Some(Ok(row))
+            }
+            None => None,
+        },
+        Err(err) => Some(Err(err)),
+    }));
+    Ok(QueryIterator { columns, rows })
 }

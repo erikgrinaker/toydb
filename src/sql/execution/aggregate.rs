@@ -6,48 +6,39 @@ use crate::sql::types::{Column, Value};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-/// An aggregation executor
-pub struct Aggregation {
-    source: QueryIterator,
+/// Aggregates rows (i.e. GROUP BY).
+///
+/// TODO: revisit this and clean it up.
+pub(super) fn aggregate(
+    mut source: QueryIterator,
     aggregates: Vec<Aggregate>,
-    accumulators: HashMap<Vec<Value>, Vec<Box<dyn Accumulator>>>,
-}
-
-impl Aggregation {
-    pub fn new(source: QueryIterator, aggregates: Vec<Aggregate>) -> Self {
-        Self { source, aggregates, accumulators: HashMap::new() }
+) -> Result<QueryIterator> {
+    let mut accumulators: HashMap<Vec<Value>, Vec<Box<dyn Accumulator>>> = HashMap::new();
+    let agg_count = aggregates.len();
+    while let Some(mut row) = source.next().transpose()? {
+        accumulators
+            .entry(row.split_off(aggregates.len()))
+            .or_insert(aggregates.iter().map(<dyn Accumulator>::from).collect())
+            .iter_mut()
+            .zip(row)
+            .try_for_each(|(acc, value)| acc.accumulate(&value))?
     }
-
-    #[allow(clippy::or_fun_call)]
-    pub fn execute(mut self) -> Result<QueryIterator> {
-        let agg_count = self.aggregates.len();
-        while let Some(mut row) = self.source.next().transpose()? {
-            self.accumulators
-                .entry(row.split_off(self.aggregates.len()))
-                .or_insert(self.aggregates.iter().map(<dyn Accumulator>::from).collect())
-                .iter_mut()
-                .zip(row)
-                .try_for_each(|(acc, value)| acc.accumulate(&value))?
-        }
-        // If there were no rows and no group-by columns, return a row of empty accumulators:
-        // SELECT COUNT(*) FROM t WHERE FALSE
-        if self.accumulators.is_empty() && self.aggregates.len() == self.source.columns.len() {
-            self.accumulators
-                .insert(Vec::new(), self.aggregates.iter().map(<dyn Accumulator>::from).collect());
-        }
-        Ok(QueryIterator {
-            columns: self
-                .source
-                .columns
-                .into_iter()
-                .enumerate()
-                .map(|(i, c)| if i < agg_count { Column { name: None } } else { c })
-                .collect(),
-            rows: Box::new(self.accumulators.into_iter().map(|(bucket, accs)| {
-                Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())
-            })),
-        })
+    // If there were no rows and no group-by columns, return a row of empty accumulators:
+    // SELECT COUNT(*) FROM t WHERE FALSE
+    if accumulators.is_empty() && aggregates.len() == source.columns.len() {
+        accumulators.insert(Vec::new(), aggregates.iter().map(<dyn Accumulator>::from).collect());
     }
+    Ok(QueryIterator {
+        columns: source
+            .columns
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| if i < agg_count { Column { name: None } } else { c })
+            .collect(),
+        rows: Box::new(accumulators.into_iter().map(|(bucket, accs)| {
+            Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())
+        })),
+    })
 }
 
 // An accumulator

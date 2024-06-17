@@ -61,24 +61,42 @@ impl std::hash::Hash for Value {
     }
 }
 
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        match (self, other) {
+            // For ordering purposes, we consider e.g. NULL and NaN equal, and
+            // establish a total order.
+            (Self::Null, Self::Null) => Ordering::Equal,
+            (Self::Boolean(a), Self::Boolean(b)) => a.cmp(b),
+            (Self::Integer(a), Self::Integer(b)) => a.cmp(b),
+            (Self::Integer(a), Self::Float(b)) => (*a as f64).total_cmp(b),
+            (Self::Float(a), Self::Integer(b)) => a.total_cmp(&(*b as f64)),
+            (Self::Float(a), Self::Float(b)) => a.total_cmp(b),
+            (Self::String(a), Self::String(b)) => a.cmp(b),
+
+            // Mixed types. Should rarely come up, but we may as well establish
+            // an order, especially since we also implement Eq. We can handle
+            // any special cases during expression evaluation.
+            (Self::Null, _) => Ordering::Less,
+            (_, Self::Null) => Ordering::Greater,
+            (Self::Boolean(_), _) => Ordering::Less,
+            (_, Self::Boolean(_)) => Ordering::Greater,
+            (Self::Float(_), _) => Ordering::Less,
+            (_, Self::Float(_)) => Ordering::Greater,
+            (Self::Integer(_), _) => Ordering::Less,
+            (_, Self::Integer(_)) => Ordering::Greater,
+            #[allow(unreachable_patterns)]
+            (Self::String(_), _) => Ordering::Less,
+            #[allow(unreachable_patterns)]
+            (_, Self::String(_)) => Ordering::Greater,
+        }
+    }
+}
+
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            // For ordering purposes, NULL is ordered first.
-            //
-            // TODO: revisit this and make sure the NULL handling is sound and
-            // consistent with e.g. hash and eq handling.
-            (Self::Null, Self::Null) => Some(std::cmp::Ordering::Equal),
-            (Self::Null, _) => Some(std::cmp::Ordering::Less),
-            (_, Self::Null) => Some(std::cmp::Ordering::Greater),
-            (Self::Boolean(a), Self::Boolean(b)) => a.partial_cmp(b),
-            (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
-            (Self::Float(a), Self::Integer(b)) => a.partial_cmp(&(*b as f64)),
-            (Self::Integer(a), Self::Float(b)) => (*a as f64).partial_cmp(b),
-            (Self::Integer(a), Self::Integer(b)) => a.partial_cmp(b),
-            (Self::String(a), Self::String(b)) => a.partial_cmp(b),
-            (_, _) => None,
-        }
+        Some(self.cmp(other))
     }
 }
 

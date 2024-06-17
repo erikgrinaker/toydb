@@ -2,38 +2,17 @@ use crate::error::Result;
 use crate::sql::engine::Transaction;
 use crate::sql::types::schema::Table;
 
-/// A CREATE TABLE executor
-pub struct CreateTable {
-    table: Table,
+// Creates a table (i.e. CREATE TABLE).
+pub(super) fn create_table(txn: &mut impl Transaction, schema: Table) -> Result<()> {
+    txn.create_table(schema)
 }
 
-impl CreateTable {
-    pub fn new(table: Table) -> Self {
-        Self { table }
+/// Deletes a table (i.e. DROP TABLE). Returns true if the table existed.
+pub(super) fn drop_table(txn: &mut impl Transaction, table: &str, if_exists: bool) -> Result<bool> {
+    // TODO the planner should deal with this.
+    if if_exists && txn.get_table(table)?.is_none() {
+        return Ok(false);
     }
-
-    pub fn execute(self, txn: &mut impl Transaction) -> Result<()> {
-        txn.create_table(self.table)
-    }
-}
-
-/// A DROP TABLE executor
-pub struct DropTable {
-    table: String,
-    if_exists: bool,
-}
-
-impl DropTable {
-    pub fn new(table: String, if_exists: bool) -> Self {
-        Self { table, if_exists }
-    }
-
-    pub fn execute(self, txn: &mut impl Transaction) -> Result<bool> {
-        // TODO the planner should deal with this.
-        if self.if_exists && txn.get_table(&self.table)?.is_none() {
-            return Ok(false);
-        }
-        txn.drop_table(&self.table)?;
-        Ok(true)
-    }
+    txn.drop_table(table)?;
+    Ok(true)
 }
