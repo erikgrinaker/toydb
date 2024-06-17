@@ -61,7 +61,7 @@ impl Table {
     }
 
     /// Validates the table schema
-    pub fn validate(&self, txn: &mut dyn Transaction) -> Result<()> {
+    pub fn validate(&self, txn: &dyn Transaction) -> Result<()> {
         if self.columns.is_empty() {
             return errinput!("table {} has no columns", self.name);
         }
@@ -77,7 +77,7 @@ impl Table {
     }
 
     /// Validates a row
-    pub fn validate_row(&self, row: &[Value], txn: &mut dyn Transaction) -> Result<()> {
+    pub fn validate_row(&self, row: &[Value], txn: &dyn Transaction) -> Result<()> {
         if row.len() != self.columns.len() {
             return errinput!("invalid row size for table {}", self.name);
         }
@@ -123,7 +123,7 @@ pub struct Column {
 
 impl Column {
     /// Validates the column schema
-    pub fn validate(&self, table: &Table, txn: &mut dyn Transaction) -> Result<()> {
+    pub fn validate(&self, table: &Table, txn: &dyn Transaction) -> Result<()> {
         // Validate primary key
         if self.primary_key && self.nullable {
             return errinput!("primary key {} cannot be nullable", self.name);
@@ -184,7 +184,7 @@ impl Column {
         table: &Table,
         pk: &Value,
         value: &Value,
-        txn: &mut dyn Transaction,
+        txn: &dyn Transaction,
     ) -> Result<()> {
         // Validate datatype
         match value.datatype() {

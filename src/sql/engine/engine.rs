@@ -48,12 +48,14 @@ pub trait Transaction: Catalog {
     /// Rolls back the transaction.
     fn rollback(self) -> Result<()>;
 
-    /// Deletes a table row by primary key.
-    fn delete(&mut self, table: &str, id: &Value) -> Result<()>;
+    /// TOOD: consider operating on batches of IDs/rows.
+
+    /// Deletes a set of table row by primary key.
+    fn delete(&self, table: &str, id: &Value) -> Result<()>;
     /// Fetches a table row by primary key.
     fn get(&self, table: &str, id: &Value) -> Result<Option<Row>>;
     /// Inserts a new table row.
-    fn insert(&mut self, table: &str, row: Row) -> Result<()>;
+    fn insert(&self, table: &str, row: Row) -> Result<()>;
     /// Looks up a set of table primary keys by an index value.
     /// TODO: should this just return a Vec instead?
     fn lookup_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>>;
@@ -63,7 +65,7 @@ pub trait Transaction: Catalog {
     /// TODO: this is only used for tests. Remove it?
     fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
     /// Updates a table row by primary key.
-    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()>;
+    fn update(&self, table: &str, id: &Value, row: Row) -> Result<()>;
 }
 
 /// An index scan iterator.
@@ -72,12 +74,12 @@ pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, HashSet<Value>)>>>;
 /// The catalog stores schema information
 pub trait Catalog {
     /// Creates a new table.
-    fn create_table(&mut self, table: Table) -> Result<()>;
+    fn create_table(&self, table: Table) -> Result<()>;
     /// Drops a table. Errors if it does not exist.
     ///
     /// TODO: consider taking an if_exists parameter, but that will incur a Raft
     /// roundtrip.
-    fn drop_table(&mut self, table: &str) -> Result<()>;
+    fn drop_table(&self, table: &str) -> Result<()>;
     /// Fetches a table schema.
     fn get_table(&self, table: &str) -> Result<Option<Table>>;
     /// Lists tables.

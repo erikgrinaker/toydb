@@ -93,7 +93,7 @@ impl<E: storage::Engine> Transaction<E> {
 
     /// Saves an index entry.
     fn index_save(
-        &mut self,
+        &self,
         table: &str,
         column: &str,
         value: &Value,
@@ -125,7 +125,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         self.txn.rollback()
     }
 
-    fn insert(&mut self, table: &str, row: Row) -> Result<()> {
+    fn insert(&self, table: &str, row: Row) -> Result<()> {
         let table = self.must_get_table(table)?;
         table.validate_row(&row, self)?;
         let id = table.get_row_key(&row)?;
@@ -143,7 +143,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         Ok(())
     }
 
-    fn delete(&mut self, table: &str, id: &Value) -> Result<()> {
+    fn delete(&self, table: &str, id: &Value) -> Result<()> {
         let table = self.must_get_table(table)?;
         for (t, cs) in self.references(&table.name, true)? {
             let t = self.must_get_table(&t)?;
@@ -240,7 +240,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         ))
     }
 
-    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()> {
+    fn update(&self, table: &str, id: &Value, row: Row) -> Result<()> {
         let table = self.must_get_table(table)?;
         // If the primary key changes we do a delete and create, otherwise we replace the row
         if id != &table.get_row_key(&row)? {
@@ -273,7 +273,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 }
 
 impl<E: storage::Engine> Catalog for Transaction<E> {
-    fn create_table(&mut self, table: Table) -> Result<()> {
+    fn create_table(&self, table: Table) -> Result<()> {
         if self.get_table(&table.name)?.is_some() {
             return errinput!("table {} already exists", table.name);
         }
@@ -281,7 +281,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         self.txn.set(&Key::Table((&table.name).into()).encode(), table.encode())
     }
 
-    fn drop_table(&mut self, table: &str) -> Result<()> {
+    fn drop_table(&self, table: &str) -> Result<()> {
         let table = self.must_get_table(table)?;
         if let Some((t, cs)) = self.references(&table.name, false)?.first() {
             return errinput!("table {} is referenced by table {} column {}", table.name, t, cs[0]);

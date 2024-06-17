@@ -199,7 +199,7 @@ impl super::Transaction for Transaction {
         Ok(())
     }
 
-    fn insert(&mut self, table: &str, row: Row) -> Result<()> {
+    fn insert(&self, table: &str, row: Row) -> Result<()> {
         self.client.mutate(Mutation::Create {
             txn: self.state.clone(),
             table: table.to_string(),
@@ -207,7 +207,7 @@ impl super::Transaction for Transaction {
         })
     }
 
-    fn delete(&mut self, table: &str, id: &Value) -> Result<()> {
+    fn delete(&self, table: &str, id: &Value) -> Result<()> {
         self.client.mutate(Mutation::Delete {
             txn: self.state.clone(),
             table: table.to_string(),
@@ -258,7 +258,7 @@ impl super::Transaction for Transaction {
         ))
     }
 
-    fn update(&mut self, table: &str, id: &Value, row: Row) -> Result<()> {
+    fn update(&self, table: &str, id: &Value, row: Row) -> Result<()> {
         self.client.mutate(Mutation::Update {
             txn: self.state.clone(),
             table: table.to_string(),
@@ -269,11 +269,11 @@ impl super::Transaction for Transaction {
 }
 
 impl Catalog for Transaction {
-    fn create_table(&mut self, table: Table) -> Result<()> {
+    fn create_table(&self, table: Table) -> Result<()> {
         self.client.mutate(Mutation::CreateTable { txn: self.state.clone(), schema: table })
     }
 
-    fn drop_table(&mut self, table: &str) -> Result<()> {
+    fn drop_table(&self, table: &str) -> Result<()> {
         self.client
             .mutate(Mutation::DeleteTable { txn: self.state.clone(), table: table.to_string() })
     }
