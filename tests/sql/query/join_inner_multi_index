@@ -178,7 +178,89 @@ Plan: Select(
             source: NestedLoopJoin {
                 left: NestedLoopJoin {
                     left: Scan {
-                        table: "movies",
+                        table: Table {
+                            name: "movies",
+                            columns: [
+                                Column {
+                                    name: "id",
+                                    datatype: Integer,
+                                    primary_key: true,
+                                    nullable: false,
+                                    default: None,
+                                    unique: true,
+                                    references: None,
+                                    index: false,
+                                },
+                                Column {
+                                    name: "title",
+                                    datatype: String,
+                                    primary_key: false,
+                                    nullable: false,
+                                    default: None,
+                                    unique: false,
+                                    references: None,
+                                    index: false,
+                                },
+                                Column {
+                                    name: "studio_id",
+                                    datatype: Integer,
+                                    primary_key: false,
+                                    nullable: false,
+                                    default: None,
+                                    unique: false,
+                                    references: Some(
+                                        "studios",
+                                    ),
+                                    index: true,
+                                },
+                                Column {
+                                    name: "genre_id",
+                                    datatype: Integer,
+                                    primary_key: false,
+                                    nullable: false,
+                                    default: None,
+                                    unique: false,
+                                    references: Some(
+                                        "genres",
+                                    ),
+                                    index: true,
+                                },
+                                Column {
+                                    name: "released",
+                                    datatype: Integer,
+                                    primary_key: false,
+                                    nullable: false,
+                                    default: None,
+                                    unique: false,
+                                    references: None,
+                                    index: false,
+                                },
+                                Column {
+                                    name: "rating",
+                                    datatype: Float,
+                                    primary_key: false,
+                                    nullable: true,
+                                    default: Some(
+                                        Null,
+                                    ),
+                                    unique: false,
+                                    references: None,
+                                    index: false,
+                                },
+                                Column {
+                                    name: "ultrahd",
+                                    datatype: Boolean,
+                                    primary_key: false,
+                                    nullable: true,
+                                    default: Some(
+                                        Null,
+                                    ),
+                                    unique: false,
+                                    references: None,
+                                    index: false,
+                                },
+                            ],
+                        },
                         alias: Some(
                             "m",
                         ),
@@ -186,7 +268,31 @@ Plan: Select(
                     },
                     left_size: 7,
                     right: Scan {
-                        table: "genres",
+                        table: Table {
+                            name: "genres",
+                            columns: [
+                                Column {
+                                    name: "id",
+                                    datatype: Integer,
+                                    primary_key: true,
+                                    nullable: false,
+                                    default: None,
+                                    unique: true,
+                                    references: None,
+                                    index: false,
+                                },
+                                Column {
+                                    name: "name",
+                                    datatype: String,
+                                    primary_key: false,
+                                    nullable: false,
+                                    default: None,
+                                    unique: false,
+                                    references: None,
+                                    index: false,
+                                },
+                            ],
+                        },
                         alias: Some(
                             "g",
                         ),
@@ -242,7 +348,45 @@ Plan: Select(
                 },
                 left_size: 9,
                 right: Scan {
-                    table: "studios",
+                    table: Table {
+                        name: "studios",
+                        columns: [
+                            Column {
+                                name: "id",
+                                datatype: Integer,
+                                primary_key: true,
+                                nullable: false,
+                                default: None,
+                                unique: true,
+                                references: None,
+                                index: false,
+                            },
+                            Column {
+                                name: "name",
+                                datatype: String,
+                                primary_key: false,
+                                nullable: false,
+                                default: None,
+                                unique: false,
+                                references: None,
+                                index: false,
+                            },
+                            Column {
+                                name: "country_id",
+                                datatype: String,
+                                primary_key: false,
+                                nullable: true,
+                                default: Some(
+                                    Null,
+                                ),
+                                unique: false,
+                                references: Some(
+                                    "countries",
+                                ),
+                                index: true,
+                            },
+                        ],
+                    },
                     alias: Some(
                         "s",
                     ),
@@ -371,7 +515,89 @@ Optimized plan: Select(
                 left: HashJoin {
                     left: Filter {
                         source: IndexLookup {
-                            table: "movies",
+                            table: Table {
+                                name: "movies",
+                                columns: [
+                                    Column {
+                                        name: "id",
+                                        datatype: Integer,
+                                        primary_key: true,
+                                        nullable: false,
+                                        default: None,
+                                        unique: true,
+                                        references: None,
+                                        index: false,
+                                    },
+                                    Column {
+                                        name: "title",
+                                        datatype: String,
+                                        primary_key: false,
+                                        nullable: false,
+                                        default: None,
+                                        unique: false,
+                                        references: None,
+                                        index: false,
+                                    },
+                                    Column {
+                                        name: "studio_id",
+                                        datatype: Integer,
+                                        primary_key: false,
+                                        nullable: false,
+                                        default: None,
+                                        unique: false,
+                                        references: Some(
+                                            "studios",
+                                        ),
+                                        index: true,
+                                    },
+                                    Column {
+                                        name: "genre_id",
+                                        datatype: Integer,
+                                        primary_key: false,
+                                        nullable: false,
+                                        default: None,
+                                        unique: false,
+                                        references: Some(
+                                            "genres",
+                                        ),
+                                        index: true,
+                                    },
+                                    Column {
+                                        name: "released",
+                                        datatype: Integer,
+                                        primary_key: false,
+                                        nullable: false,
+                                        default: None,
+                                        unique: false,
+                                        references: None,
+                                        index: false,
+                                    },
+                                    Column {
+                                        name: "rating",
+                                        datatype: Float,
+                                        primary_key: false,
+                                        nullable: true,
+                                        default: Some(
+                                            Null,
+                                        ),
+                                        unique: false,
+                                        references: None,
+                                        index: false,
+                                    },
+                                    Column {
+                                        name: "ultrahd",
+                                        datatype: Boolean,
+                                        primary_key: false,
+                                        nullable: true,
+                                        default: Some(
+                                            Null,
+                                        ),
+                                        unique: false,
+                                        references: None,
+                                        index: false,
+                                    },
+                                ],
+                            },
                             alias: Some(
                                 "m",
                             ),
@@ -413,7 +639,31 @@ Optimized plan: Select(
                         ),
                     ),
                     right: KeyLookup {
-                        table: "genres",
+                        table: Table {
+                            name: "genres",
+                            columns: [
+                                Column {
+                                    name: "id",
+                                    datatype: Integer,
+                                    primary_key: true,
+                                    nullable: false,
+                                    default: None,
+                                    unique: true,
+                                    references: None,
+                                    index: false,
+                                },
+                                Column {
+                                    name: "name",
+                                    datatype: String,
+                                    primary_key: false,
+                                    nullable: false,
+                                    default: None,
+                                    unique: false,
+                                    references: None,
+                                    index: false,
+                                },
+                            ],
+                        },
                         alias: Some(
                             "g",
                         ),
@@ -448,7 +698,45 @@ Optimized plan: Select(
                     ),
                 ),
                 right: KeyLookup {
-                    table: "studios",
+                    table: Table {
+                        name: "studios",
+                        columns: [
+                            Column {
+                                name: "id",
+                                datatype: Integer,
+                                primary_key: true,
+                                nullable: false,
+                                default: None,
+                                unique: true,
+                                references: None,
+                                index: false,
+                            },
+                            Column {
+                                name: "name",
+                                datatype: String,
+                                primary_key: false,
+                                nullable: false,
+                                default: None,
+                                unique: false,
+                                references: None,
+                                index: false,
+                            },
+                            Column {
+                                name: "country_id",
+                                datatype: String,
+                                primary_key: false,
+                                nullable: true,
+                                default: Some(
+                                    Null,
+                                ),
+                                unique: false,
+                                references: Some(
+                                    "countries",
+                                ),
+                                index: true,
+                            },
+                        ],
+                    },
                     alias: Some(
                         "s",
                     ),

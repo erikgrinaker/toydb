@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 /// The SQL engine interface.
 pub trait Engine<'a>: Sized {
     /// The transaction type.
-    type Transaction: Transaction + 'a;
+    type Transaction: Transaction + Catalog + 'a;
 
     /// Begins a read-write transaction.
     fn begin(&self) -> Result<Self::Transaction>;
@@ -32,11 +32,7 @@ pub trait Engine<'a>: Sized {
 /// All methods operate on row batches rather than single rows to amortize the
 /// cost. We have to do a Raft roundtrip for every call, and we'd rather not
 /// have to do a Raft roundtrip for every row.
-///
-/// TODO: split out Catalog trait and don't have Transaction depend on it. This
-/// enforces cleaner separation of when catalog access is valid (i.e. during
-/// planning but not execution).
-pub trait Transaction: Catalog {
+pub trait Transaction {
     /// The transaction's MVCC version.
     fn version(&self) -> mvcc::Version;
     /// Whether the transaction is read-only.
@@ -68,15 +64,13 @@ pub trait Transaction: Catalog {
 /// An index scan iterator.
 pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, HashSet<Value>)>>>;
 
-/// The catalog stores schema information
+/// The catalog stores schema information.
 pub trait Catalog {
     /// Creates a new table.
     fn create_table(&self, table: Table) -> Result<()>;
-    /// Drops a table. Errors if it does not exist.
-    ///
-    /// TODO: consider taking an if_exists parameter, but that will incur a Raft
-    /// roundtrip.
-    fn drop_table(&self, table: &str) -> Result<()>;
+    /// Drops a table. Errors if it does not exist, unless if_exists is true.
+    /// Returns true if the table existed and was deleted.
+    fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool>;
     /// Fetches a table schema.
     fn get_table(&self, table: &str) -> Result<Option<Table>>;
     /// Lists tables.

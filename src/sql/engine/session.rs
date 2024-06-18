@@ -69,7 +69,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
             }
             // TODO: this needs testing.
             ast::Statement::Explain(statement) => self.with_txn_read_only(|txn| {
-                Ok(StatementResult::Explain(Plan::build(*statement, txn)?.optimize(txn)?))
+                Ok(StatementResult::Explain(Plan::build(*statement, txn)?.optimize()?))
             }),
             statement if self.txn.is_some() => {
                 Self::execute_with(statement, self.txn.as_mut().unwrap())
@@ -101,7 +101,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
         statement: ast::Statement,
         txn: &mut E::Transaction,
     ) -> Result<StatementResult> {
-        Plan::build(statement, txn)?.optimize(txn)?.execute(txn)?.try_into()
+        Plan::build(statement, txn)?.optimize()?.execute(txn)?.try_into()
     }
 
     /// Runs a read-only closure in the session's transaction, or a new

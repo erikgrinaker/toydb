@@ -21,42 +21,49 @@ pub enum Plan {
     /// A DROP TABLE plan.
     DropTable { table: String, if_exists: bool },
     /// A DELETE plan.
-    Delete { table: String, source: Node },
+    Delete { table: String, key_index: usize, source: Node },
     /// An INSERT plan.
     /// TODO: consider using a source which generates expression rows.
-    Insert { table: String, columns: Vec<String>, expressions: Vec<Vec<Expression>> },
+    Insert { table: Table, columns: Vec<String>, expressions: Vec<Vec<Expression>> },
     /// An UPDATE plan.
-    Update { table: String, source: Node, expressions: Vec<(usize, Option<String>, Expression)> },
+    Update {
+        table: String,
+        key_index: usize,
+        source: Node,
+        expressions: Vec<(usize, Option<String>, Expression)>,
+    },
     /// A SELECT plan.
     Select(Node),
 }
 
 impl Plan {
     /// Builds a plan from an AST statement.
-    pub fn build<C: Catalog>(statement: ast::Statement, catalog: &mut C) -> Result<Self> {
+    pub fn build(statement: ast::Statement, catalog: &impl Catalog) -> Result<Self> {
         Planner::new(catalog).build(statement)
     }
 
     /// Executes the plan, consuming it.
-    pub fn execute(self, txn: &mut impl Transaction) -> Result<ExecutionResult> {
-        execution::execute_plan(self, txn)
+    pub fn execute(self, txn: &(impl Transaction + Catalog)) -> Result<ExecutionResult> {
+        execution::execute_plan(self, txn, txn)
     }
 
     /// Optimizes the plan, consuming it.
-    pub fn optimize<C: Catalog>(self, catalog: &mut C) -> Result<Self> {
-        let mut optimize = |mut node| -> Result<Node> {
+    pub fn optimize(self) -> Result<Self> {
+        let optimize = |mut node| -> Result<Node> {
             node = optimizer::ConstantFolder.optimize(node)?;
             node = optimizer::FilterPushdown.optimize(node)?;
-            node = optimizer::IndexLookup::new(catalog).optimize(node)?;
+            node = optimizer::IndexLookup.optimize(node)?;
             node = optimizer::NoopCleaner.optimize(node)?;
             node = optimizer::JoinType.optimize(node)?;
             Ok(node)
         };
         Ok(match self {
             Self::CreateTable { .. } | Self::DropTable { .. } | Self::Insert { .. } => self,
-            Self::Delete { table, source } => Self::Delete { table, source: optimize(source)? },
-            Self::Update { table, source, expressions } => {
-                Self::Update { table, source: optimize(source)?, expressions }
+            Self::Delete { table, key_index, source } => {
+                Self::Delete { table, key_index, source: optimize(source)? }
+            }
+            Self::Update { table, key_index, source, expressions } => {
+                Self::Update { table, key_index, source: optimize(source)?, expressions }
             }
             Self::Select(root) => Self::Select(optimize(root)?),
         })
@@ -69,7 +76,7 @@ impl std::fmt::Display for Plan {
         match self {
             Self::CreateTable { schema } => write!(f, "CreateTable: {}", schema.name),
             Self::DropTable { table, if_exists: _ } => write!(f, "DropTable: {table}"),
-            Self::Delete { source, table } => {
+            Self::Delete { table, key_index: _, source } => {
                 write!(
                     f,
                     "Delete: {table}\n{}",
@@ -77,10 +84,10 @@ impl std::fmt::Display for Plan {
                 )
             }
             Self::Insert { table, columns: _, expressions } => {
-                write!(f, "Insert: {table} ({} rows)", expressions.len())
+                write!(f, "Insert: {} ({} rows)", table.name, expressions.len())
             }
             Self::Select(root) => root.fmt(f),
-            Self::Update { source, table, expressions } => {
+            Self::Update { table, key_index: _, source, expressions } => {
                 write!(
                     f,
                     "Update: {table} ({})\n{}",
@@ -119,13 +126,13 @@ pub enum Node {
         outer: bool,
     },
     IndexLookup {
-        table: String,
+        table: Table,
         alias: Option<String>,
         column: String,
         values: Vec<Value>,
     },
     KeyLookup {
-        table: String,
+        table: Table,
         alias: Option<String>,
         keys: Vec<Value>,
     },
@@ -154,7 +161,7 @@ pub enum Node {
         expressions: Vec<(Expression, Option<String>)>,
     },
     Scan {
-        table: String,
+        table: Table,
         alias: Option<String>,
         filter: Option<Expression>,
     },
@@ -305,7 +312,7 @@ impl Node {
                 s += &right.format(indent, false, true);
             }
             Self::IndexLookup { table, column, alias, values } => {
-                s += &format!("IndexLookup: {}", table);
+                s += &format!("IndexLookup: {}", table.name);
                 if let Some(alias) = alias {
                     s += &format!(" as {}", alias);
                 }
@@ -321,7 +328,7 @@ impl Node {
                 s += "\n";
             }
             Self::KeyLookup { table, alias, keys } => {
-                s += &format!("KeyLookup: {}", table);
+                s += &format!("KeyLookup: {}", table.name);
                 if let Some(alias) = alias {
                     s += &format!(" as {}", alias);
                 }
@@ -378,7 +385,7 @@ impl Node {
                 s += &source.format(indent, false, true);
             }
             Self::Scan { table, alias, filter } => {
-                s += &format!("Scan: {}", table);
+                s += &format!("Scan: {}", table.name);
                 if let Some(alias) = alias {
                     s += &format!(" as {}", alias);
                 }

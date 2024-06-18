@@ -38,7 +38,33 @@ AST: Select {
 Plan: Select(
     Order {
         source: Scan {
-            table: "integers",
+            table: Table {
+                name: "integers",
+                columns: [
+                    Column {
+                        name: "id",
+                        datatype: Integer,
+                        primary_key: true,
+                        nullable: false,
+                        default: None,
+                        unique: true,
+                        references: None,
+                        index: false,
+                    },
+                    Column {
+                        name: "value",
+                        datatype: Integer,
+                        primary_key: false,
+                        nullable: true,
+                        default: Some(
+                            Null,
+                        ),
+                        unique: false,
+                        references: None,
+                        index: false,
+                    },
+                ],
+            },
             alias: None,
             filter: None,
         },
@@ -62,7 +88,33 @@ Plan: Select(
 Optimized plan: Select(
     Order {
         source: Scan {
-            table: "integers",
+            table: Table {
+                name: "integers",
+                columns: [
+                    Column {
+                        name: "id",
+                        datatype: Integer,
+                        primary_key: true,
+                        nullable: false,
+                        default: None,
+                        unique: true,
+                        references: None,
+                        index: false,
+                    },
+                    Column {
+                        name: "value",
+                        datatype: Integer,
+                        primary_key: false,
+                        nullable: true,
+                        default: Some(
+                            Null,
+                        ),
+                        unique: false,
+                        references: None,
+                        index: false,
+                    },
+                ],
+            },
             alias: None,
             filter: None,
         },

@@ -96,7 +96,31 @@ Plan: Select(
         source: Aggregation {
             source: Projection {
                 source: Scan {
-                    table: "genres",
+                    table: Table {
+                        name: "genres",
+                        columns: [
+                            Column {
+                                name: "id",
+                                datatype: Integer,
+                                primary_key: true,
+                                nullable: false,
+                                default: None,
+                                unique: true,
+                                references: None,
+                                index: false,
+                            },
+                            Column {
+                                name: "name",
+                                datatype: String,
+                                primary_key: false,
+                                nullable: false,
+                                default: None,
+                                unique: false,
+                                references: None,
+                                index: false,
+                            },
+                        ],
+                    },
                     alias: None,
                     filter: None,
                 },
@@ -196,7 +220,31 @@ Optimized plan: Select(
         source: Aggregation {
             source: Projection {
                 source: Scan {
-                    table: "genres",
+                    table: Table {
+                        name: "genres",
+                        columns: [
+                            Column {
+                                name: "id",
+                                datatype: Integer,
+                                primary_key: true,
+                                nullable: false,
+                                default: None,
+                                unique: true,
+                                references: None,
+                                index: false,
+                            },
+                            Column {
+                                name: "name",
+                                datatype: String,
+                                primary_key: false,
+                                nullable: false,
+                                default: None,
+                                unique: false,
+                                references: None,
+                                index: false,
+                            },
+                        ],
+                    },
                     alias: None,
                     filter: None,
                 },

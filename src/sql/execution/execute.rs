@@ -5,41 +5,45 @@ use super::source;
 use super::transform;
 use super::write;
 use crate::error::Result;
-use crate::sql::engine::Transaction;
+use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::plan::{Node, Plan};
 use crate::sql::types::{Columns, Row, Rows};
 
 /// Executes a plan, returning an execution result.
-pub fn execute_plan(plan: Plan, txn: &impl Transaction) -> Result<ExecutionResult> {
+pub fn execute_plan(
+    plan: Plan,
+    txn: &impl Transaction,
+    catalog: &impl Catalog,
+) -> Result<ExecutionResult> {
     Ok(match plan {
         Plan::CreateTable { schema } => {
             let name = schema.name.clone();
-            schema::create_table(txn, schema)?;
+            schema::create_table(catalog, schema)?;
             ExecutionResult::CreateTable { name }
         }
 
         Plan::DropTable { table, if_exists } => {
-            let existed = schema::drop_table(txn, &table, if_exists)?;
+            let existed = schema::drop_table(catalog, &table, if_exists)?;
             ExecutionResult::DropTable { name: table, existed }
         }
 
-        Plan::Delete { table, source } => {
+        Plan::Delete { table, key_index, source } => {
             let source = execute(source, txn)?;
-            let count = write::delete(txn, &table, source)?;
+            let count = write::delete(txn, table, key_index, source)?;
             ExecutionResult::Delete { count }
         }
 
         Plan::Insert { table, columns, expressions } => {
-            let count = write::insert(txn, &table, columns, expressions)?;
+            let count = write::insert(txn, table, columns, expressions)?;
             ExecutionResult::Insert { count }
         }
 
         Plan::Select(node) => ExecutionResult::Select { iter: execute(node, txn)? },
 
-        Plan::Update { table, source, expressions } => {
+        Plan::Update { table, key_index, source, expressions } => {
             let source = execute(source, txn)?;
             let expressions = expressions.into_iter().map(|(i, _, expr)| (i, expr)).collect();
-            let count = write::update(txn, &table, source, expressions)?;
+            let count = write::update(txn, table, key_index, source, expressions)?;
             ExecutionResult::Update { count }
         }
     })
@@ -47,8 +51,7 @@ pub fn execute_plan(plan: Plan, txn: &impl Transaction) -> Result<ExecutionResul
 
 /// Recursively executes a query plan node, returning a query iterator.
 ///
-/// TODO: since iterators are lazy, make this infallible and move all catalog
-/// lookups to planning.
+/// TODO: since iterators are lazy, make this infallible if possible.
 pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
     match node {
         Node::Aggregation { source, aggregates } => {
@@ -68,10 +71,10 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
         }
 
         Node::IndexLookup { table, alias: _, column, values } => {
-            source::lookup_index(txn, &table, &column, values)
+            source::lookup_index(txn, table, column, values)
         }
 
-        Node::KeyLookup { table, alias: _, keys } => source::lookup_key(txn, &table, keys),
+        Node::KeyLookup { table, alias: _, keys } => source::lookup_key(txn, table, keys),
 
         Node::Limit { source, limit } => {
             let source = execute(*source, txn)?;
@@ -101,7 +104,7 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
             Ok(transform::project(source, expressions))
         }
 
-        Node::Scan { table, alias: _, filter } => source::scan(txn, &table, filter),
+        Node::Scan { table, alias: _, filter } => source::scan(txn, table, filter),
     }
 }
 

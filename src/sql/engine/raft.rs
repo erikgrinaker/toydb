@@ -33,7 +33,7 @@ enum Mutation {
     /// Creates a table
     CreateTable { txn: TransactionState, schema: Table },
     /// Deletes a table
-    DeleteTable { txn: TransactionState, table: String },
+    DeleteTable { txn: TransactionState, table: String, if_exists: bool },
 }
 
 impl encoding::Value for Mutation {}
@@ -270,9 +270,12 @@ impl Catalog for Transaction {
         self.client.mutate(Mutation::CreateTable { txn: self.state.clone(), schema: table })
     }
 
-    fn drop_table(&self, table: &str) -> Result<()> {
-        self.client
-            .mutate(Mutation::DeleteTable { txn: self.state.clone(), table: table.to_string() })
+    fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool> {
+        self.client.mutate(Mutation::DeleteTable {
+            txn: self.state.clone(),
+            table: table.to_string(),
+            if_exists,
+        })
     }
 
     fn get_table(&self, table: &str) -> Result<Option<Table>> {
@@ -323,8 +326,8 @@ impl<E: storage::Engine> State<E> {
             Mutation::CreateTable { txn, schema } => {
                 bincode::serialize(&self.engine.resume(txn)?.create_table(schema)?)
             }
-            Mutation::DeleteTable { txn, table } => {
-                bincode::serialize(&self.engine.resume(txn)?.drop_table(&table)?)
+            Mutation::DeleteTable { txn, table, if_exists } => {
+                bincode::serialize(&self.engine.resume(txn)?.drop_table(&table, if_exists)?)
             }
         };
         Ok(response)

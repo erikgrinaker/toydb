@@ -80,7 +80,7 @@ macro_rules! test_query {
             // First, just try to generate a plan and execute it
             let result = Parser::new($query).parse()
                 .and_then(|ast| Plan::build(ast, &mut txn))
-                .and_then(|plan| plan.optimize(&mut txn))
+                .and_then(|plan| plan.optimize())
                 .and_then(|plan| {
                     write!(f, "Explain:\n{}\n\n", plan)?;
                     plan.execute(&mut txn).and_then(|r| r.try_into())
@@ -128,7 +128,7 @@ macro_rules! test_query {
             write!(f, "{:#?}\n\n", plan)?;
 
             write!(f, "Optimized plan: ")?;
-            let plan = match plan.optimize(&mut txn) {
+            let plan = match plan.optimize() {
                 Ok(plan) => plan,
                 Err(err) => {
                     write!(f, "{:?}", err)?;

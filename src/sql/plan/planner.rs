@@ -11,12 +11,12 @@ use std::mem::replace;
 
 /// A query plan builder.
 pub struct Planner<'a, C: Catalog> {
-    catalog: &'a mut C,
+    catalog: &'a C,
 }
 
 impl<'a, C: Catalog> Planner<'a, C> {
     /// Creates a new planner.
-    pub fn new(catalog: &'a mut C) -> Self {
+    pub fn new(catalog: &'a C) -> Self {
         Self { catalog }
     }
 
@@ -69,9 +69,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             // DML statements (mutations).
             ast::Statement::Delete { table, r#where } => {
-                let scope = &mut Scope::from_table(self.catalog.must_get_table(&table)?)?;
+                let table = self.catalog.must_get_table(&table)?;
+                let scope = &mut Scope::from_table(table.clone())?;
                 Plan::Delete {
-                    table: table.clone(),
+                    table: table.name.clone(),
+                    key_index: table.get_row_key_index()?,
                     source: Node::Scan {
                         table,
                         alias: None,
@@ -80,24 +82,30 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 }
             }
 
-            ast::Statement::Insert { table, columns, values } => Plan::Insert {
-                table,
-                columns: columns.unwrap_or_default(),
-                expressions: values
-                    .into_iter()
-                    .map(|exprs| {
-                        exprs
-                            .into_iter()
-                            .map(|expr| self.build_expression(&mut Scope::constant(), expr))
-                            .collect::<Result<_>>()
-                    })
-                    .collect::<Result<_>>()?,
-            },
+            ast::Statement::Insert { table, columns, values } => {
+                let table = self.catalog.must_get_table(&table)?;
+                Plan::Insert {
+                    table,
+                    columns: columns.unwrap_or_default(),
+                    expressions: values
+                        .into_iter()
+                        .map(|exprs| {
+                            exprs
+                                .into_iter()
+                                .map(|expr| self.build_expression(&mut Scope::constant(), expr))
+                                .collect::<Result<_>>()
+                        })
+                        .collect::<Result<_>>()?,
+                }
+            }
 
             ast::Statement::Update { table, set, r#where } => {
-                let scope = &mut Scope::from_table(self.catalog.must_get_table(&table)?)?;
+                let table = self.catalog.must_get_table(&table)?;
+                let key_index = table.get_row_key_index()?;
+                let scope = &mut Scope::from_table(table.clone())?;
                 Plan::Update {
-                    table: table.clone(),
+                    table: table.name.clone(),
+                    key_index,
                     source: Node::Scan {
                         table,
                         alias: None,
@@ -285,11 +293,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
     fn build_from_item(&self, scope: &mut Scope, item: ast::FromItem) -> Result<Node> {
         Ok(match item {
             ast::FromItem::Table { name, alias } => {
-                scope.add_table(
-                    alias.clone().unwrap_or_else(|| name.clone()),
-                    self.catalog.must_get_table(&name)?,
-                )?;
-                Node::Scan { table: name, alias, filter: None }
+                let table = self.catalog.must_get_table(&name)?;
+                scope.add_table(alias.clone().unwrap_or_else(|| name.clone()), table.clone())?;
+                Node::Scan { table, alias, filter: None }
             }
 
             ast::FromItem::Join { left, right, r#type, predicate } => {

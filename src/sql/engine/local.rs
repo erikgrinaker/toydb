@@ -296,8 +296,14 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         self.txn.set(&Key::Table((&table.name).into()).encode(), table.encode())
     }
 
-    fn drop_table(&self, table: &str) -> Result<()> {
-        let table = self.must_get_table(table)?;
+    fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool> {
+        let table = if !if_exists {
+            self.must_get_table(table)?
+        } else if let Some(table) = self.get_table(table)? {
+            table
+        } else {
+            return Ok(false);
+        };
         if let Some((t, cs)) = self.references(&table.name, false)?.first() {
             return errinput!("table {} is referenced by table {} column {}", table.name, t, cs[0]);
         }
@@ -305,7 +311,8 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         while let Some(row) = scan.next().transpose()? {
             self.delete(&table.name, &[table.get_row_key(&row)?])?
         }
-        self.txn.delete(&Key::Table(table.name.into()).encode())
+        self.txn.delete(&Key::Table(table.name.into()).encode())?;
+        Ok(true)
     }
 
     fn get_table(&self, table: &str) -> Result<Option<Table>> {

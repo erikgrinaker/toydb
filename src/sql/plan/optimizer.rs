@@ -1,7 +1,6 @@
 use super::super::types::{Expression, Value};
 use super::plan::Node;
 use crate::error::Result;
-use crate::sql::engine::Catalog;
 
 use std::mem::replace;
 
@@ -158,15 +157,9 @@ impl FilterPushdown {
 }
 
 /// An index lookup optimizer, which converts table scans to index lookups.
-pub struct IndexLookup<'a, C: Catalog> {
-    catalog: &'a mut C,
-}
+pub struct IndexLookup;
 
-impl<'a, C: Catalog> IndexLookup<'a, C> {
-    pub fn new(catalog: &'a mut C) -> Self {
-        Self { catalog }
-    }
-
+impl IndexLookup {
     // Wraps a node in a filter for the given CNF vector, if any, otherwise returns the bare node.
     fn wrap_cnf(&self, node: Node, cnf: Vec<Expression>) -> Node {
         if let Some(predicate) = Expression::from_cnf_vec(cnf) {
@@ -177,12 +170,11 @@ impl<'a, C: Catalog> IndexLookup<'a, C> {
     }
 }
 
-impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
+impl Optimizer for IndexLookup {
     fn optimize(&self, node: Node) -> Result<Node> {
         node.transform(&Ok, &|n| match n {
             Node::Scan { table, alias, filter: Some(filter) } => {
-                let columns = self.catalog.must_get_table(&table)?.columns;
-                let pk = columns.iter().position(|c| c.primary_key).unwrap();
+                let pk = table.columns.iter().position(|c| c.primary_key).unwrap();
 
                 // Convert the filter into conjunctive normal form, and try to convert each
                 // sub-expression into a lookup. If a lookup is found, return a lookup node and then
@@ -193,12 +185,12 @@ impl<'a, C: Catalog> Optimizer for IndexLookup<'a, C> {
                         cnf.remove(i);
                         return Ok(self.wrap_cnf(Node::KeyLookup { table, alias, keys }, cnf));
                     }
-                    for (ci, column) in columns.iter().enumerate().filter(|(_, c)| c.index) {
+                    for (ci, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
                         if let Some(values) = cnf[i].as_lookup(ci) {
                             cnf.remove(i);
                             return Ok(self.wrap_cnf(
                                 Node::IndexLookup {
-                                    table,
+                                    table: table.clone(),
                                     alias,
                                     column: column.name.clone(),
                                     values,

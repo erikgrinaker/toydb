@@ -28,7 +28,89 @@ AST: Select {
 Plan: Select(
     Filter {
         source: Scan {
-            table: "movies",
+            table: Table {
+                name: "movies",
+                columns: [
+                    Column {
+                        name: "id",
+                        datatype: Integer,
+                        primary_key: true,
+                        nullable: false,
+                        default: None,
+                        unique: true,
+                        references: None,
+                        index: false,
+                    },
+                    Column {
+                        name: "title",
+                        datatype: String,
+                        primary_key: false,
+                        nullable: false,
+                        default: None,
+                        unique: false,
+                        references: None,
+                        index: false,
+                    },
+                    Column {
+                        name: "studio_id",
+                        datatype: Integer,
+                        primary_key: false,
+                        nullable: false,
+                        default: None,
+                        unique: false,
+                        references: Some(
+                            "studios",
+                        ),
+                        index: true,
+                    },
+                    Column {
+                        name: "genre_id",
+                        datatype: Integer,
+                        primary_key: false,
+                        nullable: false,
+                        default: None,
+                        unique: false,
+                        references: Some(
+                            "genres",
+                        ),
+                        index: true,
+                    },
+                    Column {
+                        name: "released",
+                        datatype: Integer,
+                        primary_key: false,
+                        nullable: false,
+                        default: None,
+                        unique: false,
+                        references: None,
+                        index: false,
+                    },
+                    Column {
+                        name: "rating",
+                        datatype: Float,
+                        primary_key: false,
+                        nullable: true,
+                        default: Some(
+                            Null,
+                        ),
+                        unique: false,
+                        references: None,
+                        index: false,
+                    },
+                    Column {
+                        name: "ultrahd",
+                        datatype: Boolean,
+                        primary_key: false,
+                        nullable: true,
+                        default: Some(
+                            Null,
+                        ),
+                        unique: false,
+                        references: None,
+                        index: false,
+                    },
+                ],
+            },
             alias: None,
             filter: None,
         },
@@ -40,7 +122,89 @@ Plan: Select(
 
 Optimized plan: Select(
     Scan {
-        table: "movies",
+        table: Table {
+            name: "movies",
+            columns: [
+                Column {
+                    name: "id",
+                    datatype: Integer,
+                    primary_key: true,
+                    nullable: false,
+                    default: None,
+                    unique: true,
+                    references: None,
+                    index: false,
+                },
+                Column {
+                    name: "title",
+                    datatype: String,
+                    primary_key: false,
+                    nullable: false,
+                    default: None,
+                    unique: false,
+                    references: None,
+                    index: false,
+                },
+                Column {
+                    name: "studio_id",
+                    datatype: Integer,
+                    primary_key: false,
+                    nullable: false,
+                    default: None,
+                    unique: false,
+                    references: Some(
+                        "studios",
+                    ),
+                    index: true,
+                },
+                Column {
+                    name: "genre_id",
+                    datatype: Integer,
+                    primary_key: false,
+                    nullable: false,
+                    default: None,
+                    unique: false,
+                    references: Some(
+                        "genres",
+                    ),
+                    index: true,
+                },
+                Column {
+                    name: "released",
+                    datatype: Integer,
+                    primary_key: false,
+                    nullable: false,
+                    default: None,
+                    unique: false,
+                    references: None,
+                    index: false,
+                },
+                Column {
+                    name: "rating",
+                    datatype: Float,
+                    primary_key: false,
+                    nullable: true,
+                    default: Some(
+                        Null,
+                    ),
+                    unique: false,
+                    references: None,
+                    index: false,
+                },
+                Column {
+                    name: "ultrahd",
+                    datatype: Boolean,
+                    primary_key: false,
+                    nullable: true,
+                    default: Some(
+                        Null,
+                    ),
+                    unique: false,
+                    references: None,
+                    index: false,
+                },
+            ],
+        },
         alias: None,
         filter: Some(
             Constant(

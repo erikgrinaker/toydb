@@ -7,13 +7,15 @@ use crate::sql::types::{Expression, Row, Value};
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE).
 /// Returns the number of rows deleted.
-pub(super) fn delete(txn: &impl Transaction, table: &str, source: QueryIterator) -> Result<u64> {
-    // TODO: should be prepared by planner.
-    let table = txn.must_get_table(table)?;
-    let ids: Vec<_> =
-        source.map(|r| r.and_then(|row| table.get_row_key(&row))).collect::<Result<_>>()?;
+pub(super) fn delete(
+    txn: &impl Transaction,
+    table: String,
+    key_index: usize,
+    source: QueryIterator,
+) -> Result<u64> {
+    let ids: Vec<_> = source.map(|r| r.map(|row| row[key_index].clone())).collect::<Result<_>>()?;
     let count = ids.len() as u64;
-    txn.delete(&table.name, &ids)?;
+    txn.delete(&table, &ids)?;
     Ok(count)
 }
 
@@ -22,11 +24,10 @@ pub(super) fn delete(txn: &impl Transaction, table: &str, source: QueryIterator)
 /// TODO: this should take rows from a values source.
 pub(super) fn insert(
     txn: &impl Transaction,
-    table: &str,
+    table: Table,
     columns: Vec<String>,
     values: Vec<Vec<Expression>>,
 ) -> Result<u64> {
-    let table = txn.must_get_table(table)?;
     let mut rows = Vec::with_capacity(values.len());
     for expressions in values {
         let mut row =
@@ -47,14 +48,14 @@ pub(super) fn insert(
 /// rows updated.
 pub(super) fn update(
     txn: &impl Transaction,
-    table: &str,
+    table: String,
+    key_index: usize,
     mut source: QueryIterator,
     expressions: Vec<(usize, Expression)>,
 ) -> Result<u64> {
-    let table = txn.must_get_table(table)?;
     let mut update = std::collections::HashMap::new();
     while let Some(row) = source.next().transpose()? {
-        let id = table.get_row_key(&row)?;
+        let id = row[key_index].clone();
         let mut new = row.clone();
         for (field, expr) in &expressions {
             new[*field] = expr.evaluate(Some(&row))?;
@@ -62,7 +63,7 @@ pub(super) fn update(
         update.insert(id, new);
     }
     let count = update.len() as u64;
-    txn.update(&table.name, update)?;
+    txn.update(&table, update)?;
     Ok(count)
 }
 

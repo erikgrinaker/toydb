@@ -1,7 +1,8 @@
 use super::{DataType, Value};
 use crate::encoding;
 use crate::errinput;
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::sql::engine::Catalog;
 use crate::sql::engine::Transaction;
 use crate::sql::parser::format_ident;
 
@@ -50,18 +51,21 @@ impl Table {
 
     /// Returns the primary key value of a row
     pub fn get_row_key(&self, row: &[Value]) -> Result<Value> {
-        row.get(
-            self.columns
-                .iter()
-                .position(|c| c.primary_key)
-                .ok_or::<Error>(errinput!("primary key not found"))?,
-        )
-        .cloned()
-        .ok_or(errinput!("primary key value not found for row"))
+        self.get_row_key_at(row, self.get_row_key_index()?)
+    }
+
+    /// Returns the primary key value at the given index.
+    pub fn get_row_key_at(&self, row: &[Value], index: usize) -> Result<Value> {
+        row.get(index).cloned().ok_or(errinput!("primary key value not found for row"))
+    }
+
+    /// Returns the index of the primary key field.
+    pub fn get_row_key_index(&self) -> Result<usize> {
+        self.columns.iter().position(|c| c.primary_key).ok_or(errinput!("primary key not found"))
     }
 
     /// Validates the table schema
-    pub fn validate(&self, txn: &dyn Transaction) -> Result<()> {
+    pub fn validate(&self, catalog: &dyn Catalog) -> Result<()> {
         if self.columns.is_empty() {
             return errinput!("table {} has no columns", self.name);
         }
@@ -71,7 +75,7 @@ impl Table {
             _ => return errinput!("multiple primary keys in table {}", self.name),
         };
         for column in &self.columns {
-            column.validate(self, txn)?;
+            column.validate(self, catalog)?;
         }
         Ok(())
     }
@@ -123,7 +127,7 @@ pub struct Column {
 
 impl Column {
     /// Validates the column schema
-    pub fn validate(&self, table: &Table, txn: &dyn Transaction) -> Result<()> {
+    pub fn validate(&self, table: &Table, catalog: &dyn Catalog) -> Result<()> {
         // Validate primary key
         if self.primary_key && self.nullable {
             return errinput!("primary key {} cannot be nullable", self.name);
@@ -156,7 +160,7 @@ impl Column {
         if let Some(reference) = &self.references {
             let target = if reference == &table.name {
                 table.clone()
-            } else if let Some(table) = txn.get_table(reference)? {
+            } else if let Some(table) = catalog.get_table(reference)? {
                 table
             } else {
                 return errinput!(
