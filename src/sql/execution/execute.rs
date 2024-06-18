@@ -10,7 +10,7 @@ use crate::sql::plan::{Node, Plan};
 use crate::sql::types::{Columns, Row, Rows};
 
 /// Executes a plan, returning an execution result.
-pub fn execute_plan(plan: Plan, txn: &mut impl Transaction) -> Result<ExecutionResult> {
+pub fn execute_plan(plan: Plan, txn: &impl Transaction) -> Result<ExecutionResult> {
     Ok(match plan {
         Plan::CreateTable { schema } => {
             let name = schema.name.clone();
@@ -49,7 +49,7 @@ pub fn execute_plan(plan: Plan, txn: &mut impl Transaction) -> Result<ExecutionR
 ///
 /// TODO: since iterators are lazy, make this infallible and move all catalog
 /// lookups to planning.
-pub fn execute(node: Node, txn: &mut impl Transaction) -> Result<QueryIterator> {
+pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
     match node {
         Node::Aggregation { source, aggregates } => {
             let source = execute(*source, txn)?;

@@ -5,7 +5,7 @@ use crate::sql::types::{Column, Expression, Row, Value};
 
 /// A table scan source.
 pub(super) fn scan(
-    txn: &mut impl Transaction,
+    txn: &impl Transaction,
     table: &str,
     filter: Option<Expression>,
 ) -> Result<QueryIterator> {
@@ -19,7 +19,7 @@ pub(super) fn scan(
 
 /// A primary key lookup source.
 pub(super) fn lookup_key(
-    txn: &mut impl Transaction,
+    txn: &impl Transaction,
     table: &str,
     keys: Vec<Value>,
 ) -> Result<QueryIterator> {
@@ -40,7 +40,7 @@ pub(super) fn lookup_key(
 
 /// An index lookup source.
 pub(super) fn lookup_index(
-    txn: &mut impl Transaction,
+    txn: &impl Transaction,
     table: &str,
     column: &str,
     values: Vec<Value>,

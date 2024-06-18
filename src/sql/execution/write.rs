@@ -8,7 +8,7 @@ use crate::sql::types::{Expression, Row, Value};
 /// Deletes rows, taking primary keys from the source (i.e. DELETE).
 /// Returns the number of rows deleted.
 pub(super) fn delete(
-    txn: &mut impl Transaction,
+    txn: &impl Transaction,
     table: &str,
     mut source: QueryIterator,
 ) -> Result<u64> {
@@ -26,7 +26,7 @@ pub(super) fn delete(
 ///
 /// TODO: this should take rows from a values source.
 pub(super) fn insert(
-    txn: &mut impl Transaction,
+    txn: &impl Transaction,
     table: &str,
     columns: Vec<String>,
     values: Vec<Vec<Expression>>,
@@ -50,7 +50,7 @@ pub(super) fn insert(
 /// Updates rows passed in from the source (i.e. UPDATE). Returns the number of
 /// rows updated.
 pub(super) fn update(
-    txn: &mut impl Transaction,
+    txn: &impl Transaction,
     table: &str,
     mut source: QueryIterator,
     expressions: Vec<(usize, Expression)>,
