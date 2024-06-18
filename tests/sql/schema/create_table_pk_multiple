@@ -1,4 +1,4 @@
 Query: CREATE TABLE name (id INTEGER PRIMARY KEY, name STRING PRIMARY KEY)
-Error: InvalidInput("multiple primary keys in table name")
+Error: InvalidInput("multiple primary keys for table name")
 
 Storage:

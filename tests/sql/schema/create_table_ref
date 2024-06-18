@@ -4,8 +4,10 @@ Result: CreateTable { name: "other" }
 Storage:
 CREATE TABLE other (
   id INTEGER PRIMARY KEY,
-  test_id INTEGER DEFAULT NULL REFERENCES test
+  test_id INTEGER DEFAULT NULL INDEX REFERENCES test
 )
+
+Index other.test_id
 
 CREATE TABLE test (
   id INTEGER PRIMARY KEY

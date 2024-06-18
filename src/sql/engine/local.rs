@@ -146,7 +146,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             if !self.get(&table.name, &[id.clone()])?.is_empty() {
                 return errinput!("primary key {id} already exists for table {}", table.name);
             }
-            self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode(), row.encode())?;
+            self.txn.set(&Key::Row((&table.name).into(), id.into()).encode(), row.encode())?;
 
             // Update indexes
             for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
@@ -159,6 +159,8 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     }
 
     fn delete(&self, table: &str, ids: &[Value]) -> Result<()> {
+        // Check for foreign key referenes.
+
         // TODO: try to be more clever than simply iterating over each ID.
         for id in ids {
             let table = self.must_get_table(table)?;
@@ -172,7 +174,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                 while let Some(row) = scan.next().transpose()? {
                     for (i, c) in &cs {
                         if &row[*i] == id
-                            && (table.name != t.name || id != &table.get_row_key(&row)?)
+                            && (table.name != t.name || id != table.get_row_key(&row)?)
                         {
                             return errinput!(
                                 "primary key {id} referenced by table {} column {c}",
@@ -275,7 +277,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         // TODO: be more clever than just iterating here.
         for (id, row) in rows {
             // If the primary key changes we do a delete and create, otherwise we replace the row
-            if id != table.get_row_key(&row)? {
+            if id != *table.get_row_key(&row)? {
                 self.delete(&table.name, &[id.clone()])?;
                 self.insert(&table.name, vec![row])?;
                 return Ok(());
@@ -330,7 +332,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         }
         let mut scan = self.scan(&table.name, None)?;
         while let Some(row) = scan.next().transpose()? {
-            self.delete(&table.name, &[table.get_row_key(&row)?])?
+            self.delete(&table.name, &[table.get_row_key(&row)?.clone()])?
         }
         self.txn.delete(&Key::Table(table.name.into()).encode())?;
         Ok(true)

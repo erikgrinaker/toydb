@@ -4,13 +4,17 @@ Error: InvalidInput("table target is referenced by table source column target_id
 Storage:
 CREATE TABLE self (
   id INTEGER PRIMARY KEY,
-  self_id INTEGER DEFAULT NULL REFERENCES self
+  self_id INTEGER DEFAULT NULL INDEX REFERENCES self
 )
+
+Index self.self_id
 
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id INTEGER DEFAULT NULL REFERENCES target
+  target_id INTEGER DEFAULT NULL INDEX REFERENCES target
 )
+
+Index source.target_id
 
 CREATE TABLE target (
   id INTEGER PRIMARY KEY

@@ -4,9 +4,12 @@ Result: Create { count: 1 }
 Storage:
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id BOOLEAN DEFAULT NULL REFERENCES target
+  target_id BOOLEAN DEFAULT NULL INDEX REFERENCES target
 )
 [Integer(1), Null]
+
+Index source.target_id
+Null => [Integer(1)]
 
 CREATE TABLE target (
   id BOOLEAN PRIMARY KEY

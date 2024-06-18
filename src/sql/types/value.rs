@@ -5,7 +5,7 @@ use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 /// A primitive data type.
-#[derive(Clone, Debug, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Serialize, Deserialize)]
 pub enum DataType {
     /// A boolean: true or false.
     Boolean,

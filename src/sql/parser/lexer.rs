@@ -484,3 +484,13 @@ impl<'a> Lexer<'a> {
         while self.next_if(|c| c.is_whitespace()).is_some() {}
     }
 }
+
+/// Returns true if the entire given string is a single valid identifier.
+pub fn is_ident(ident: &str) -> bool {
+    let mut lexer = Lexer::new(ident);
+    let token = lexer.next();
+    if lexer.next().is_some() {
+        return false; // multiple tokens, so not an identifier
+    }
+    matches!(token, Some(Ok(Token::Ident(_))))
+}

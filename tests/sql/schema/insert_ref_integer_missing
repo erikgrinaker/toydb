@@ -4,8 +4,10 @@ Error: InvalidInput("referenced primary key 7 in table target does not exist")
 Storage:
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id INTEGER DEFAULT NULL REFERENCES target
+  target_id INTEGER DEFAULT NULL INDEX REFERENCES target
 )
+
+Index source.target_id
 
 CREATE TABLE target (
   id INTEGER PRIMARY KEY

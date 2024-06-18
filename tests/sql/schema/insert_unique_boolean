@@ -4,11 +4,28 @@ Result: Create { count: 1 }
 Storage:
 CREATE TABLE "unique" (
   id INTEGER PRIMARY KEY,
-  "boolean" BOOLEAN DEFAULT NULL UNIQUE,
-  "float" FLOAT DEFAULT NULL UNIQUE,
-  "integer" INTEGER DEFAULT NULL UNIQUE,
-  "string" STRING DEFAULT NULL UNIQUE
+  "boolean" BOOLEAN DEFAULT NULL UNIQUE INDEX,
+  "float" FLOAT DEFAULT NULL UNIQUE INDEX,
+  "integer" INTEGER DEFAULT NULL UNIQUE INDEX,
+  "string" STRING DEFAULT NULL UNIQUE INDEX
 )
 [Integer(0), Null, Null, Null, Null]
 [Integer(1), Boolean(true), Float(3.14), Integer(7), String("foo")]
 [Integer(2), Boolean(false), Null, Null, Null]
+
+Index unique.boolean
+Null => [Integer(0)]
+Boolean(false) => [Integer(2)]
+Boolean(true) => [Integer(1)]
+
+Index unique.float
+Null => [Integer(0), Integer(2)]
+Float(3.14) => [Integer(1)]
+
+Index unique.integer
+Null => [Integer(0), Integer(2)]
+Integer(7) => [Integer(1)]
+
+Index unique.string
+Null => [Integer(0), Integer(2)]
+String("foo") => [Integer(1)]

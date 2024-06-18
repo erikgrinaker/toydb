@@ -26,11 +26,11 @@ fn get_table() -> Result<()> {
         c.get_table("movies")?,
         schema::Table {
             name: "movies".into(),
+            primary_key: 0,
             columns: vec![
                 schema::Column {
                     name: "id".into(),
                     datatype: DataType::Integer,
-                    primary_key: true,
                     nullable: false,
                     default: None,
                     unique: true,
@@ -40,7 +40,6 @@ fn get_table() -> Result<()> {
                 schema::Column {
                     name: "title".into(),
                     datatype: DataType::String,
-                    primary_key: false,
                     nullable: false,
                     default: None,
                     unique: false,
@@ -50,27 +49,24 @@ fn get_table() -> Result<()> {
                 schema::Column {
                     name: "studio_id".into(),
                     datatype: DataType::Integer,
-                    primary_key: false,
                     nullable: false,
                     default: None,
                     unique: false,
-                    index: false,
+                    index: true,
                     references: Some("studios".into()),
                 },
                 schema::Column {
                     name: "genre_id".into(),
                     datatype: DataType::Integer,
-                    primary_key: false,
                     nullable: false,
                     default: None,
                     unique: false,
-                    index: false,
+                    index: true,
                     references: Some("genres".into()),
                 },
                 schema::Column {
                     name: "released".into(),
                     datatype: DataType::Integer,
-                    primary_key: false,
                     nullable: false,
                     default: None,
                     unique: false,
@@ -80,7 +76,6 @@ fn get_table() -> Result<()> {
                 schema::Column {
                     name: "rating".into(),
                     datatype: DataType::Float,
-                    primary_key: false,
                     nullable: true,
                     default: Some(Value::Null),
                     unique: false,
@@ -90,7 +85,6 @@ fn get_table() -> Result<()> {
                 schema::Column {
                     name: "ultrahd".into(),
                     datatype: DataType::Boolean,
-                    primary_key: false,
                     nullable: true,
                     default: Some(Value::Null),
                     unique: false,
@@ -132,9 +126,9 @@ fn status() -> Result<()> {
                 storage: storage::engine::Status {
                     name: "bitcask".to_string(),
                     keys: 13,
-                    size: 962,
-                    total_disk_size: 1176,
-                    live_disk_size: 1066,
+                    size: 952,
+                    total_disk_size: 1166,
+                    live_disk_size: 1056,
                     garbage_disk_size: 110,
                 },
             },
@@ -143,11 +137,11 @@ fn status() -> Result<()> {
                 active_txns: 0,
                 storage: engine::Status {
                     name: "bitcask".to_string(),
-                    keys: 26,
-                    size: 1630,
-                    total_disk_size: 4156,
-                    live_disk_size: 1838,
-                    garbage_disk_size: 2318
+                    keys: 36,
+                    size: 2177,
+                    total_disk_size: 7601,
+                    live_disk_size: 2465,
+                    garbage_disk_size: 5136,
                 },
             }
         },

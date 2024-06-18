@@ -1,4 +1,4 @@
 Query: CREATE TABLE name (id INTEGER)
-Error: InvalidInput("no primary key in table name")
+Error: InvalidInput("no primary key for table name")
 
 Storage:

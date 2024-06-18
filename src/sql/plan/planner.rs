@@ -36,32 +36,35 @@ impl<'a, C: Catalog> Planner<'a, C> {
             ast::Statement::Explain(_) => panic!("unexpected explain statement"),
 
             // DDL statements (schema changes).
-            ast::Statement::CreateTable { name, columns } => Plan::CreateTable {
-                schema: Table::new(
-                    name,
-                    columns
-                        .into_iter()
-                        .map(|c| {
-                            let nullable = c.nullable.unwrap_or(!c.primary_key);
-                            let default = match c.default {
+            ast::Statement::CreateTable { name, columns } => {
+                let Some(primary_key) = columns.iter().position(|c| c.primary_key) else {
+                    return errinput!("no primary key for table {name}");
+                };
+                if columns.iter().filter(|c| c.primary_key).count() > 1 {
+                    return errinput!("multiple primary keys for table {name}");
+                }
+                let columns = columns
+                    .into_iter()
+                    .map(|c| {
+                        let nullable = c.nullable.unwrap_or(!c.primary_key);
+                        Ok(Column {
+                            name: c.name,
+                            datatype: c.datatype,
+                            nullable,
+                            default: match c.default {
                                 Some(expr) => Some(self.evaluate_constant(expr)?),
                                 None if nullable => Some(Value::Null),
                                 None => None,
-                            };
-                            Ok(Column {
-                                name: c.name,
-                                datatype: c.datatype,
-                                primary_key: c.primary_key,
-                                nullable,
-                                default,
-                                index: c.index && !c.primary_key,
-                                unique: c.unique || c.primary_key,
-                                references: c.references,
-                            })
+                            },
+                            unique: c.unique || c.primary_key,
+                            index: (c.index || c.unique || c.references.is_some())
+                                && !c.primary_key,
+                            references: c.references,
                         })
-                        .collect::<Result<_>>()?,
-                )?,
-            },
+                    })
+                    .collect::<Result<_>>()?;
+                Plan::CreateTable { schema: Table { name, primary_key, columns } }
+            }
 
             ast::Statement::DropTable { name, if_exists } => {
                 Plan::DropTable { table: name, if_exists }
@@ -73,7 +76,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let scope = &mut Scope::from_table(table.clone())?;
                 Plan::Delete {
                     table: table.name.clone(),
-                    key_index: table.get_row_key_index()?,
+                    key_index: table.primary_key,
                     source: Node::Scan {
                         table,
                         alias: None,
@@ -101,11 +104,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             ast::Statement::Update { table, set, r#where } => {
                 let table = self.catalog.must_get_table(&table)?;
-                let key_index = table.get_row_key_index()?;
                 let scope = &mut Scope::from_table(table.clone())?;
                 Plan::Update {
                     table: table.name.clone(),
-                    key_index,
+                    key_index: table.primary_key,
                     source: Node::Scan {
                         table,
                         alias: None,

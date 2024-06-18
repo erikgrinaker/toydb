@@ -4,11 +4,15 @@ Result: Update { count: 1 }
 Storage:
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id INTEGER DEFAULT NULL REFERENCES target
+  target_id INTEGER DEFAULT NULL INDEX REFERENCES target
 )
 [Integer(1), Integer(1)]
 [Integer(2), Null]
 [Integer(4), Null]
+
+Index source.target_id
+Null => [Integer(2), Integer(4)]
+Integer(1) => [Integer(1)]
 
 CREATE TABLE target (
   id INTEGER PRIMARY KEY,

@@ -9,10 +9,16 @@ Result: CreateTable { name: "other" }
 Storage:
 CREATE TABLE other (
   id INTEGER PRIMARY KEY,
-  test_id_a INTEGER DEFAULT NULL REFERENCES test,
-  test_id_b INTEGER DEFAULT NULL REFERENCES test,
-  test_id_c INTEGER DEFAULT NULL REFERENCES test
+  test_id_a INTEGER DEFAULT NULL INDEX REFERENCES test,
+  test_id_b INTEGER DEFAULT NULL INDEX REFERENCES test,
+  test_id_c INTEGER DEFAULT NULL INDEX REFERENCES test
 )
+
+Index other.test_id_a
+
+Index other.test_id_b
+
+Index other.test_id_c
 
 CREATE TABLE test (
   id INTEGER PRIMARY KEY

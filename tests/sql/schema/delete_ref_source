@@ -4,10 +4,14 @@ Result: Delete { count: 1 }
 Storage:
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id INTEGER DEFAULT NULL REFERENCES target
+  target_id INTEGER DEFAULT NULL INDEX REFERENCES target
 )
 [Integer(2), Integer(2)]
 [Integer(4), Null]
+
+Index source.target_id
+Null => [Integer(4)]
+Integer(2) => [Integer(2)]
 
 CREATE TABLE target (
   id INTEGER PRIMARY KEY,

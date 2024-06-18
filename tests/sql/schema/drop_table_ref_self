@@ -4,8 +4,10 @@ Result: DropTable { name: "self", existed: true }
 Storage:
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id INTEGER DEFAULT NULL REFERENCES target
+  target_id INTEGER DEFAULT NULL INDEX REFERENCES target
 )
+
+Index source.target_id
 
 CREATE TABLE target (
   id INTEGER PRIMARY KEY

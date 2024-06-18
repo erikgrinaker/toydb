@@ -4,9 +4,12 @@ Result: Create { count: 1 }
 Storage:
 CREATE TABLE source (
   id INTEGER PRIMARY KEY,
-  target_id STRING DEFAULT NULL REFERENCES target
+  target_id STRING DEFAULT NULL INDEX REFERENCES target
 )
 [Integer(1), String("foo")]
+
+Index source.target_id
+String("foo") => [Integer(1)]
 
 CREATE TABLE target (
   id STRING PRIMARY KEY

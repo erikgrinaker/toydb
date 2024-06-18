@@ -38,28 +38,27 @@ Plan: Select(
         source: Scan {
             table: Table {
                 name: "booleans",
+                primary_key: 0,
                 columns: [
                     Column {
                         name: "id",
                         datatype: Integer,
-                        primary_key: true,
                         nullable: false,
                         default: None,
                         unique: true,
-                        references: None,
                         index: false,
+                        references: None,
                     },
                     Column {
                         name: "value",
                         datatype: Boolean,
-                        primary_key: false,
                         nullable: true,
                         default: Some(
                             Null,
                         ),
                         unique: false,
-                        references: None,
                         index: false,
+                        references: None,
                     },
                 ],
             },
@@ -88,28 +87,27 @@ Optimized plan: Select(
         source: Scan {
             table: Table {
                 name: "booleans",
+                primary_key: 0,
                 columns: [
                     Column {
                         name: "id",
                         datatype: Integer,
-                        primary_key: true,
                         nullable: false,
                         default: None,
                         unique: true,
-                        references: None,
                         index: false,
+                        references: None,
                     },
                     Column {
                         name: "value",
                         datatype: Boolean,
-                        primary_key: false,
                         nullable: true,
                         default: Some(
                             Null,
                         ),
                         unique: false,
-                        references: None,
                         index: false,
+                        references: None,
                     },
                 ],
             },

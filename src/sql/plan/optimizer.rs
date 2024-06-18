@@ -174,14 +174,12 @@ impl Optimizer for IndexLookup {
     fn optimize(&self, node: Node) -> Result<Node> {
         node.transform(&Ok, &|n| match n {
             Node::Scan { table, alias, filter: Some(filter) } => {
-                let pk = table.columns.iter().position(|c| c.primary_key).unwrap();
-
                 // Convert the filter into conjunctive normal form, and try to convert each
                 // sub-expression into a lookup. If a lookup is found, return a lookup node and then
                 // apply the remaining conjunctions as a filter node, if any.
                 let mut cnf = filter.clone().into_cnf_vec();
                 for i in 0..cnf.len() {
-                    if let Some(keys) = cnf[i].as_lookup(pk) {
+                    if let Some(keys) = cnf[i].as_lookup(table.primary_key) {
                         cnf.remove(i);
                         return Ok(self.wrap_cnf(Node::KeyLookup { table, alias, keys }, cnf));
                     }
