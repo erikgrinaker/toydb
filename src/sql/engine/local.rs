@@ -31,13 +31,13 @@ impl<E: storage::Engine> Local<E> {
         Ok(<Self as super::Engine>::Transaction::new(self.kv.resume(state)?))
     }
 
-    /// Fetches an unversioned metadata value
-    pub fn get_metadata(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+    /// Fetches an unversioned key.
+    pub fn get_unversioned(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.kv.get_unversioned(key)
     }
 
-    /// Sets an unversioned metadata value
-    pub fn set_metadata(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
+    /// Sets an unversioned key.
+    pub fn set_unversioned(&self, key: &[u8], value: Vec<u8>) -> Result<()> {
         self.kv.set_unversioned(key, value)
     }
 }

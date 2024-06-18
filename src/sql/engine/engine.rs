@@ -20,11 +20,11 @@ pub trait Engine<'a>: Sized {
     type Transaction: Transaction + Catalog + 'a;
 
     /// Begins a read-write transaction.
-    fn begin(&self) -> Result<Self::Transaction>;
+    fn begin(&'a self) -> Result<Self::Transaction>;
     /// Begins a read-only transaction.
-    fn begin_read_only(&self) -> Result<Self::Transaction>;
+    fn begin_read_only(&'a self) -> Result<Self::Transaction>;
     /// Begins a read-only transaction as of a historical version.
-    fn begin_as_of(&self, version: mvcc::Version) -> Result<Self::Transaction>;
+    fn begin_as_of(&'a self, version: mvcc::Version) -> Result<Self::Transaction>;
 
     /// Creates a session for executing SQL statements. Can't outlive engine.
     fn session(&'a self) -> Session<'a, Self> {
@@ -38,8 +38,6 @@ pub trait Engine<'a>: Sized {
 /// All methods operate on row batches rather than single rows to amortize the
 /// cost. With the Raft engine, each call results in a Raft roundtrip, and we'd
 /// rather not have to do that for every single row that's modified.
-///
-/// TODO: decide whether to use borrowed, owned, or Cowed parameters.
 pub trait Transaction {
     /// The transaction's MVCC version. Unique for read/write transactions.
     fn version(&self) -> mvcc::Version;

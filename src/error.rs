@@ -42,8 +42,10 @@ impl Error {
     /// panic to prevent replica divergence.
     pub fn is_deterministic(&self) -> bool {
         match self {
-            // Aborts don't happen during application, only leader changes.
-            Error::Abort => true,
+            // Aborts don't happen during application, only leader changes. But
+            // we consider them non-deterministic in case a abort should happen
+            // unexpectedly below Raft.
+            Error::Abort => false,
             // Possible data corruption local to this node.
             Error::InvalidData(_) => false,
             // Input errors are (likely) deterministic. We could employ command

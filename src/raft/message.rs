@@ -27,6 +27,11 @@ impl encoding::Value for Envelope {}
 /// ensuring messages are not dropped or reordered as long as the connection
 /// remains intact. A message and its response are sent across separate TCP
 /// connections (outbound from their respective senders).
+///
+/// TODO: add a Read(Response) message type for reads, to avoid sending
+/// heartbeats on every read -- these could otherwise cause spurious replication
+/// probes for behind followers. We still need the read_seq in the heartbeat for
+/// retries.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Message {
     /// Candidates campaign for leadership by soliciting votes from peers.

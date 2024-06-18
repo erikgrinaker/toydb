@@ -1,180 +1,132 @@
-use super::super::types::schema::Table;
-use super::super::types::{Expression, Row, Rows, Value};
 use super::{Catalog, Engine as _, IndexScan, Transaction as _};
 use crate::encoding::{self, bincode, Value as _};
 use crate::errdata;
 use crate::error::Result;
-use crate::raft::{self, Entry};
-use crate::storage::{self, mvcc, mvcc::TransactionState};
+use crate::raft;
+use crate::sql::types::schema::Table;
+use crate::sql::types::{Expression, Row, Rows, Value};
+use crate::storage::{self, mvcc};
 
 use crossbeam::channel::Sender;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// A Raft state machine mutation.
+/// A Raft-based SQL engine. This dispatches to the `Local` engine for local
+/// processing and storage on each node, but plumbs read/write commands through
+/// Raft for distributed consensus.
 ///
-/// TODO: use Cows for these.
-#[derive(Clone, Serialize, Deserialize)]
-enum Mutation {
-    /// Begins a read-write transaction
-    Begin,
-    /// Commits the given transaction
-    Commit(TransactionState),
-    /// Rolls back the given transaction
-    Rollback(TransactionState),
-
-    /// Creates a new row
-    Create { txn: TransactionState, table: String, rows: Vec<Row> },
-    /// Deletes a row
-    Delete { txn: TransactionState, table: String, ids: Vec<Value> },
-    /// Updates a row
-    Update { txn: TransactionState, table: String, rows: HashMap<Value, Row> },
-
-    /// Creates a table
-    CreateTable { txn: TransactionState, schema: Table },
-    /// Deletes a table
-    DeleteTable { txn: TransactionState, table: String, if_exists: bool },
-}
-
-impl encoding::Value for Mutation {}
-
-/// A Raft state machine query.
+/// The `Raft` engine itself is simply a Raft client which sends `raft::Request`
+/// requests to the local Raft node for processing. These requests are received
+/// and processed by the Raft engine's `State` state machine running below Raft
+/// on each node, which forwards the commands to a `Local` SQL engine which
+/// actually executes them using a `storage::Engine` for local storage. I.e.:
 ///
-/// TODO: use Cows for these.
-#[derive(Clone, Serialize, Deserialize)]
-enum Query {
-    /// Begins a read-only transaction
-    BeginReadOnly { as_of: Option<u64> },
-    /// Fetches engine status
-    Status,
-
-    /// Reads a row
-    Read { txn: TransactionState, table: String, ids: Vec<Value> },
-    /// Reads an index entry
-    ReadIndex { txn: TransactionState, table: String, column: String, values: Vec<Value> },
-    /// Scans a table's rows
-    Scan { txn: TransactionState, table: String, filter: Option<Expression> },
-    /// Scans an index
-    ScanIndex { txn: TransactionState, table: String, column: String },
-
-    /// Scans the tables
-    ScanTables { txn: TransactionState },
-    /// Reads a table
-    ReadTable { txn: TransactionState, table: String },
-}
-
-impl encoding::Value for Query {}
-
-/// Status for the Raft SQL engine.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Status {
-    pub raft: raft::Status,
-    pub mvcc: mvcc::Status,
-}
-
-/// A client for the local Raft node.
-struct Client {
+/// 1. `sql::engine::Session`: plans and executes a SQL statement.
+/// 2. `sql::engine::Raft`: sends row CRUD commands as `raft::Request`.
+/// 3. `raft::Node`: performs Raft distributed consensus.
+/// 4. `sql::engine::raft::State`: receives CRUD commands.
+/// 5. `sql::engine::Local`: executes CRUD commands on each node.
+/// 6. `storage::Engine`: reads/writes data on disk.
+pub struct Raft {
+    /// Sends requests to the local Raft node, along with a response channel.
     tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
 }
 
-impl Client {
-    /// Creates a new Raft client.
-    fn new(tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>) -> Self {
+impl Raft {
+    /// Creates a new Raft-based SQL engine, given a Raft request channel to the
+    /// local Raft node.
+    pub fn new(tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>) -> Self {
         Self { tx }
     }
 
-    /// Executes a request against the Raft cluster.
+    /// Creates the Raft-managed state machine for the Raft engine. Receives
+    /// commands from the Raft engine and executes them on a `Local` engine.
+    pub fn new_state<E: storage::Engine>(engine: E) -> Result<State<E>> {
+        State::new(engine)
+    }
+
+    /// Executes a request against the Raft cluster, waiting for the response.
     fn execute(&self, request: raft::Request) -> Result<raft::Response> {
         let (response_tx, response_rx) = crossbeam::channel::bounded(1);
         self.tx.send((request, response_tx))?;
         response_rx.recv()?
     }
 
-    /// Mutates the Raft state machine, deserializing the response into the
-    /// return type.
-    fn mutate<V: DeserializeOwned>(&self, mutation: Mutation) -> Result<V> {
+    /// Writes through Raft, deserializing the response into the return type.
+    fn write<V: DeserializeOwned>(&self, mutation: Write) -> Result<V> {
         match self.execute(raft::Request::Write(mutation.encode()))? {
             raft::Response::Write(response) => Ok(bincode::deserialize(&response)?),
-            resp => errdata!("unexpected Raft mutation response {resp:?}"),
+            resp => errdata!("unexpected Raft write response {resp:?}"),
         }
     }
 
-    /// Queries the Raft state machine, deserializing the response into the
-    /// return type.
-    fn query<V: DeserializeOwned>(&self, query: Query) -> Result<V> {
+    /// Reads from Raft, deserializing the response into the return type.
+    fn read<V: DeserializeOwned>(&self, query: Read) -> Result<V> {
         match self.execute(raft::Request::Read(query.encode()))? {
             raft::Response::Read(response) => Ok(bincode::deserialize(&response)?),
-            resp => errdata!("unexpected Raft query response {resp:?}"),
+            resp => errdata!("unexpected Raft read response {resp:?}"),
         }
     }
 
-    /// Fetches Raft node status.
-    fn status(&self) -> Result<raft::Status> {
-        match self.execute(raft::Request::Status)? {
-            raft::Response::Status(status) => Ok(status),
-            resp => errdata!("unexpected Raft status response {resp:?}"),
-        }
-    }
-}
-
-/// A SQL engine using a Raft state machine.
-pub struct Raft {
-    tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
-}
-
-impl Raft {
-    /// Creates a new Raft-based SQL engine.
-    pub fn new(tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>) -> Self {
-        Self { tx }
-    }
-
-    /// Creates an underlying state machine for a Raft engine.
-    pub fn new_state<E: storage::Engine>(engine: E) -> Result<State<E>> {
-        State::new(engine)
-    }
-
-    /// Returns Raft SQL engine status.
+    /// Raft SQL engine status.
     pub fn status(&self) -> Result<Status> {
-        let client = Client::new(self.tx.clone());
-        Ok(Status { raft: client.status()?, mvcc: client.query(Query::Status)? })
+        let raft = match self.execute(raft::Request::Status)? {
+            raft::Response::Status(status) => status,
+            resp => return errdata!("unexpected Raft status response {resp:?}"),
+        };
+        let mvcc = self.read(Read::Status)?;
+        Ok(Status { raft, mvcc })
     }
 }
 
 impl<'a> super::Engine<'a> for Raft {
-    type Transaction = Transaction;
+    type Transaction = Transaction<'a>;
 
-    fn begin(&self) -> Result<Self::Transaction> {
-        Transaction::begin(Client::new(self.tx.clone()), false, None)
+    fn begin(&'a self) -> Result<Self::Transaction> {
+        Transaction::begin(self, false, None)
     }
 
-    fn begin_read_only(&self) -> Result<Self::Transaction> {
-        Transaction::begin(Client::new(self.tx.clone()), true, None)
+    fn begin_read_only(&'a self) -> Result<Self::Transaction> {
+        Transaction::begin(self, true, None)
     }
 
-    fn begin_as_of(&self, version: u64) -> Result<Self::Transaction> {
-        Transaction::begin(Client::new(self.tx.clone()), true, Some(version))
+    fn begin_as_of(&'a self, version: mvcc::Version) -> Result<Self::Transaction> {
+        Transaction::begin(self, true, Some(version))
     }
 }
 
-/// A Raft-based SQL transaction.
-pub struct Transaction {
-    client: Client,
-    state: TransactionState,
+/// A Raft SQL engine transaction.
+///
+/// This keeps track of the transaction state in memory, for the benefit of
+/// read-only transactions. An `mvcc::Transaction` normally encapsulates this
+/// and manages it in memory, but since `mvcc::Transaction` runs below Raft, it
+/// can't maintain this state between individual requests (which could execute
+/// on different leaders). Instead, we use `mvcc::Transaction::resume` to resume
+/// the transaction using the provided transaction state for each request.
+pub struct Transaction<'a> {
+    /// The Raft SQL engine, used to communicate with Raft.
+    engine: &'a Raft,
+    /// The MVCC transaction state.
+    state: mvcc::TransactionState,
 }
 
-impl Transaction {
+impl<'a> Transaction<'a> {
     /// Starts a transaction in the given mode.
-    fn begin(client: Client, read_only: bool, as_of: Option<u64>) -> Result<Self> {
+    fn begin(engine: &'a Raft, read_only: bool, as_of: Option<mvcc::Version>) -> Result<Self> {
+        assert!(as_of.is_none() || read_only, "can't use as_of without read_only");
+        // Read-only transactions don't need to persist anything, they just need
+        // to grab the current transaction state, so submit them as reads to
+        // avoid a replication roundtrip (which would also require fsyncs).
         let state = if read_only || as_of.is_some() {
-            client.query(Query::BeginReadOnly { as_of })?
+            engine.read(Read::BeginReadOnly { as_of })?
         } else {
-            client.mutate(Mutation::Begin)?
+            engine.write(Write::Begin)?
         };
-        Ok(Self { client, state })
+        Ok(Self { engine, state })
     }
 }
 
-impl super::Transaction for Transaction {
+impl<'a> super::Transaction for Transaction<'a> {
     fn version(&self) -> mvcc::Version {
         self.state.version
     }
@@ -184,29 +136,21 @@ impl super::Transaction for Transaction {
     }
 
     fn commit(self) -> Result<()> {
-        if !self.read_only() {
-            self.client.mutate(Mutation::Commit(self.state.clone()))?
+        if self.state.read_only {
+            return Ok(()); // noop
         }
-        Ok(())
+        self.engine.write(Write::Commit(self.state.clone()))
     }
 
     fn rollback(self) -> Result<()> {
-        if !self.read_only() {
-            self.client.mutate(Mutation::Rollback(self.state.clone()))?;
+        if self.state.read_only {
+            return Ok(()); // noop
         }
-        Ok(())
-    }
-
-    fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()> {
-        self.client.mutate(Mutation::Create {
-            txn: self.state.clone(),
-            table: table.to_string(),
-            rows,
-        })
+        self.engine.write(Write::Rollback(self.state.clone()))
     }
 
     fn delete(&self, table: &str, ids: &[Value]) -> Result<()> {
-        self.client.mutate(Mutation::Delete {
+        self.engine.write(Write::Delete {
             txn: self.state.clone(),
             table: table.to_string(),
             ids: ids.to_vec(),
@@ -214,15 +158,19 @@ impl super::Transaction for Transaction {
     }
 
     fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>> {
-        self.client.query(Query::Read {
+        self.engine.read(Read::Get {
             txn: self.state.clone(),
             table: table.to_string(),
             ids: ids.to_vec(),
         })
     }
 
+    fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()> {
+        self.engine.write(Write::Insert { txn: self.state.clone(), table: table.to_string(), rows })
+    }
+
     fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>> {
-        self.client.query(Query::ReadIndex {
+        self.engine.read(Read::LookupIndex {
             txn: self.state.clone(),
             table: table.to_string(),
             column: column.to_string(),
@@ -231,47 +179,35 @@ impl super::Transaction for Transaction {
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
-        Ok(Box::new(
-            self.client
-                .query::<Vec<_>>(Query::Scan {
-                    txn: self.state.clone(),
-                    table: table.to_string(),
-                    filter,
-                })?
-                .into_iter()
-                .map(Ok),
-        ))
+        let scan: Vec<_> = self.engine.read(Read::Scan {
+            txn: self.state.clone(),
+            table: table.to_string(),
+            filter,
+        })?;
+        Ok(Box::new(scan.into_iter().map(Ok)))
     }
 
     fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan> {
-        Ok(Box::new(
-            self.client
-                .query::<Vec<_>>(Query::ScanIndex {
-                    txn: self.state.clone(),
-                    table: table.to_string(),
-                    column: column.to_string(),
-                })?
-                .into_iter()
-                .map(Ok),
-        ))
+        let scan: Vec<_> = self.engine.read(Read::ScanIndex {
+            txn: self.state.clone(),
+            table: table.to_string(),
+            column: column.to_string(),
+        })?;
+        Ok(Box::new(scan.into_iter().map(Ok)))
     }
 
     fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()> {
-        self.client.mutate(Mutation::Update {
-            txn: self.state.clone(),
-            table: table.to_string(),
-            rows,
-        })
+        self.engine.write(Write::Update { txn: self.state.clone(), table: table.to_string(), rows })
     }
 }
 
-impl Catalog for Transaction {
-    fn create_table(&self, table: Table) -> Result<()> {
-        self.client.mutate(Mutation::CreateTable { txn: self.state.clone(), schema: table })
+impl<'a> Catalog for Transaction<'a> {
+    fn create_table(&self, schema: Table) -> Result<()> {
+        self.engine.write(Write::CreateTable { txn: self.state.clone(), schema })
     }
 
     fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool> {
-        self.client.mutate(Mutation::DeleteTable {
+        self.engine.write(Write::DeleteTable {
             txn: self.state.clone(),
             table: table.to_string(),
             if_exists,
@@ -279,113 +215,173 @@ impl Catalog for Transaction {
     }
 
     fn get_table(&self, table: &str) -> Result<Option<Table>> {
-        self.client.query(Query::ReadTable { txn: self.state.clone(), table: table.to_string() })
+        self.engine.read(Read::GetTable { txn: self.state.clone(), table: table.to_string() })
     }
 
     fn list_tables(&self) -> Result<Vec<Table>> {
-        self.client.query(Query::ScanTables { txn: self.state.clone() })
+        self.engine.read(Read::ListTables { txn: self.state.clone() })
     }
 }
 
-/// The Raft state machine for the Raft-based SQL engine, using a KV SQL engine
+/// The state machine for the Raft SQL engine. Receives commands from the Raft
+/// SQL engine and dispatches to a `Local` SQL engine which does the actual
+/// work, using a `storage::Engine` for storage.
+///
+/// For simplicity, we don't attempt to stream large requests or responses,
+/// instead simply delivering them as one large chunk. This means that e.g. a
+/// full table scan will pull the entire table into memory, serialize it, and
+/// send it across the network as one message. The simplest way to address this
+/// would likely be to send batches of e.g. 1000 rows at a time.
 pub struct State<E: storage::Engine> {
-    /// The underlying local SQL engine.
-    engine: super::Local<E>,
-    /// The last applied index
-    applied_index: u64,
+    /// The local SQL engine.
+    local: super::Local<E>,
+    /// The last applied index. This tells Raft which command to apply next.
+    applied_index: raft::Index,
 }
 
 impl<E: storage::Engine> State<E> {
-    /// Creates a new Raft state maching using the given storage engine.
+    /// Creates a new Raft state maching using the given storage engine for
+    /// local storage.
     pub fn new(engine: E) -> Result<Self> {
-        let engine = super::Local::new(engine);
-        let applied_index = engine
-            .get_metadata(b"applied_index")?
+        let local = super::Local::new(engine);
+        let applied_index = local
+            .get_unversioned(b"applied_index")?
             .map(|b| bincode::deserialize(&b))
-            .unwrap_or(Ok(0))?;
-        Ok(State { engine, applied_index })
+            .transpose()?
+            .unwrap_or(0);
+        Ok(State { local, applied_index })
     }
 
-    /// Mutates the state machine.
-    fn mutate(&mut self, mutation: Mutation) -> Result<Vec<u8>> {
-        let response = match mutation {
-            Mutation::Begin => self.engine.begin()?.state().encode(),
-            Mutation::Commit(txn) => bincode::serialize(&self.engine.resume(txn)?.commit()?),
-            Mutation::Rollback(txn) => bincode::serialize(&self.engine.resume(txn)?.rollback()?),
+    /// Executes a write command.
+    fn write(&self, command: Write) -> Result<Vec<u8>> {
+        Ok(match command {
+            Write::Begin => self.local.begin()?.state().encode(),
+            Write::Commit(txn) => bincode::serialize(&self.local.resume(txn)?.commit()?),
+            Write::Rollback(txn) => bincode::serialize(&self.local.resume(txn)?.rollback()?),
 
-            Mutation::Create { txn, table, rows } => {
-                bincode::serialize(&self.engine.resume(txn)?.insert(&table, rows)?)
+            Write::Delete { txn, table, ids } => {
+                bincode::serialize(&self.local.resume(txn)?.delete(&table, &ids)?)
             }
-            Mutation::Delete { txn, table, ids } => {
-                bincode::serialize(&self.engine.resume(txn)?.delete(&table, &ids)?)
+            Write::Insert { txn, table, rows } => {
+                bincode::serialize(&self.local.resume(txn)?.insert(&table, rows)?)
             }
-            Mutation::Update { txn, table, rows } => {
-                bincode::serialize(&self.engine.resume(txn)?.update(&table, rows)?)
+            Write::Update { txn, table, rows } => {
+                bincode::serialize(&self.local.resume(txn)?.update(&table, rows)?)
             }
 
-            Mutation::CreateTable { txn, schema } => {
-                bincode::serialize(&self.engine.resume(txn)?.create_table(schema)?)
+            Write::CreateTable { txn, schema } => {
+                bincode::serialize(&self.local.resume(txn)?.create_table(schema)?)
             }
-            Mutation::DeleteTable { txn, table, if_exists } => {
-                bincode::serialize(&self.engine.resume(txn)?.drop_table(&table, if_exists)?)
+            Write::DeleteTable { txn, table, if_exists } => {
+                bincode::serialize(&self.local.resume(txn)?.drop_table(&table, if_exists)?)
             }
-        };
-        Ok(response)
+        })
     }
 }
 
 impl<E: storage::Engine> raft::State for State<E> {
-    fn get_applied_index(&self) -> u64 {
+    fn get_applied_index(&self) -> raft::Index {
         self.applied_index
     }
 
-    fn apply(&mut self, entry: Entry) -> Result<Vec<u8>> {
+    fn apply(&mut self, entry: raft::Entry) -> Result<Vec<u8>> {
         assert_eq!(entry.index, self.applied_index + 1, "entry index not after applied index");
 
         let result = match &entry.command {
-            Some(command) => match self.mutate(Mutation::decode(command)?) {
-                // We must panic on non-deterministic apply failures to prevent
-                // replica divergence. See [`raft::State`] documentation for
-                // details.
+            Some(command) => match self.write(Write::decode(command)?) {
+                // Panic on non-deterministic apply failures, to prevent replica
+                // divergence. See [`raft::State`] docs for details.
                 Err(e) if !e.is_deterministic() => panic!("non-deterministic apply failure: {e}"),
                 result => result,
             },
+            // Raft submits noop commands on leader changes. Ignore them, but
+            // record the applied index below.
             None => Ok(Vec::new()),
         };
+
+        // Persist the applied index. We don't have to flush, because it's ok to
+        // lose a tail of the state machine writes (e.g. if the machine
+        // crashes). Raft will replay the log from the last known applied index.
         self.applied_index = entry.index;
-        self.engine.set_metadata(b"applied_index", bincode::serialize(&entry.index))?;
+        self.local.set_unversioned(b"applied_index", bincode::serialize(&entry.index))?;
         result
     }
 
     fn read(&self, command: Vec<u8>) -> Result<Vec<u8>> {
-        let response = match Query::decode(&command)? {
-            Query::BeginReadOnly { as_of } => {
-                let txn = if let Some(version) = as_of {
-                    self.engine.begin_as_of(version)?
-                } else {
-                    self.engine.begin_read_only()?
+        Ok(match Read::decode(&command)? {
+            Read::BeginReadOnly { as_of } => {
+                let txn = match as_of {
+                    Some(version) => self.local.begin_as_of(version)?,
+                    None => self.local.begin_read_only()?,
                 };
                 txn.state().encode()
             }
-            Query::Read { txn, table, ids } => self.engine.resume(txn)?.get(&table, &ids)?.encode(),
-            Query::ReadIndex { txn, table, column, values } => {
-                self.engine.resume(txn)?.lookup_index(&table, &column, &values)?.encode()
+            Read::Status => self.local.mvcc.status()?.encode(),
+
+            Read::Get { txn, table, ids } => self.local.resume(txn)?.get(&table, &ids)?.encode(),
+            Read::LookupIndex { txn, table, column, values } => {
+                self.local.resume(txn)?.lookup_index(&table, &column, &values)?.encode()
             }
-            // FIXME These need to stream rows somehow
-            Query::Scan { txn, table, filter } => {
-                self.engine.resume(txn)?.scan(&table, filter)?.collect::<Result<Vec<_>>>()?.encode()
+            Read::Scan { txn, table, filter } => {
+                // For simplicity, buffer the entire scan. See `State` comment.
+                self.local.resume(txn)?.scan(&table, filter)?.collect::<Result<Vec<_>>>()?.encode()
             }
-            Query::ScanIndex { txn, table, column } => self
-                .engine
+            Read::ScanIndex { txn, table, column } => self
+                .local
                 .resume(txn)?
                 .scan_index(&table, &column)?
                 .collect::<Result<Vec<_>>>()?
                 .encode(),
-            Query::Status => self.engine.kv.status()?.encode(),
 
-            Query::ReadTable { txn, table } => self.engine.resume(txn)?.get_table(&table)?.encode(),
-            Query::ScanTables { txn } => self.engine.resume(txn)?.list_tables()?.encode(),
-        };
-        Ok(response)
+            Read::GetTable { txn, table } => self.local.resume(txn)?.get_table(&table)?.encode(),
+            Read::ListTables { txn } => self.local.resume(txn)?.list_tables()?.encode(),
+        })
     }
+}
+
+/// A Raft engine read. Values correspond to engine method parameters.
+///
+/// The values must be owned to allow decoding into the struct. This incurs a
+/// clone on the encode path. We could avoid this by using Cows, but we'll keep
+/// it simple.
+#[derive(Serialize, Deserialize)]
+enum Read {
+    BeginReadOnly { as_of: Option<mvcc::Version> },
+    Status,
+
+    Get { txn: mvcc::TransactionState, table: String, ids: Vec<Value> },
+    LookupIndex { txn: mvcc::TransactionState, table: String, column: String, values: Vec<Value> },
+    Scan { txn: mvcc::TransactionState, table: String, filter: Option<Expression> },
+    ScanIndex { txn: mvcc::TransactionState, table: String, column: String },
+
+    GetTable { txn: mvcc::TransactionState, table: String },
+    ListTables { txn: mvcc::TransactionState },
+}
+
+impl encoding::Value for Read {}
+
+/// A Raft engine write. Values correspond to engine method parameters.
+///
+/// TODO: consider using Cows here.
+#[derive(Serialize, Deserialize)]
+enum Write {
+    Begin,
+    Commit(mvcc::TransactionState),
+    Rollback(mvcc::TransactionState),
+
+    Delete { txn: mvcc::TransactionState, table: String, ids: Vec<Value> },
+    Insert { txn: mvcc::TransactionState, table: String, rows: Vec<Row> },
+    Update { txn: mvcc::TransactionState, table: String, rows: HashMap<Value, Row> },
+
+    CreateTable { txn: mvcc::TransactionState, schema: Table },
+    DeleteTable { txn: mvcc::TransactionState, table: String, if_exists: bool },
+}
+
+impl encoding::Value for Write {}
+
+/// Raft SQL engine status.
+#[derive(Serialize, Deserialize)]
+pub struct Status {
+    pub raft: raft::Status,
+    pub mvcc: mvcc::Status,
 }
