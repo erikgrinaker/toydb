@@ -99,6 +99,26 @@ impl<E: storage::Engine> Transaction<E> {
             self.txn.set(&key, index.encode())
         }
     }
+
+    /// Returns all foreign key references to a table, as table -> columns.
+    /// This includes references from the table itself.
+    fn references(&self, table: &str) -> Result<Vec<(String, Vec<String>)>> {
+        Ok(self
+            .list_tables()?
+            .into_iter()
+            .map(|t| {
+                (
+                    t.name,
+                    t.columns
+                        .iter()
+                        .filter(|c| c.references.as_deref() == Some(table))
+                        .map(|c| c.name.clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .filter(|(_, cs)| !cs.is_empty())
+            .collect())
+    }
 }
 
 impl<E: storage::Engine> super::Transaction for Transaction<E> {
@@ -142,7 +162,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         // TODO: try to be more clever than simply iterating over each ID.
         for id in ids {
             let table = self.must_get_table(table)?;
-            for (t, cs) in self.references(&table.name, true)? {
+            for (t, cs) in self.references(&table.name)? {
                 let t = self.must_get_table(&t)?;
                 let cs = cs
                     .into_iter()
@@ -304,7 +324,8 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         } else {
             return Ok(false);
         };
-        if let Some((t, cs)) = self.references(&table.name, false)?.first() {
+        if let Some((t, cs)) = self.references(&table.name)?.iter().find(|(t, _)| *t != table.name)
+        {
             return errinput!("table {} is referenced by table {} column {}", table.name, t, cs[0]);
         }
         let mut scan = self.scan(&table.name, None)?;

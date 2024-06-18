@@ -9,9 +9,14 @@ use crate::storage::mvcc;
 
 use std::collections::{HashMap, HashSet};
 
-/// The SQL engine interface.
+/// A SQL engine. This provides low-level CRUD (create, read, update, delete)
+/// operations for table rows, a schema catalog for accessing and modifying
+/// table schemas, and interactive SQL sessions that execute client SQL
+/// statements. All engine access is transactional with snapshot isolation.
 pub trait Engine<'a>: Sized {
-    /// The transaction type.
+    /// The engine's transaction type. This provides both row-level CRUD
+    /// operations as well as transactional access to the schema catalog. It
+    /// can't outlive the engine.
     type Transaction: Transaction + Catalog + 'a;
 
     /// Begins a read-write transaction.
@@ -21,19 +26,22 @@ pub trait Engine<'a>: Sized {
     /// Begins a read-only transaction as of a historical version.
     fn begin_as_of(&self, version: mvcc::Version) -> Result<Self::Transaction>;
 
-    /// Creates a client session for executing SQL statements.
+    /// Creates a session for executing SQL statements. Can't outlive engine.
     fn session(&'a self) -> Session<'a, Self> {
         Session::new(self)
     }
 }
 
-/// A SQL transaction.
+/// A SQL transaction. Executes transactional CRUD operations on table rows.
+/// Provides snapshot isolation (see `storage::mvcc` module for details).
 ///
 /// All methods operate on row batches rather than single rows to amortize the
-/// cost. We have to do a Raft roundtrip for every call, and we'd rather not
-/// have to do a Raft roundtrip for every row.
+/// cost. With the Raft engine, each call results in a Raft roundtrip, and we'd
+/// rather not have to do that for every single row that's modified.
+///
+/// TODO: decide whether to use borrowed, owned, or Cowed parameters.
 pub trait Transaction {
-    /// The transaction's MVCC version.
+    /// The transaction's MVCC version. Unique for read/write transactions.
     fn version(&self) -> mvcc::Version;
     /// Whether the transaction is read-only.
     fn read_only(&self) -> bool;
@@ -43,62 +51,49 @@ pub trait Transaction {
     /// Rolls back the transaction.
     fn rollback(self) -> Result<()>;
 
-    /// Deletes table rows by primary key.
+    /// Deletes table rows by primary key, if they exist.
     fn delete(&self, table: &str, ids: &[Value]) -> Result<()>;
-    /// Fetches table rows by primary key.
+    /// Fetches table rows by primary key, if they exist.
     fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>>;
     /// Inserts new table rows.
     fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()>;
-    /// Looks up a set of table primary keys by an index value.
-    /// TODO: should this just return a Vec instead?
+    /// Looks up a set of primary keys by index values.
     fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>>;
     /// Scans a table's rows, optionally applying the given filter.
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
-    /// Scans a column's index entries.
-    /// TODO: this is only used for tests. Remove it?
-    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
     /// Updates table rows by primary key.
     fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()>;
+
+    /// Scans a column's index entries.
+    /// TODO: this is only used for tests, remove it.
+    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
 }
 
 /// An index scan iterator.
 pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, HashSet<Value>)>>>;
 
-/// The catalog stores schema information.
+/// The catalog stores table schema information. It is required for
+/// Engine::Transaction, and thus fully transactional. For simplicity, it only
+/// supports very simple operations: creating and dropping tables. There are no
+/// ALTER TABLE schema changes, nor CREATE INDEX -- everything has to be
+/// specified when the table is initially created.
+///
+/// This type is separate from Transaction, even though Engine::Transaction
+/// requires transactions to implement it. This allows better control of when
+/// catalog access should be used (i.e. during planning, not execution).
 pub trait Catalog {
-    /// Creates a new table.
+    /// Creates a new table. Errors if it already exists.
     fn create_table(&self, table: Table) -> Result<()>;
     /// Drops a table. Errors if it does not exist, unless if_exists is true.
     /// Returns true if the table existed and was deleted.
     fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool>;
-    /// Fetches a table schema.
+    /// Fetches a table schema, or None if it doesn't exist.
     fn get_table(&self, table: &str) -> Result<Option<Table>>;
-    /// Lists tables.
+    /// Returns a list of all table schemas.
     fn list_tables(&self) -> Result<Vec<Table>>;
 
-    /// Reads a table, errors if it does not exist.
+    /// Fetches a table schema, or errors if it does not exist.
     fn must_get_table(&self, table: &str) -> Result<Table> {
         self.get_table(table)?.ok_or(errinput!("table {table} does not exist"))
-    }
-
-    /// Returns all references to a table, as table,column pairs.
-    /// TODO: make this actually be table,column, instead of a column vec.
-    fn references(&self, table: &str, with_self: bool) -> Result<Vec<(String, Vec<String>)>> {
-        Ok(self
-            .list_tables()?
-            .into_iter()
-            .filter(|t| with_self || t.name != table)
-            .map(|t| {
-                (
-                    t.name,
-                    t.columns
-                        .iter()
-                        .filter(|c| c.references.as_deref() == Some(table))
-                        .map(|c| c.name.clone())
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .filter(|(_, cs)| !cs.is_empty())
-            .collect())
     }
 }
