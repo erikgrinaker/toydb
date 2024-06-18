@@ -565,7 +565,7 @@ impl<E: Engine> Transaction<E> {
 
     /// Returns an iterator over the latest visible key/value pairs at the
     /// transaction's version.
-    pub fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Result<Scan<E>> {
+    pub fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Scan<E> {
         let start = match range.start_bound() {
             Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), u64::MAX).encode()),
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), 0).encode()),
@@ -576,17 +576,19 @@ impl<E: Engine> Transaction<E> {
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), u64::MAX).encode()),
             Bound::Unbounded => Bound::Excluded(KeyPrefix::Unversioned.encode()),
         };
-        Ok(Scan::new(self.engine.lock()?, self.state(), start, end))
+        let engine = self.engine.lock().expect("mutex failed");
+        Scan::new(engine, self.state(), start, end)
     }
 
     /// Scans keys under a given prefix.
-    pub fn scan_prefix(&self, prefix: &[u8]) -> Result<Scan<E>> {
+    pub fn scan_prefix(&self, prefix: &[u8]) -> Scan<E> {
         // Normally, KeyPrefix::Version will only match all versions of the
         // exact given key. We want all keys maching the prefix, so we chop off
         // the KeyCode byte slice terminator 0x0000 at the end.
         let mut prefix = KeyPrefix::Version(prefix.into()).encode();
         prefix.truncate(prefix.len() - 2);
-        Ok(Scan::new_prefix(self.engine.lock()?, self.state(), prefix))
+        let engine = self.engine.lock().expect("mutex error");
+        Scan::new_prefix(engine, self.state(), prefix)
     }
 }
 
@@ -960,7 +962,7 @@ pub mod tests {
                     )?;
                     args.reject_rest()?;
 
-                    let mut scan = txn.scan(range)?;
+                    let mut scan = txn.scan(range);
                     let kvs: Vec<_> = match reverse {
                         false => scan.iter().collect::<crate::error::Result<_>>()?,
                         true => scan.iter().rev().collect::<crate::error::Result<_>>()?,
@@ -979,7 +981,7 @@ pub mod tests {
                     let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
                     args.reject_rest()?;
 
-                    let mut scan = txn.scan_prefix(&prefix)?;
+                    let mut scan = txn.scan_prefix(&prefix);
                     let kvs: Vec<_> = match reverse {
                         false => scan.iter().collect::<crate::error::Result<_>>()?,
                         true => scan.iter().rev().collect::<crate::error::Result<_>>()?,

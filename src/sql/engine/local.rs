@@ -205,7 +205,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         let table = self.must_get_table(table)?;
         Ok(Box::new(
             self.txn
-                .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode())?
+                .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode())
                 .iter()
                 .map(|r| r.and_then(|(_, v)| Row::decode(&v)))
                 .filter_map(move |r| match r {
@@ -235,7 +235,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             self.txn
                 .scan_prefix(
                     &KeyPrefix::Index((&table.name).into(), (&column.name).into()).encode(),
-                )?
+                )
                 .iter()
                 .map(|r| -> Result<(Value, HashSet<Value>)> {
                     let (k, v) = r?;
@@ -314,7 +314,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
 
     fn list_tables(&self) -> Result<Vec<Table>> {
         self.txn
-            .scan_prefix(&KeyPrefix::Table.encode())?
+            .scan_prefix(&KeyPrefix::Table.encode())
             .iter()
             .map(|r| r.and_then(|(_, v)| Table::decode(&v)))
             .collect()
