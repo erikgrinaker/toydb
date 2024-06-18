@@ -7,7 +7,7 @@ use crate::sql::types::schema::Table;
 use crate::sql::types::{Expression, Row, Rows, Value};
 use crate::storage::mvcc;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// The SQL engine interface.
 pub trait Engine<'a>: Sized {
@@ -29,6 +29,10 @@ pub trait Engine<'a>: Sized {
 
 /// A SQL transaction.
 ///
+/// All methods operate on row batches rather than single rows to amortize the
+/// cost. We have to do a Raft roundtrip for every call, and we'd rather not
+/// have to do a Raft roundtrip for every row.
+///
 /// TODO: split out Catalog trait and don't have Transaction depend on it. This
 /// enforces cleaner separation of when catalog access is valid (i.e. during
 /// planning but not execution).
@@ -43,24 +47,22 @@ pub trait Transaction: Catalog {
     /// Rolls back the transaction.
     fn rollback(self) -> Result<()>;
 
-    /// TOOD: consider operating on batches of IDs/rows.
-
-    /// Deletes a set of table row by primary key.
-    fn delete(&self, table: &str, id: &Value) -> Result<()>;
-    /// Fetches a table row by primary key.
-    fn get(&self, table: &str, id: &Value) -> Result<Option<Row>>;
-    /// Inserts a new table row.
-    fn insert(&self, table: &str, row: Row) -> Result<()>;
+    /// Deletes table rows by primary key.
+    fn delete(&self, table: &str, ids: &[Value]) -> Result<()>;
+    /// Fetches table rows by primary key.
+    fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>>;
+    /// Inserts new table rows.
+    fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()>;
     /// Looks up a set of table primary keys by an index value.
     /// TODO: should this just return a Vec instead?
-    fn lookup_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>>;
+    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>>;
     /// Scans a table's rows, optionally applying the given filter.
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
     /// Scans a column's index entries.
     /// TODO: this is only used for tests. Remove it?
     fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
-    /// Updates a table row by primary key.
-    fn update(&self, table: &str, id: &Value, row: Row) -> Result<()>;
+    /// Updates table rows by primary key.
+    fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()>;
 }
 
 /// An index scan iterator.

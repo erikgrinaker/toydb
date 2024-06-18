@@ -25,16 +25,9 @@ pub(super) fn lookup_key(
 ) -> Result<QueryIterator> {
     // TODO: move catalog lookup elsewhere and make this infallible.
     let table = txn.must_get_table(table)?;
-
-    // TODO: don't collect into vec, requires shared txn borrow.
-    let rows = keys
-        .into_iter()
-        .filter_map(|key| txn.get(&table.name, &key).transpose())
-        .collect::<Result<Vec<Row>>>()?;
-
     Ok(QueryIterator {
         columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
-        rows: Box::new(rows.into_iter().map(Ok)),
+        rows: Box::new(txn.get(&table.name, &keys)?.into_iter().map(Ok)),
     })
 }
 
@@ -47,18 +40,8 @@ pub(super) fn lookup_index(
 ) -> Result<QueryIterator> {
     // TODO: pass in from planner.
     let table = txn.must_get_table(table)?;
-
-    // TODO: consider cleaning up.
-    let mut pks = std::collections::HashSet::new();
-    for value in values {
-        pks.extend(txn.lookup_index(&table.name, column, &value)?);
-    }
-
-    // TODO: use a shared txn borrow instead.
-    let rows = pks
-        .into_iter()
-        .filter_map(|pk| txn.get(&table.name, &pk).transpose())
-        .collect::<Result<Vec<Row>>>()?;
+    let pks: Vec<_> = txn.lookup_index(&table.name, column, &values)?.into_iter().collect();
+    let rows = txn.get(&table.name, &pks)?;
 
     Ok(QueryIterator {
         columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),

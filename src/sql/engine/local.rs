@@ -9,7 +9,7 @@ use crate::{errdata, errinput};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::clone::Clone;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// A SQL engine using a local storage engine.
 pub struct Local<E: storage::Engine> {
@@ -118,70 +118,87 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         self.txn.rollback()
     }
 
-    fn insert(&self, table: &str, row: Row) -> Result<()> {
+    fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()> {
         let table = self.must_get_table(table)?;
-        table.validate_row(&row, self)?;
-        let id = table.get_row_key(&row)?;
-        if self.get(&table.name, &id)?.is_some() {
-            return errinput!("primary key {id} already exists for table {}", table.name);
-        }
-        self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode(), row.encode())?;
+        for row in rows {
+            table.validate_row(&row, self)?;
+            let id = table.get_row_key(&row)?;
+            if !self.get(&table.name, &[id.clone()])?.is_empty() {
+                return errinput!("primary key {id} already exists for table {}", table.name);
+            }
+            self.txn.set(&Key::Row((&table.name).into(), (&id).into()).encode(), row.encode())?;
 
-        // Update indexes
-        for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
-            let mut index = self.index_load(&table.name, &column.name, &row[i])?;
-            index.insert(id.clone());
-            self.index_save(&table.name, &column.name, &row[i], index)?;
+            // Update indexes
+            for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
+                let mut index = self.index_load(&table.name, &column.name, &row[i])?;
+                index.insert(id.clone());
+                self.index_save(&table.name, &column.name, &row[i], index)?;
+            }
         }
         Ok(())
     }
 
-    fn delete(&self, table: &str, id: &Value) -> Result<()> {
-        let table = self.must_get_table(table)?;
-        for (t, cs) in self.references(&table.name, true)? {
-            let t = self.must_get_table(&t)?;
-            let cs = cs
-                .into_iter()
-                .map(|c| Ok((t.get_column_index(&c)?, c)))
-                .collect::<Result<Vec<_>>>()?;
-            let mut scan = self.scan(&t.name, None)?;
-            while let Some(row) = scan.next().transpose()? {
-                for (i, c) in &cs {
-                    if &row[*i] == id && (table.name != t.name || id != &table.get_row_key(&row)?) {
-                        return errinput!(
-                            "primary key {id} referenced by table {} column {c}",
-                            t.name
-                        );
+    fn delete(&self, table: &str, ids: &[Value]) -> Result<()> {
+        // TODO: try to be more clever than simply iterating over each ID.
+        for id in ids {
+            let table = self.must_get_table(table)?;
+            for (t, cs) in self.references(&table.name, true)? {
+                let t = self.must_get_table(&t)?;
+                let cs = cs
+                    .into_iter()
+                    .map(|c| Ok((t.get_column_index(&c)?, c)))
+                    .collect::<Result<Vec<_>>>()?;
+                let mut scan = self.scan(&t.name, None)?;
+                while let Some(row) = scan.next().transpose()? {
+                    for (i, c) in &cs {
+                        if &row[*i] == id
+                            && (table.name != t.name || id != &table.get_row_key(&row)?)
+                        {
+                            return errinput!(
+                                "primary key {id} referenced by table {} column {c}",
+                                t.name
+                            );
+                        }
                     }
                 }
             }
-        }
 
-        let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
-        if !indexes.is_empty() {
-            if let Some(row) = self.get(&table.name, id)? {
-                for (i, column) in indexes {
-                    let mut index = self.index_load(&table.name, &column.name, &row[i])?;
-                    index.remove(id);
-                    self.index_save(&table.name, &column.name, &row[i], index)?;
+            let indexes: Vec<_> =
+                table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
+            if !indexes.is_empty() {
+                for row in self.get(&table.name, &[id.clone()])? {
+                    for (i, column) in &indexes {
+                        let mut index = self.index_load(&table.name, &column.name, &row[*i])?;
+                        index.remove(id);
+                        self.index_save(&table.name, &column.name, &row[*i], index)?;
+                    }
                 }
             }
+            self.txn.delete(&Key::Row(table.name.into(), id.into()).encode())?;
         }
-        self.txn.delete(&Key::Row(table.name.into(), id.into()).encode())
+        Ok(())
     }
 
-    fn get(&self, table: &str, id: &Value) -> Result<Option<Row>> {
-        self.txn
-            .get(&Key::Row(table.into(), id.into()).encode())?
-            .map(|v| Row::decode(&v))
-            .transpose()
+    fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>> {
+        ids.iter()
+            .filter_map(|id| {
+                self.txn
+                    .get(&Key::Row(table.into(), id.into()).encode())
+                    .transpose()
+                    .map(|r| r.and_then(|v| Row::decode(&v)))
+            })
+            .collect()
     }
 
-    fn lookup_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
+    fn lookup_index(&self, table: &str, column: &str, value: &[Value]) -> Result<HashSet<Value>> {
         if !self.must_get_table(table)?.get_column(column)?.index {
             return errinput!("no index on {table}.{column}");
         }
-        self.index_load(table, column, value)
+        let mut pks = HashSet::new();
+        for v in value {
+            pks.extend(self.index_load(table, column, v)?)
+        }
+        Ok(pks)
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
@@ -233,35 +250,40 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         ))
     }
 
-    fn update(&self, table: &str, id: &Value, row: Row) -> Result<()> {
+    fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()> {
         let table = self.must_get_table(table)?;
-        // If the primary key changes we do a delete and create, otherwise we replace the row
-        if id != &table.get_row_key(&row)? {
-            self.delete(&table.name, id)?;
-            self.insert(&table.name, row)?;
-            return Ok(());
-        }
-
-        // Update indexes, knowing that the primary key has not changed
-        let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
-        if !indexes.is_empty() {
-            let old = self.get(&table.name, id)?.unwrap();
-            for (i, column) in indexes {
-                if old[i] == row[i] {
-                    continue;
-                }
-                let mut index = self.index_load(&table.name, &column.name, &old[i])?;
-                index.remove(id);
-                self.index_save(&table.name, &column.name, &old[i], index)?;
-
-                let mut index = self.index_load(&table.name, &column.name, &row[i])?;
-                index.insert(id.clone());
-                self.index_save(&table.name, &column.name, &row[i], index)?;
+        // TODO: be more clever than just iterating here.
+        for (id, row) in rows {
+            // If the primary key changes we do a delete and create, otherwise we replace the row
+            if id != table.get_row_key(&row)? {
+                self.delete(&table.name, &[id.clone()])?;
+                self.insert(&table.name, vec![row])?;
+                return Ok(());
             }
-        }
 
-        table.validate_row(&row, self)?;
-        self.txn.set(&Key::Row(table.name.into(), id.into()).encode(), row.encode())
+            // Update indexes, knowing that the primary key has not changed
+            let indexes: Vec<_> =
+                table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
+            if !indexes.is_empty() {
+                let old = self.get(&table.name, &[id.clone()])?.remove(0);
+                for (i, column) in indexes {
+                    if old[i] == row[i] {
+                        continue;
+                    }
+                    let mut index = self.index_load(&table.name, &column.name, &old[i])?;
+                    index.remove(&id);
+                    self.index_save(&table.name, &column.name, &old[i], index)?;
+
+                    let mut index = self.index_load(&table.name, &column.name, &row[i])?;
+                    index.insert(id.clone());
+                    self.index_save(&table.name, &column.name, &row[i], index)?;
+                }
+            }
+
+            table.validate_row(&row, self)?;
+            self.txn.set(&Key::Row((&table.name).into(), id.into()).encode(), row.encode())?;
+        }
+        Ok(())
     }
 }
 
@@ -281,7 +303,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         }
         let mut scan = self.scan(&table.name, None)?;
         while let Some(row) = scan.next().transpose()? {
-            self.delete(&table.name, &table.get_row_key(&row)?)?
+            self.delete(&table.name, &[table.get_row_key(&row)?])?
         }
         self.txn.delete(&Key::Table(table.name.into()).encode())
     }

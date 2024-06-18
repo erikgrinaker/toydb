@@ -213,7 +213,7 @@ impl Column {
                 Value::Null => Ok(()),
                 Value::Float(f) if f.is_nan() => Ok(()),
                 v if target == &table.name && v == pk => Ok(()),
-                v if txn.get(target, v)?.is_none() => {
+                v if txn.get(target, &[v.clone()])?.is_empty() => {
                     errinput!("referenced primary key {v} in table {target} does not exist",)
                 }
                 _ => Ok(()),

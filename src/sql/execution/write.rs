@@ -7,18 +7,13 @@ use crate::sql::types::{Expression, Row, Value};
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE).
 /// Returns the number of rows deleted.
-pub(super) fn delete(
-    txn: &impl Transaction,
-    table: &str,
-    mut source: QueryIterator,
-) -> Result<u64> {
+pub(super) fn delete(txn: &impl Transaction, table: &str, source: QueryIterator) -> Result<u64> {
     // TODO: should be prepared by planner.
     let table = txn.must_get_table(table)?;
-    let mut count = 0;
-    while let Some(row) = source.next().transpose()? {
-        txn.delete(&table.name, &table.get_row_key(&row)?)?;
-        count += 1
-    }
+    let ids: Vec<_> =
+        source.map(|r| r.and_then(|row| table.get_row_key(&row))).collect::<Result<_>>()?;
+    let count = ids.len() as u64;
+    txn.delete(&table.name, &ids)?;
     Ok(count)
 }
 
@@ -32,7 +27,7 @@ pub(super) fn insert(
     values: Vec<Vec<Expression>>,
 ) -> Result<u64> {
     let table = txn.must_get_table(table)?;
-    let mut count = 0;
+    let mut rows = Vec::with_capacity(values.len());
     for expressions in values {
         let mut row =
             expressions.into_iter().map(|expr| expr.evaluate(None)).collect::<Result<_>>()?;
@@ -41,9 +36,10 @@ pub(super) fn insert(
         } else {
             row = make_row(&table, &columns, row)?;
         }
-        txn.insert(&table.name, row)?;
-        count += 1;
+        rows.push(row);
     }
+    let count = rows.len() as u64;
+    txn.insert(&table.name, rows)?;
     Ok(count)
 }
 
@@ -56,29 +52,18 @@ pub(super) fn update(
     expressions: Vec<(usize, Expression)>,
 ) -> Result<u64> {
     let table = txn.must_get_table(table)?;
-    // The iterator will see our changes, such that the same item may be
-    // iterated over multiple times. We keep track of the primary keys here
-    // to avoid that, althought it may cause ballooning memory usage for
-    // large updates.
-    //
-    // FIXME This is not safe for primary key updates, which may still be
-    // processed multiple times - it should be possible to come up with a
-    // pathological case that loops forever (e.g. UPDATE test SET id = id +
-    // 1).
-    let mut updated = std::collections::HashSet::new();
+    let mut update = std::collections::HashMap::new();
     while let Some(row) = source.next().transpose()? {
         let id = table.get_row_key(&row)?;
-        if updated.contains(&id) {
-            continue;
-        }
         let mut new = row.clone();
         for (field, expr) in &expressions {
             new[*field] = expr.evaluate(Some(&row))?;
         }
-        txn.update(&table.name, &id, new)?;
-        updated.insert(id);
+        update.insert(id, new);
     }
-    Ok(updated.len() as u64)
+    let count = update.len() as u64;
+    txn.update(&table.name, update)?;
+    Ok(count)
 }
 
 // Builds a row from a set of column names and values, padding it with default values.

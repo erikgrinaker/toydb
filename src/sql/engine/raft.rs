@@ -9,7 +9,7 @@ use crate::storage::{self, mvcc, mvcc::TransactionState};
 
 use crossbeam::channel::Sender;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// A Raft state machine mutation.
 ///
@@ -24,11 +24,11 @@ enum Mutation {
     Rollback(TransactionState),
 
     /// Creates a new row
-    Create { txn: TransactionState, table: String, row: Row },
+    Create { txn: TransactionState, table: String, rows: Vec<Row> },
     /// Deletes a row
-    Delete { txn: TransactionState, table: String, id: Value },
+    Delete { txn: TransactionState, table: String, ids: Vec<Value> },
     /// Updates a row
-    Update { txn: TransactionState, table: String, id: Value, row: Row },
+    Update { txn: TransactionState, table: String, rows: HashMap<Value, Row> },
 
     /// Creates a table
     CreateTable { txn: TransactionState, schema: Table },
@@ -49,9 +49,9 @@ enum Query {
     Status,
 
     /// Reads a row
-    Read { txn: TransactionState, table: String, id: Value },
+    Read { txn: TransactionState, table: String, ids: Vec<Value> },
     /// Reads an index entry
-    ReadIndex { txn: TransactionState, table: String, column: String, value: Value },
+    ReadIndex { txn: TransactionState, table: String, column: String, values: Vec<Value> },
     /// Scans a table's rows
     Scan { txn: TransactionState, table: String, filter: Option<Expression> },
     /// Scans an index
@@ -197,36 +197,36 @@ impl super::Transaction for Transaction {
         Ok(())
     }
 
-    fn insert(&self, table: &str, row: Row) -> Result<()> {
+    fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()> {
         self.client.mutate(Mutation::Create {
             txn: self.state.clone(),
             table: table.to_string(),
-            row,
+            rows,
         })
     }
 
-    fn delete(&self, table: &str, id: &Value) -> Result<()> {
+    fn delete(&self, table: &str, ids: &[Value]) -> Result<()> {
         self.client.mutate(Mutation::Delete {
             txn: self.state.clone(),
             table: table.to_string(),
-            id: id.clone(),
+            ids: ids.to_vec(),
         })
     }
 
-    fn get(&self, table: &str, id: &Value) -> Result<Option<Row>> {
+    fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>> {
         self.client.query(Query::Read {
             txn: self.state.clone(),
             table: table.to_string(),
-            id: id.clone(),
+            ids: ids.to_vec(),
         })
     }
 
-    fn lookup_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
+    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>> {
         self.client.query(Query::ReadIndex {
             txn: self.state.clone(),
             table: table.to_string(),
             column: column.to_string(),
-            value: value.clone(),
+            values: values.to_vec(),
         })
     }
 
@@ -256,12 +256,11 @@ impl super::Transaction for Transaction {
         ))
     }
 
-    fn update(&self, table: &str, id: &Value, row: Row) -> Result<()> {
+    fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()> {
         self.client.mutate(Mutation::Update {
             txn: self.state.clone(),
             table: table.to_string(),
-            id: id.clone(),
-            row,
+            rows,
         })
     }
 }
@@ -311,14 +310,14 @@ impl<E: storage::Engine> State<E> {
             Mutation::Commit(txn) => bincode::serialize(&self.engine.resume(txn)?.commit()?),
             Mutation::Rollback(txn) => bincode::serialize(&self.engine.resume(txn)?.rollback()?),
 
-            Mutation::Create { txn, table, row } => {
-                bincode::serialize(&self.engine.resume(txn)?.insert(&table, row)?)
+            Mutation::Create { txn, table, rows } => {
+                bincode::serialize(&self.engine.resume(txn)?.insert(&table, rows)?)
             }
-            Mutation::Delete { txn, table, id } => {
-                bincode::serialize(&self.engine.resume(txn)?.delete(&table, &id)?)
+            Mutation::Delete { txn, table, ids } => {
+                bincode::serialize(&self.engine.resume(txn)?.delete(&table, &ids)?)
             }
-            Mutation::Update { txn, table, id, row } => {
-                bincode::serialize(&self.engine.resume(txn)?.update(&table, &id, row)?)
+            Mutation::Update { txn, table, rows } => {
+                bincode::serialize(&self.engine.resume(txn)?.update(&table, rows)?)
             }
 
             Mutation::CreateTable { txn, schema } => {
@@ -365,9 +364,9 @@ impl<E: storage::Engine> raft::State for State<E> {
                 };
                 txn.state().encode()
             }
-            Query::Read { txn, table, id } => self.engine.resume(txn)?.get(&table, &id)?.encode(),
-            Query::ReadIndex { txn, table, column, value } => {
-                self.engine.resume(txn)?.lookup_index(&table, &column, &value)?.encode()
+            Query::Read { txn, table, ids } => self.engine.resume(txn)?.get(&table, &ids)?.encode(),
+            Query::ReadIndex { txn, table, column, values } => {
+                self.engine.resume(txn)?.lookup_index(&table, &column, &values)?.encode()
             }
             // FIXME These need to stream rows somehow
             Query::Scan { txn, table, filter } => {

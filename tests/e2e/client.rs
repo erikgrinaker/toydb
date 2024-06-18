@@ -126,16 +126,16 @@ fn status() -> Result<()> {
             raft: raft::Status {
                 leader: 1,
                 term: 1,
-                match_index: [(1, 27)].into(),
-                commit_index: 27,
-                applied_index: 27,
+                match_index: [(1, 11)].into(),
+                commit_index: 11,
+                applied_index: 11,
                 storage: storage::engine::Status {
                     name: "bitcask".to_string(),
-                    keys: 29,
-                    size: 1349,
-                    total_disk_size: 1867,
-                    live_disk_size: 1581,
-                    garbage_disk_size: 286
+                    keys: 13,
+                    size: 962,
+                    total_disk_size: 1176,
+                    live_disk_size: 1066,
+                    garbage_disk_size: 110,
                 },
             },
             mvcc: mvcc::Status {
@@ -145,9 +145,9 @@ fn status() -> Result<()> {
                     name: "bitcask".to_string(),
                     keys: 26,
                     size: 1630,
-                    total_disk_size: 4556,
+                    total_disk_size: 4156,
                     live_disk_size: 1838,
-                    garbage_disk_size: 2718
+                    garbage_disk_size: 2318
                 },
             }
         },
