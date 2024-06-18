@@ -1,5 +1,5 @@
 Query: DELETE FROM self
-Error: InvalidInput("primary key 1 referenced by table self column self_id")
+Result: Delete { count: 4 }
 
 Storage:
 CREATE TABLE self (
@@ -7,12 +7,5 @@ CREATE TABLE self (
   self_id INTEGER DEFAULT NULL INDEX REFERENCES self,
   value STRING DEFAULT NULL
 )
-[Integer(1), Integer(1), String("a")]
-[Integer(2), Integer(1), String("b")]
-[Integer(3), Integer(3), String("c")]
-[Integer(4), Null, String("d")]
 
 Index self.self_id
-Null => [Integer(4)]
-Integer(1) => [Integer(1), Integer(2)]
-Integer(3) => [Integer(3)]

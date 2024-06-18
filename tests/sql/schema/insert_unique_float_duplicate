@@ -1,5 +1,5 @@
 Query: INSERT INTO "unique" (id, "float") VALUES (2, 3.14)
-Error: InvalidInput("unique value 3.14 already exists for column float")
+Error: InvalidInput("value 3.14 already in unique column float")
 
 Storage:
 CREATE TABLE "unique" (

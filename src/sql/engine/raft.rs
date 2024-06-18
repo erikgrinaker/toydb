@@ -316,7 +316,7 @@ impl<E: storage::Engine> raft::State for State<E> {
                 };
                 txn.state().encode()
             }
-            Read::Status => self.local.kv.status()?.encode(),
+            Read::Status => self.local.mvcc.status()?.encode(),
 
             Read::Get { txn, table, ids } => self.local.resume(txn)?.get(&table, &ids)?.encode(),
             Read::LookupIndex { txn, table, column, values } => {

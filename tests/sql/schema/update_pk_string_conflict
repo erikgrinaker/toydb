@@ -1,5 +1,5 @@
 Query: UPDATE "string" SET pk = 'bar' WHERE pk = 'foo'
-Error: InvalidInput("primary key bar already exists for table string")
+Error: InvalidInput("primary key bar already exists")
 
 Storage:
 CREATE TABLE "string" (

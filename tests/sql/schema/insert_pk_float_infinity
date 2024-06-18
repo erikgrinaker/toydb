@@ -1,5 +1,5 @@
 Query: INSERT INTO "float" VALUES (INFINITY)
-Error: InvalidInput("primary key inf already exists for table float")
+Error: InvalidInput("primary key inf already exists")
 
 Storage:
 CREATE TABLE "float" (

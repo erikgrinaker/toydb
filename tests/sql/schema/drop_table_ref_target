@@ -1,5 +1,5 @@
 Query: DROP TABLE target
-Error: InvalidInput("table target is referenced by table source column target_id")
+Error: InvalidInput("table target is referenced from source.target_id")
 
 Storage:
 CREATE TABLE self (

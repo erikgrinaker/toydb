@@ -3,7 +3,7 @@ Query: SELECT * FROM movies WHERE 'abc'
 Explain:
 Scan: movies (abc)
 
-Error: invalid data: filter returned abc, expected boolean
+Error: invalid input: filter returned abc, expected boolean
 
 AST: Select {
     select: [],

@@ -1,13 +1,13 @@
 use super::value::{DataType, Value};
 use crate::encoding;
+use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
-use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-/// A table schema, which specifies the structure and constraints of its data.
+/// A table schema, which specifies the data structure and constraints.
 ///
 /// Tables can't change after they are created. There is no ALTER TABLE nor
 /// CREATE/DROP INDEX -- only CREATE TABLE and DROP TABLE.
@@ -85,25 +85,12 @@ impl std::fmt::Display for Table {
 impl Table {
     /// Fetches a column by name.
     ///
-    /// TODO: consider getting rid of all these helpers.
+    /// TODO: consider getting rid of this helper.
     pub fn get_column(&self, name: &str) -> Result<&Column> {
         self.columns
             .iter()
             .find(|c| c.name == name)
             .ok_or(errinput!("column {name} not found in table {}", self.name))
-    }
-
-    /// Fetches a column index by name
-    pub fn get_column_index(&self, name: &str) -> Result<usize> {
-        self.columns
-            .iter()
-            .position(|c| c.name == name)
-            .ok_or(errinput!("column {name} not found in table {}", self.name))
-    }
-
-    /// Returns the primary key value of a row.
-    pub fn get_row_key<'a>(&self, row: &'a [Value]) -> Result<&'a Value> {
-        row.get(self.primary_key).ok_or(errdata!("no primary key in row {row:?}"))
     }
 
     /// Validates the table schema.
@@ -183,67 +170,57 @@ impl Table {
         Ok(())
     }
 
-    /// Validates a row.
+    /// Validates a row, including uniqueness constraints and references.
     ///
-    /// TODO: clean this up together with the Local engine. Who should be
-    /// responsible for non-local validation (i.e. primary/unique conflicts and
-    /// reference integrity)?
-    pub fn validate_row(&self, row: &[Value], txn: &impl Transaction) -> Result<()> {
+    /// If update is true, the row replaces an existing entry with the same
+    /// primary key. Otherwise, it is an insert. Primary key changes are
+    /// implemented as a delete+insert.
+    pub fn validate_row(&self, row: &[Value], update: bool, txn: &impl Transaction) -> Result<()> {
         if row.len() != self.columns.len() {
             return errinput!("invalid row size for table {}", self.name);
         }
-        let pk = self.get_row_key(row)?;
-        for (i, (column, value)) in self.columns.iter().zip(row.iter()).enumerate() {
+
+        // Validate primary key.
+        let id = &row[self.primary_key];
+        let idslice = &row[self.primary_key..=self.primary_key];
+        if !update && !txn.get(&self.name, idslice)?.is_empty() {
+            return errinput!("primary key {id} already exists");
+        }
+
+        for (i, (column, value)) in self.columns.iter().zip(row).enumerate() {
+            let (cname, ctype) = (&column.name, &column.datatype);
+            let valueslice = &row[i..=i];
+
             // Validate datatype.
-            match value.datatype() {
-                None if column.nullable => {}
-                None => return errinput!("NULL value not allowed for column {}", column.name),
-                Some(ref datatype) if datatype != &column.datatype => {
-                    return errinput!(
-                        "invalid datatype {} for {} column {}",
-                        datatype,
-                        column.datatype,
-                        column.name
-                    )
+            if let Some(ref vtype) = value.datatype() {
+                if vtype != ctype {
+                    return errinput!("invalid datatype {vtype} for {ctype} column {cname}");
                 }
-                _ => {}
+            }
+            if value == &Value::Null && !column.nullable {
+                return errinput!("NULL value not allowed for column {cname}");
             }
 
-            // Validate value
-            match value {
-                Value::String(s) if s.len() > 1024 => {
-                    errinput!("strings cannot be more than 1024 bytes")
-                }
-                _ => Ok(()),
-            }?;
-
-            // Validate outgoing references
+            // Validate outgoing references.
             if let Some(target) = &column.references {
                 match value {
-                    Value::Null => Ok(()),
-                    Value::Float(f) if f.is_nan() => Ok(()),
-                    v if target == &self.name && v == pk => Ok(()),
-                    v if txn.get(target, &[v.clone()])?.is_empty() => {
-                        errinput!("referenced primary key {v} in table {target} does not exist",)
+                    v if v.is_unknown() => {}
+                    v if target == &self.name && v == id => {}
+                    v if txn.get(target, valueslice)?.is_empty() => {
+                        return errinput!("reference {v} not in table {target}");
                     }
-                    _ => Ok(()),
-                }?;
+                    _ => {}
+                }
             }
 
-            // Validate uniqueness constraints.
-            // TODO: this needs an index lookup.
-            if column.unique && i != self.primary_key && value != &Value::Null {
-                let index = self.get_column_index(&column.name)?;
-                let mut scan = txn.scan(&self.name, None)?;
-                while let Some(row) = scan.next().transpose()? {
-                    if row.get(index).unwrap_or(&Value::Null) == value
-                        && self.get_row_key(&row)? != pk
-                    {
-                        return errinput!(
-                            "unique value {value} already exists for column {}",
-                            column.name
-                        );
-                    }
+            // Validate uniqueness constraints. Unique columns are indexed.
+            if column.unique && i != self.primary_key && !value.is_unknown() {
+                let mut index = txn.lookup_index(&self.name, &column.name, valueslice)?;
+                if update {
+                    index.remove(id); // ignore existing version of this row
+                }
+                if !index.is_empty() {
+                    return errinput!("value {value} already in unique column {cname}");
                 }
             }
         }

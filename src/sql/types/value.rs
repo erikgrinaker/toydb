@@ -111,6 +111,15 @@ impl Value {
             Self::String(_) => Some(DataType::String),
         }
     }
+
+    /// Returns true if the value is unknown (NULL or NaN).
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            Self::Null => true,
+            Self::Float(f) if f.is_nan() => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for Value {

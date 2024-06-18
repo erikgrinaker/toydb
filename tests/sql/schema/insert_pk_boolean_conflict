@@ -1,5 +1,5 @@
 Query: INSERT INTO "boolean" VALUES (FALSE)
-Error: InvalidInput("primary key FALSE already exists for table boolean")
+Error: InvalidInput("primary key FALSE already exists")
 
 Storage:
 CREATE TABLE "boolean" (

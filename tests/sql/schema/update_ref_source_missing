@@ -1,5 +1,5 @@
 Query: UPDATE source SET target_id = 9 WHERE id = 4
-Error: InvalidInput("referenced primary key 9 in table target does not exist")
+Error: InvalidInput("reference 9 not in table target")
 
 Storage:
 CREATE TABLE source (

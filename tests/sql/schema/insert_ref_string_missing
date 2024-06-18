@@ -1,5 +1,5 @@
 Query: INSERT INTO source VALUES (1, 'baz')
-Error: InvalidInput("referenced primary key baz in table target does not exist")
+Error: InvalidInput("reference baz not in table target")
 
 Storage:
 CREATE TABLE source (

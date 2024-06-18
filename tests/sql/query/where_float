@@ -3,7 +3,7 @@ Query: SELECT * FROM movies WHERE 3.14
 Explain:
 Scan: movies (3.14)
 
-Error: invalid data: filter returned 3.14, expected boolean
+Error: invalid input: filter returned 3.14, expected boolean
 
 AST: Select {
     select: [],

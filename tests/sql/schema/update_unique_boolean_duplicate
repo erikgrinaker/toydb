@@ -1,5 +1,5 @@
 Query: UPDATE "unique" SET "boolean" = TRUE WHERE id = 0
-Error: InvalidInput("unique value TRUE already exists for column boolean")
+Error: InvalidInput("value TRUE already in unique column boolean")
 
 Storage:
 CREATE TABLE "unique" (

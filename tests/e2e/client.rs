@@ -186,7 +186,7 @@ fn execute() -> Result<()> {
     // INSERT
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (1, 'Western')"),
-        Err(Error::InvalidInput("primary key 1 already exists for table genres".into())),
+        Err(Error::InvalidInput("primary key 1 already exists".into())),
     );
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (9, 'Western')"),
@@ -208,7 +208,7 @@ fn execute() -> Result<()> {
     );
     assert_eq!(
         c.execute("UPDATE genres SET id = 1 WHERE id = 9"),
-        Err(Error::InvalidInput("primary key 1 already exists for table genres".into()))
+        Err(Error::InvalidInput("primary key 1 already exists".into()))
     );
 
     // DELETE
@@ -300,7 +300,7 @@ fn execute_txn() -> Result<()> {
     c.execute("INSERT INTO genres VALUES (5, 'Horror')")?;
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (5, 'Musical')"),
-        Err(Error::InvalidInput("primary key 5 already exists for table genres".into()))
+        Err(Error::InvalidInput("primary key 5 already exists".into()))
     );
     assert_eq!(c.txn(), Some((4, false)));
     c.execute("INSERT INTO genres VALUES (6, 'Western')")?;

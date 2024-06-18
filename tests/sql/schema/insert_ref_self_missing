@@ -1,5 +1,5 @@
 Query: INSERT INTO self VALUES (5, 9, 'e')
-Error: InvalidInput("referenced primary key 9 in table self does not exist")
+Error: InvalidInput("reference 9 not in table self")
 
 Storage:
 CREATE TABLE self (
