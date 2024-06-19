@@ -50,7 +50,14 @@ use serde::{de, ser};
 use crate::errdata;
 use crate::error::{Error, Result};
 
-// Serializes a key to a binary KeyCode representation.
+/// Serializes a key to a binary KeyCode representation.
+///
+/// This will allocate a new byte vector for every call. Often, keys are used
+/// immediately and then discarded, so we could reuse a byte buffer between
+/// calls to avoid the allocations. We don't, for simplicity.
+///
+/// TODO: given lifetime enforcement, it would be trivial to hand out references
+/// to the reused byte buffer. Consider adding this.
 pub fn serialize<T: serde::Serialize>(key: &T) -> Vec<u8> {
     let mut serializer = Serializer { output: Vec::new() };
     // Panic on serialization failures, as this is typically an issue with the
@@ -59,7 +66,7 @@ pub fn serialize<T: serde::Serialize>(key: &T) -> Vec<u8> {
     serializer.output
 }
 
-// Deserializes a key from a binary KeyCode representation.
+/// Deserializes a key from a binary KeyCode representation.
 pub fn deserialize<'a, T: serde::Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
     let mut deserializer = Deserializer::from_bytes(input);
     let t = T::deserialize(&mut deserializer)?;
@@ -72,7 +79,7 @@ pub fn deserialize<'a, T: serde::Deserialize<'a>>(input: &'a [u8]) -> Result<T> 
     Ok(t)
 }
 
-// Serializes keys as binary byte vectors.
+/// Serializes keys as binary byte vectors.
 struct Serializer {
     output: Vec<u8>,
 }
@@ -197,7 +204,7 @@ impl<'a> serde::Serializer for &'a mut Serializer {
         unimplemented!()
     }
 
-    // Enum variants are serialized using their index, as a single byte.
+    /// Enum variants are serialized using their index, as a single byte.
     fn serialize_unit_variant(self, _: &'static str, index: u32, _: &'static str) -> Result<()> {
         self.output.push(u8::try_from(index)?);
         Ok(())
@@ -211,7 +218,7 @@ impl<'a> serde::Serializer for &'a mut Serializer {
         unimplemented!()
     }
 
-    // Newtype variants are serialized using the variant index and inner type.
+    /// Newtype variants are serialized using the variant index and inner type.
     fn serialize_newtype_variant<T: serde::Serialize + ?Sized>(
         self,
         name: &'static str,
@@ -223,12 +230,12 @@ impl<'a> serde::Serializer for &'a mut Serializer {
         value.serialize(self)
     }
 
-    // Sequences are serialized as the concatenation of the serialized elements.
+    /// Sequences are serialized as the concatenation of the serialized elements.
     fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq> {
         Ok(self)
     }
 
-    // Tuples are serialized as the concatenation of the serialized elements.
+    /// Tuples are serialized as the concatenation of the serialized elements.
     fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple> {
         Ok(self)
     }
@@ -241,8 +248,8 @@ impl<'a> serde::Serializer for &'a mut Serializer {
         unimplemented!()
     }
 
-    // Tuple variants are serialized using the variant index and the
-    // concatenation of the serialized elements.
+    /// Tuple variants are serialized using the variant index and the
+    /// concatenation of the serialized elements.
     fn serialize_tuple_variant(
         self,
         name: &'static str,
@@ -273,7 +280,7 @@ impl<'a> serde::Serializer for &'a mut Serializer {
     }
 }
 
-// Sequences simply concatenate the serialized elements, with no external structure.
+/// Sequences simply concatenate the serialized elements, with no external structure.
 impl<'a> ser::SerializeSeq for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
@@ -287,7 +294,7 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
     }
 }
 
-// Tuples, like sequences, simply concatenate the serialized elements.
+/// Tuples, like sequences, simply concatenate the serialized elements.
 impl<'a> ser::SerializeTuple for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
@@ -301,7 +308,7 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     }
 }
 
-// Tuples, like sequences, simply concatenate the serialized elements.
+/// Tuples, like sequences, simply concatenate the serialized elements.
 impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
@@ -315,21 +322,21 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
     }
 }
 
-// Deserializes keys from byte slices into a given type. The format is not
-// self-describing, so the caller must provide a concrete type to deserialize
-// into.
+/// Deserializes keys from byte slices into a given type. The format is not
+/// self-describing, so the caller must provide a concrete type to deserialize
+/// into.
 pub struct Deserializer<'de> {
     input: &'de [u8],
 }
 
 impl<'de> Deserializer<'de> {
-    // Creates a deserializer for a byte slice.
+    /// Creates a deserializer for a byte slice.
     pub fn from_bytes(input: &'de [u8]) -> Self {
         Deserializer { input }
     }
 
-    // Chops off and returns the next len bytes of the byte slice, or errors if
-    // there aren't enough bytes left.
+    /// Chops off and returns the next len bytes of the byte slice, or errors if
+    /// there aren't enough bytes left.
     fn take_bytes(&mut self, len: usize) -> Result<&[u8]> {
         if self.input.len() < len {
             return errdata!("insufficient bytes, expected {len} bytes for {:x?}", self.input);
@@ -339,7 +346,7 @@ impl<'de> Deserializer<'de> {
         Ok(bytes)
     }
 
-    // Decodes and chops off the next encoded byte slice.
+    /// Decodes and chops off the next encoded byte slice.
     fn decode_next_bytes(&mut self) -> Result<Vec<u8>> {
         // We can't easily share state between Iterator.scan() and
         // Iterator.filter() when processing escape sequences, so use a
@@ -362,7 +369,7 @@ impl<'de> Deserializer<'de> {
     }
 }
 
-// For details on serialization formats, see Serializer.
+/// For details on serialization formats, see Serializer.
 impl<'de, 'a> serde::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
@@ -522,7 +529,7 @@ impl<'de, 'a> serde::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 }
 
-// Sequences are simply deserialized until the byte slice is exhausted.
+/// Sequences are simply deserialized until the byte slice is exhausted.
 impl<'de> de::SeqAccess<'de> for Deserializer<'de> {
     type Error = Error;
 
@@ -537,7 +544,7 @@ impl<'de> de::SeqAccess<'de> for Deserializer<'de> {
     }
 }
 
-// Enum variants are deserialized by their index.
+/// Enum variants are deserialized by their index.
 impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
     type Variant = Self;
@@ -552,7 +559,7 @@ impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
     }
 }
 
-// Enum variant contents are deserialized as sequences.
+/// Enum variant contents are deserialized as sequences.
 impl<'de> de::VariantAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
