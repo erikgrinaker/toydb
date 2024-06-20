@@ -20,11 +20,18 @@ Projection: #0, #1, #2, #3, #4
 
 Result: ["id", "title", "genre", "studio", "rating"]
 [Integer(10), String("Inception"), String("Science Fiction"), String("Warner Bros"), Float(8.8)]
+[Integer(10), String("Inception"), String("Science Fiction"), String("Warner Bros"), Float(8.8)]
+[Integer(1), String("Stalker"), String("Science Fiction"), String("Mosfilm"), Float(8.2)]
 [Integer(1), String("Stalker"), String("Science Fiction"), String("Mosfilm"), Float(8.2)]
 [Integer(4), String("Heat"), String("Action"), String("Warner Bros"), Float(8.2)]
+[Integer(4), String("Heat"), String("Action"), String("Warner Bros"), Float(8.2)]
+[Integer(6), String("Solaris"), String("Science Fiction"), String("Mosfilm"), Float(8.1)]
 [Integer(6), String("Solaris"), String("Science Fiction"), String("Mosfilm"), Float(8.1)]
 [Integer(7), String("Gravity"), String("Science Fiction"), String("Warner Bros"), Float(7.7)]
+[Integer(7), String("Gravity"), String("Science Fiction"), String("Warner Bros"), Float(7.7)]
 [Integer(9), String("Birdman"), String("Comedy"), String("Warner Bros"), Float(7.7)]
+[Integer(9), String("Birdman"), String("Comedy"), String("Warner Bros"), Float(7.7)]
+[Integer(5), String("The Fountain"), String("Science Fiction"), String("Warner Bros"), Float(7.2)]
 [Integer(5), String("The Fountain"), String("Science Fiction"), String("Warner Bros"), Float(7.2)]
 
 AST: Select {
@@ -593,94 +600,90 @@ Plan: Select(
                         ),
                     ),
                 },
-                expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "title",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                    (
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    Some(
-                                        "g",
-                                    ),
-                                    "name",
-                                ),
-                            ),
-                        ),
-                        Some(
+                labels: [
+                    None,
+                    None,
+                    Some(
+                        (
+                            None,
                             "genre",
                         ),
                     ),
-                    (
-                        Field(
-                            10,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "name",
-                                ),
-                            ),
-                        ),
-                        Some(
+                    Some(
+                        (
+                            None,
                             "studio",
                         ),
                     ),
-                    (
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "rating",
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "m",
                                 ),
+                                "id",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            4,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "released",
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "m",
                                 ),
+                                "title",
                             ),
                         ),
-                        None,
+                    ),
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        10,
+                        Some(
+                            (
+                                Some(
+                                    "s",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        5,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "rating",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        4,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "released",
+                            ),
+                        ),
                     ),
                 ],
             },
@@ -729,40 +732,32 @@ Plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
-            (
-                Field(
-                    3,
-                    None,
-                ),
+            Field(
+                3,
                 None,
             ),
-            (
-                Field(
-                    4,
-                    None,
-                ),
+            Field(
+                4,
                 None,
             ),
         ],
@@ -1126,94 +1121,90 @@ Optimized plan: Select(
                     ),
                     outer: false,
                 },
-                expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "title",
-                                ),
-                            ),
-                        ),
-                        None,
-                    ),
-                    (
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    Some(
-                                        "g",
-                                    ),
-                                    "name",
-                                ),
-                            ),
-                        ),
-                        Some(
+                labels: [
+                    None,
+                    None,
+                    Some(
+                        (
+                            None,
                             "genre",
                         ),
                     ),
-                    (
-                        Field(
-                            10,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "name",
-                                ),
-                            ),
-                        ),
-                        Some(
+                    Some(
+                        (
+                            None,
                             "studio",
                         ),
                     ),
-                    (
-                        Field(
-                            5,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "rating",
+                    None,
+                    None,
+                ],
+                expressions: [
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "m",
                                 ),
+                                "id",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            4,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "released",
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "m",
                                 ),
+                                "title",
                             ),
                         ),
-                        None,
+                    ),
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "g",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        10,
+                        Some(
+                            (
+                                Some(
+                                    "s",
+                                ),
+                                "name",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        5,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "rating",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        4,
+                        Some(
+                            (
+                                Some(
+                                    "m",
+                                ),
+                                "released",
+                            ),
+                        ),
                     ),
                 ],
             },
@@ -1262,40 +1253,32 @@ Optimized plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
-            (
-                Field(
-                    3,
-                    None,
-                ),
+            Field(
+                3,
                 None,
             ),
-            (
-                Field(
-                    4,
-                    None,
-                ),
+            Field(
+                4,
                 None,
             ),
         ],

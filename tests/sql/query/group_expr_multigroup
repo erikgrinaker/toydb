@@ -174,58 +174,18 @@ Plan: Select(
                         alias: None,
                         filter: None,
                     },
-                    expressions: [
-                        (
-                            Field(
-                                5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
-                            Field(
-                                2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
-                            Field(
-                                3,
-                                Some(
-                                    (
-                                        None,
-                                        "genre_id",
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
+                    labels: [
+                        None,
+                        None,
+                        None,
                     ],
-                },
-                aggregates: [
-                    Max,
-                ],
-            },
-            expressions: [
-                (
-                    Add(
+                    expressions: [
                         Field(
-                            1,
+                            5,
                             Some(
                                 (
                                     None,
-                                    "studio_id",
+                                    "rating",
                                 ),
                             ),
                         ),
@@ -234,23 +194,63 @@ Plan: Select(
                             Some(
                                 (
                                     None,
+                                    "studio_id",
+                                ),
+                            ),
+                        ),
+                        Field(
+                            3,
+                            Some(
+                                (
+                                    None,
                                     "genre_id",
                                 ),
                             ),
                         ),
-                    ),
-                    Some(
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                Some(
+                    (
+                        None,
                         "multi",
                     ),
                 ),
-                (
-                    Field(
-                        0,
+                Some(
+                    (
                         None,
-                    ),
-                    Some(
                         "rating",
                     ),
+                ),
+            ],
+            expressions: [
+                Add(
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        2,
+                        Some(
+                            (
+                                None,
+                                "genre_id",
+                            ),
+                        ),
+                    ),
+                ),
+                Field(
+                    0,
+                    None,
                 ),
             ],
         },
@@ -369,58 +369,18 @@ Optimized plan: Select(
                         alias: None,
                         filter: None,
                     },
-                    expressions: [
-                        (
-                            Field(
-                                5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
-                            Field(
-                                2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
-                            Field(
-                                3,
-                                Some(
-                                    (
-                                        None,
-                                        "genre_id",
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
+                    labels: [
+                        None,
+                        None,
+                        None,
                     ],
-                },
-                aggregates: [
-                    Max,
-                ],
-            },
-            expressions: [
-                (
-                    Add(
+                    expressions: [
                         Field(
-                            1,
+                            5,
                             Some(
                                 (
                                     None,
-                                    "studio_id",
+                                    "rating",
                                 ),
                             ),
                         ),
@@ -429,23 +389,63 @@ Optimized plan: Select(
                             Some(
                                 (
                                     None,
+                                    "studio_id",
+                                ),
+                            ),
+                        ),
+                        Field(
+                            3,
+                            Some(
+                                (
+                                    None,
                                     "genre_id",
                                 ),
                             ),
                         ),
-                    ),
-                    Some(
+                    ],
+                },
+                aggregates: [
+                    Max,
+                ],
+            },
+            labels: [
+                Some(
+                    (
+                        None,
                         "multi",
                     ),
                 ),
-                (
-                    Field(
-                        0,
+                Some(
+                    (
                         None,
-                    ),
-                    Some(
                         "rating",
                     ),
+                ),
+            ],
+            expressions: [
+                Add(
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
+                    ),
+                    Field(
+                        2,
+                        Some(
+                            (
+                                None,
+                                "genre_id",
+                            ),
+                        ),
+                    ),
+                ),
+                Field(
+                    0,
+                    None,
                 ),
             ],
         },

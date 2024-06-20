@@ -45,6 +45,8 @@ pub(super) fn lookup_index(
 
 /// Produces a single empty row. Used for queries without a FROM clause, e.g.
 /// SELECT 1+1, in order to have something to project against.
+///
+/// TODO: replace with values.
 pub(super) fn nothing() -> QueryIterator {
     QueryIterator { columns: Vec::new(), rows: Box::new(std::iter::once(Ok(Row::new()))) }
 }

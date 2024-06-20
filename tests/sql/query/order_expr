@@ -174,32 +174,46 @@ Plan: Select(
                 alias: None,
                 filter: None,
             },
+            labels: [
+                None,
+                None,
+                None,
+                Some(
+                    (
+                        None,
+                        "ord",
+                    ),
+                ),
+            ],
             expressions: [
-                (
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
                         ),
                     ),
-                    None,
                 ),
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "title",
-                            ),
+                Field(
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
                         ),
                     ),
-                    None,
                 ),
-                (
+                Field(
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
+                        ),
+                    ),
+                ),
+                Modulo(
                     Field(
                         4,
                         Some(
@@ -209,27 +223,10 @@ Plan: Select(
                             ),
                         ),
                     ),
-                    None,
-                ),
-                (
-                    Modulo(
-                        Field(
+                    Constant(
+                        Integer(
                             4,
-                            Some(
-                                (
-                                    None,
-                                    "released",
-                                ),
-                            ),
                         ),
-                        Constant(
-                            Integer(
-                                4,
-                            ),
-                        ),
-                    ),
-                    Some(
-                        "ord",
                     ),
                 ),
             ],
@@ -335,32 +332,46 @@ Optimized plan: Select(
                 alias: None,
                 filter: None,
             },
+            labels: [
+                None,
+                None,
+                None,
+                Some(
+                    (
+                        None,
+                        "ord",
+                    ),
+                ),
+            ],
             expressions: [
-                (
-                    Field(
-                        0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                Field(
+                    0,
+                    Some(
+                        (
+                            None,
+                            "id",
                         ),
                     ),
-                    None,
                 ),
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "title",
-                            ),
+                Field(
+                    1,
+                    Some(
+                        (
+                            None,
+                            "title",
                         ),
                     ),
-                    None,
                 ),
-                (
+                Field(
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
+                        ),
+                    ),
+                ),
+                Modulo(
                     Field(
                         4,
                         Some(
@@ -370,27 +381,10 @@ Optimized plan: Select(
                             ),
                         ),
                     ),
-                    None,
-                ),
-                (
-                    Modulo(
-                        Field(
+                    Constant(
+                        Integer(
                             4,
-                            Some(
-                                (
-                                    None,
-                                    "released",
-                                ),
-                            ),
                         ),
-                        Constant(
-                            Integer(
-                                4,
-                            ),
-                        ),
-                    ),
-                    Some(
-                        "ord",
                     ),
                 ),
             ],

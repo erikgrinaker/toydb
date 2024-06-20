@@ -170,42 +170,38 @@ Plan: Select(
                                 alias: None,
                                 filter: None,
                             },
+                            labels: [
+                                None,
+                                None,
+                                None,
+                            ],
                             expressions: [
-                                (
-                                    Field(
-                                        5,
-                                        Some(
-                                            (
-                                                None,
-                                                "rating",
-                                            ),
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
                                         ),
                                     ),
-                                    None,
                                 ),
-                                (
-                                    Field(
-                                        5,
-                                        Some(
-                                            (
-                                                None,
-                                                "rating",
-                                            ),
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
                                         ),
                                     ),
-                                    None,
                                 ),
-                                (
-                                    Field(
-                                        2,
-                                        Some(
-                                            (
-                                                None,
-                                                "studio_id",
-                                            ),
+                                Field(
+                                    2,
+                                    Some(
+                                        (
+                                            None,
+                                            "studio_id",
                                         ),
                                     ),
-                                    None,
                                 ),
                             ],
                         },
@@ -214,33 +210,29 @@ Plan: Select(
                             Min,
                         ],
                     },
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Field(
-                                2,
-                                Some(
-                                    (
-                                        Some(
-                                            "movies",
-                                        ),
-                                        "studio_id",
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
                                     ),
+                                    "studio_id",
                                 ),
                             ),
+                        ),
+                        Field(
+                            0,
                             None,
                         ),
-                        (
-                            Field(
-                                0,
-                                None,
-                            ),
-                            None,
-                        ),
-                        (
-                            Field(
-                                1,
-                                None,
-                            ),
+                        Field(
+                            1,
                             None,
                         ),
                     ],
@@ -274,19 +266,17 @@ Plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
         ],
@@ -381,42 +371,38 @@ Optimized plan: Select(
                                 alias: None,
                                 filter: None,
                             },
+                            labels: [
+                                None,
+                                None,
+                                None,
+                            ],
                             expressions: [
-                                (
-                                    Field(
-                                        5,
-                                        Some(
-                                            (
-                                                None,
-                                                "rating",
-                                            ),
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
                                         ),
                                     ),
-                                    None,
                                 ),
-                                (
-                                    Field(
-                                        5,
-                                        Some(
-                                            (
-                                                None,
-                                                "rating",
-                                            ),
+                                Field(
+                                    5,
+                                    Some(
+                                        (
+                                            None,
+                                            "rating",
                                         ),
                                     ),
-                                    None,
                                 ),
-                                (
-                                    Field(
-                                        2,
-                                        Some(
-                                            (
-                                                None,
-                                                "studio_id",
-                                            ),
+                                Field(
+                                    2,
+                                    Some(
+                                        (
+                                            None,
+                                            "studio_id",
                                         ),
                                     ),
-                                    None,
                                 ),
                             ],
                         },
@@ -425,33 +411,29 @@ Optimized plan: Select(
                             Min,
                         ],
                     },
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Field(
-                                2,
-                                Some(
-                                    (
-                                        Some(
-                                            "movies",
-                                        ),
-                                        "studio_id",
+                        Field(
+                            2,
+                            Some(
+                                (
+                                    Some(
+                                        "movies",
                                     ),
+                                    "studio_id",
                                 ),
                             ),
+                        ),
+                        Field(
+                            0,
                             None,
                         ),
-                        (
-                            Field(
-                                0,
-                                None,
-                            ),
-                            None,
-                        ),
-                        (
-                            Field(
-                                1,
-                                None,
-                            ),
+                        Field(
+                            1,
                             None,
                         ),
                     ],
@@ -485,19 +467,17 @@ Optimized plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
         ],

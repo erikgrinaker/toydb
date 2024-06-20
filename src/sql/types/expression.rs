@@ -132,6 +132,7 @@ impl Expression {
             // which are interchangeable. NULLs yield NULL.
             //
             // TODO: handle the f64 NaN case.
+            // TODO: shouldn't this dispatch to Value.cmp()?
             #[allow(clippy::float_cmp)]
             Self::Equal(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs == rhs),
@@ -169,6 +170,8 @@ impl Expression {
 
             // Mathematical operations. Inputs must be numbers, but integers and
             // floats are interchangeable (float when mixed). NULLs yield NULL.
+            //
+            // TODO: implement Add, CheckedAdd, etc. instead for Value.
             Self::Add(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(lhs), Integer(rhs)) => {
                     Integer(lhs.checked_add(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
@@ -525,5 +528,17 @@ impl Expression {
                 .collect(),
         )
         .unwrap()
+    }
+}
+
+impl From<Value> for Expression {
+    fn from(value: Value) -> Self {
+        Expression::Constant(value)
+    }
+}
+
+impl From<Value> for Box<Expression> {
+    fn from(value: Value) -> Self {
+        Box::new(value.into())
     }
 }

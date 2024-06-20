@@ -143,30 +143,28 @@ Plan: Select(
                             alias: None,
                             filter: None,
                         },
+                        labels: [
+                            None,
+                            None,
+                        ],
                         expressions: [
-                            (
-                                Field(
-                                    5,
-                                    Some(
-                                        (
-                                            None,
-                                            "rating",
-                                        ),
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
                                     ),
                                 ),
-                                None,
                             ),
-                            (
-                                Field(
-                                    2,
-                                    Some(
-                                        (
-                                            None,
-                                            "studio_id",
-                                        ),
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
                                     ),
                                 ),
-                                None,
                             ),
                         ],
                     },
@@ -174,27 +172,25 @@ Plan: Select(
                         Max,
                     ],
                 },
+                labels: [
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            0,
-                            None,
-                        ),
+                    Field(
+                        0,
                         None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "studio_id",
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
                                 ),
+                                "studio_id",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -215,12 +211,12 @@ Plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
         ],
@@ -314,30 +310,28 @@ Optimized plan: Select(
                             alias: None,
                             filter: None,
                         },
+                        labels: [
+                            None,
+                            None,
+                        ],
                         expressions: [
-                            (
-                                Field(
-                                    5,
-                                    Some(
-                                        (
-                                            None,
-                                            "rating",
-                                        ),
+                            Field(
+                                5,
+                                Some(
+                                    (
+                                        None,
+                                        "rating",
                                     ),
                                 ),
-                                None,
                             ),
-                            (
-                                Field(
-                                    2,
-                                    Some(
-                                        (
-                                            None,
-                                            "studio_id",
-                                        ),
+                            Field(
+                                2,
+                                Some(
+                                    (
+                                        None,
+                                        "studio_id",
                                     ),
                                 ),
-                                None,
                             ),
                         ],
                     },
@@ -345,27 +339,25 @@ Optimized plan: Select(
                         Max,
                     ],
                 },
+                labels: [
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            0,
-                            None,
-                        ),
+                    Field(
+                        0,
                         None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "studio_id",
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
                                 ),
+                                "studio_id",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -386,12 +378,12 @@ Optimized plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
         ],

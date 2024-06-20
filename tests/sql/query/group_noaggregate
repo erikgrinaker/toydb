@@ -142,37 +142,37 @@ Plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Field(
-                                1,
-                                Some(
-                                    (
-                                        None,
-                                        "title",
-                                    ),
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
                                 ),
                             ),
-                            None,
                         ),
                     ],
                 },
                 aggregates: [],
             },
+            labels: [
+                None,
+            ],
             expressions: [
-                (
-                    Field(
-                        0,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "title",
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "movies",
                             ),
+                            "title",
                         ),
                     ),
-                    None,
                 ),
             ],
         },
@@ -281,37 +281,37 @@ Optimized plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Field(
-                                1,
-                                Some(
-                                    (
-                                        None,
-                                        "title",
-                                    ),
+                        Field(
+                            1,
+                            Some(
+                                (
+                                    None,
+                                    "title",
                                 ),
                             ),
-                            None,
                         ),
                     ],
                 },
                 aggregates: [],
             },
+            labels: [
+                None,
+            ],
             expressions: [
-                (
-                    Field(
-                        0,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "title",
+                Field(
+                    0,
+                    Some(
+                        (
+                            Some(
+                                "movies",
                             ),
+                            "title",
                         ),
                     ),
-                    None,
                 ),
             ],
         },

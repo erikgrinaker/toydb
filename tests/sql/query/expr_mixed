@@ -160,48 +160,49 @@ Plan: Select(
             alias: None,
             filter: None,
         },
-        expressions: [
-            (
-                Add(
-                    Constant(
-                        Integer(
-                            1,
-                        ),
-                    ),
-                    Multiply(
-                        Constant(
-                            Integer(
-                                2,
-                            ),
-                        ),
-                        Constant(
-                            Integer(
-                                3,
-                            ),
-                        ),
-                    ),
-                ),
-                None,
-            ),
-            (
-                Subtract(
-                    Constant(
-                        Integer(
-                            2020,
-                        ),
-                    ),
-                    Field(
-                        4,
-                        Some(
-                            (
-                                None,
-                                "released",
-                            ),
-                        ),
-                    ),
-                ),
-                Some(
+        labels: [
+            None,
+            Some(
+                (
+                    None,
                     "age",
+                ),
+            ),
+        ],
+        expressions: [
+            Add(
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Multiply(
+                    Constant(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                    Constant(
+                        Integer(
+                            3,
+                        ),
+                    ),
+                ),
+            ),
+            Subtract(
+                Constant(
+                    Integer(
+                        2020,
+                    ),
+                ),
+                Field(
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
+                        ),
+                    ),
                 ),
             ),
         ],
@@ -291,34 +292,35 @@ Optimized plan: Select(
             alias: None,
             filter: None,
         },
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "age",
+                ),
+            ),
+        ],
         expressions: [
-            (
+            Constant(
+                Integer(
+                    7,
+                ),
+            ),
+            Subtract(
                 Constant(
                     Integer(
-                        7,
+                        2020,
                     ),
                 ),
-                None,
-            ),
-            (
-                Subtract(
-                    Constant(
-                        Integer(
-                            2020,
+                Field(
+                    4,
+                    Some(
+                        (
+                            None,
+                            "released",
                         ),
                     ),
-                    Field(
-                        4,
-                        Some(
-                            (
-                                None,
-                                "released",
-                            ),
-                        ),
-                    ),
-                ),
-                Some(
-                    "age",
                 ),
             ),
         ],

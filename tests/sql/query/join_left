@@ -231,37 +231,41 @@ Plan: Select(
             ),
             outer: true,
         },
-        expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "id",
-                        ),
-                    ),
-                ),
-                Some(
+        labels: [
+            Some(
+                (
+                    None,
                     "movie_id",
                 ),
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
+            Some(
+                (
+                    None,
+                    "genre_id",
+                ),
+            ),
+        ],
+        expressions: [
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "id",
                     ),
                 ),
+            ),
+            Field(
+                7,
                 Some(
-                    "genre_id",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
                 ),
             ),
         ],
@@ -408,37 +412,41 @@ Optimized plan: Select(
             ),
             outer: true,
         },
-        expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "id",
-                        ),
-                    ),
-                ),
-                Some(
+        labels: [
+            Some(
+                (
+                    None,
                     "movie_id",
                 ),
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
+            Some(
+                (
+                    None,
+                    "genre_id",
+                ),
+            ),
+        ],
+        expressions: [
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "id",
                     ),
                 ),
+            ),
+            Field(
+                7,
                 Some(
-                    "genre_id",
+                    (
+                        Some(
+                            "g",
+                        ),
+                        "id",
+                    ),
                 ),
             ),
         ],

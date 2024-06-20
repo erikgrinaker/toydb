@@ -123,18 +123,18 @@ Plan: Select(
             alias: None,
             filter: None,
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
+            Field(
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },
@@ -223,18 +223,18 @@ Optimized plan: Select(
             alias: None,
             filter: None,
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
+            Field(
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },

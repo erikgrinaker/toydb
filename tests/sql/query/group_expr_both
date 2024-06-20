@@ -168,37 +168,35 @@ Plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
+                        ),
+                        Multiply(
                             Field(
-                                5,
+                                2,
                                 Some(
                                     (
                                         None,
-                                        "rating",
+                                        "studio_id",
                                     ),
                                 ),
                             ),
-                            None,
-                        ),
-                        (
-                            Multiply(
-                                Field(
+                            Constant(
+                                Integer(
                                     2,
-                                    Some(
-                                        (
-                                            None,
-                                            "studio_id",
-                                        ),
-                                    ),
-                                ),
-                                Constant(
-                                    Integer(
-                                        2,
-                                    ),
                                 ),
                             ),
-                            None,
                         ),
                     ],
                 },
@@ -206,22 +204,23 @@ Plan: Select(
                     Max,
                 ],
             },
-            expressions: [
-                (
-                    Field(
-                        1,
+            labels: [
+                None,
+                Some(
+                    (
                         None,
-                    ),
-                    None,
-                ),
-                (
-                    Field(
-                        0,
-                        None,
-                    ),
-                    Some(
                         "rating",
                     ),
+                ),
+            ],
+            expressions: [
+                Field(
+                    1,
+                    None,
+                ),
+                Field(
+                    0,
+                    None,
                 ),
             ],
         },
@@ -328,37 +327,35 @@ Optimized plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
+                        ),
+                        Multiply(
                             Field(
-                                5,
+                                2,
                                 Some(
                                     (
                                         None,
-                                        "rating",
+                                        "studio_id",
                                     ),
                                 ),
                             ),
-                            None,
-                        ),
-                        (
-                            Multiply(
-                                Field(
+                            Constant(
+                                Integer(
                                     2,
-                                    Some(
-                                        (
-                                            None,
-                                            "studio_id",
-                                        ),
-                                    ),
-                                ),
-                                Constant(
-                                    Integer(
-                                        2,
-                                    ),
                                 ),
                             ),
-                            None,
                         ),
                     ],
                 },
@@ -366,22 +363,23 @@ Optimized plan: Select(
                     Max,
                 ],
             },
-            expressions: [
-                (
-                    Field(
-                        1,
+            labels: [
+                None,
+                Some(
+                    (
                         None,
-                    ),
-                    None,
-                ),
-                (
-                    Field(
-                        0,
-                        None,
-                    ),
-                    Some(
                         "rating",
                     ),
+                ),
+            ],
+            expressions: [
+                Field(
+                    1,
+                    None,
+                ),
+                Field(
+                    0,
+                    None,
                 ),
             ],
         },

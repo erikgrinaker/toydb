@@ -123,46 +123,38 @@ Plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
                 ],
             },
@@ -174,40 +166,32 @@ Plan: Select(
                 Average,
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
-            (
-                Field(
-                    3,
-                    None,
-                ),
+            Field(
+                3,
                 None,
             ),
-            (
-                Field(
-                    4,
-                    None,
-                ),
+            Field(
+                4,
                 None,
             ),
         ],
@@ -246,46 +230,38 @@ Optimized plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
-                    (
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
-                        None,
                     ),
                 ],
             },
@@ -297,40 +273,32 @@ Optimized plan: Select(
                 Average,
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
-            (
-                Field(
-                    3,
-                    None,
-                ),
+            Field(
+                3,
                 None,
             ),
-            (
-                Field(
-                    4,
-                    None,
-                ),
+            Field(
+                4,
                 None,
             ),
         ],

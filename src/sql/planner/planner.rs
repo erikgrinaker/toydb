@@ -5,7 +5,7 @@ use super::{plan::Node, plan::Plan, Aggregate, Direction};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Catalog;
-use crate::sql::types::{Column, Expression, Table, Value};
+use crate::sql::types::{Column, Expression, Label, Table, Value};
 
 use std::collections::{HashMap, HashSet};
 use std::mem::replace;
@@ -88,22 +88,29 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             ast::Statement::Insert { table, columns, values } => {
                 let table = self.catalog.must_get_table(&table)?;
-                Plan::Insert {
-                    table,
-                    columns: columns.unwrap_or_default(),
-                    source: Node::Values {
-                        labels: vec![None; values.len()],
-                        rows: values
-                            .into_iter()
-                            .map(|exprs| {
-                                exprs
-                                    .into_iter()
-                                    .map(|expr| self.build_expression(&mut Scope::constant(), expr))
-                                    .collect::<Result<_>>()
-                            })
-                            .collect::<Result<_>>()?,
-                    },
+                let mut column_map = None;
+                if let Some(columns) = columns {
+                    let column_map = column_map.insert(HashMap::new());
+                    for (vidx, name) in columns.into_iter().enumerate() {
+                        let Some(cidx) = table.columns.iter().position(|c| c.name == name) else {
+                            return errinput!("unknown column {name} in table {}", table.name);
+                        };
+                        if column_map.insert(cidx, vidx).is_some() {
+                            return errinput!("column {name} given multiple times");
+                        }
+                    }
                 }
+                let labels = vec![None; values.len()];
+                let rows = values
+                    .into_iter()
+                    .map(|exprs| {
+                        exprs
+                            .into_iter()
+                            .map(|expr| self.build_expression(&mut Scope::constant(), expr))
+                            .collect::<Result<_>>()
+                    })
+                    .collect::<Result<_>>()?;
+                Plan::Insert { table, column_map, source: Node::Values { labels, rows } }
             }
 
             ast::Statement::Update { table, set, r#where } => {
@@ -195,12 +202,14 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     }
 
                     // Build the remaining non-aggregate projection.
-                    let expressions: Vec<(Expression, Option<String>)> = select
+                    let labels: Vec<_> =
+                        select.iter().map(|(_, l)| l.clone().map(|l| (None, l))).collect();
+                    let expressions: Vec<_> = select
                         .into_iter()
-                        .map(|(e, l)| Ok((self.build_expression(scope, e)?, l)))
+                        .map(|(e, _)| self.build_expression(scope, e))
                         .collect::<Result<_>>()?;
-                    scope.project(&expressions)?;
-                    node = Node::Projection { source: Box::new(node), expressions };
+                    scope.project(&expressions, &labels)?;
+                    node = Node::Projection { source: Box::new(node), labels, expressions };
                 };
 
                 // Build HAVING clause.
@@ -256,8 +265,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 if hidden > 0 {
                     node = Node::Projection {
                         source: Box::new(node),
+                        labels: vec![None; scope.len() - hidden],
                         expressions: (0..(scope.len() - hidden))
-                            .map(|i| (Expression::Field(i, None), None))
+                            .map(|i| Expression::Field(i, None))
                             .collect(),
                     }
                 }
@@ -321,12 +331,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 };
                 let mut node = Node::NestedLoopJoin { left, left_size, right, predicate, outer };
                 if matches!(r#type, ast::JoinType::Right) {
+                    let labels = vec![None; scope.len()];
                     let expressions = (left_size..scope.len())
                         .chain(0..left_size)
-                        .map(|i| Ok((Expression::Field(i, scope.get_label(i)?), None)))
+                        .map(|i| Ok(Expression::Field(i, scope.get_label(i)?)))
                         .collect::<Result<Vec<_>>>()?;
-                    scope.project(&expressions)?;
-                    node = Node::Projection { source: Box::new(node), expressions }
+                    scope.project(&expressions, &labels)?;
+                    node = Node::Projection { source: Box::new(node), labels, expressions }
                 }
                 node
             }
@@ -345,31 +356,35 @@ impl<'a, C: Catalog> Planner<'a, C> {
     ) -> Result<Node> {
         let mut aggregates = Vec::new();
         let mut expressions = Vec::new();
+        let mut labels = Vec::new();
         for (aggregate, expr) in aggregations {
             aggregates.push(aggregate);
-            expressions.push((self.build_expression(scope, expr)?, None));
+            expressions.push(self.build_expression(scope, expr)?);
+            labels.push(None);
         }
         for (expr, label) in groups {
-            expressions.push((self.build_expression(scope, expr)?, label));
+            expressions.push(self.build_expression(scope, expr)?);
+            labels.push(label.map(|l| (None, l)));
         }
         scope.project(
             &expressions
                 .iter()
                 .cloned()
                 .enumerate()
-                .map(|(i, (e, l))| {
+                .map(|(i, e)| {
                     if i < aggregates.len() {
                         // We pass null values here since we don't want field references to hit
                         // the fields in scope before the aggregation.
-                        (Expression::Constant(Value::Null), None)
+                        Expression::Constant(Value::Null)
                     } else {
-                        (e, l)
+                        e
                     }
                 })
                 .collect::<Vec<_>>(),
+            &labels,
         )?;
         let node = Node::Aggregation {
-            source: Box::new(Node::Projection { source: Box::new(source), expressions }),
+            source: Box::new(Node::Projection { source: Box::new(source), labels, expressions }),
             aggregates,
         };
         Ok(node)
@@ -788,15 +803,15 @@ impl Scope {
 
     /// Projects the scope. This takes a set of expressions and labels in the current scope,
     /// and returns a new scope for the projection.
-    fn project(&mut self, projection: &[(Expression, Option<String>)]) -> Result<()> {
+    fn project(&mut self, expressions: &[Expression], labels: &[Option<Label>]) -> Result<()> {
         if self.constant {
             panic!("can't modify constant scope");
         }
         let mut new = Self::new();
         new.tables = self.tables.clone();
-        for (expr, label) in projection {
+        for (expr, label) in expressions.iter().zip(labels) {
             match (expr, label) {
-                (_, Some(label)) => new.add_column(None, Some(label.clone())),
+                (_, Some((None, label))) => new.add_column(None, Some(label.clone())),
                 (Expression::Field(_, Some((Some(table), name))), _) => {
                     new.add_column(Some(table.clone()), Some(name.clone()))
                 }

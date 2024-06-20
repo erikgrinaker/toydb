@@ -120,66 +120,58 @@ Plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -191,40 +183,32 @@ Plan: Select(
                 Average,
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
-            (
-                Field(
-                    3,
-                    None,
-                ),
+            Field(
+                3,
                 None,
             ),
-            (
-                Field(
-                    4,
-                    None,
-                ),
+            Field(
+                4,
                 None,
             ),
         ],
@@ -265,66 +249,58 @@ Optimized plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "i",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "i",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -336,40 +312,32 @@ Optimized plan: Select(
                 Average,
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
-            (
-                Field(
-                    3,
-                    None,
-                ),
+            Field(
+                3,
                 None,
             ),
-            (
-                Field(
-                    4,
-                    None,
-                ),
+            Field(
+                4,
                 None,
             ),
         ],

@@ -1,5 +1,5 @@
 Query: INSERT INTO test (id, missing) VALUES (0, 'x')
-Error: InvalidInput("column missing not found in table test")
+Error: InvalidInput("unknown column missing in table test")
 
 Storage:
 CREATE TABLE other (

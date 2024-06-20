@@ -30,14 +30,14 @@ AST: Select {
 Plan: Select(
     Projection {
         source: Nothing,
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Constant(
-                    Integer(
-                        1,
-                    ),
+            Constant(
+                Integer(
+                    1,
                 ),
-                None,
             ),
         ],
     },
@@ -46,14 +46,14 @@ Plan: Select(
 Optimized plan: Select(
     Projection {
         source: Nothing,
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Constant(
-                    Integer(
-                        1,
-                    ),
+            Constant(
+                Integer(
+                    1,
                 ),
-                None,
             ),
         ],
     },

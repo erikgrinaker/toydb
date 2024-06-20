@@ -125,20 +125,20 @@ Plan: Select(
             alias: None,
             filter: None,
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "movies",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },
@@ -227,20 +227,20 @@ Optimized plan: Select(
             alias: None,
             filter: None,
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "movies",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },

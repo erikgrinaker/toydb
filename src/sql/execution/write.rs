@@ -1,8 +1,10 @@
 use super::QueryIterator;
-use crate::errinput;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::sql::engine::Transaction;
-use crate::sql::types::{Expression, Row, Table, Value};
+use crate::sql::types::{Expression, Table};
+use crate::{errdata, errinput};
+
+use std::collections::HashMap;
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE).
 /// Returns the number of rows deleted.
@@ -12,27 +14,60 @@ pub(super) fn delete(
     key_index: usize,
     source: QueryIterator,
 ) -> Result<u64> {
-    let ids: Vec<_> = source.map(|r| r.map(|row| row[key_index].clone())).collect::<Result<_>>()?;
+    let ids = source
+        // TODO: consider moving this out to a QueryIterator helper.
+        .map(|r| r.and_then(|row| row.into_iter().nth(key_index).ok_or(errdata!("short row"))))
+        .collect::<Result<Vec<_>>>()?;
     let count = ids.len() as u64;
     txn.delete(&table, &ids)?;
     Ok(count)
 }
 
-/// Inserts rows into a table (i.e. INSERT).
+/// Inserts rows into a table (i.e. INSERT) from the given source.
+///
+/// If given, column_map contains the mapping of table -> source columns for all
+/// columns in source. Otherwise, every column in source is the corresponding
+/// column in table, but the source may not have all columns in table (there may
+/// be a missing tail).
 pub(super) fn insert(
     txn: &impl Transaction,
     table: Table,
-    columns: Vec<String>,
+    column_map: Option<HashMap<usize, usize>>,
     mut source: QueryIterator,
 ) -> Result<u64> {
     let mut rows = Vec::new();
-    while let Some(mut row) = source.next().transpose()? {
-        // TODO: the pad/make row logic should probably be moved to the Values
-        // source, or otherwise have a better mapping from the source.
-        if columns.is_empty() {
-            row = pad_row(&table, row)?;
-        } else {
-            row = make_row(&table, &columns, row)?;
+    while let Some(values) = source.next().transpose()? {
+        // Fast path: the row is already complete, with no column mapping.
+        if values.len() == table.columns.len() && column_map.is_none() {
+            rows.push(values);
+            continue;
+        }
+
+        if values.len() > table.columns.len() {
+            return errinput!("too many values for table {}", table.name);
+        }
+        if let Some(column_map) = &column_map {
+            if column_map.len() != values.len() {
+                return errinput!("column and value counts do not match");
+            }
+        }
+
+        // Fill in the row with default values for missing fields, and map
+        // source fields to table fields.
+        let mut row = Vec::with_capacity(table.columns.len());
+        for (cidx, column) in table.columns.iter().enumerate() {
+            if column_map.is_none() && cidx < values.len() {
+                // Pass through the source column to the table column.
+                row.push(values[cidx].clone())
+            } else if let Some(vidx) = column_map.as_ref().and_then(|c| c.get(&cidx)).copied() {
+                // Map the source column to the table column.
+                row.push(values[vidx].clone())
+            } else if let Some(default) = &column.default {
+                // Column not given in source, use the default.
+                row.push(default.clone())
+            } else {
+                return errinput!("no value given for column {} with no default", column.name);
+            }
         }
         rows.push(row);
     }
@@ -50,53 +85,16 @@ pub(super) fn update(
     mut source: QueryIterator,
     expressions: Vec<(usize, Expression)>,
 ) -> Result<u64> {
-    let mut update = std::collections::HashMap::new();
+    let mut updates = HashMap::new();
     while let Some(row) = source.next().transpose()? {
-        let id = row[key_index].clone();
         let mut new = row.clone();
         for (field, expr) in &expressions {
             new[*field] = expr.evaluate(Some(&row))?;
         }
-        update.insert(id, new);
+        let id = row.into_iter().nth(key_index).ok_or::<Error>(errdata!("short row"))?;
+        updates.insert(id, new);
     }
-    let count = update.len() as u64;
-    txn.update(&table, update)?;
+    let count = updates.len() as u64;
+    txn.update(&table, updates)?;
     Ok(count)
-}
-
-// Builds a row from a set of column names and values, padding it with default values.
-pub fn make_row(table: &Table, columns: &[String], values: Vec<Value>) -> Result<Row> {
-    if columns.len() != values.len() {
-        return errinput!("column and value counts do not match");
-    }
-    let mut inputs = std::collections::HashMap::new();
-    for (c, v) in columns.iter().zip(values.into_iter()) {
-        table.get_column(c)?;
-        if inputs.insert(c.clone(), v).is_some() {
-            return errinput!("column {c} given multiple times");
-        }
-    }
-    let mut row = Row::new();
-    for column in table.columns.iter() {
-        if let Some(value) = inputs.get(&column.name) {
-            row.push(value.clone())
-        } else if let Some(value) = &column.default {
-            row.push(value.clone())
-        } else {
-            return errinput!("no value given for column {}", column.name);
-        }
-    }
-    Ok(row)
-}
-
-/// Pads a row with default values where possible.
-fn pad_row(table: &Table, mut row: Row) -> Result<Row> {
-    for column in table.columns.iter().skip(row.len()) {
-        if let Some(default) = &column.default {
-            row.push(default.clone())
-        } else {
-            return errinput!("no default value for column {}", column.name);
-        }
-    }
-    Ok(row)
 }

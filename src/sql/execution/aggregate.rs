@@ -1,220 +1,135 @@
 use super::QueryIterator;
 use crate::error::Result;
 use crate::sql::planner::Aggregate;
-use crate::sql::types::Value;
+use crate::sql::types::{Row, Value};
 
-use std::cmp::Ordering;
 use std::collections::HashMap;
 
 /// Aggregates rows (i.e. GROUP BY).
-///
-/// TODO: revisit this and clean it up.
 pub(super) fn aggregate(
     mut source: QueryIterator,
     aggregates: Vec<Aggregate>,
 ) -> Result<QueryIterator> {
-    let mut accumulators: HashMap<Vec<Value>, Vec<Box<dyn Accumulator>>> = HashMap::new();
-    let agg_count = aggregates.len();
+    // Aggregate rows from source, grouped by non-aggregation columns. For
+    // example, SELECT a, b, SUM(c), MAX(d) ... uses a,b as grouping buckets and
+    // SUM(c),MAX(d) as accumulators for each a,b bucket.
+    let mut accumulators: HashMap<Row, Vec<Accumulator>> = HashMap::new();
     while let Some(mut row) = source.next().transpose()? {
         accumulators
             .entry(row.split_off(aggregates.len()))
-            .or_insert(aggregates.iter().map(<dyn Accumulator>::from).collect())
+            .or_insert(aggregates.iter().map(Accumulator::new).collect())
             .iter_mut()
             .zip(row)
-            .try_for_each(|(acc, value)| acc.accumulate(&value))?
+            .try_for_each(|(acc, value)| acc.add(value))?
     }
-    // If there were no rows and no group-by columns, return a row of empty accumulators:
-    // SELECT COUNT(*) FROM t WHERE FALSE
+
+    // If there were no rows and no group-by columns, return a row of empty
+    // accumulators, e.g.: SELECT COUNT(*) FROM t WHERE FALSE
     if accumulators.is_empty() && aggregates.len() == source.columns.len() {
-        accumulators.insert(Vec::new(), aggregates.iter().map(<dyn Accumulator>::from).collect());
+        accumulators.insert(Vec::new(), aggregates.iter().map(Accumulator::new).collect());
     }
+
+    // Pass through non-aggregation column labels from the source.
+    let columns = source
+        .columns
+        .into_iter()
+        .enumerate()
+        .map(|(i, label)| if i < aggregates.len() { None } else { label })
+        .collect();
+
+    // Emit the aggregate and row values for each row bucket.
     Ok(QueryIterator {
-        columns: source
-            .columns
-            .into_iter()
-            .enumerate()
-            .map(|(i, label)| if i < agg_count { None } else { label })
-            .collect(),
-        rows: Box::new(accumulators.into_iter().map(|(bucket, accs)| {
-            Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())
+        columns,
+        rows: Box::new(accumulators.into_iter().map(|(row, accs)| {
+            accs.into_iter()
+                .map(|acc| acc.value())
+                .chain(row.into_iter().map(Ok))
+                .collect::<Result<_>>()
         })),
     })
 }
 
-// An accumulator
-pub trait Accumulator: std::fmt::Debug + Send {
-    // Accumulates a value
-    fn accumulate(&mut self, value: &Value) -> Result<()>;
-
-    // Calculates a final aggregate
-    fn aggregate(&self) -> Value;
+/// Accumulates aggregate values. Uses an enum rather than a trait since we need
+/// to keep these in a vector (could use boxed trait objects too).
+pub enum Accumulator {
+    Average { count: i64, sum: Value },
+    Count(i64),
+    Max(Option<Value>),
+    Min(Option<Value>),
+    Sum(Option<Value>),
 }
 
-impl dyn Accumulator {
-    fn from(aggregate: &Aggregate) -> Box<dyn Accumulator> {
-        match aggregate {
-            Aggregate::Average => Box::new(Average::new()),
-            Aggregate::Count => Box::new(Count::new()),
-            Aggregate::Max => Box::new(Max::new()),
-            Aggregate::Min => Box::new(Min::new()),
-            Aggregate::Sum => Box::new(Sum::new()),
-        }
-    }
-}
-
-// Count non-null values
-#[derive(Debug)]
-pub struct Count {
-    count: u64,
-}
-
-impl Count {
-    pub fn new() -> Self {
-        Self { count: 0 }
-    }
-}
-
-impl Accumulator for Count {
-    fn accumulate(&mut self, value: &Value) -> Result<()> {
-        match value {
-            Value::Null => {}
-            _ => self.count += 1,
-        }
-        Ok(())
-    }
-
-    fn aggregate(&self) -> Value {
-        Value::Integer(self.count as i64)
-    }
-}
-
-// Average value
-#[derive(Debug)]
-pub struct Average {
-    count: Count,
-    sum: Sum,
-}
-
-impl Average {
-    pub fn new() -> Self {
-        Self { count: Count::new(), sum: Sum::new() }
-    }
-}
-
-impl Accumulator for Average {
-    fn accumulate(&mut self, value: &Value) -> Result<()> {
-        self.count.accumulate(value)?;
-        self.sum.accumulate(value)?;
-        Ok(())
-    }
-
-    fn aggregate(&self) -> Value {
-        match (self.sum.aggregate(), self.count.aggregate()) {
-            (Value::Integer(s), Value::Integer(c)) => Value::Integer(s / c),
-            (Value::Float(s), Value::Integer(c)) => Value::Float(s / c as f64),
-            _ => Value::Null,
-        }
-    }
-}
-
-// Maximum value
-#[derive(Debug)]
-pub struct Max {
-    max: Option<Value>,
-}
-
-impl Max {
-    pub fn new() -> Self {
-        Self { max: None }
-    }
-}
-
-impl Accumulator for Max {
-    fn accumulate(&mut self, value: &Value) -> Result<()> {
-        if let Some(max) = &mut self.max {
-            match value.partial_cmp(max) {
-                _ if max.datatype() != value.datatype() => *max = Value::Null,
-                None => *max = Value::Null,
-                Some(Ordering::Greater) => *max = value.clone(),
-                Some(Ordering::Equal) | Some(Ordering::Less) => {}
-            };
-        } else {
-            self.max = Some(value.clone())
-        }
-        Ok(())
-    }
-
-    fn aggregate(&self) -> Value {
-        match &self.max {
-            Some(value) => value.clone(),
-            None => Value::Null,
-        }
-    }
-}
-
-// Minimum value
-#[derive(Debug)]
-pub struct Min {
-    min: Option<Value>,
-}
-
-impl Min {
-    pub fn new() -> Self {
-        Self { min: None }
-    }
-}
-
-impl Accumulator for Min {
-    fn accumulate(&mut self, value: &Value) -> Result<()> {
-        if let Some(min) = &mut self.min {
-            match value.partial_cmp(min) {
-                _ if min.datatype() != value.datatype() => *min = Value::Null,
-                None => *min = Value::Null,
-                Some(Ordering::Less) => *min = value.clone(),
-                Some(Ordering::Equal) | Some(Ordering::Greater) => {}
-            };
-        } else {
-            self.min = Some(value.clone())
-        }
-        Ok(())
-    }
-
-    fn aggregate(&self) -> Value {
-        match &self.min {
-            Some(value) => value.clone(),
-            None => Value::Null,
-        }
-    }
-}
-
-// Sum of values
-#[derive(Debug)]
-pub struct Sum {
-    sum: Option<Value>,
-}
-
-impl Sum {
-    pub fn new() -> Self {
-        Self { sum: None }
-    }
-}
-
-impl Accumulator for Sum {
-    fn accumulate(&mut self, value: &Value) -> Result<()> {
-        self.sum = match (&self.sum, value) {
-            (Some(Value::Integer(s)), Value::Integer(i)) => Some(Value::Integer(s + i)),
-            (Some(Value::Float(s)), Value::Float(f)) => Some(Value::Float(s + f)),
-            (None, Value::Integer(i)) => Some(Value::Integer(*i)),
-            (None, Value::Float(f)) => Some(Value::Float(*f)),
-            _ => Some(Value::Null),
+impl std::fmt::Display for Accumulator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let aggregate = match self {
+            Self::Average { .. } => Aggregate::Average,
+            Self::Count(_) => Aggregate::Count,
+            Self::Max(_) => Aggregate::Max,
+            Self::Min(_) => Aggregate::Min,
+            Self::Sum(_) => Aggregate::Sum,
         };
+        write!(f, "{aggregate}")
+    }
+}
+
+impl Accumulator {
+    /// Creates a new accumulator from an aggregate kind.
+    fn new(aggregate: &Aggregate) -> Self {
+        match aggregate {
+            Aggregate::Average => Self::Average { count: 0, sum: Value::Integer(0) },
+            Aggregate::Count => Self::Count(0),
+            Aggregate::Max => Self::Max(None),
+            Aggregate::Min => Self::Min(None),
+            Aggregate::Sum => Self::Sum(None),
+        }
+    }
+
+    /// Adds a value to the accumulator.
+    fn add(&mut self, value: Value) -> Result<()> {
+        use std::cmp::Ordering;
+        match (self, value) {
+            (Self::Average { sum: Value::Null, count: _ }, _) => {}
+            (Self::Average { sum, count: _ }, Value::Null) => *sum = Value::Null,
+            (Self::Average { sum, count }, value) => {
+                *sum = sum.checked_add(&value)?;
+                *count += 1;
+            }
+
+            (Self::Count(_), Value::Null) => {}
+            (Self::Count(c), _) => *c += 1,
+
+            (Self::Max(Some(Value::Null)), _) => {}
+            (Self::Max(max), Value::Null) => *max = Some(Value::Null),
+            (Self::Max(max @ None), value) => *max = Some(value),
+            (Self::Max(Some(max)), value) => {
+                if value.cmp(max) == Ordering::Greater {
+                    *max = value
+                }
+            }
+
+            (Self::Min(Some(Value::Null)), _) => {}
+            (Self::Min(min), Value::Null) => *min = Some(Value::Null),
+            (Self::Min(min @ None), value) => *min = Some(value),
+            (Self::Min(Some(min)), value) => {
+                if value.cmp(min) == Ordering::Less {
+                    *min = value
+                }
+            }
+
+            (Self::Sum(sum @ None), value) => *sum = Some(Value::Integer(0).checked_add(&value)?),
+            (Self::Sum(Some(sum)), value) => *sum = sum.checked_add(&value)?,
+        }
         Ok(())
     }
 
-    fn aggregate(&self) -> Value {
-        match &self.sum {
-            Some(value) => value.clone(),
-            None => Value::Null,
-        }
+    /// Returns the aggregate value.
+    fn value(self) -> Result<Value> {
+        Ok(match self {
+            Self::Average { count: 0, sum: _ } => Value::Null,
+            Self::Average { count, sum } => sum.checked_div(&Value::Integer(count))?,
+            Self::Count(c) => c.into(),
+            Self::Max(None) | Self::Min(None) | Self::Sum(None) => Value::Null,
+            Self::Max(Some(v)) | Self::Min(Some(v)) | Self::Sum(Some(v)) => v,
+        })
     }
 }

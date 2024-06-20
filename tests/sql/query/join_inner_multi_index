@@ -431,51 +431,53 @@ Plan: Select(
                 ),
                 outer: false,
             },
-            expressions: [
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "title",
-                            ),
-                        ),
-                    ),
-                    None,
-                ),
-                (
-                    Field(
-                        8,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "name",
-                            ),
-                        ),
-                    ),
-                    Some(
+            labels: [
+                None,
+                Some(
+                    (
+                        None,
                         "genre",
                     ),
                 ),
-                (
-                    Field(
-                        10,
-                        Some(
-                            (
-                                Some(
-                                    "s",
-                                ),
-                                "name",
+                Some(
+                    (
+                        None,
+                        "studio",
+                    ),
+                ),
+            ],
+            expressions: [
+                Field(
+                    1,
+                    Some(
+                        (
+                            Some(
+                                "m",
                             ),
+                            "title",
                         ),
                     ),
+                ),
+                Field(
+                    8,
                     Some(
-                        "studio",
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "name",
+                        ),
+                    ),
+                ),
+                Field(
+                    10,
+                    Some(
+                        (
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
                     ),
                 ),
             ],
@@ -741,51 +743,53 @@ Optimized plan: Select(
                 ),
                 outer: false,
             },
-            expressions: [
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "title",
-                            ),
-                        ),
-                    ),
-                    None,
-                ),
-                (
-                    Field(
-                        8,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "name",
-                            ),
-                        ),
-                    ),
-                    Some(
+            labels: [
+                None,
+                Some(
+                    (
+                        None,
                         "genre",
                     ),
                 ),
-                (
-                    Field(
-                        10,
-                        Some(
-                            (
-                                Some(
-                                    "s",
-                                ),
-                                "name",
+                Some(
+                    (
+                        None,
+                        "studio",
+                    ),
+                ),
+            ],
+            expressions: [
+                Field(
+                    1,
+                    Some(
+                        (
+                            Some(
+                                "m",
                             ),
+                            "title",
                         ),
                     ),
+                ),
+                Field(
+                    8,
                     Some(
-                        "studio",
+                        (
+                            Some(
+                                "g",
+                            ),
+                            "name",
+                        ),
+                    ),
+                ),
+                Field(
+                    10,
+                    Some(
+                        (
+                            Some(
+                                "s",
+                            ),
+                            "name",
+                        ),
                     ),
                 ),
             ],

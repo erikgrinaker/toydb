@@ -142,42 +142,38 @@ Plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    None,
-                                    "id",
-                                ),
+                    Field(
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "title",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "title",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            4,
-                            Some(
-                                (
-                                    None,
-                                    "released",
-                                ),
+                    Field(
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -198,19 +194,17 @@ Plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
         ],
@@ -302,42 +296,38 @@ Optimized plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    None,
-                                    "id",
-                                ),
+                    Field(
+                        0,
+                        Some(
+                            (
+                                None,
+                                "id",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "title",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "title",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            4,
-                            Some(
-                                (
-                                    None,
-                                    "released",
-                                ),
+                    Field(
+                        4,
+                        Some(
+                            (
+                                None,
+                                "released",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -358,19 +348,17 @@ Optimized plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
         ],

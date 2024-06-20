@@ -1,16 +1,17 @@
 use super::aggregate;
 use super::join;
-use super::schema;
 use super::source;
 use super::transform;
 use super::write;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::planner::{Node, Plan};
-use crate::sql::types::Label;
-use crate::sql::types::{Row, Rows};
+use crate::sql::types::{Label, Row, Rows};
 
 /// Executes a plan, returning an execution result.
+///
+/// Takes the transaction and catalog separately, even though Transaction must
+/// implement Catalog, to ensure the catalog is primarily used during planning.
 pub fn execute_plan(
     plan: Plan,
     txn: &impl Transaction,
@@ -19,12 +20,12 @@ pub fn execute_plan(
     Ok(match plan {
         Plan::CreateTable { schema } => {
             let name = schema.name.clone();
-            schema::create_table(catalog, schema)?;
+            catalog.create_table(schema)?;
             ExecutionResult::CreateTable { name }
         }
 
         Plan::DropTable { table, if_exists } => {
-            let existed = schema::drop_table(catalog, &table, if_exists)?;
+            let existed = catalog.drop_table(&table, if_exists)?;
             ExecutionResult::DropTable { name: table, existed }
         }
 
@@ -34,9 +35,9 @@ pub fn execute_plan(
             ExecutionResult::Delete { count }
         }
 
-        Plan::Insert { table, columns, source } => {
+        Plan::Insert { table, column_map, source } => {
             let source = execute(source, txn)?;
-            let count = write::insert(txn, table, columns, source)?;
+            let count = write::insert(txn, table, column_map, source)?;
             ExecutionResult::Insert { count }
         }
 
@@ -101,9 +102,9 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
             Ok(transform::order(source, orders))
         }
 
-        Node::Projection { source, expressions } => {
+        Node::Projection { source, labels, expressions } => {
             let source = execute(*source, txn)?;
-            Ok(transform::project(source, expressions))
+            Ok(transform::project(source, labels, expressions))
         }
 
         Node::Scan { table, alias: _, filter } => source::scan(txn, table, filter),
@@ -123,6 +124,10 @@ pub enum ExecutionResult {
 }
 
 /// A query result iterator, containing the columns and row iterator.
+///
+/// TODO: if we resolve labels during planning, we can replace this with a
+/// simple Rows iterator. We can probably also make that generic instead of a
+/// trait object, since we know the type when calling each executor.
 pub struct QueryIterator {
     /// Column names.
     pub columns: Vec<Option<Label>>,

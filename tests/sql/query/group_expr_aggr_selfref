@@ -179,78 +179,31 @@ Plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Multiply(
-                                Field(
-                                    5,
-                                    Some(
-                                        (
-                                            None,
-                                            "rating",
-                                        ),
-                                    ),
-                                ),
-                                Constant(
-                                    Integer(
-                                        10,
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
-                            Constant(
-                                Boolean(
-                                    true,
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
+                        Multiply(
                             Field(
-                                2,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "studio_id",
+                                        "rating",
                                     ),
                                 ),
                             ),
-                            None,
-                        ),
-                    ],
-                },
-                aggregates: [
-                    Sum,
-                    Count,
-                ],
-            },
-            expressions: [
-                (
-                    Field(
-                        2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
+                            Constant(
+                                Integer(
+                                    10,
                                 ),
-                                "studio_id",
                             ),
                         ),
-                    ),
-                    None,
-                ),
-                (
-                    Add(
-                        Divide(
-                            Field(
-                                0,
-                                None,
-                            ),
-                            Field(
-                                1,
-                                None,
+                        Constant(
+                            Boolean(
+                                true,
                             ),
                         ),
                         Field(
@@ -262,8 +215,49 @@ Plan: Select(
                                 ),
                             ),
                         ),
+                    ],
+                },
+                aggregates: [
+                    Sum,
+                    Count,
+                ],
+            },
+            labels: [
+                None,
+                None,
+            ],
+            expressions: [
+                Field(
+                    2,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "studio_id",
+                        ),
                     ),
-                    None,
+                ),
+                Add(
+                    Divide(
+                        Field(
+                            0,
+                            None,
+                        ),
+                        Field(
+                            1,
+                            None,
+                        ),
+                    ),
+                    Field(
+                        2,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
+                    ),
                 ),
             ],
         },
@@ -372,78 +366,31 @@ Optimized plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Multiply(
-                                Field(
-                                    5,
-                                    Some(
-                                        (
-                                            None,
-                                            "rating",
-                                        ),
-                                    ),
-                                ),
-                                Constant(
-                                    Integer(
-                                        10,
-                                    ),
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
-                            Constant(
-                                Boolean(
-                                    true,
-                                ),
-                            ),
-                            None,
-                        ),
-                        (
+                        Multiply(
                             Field(
-                                2,
+                                5,
                                 Some(
                                     (
                                         None,
-                                        "studio_id",
+                                        "rating",
                                     ),
                                 ),
                             ),
-                            None,
-                        ),
-                    ],
-                },
-                aggregates: [
-                    Sum,
-                    Count,
-                ],
-            },
-            expressions: [
-                (
-                    Field(
-                        2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
+                            Constant(
+                                Integer(
+                                    10,
                                 ),
-                                "studio_id",
                             ),
                         ),
-                    ),
-                    None,
-                ),
-                (
-                    Add(
-                        Divide(
-                            Field(
-                                0,
-                                None,
-                            ),
-                            Field(
-                                1,
-                                None,
+                        Constant(
+                            Boolean(
+                                true,
                             ),
                         ),
                         Field(
@@ -455,8 +402,49 @@ Optimized plan: Select(
                                 ),
                             ),
                         ),
+                    ],
+                },
+                aggregates: [
+                    Sum,
+                    Count,
+                ],
+            },
+            labels: [
+                None,
+                None,
+            ],
+            expressions: [
+                Field(
+                    2,
+                    Some(
+                        (
+                            Some(
+                                "movies",
+                            ),
+                            "studio_id",
+                        ),
                     ),
-                    None,
+                ),
+                Add(
+                    Divide(
+                        Field(
+                            0,
+                            None,
+                        ),
+                        Field(
+                            1,
+                            None,
+                        ),
+                    ),
+                    Field(
+                        2,
+                        Some(
+                            (
+                                None,
+                                "studio_id",
+                            ),
+                        ),
+                    ),
                 ),
             ],
         },

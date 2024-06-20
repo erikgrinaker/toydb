@@ -201,34 +201,32 @@ Plan: Select(
             predicate: None,
             outer: false,
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "g",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },
@@ -354,34 +352,32 @@ Optimized plan: Select(
             predicate: None,
             outer: false,
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "g",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },

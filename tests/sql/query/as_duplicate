@@ -42,25 +42,29 @@ AST: Select {
 Plan: Select(
     Projection {
         source: Nothing,
-        expressions: [
-            (
-                Constant(
-                    Integer(
-                        1,
-                    ),
-                ),
-                Some(
+        labels: [
+            Some(
+                (
+                    None,
                     "a",
                 ),
             ),
-            (
-                Constant(
-                    Integer(
-                        2,
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "a",
+                ),
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
                 ),
             ),
         ],
@@ -70,25 +74,29 @@ Plan: Select(
 Optimized plan: Select(
     Projection {
         source: Nothing,
-        expressions: [
-            (
-                Constant(
-                    Integer(
-                        1,
-                    ),
-                ),
-                Some(
+        labels: [
+            Some(
+                (
+                    None,
                     "a",
                 ),
             ),
-            (
-                Constant(
-                    Integer(
-                        2,
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "a",
+                ),
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
                 ),
             ),
         ],

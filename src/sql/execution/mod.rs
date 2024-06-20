@@ -1,7 +1,6 @@
 mod aggregate;
 mod execute;
 mod join;
-mod schema;
 mod source;
 mod transform;
 mod write;

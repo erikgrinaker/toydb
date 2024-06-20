@@ -1,5 +1,5 @@
 Query: INSERT INTO test VALUES (1, 'a', 100, NULL)
-Error: InvalidInput("invalid row size for table test")
+Error: InvalidInput("too many values for table test")
 
 Storage:
 CREATE TABLE other (

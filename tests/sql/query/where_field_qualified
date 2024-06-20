@@ -266,34 +266,32 @@ Plan: Select(
                 ),
             ),
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "movies",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "genres",
-                            ),
-                            "id",
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "genres",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },
@@ -458,34 +456,32 @@ Optimized plan: Select(
             predicate: None,
             outer: false,
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "movies",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "genres",
-                            ),
-                            "id",
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "genres",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
         ],
     },

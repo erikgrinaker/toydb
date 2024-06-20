@@ -1,5 +1,5 @@
 Query: INSERT INTO defaults (id) VALUES (1)
-Error: InvalidInput("no value given for column required")
+Error: InvalidInput("no value given for column required with no default")
 
 Storage:
 CREATE TABLE defaults (

@@ -261,28 +261,26 @@ Plan: Select(
                         ),
                         outer: false,
                     },
+                    labels: [
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Constant(
-                                Boolean(
-                                    true,
-                                ),
+                        Constant(
+                            Boolean(
+                                true,
                             ),
-                            None,
                         ),
-                        (
-                            Field(
-                                8,
-                                Some(
-                                    (
-                                        Some(
-                                            "s",
-                                        ),
-                                        "name",
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
                                     ),
+                                    "name",
                                 ),
                             ),
-                            None,
                         ),
                     ],
                 },
@@ -290,26 +288,24 @@ Plan: Select(
                     Count,
                 ],
             },
+            labels: [
+                None,
+                None,
+            ],
             expressions: [
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                Some(
-                                    "s",
-                                ),
-                                "name",
+                Field(
+                    1,
+                    Some(
+                        (
+                            Some(
+                                "s",
                             ),
+                            "name",
                         ),
                     ),
-                    None,
                 ),
-                (
-                    Field(
-                        0,
-                        None,
-                    ),
+                Field(
+                    0,
                     None,
                 ),
             ],
@@ -489,28 +485,26 @@ Optimized plan: Select(
                         ),
                         outer: false,
                     },
+                    labels: [
+                        None,
+                        None,
+                    ],
                     expressions: [
-                        (
-                            Constant(
-                                Boolean(
-                                    true,
-                                ),
+                        Constant(
+                            Boolean(
+                                true,
                             ),
-                            None,
                         ),
-                        (
-                            Field(
-                                8,
-                                Some(
-                                    (
-                                        Some(
-                                            "s",
-                                        ),
-                                        "name",
+                        Field(
+                            8,
+                            Some(
+                                (
+                                    Some(
+                                        "s",
                                     ),
+                                    "name",
                                 ),
                             ),
-                            None,
                         ),
                     ],
                 },
@@ -518,26 +512,24 @@ Optimized plan: Select(
                     Count,
                 ],
             },
+            labels: [
+                None,
+                None,
+            ],
             expressions: [
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                Some(
-                                    "s",
-                                ),
-                                "name",
+                Field(
+                    1,
+                    Some(
+                        (
+                            Some(
+                                "s",
                             ),
+                            "name",
                         ),
                     ),
-                    None,
                 ),
-                (
-                    Field(
-                        0,
-                        None,
-                    ),
+                Field(
+                    0,
                     None,
                 ),
             ],

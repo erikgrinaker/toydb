@@ -1,5 +1,6 @@
 use crate::encoding;
 use crate::errdata;
+use crate::errinput;
 use crate::error::{Error, Result};
 
 use serde::{Deserialize, Serialize};
@@ -45,7 +46,8 @@ pub enum Value {
 
 impl encoding::Value for Value {}
 
-// TODO: revisit and document the f64 handling here.
+// TODO: revisit and document the f64 handling here. FWIW, PostgreSQL considers
+// NaN = NaN, maybe we should too.
 impl std::cmp::Eq for Value {}
 
 impl std::hash::Hash for Value {
@@ -101,6 +103,37 @@ impl PartialOrd for Value {
 }
 
 impl Value {
+    /// Adds two values, returning a new value. Errors when invalid.
+    pub fn checked_add(&self, other: &Self) -> Result<Self> {
+        use Value::*;
+        Ok(match (self, other) {
+            (Integer(lhs), Integer(rhs)) => {
+                Integer(lhs.checked_add(*rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+            }
+            (Integer(lhs), Float(rhs)) => Float(*lhs as f64 + rhs),
+            (Float(lhs), Integer(rhs)) => Float(lhs + *rhs as f64),
+            (Float(lhs), Float(rhs)) => Float(lhs + rhs),
+            (Null, Integer(_) | Float(_) | Null) => Null,
+            (Integer(_) | Float(_), Null) => Null,
+            (lhs, rhs) => return errinput!("can't add {lhs} and {rhs}"),
+        })
+    }
+
+    /// Divides two values, returning a new value. Errors when invalid.
+    pub fn checked_div(&self, other: &Self) -> Result<Self> {
+        use Value::*;
+        Ok(match (self, other) {
+            (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
+            (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
+            (Integer(lhs), Float(rhs)) => Float(*lhs as f64 / rhs),
+            (Float(lhs), Integer(rhs)) => Float(lhs / *rhs as f64),
+            (Float(lhs), Float(rhs)) => Float(lhs / rhs),
+            (Null, Integer(_) | Float(_) | Null) => Null,
+            (Integer(_) | Float(_), Null) => Null,
+            (lhs, rhs) => return errinput!("can't divide {lhs} and {rhs}"),
+        })
+    }
+
     /// Returns the value's datatype, or None for null values.
     pub fn datatype(&self) -> Option<DataType> {
         match self {

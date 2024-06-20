@@ -130,30 +130,28 @@ Plan: Select(
             alias: None,
             filter: None,
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
+            Field(
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    1,
-                    Some(
-                        (
-                            None,
-                            "title",
-                        ),
+            Field(
+                1,
+                Some(
+                    (
+                        None,
+                        "title",
                     ),
                 ),
-                None,
             ),
         ],
     },
@@ -242,30 +240,28 @@ Optimized plan: Select(
             alias: None,
             filter: None,
         },
+        labels: [
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
+            Field(
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    1,
-                    Some(
-                        (
-                            None,
-                            "title",
-                        ),
+            Field(
+                1,
+                Some(
+                    (
+                        None,
+                        "title",
                     ),
                 ),
-                None,
             ),
         ],
     },

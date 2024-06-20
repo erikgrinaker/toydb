@@ -67,44 +67,45 @@ AST: Select {
 Plan: Select(
     Projection {
         source: Nothing,
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "nope",
+                ),
+            ),
+        ],
         expressions: [
-            (
-                Add(
+            Add(
+                Constant(
+                    Integer(
+                        1,
+                    ),
+                ),
+                Multiply(
                     Constant(
                         Integer(
-                            1,
+                            2,
                         ),
                     ),
-                    Multiply(
-                        Constant(
-                            Integer(
-                                2,
-                            ),
-                        ),
-                        Constant(
-                            Integer(
-                                3,
-                            ),
+                    Constant(
+                        Integer(
+                            3,
                         ),
                     ),
                 ),
-                None,
             ),
-            (
-                Like(
-                    Constant(
-                        String(
-                            "abc",
-                        ),
-                    ),
-                    Constant(
-                        String(
-                            "x%",
-                        ),
+            Like(
+                Constant(
+                    String(
+                        "abc",
                     ),
                 ),
-                Some(
-                    "nope",
+                Constant(
+                    String(
+                        "x%",
+                    ),
                 ),
             ),
         ],
@@ -114,23 +115,24 @@ Plan: Select(
 Optimized plan: Select(
     Projection {
         source: Nothing,
-        expressions: [
-            (
-                Constant(
-                    Integer(
-                        7,
-                    ),
-                ),
-                None,
-            ),
-            (
-                Constant(
-                    Boolean(
-                        false,
-                    ),
-                ),
-                Some(
+        labels: [
+            None,
+            Some(
+                (
+                    None,
                     "nope",
+                ),
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    7,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
                 ),
             ),
         ],

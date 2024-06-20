@@ -6,11 +6,13 @@ use crate::sql::execution::{self, ExecutionResult};
 use crate::sql::parser::ast;
 use crate::sql::types::{Expression, Label, Table, Value};
 
+use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// A statement execution plan. These are mostly made up of nested query plan
-/// Nodes, which stream rows, but the root nodes can also perform data
-/// modifications or schema changes.
+/// Nodes, which process and stream rows, but the root nodes can also perform
+/// data modifications or schema changes.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Plan {
     /// A CREATE TABLE plan.
@@ -20,7 +22,7 @@ pub enum Plan {
     /// A DELETE plan.
     Delete { table: String, key_index: usize, source: Node },
     /// An INSERT plan.
-    Insert { table: Table, columns: Vec<String>, source: Node },
+    Insert { table: Table, column_map: Option<HashMap<usize, usize>>, source: Node },
     /// An UPDATE plan.
     Update {
         table: String,
@@ -79,7 +81,7 @@ impl std::fmt::Display for Plan {
                     source.format(String::new(), false, true).trim_end()
                 )
             }
-            Self::Insert { table, columns: _, source: _ } => {
+            Self::Insert { table, column_map: _, source: _ } => {
                 write!(f, "Insert: {}", table.name)
             }
             Self::Select(root) => root.fmt(f),
@@ -155,7 +157,8 @@ pub enum Node {
     },
     Projection {
         source: Box<Node>,
-        expressions: Vec<(Expression, Option<String>)>,
+        labels: Vec<Option<Label>>,
+        expressions: Vec<Expression>,
     },
     Scan {
         table: Table,
@@ -215,9 +218,11 @@ impl Node {
             Self::Order { source, orders } => {
                 Self::Order { source: source.transform(before, after)?.into(), orders }
             }
-            Self::Projection { source, expressions } => {
-                Self::Projection { source: source.transform(before, after)?.into(), expressions }
-            }
+            Self::Projection { source, labels, expressions } => Self::Projection {
+                source: source.transform(before, after)?.into(),
+                labels,
+                expressions,
+            },
         };
         after(self)
     }
@@ -259,11 +264,12 @@ impl Node {
                     outer,
                 }
             }
-            Self::Projection { source, expressions } => Self::Projection {
+            Self::Projection { source, labels, expressions } => Self::Projection {
                 source,
+                labels,
                 expressions: expressions
                     .into_iter()
-                    .map(|(e, l)| Ok((e.transform(before, after)?, l)))
+                    .map(|e| e.transform(before, after))
                     .collect::<Result<_>>()?,
             },
             Self::Scan { table, alias, filter: Some(filter) } => {
@@ -382,14 +388,10 @@ impl Node {
                 );
                 s += &source.format(indent, false, true);
             }
-            Self::Projection { source, expressions } => {
+            Self::Projection { source, labels: _, expressions } => {
                 s += &format!(
                     "Projection: {}\n",
-                    expressions
-                        .iter()
-                        .map(|(expr, _)| expr.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
+                    expressions.iter().map(|expr| expr.to_string()).join(", ")
                 );
                 s += &source.format(indent, false, true);
             }

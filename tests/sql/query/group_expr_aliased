@@ -159,38 +159,39 @@ Plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                        Some(
+                            (
+                                None,
+                                "twice",
+                            ),
+                        ),
+                    ],
                     expressions: [
-                        (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
+                        ),
+                        Multiply(
                             Field(
-                                5,
+                                2,
                                 Some(
                                     (
                                         None,
-                                        "rating",
+                                        "studio_id",
                                     ),
                                 ),
                             ),
-                            None,
-                        ),
-                        (
-                            Multiply(
-                                Field(
+                            Constant(
+                                Integer(
                                     2,
-                                    Some(
-                                        (
-                                            None,
-                                            "studio_id",
-                                        ),
-                                    ),
                                 ),
-                                Constant(
-                                    Integer(
-                                        2,
-                                    ),
-                                ),
-                            ),
-                            Some(
-                                "twice",
                             ),
                         ),
                     ],
@@ -199,26 +200,27 @@ Plan: Select(
                     Max,
                 ],
             },
-            expressions: [
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "twice",
-                            ),
-                        ),
-                    ),
-                    Some(
+            labels: [
+                Some(
+                    (
+                        None,
                         "twice",
                     ),
                 ),
-                (
-                    Field(
-                        0,
-                        None,
+                None,
+            ],
+            expressions: [
+                Field(
+                    1,
+                    Some(
+                        (
+                            None,
+                            "twice",
+                        ),
                     ),
+                ),
+                Field(
+                    0,
                     None,
                 ),
             ],
@@ -326,38 +328,39 @@ Optimized plan: Select(
                         alias: None,
                         filter: None,
                     },
+                    labels: [
+                        None,
+                        Some(
+                            (
+                                None,
+                                "twice",
+                            ),
+                        ),
+                    ],
                     expressions: [
-                        (
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
+                                ),
+                            ),
+                        ),
+                        Multiply(
                             Field(
-                                5,
+                                2,
                                 Some(
                                     (
                                         None,
-                                        "rating",
+                                        "studio_id",
                                     ),
                                 ),
                             ),
-                            None,
-                        ),
-                        (
-                            Multiply(
-                                Field(
+                            Constant(
+                                Integer(
                                     2,
-                                    Some(
-                                        (
-                                            None,
-                                            "studio_id",
-                                        ),
-                                    ),
                                 ),
-                                Constant(
-                                    Integer(
-                                        2,
-                                    ),
-                                ),
-                            ),
-                            Some(
-                                "twice",
                             ),
                         ),
                     ],
@@ -366,26 +369,27 @@ Optimized plan: Select(
                     Max,
                 ],
             },
-            expressions: [
-                (
-                    Field(
-                        1,
-                        Some(
-                            (
-                                None,
-                                "twice",
-                            ),
-                        ),
-                    ),
-                    Some(
+            labels: [
+                Some(
+                    (
+                        None,
                         "twice",
                     ),
                 ),
-                (
-                    Field(
-                        0,
-                        None,
+                None,
+            ],
+            expressions: [
+                Field(
+                    1,
+                    Some(
+                        (
+                            None,
+                            "twice",
+                        ),
                     ),
+                ),
+                Field(
+                    0,
                     None,
                 ),
             ],

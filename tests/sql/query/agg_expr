@@ -146,33 +146,31 @@ Plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Multiply(
-                            Field(
-                                5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
-                                ),
-                            ),
-                            Constant(
-                                Integer(
-                                    10,
+                    Multiply(
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
                                 ),
                             ),
                         ),
-                        None,
-                    ),
-                    (
                         Constant(
-                            Boolean(
-                                true,
+                            Integer(
+                                10,
                             ),
                         ),
-                        None,
+                    ),
+                    Constant(
+                        Boolean(
+                            true,
+                        ),
                     ),
                 ],
             },
@@ -181,19 +179,19 @@ Plan: Select(
                 Count,
             ],
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Divide(
-                    Field(
-                        0,
-                        None,
-                    ),
-                    Field(
-                        1,
-                        None,
-                    ),
+            Divide(
+                Field(
+                    0,
+                    None,
                 ),
-                None,
+                Field(
+                    1,
+                    None,
+                ),
             ),
         ],
     },
@@ -284,33 +282,31 @@ Optimized plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Multiply(
-                            Field(
-                                5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
-                                ),
-                            ),
-                            Constant(
-                                Integer(
-                                    10,
+                    Multiply(
+                        Field(
+                            5,
+                            Some(
+                                (
+                                    None,
+                                    "rating",
                                 ),
                             ),
                         ),
-                        None,
-                    ),
-                    (
                         Constant(
-                            Boolean(
-                                true,
+                            Integer(
+                                10,
                             ),
                         ),
-                        None,
+                    ),
+                    Constant(
+                        Boolean(
+                            true,
+                        ),
                     ),
                 ],
             },
@@ -319,19 +315,19 @@ Optimized plan: Select(
                 Count,
             ],
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Divide(
-                    Field(
-                        0,
-                        None,
-                    ),
-                    Field(
-                        1,
-                        None,
-                    ),
+            Divide(
+                Field(
+                    0,
+                    None,
                 ),
-                None,
+                Field(
+                    1,
+                    None,
+                ),
             ),
         ],
     },

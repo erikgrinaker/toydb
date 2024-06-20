@@ -4,7 +4,7 @@ use super::QueryIterator;
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::planner::Direction;
-use crate::sql::types::{Expression, Value};
+use crate::sql::types::{Expression, Label, Value};
 
 /// Filters the input rows (i.e. WHERE).
 pub(super) fn filter(source: QueryIterator, predicate: Expression) -> QueryIterator {
@@ -67,14 +67,14 @@ pub(super) fn order(source: QueryIterator, order: Vec<(Expression, Direction)>) 
 /// Projects the rows using the given expressions and labels (i.e. SELECT).
 pub(super) fn project(
     source: QueryIterator,
-    expressions: Vec<(Expression, Option<String>)>,
+    labels: Vec<Option<Label>>,
+    expressions: Vec<Expression>,
 ) -> QueryIterator {
-    // TODO: pass expressions and labels separately.
-    // TODO: these should be actual labels.
-    let (expressions, labels): (Vec<_>, Vec<_>) = expressions.into_iter().unzip();
-
     // Use explicit column label if given, or pass through the source column
     // label if referenced (e.g. SELECT a, b, a FROM table).
+    //
+    // TODO: the labels can probably be resolved entirely during planning,
+    // without having to plumb them through execution.
     source
         .map_columns(|columns| {
             labels
@@ -82,7 +82,7 @@ pub(super) fn project(
                 .enumerate()
                 .map(|(i, label)| {
                     if let Some(label) = label {
-                        Some((None, label))
+                        Some(label)
                     } else if let Expression::Field(f, _) = &expressions[i] {
                         columns.get(*f).cloned().expect("invalid field reference")
                     } else {

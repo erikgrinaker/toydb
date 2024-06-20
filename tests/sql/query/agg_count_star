@@ -124,14 +124,14 @@ Plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                ],
                 expressions: [
-                    (
-                        Constant(
-                            Boolean(
-                                true,
-                            ),
+                    Constant(
+                        Boolean(
+                            true,
                         ),
-                        None,
                     ),
                 ],
             },
@@ -139,12 +139,12 @@ Plan: Select(
                 Count,
             ],
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
         ],
@@ -236,14 +236,14 @@ Optimized plan: Select(
                     alias: None,
                     filter: None,
                 },
+                labels: [
+                    None,
+                ],
                 expressions: [
-                    (
-                        Constant(
-                            Boolean(
-                                true,
-                            ),
+                    Constant(
+                        Boolean(
+                            true,
                         ),
-                        None,
                     ),
                 ],
             },
@@ -251,12 +251,12 @@ Optimized plan: Select(
                 Count,
             ],
         },
+        labels: [
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
         ],

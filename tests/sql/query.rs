@@ -312,6 +312,7 @@ test_query! {
             INNER JOIN genres g ON m.genre_id = g.id AND g.id = 1
             INNER JOIN studios s ON m.studio_id = s.id AND s.id = 4
         ORDER BY m.title"#,
+    // TODO: deal with the duplicates here.
     join_inner_multi_same: r#"
         SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating
         FROM movies m JOIN genres g ON m.genre_id = g.id,

@@ -244,72 +244,64 @@ Plan: Select(
                         ),
                     ),
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "id",
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
                                 ),
+                                "id",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "title",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "title",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    None,
-                                    "name",
-                                ),
+                    Field(
+                        8,
+                        Some(
+                            (
+                                None,
+                                "name",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    Some(
-                                        "genres",
-                                    ),
-                                    "name",
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "genres",
                                 ),
+                                "name",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "title",
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
                                 ),
+                                "title",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -344,26 +336,22 @@ Plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
         ],
@@ -508,72 +496,64 @@ Optimized plan: Select(
                     ),
                     outer: false,
                 },
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
                 expressions: [
-                    (
-                        Field(
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "id",
+                    Field(
+                        0,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
                                 ),
+                                "id",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    None,
-                                    "title",
-                                ),
+                    Field(
+                        1,
+                        Some(
+                            (
+                                None,
+                                "title",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    None,
-                                    "name",
-                                ),
+                    Field(
+                        8,
+                        Some(
+                            (
+                                None,
+                                "name",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            8,
-                            Some(
-                                (
-                                    Some(
-                                        "genres",
-                                    ),
-                                    "name",
+                    Field(
+                        8,
+                        Some(
+                            (
+                                Some(
+                                    "genres",
                                 ),
+                                "name",
                             ),
                         ),
-                        None,
                     ),
-                    (
-                        Field(
-                            1,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "title",
+                    Field(
+                        1,
+                        Some(
+                            (
+                                Some(
+                                    "movies",
                                 ),
+                                "title",
                             ),
                         ),
-                        None,
                     ),
                 ],
             },
@@ -608,26 +588,22 @@ Optimized plan: Select(
                 ),
             ],
         },
+        labels: [
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    None,
-                ),
+            Field(
+                0,
                 None,
             ),
-            (
-                Field(
-                    1,
-                    None,
-                ),
+            Field(
+                1,
                 None,
             ),
-            (
-                Field(
-                    2,
-                    None,
-                ),
+            Field(
+                2,
                 None,
             ),
         ],

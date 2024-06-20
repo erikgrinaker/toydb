@@ -163,57 +163,61 @@ Plan: Select(
             alias: None,
             filter: None,
         },
-        expressions: [
-            (
-                Constant(
-                    Integer(
-                        1,
-                    ),
-                ),
-                None,
-            ),
-            (
-                Constant(
-                    Integer(
-                        2,
-                    ),
-                ),
-                Some(
+        labels: [
+            None,
+            Some(
+                (
+                    None,
                     "b",
                 ),
             ),
-            (
-                Constant(
-                    Integer(
-                        3,
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "c",
                 ),
             ),
-            (
-                Constant(
-                    Integer(
-                        4,
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "👋",
                 ),
             ),
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "some id",
+                ),
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+            Constant(
+                Integer(
+                    3,
+                ),
+            ),
+            Constant(
+                Integer(
+                    4,
+                ),
+            ),
+            Field(
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
+                    ),
                 ),
             ),
         ],
@@ -303,57 +307,61 @@ Optimized plan: Select(
             alias: None,
             filter: None,
         },
-        expressions: [
-            (
-                Constant(
-                    Integer(
-                        1,
-                    ),
-                ),
-                None,
-            ),
-            (
-                Constant(
-                    Integer(
-                        2,
-                    ),
-                ),
-                Some(
+        labels: [
+            None,
+            Some(
+                (
+                    None,
                     "b",
                 ),
             ),
-            (
-                Constant(
-                    Integer(
-                        3,
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "c",
                 ),
             ),
-            (
-                Constant(
-                    Integer(
-                        4,
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "👋",
                 ),
             ),
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
-                    ),
-                ),
-                Some(
+            Some(
+                (
+                    None,
                     "some id",
+                ),
+            ),
+        ],
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+            Constant(
+                Integer(
+                    3,
+                ),
+            ),
+            Constant(
+                Integer(
+                    4,
+                ),
+            ),
+            Field(
+                0,
+                Some(
+                    (
+                        None,
+                        "id",
+                    ),
                 ),
             ),
         ],

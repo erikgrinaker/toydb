@@ -414,90 +414,80 @@ Plan: Select(
                 ),
             ),
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    1,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
+            Field(
+                1,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "title",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "g",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    8,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "name",
+            Field(
+                8,
+                Some(
+                    (
+                        Some(
+                            "g",
                         ),
+                        "name",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    9,
-                    Some(
-                        (
-                            Some(
-                                "c",
-                            ),
-                            "id",
+            Field(
+                9,
+                Some(
+                    (
+                        Some(
+                            "c",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    10,
-                    Some(
-                        (
-                            Some(
-                                "c",
-                            ),
-                            "name",
+            Field(
+                10,
+                Some(
+                    (
+                        Some(
+                            "c",
                         ),
+                        "name",
                     ),
                 ),
-                None,
             ),
         ],
     },
@@ -722,90 +712,80 @@ Optimized plan: Select(
             predicate: None,
             outer: false,
         },
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
         expressions: [
-            (
-                Field(
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "id",
+            Field(
+                0,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    1,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
+            Field(
+                1,
+                Some(
+                    (
+                        Some(
+                            "m",
                         ),
+                        "title",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    7,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
+            Field(
+                7,
+                Some(
+                    (
+                        Some(
+                            "g",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    8,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "name",
+            Field(
+                8,
+                Some(
+                    (
+                        Some(
+                            "g",
                         ),
+                        "name",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    9,
-                    Some(
-                        (
-                            Some(
-                                "c",
-                            ),
-                            "id",
+            Field(
+                9,
+                Some(
+                    (
+                        Some(
+                            "c",
                         ),
+                        "id",
                     ),
                 ),
-                None,
             ),
-            (
-                Field(
-                    10,
-                    Some(
-                        (
-                            Some(
-                                "c",
-                            ),
-                            "name",
+            Field(
+                10,
+                Some(
+                    (
+                        Some(
+                            "c",
                         ),
+                        "name",
                     ),
                 ),
-                None,
             ),
         ],
     },
