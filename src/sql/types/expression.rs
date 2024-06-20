@@ -1,81 +1,138 @@
-use super::{Row, Value};
+use super::{Label, Row, Value};
 use crate::errinput;
 use crate::error::{Error, Result};
 
-use regex::Regex;
-use serde_derive::{Deserialize, Serialize};
-use std::fmt::{self, Display};
-use std::mem::replace;
+use serde::{Deserialize, Serialize};
 
-/// An expression, made up of constants and operations
+/// An expression, made up of nested values and operators. Values can either be
+/// constants or row field references.
+///
+/// Since this is a recursive data structure, we have to box each child
+/// expression, which incurs a heap allocation. There are clever ways to get
+/// around this, but we keep it simple.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expression {
-    // Values
+    /// A constant value.
     Constant(Value),
-    Field(usize, Option<(Option<String>, String)>),
+    /// A field reference (row index) with optional label. The label is only
+    /// used for display purposes.
+    Field(usize, Option<Label>),
 
-    // Logical operations
+    /// Logical AND of two booleans: a AND b.
     And(Box<Expression>, Box<Expression>),
-    Not(Box<Expression>),
+    /// Logical OR of two booleans: a OR b.
     Or(Box<Expression>, Box<Expression>),
+    /// Logical NOT of a boolean: NOT a.
+    Not(Box<Expression>),
 
-    // Comparisons operations (GTE, LTE, and NEQ are composite operations)
+    /// Equality comparison of two values: a = b.
     Equal(Box<Expression>, Box<Expression>),
+    /// > comparison of two values: a > b.
     GreaterThan(Box<Expression>, Box<Expression>),
-    IsNull(Box<Expression>),
+    /// < comparison of two values: a < b.
     LessThan(Box<Expression>, Box<Expression>),
+    /// Returns true if the value is null: a IS NULL.
+    IsNull(Box<Expression>),
 
-    // Mathematical operations
+    /// Adds two numbers: a + b.
     Add(Box<Expression>, Box<Expression>),
-    Assert(Box<Expression>),
+    /// Divides two numbers: a / b.
     Divide(Box<Expression>, Box<Expression>),
+    /// Exponentiates two numbers, i.e. a ^ b.
     Exponentiate(Box<Expression>, Box<Expression>),
+    /// Takes the factorial of a number: 4! = 4*3*2*1.
     Factorial(Box<Expression>),
+    /// The identify function, which simply returns the same number.
+    Identity(Box<Expression>),
+    /// The remainder after dividing two numbers: a % b.
     Modulo(Box<Expression>, Box<Expression>),
+    /// Multiplies two numbers: a * b.
     Multiply(Box<Expression>, Box<Expression>),
+    /// Negates the given number: -a.
     Negate(Box<Expression>),
+    /// Subtracts two numbers: a - b.
     Subtract(Box<Expression>, Box<Expression>),
 
-    // String operations
+    // Checks if a string matches a pattern: a LIKE b.
     Like(Box<Expression>, Box<Expression>),
 }
 
+impl std::fmt::Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Constant(value) => write!(f, "{value}"),
+            Self::Field(index, None) => write!(f, "#{index}"),
+            Self::Field(_, Some((None, name))) => write!(f, "{name}"),
+            Self::Field(_, Some((Some(table), name))) => write!(f, "{table}.{name}"),
+
+            Self::And(lhs, rhs) => write!(f, "{lhs} AND {rhs}"),
+            Self::Or(lhs, rhs) => write!(f, "{lhs} OR {rhs}"),
+            Self::Not(expr) => write!(f, "NOT {expr}"),
+
+            Self::Equal(lhs, rhs) => write!(f, "{lhs} = {rhs}"),
+            Self::GreaterThan(lhs, rhs) => write!(f, "{lhs} > {rhs}"),
+            Self::LessThan(lhs, rhs) => write!(f, "{lhs} < {rhs}"),
+            Self::IsNull(expr) => write!(f, "{expr} IS NULL"),
+
+            Self::Add(lhs, rhs) => write!(f, "{lhs} + {rhs}"),
+            Self::Divide(lhs, rhs) => write!(f, "{lhs} / {rhs}"),
+            Self::Exponentiate(lhs, rhs) => write!(f, "{lhs} ^ {rhs}"),
+            Self::Factorial(expr) => write!(f, "{expr}!"),
+            Self::Identity(expr) => write!(f, "{expr}"),
+            Self::Modulo(lhs, rhs) => write!(f, "{lhs} % {rhs}"),
+            Self::Multiply(lhs, rhs) => write!(f, "{lhs} * {rhs}"),
+            Self::Negate(expr) => write!(f, "-{expr}"),
+            Self::Subtract(lhs, rhs) => write!(f, "{lhs} - {rhs}"),
+
+            Self::Like(lhs, rhs) => write!(f, "{lhs} LIKE {rhs}"),
+        }
+    }
+}
+
 impl Expression {
-    /// Evaluates an expression to a value, given an environment
+    /// Evaluates an expression, returning a value. If a row is given, Field
+    /// references will look up the row value at the field index. If no row is
+    /// given, any field references yield NULL.
     pub fn evaluate(&self, row: Option<&Row>) -> Result<Value> {
         use Value::*;
         Ok(match self {
-            // Constant values
-            Self::Constant(c) => c.clone(),
-            Self::Field(i, _) => row.and_then(|row| row.get(*i).cloned()).unwrap_or(Null),
+            // Constant values return itself.
+            Self::Constant(value) => value.clone(),
 
-            // Logical operations
+            // Field references look up a row value. The planner must make sure
+            // the field reference is valid.
+            Self::Field(i, _) => row.map(|row| row[*i].clone()).unwrap_or(Null),
+
+            // Logical AND. Inputs must be boolean or NULL. NULLs generally
+            // yield NULL, except the special case NULL AND false == false.
             Self::And(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs && rhs),
-                (Boolean(lhs), Null) if !lhs => Boolean(false),
-                (Boolean(_), Null) => Null,
-                (Null, Boolean(rhs)) if !rhs => Boolean(false),
-                (Null, Boolean(_)) => Null,
-                (Null, Null) => Null,
+                (Boolean(b), Null) | (Null, Boolean(b)) if !b => Boolean(false),
+                (Boolean(_), Null) | (Null, Boolean(_)) | (Null, Null) => Null,
                 (lhs, rhs) => return errinput!("can't and {lhs} and {rhs}"),
             },
+
+            // Logical OR. Inputs must be boolean or NULL. NULLs generally
+            // yield NULL, except the special case NULL OR true == true.
+            Self::Or(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
+                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
+                (Boolean(b), Null) | (Null, Boolean(b)) if b => Boolean(true),
+                (Boolean(_), Null) | (Null, Boolean(_)) | (Null, Null) => Null,
+                (lhs, rhs) => return errinput!("can't or {lhs} and {rhs}"),
+            },
+
+            // Logical NOT. Input must be boolean or NULL.
             Self::Not(expr) => match expr.evaluate(row)? {
                 Boolean(b) => Boolean(!b),
                 Null => Null,
                 value => return errinput!("can't negate {value}"),
             },
-            Self::Or(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
-                (Boolean(lhs), Null) if lhs => Boolean(true),
-                (Boolean(_), Null) => Null,
-                (Null, Boolean(rhs)) if rhs => Boolean(true),
-                (Null, Boolean(_)) => Null,
-                (Null, Null) => Null,
-                (lhs, rhs) => return errinput!("can't or {lhs} and {rhs}"),
-            },
 
-            // Comparison operations
-            #[allow(clippy::float_cmp)] // Up to the user if they want to compare or not
+            // Comparisons. Must be of same type, except floats and integers
+            // which are interchangeable. NULLs yield NULL.
+            //
+            // TODO: handle the f64 NaN case.
+            #[allow(clippy::float_cmp)]
             Self::Equal(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs == rhs),
                 (Integer(lhs), Integer(rhs)) => Boolean(lhs == rhs),
@@ -108,58 +165,42 @@ impl Expression {
                 (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
-            Self::IsNull(expr) => match expr.evaluate(row)? {
-                Null => Boolean(true),
-                _ => Boolean(false),
-            },
+            Self::IsNull(expr) => Boolean(expr.evaluate(row)? == Null),
 
-            // Mathematical operations
+            // Mathematical operations. Inputs must be numbers, but integers and
+            // floats are interchangeable (float when mixed). NULLs yield NULL.
             Self::Add(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(lhs), Integer(rhs)) => {
                     Integer(lhs.checked_add(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
                 }
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 + rhs),
-                (Integer(_), Null) => Null,
-                (Float(lhs), Float(rhs)) => Float(lhs + rhs),
                 (Float(lhs), Integer(rhs)) => Float(lhs + rhs as f64),
-                (Float(_), Null) => Null,
-                (Null, Float(_)) => Null,
-                (Null, Integer(_)) => Null,
-                (Null, Null) => Null,
+                (Float(lhs), Float(rhs)) => Float(lhs + rhs),
+                (Null, Integer(_) | Float(_) | Null) => Null,
+                (Integer(_) | Float(_), Null) => Null,
                 (lhs, rhs) => return errinput!("can't add {lhs} and {rhs}"),
-            },
-            Self::Assert(expr) => match expr.evaluate(row)? {
-                Float(f) => Float(f),
-                Integer(i) => Integer(i),
-                Null => Null,
-                expr => return errinput!("can't take the positive of {expr}"),
             },
             Self::Divide(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
                 (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 / rhs),
-                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs / rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(lhs / rhs),
-                (Float(_), Null) => Null,
-                (Null, Float(_)) => Null,
-                (Null, Integer(_)) => Null,
-                (Null, Null) => Null,
+                (Null, Integer(_) | Float(_) | Null) => Null,
+                (Integer(_) | Float(_), Null) => Null,
                 (lhs, rhs) => return errinput!("can't divide {lhs} and {rhs}"),
             },
             Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) if rhs >= 0 => Integer(
-                    lhs.checked_pow(rhs as u32).ok_or::<Error>(errinput!("integer overflow"))?,
-                ),
+                (Integer(lhs), Integer(rhs)) if rhs >= 0 => {
+                    let rhs: u32 = rhs.try_into().or(errinput!("integer overflow"))?;
+                    Integer(lhs.checked_pow(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+                }
                 (Integer(lhs), Integer(rhs)) => Float((lhs as f64).powf(rhs as f64)),
                 (Integer(lhs), Float(rhs)) => Float((lhs as f64).powf(rhs)),
-                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float((lhs).powi(rhs as i32)),
                 (Float(lhs), Float(rhs)) => Float((lhs).powf(rhs)),
-                (Float(_), Null) => Null,
-                (Null, Float(_)) => Null,
-                (Null, Integer(_)) => Null,
-                (Null, Null) => Null,
+                (Integer(_) | Float(_), Null) => Null,
+                (Null, Integer(_) | Float(_) | Null) => Null,
                 (lhs, rhs) => return errinput!("can't exponentiate {lhs} and {rhs}"),
             },
             Self::Factorial(expr) => match expr.evaluate(row)? {
@@ -168,18 +209,19 @@ impl Expression {
                 Null => Null,
                 value => return errinput!("can't take factorial of {value}"),
             },
+            Self::Identity(expr) => match expr.evaluate(row)? {
+                v @ (Integer(_) | Float(_) | Null) => v,
+                expr => return errinput!("can't take the identity of {expr}"),
+            },
             Self::Modulo(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                // This uses remainder semantics, like Postgres.
+                // Uses remainder semantics, like Postgres.
                 (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
                 (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 % rhs),
-                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs % rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(lhs % rhs),
-                (Float(_), Null) => Null,
-                (Null, Float(_)) => Null,
-                (Null, Integer(_)) => Null,
-                (Null, Null) => Null,
+                (Integer(_) | Float(_) | Null, Null) => Null,
+                (Null, Integer(_) | Float(_)) => Null,
                 (lhs, rhs) => return errinput!("can't take modulo of {lhs} and {rhs}"),
             },
             Self::Multiply(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
@@ -187,13 +229,10 @@ impl Expression {
                     Integer(lhs.checked_mul(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
                 }
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 * rhs),
-                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs * rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(lhs * rhs),
-                (Float(_), Null) => Null,
-                (Null, Float(_)) => Null,
-                (Null, Integer(_)) => Null,
-                (Null, Null) => Null,
+                (Null, Integer(_) | Float(_) | Null) => Null,
+                (Integer(_) | Float(_), Null) => Null,
                 (lhs, rhs) => return errinput!("can't multiply {lhs} and {rhs}"),
             },
             Self::Negate(expr) => match expr.evaluate(row)? {
@@ -207,88 +246,37 @@ impl Expression {
                     Integer(lhs.checked_sub(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
                 }
                 (Integer(lhs), Float(rhs)) => Float(lhs as f64 - rhs),
-                (Integer(_), Null) => Null,
                 (Float(lhs), Integer(rhs)) => Float(lhs - rhs as f64),
                 (Float(lhs), Float(rhs)) => Float(lhs - rhs),
-                (Float(_), Null) => Null,
-                (Null, Float(_)) => Null,
-                (Null, Integer(_)) => Null,
-                (Null, Null) => Null,
+                (Null, Integer(_) | Float(_) | Null) => Null,
+                (Integer(_) | Float(_), Null) => Null,
                 (lhs, rhs) => return errinput!("can't subtract {lhs} and {rhs}"),
             },
 
-            // String operations
+            // LIKE pattern matching, using _ and % as single- and
+            // multi-character wildcards. Can be escaped as __ and %%. Inputs
+            // must be strings. NULLs yield NULL.
             Self::Like(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (String(lhs), String(rhs)) => Boolean(
-                    Regex::new(&format!(
+                (String(lhs), String(rhs)) => {
+                    let pattern = format!(
                         "^{}$",
                         regex::escape(&rhs)
                             .replace('%', ".*")
-                            .replace(".*.*", "%")
                             .replace('_', ".")
-                            .replace("..", "_")
-                    ))?
-                    .is_match(&lhs),
-                ),
-                (String(_), Null) => Null,
-                (Null, String(_)) => Null,
+                            .replace(".*.*", "%") // escaped %%
+                            .replace("..", "_") // escaped __
+                    );
+                    Boolean(regex::Regex::new(&pattern)?.is_match(&lhs))
+                }
+                (String(_), Null) | (Null, String(_)) | (Null, Null) => Null,
                 (lhs, rhs) => return errinput!("can't LIKE {lhs} and {rhs}"),
             },
         })
     }
 
-    /// Walks the expression tree while calling a closure. Returns true as soon as the closure
-    /// returns true. This is the inverse of walk().
-    pub fn contains<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
-        !self.walk(&|e| !visitor(e))
-    }
-
-    /// Replaces the expression with result of the closure. Helper function for transform().
-    fn replace_with<F: Fn(Self) -> Result<Self>>(&mut self, f: F) -> Result<()> {
-        // Temporarily replace expression with a null value, in case closure panics. May consider
-        // replace_with crate if this hampers performance.
-        let expr = replace(self, Expression::Constant(Value::Null));
-        *self = f(expr)?;
-        Ok(())
-    }
-
-    /// Transforms the expression tree by applying a closure before and after descending.
-    pub fn transform<B, A>(mut self, before: &B, after: &A) -> Result<Self>
-    where
-        B: Fn(Self) -> Result<Self>,
-        A: Fn(Self) -> Result<Self>,
-    {
-        self = before(self)?;
-        match &mut self {
-            Self::Add(lhs, rhs)
-            | Self::And(lhs, rhs)
-            | Self::Divide(lhs, rhs)
-            | Self::Equal(lhs, rhs)
-            | Self::Exponentiate(lhs, rhs)
-            | Self::GreaterThan(lhs, rhs)
-            | Self::LessThan(lhs, rhs)
-            | Self::Like(lhs, rhs)
-            | Self::Modulo(lhs, rhs)
-            | Self::Multiply(lhs, rhs)
-            | Self::Or(lhs, rhs)
-            | Self::Subtract(lhs, rhs) => {
-                Self::replace_with(lhs, |e| e.transform(before, after))?;
-                Self::replace_with(rhs, |e| e.transform(before, after))?;
-            }
-
-            Self::Assert(expr)
-            | Self::Factorial(expr)
-            | Self::IsNull(expr)
-            | Self::Negate(expr)
-            | Self::Not(expr) => Self::replace_with(expr, |e| e.transform(before, after))?,
-
-            Self::Constant(_) | Self::Field(_, _) => {}
-        };
-        after(self)
-    }
-
-    /// Walks the expression tree, calling a closure for every node. Halts if closure returns false.
-    pub fn walk<F: Fn(&Expression) -> bool>(&self, visitor: &F) -> bool {
+    /// Recursively walks the expression tree depth-first, calling the given
+    /// closure until it returns false. Returns true otherwise.
+    pub fn walk(&self, visitor: &impl Fn(&Expression) -> bool) -> bool {
         visitor(self)
             && match self {
                 Self::Add(lhs, rhs)
@@ -304,8 +292,8 @@ impl Expression {
                 | Self::Or(lhs, rhs)
                 | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
 
-                Self::Assert(expr)
-                | Self::Factorial(expr)
+                Self::Factorial(expr)
+                | Self::Identity(expr)
                 | Self::IsNull(expr)
                 | Self::Negate(expr)
                 | Self::Not(expr) => expr.walk(visitor),
@@ -313,6 +301,55 @@ impl Expression {
                 Self::Constant(_) | Self::Field(_, _) => true,
             }
     }
+
+    /// Recursively walks the expression tree depth-first, calling the given
+    /// closure until it returns true. Returns false otherwise. This is the
+    /// inverse of walk().
+    pub fn contains(&self, visitor: &impl Fn(&Expression) -> bool) -> bool {
+        !self.walk(&|e| !visitor(e))
+    }
+
+    /// Transforms the expression tree by recursively applying the given
+    /// closures depth-first to each node before/after descending.
+    pub fn transform<B, A>(mut self, before: &B, after: &A) -> Result<Self>
+    where
+        B: Fn(Self) -> Result<Self>,
+        A: Fn(Self) -> Result<Self>,
+    {
+        // Helper for transforming boxed expressions.
+        let transform = |mut expr: Box<Expression>| -> Result<Box<Expression>> {
+            *expr = expr.transform(before, after)?;
+            Ok(expr)
+        };
+
+        self = before(self)?;
+        self = match self {
+            Self::Add(lhs, rhs) => Self::Add(transform(lhs)?, transform(rhs)?),
+            Self::And(lhs, rhs) => Self::And(transform(lhs)?, transform(rhs)?),
+            Self::Divide(lhs, rhs) => Self::Divide(transform(lhs)?, transform(rhs)?),
+            Self::Equal(lhs, rhs) => Self::Equal(transform(lhs)?, transform(rhs)?),
+            Self::Exponentiate(lhs, rhs) => Self::Exponentiate(transform(lhs)?, transform(rhs)?),
+            Self::GreaterThan(lhs, rhs) => Self::GreaterThan(transform(lhs)?, transform(rhs)?),
+            Self::LessThan(lhs, rhs) => Self::LessThan(transform(lhs)?, transform(rhs)?),
+            Self::Like(lhs, rhs) => Self::Like(transform(lhs)?, transform(rhs)?),
+            Self::Modulo(lhs, rhs) => Self::Modulo(transform(lhs)?, transform(rhs)?),
+            Self::Multiply(lhs, rhs) => Self::Multiply(transform(lhs)?, transform(rhs)?),
+            Self::Or(lhs, rhs) => Self::Or(transform(lhs)?, transform(rhs)?),
+            Self::Subtract(lhs, rhs) => Self::Subtract(transform(lhs)?, transform(rhs)?),
+
+            Self::Factorial(expr) => Self::Factorial(transform(expr)?),
+            Self::Identity(expr) => Self::Identity(transform(expr)?),
+            Self::IsNull(expr) => Self::IsNull(transform(expr)?),
+            Self::Negate(expr) => Self::Negate(transform(expr)?),
+            Self::Not(expr) => Self::Not(transform(expr)?),
+
+            expr @ (Self::Constant(_) | Self::Field(_, _)) => expr,
+        };
+        self = after(self)?;
+        Ok(self)
+    }
+
+    // TODO: clean up the transformations below when the optimizer is cleaned up.
 
     /// Converts the expression into its negation normal form. This pushes NOT operators into the
     /// tree using De Morgan's laws, such that they never occur before other logical operators.
@@ -469,11 +506,7 @@ impl Expression {
     }
 
     // Creates an expression from a list of field lookup values.
-    pub fn from_lookup(
-        field: usize,
-        label: Option<(Option<String>, String)>,
-        values: Vec<Value>,
-    ) -> Self {
+    pub fn from_lookup(field: usize, label: Option<Label>, values: Vec<Value>) -> Self {
         if values.is_empty() {
             return Expression::Equal(
                 Expression::Field(field, label).into(),
@@ -492,38 +525,5 @@ impl Expression {
                 .collect(),
         )
         .unwrap()
-    }
-}
-
-impl Display for Expression {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Self::Constant(v) => v.to_string(),
-            Self::Field(i, None) => format!("#{}", i),
-            Self::Field(_, Some((None, name))) => name.to_string(),
-            Self::Field(_, Some((Some(table), name))) => format!("{}.{}", table, name),
-
-            Self::And(lhs, rhs) => format!("{} AND {}", lhs, rhs),
-            Self::Or(lhs, rhs) => format!("{} OR {}", lhs, rhs),
-            Self::Not(expr) => format!("NOT {}", expr),
-
-            Self::Equal(lhs, rhs) => format!("{} = {}", lhs, rhs),
-            Self::GreaterThan(lhs, rhs) => format!("{} > {}", lhs, rhs),
-            Self::LessThan(lhs, rhs) => format!("{} < {}", lhs, rhs),
-            Self::IsNull(expr) => format!("{} IS NULL", expr),
-
-            Self::Add(lhs, rhs) => format!("{} + {}", lhs, rhs),
-            Self::Assert(expr) => expr.to_string(),
-            Self::Divide(lhs, rhs) => format!("{} / {}", lhs, rhs),
-            Self::Exponentiate(lhs, rhs) => format!("{} ^ {}", lhs, rhs),
-            Self::Factorial(expr) => format!("!{}", expr),
-            Self::Modulo(lhs, rhs) => format!("{} % {}", lhs, rhs),
-            Self::Multiply(lhs, rhs) => format!("{} * {}", lhs, rhs),
-            Self::Negate(expr) => format!("-{}", expr),
-            Self::Subtract(lhs, rhs) => format!("{} - {}", lhs, rhs),
-
-            Self::Like(lhs, rhs) => format!("{} LIKE {}", lhs, rhs),
-        };
-        write!(f, "{}", s)
     }
 }

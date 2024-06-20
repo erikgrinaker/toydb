@@ -1,4 +1,4 @@
-use super::value::{DataType, Value};
+use super::{DataType, Value};
 use crate::encoding;
 use crate::errinput;
 use crate::error::Result;

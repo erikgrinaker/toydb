@@ -318,8 +318,8 @@ test_expr! {
     op_assert_infinity: "+INFINITY" => Ok(Float(std::f64::INFINITY)),
     op_assert_nan: "+NAN" => Ok(Float(std::f64::NAN)),
     op_assert_multi: "+++1" => Ok(Integer(1)),
-    op_assert_error_bool: "+TRUE" => Err(Error::InvalidInput("can't take the positive of TRUE".into())),
-    op_assert_error_string: "+'abc'" => Err(Error::InvalidInput("can't take the positive of abc".into())),
+    op_assert_error_bool: "+TRUE" => Err(Error::InvalidInput("can't take the identity of TRUE".into())),
+    op_assert_error_string: "+'abc'" => Err(Error::InvalidInput("can't take the identity of abc".into())),
 
     op_divide_float_float: "4.16 / 3.2" => Ok(Float(1.3)),
     op_divide_float_float_zero: "4.16 / 0.0" => Ok(Float(std::f64::INFINITY)),

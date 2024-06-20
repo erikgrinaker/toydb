@@ -603,7 +603,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 .into()),
 
                 // Mathematical operators
-                ast::Operation::Assert(expr) => Assert(self.build_expression(scope, *expr)?.into()),
                 ast::Operation::Add(lhs, rhs) => Add(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
@@ -618,6 +617,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ),
                 ast::Operation::Factorial(expr) => {
                     Factorial(self.build_expression(scope, *expr)?.into())
+                }
+                ast::Operation::Identity(expr) => {
+                    Identity(self.build_expression(scope, *expr)?.into())
                 }
                 ast::Operation::Modulo(lhs, rhs) => Modulo(
                     self.build_expression(scope, *lhs)?.into(),

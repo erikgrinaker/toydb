@@ -147,10 +147,10 @@ pub enum Operation {
 
     // Mathematical operators
     Add(Box<Expression>, Box<Expression>),
-    Assert(Box<Expression>),
     Divide(Box<Expression>, Box<Expression>),
     Exponentiate(Box<Expression>, Box<Expression>),
     Factorial(Box<Expression>),
+    Identity(Box<Expression>),
     Modulo(Box<Expression>, Box<Expression>),
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),
@@ -204,8 +204,8 @@ impl Expression {
                 Self::replace_with(rhs, |e| e.transform(before, after))?;
             }
 
-            Self::Operation(Assert(expr))
-            | Self::Operation(Factorial(expr))
+            Self::Operation(Factorial(expr))
+            | Self::Operation(Identity(expr))
             | Self::Operation(IsNull(expr))
             | Self::Operation(Negate(expr))
             | Self::Operation(Not(expr)) => {
@@ -253,8 +253,8 @@ impl Expression {
                 | Self::Operation(Or(lhs, rhs))
                 | Self::Operation(Subtract(lhs, rhs)) => lhs.walk(visitor) && rhs.walk(visitor),
 
-                Self::Operation(Assert(expr))
-                | Self::Operation(Factorial(expr))
+                Self::Operation(Factorial(expr))
+                | Self::Operation(Identity(expr))
                 | Self::Operation(IsNull(expr))
                 | Self::Operation(Negate(expr))
                 | Self::Operation(Not(expr)) => expr.walk(visitor),

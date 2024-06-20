@@ -4,4 +4,4 @@ mod value;
 
 pub use expression::Expression;
 pub use schema::{Column, Table};
-pub use value::{DataType, Row, Rows, Value};
+pub use value::{DataType, Label, Row, Rows, Value};

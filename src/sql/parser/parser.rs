@@ -601,7 +601,7 @@ enum PrefixOperator {
 impl PrefixOperator {
     fn build(&self, rhs: ast::Expression) -> ast::Expression {
         match self {
-            Self::Plus => ast::Operation::Assert(Box::new(rhs)).into(),
+            Self::Plus => ast::Operation::Identity(Box::new(rhs)).into(),
             Self::Minus => ast::Operation::Negate(Box::new(rhs)).into(),
             Self::Not => ast::Operation::Not(Box::new(rhs)).into(),
         }
