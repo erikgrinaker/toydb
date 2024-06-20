@@ -4,7 +4,7 @@ use toydb::errdata;
 use toydb::error::Result;
 use toydb::sql::engine::{Engine, StatementResult, Transaction};
 use toydb::sql::parser::Parser;
-use toydb::sql::plan::Plan;
+use toydb::sql::planner::Plan;
 
 use goldenfile::Mint;
 use std::io::Write;

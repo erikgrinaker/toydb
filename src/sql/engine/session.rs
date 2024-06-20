@@ -3,7 +3,7 @@ use super::{Engine, Transaction as _};
 use crate::error::{Error, Result};
 use crate::sql::execution::ExecutionResult;
 use crate::sql::parser::{ast, Parser};
-use crate::sql::plan::Plan;
+use crate::sql::planner::Plan;
 use crate::sql::types::{Row, Rows, Value};
 use crate::storage::mvcc;
 use crate::{errdata, errinput};

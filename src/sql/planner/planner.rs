@@ -1,3 +1,5 @@
+#![allow(clippy::module_inception)]
+
 use super::super::parser::ast;
 use super::{plan::Node, plan::Plan, Aggregate, Direction};
 use crate::errinput;

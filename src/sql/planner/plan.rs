@@ -1,5 +1,3 @@
-#![allow(clippy::module_inception)]
-
 use super::optimizer::{self, Optimizer as _};
 use super::planner::Planner;
 use crate::error::Result;

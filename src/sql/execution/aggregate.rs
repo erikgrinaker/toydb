@@ -1,6 +1,6 @@
 use super::QueryIterator;
 use crate::error::Result;
-use crate::sql::plan::Aggregate;
+use crate::sql::planner::Aggregate;
 use crate::sql::types::Value;
 
 use std::cmp::Ordering;

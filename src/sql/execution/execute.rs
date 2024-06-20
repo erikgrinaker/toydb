@@ -6,7 +6,7 @@ use super::transform;
 use super::write;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
-use crate::sql::plan::{Node, Plan};
+use crate::sql::planner::{Node, Plan};
 use crate::sql::types::{Row, Rows};
 
 /// Executes a plan, returning an execution result.

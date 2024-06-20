@@ -3,7 +3,7 @@ use itertools::izip;
 use super::QueryIterator;
 use crate::errinput;
 use crate::error::Result;
-use crate::sql::plan::Direction;
+use crate::sql::planner::Direction;
 use crate::sql::types::{Expression, Value};
 
 /// Filters the input rows (i.e. WHERE).
