@@ -7,6 +7,7 @@ use super::write;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::planner::{Node, Plan};
+use crate::sql::types::Label;
 use crate::sql::types::{Row, Rows};
 
 /// Executes a plan, returning an execution result.
@@ -121,7 +122,7 @@ pub enum ExecutionResult {
 /// A query result iterator, containing the columns and row iterator.
 pub struct QueryIterator {
     /// Column names.
-    pub columns: Vec<Option<String>>,
+    pub columns: Vec<Option<Label>>,
     /// Row iterator.
     pub rows: Rows,
 }
@@ -138,7 +139,7 @@ impl QueryIterator {
     /// Replaces the columns with the result of the closure.
     pub fn map_columns<F>(mut self, f: F) -> Self
     where
-        F: FnOnce(Vec<Option<String>>) -> Vec<Option<String>>,
+        F: FnOnce(Vec<Option<Label>>) -> Vec<Option<Label>>,
     {
         self.columns = f(self.columns);
         self

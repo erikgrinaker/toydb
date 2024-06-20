@@ -92,7 +92,7 @@ macro_rules! test_query {
                     if !columns.is_empty() || !rows.is_empty() {
                         write!(f, " {:?}\n", columns
                             .into_iter()
-                            .map(|c| c.unwrap_or_else(|| "?".to_string()))
+                            .map(|c| c.map(|l| l.1).unwrap_or_else(|| "?".to_string()))
                             .collect::<Vec<_>>())?;
                         for row in rows {
                             write!(f, "{:?}\n", row)?;

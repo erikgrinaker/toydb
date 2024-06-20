@@ -70,6 +70,7 @@ pub(super) fn project(
     expressions: Vec<(Expression, Option<String>)>,
 ) -> QueryIterator {
     // TODO: pass expressions and labels separately.
+    // TODO: these should be actual labels.
     let (expressions, labels): (Vec<_>, Vec<_>) = expressions.into_iter().unzip();
 
     // Use explicit column label if given, or pass through the source column
@@ -81,7 +82,7 @@ pub(super) fn project(
                 .enumerate()
                 .map(|(i, label)| {
                     if let Some(label) = label {
-                        Some(label)
+                        Some((None, label))
                     } else if let Expression::Field(f, _) = &expressions[i] {
                         columns.get(*f).cloned().expect("invalid field reference")
                     } else {

@@ -33,7 +33,7 @@ pub(super) fn aggregate(
             .columns
             .into_iter()
             .enumerate()
-            .map(|(i, c)| if i < agg_count { None } else { c })
+            .map(|(i, label)| if i < agg_count { None } else { label })
             .collect(),
         rows: Box::new(accumulators.into_iter().map(|(bucket, accs)| {
             Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())
