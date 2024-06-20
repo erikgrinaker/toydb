@@ -159,7 +159,7 @@ fn execute() -> Result<()> {
     let result = c.execute("SELECT * FROM genres")?;
     assert_eq!(
         result,
-        StatementResult::Query {
+        StatementResult::Select {
             columns: vec![Column { name: Some("id".into()) }, Column { name: Some("name".into()) }],
             rows: vec![
                 vec![Value::Integer(1), Value::String("Science Fiction".into())],
@@ -172,7 +172,7 @@ fn execute() -> Result<()> {
     let result = c.execute("SELECT * FROM genres WHERE FALSE")?;
     assert_eq!(
         result,
-        StatementResult::Query {
+        StatementResult::Select {
             columns: vec![Column { name: Some("id".into()) }, Column { name: Some("name".into()) }],
             rows: vec![],
         }
@@ -190,7 +190,7 @@ fn execute() -> Result<()> {
     );
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (9, 'Western')"),
-        Ok(StatementResult::Create { count: 1 }),
+        Ok(StatementResult::Insert { count: 1 }),
     );
     assert_eq!(
         c.execute("INSERT INTO x VALUES (9, 'Western')"),

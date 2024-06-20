@@ -188,7 +188,7 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
             },
             StatementResult::Commit { version: id } => println!("Committed transaction {}", id),
             StatementResult::Rollback { version: id } => println!("Rolled back transaction {}", id),
-            StatementResult::Create { count } => println!("Created {} rows", count),
+            StatementResult::Insert { count } => println!("Created {} rows", count),
             StatementResult::Delete { count } => println!("Deleted {} rows", count),
             StatementResult::Update { count } => println!("Updated {} rows", count),
             StatementResult::CreateTable { name } => println!("Created table {}", name),
@@ -197,7 +197,7 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
                 false => println!("Table {} did not exit", name),
             },
             StatementResult::Explain(plan) => println!("{}", plan),
-            StatementResult::Query { columns, rows } => {
+            StatementResult::Select { columns, rows } => {
                 if self.show_headers {
                     println!(
                         "{}",

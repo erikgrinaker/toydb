@@ -285,11 +285,11 @@ impl Server {
             debug!("Received request {request:?}");
             let response = match request {
                 Request::Execute(query) => session.execute(&query).map(Response::Execute),
-                Request::GetTable(table) => session
-                    .with_txn_read_only(|txn| txn.must_get_table(&table))
-                    .map(Response::GetTable),
+                Request::GetTable(table) => {
+                    session.with_txn(true, |txn| txn.must_get_table(&table)).map(Response::GetTable)
+                }
                 Request::ListTables => session
-                    .with_txn_read_only(|txn| {
+                    .with_txn(true, |txn| {
                         Ok(txn.list_tables()?.into_iter().map(|t| t.name).collect())
                     })
                     .map(Response::ListTables),

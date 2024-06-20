@@ -1,5 +1,5 @@
 Query: INSERT INTO "string" VALUES ('baz')
-Result: Create { count: 1 }
+Result: Insert { count: 1 }
 
 Storage:
 CREATE TABLE "string" (

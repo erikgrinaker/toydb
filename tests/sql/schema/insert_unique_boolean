@@ -1,5 +1,5 @@
 Query: INSERT INTO "unique" (id, "boolean") VALUES (2, FALSE)
-Result: Create { count: 1 }
+Result: Insert { count: 1 }
 
 Storage:
 CREATE TABLE "unique" (

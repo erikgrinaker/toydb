@@ -1,5 +1,5 @@
 Query: INSERT INTO "unique" (id, "string") VALUES (2, 'Foo')
-Result: Create { count: 1 }
+Result: Insert { count: 1 }
 
 Storage:
 CREATE TABLE "unique" (

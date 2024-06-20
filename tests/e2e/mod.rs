@@ -16,7 +16,7 @@ use testcluster::TestCluster;
 /// TODO: get rid of these.
 fn assert_rows(result: toydb::StatementResult, expect: Vec<toydb::sql::types::Row>) {
     match result {
-        toydb::StatementResult::Query { rows, .. } => {
+        toydb::StatementResult::Select { rows, .. } => {
             pretty_assertions::assert_eq!(rows, expect)
         }
         r => panic!("Unexpected result {:?}", r),

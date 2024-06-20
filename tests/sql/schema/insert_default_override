@@ -1,5 +1,5 @@
 Query: INSERT INTO defaults VALUES (1, TRUE, TRUE, FALSE, 2.718, 3, 'bar')
-Result: Create { count: 1 }
+Result: Insert { count: 1 }
 
 Storage:
 CREATE TABLE defaults (

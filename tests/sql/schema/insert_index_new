@@ -1,5 +1,5 @@
 Query: INSERT INTO test VALUES (4, 'c', 104)
-Result: Create { count: 1 }
+Result: Insert { count: 1 }
 
 Storage:
 CREATE TABLE test (

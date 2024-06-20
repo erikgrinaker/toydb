@@ -87,7 +87,7 @@ macro_rules! test_query {
                 });
 
             match result {
-                Ok(StatementResult::Query{columns, rows}) => {
+                Ok(StatementResult::Select{columns, rows}) => {
                     write!(f, "Result:")?;
                     if !columns.is_empty() || !rows.is_empty() {
                         write!(f, " {:?}\n", columns

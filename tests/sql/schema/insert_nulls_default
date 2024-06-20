@@ -1,5 +1,5 @@
 Query: INSERT INTO nulls (id, "null", not_null) VALUES (1, NULL, TRUE)
-Result: Create { count: 1 }
+Result: Insert { count: 1 }
 
 Storage:
 CREATE TABLE nulls (

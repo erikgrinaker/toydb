@@ -20,6 +20,7 @@ use std::collections::HashSet;
 use std::io::Write as _;
 use std::time::Duration;
 use toydb::error::Result;
+use toydb::sql::types::{Row, Rows};
 use toydb::{Client, StatementResult};
 
 fn main() -> Result<()> {
@@ -259,14 +260,13 @@ impl Workload for Read {
             r#"SELECT * FROM "read" WHERE {}"#,
             item.iter().map(|id| format!("id = {}", id)).join(" OR ")
         );
-        let rows = client.execute(&query)?.into_rows()?;
+        let rows: Rows = client.execute(&query)?.try_into()?;
         assert_eq!(rows.count(), batch_size, "Unexpected row count");
         Ok(())
     }
 
     fn verify(&self, client: &mut Client, _: usize) -> Result<()> {
-        let count: i64 =
-            client.execute(r#"SELECT COUNT(*) FROM "read""#)?.into_value()?.try_into()?;
+        let count: i64 = client.execute(r#"SELECT COUNT(*) FROM "read""#)?.try_into()?;
         assert_eq!(count, self.rows as i64, "Unexpected row count");
         Ok(())
     }
@@ -337,7 +337,7 @@ impl Workload for Write {
             r#"INSERT INTO "write" (id, value) VALUES {}"#,
             item.iter().map(|(id, value)| format!("({}, '{}')", id, value)).join(", ")
         );
-        if let StatementResult::Create { count } = client.execute(&query)? {
+        if let StatementResult::Insert { count } = client.execute(&query)? {
             assert_eq!(count as usize, batch_size, "Unexpected row count");
         } else {
             panic!("Unexpected result")
@@ -346,8 +346,7 @@ impl Workload for Write {
     }
 
     fn verify(&self, client: &mut Client, txns: usize) -> Result<()> {
-        let count: i64 =
-            client.execute(r#"SELECT COUNT(*) FROM "write""#)?.into_value()?.try_into()?;
+        let count: i64 = client.execute(r#"SELECT COUNT(*) FROM "write""#)?.try_into()?;
         assert_eq!(count as usize, txns * self.batch, "Unexpected row count");
         Ok(())
     }
@@ -465,7 +464,7 @@ impl Workload for Bank {
 
         client.execute("BEGIN")?;
 
-        let mut row = client
+        let row: Row = client
             .execute(&format!(
                 "SELECT a.id, a.balance
                         FROM account a JOIN customer c ON a.customer_id = c.id
@@ -474,9 +473,10 @@ impl Workload for Bank {
                         LIMIT 1",
                 from
             ))?
-            .into_row()?;
-        let from_balance: i64 = row.pop().unwrap().try_into()?;
-        let from_account: i64 = row.pop().unwrap().try_into()?;
+            .try_into()?;
+        let mut row = row.into_iter();
+        let from_account: i64 = row.next().unwrap().try_into()?;
+        let from_balance: i64 = row.next().unwrap().try_into()?;
         amount = std::cmp::min(amount, from_balance as u64);
 
         let to_account: i64 = client
@@ -488,7 +488,6 @@ impl Workload for Bank {
                         LIMIT 1",
                 to
             ))?
-            .into_value()?
             .try_into()?;
 
         client.execute(&format!(
@@ -506,13 +505,10 @@ impl Workload for Bank {
     }
 
     fn verify(&self, client: &mut Client, _: usize) -> Result<()> {
-        let balance: i64 =
-            client.execute("SELECT SUM(balance) FROM account")?.into_value()?.try_into()?;
+        let balance: i64 = client.execute("SELECT SUM(balance) FROM account")?.try_into()?;
         assert_eq!(balance as u64, self.customers * self.accounts * self.balance);
-        let negative: i64 = client
-            .execute("SELECT COUNT(*) FROM account WHERE balance < 0")?
-            .into_value()?
-            .try_into()?;
+        let negative: i64 =
+            client.execute("SELECT COUNT(*) FROM account WHERE balance < 0")?.try_into()?;
         assert_eq!(negative, 0);
         Ok(())
     }
