@@ -19,18 +19,16 @@ pub(super) fn delete(
 }
 
 /// Inserts rows into a table (i.e. INSERT).
-///
-/// TODO: this should take rows from a values source.
 pub(super) fn insert(
     txn: &impl Transaction,
     table: Table,
     columns: Vec<String>,
-    values: Vec<Vec<Expression>>,
+    mut source: QueryIterator,
 ) -> Result<u64> {
-    let mut rows = Vec::with_capacity(values.len());
-    for expressions in values {
-        let mut row =
-            expressions.into_iter().map(|expr| expr.evaluate(None)).collect::<Result<_>>()?;
+    let mut rows = Vec::new();
+    while let Some(mut row) = source.next().transpose()? {
+        // TODO: the pad/make row logic should probably be moved to the Values
+        // source, or otherwise have a better mapping from the source.
         if columns.is_empty() {
             row = pad_row(&table, row)?;
         } else {

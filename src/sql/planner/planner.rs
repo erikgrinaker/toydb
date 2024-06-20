@@ -91,15 +91,18 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 Plan::Insert {
                     table,
                     columns: columns.unwrap_or_default(),
-                    expressions: values
-                        .into_iter()
-                        .map(|exprs| {
-                            exprs
-                                .into_iter()
-                                .map(|expr| self.build_expression(&mut Scope::constant(), expr))
-                                .collect::<Result<_>>()
-                        })
-                        .collect::<Result<_>>()?,
+                    source: Node::Values {
+                        labels: vec![None; values.len()],
+                        rows: values
+                            .into_iter()
+                            .map(|exprs| {
+                                exprs
+                                    .into_iter()
+                                    .map(|expr| self.build_expression(&mut Scope::constant(), expr))
+                                    .collect::<Result<_>>()
+                            })
+                            .collect::<Result<_>>()?,
+                    },
                 }
             }
 

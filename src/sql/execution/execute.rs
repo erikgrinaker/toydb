@@ -34,8 +34,9 @@ pub fn execute_plan(
             ExecutionResult::Delete { count }
         }
 
-        Plan::Insert { table, columns, expressions } => {
-            let count = write::insert(txn, table, columns, expressions)?;
+        Plan::Insert { table, columns, source } => {
+            let source = execute(source, txn)?;
+            let count = write::insert(txn, table, columns, source)?;
             ExecutionResult::Insert { count }
         }
 
@@ -106,6 +107,8 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
         }
 
         Node::Scan { table, alias: _, filter } => source::scan(txn, table, filter),
+
+        Node::Values { labels, rows } => Ok(source::values(labels, rows)),
     }
 }
 

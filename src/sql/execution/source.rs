@@ -1,7 +1,7 @@
 use super::QueryIterator;
 use crate::error::Result;
 use crate::sql::engine::Transaction;
-use crate::sql::types::{Expression, Row, Table, Value};
+use crate::sql::types::{Expression, Label, Row, Table, Value};
 
 /// A table scan source.
 pub(super) fn scan(
@@ -47,4 +47,14 @@ pub(super) fn lookup_index(
 /// SELECT 1+1, in order to have something to project against.
 pub(super) fn nothing() -> QueryIterator {
     QueryIterator { columns: Vec::new(), rows: Box::new(std::iter::once(Ok(Row::new()))) }
+}
+
+/// Emits predefined constant values.
+pub(super) fn values(labels: Vec<Option<Label>>, rows: Vec<Vec<Expression>>) -> QueryIterator {
+    QueryIterator {
+        columns: labels,
+        rows: Box::new(
+            rows.into_iter().map(|row| row.into_iter().map(|expr| expr.evaluate(None)).collect()),
+        ),
+    }
 }

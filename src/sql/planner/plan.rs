@@ -4,7 +4,7 @@ use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::execution::{self, ExecutionResult};
 use crate::sql::parser::ast;
-use crate::sql::types::{Expression, Table, Value};
+use crate::sql::types::{Expression, Label, Table, Value};
 
 use serde::{Deserialize, Serialize};
 
@@ -20,8 +20,7 @@ pub enum Plan {
     /// A DELETE plan.
     Delete { table: String, key_index: usize, source: Node },
     /// An INSERT plan.
-    /// TODO: consider using a source which generates expression rows.
-    Insert { table: Table, columns: Vec<String>, expressions: Vec<Vec<Expression>> },
+    Insert { table: Table, columns: Vec<String>, source: Node },
     /// An UPDATE plan.
     Update {
         table: String,
@@ -80,8 +79,8 @@ impl std::fmt::Display for Plan {
                     source.format(String::new(), false, true).trim_end()
                 )
             }
-            Self::Insert { table, columns: _, expressions } => {
-                write!(f, "Insert: {} ({} rows)", table.name, expressions.len())
+            Self::Insert { table, columns: _, source: _ } => {
+                write!(f, "Insert: {}", table.name)
             }
             Self::Select(root) => root.fmt(f),
             Self::Update { table, key_index: _, source, expressions } => {
@@ -117,9 +116,9 @@ pub enum Node {
     },
     HashJoin {
         left: Box<Node>,
-        left_field: (usize, Option<(Option<String>, String)>),
+        left_field: (usize, Option<Label>),
         right: Box<Node>,
-        right_field: (usize, Option<(Option<String>, String)>),
+        right_field: (usize, Option<Label>),
         outer: bool,
     },
     IndexLookup {
@@ -144,6 +143,7 @@ pub enum Node {
         predicate: Option<Expression>,
         outer: bool,
     },
+    // TODO: replace with Values, but requires changes to aggregate planning.
     Nothing,
     Offset {
         source: Box<Node>,
@@ -162,6 +162,10 @@ pub enum Node {
         alias: Option<String>,
         filter: Option<Expression>,
     },
+    Values {
+        labels: Vec<Option<Label>>,
+        rows: Vec<Vec<Expression>>,
+    },
 }
 
 impl Node {
@@ -174,10 +178,11 @@ impl Node {
     {
         self = before(self)?;
         self = match self {
-            node @ Self::IndexLookup { .. }
-            | node @ Self::KeyLookup { .. }
-            | node @ Self::Nothing
-            | node @ Self::Scan { .. } => node,
+            node @ (Self::IndexLookup { .. }
+            | Self::KeyLookup { .. }
+            | Self::Nothing
+            | Self::Scan { .. }
+            | Self::Values { .. }) => node,
 
             Self::Aggregation { source, aggregates } => {
                 Self::Aggregation { source: source.transform(before, after)?.into(), aggregates }
@@ -264,6 +269,13 @@ impl Node {
             Self::Scan { table, alias, filter: Some(filter) } => {
                 Self::Scan { table, alias, filter: Some(filter.transform(before, after)?) }
             }
+            Self::Values { labels, rows } => Self::Values {
+                labels,
+                rows: rows
+                    .into_iter()
+                    .map(|row| row.into_iter().map(|e| e.transform(before, after)).collect())
+                    .collect::<Result<_>>()?,
+            },
         })
     }
 
@@ -390,6 +402,9 @@ impl Node {
                     s += &format!(" ({})", expr);
                 }
                 s += "\n";
+            }
+            Self::Values { labels: _, rows } => {
+                s += &format!("Values: {} rows\n", rows.len());
             }
         };
         if root {
