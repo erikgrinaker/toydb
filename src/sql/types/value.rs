@@ -221,14 +221,3 @@ pub type Row = Vec<Value>;
 ///
 /// TODO: try to avoid boxing here.
 pub type Rows = Box<dyn Iterator<Item = Result<Row>>>;
-
-/// A column (in a result set, see schema::Column for table columns).
-///
-/// TODO: revisit column handling in result sets.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Column {
-    pub name: Option<String>,
-}
-
-/// A set of columns.
-pub type Columns = Vec<Column>;

@@ -2,8 +2,7 @@ use super::QueryIterator;
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Transaction;
-use crate::sql::types::schema::Table;
-use crate::sql::types::{Expression, Row, Value};
+use crate::sql::types::{Expression, Row, Table, Value};
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE).
 /// Returns the number of rows deleted.

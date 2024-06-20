@@ -3,8 +3,7 @@ use crate::error::{Error, Result};
 use crate::raft;
 use crate::sql;
 use crate::sql::engine::{Catalog as _, Engine as _, StatementResult};
-use crate::sql::types::schema::Table;
-use crate::sql::types::Row;
+use crate::sql::types::{Row, Table};
 use crate::storage;
 
 use crossbeam::channel::{Receiver, Sender};

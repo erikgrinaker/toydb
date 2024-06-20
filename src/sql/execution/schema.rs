@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::sql::engine::Catalog;
-use crate::sql::types::schema::Table;
+use crate::sql::types::Table;
 
 // Creates a table (i.e. CREATE TABLE).
 pub(super) fn create_table(catalog: &impl Catalog, schema: Table) -> Result<()> {

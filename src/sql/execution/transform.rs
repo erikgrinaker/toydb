@@ -4,7 +4,7 @@ use super::QueryIterator;
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::plan::Direction;
-use crate::sql::types::{Column, Expression, Value};
+use crate::sql::types::{Expression, Value};
 
 /// Filters the input rows (i.e. WHERE).
 pub(super) fn filter(source: QueryIterator, predicate: Expression) -> QueryIterator {
@@ -81,11 +81,11 @@ pub(super) fn project(
                 .enumerate()
                 .map(|(i, label)| {
                     if let Some(label) = label {
-                        Column { name: Some(label) }
+                        Some(label)
                     } else if let Expression::Field(f, _) = &expressions[i] {
                         columns.get(*f).cloned().expect("invalid field reference")
                     } else {
-                        Column { name: None }
+                        None
                     }
                 })
                 .collect()

@@ -3,8 +3,7 @@
 use super::Session;
 use crate::errinput;
 use crate::error::Result;
-use crate::sql::types::schema::Table;
-use crate::sql::types::{Expression, Row, Rows, Value};
+use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::mvcc;
 
 use std::collections::{HashMap, HashSet};

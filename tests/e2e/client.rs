@@ -4,9 +4,7 @@ use toydb::error::{Error, Result};
 use toydb::raft;
 use toydb::server::Status;
 use toydb::sql::engine::StatementResult;
-use toydb::sql::types::schema;
-use toydb::sql::types::{Column, DataType, Value};
-use toydb::storage;
+use toydb::sql::types::{Column, DataType, Table, Value};
 use toydb::storage::{engine, mvcc};
 
 use pretty_assertions::assert_eq;
@@ -24,11 +22,11 @@ fn get_table() -> Result<()> {
     );
     assert_eq!(
         c.get_table("movies")?,
-        schema::Table {
+        Table {
             name: "movies".into(),
             primary_key: 0,
             columns: vec![
-                schema::Column {
+                Column {
                     name: "id".into(),
                     datatype: DataType::Integer,
                     nullable: false,
@@ -37,7 +35,7 @@ fn get_table() -> Result<()> {
                     index: false,
                     references: None,
                 },
-                schema::Column {
+                Column {
                     name: "title".into(),
                     datatype: DataType::String,
                     nullable: false,
@@ -46,7 +44,7 @@ fn get_table() -> Result<()> {
                     index: false,
                     references: None,
                 },
-                schema::Column {
+                Column {
                     name: "studio_id".into(),
                     datatype: DataType::Integer,
                     nullable: false,
@@ -55,7 +53,7 @@ fn get_table() -> Result<()> {
                     index: true,
                     references: Some("studios".into()),
                 },
-                schema::Column {
+                Column {
                     name: "genre_id".into(),
                     datatype: DataType::Integer,
                     nullable: false,
@@ -64,7 +62,7 @@ fn get_table() -> Result<()> {
                     index: true,
                     references: Some("genres".into()),
                 },
-                schema::Column {
+                Column {
                     name: "released".into(),
                     datatype: DataType::Integer,
                     nullable: false,
@@ -73,7 +71,7 @@ fn get_table() -> Result<()> {
                     index: false,
                     references: None,
                 },
-                schema::Column {
+                Column {
                     name: "rating".into(),
                     datatype: DataType::Float,
                     nullable: true,
@@ -82,7 +80,7 @@ fn get_table() -> Result<()> {
                     index: false,
                     references: None,
                 },
-                schema::Column {
+                Column {
                     name: "ultrahd".into(),
                     datatype: DataType::Boolean,
                     nullable: true,
@@ -123,7 +121,7 @@ fn status() -> Result<()> {
                 match_index: [(1, 11)].into(),
                 commit_index: 11,
                 applied_index: 11,
-                storage: storage::engine::Status {
+                storage: engine::Status {
                     name: "bitcask".to_string(),
                     keys: 13,
                     size: 952,
@@ -160,7 +158,7 @@ fn execute() -> Result<()> {
     assert_eq!(
         result,
         StatementResult::Select {
-            columns: vec![Column { name: Some("id".into()) }, Column { name: Some("name".into()) }],
+            columns: vec![Some("id".into()), Some("name".into())],
             rows: vec![
                 vec![Value::Integer(1), Value::String("Science Fiction".into())],
                 vec![Value::Integer(2), Value::String("Action".into())],
@@ -173,7 +171,7 @@ fn execute() -> Result<()> {
     assert_eq!(
         result,
         StatementResult::Select {
-            columns: vec![Column { name: Some("id".into()) }, Column { name: Some("name".into()) }],
+            columns: vec![Some("id".into()), Some("name".into())],
             rows: vec![],
         }
     );

@@ -3,8 +3,7 @@ use crate::encoding::{self, bincode, Value as _};
 use crate::errdata;
 use crate::error::Result;
 use crate::raft;
-use crate::sql::types::schema::Table;
-use crate::sql::types::{Expression, Row, Rows, Value};
+use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::{self, mvcc};
 
 use crossbeam::channel::Sender;

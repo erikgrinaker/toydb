@@ -1,8 +1,7 @@
 use super::Catalog;
 use crate::encoding::{self, Key as _, Value as _};
 use crate::error::Result;
-use crate::sql::types::schema::Table;
-use crate::sql::types::{Expression, Row, Rows, Value};
+use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::{self, mvcc};
 use crate::{errdata, errinput};
 

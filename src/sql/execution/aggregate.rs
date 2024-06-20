@@ -1,7 +1,7 @@
 use super::QueryIterator;
 use crate::error::Result;
 use crate::sql::plan::Aggregate;
-use crate::sql::types::{Column, Value};
+use crate::sql::types::Value;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -33,7 +33,7 @@ pub(super) fn aggregate(
             .columns
             .into_iter()
             .enumerate()
-            .map(|(i, c)| if i < agg_count { Column { name: None } } else { c })
+            .map(|(i, c)| if i < agg_count { None } else { c })
             .collect(),
         rows: Box::new(accumulators.into_iter().map(|(bucket, accs)| {
             Ok(accs.into_iter().map(|acc| acc.aggregate()).chain(bucket).collect())

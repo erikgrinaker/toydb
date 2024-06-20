@@ -203,7 +203,7 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
                         "{}",
                         columns
                             .iter()
-                            .map(|c| c.name.as_deref().unwrap_or("?"))
+                            .map(|c| c.as_deref().unwrap_or("?"))
                             .collect::<Vec<_>>()
                             .join("|")
                     );

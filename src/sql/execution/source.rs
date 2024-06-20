@@ -1,8 +1,7 @@
 use super::QueryIterator;
 use crate::error::Result;
 use crate::sql::engine::Transaction;
-use crate::sql::types::schema::Table;
-use crate::sql::types::{Column, Expression, Row, Value};
+use crate::sql::types::{Expression, Row, Table, Value};
 
 /// A table scan source.
 pub(super) fn scan(
@@ -11,7 +10,7 @@ pub(super) fn scan(
     filter: Option<Expression>,
 ) -> Result<QueryIterator> {
     Ok(QueryIterator {
-        columns: table.columns.into_iter().map(|c| Column { name: Some(c.name) }).collect(),
+        columns: table.columns.into_iter().map(|c| Some(c.name)).collect(),
         rows: Box::new(txn.scan(&table.name, filter)?),
     })
 }
@@ -23,7 +22,7 @@ pub(super) fn lookup_key(
     keys: Vec<Value>,
 ) -> Result<QueryIterator> {
     Ok(QueryIterator {
-        columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
+        columns: table.columns.into_iter().map(|c| Some(c.name)).collect(),
         rows: Box::new(txn.get(&table.name, &keys)?.into_iter().map(Ok)),
     })
 }
@@ -39,7 +38,7 @@ pub(super) fn lookup_index(
     let rows = txn.get(&table.name, &pks)?;
 
     Ok(QueryIterator {
-        columns: table.columns.iter().map(|c| Column { name: Some(c.name.clone()) }).collect(),
+        columns: table.columns.into_iter().map(|c| Some(c.name)).collect(),
         rows: Box::new(rows.into_iter().map(Ok)),
     })
 }
