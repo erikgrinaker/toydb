@@ -1,6 +1,6 @@
 use super::{Label, Row, Value};
 use crate::errinput;
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 use serde::{Deserialize, Serialize};
 
@@ -131,8 +131,8 @@ impl Expression {
             // Comparisons. Must be of same type, except floats and integers
             // which are interchangeable. NULLs yield NULL.
             //
-            // TODO: handle the f64 NaN case.
-            // TODO: shouldn't this dispatch to Value.cmp()?
+            // Does not dispatch to Value.cmp() because sorting and comparisons
+            // are different for f64 NaN and -0 values.
             #[allow(clippy::float_cmp)]
             Self::Equal(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs == rhs),
@@ -170,42 +170,9 @@ impl Expression {
 
             // Mathematical operations. Inputs must be numbers, but integers and
             // floats are interchangeable (float when mixed). NULLs yield NULL.
-            //
-            // TODO: implement Add, CheckedAdd, etc. instead for Value.
-            Self::Add(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) => {
-                    Integer(lhs.checked_add(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
-                }
-                (Integer(lhs), Float(rhs)) => Float(lhs as f64 + rhs),
-                (Float(lhs), Integer(rhs)) => Float(lhs + rhs as f64),
-                (Float(lhs), Float(rhs)) => Float(lhs + rhs),
-                (Null, Integer(_) | Float(_) | Null) => Null,
-                (Integer(_) | Float(_), Null) => Null,
-                (lhs, rhs) => return errinput!("can't add {lhs} and {rhs}"),
-            },
-            Self::Divide(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
-                (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
-                (Integer(lhs), Float(rhs)) => Float(lhs as f64 / rhs),
-                (Float(lhs), Integer(rhs)) => Float(lhs / rhs as f64),
-                (Float(lhs), Float(rhs)) => Float(lhs / rhs),
-                (Null, Integer(_) | Float(_) | Null) => Null,
-                (Integer(_) | Float(_), Null) => Null,
-                (lhs, rhs) => return errinput!("can't divide {lhs} and {rhs}"),
-            },
-            Self::Exponentiate(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) if rhs >= 0 => {
-                    let rhs: u32 = rhs.try_into().or(errinput!("integer overflow"))?;
-                    Integer(lhs.checked_pow(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
-                }
-                (Integer(lhs), Integer(rhs)) => Float((lhs as f64).powf(rhs as f64)),
-                (Integer(lhs), Float(rhs)) => Float((lhs as f64).powf(rhs)),
-                (Float(lhs), Integer(rhs)) => Float((lhs).powi(rhs as i32)),
-                (Float(lhs), Float(rhs)) => Float((lhs).powf(rhs)),
-                (Integer(_) | Float(_), Null) => Null,
-                (Null, Integer(_) | Float(_) | Null) => Null,
-                (lhs, rhs) => return errinput!("can't exponentiate {lhs} and {rhs}"),
-            },
+            Self::Add(lhs, rhs) => lhs.evaluate(row)?.checked_add(&rhs.evaluate(row)?)?,
+            Self::Divide(lhs, rhs) => lhs.evaluate(row)?.checked_div(&rhs.evaluate(row)?)?,
+            Self::Exponentiate(lhs, rhs) => lhs.evaluate(row)?.checked_pow(&rhs.evaluate(row)?)?,
             Self::Factorial(expr) => match expr.evaluate(row)? {
                 Integer(i) if i < 0 => return errinput!("can't take factorial of negative number"),
                 Integer(i) => Integer((1..=i).product()),
@@ -216,45 +183,15 @@ impl Expression {
                 v @ (Integer(_) | Float(_) | Null) => v,
                 expr => return errinput!("can't take the identity of {expr}"),
             },
-            Self::Modulo(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                // Uses remainder semantics, like Postgres.
-                (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
-                (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),
-                (Integer(lhs), Float(rhs)) => Float(lhs as f64 % rhs),
-                (Float(lhs), Integer(rhs)) => Float(lhs % rhs as f64),
-                (Float(lhs), Float(rhs)) => Float(lhs % rhs),
-                (Integer(_) | Float(_) | Null, Null) => Null,
-                (Null, Integer(_) | Float(_)) => Null,
-                (lhs, rhs) => return errinput!("can't take modulo of {lhs} and {rhs}"),
-            },
-            Self::Multiply(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) => {
-                    Integer(lhs.checked_mul(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
-                }
-                (Integer(lhs), Float(rhs)) => Float(lhs as f64 * rhs),
-                (Float(lhs), Integer(rhs)) => Float(lhs * rhs as f64),
-                (Float(lhs), Float(rhs)) => Float(lhs * rhs),
-                (Null, Integer(_) | Float(_) | Null) => Null,
-                (Integer(_) | Float(_), Null) => Null,
-                (lhs, rhs) => return errinput!("can't multiply {lhs} and {rhs}"),
-            },
+            Self::Modulo(lhs, rhs) => lhs.evaluate(row)?.checked_rem(&rhs.evaluate(row)?)?,
+            Self::Multiply(lhs, rhs) => lhs.evaluate(row)?.checked_mul(&rhs.evaluate(row)?)?,
             Self::Negate(expr) => match expr.evaluate(row)? {
                 Integer(i) => Integer(-i),
                 Float(f) => Float(-f),
                 Null => Null,
                 value => return errinput!("can't negate {value}"),
             },
-            Self::Subtract(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
-                (Integer(lhs), Integer(rhs)) => {
-                    Integer(lhs.checked_sub(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
-                }
-                (Integer(lhs), Float(rhs)) => Float(lhs as f64 - rhs),
-                (Float(lhs), Integer(rhs)) => Float(lhs - rhs as f64),
-                (Float(lhs), Float(rhs)) => Float(lhs - rhs),
-                (Null, Integer(_) | Float(_) | Null) => Null,
-                (Integer(_) | Float(_), Null) => Null,
-                (lhs, rhs) => return errinput!("can't subtract {lhs} and {rhs}"),
-            },
+            Self::Subtract(lhs, rhs) => lhs.evaluate(row)?.checked_sub(&rhs.evaluate(row)?)?,
 
             // LIKE pattern matching, using _ and % as single- and
             // multi-character wildcards. Can be escaped as __ and %%. Inputs

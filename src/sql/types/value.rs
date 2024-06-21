@@ -103,7 +103,7 @@ impl PartialOrd for Value {
 }
 
 impl Value {
-    /// Adds two values, returning a new value. Errors when invalid.
+    /// Adds two values. Errors when invalid.
     pub fn checked_add(&self, other: &Self) -> Result<Self> {
         use Value::*;
         Ok(match (self, other) {
@@ -119,7 +119,7 @@ impl Value {
         })
     }
 
-    /// Divides two values, returning a new value. Errors when invalid.
+    /// Divides two values. Errors when invalid.
     pub fn checked_div(&self, other: &Self) -> Result<Self> {
         use Value::*;
         Ok(match (self, other) {
@@ -131,6 +131,72 @@ impl Value {
             (Null, Integer(_) | Float(_) | Null) => Null,
             (Integer(_) | Float(_), Null) => Null,
             (lhs, rhs) => return errinput!("can't divide {lhs} and {rhs}"),
+        })
+    }
+
+    /// Exponentiates two values. Errors when invalid.
+    pub fn checked_pow(&self, other: &Self) -> Result<Self> {
+        use Value::*;
+        Ok(match (self, other) {
+            (Integer(lhs), Integer(rhs)) if *rhs >= 0 => {
+                let rhs: u32 = (*rhs).try_into().or(errinput!("integer overflow"))?;
+                Integer(lhs.checked_pow(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+            }
+            (Integer(lhs), Integer(rhs)) => Float((*lhs as f64).powf(*rhs as f64)),
+            (Integer(lhs), Float(rhs)) => Float((*lhs as f64).powf(*rhs)),
+            (Float(lhs), Integer(rhs)) => Float((lhs).powi(*rhs as i32)),
+            (Float(lhs), Float(rhs)) => Float((lhs).powf(*rhs)),
+            (Integer(_) | Float(_), Null) => Null,
+            (Null, Integer(_) | Float(_) | Null) => Null,
+            (lhs, rhs) => return errinput!("can't exponentiate {lhs} and {rhs}"),
+        })
+    }
+
+    /// Multiplies two values. Errors when invalid.
+    pub fn checked_mul(&self, other: &Self) -> Result<Self> {
+        use Value::*;
+        Ok(match (self, other) {
+            (Integer(lhs), Integer(rhs)) => {
+                Integer(lhs.checked_mul(*rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+            }
+            (Integer(lhs), Float(rhs)) => Float(*lhs as f64 * rhs),
+            (Float(lhs), Integer(rhs)) => Float(lhs * *rhs as f64),
+            (Float(lhs), Float(rhs)) => Float(lhs * rhs),
+            (Null, Integer(_) | Float(_) | Null) => Null,
+            (Integer(_) | Float(_), Null) => Null,
+            (lhs, rhs) => return errinput!("can't multiply {lhs} and {rhs}"),
+        })
+    }
+
+    /// Finds the remainder of two values. Errors when invalid.
+    pub fn checked_rem(&self, other: &Self) -> Result<Self> {
+        use Value::*;
+        Ok(match (self, other) {
+            // Uses remainder semantics, like Postgres.
+            (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
+            (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),
+            (Integer(lhs), Float(rhs)) => Float(*lhs as f64 % rhs),
+            (Float(lhs), Integer(rhs)) => Float(lhs % *rhs as f64),
+            (Float(lhs), Float(rhs)) => Float(lhs % rhs),
+            (Integer(_) | Float(_) | Null, Null) => Null,
+            (Null, Integer(_) | Float(_)) => Null,
+            (lhs, rhs) => return errinput!("can't take modulo of {lhs} and {rhs}"),
+        })
+    }
+
+    /// Subtracts two values. Errors when invalid.
+    pub fn checked_sub(&self, other: &Self) -> Result<Self> {
+        use Value::*;
+        Ok(match (self, other) {
+            (Integer(lhs), Integer(rhs)) => {
+                Integer(lhs.checked_sub(*rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+            }
+            (Integer(lhs), Float(rhs)) => Float(*lhs as f64 - rhs),
+            (Float(lhs), Integer(rhs)) => Float(lhs - *rhs as f64),
+            (Float(lhs), Float(rhs)) => Float(lhs - rhs),
+            (Null, Integer(_) | Float(_) | Null) => Null,
+            (Integer(_) | Float(_), Null) => Null,
+            (lhs, rhs) => return errinput!("can't subtract {lhs} and {rhs}"),
         })
     }
 
