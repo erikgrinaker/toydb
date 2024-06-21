@@ -5,7 +5,7 @@ Error: invalid input: unknown field year
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Subtract(
                     Literal(
                         Integer(

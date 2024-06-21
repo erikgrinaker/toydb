@@ -29,7 +29,7 @@ AST: Select {
             },
             type: Inner,
             predicate: Some(
-                Operation(
+                Operator(
                     Equal(
                         Field(
                             Some(
@@ -49,7 +49,7 @@ AST: Select {
         },
     ],
     where: Some(
-        Operation(
+        Operator(
             GreaterThanOrEqual(
                 Field(
                     Some(

@@ -36,7 +36,7 @@ AST: Select {
             },
             type: Right,
             predicate: Some(
-                Operation(
+                Operator(
                     Equal(
                         Field(
                             Some(

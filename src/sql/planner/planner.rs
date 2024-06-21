@@ -276,7 +276,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// Builds a FROM clause consisting of several items. Each item is either a single table or a
     /// join of an arbitrary number of tables. All of the items are joined, since e.g. 'SELECT * FROM
     /// a, b' is an implicit join of a and b.
-    fn build_from_clause(&self, scope: &mut Scope, from: Vec<ast::FromItem>) -> Result<Node> {
+    fn build_from_clause(&self, scope: &mut Scope, from: Vec<ast::From>) -> Result<Node> {
         let base_scope = scope.clone();
         let mut items = from.into_iter();
         let mut node = match items.next() {
@@ -302,15 +302,15 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// e.g. 'SELECT * FROM a LEFT JOIN b ON b.a_id = a.id'. Any tables will be stored in
     /// self.tables keyed by their query name (i.e. alias if given, otherwise name). The table can
     /// only be referenced by the query name (so if alias is given, cannot reference by name).
-    fn build_from_item(&self, scope: &mut Scope, item: ast::FromItem) -> Result<Node> {
+    fn build_from_item(&self, scope: &mut Scope, item: ast::From) -> Result<Node> {
         Ok(match item {
-            ast::FromItem::Table { name, alias } => {
+            ast::From::Table { name, alias } => {
                 let table = self.catalog.must_get_table(&name)?;
                 scope.add_table(alias.clone().unwrap_or_else(|| name.clone()), table.clone())?;
                 Node::Scan { table, alias, filter: None }
             }
 
-            ast::FromItem::Join { left, right, r#type, predicate } => {
+            ast::From::Join { left, right, r#type, predicate } => {
                 // Right outer joins are built as a left outer join with an additional projection
                 // to swap the resulting columns.
                 let (left, right) = match r#type {
@@ -556,28 +556,28 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 Field(scope.resolve(table.as_deref(), &name)?, Some((table, name)))
             }
             ast::Expression::Function(name, _) => return errinput!("unknown function {name}"),
-            ast::Expression::Operation(op) => match op {
+            ast::Expression::Operator(op) => match op {
                 // Logical operators
-                ast::Operation::And(lhs, rhs) => And(
+                ast::Operator::And(lhs, rhs) => And(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Not(expr) => Not(self.build_expression(scope, *expr)?.into()),
-                ast::Operation::Or(lhs, rhs) => Or(
+                ast::Operator::Not(expr) => Not(self.build_expression(scope, *expr)?.into()),
+                ast::Operator::Or(lhs, rhs) => Or(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
 
                 // Comparison operators
-                ast::Operation::Equal(lhs, rhs) => Equal(
+                ast::Operator::Equal(lhs, rhs) => Equal(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::GreaterThan(lhs, rhs) => GreaterThan(
+                ast::Operator::GreaterThan(lhs, rhs) => GreaterThan(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::GreaterThanOrEqual(lhs, rhs) => Or(
+                ast::Operator::GreaterThanOrEqual(lhs, rhs) => Or(
                     GreaterThan(
                         self.build_expression(scope, *lhs.clone())?.into(),
                         self.build_expression(scope, *rhs.clone())?.into(),
@@ -589,12 +589,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     )
                     .into(),
                 ),
-                ast::Operation::IsNull(expr) => IsNull(self.build_expression(scope, *expr)?.into()),
-                ast::Operation::LessThan(lhs, rhs) => LessThan(
+                ast::Operator::IsNull(expr) => IsNull(self.build_expression(scope, *expr)?.into()),
+                ast::Operator::LessThan(lhs, rhs) => LessThan(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::LessThanOrEqual(lhs, rhs) => Or(
+                ast::Operator::LessThanOrEqual(lhs, rhs) => Or(
                     LessThan(
                         self.build_expression(scope, *lhs.clone())?.into(),
                         self.build_expression(scope, *rhs.clone())?.into(),
@@ -606,45 +606,45 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     )
                     .into(),
                 ),
-                ast::Operation::Like(lhs, rhs) => Like(
+                ast::Operator::Like(lhs, rhs) => Like(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::NotEqual(lhs, rhs) => Not(Equal(
+                ast::Operator::NotEqual(lhs, rhs) => Not(Equal(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 )
                 .into()),
 
                 // Mathematical operators
-                ast::Operation::Add(lhs, rhs) => Add(
+                ast::Operator::Add(lhs, rhs) => Add(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Divide(lhs, rhs) => Divide(
+                ast::Operator::Divide(lhs, rhs) => Divide(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Exponentiate(lhs, rhs) => Exponentiate(
+                ast::Operator::Exponentiate(lhs, rhs) => Exponentiate(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Factorial(expr) => {
+                ast::Operator::Factorial(expr) => {
                     Factorial(self.build_expression(scope, *expr)?.into())
                 }
-                ast::Operation::Identity(expr) => {
+                ast::Operator::Identity(expr) => {
                     Identity(self.build_expression(scope, *expr)?.into())
                 }
-                ast::Operation::Modulo(lhs, rhs) => Modulo(
+                ast::Operator::Modulo(lhs, rhs) => Modulo(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Multiply(lhs, rhs) => Multiply(
+                ast::Operator::Multiply(lhs, rhs) => Multiply(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),
-                ast::Operation::Negate(expr) => Negate(self.build_expression(scope, *expr)?.into()),
-                ast::Operation::Subtract(lhs, rhs) => Subtract(
+                ast::Operator::Negate(expr) => Negate(self.build_expression(scope, *expr)?.into()),
+                ast::Operator::Subtract(lhs, rhs) => Subtract(
                     self.build_expression(scope, *lhs)?.into(),
                     self.build_expression(scope, *rhs)?.into(),
                 ),

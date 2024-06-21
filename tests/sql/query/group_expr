@@ -38,7 +38,7 @@ AST: Select {
     ],
     where: None,
     group_by: [
-        Operation(
+        Operator(
             Multiply(
                 Field(
                     None,

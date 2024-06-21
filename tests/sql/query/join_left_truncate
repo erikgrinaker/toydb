@@ -52,7 +52,7 @@ AST: Select {
             },
             type: Left,
             predicate: Some(
-                Operation(
+                Operator(
                     Equal(
                         Field(
                             Some(

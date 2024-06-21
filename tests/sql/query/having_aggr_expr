@@ -50,9 +50,9 @@ AST: Select {
         ),
     ],
     having: Some(
-        Operation(
+        Operator(
             LessThan(
-                Operation(
+                Operator(
                     Subtract(
                         Function(
                             "max",

@@ -79,9 +79,9 @@ AST: Select {
         },
     ],
     where: Some(
-        Operation(
+        Operator(
             Not(
-                Operation(
+                Operator(
                     IsNull(
                         Field(
                             None,

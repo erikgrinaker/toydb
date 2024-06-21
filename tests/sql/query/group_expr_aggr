@@ -23,12 +23,12 @@ AST: Select {
             None,
         ),
         (
-            Operation(
+            Operator(
                 Divide(
                     Function(
                         "sum",
                         [
-                            Operation(
+                            Operator(
                                 Multiply(
                                     Field(
                                         None,

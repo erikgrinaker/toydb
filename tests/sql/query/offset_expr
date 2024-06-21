@@ -26,7 +26,7 @@ AST: Select {
     having: None,
     order: [],
     offset: Some(
-        Operation(
+        Operator(
             Add(
                 Literal(
                     Integer(

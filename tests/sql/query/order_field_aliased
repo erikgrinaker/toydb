@@ -60,7 +60,7 @@ AST: Select {
         },
     ],
     where: Some(
-        Operation(
+        Operator(
             Equal(
                 Field(
                     Some(

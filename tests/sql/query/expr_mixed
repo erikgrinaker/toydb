@@ -19,14 +19,14 @@ Result: ["?", "age"]
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Add(
                     Literal(
                         Integer(
                             1,
                         ),
                     ),
-                    Operation(
+                    Operator(
                         Multiply(
                             Literal(
                                 Integer(
@@ -45,7 +45,7 @@ AST: Select {
             None,
         ),
         (
-            Operation(
+            Operator(
                 Subtract(
                     Literal(
                         Integer(

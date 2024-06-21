@@ -41,7 +41,7 @@ AST: Select {
             None,
         ),
         (
-            Operation(
+            Operator(
                 Modulo(
                     Field(
                         None,
@@ -70,7 +70,7 @@ AST: Select {
     having: None,
     order: [
         (
-            Operation(
+            Operator(
                 Modulo(
                     Field(
                         None,

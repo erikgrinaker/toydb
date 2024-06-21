@@ -16,7 +16,7 @@ Result: ["?", "rating"]
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Multiply(
                     Field(
                         None,
@@ -54,7 +54,7 @@ AST: Select {
     ],
     where: None,
     group_by: [
-        Operation(
+        Operator(
             Multiply(
                 Field(
                     None,

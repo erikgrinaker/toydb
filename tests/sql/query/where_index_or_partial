@@ -18,11 +18,11 @@ AST: Select {
         },
     ],
     where: Some(
-        Operation(
+        Operator(
             And(
-                Operation(
+                Operator(
                     Or(
-                        Operation(
+                        Operator(
                             Equal(
                                 Field(
                                     None,
@@ -35,7 +35,7 @@ AST: Select {
                                 ),
                             ),
                         ),
-                        Operation(
+                        Operator(
                             Equal(
                                 Field(
                                     None,
@@ -50,7 +50,7 @@ AST: Select {
                         ),
                     ),
                 ),
-                Operation(
+                Operator(
                     Equal(
                         Field(
                             None,

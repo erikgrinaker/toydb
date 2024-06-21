@@ -51,7 +51,7 @@ AST: Select {
         ),
     ],
     having: Some(
-        Operation(
+        Operator(
             GreaterThanOrEqual(
                 Field(
                     None,

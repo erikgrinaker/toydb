@@ -19,7 +19,7 @@ Result: ["multi", "rating"]
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Add(
                     Field(
                         None,

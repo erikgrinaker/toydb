@@ -16,7 +16,7 @@ Result: ["?", "rating"]
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Multiply(
                     Field(
                         None,

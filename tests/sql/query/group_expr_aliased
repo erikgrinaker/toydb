@@ -16,7 +16,7 @@ Result: ["twice", "?"]
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Multiply(
                     Field(
                         None,

@@ -5,9 +5,9 @@ Error: invalid input: unknown field studio_id
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Add(
-                    Operation(
+                    Operator(
                         Multiply(
                             Field(
                                 None,
@@ -52,7 +52,7 @@ AST: Select {
     ],
     where: None,
     group_by: [
-        Operation(
+        Operator(
             Multiply(
                 Field(
                     None,

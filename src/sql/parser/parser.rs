@@ -355,7 +355,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a from clause
-    fn parse_clause_from(&mut self) -> Result<Vec<ast::FromItem>> {
+    fn parse_clause_from(&mut self) -> Result<Vec<ast::From>> {
         let mut from = Vec::new();
         if self.next_if_token(Keyword::From.into()).is_none() {
             return Ok(from);
@@ -373,7 +373,7 @@ impl<'a> Parser<'a> {
                     }
                 };
                 let r#type = jointype;
-                item = ast::FromItem::Join { left, right, r#type, predicate };
+                item = ast::From::Join { left, right, r#type, predicate };
             }
             from.push(item);
             if self.next_if_token(Token::Comma).is_none() {
@@ -384,12 +384,12 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a from clause item
-    fn parse_clause_from_item(&mut self) -> Result<ast::FromItem> {
+    fn parse_clause_from_item(&mut self) -> Result<ast::From> {
         self.parse_clause_from_table()
     }
 
     // Parses a from clause table
-    fn parse_clause_from_table(&mut self) -> Result<ast::FromItem> {
+    fn parse_clause_from_table(&mut self) -> Result<ast::From> {
         let name = self.next_ident()?;
         let alias = if self.next_if_token(Keyword::As.into()).is_some() {
             Some(self.next_ident()?)
@@ -398,7 +398,7 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
-        Ok(ast::FromItem::Table { name, alias })
+        Ok(ast::From::Table { name, alias })
     }
 
     // Parses a from clause join type
@@ -601,9 +601,9 @@ enum PrefixOperator {
 impl PrefixOperator {
     fn build(&self, rhs: ast::Expression) -> ast::Expression {
         match self {
-            Self::Plus => ast::Operation::Identity(Box::new(rhs)).into(),
-            Self::Minus => ast::Operation::Negate(Box::new(rhs)).into(),
-            Self::Not => ast::Operation::Not(Box::new(rhs)).into(),
+            Self::Plus => ast::Operator::Identity(Box::new(rhs)).into(),
+            Self::Minus => ast::Operator::Negate(Box::new(rhs)).into(),
+            Self::Not => ast::Operator::Not(Box::new(rhs)).into(),
         }
     }
 }
@@ -653,21 +653,21 @@ impl InfixOperator {
     fn build(&self, lhs: ast::Expression, rhs: ast::Expression) -> ast::Expression {
         let (lhs, rhs) = (Box::new(lhs), Box::new(rhs));
         match self {
-            Self::Add => ast::Operation::Add(lhs, rhs),
-            Self::And => ast::Operation::And(lhs, rhs),
-            Self::Divide => ast::Operation::Divide(lhs, rhs),
-            Self::Equal => ast::Operation::Equal(lhs, rhs),
-            Self::Exponentiate => ast::Operation::Exponentiate(lhs, rhs),
-            Self::GreaterThan => ast::Operation::GreaterThan(lhs, rhs),
-            Self::GreaterThanOrEqual => ast::Operation::GreaterThanOrEqual(lhs, rhs),
-            Self::LessThan => ast::Operation::LessThan(lhs, rhs),
-            Self::LessThanOrEqual => ast::Operation::LessThanOrEqual(lhs, rhs),
-            Self::Like => ast::Operation::Like(lhs, rhs),
-            Self::Modulo => ast::Operation::Modulo(lhs, rhs),
-            Self::Multiply => ast::Operation::Multiply(lhs, rhs),
-            Self::NotEqual => ast::Operation::NotEqual(lhs, rhs),
-            Self::Or => ast::Operation::Or(lhs, rhs),
-            Self::Subtract => ast::Operation::Subtract(lhs, rhs),
+            Self::Add => ast::Operator::Add(lhs, rhs),
+            Self::And => ast::Operator::And(lhs, rhs),
+            Self::Divide => ast::Operator::Divide(lhs, rhs),
+            Self::Equal => ast::Operator::Equal(lhs, rhs),
+            Self::Exponentiate => ast::Operator::Exponentiate(lhs, rhs),
+            Self::GreaterThan => ast::Operator::GreaterThan(lhs, rhs),
+            Self::GreaterThanOrEqual => ast::Operator::GreaterThanOrEqual(lhs, rhs),
+            Self::LessThan => ast::Operator::LessThan(lhs, rhs),
+            Self::LessThanOrEqual => ast::Operator::LessThanOrEqual(lhs, rhs),
+            Self::Like => ast::Operator::Like(lhs, rhs),
+            Self::Modulo => ast::Operator::Modulo(lhs, rhs),
+            Self::Multiply => ast::Operator::Multiply(lhs, rhs),
+            Self::NotEqual => ast::Operator::NotEqual(lhs, rhs),
+            Self::Or => ast::Operator::Or(lhs, rhs),
+            Self::Subtract => ast::Operator::Subtract(lhs, rhs),
         }
         .into()
     }
@@ -733,10 +733,10 @@ impl PostfixOperator {
         let lhs = Box::new(lhs);
         match self {
             Self::IsNull { not } => match not {
-                true => ast::Operation::Not(Box::new(ast::Operation::IsNull(lhs).into())),
-                false => ast::Operation::IsNull(lhs),
+                true => ast::Operator::Not(Box::new(ast::Operator::IsNull(lhs).into())),
+                false => ast::Operator::IsNull(lhs),
             },
-            Self::Factorial => ast::Operation::Factorial(lhs),
+            Self::Factorial => ast::Operator::Factorial(lhs),
         }
         .into()
     }

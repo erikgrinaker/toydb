@@ -39,7 +39,7 @@ AST: Select {
     where: None,
     group_by: [],
     having: Some(
-        Operation(
+        Operator(
             GreaterThan(
                 Field(
                     None,

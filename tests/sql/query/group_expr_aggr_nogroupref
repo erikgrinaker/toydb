@@ -12,14 +12,14 @@ AST: Select {
             None,
         ),
         (
-            Operation(
+            Operator(
                 Add(
-                    Operation(
+                    Operator(
                         Divide(
                             Function(
                                 "sum",
                                 [
-                                    Operation(
+                                    Operator(
                                         Multiply(
                                             Field(
                                                 None,

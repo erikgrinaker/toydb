@@ -50,7 +50,7 @@ AST: Select {
         ),
     ],
     having: Some(
-        Operation(
+        Operator(
             GreaterThan(
                 Function(
                     "min",

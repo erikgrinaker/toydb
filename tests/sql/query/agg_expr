@@ -12,12 +12,12 @@ Result: ["?"]
 AST: Select {
     select: [
         (
-            Operation(
+            Operator(
                 Divide(
                     Function(
                         "sum",
                         [
-                            Operation(
+                            Operator(
                                 Multiply(
                                     Field(
                                         None,

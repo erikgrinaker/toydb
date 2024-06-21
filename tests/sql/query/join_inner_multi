@@ -71,7 +71,7 @@ AST: Select {
                 },
                 type: Inner,
                 predicate: Some(
-                    Operation(
+                    Operator(
                         Equal(
                             Field(
                                 Some(
@@ -95,7 +95,7 @@ AST: Select {
             },
             type: Inner,
             predicate: Some(
-                Operation(
+                Operator(
                     Equal(
                         Field(
                             Some(

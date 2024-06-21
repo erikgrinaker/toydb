@@ -42,9 +42,9 @@ AST: Select {
         },
     ],
     where: Some(
-        Operation(
+        Operator(
             And(
-                Operation(
+                Operator(
                     GreaterThanOrEqual(
                         Field(
                             None,
@@ -57,7 +57,7 @@ AST: Select {
                         ),
                     ),
                 ),
-                Operation(
+                Operator(
                     Equal(
                         Field(
                             None,
