@@ -77,7 +77,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let scope = &mut Scope::from_table(table.clone())?;
                 Plan::Delete {
                     table: table.name.clone(),
-                    key_index: table.primary_key,
+                    primary_key: table.primary_key,
                     source: Node::Scan {
                         table,
                         alias: None,
@@ -118,7 +118,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let scope = &mut Scope::from_table(table.clone())?;
                 Plan::Update {
                     table: table.name.clone(),
-                    key_index: table.primary_key,
+                    primary_key: table.primary_key,
                     source: Node::Scan {
                         table,
                         alias: None,
@@ -127,11 +127,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     expressions: set
                         .into_iter()
                         .map(|(c, e)| {
-                            Ok((
-                                scope.resolve(None, &c)?,
-                                Some(c),
-                                self.build_expression(scope, e)?,
-                            ))
+                            Ok((scope.resolve(None, &c)?, c, self.build_expression(scope, e)?))
                         })
                         .collect::<Result<_>>()?,
                 }
@@ -244,7 +240,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     node = Node::Offset {
                         source: Box::new(node),
                         offset: match self.evaluate_constant(expr)? {
-                            Value::Integer(i) if i >= 0 => Ok(i as u64),
+                            Value::Integer(i) if i >= 0 => Ok(i as usize),
                             v => errinput!("invalid offset {v}"),
                         }?,
                     }
@@ -255,7 +251,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     node = Node::Limit {
                         source: Box::new(node),
                         limit: match self.evaluate_constant(expr)? {
-                            Value::Integer(i) if i >= 0 => Ok(i as u64),
+                            Value::Integer(i) if i >= 0 => Ok(i as usize),
                             v => errinput!("invalid limit {v}"),
                         }?,
                     }

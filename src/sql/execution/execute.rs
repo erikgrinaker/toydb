@@ -29,9 +29,9 @@ pub fn execute_plan(
             ExecutionResult::DropTable { name: table, existed }
         }
 
-        Plan::Delete { table, key_index, source } => {
+        Plan::Delete { table, primary_key, source } => {
             let source = execute(source, txn)?;
-            let count = write::delete(txn, table, key_index, source)?;
+            let count = write::delete(txn, table, primary_key, source)?;
             ExecutionResult::Delete { count }
         }
 
@@ -43,10 +43,10 @@ pub fn execute_plan(
 
         Plan::Select(node) => ExecutionResult::Select { iter: execute(node, txn)? },
 
-        Plan::Update { table, key_index, source, expressions } => {
+        Plan::Update { table, primary_key, source, expressions } => {
             let source = execute(source, txn)?;
             let expressions = expressions.into_iter().map(|(i, _, expr)| (i, expr)).collect();
-            let count = write::update(txn, table, key_index, source, expressions)?;
+            let count = write::update(txn, table, primary_key, source, expressions)?;
             ExecutionResult::Update { count }
         }
     })

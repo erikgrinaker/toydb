@@ -10,27 +10,42 @@ use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// A statement execution plan. These are mostly made up of nested query plan
-/// Nodes, which process and stream rows, but the root nodes can also perform
-/// data modifications or schema changes.
+/// A statement execution plan. Primarily made up of a tree of query plan Nodes,
+/// which process and stream rows, but the root nodes can perform data
+/// modifications or schema changes.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Plan {
-    /// A CREATE TABLE plan.
+    /// A CREATE TABLE plan. Creates a new table with the given schema. Errors
+    /// if the table already exists or the schema is invalid.
     CreateTable { schema: Table },
-    /// A DROP TABLE plan.
+    /// A DROP TABLE plan. Drops the given table. Errors if the table does not
+    /// exist, unless if_exists is true.
     DropTable { table: String, if_exists: bool },
-    /// A DELETE plan.
-    Delete { table: String, key_index: usize, source: Node },
-    /// An INSERT plan.
+    /// A DELETE plan. Deletes rows in table that match the rows from source.
+    /// primary_key specifies the primary key column index in source rows.
+    Delete { table: String, primary_key: usize, source: Node },
+    /// An INSERT plan. Inserts rows from source (typically a Values node) into
+    /// table. If column_map is given, it maps table → source column indexes and
+    /// must have one entry for every column in source. Columns not emitted by
+    /// source will get the column's default value if any, otherwise error.
     Insert { table: Table, column_map: Option<HashMap<usize, usize>>, source: Node },
-    /// An UPDATE plan.
+    /// An UPDATE plan. Updates rows in table that match the rows from source,
+    /// where primary_key specifies the source row column index of primary keys
+    /// to update. The given column/expression pairs specify the row updates to
+    /// be made, and will be evaluated using the old row entry from source. Rows
+    /// in source must be complete, existing rows from the table to update.
+    ///
+    /// TODO: the expressions string is only used when displaying the plan, i.e.
+    /// "column = expr". Consider getting rid of it, or combining it with other
+    /// label/column handling elsewhere.
     Update {
         table: String,
-        key_index: usize,
+        primary_key: usize,
         source: Node,
-        expressions: Vec<(usize, Option<String>, Expression)>,
+        expressions: Vec<(usize, String, Expression)>,
     },
-    /// A SELECT plan.
+    /// A SELECT plan. Recursively executes the query plan tree and returns the
+    /// resulting rows.
     Select(Node),
 }
 
@@ -57,65 +72,33 @@ impl Plan {
         };
         Ok(match self {
             Self::CreateTable { .. } | Self::DropTable { .. } | Self::Insert { .. } => self,
-            Self::Delete { table, key_index, source } => {
-                Self::Delete { table, key_index, source: optimize(source)? }
+            Self::Delete { table, primary_key, source } => {
+                Self::Delete { table, primary_key, source: optimize(source)? }
             }
-            Self::Update { table, key_index, source, expressions } => {
-                Self::Update { table, key_index, source: optimize(source)?, expressions }
+            Self::Update { table, primary_key, source, expressions } => {
+                Self::Update { table, primary_key, source: optimize(source)?, expressions }
             }
             Self::Select(root) => Self::Select(optimize(root)?),
         })
     }
 }
 
-// TODO: this needs testing and cleaning up.
-impl std::fmt::Display for Plan {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CreateTable { schema } => write!(f, "CreateTable: {}", schema.name),
-            Self::DropTable { table, if_exists: _ } => write!(f, "DropTable: {table}"),
-            Self::Delete { table, key_index: _, source } => {
-                write!(
-                    f,
-                    "Delete: {table}\n{}",
-                    source.format(String::new(), false, true).trim_end()
-                )
-            }
-            Self::Insert { table, column_map: _, source: _ } => {
-                write!(f, "Insert: {}", table.name)
-            }
-            Self::Select(root) => root.fmt(f),
-            Self::Update { table, key_index: _, source, expressions } => {
-                write!(
-                    f,
-                    "Update: {table} ({})\n{}",
-                    expressions
-                        .iter()
-                        .map(|(i, l, e)| format!(
-                            "{}={}",
-                            l.clone().unwrap_or_else(|| format!("#{}", i)),
-                            e
-                        ))
-                        .collect::<Vec<_>>()
-                        .join(","),
-                    source.format(String::new(), false, true).trim_end()
-                )
-            }
-        }
-    }
-}
-
 /// A query plan node. These return row iterators and can be nested.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
-    Aggregation {
-        source: Box<Node>,
-        aggregates: Vec<Aggregate>,
-    },
-    Filter {
-        source: Box<Node>,
-        predicate: Expression,
-    },
+    /// Aggregates the input rows by computing the given aggregates for the
+    /// corresponding source columns. Additional columns in source for which
+    /// there are no aggregates are used as group by buckets.
+    ///
+    /// TODO: consider making aggregates a field/aggregate pair.
+    Aggregation { source: Box<Node>, aggregates: Vec<Aggregate> },
+    /// Filters source rows, by only emitting rows for which the predicate
+    /// evaluates to true.
+    Filter { source: Box<Node>, predicate: Expression },
+    /// Joins the left and right sources on the given fields by building an
+    /// in-memory hashmap of the right source and looking up matches for each
+    /// row in the left source. When outer is true (e.g. LEFT JOIN), a left row
+    /// without a right match is emitted anyway, with NULLs for the right row.
     HashJoin {
         left: Box<Node>,
         left_field: (usize, Option<Label>),
@@ -123,21 +106,16 @@ pub enum Node {
         right_field: (usize, Option<Label>),
         outer: bool,
     },
-    IndexLookup {
-        table: Table,
-        alias: Option<String>,
-        column: String,
-        values: Vec<Value>,
-    },
-    KeyLookup {
-        table: Table,
-        alias: Option<String>,
-        keys: Vec<Value>,
-    },
-    Limit {
-        source: Box<Node>,
-        limit: u64,
-    },
+    /// Looks up the given values in a secondary index and emits matching rows.
+    IndexLookup { table: Table, alias: Option<String>, column: String, values: Vec<Value> },
+    /// Looks up the given primary keys and emits their rows.
+    KeyLookup { table: Table, alias: Option<String>, keys: Vec<Value> },
+    /// Only emits the first limit rows from the source, discards the rest.
+    Limit { source: Box<Node>, limit: usize },
+    /// Joins the left and right sources on the given predicate by buffering the
+    /// right source and iterating over it for every row in the left source.
+    /// When outer is true (e.g. LEFT JOIN), a left row without a right match is
+    /// emitted anyway, with NULLs for the right row.
     NestedLoopJoin {
         left: Box<Node>,
         left_size: usize,
@@ -145,106 +123,85 @@ pub enum Node {
         predicate: Option<Expression>,
         outer: bool,
     },
-    // TODO: replace with Values, but requires changes to aggregate planning.
+    /// Emits a single empty row. Used for SELECT queries with no FROM clause.
+    /// TODO: replace with Values, but requires changes to aggregate planning.
     Nothing,
-    Offset {
-        source: Box<Node>,
-        offset: u64,
-    },
-    Order {
-        source: Box<Node>,
-        orders: Vec<(Expression, Direction)>,
-    },
-    Projection {
-        source: Box<Node>,
-        labels: Vec<Option<Label>>,
-        expressions: Vec<Expression>,
-    },
-    Scan {
-        table: Table,
-        alias: Option<String>,
-        filter: Option<Expression>,
-    },
-    Values {
-        labels: Vec<Option<Label>>,
-        rows: Vec<Vec<Expression>>,
-    },
+    /// Discards the first offset rows from source, emits the rest.
+    Offset { source: Box<Node>, offset: usize },
+    /// Sorts the source rows by the given expression/direction pairs. Buffers
+    /// the entire row set in memory.
+    Order { source: Box<Node>, orders: Vec<(Expression, Direction)> },
+    /// Projects the input rows by evaluating the given expressions.
+    Projection { source: Box<Node>, labels: Vec<Option<Label>>, expressions: Vec<Expression> },
+    /// A full table scan, with an optional filter pushdown.
+    Scan { table: Table, alias: Option<String>, filter: Option<Expression> },
+    /// A constant set of values.
+    Values { labels: Vec<Option<Label>>, rows: Vec<Vec<Expression>> },
 }
 
 impl Node {
-    /// Recursively transforms query nodes by applying the given closures before
-    /// and after descending.
+    /// Recursively transforms query nodes depth-first by applying the given
+    /// closures before and after descending.
     pub fn transform<B, A>(mut self, before: &B, after: &A) -> Result<Self>
     where
         B: Fn(Self) -> Result<Self>,
         A: Fn(Self) -> Result<Self>,
     {
+        // Helper for transforming boxed nodes.
+        let transform = |mut node: Box<Node>| -> Result<Box<Node>> {
+            *node = node.transform(before, after)?;
+            Ok(node)
+        };
+
         self = before(self)?;
         self = match self {
+            Self::Aggregation { source, aggregates } => {
+                Self::Aggregation { source: transform(source)?, aggregates }
+            }
+            Self::Filter { source, predicate } => {
+                Self::Filter { source: transform(source)?, predicate }
+            }
+            Self::HashJoin { left, left_field, right, right_field, outer } => Self::HashJoin {
+                left: transform(left)?,
+                left_field,
+                right: transform(right)?,
+                right_field,
+                outer,
+            },
+            Self::Limit { source, limit } => Self::Limit { source: transform(source)?, limit },
+            Self::NestedLoopJoin { left, left_size, right, predicate, outer } => {
+                Self::NestedLoopJoin {
+                    left: transform(left)?,
+                    left_size,
+                    right: transform(right)?,
+                    predicate,
+                    outer,
+                }
+            }
+            Self::Offset { source, offset } => Self::Offset { source: transform(source)?, offset },
+            Self::Order { source, orders } => Self::Order { source: transform(source)?, orders },
+            Self::Projection { source, labels, expressions } => {
+                Self::Projection { source: transform(source)?, labels, expressions }
+            }
+
             node @ (Self::IndexLookup { .. }
             | Self::KeyLookup { .. }
             | Self::Nothing
             | Self::Scan { .. }
             | Self::Values { .. }) => node,
-
-            Self::Aggregation { source, aggregates } => {
-                Self::Aggregation { source: source.transform(before, after)?.into(), aggregates }
-            }
-            Self::Filter { source, predicate } => {
-                Self::Filter { source: source.transform(before, after)?.into(), predicate }
-            }
-            Self::HashJoin { left, left_field, right, right_field, outer } => Self::HashJoin {
-                left: left.transform(before, after)?.into(),
-                left_field,
-                right: right.transform(before, after)?.into(),
-                right_field,
-                outer,
-            },
-            Self::Limit { source, limit } => {
-                Self::Limit { source: source.transform(before, after)?.into(), limit }
-            }
-            Self::NestedLoopJoin { left, left_size, right, predicate, outer } => {
-                Self::NestedLoopJoin {
-                    left: left.transform(before, after)?.into(),
-                    left_size,
-                    right: right.transform(before, after)?.into(),
-                    predicate,
-                    outer,
-                }
-            }
-            Self::Offset { source, offset } => {
-                Self::Offset { source: source.transform(before, after)?.into(), offset }
-            }
-            Self::Order { source, orders } => {
-                Self::Order { source: source.transform(before, after)?.into(), orders }
-            }
-            Self::Projection { source, labels, expressions } => Self::Projection {
-                source: source.transform(before, after)?.into(),
-                labels,
-                expressions,
-            },
         };
-        after(self)
+        self = after(self)?;
+        Ok(self)
     }
 
-    /// Recursively transforms all expressions in a node by calling the given closures
-    /// on them before and after descending.
+    /// Recursively transforms all expressions in a node by calling the given
+    /// closures on them before and after descending.
     pub fn transform_expressions<B, A>(self, before: &B, after: &A) -> Result<Self>
     where
         B: Fn(Expression) -> Result<Expression>,
         A: Fn(Expression) -> Result<Expression>,
     {
         Ok(match self {
-            node @ Self::Aggregation { .. }
-            | node @ Self::HashJoin { .. }
-            | node @ Self::IndexLookup { .. }
-            | node @ Self::KeyLookup { .. }
-            | node @ Self::Limit { .. }
-            | node @ Self::NestedLoopJoin { predicate: None, .. }
-            | node @ Self::Nothing
-            | node @ Self::Offset { .. }
-            | node @ Self::Scan { filter: None, .. } => node,
-
             Self::Filter { source, predicate } => {
                 Self::Filter { source, predicate: predicate.transform(before, after)? }
             }
@@ -282,147 +239,174 @@ impl Node {
                     .map(|row| row.into_iter().map(|e| e.transform(before, after)).collect())
                     .collect::<Result<_>>()?,
             },
+
+            node @ Self::Aggregation { .. }
+            | node @ Self::HashJoin { .. }
+            | node @ Self::IndexLookup { .. }
+            | node @ Self::KeyLookup { .. }
+            | node @ Self::Limit { .. }
+            | node @ Self::NestedLoopJoin { predicate: None, .. }
+            | node @ Self::Nothing
+            | node @ Self::Offset { .. }
+            | node @ Self::Scan { filter: None, .. } => node,
         })
     }
+}
 
-    // Displays the node, where prefix gives the node prefix.
-    pub fn format(&self, mut indent: String, root: bool, last: bool) -> String {
-        // TODO: indent should be &str or int.
-        let mut s = indent.clone();
-        if !last {
-            s += "├─ ";
-            indent += "│  "
-        } else if !root {
-            s += "└─ ";
-            indent += "   ";
-        }
+/// Formats the plan as an EXPLAIN tree.
+impl std::fmt::Display for Plan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Aggregation { source, aggregates } => {
-                s += &format!(
-                    "Aggregation: {}\n",
-                    aggregates.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ")
-                );
-                s += &source.format(indent, false, true);
+            Self::CreateTable { schema } => write!(f, "CreateTable: {}", schema.name),
+            Self::DropTable { table, .. } => write!(f, "DropTable: {table}"),
+            Self::Delete { table, source, .. } => {
+                write!(f, "Delete: {table}")?;
+                source.format(f, String::new(), false, true)
             }
-            Self::Filter { source, predicate } => {
-                s += &format!("Filter: {}\n", predicate);
-                s += &source.format(indent, false, true);
+            Self::Insert { table, source, .. } => {
+                write!(f, "Insert: {}", table.name)?;
+                source.format(f, String::new(), false, true)
             }
-            Self::HashJoin { left, left_field, right, right_field, outer } => {
-                s += &format!(
-                    "HashJoin: {} on {} = {}\n",
-                    if *outer { "outer" } else { "inner" },
-                    match left_field {
-                        (_, Some((Some(t), n))) => format!("{}.{}", t, n),
-                        (_, Some((None, n))) => n.clone(),
-                        (i, None) => format!("left #{}", i),
-                    },
-                    match right_field {
-                        (_, Some((Some(t), n))) => format!("{}.{}", t, n),
-                        (_, Some((None, n))) => n.clone(),
-                        (i, None) => format!("right #{}", i),
-                    },
-                );
-                s += &left.format(indent.clone(), false, false);
-                s += &right.format(indent, false, true);
+            Self::Update { table, source, expressions, .. } => {
+                let expressions = expressions.iter().map(|(_, l, e)| format!("{l}={e}")).join(",");
+                write!(f, "Update: {table} ({expressions})")?;
+                source.format(f, String::new(), false, true)
             }
-            Self::IndexLookup { table, column, alias, values } => {
-                s += &format!("IndexLookup: {}", table.name);
-                if let Some(alias) = alias {
-                    s += &format!(" as {}", alias);
-                }
-                s += &format!(" column {}", column);
-                if !values.is_empty() && values.len() < 10 {
-                    s += &format!(
-                        " ({})",
-                        values.iter().map(|k| k.to_string()).collect::<Vec<_>>().join(", ")
-                    );
-                } else {
-                    s += &format!(" ({} values)", values.len());
-                }
-                s += "\n";
-            }
-            Self::KeyLookup { table, alias, keys } => {
-                s += &format!("KeyLookup: {}", table.name);
-                if let Some(alias) = alias {
-                    s += &format!(" as {}", alias);
-                }
-                if !keys.is_empty() && keys.len() < 10 {
-                    s += &format!(
-                        " ({})",
-                        keys.iter().map(|k| k.to_string()).collect::<Vec<_>>().join(", ")
-                    );
-                } else {
-                    s += &format!(" ({} keys)", keys.len());
-                }
-                s += "\n";
-            }
-            Self::Limit { source, limit } => {
-                s += &format!("Limit: {}\n", limit);
-                s += &source.format(indent, false, true);
-            }
-            Self::NestedLoopJoin { left, left_size: _, right, predicate, outer } => {
-                s += &format!("NestedLoopJoin: {}", if *outer { "outer" } else { "inner" });
-                if let Some(expr) = predicate {
-                    s += &format!(" on {}", expr);
-                }
-                s += "\n";
-                s += &left.format(indent.clone(), false, false);
-                s += &right.format(indent, false, true);
-            }
-            Self::Nothing {} => {
-                s += "Nothing\n";
-            }
-            Self::Offset { source, offset } => {
-                s += &format!("Offset: {}\n", offset);
-                s += &source.format(indent, false, true);
-            }
-            Self::Order { source, orders } => {
-                s += &format!(
-                    "Order: {}\n",
-                    orders
-                        .iter()
-                        .map(|(expr, dir)| format!("{} {}", expr, dir))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-                s += &source.format(indent, false, true);
-            }
-            Self::Projection { source, labels: _, expressions } => {
-                s += &format!(
-                    "Projection: {}\n",
-                    expressions.iter().map(|expr| expr.to_string()).join(", ")
-                );
-                s += &source.format(indent, false, true);
-            }
-            Self::Scan { table, alias, filter } => {
-                s += &format!("Scan: {}", table.name);
-                if let Some(alias) = alias {
-                    s += &format!(" as {}", alias);
-                }
-                if let Some(expr) = filter {
-                    s += &format!(" ({})", expr);
-                }
-                s += "\n";
-            }
-            Self::Values { labels: _, rows } => {
-                s += &format!("Values: {} rows\n", rows.len());
-            }
-        };
-        if root {
-            s = s.trim_end().to_string()
+            Self::Select(root) => root.fmt(f),
         }
-        s
     }
 }
 
 impl std::fmt::Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format("".to_string(), true, true))
+        self.format(f, String::new(), true, true)
     }
 }
 
-/// An aggregate operation
+impl Node {
+    /// Recursively formats the node. Prefix is used for tree branches. root is
+    /// true if this is the root (first) node, and last is used if this is the
+    /// last node in this branch.
+    pub fn format(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        mut prefix: String,
+        root: bool,
+        last: bool,
+    ) -> std::fmt::Result {
+        // If this is not the root node, emit a newline after the previous node.
+        // This avoids a spurious newline at the end of the plan.
+        if !root {
+            writeln!(f)?;
+        }
+
+        // Prefix the node with a tree branch line. Modify the prefix for any
+        // child nodes we'll recurse into.
+        write!(f, "{prefix}")?;
+        if !last {
+            write!(f, "├─ ")?;
+            prefix += "│  "
+        } else if !root {
+            write!(f, "└─ ")?;
+            prefix += "   ";
+        }
+
+        // Format the node.
+        match self {
+            Self::Aggregation { source, aggregates } => {
+                write!(f, "Aggregation: {}", aggregates.iter().join(", "))?;
+                source.format(f, prefix, false, true)?;
+            }
+            Self::Filter { source, predicate } => {
+                write!(f, "Filter: {predicate}")?;
+                source.format(f, prefix, false, true)?;
+            }
+            Self::HashJoin { left, left_field, right, right_field, outer } => {
+                let kind = if *outer { "outer" } else { "inner" };
+                // TODO: make Label a proper type with formatting.
+                let left_label = match left_field {
+                    (_, Some((Some(t), n))) => format!("{t}.{n}"),
+                    (_, Some((None, n))) => n.clone(),
+                    (i, None) => format!("left #{}", i),
+                };
+                let right_label = match right_field {
+                    (_, Some((Some(t), n))) => format!("{t}.{n}"),
+                    (_, Some((None, n))) => n.clone(),
+                    (i, None) => format!("right #{}", i),
+                };
+                write!(f, "HashJoin: {kind} on {left_label} = {right_label}")?;
+                left.format(f, prefix.clone(), false, false)?;
+                right.format(f, prefix, false, true)?;
+            }
+            Self::IndexLookup { table, column, alias, values } => {
+                write!(f, "IndexLookup: {}", table.name)?;
+                if let Some(alias) = alias {
+                    write!(f, " as {}", alias)?;
+                }
+                write!(f, " column {}", column)?;
+                if !values.is_empty() && values.len() < 10 {
+                    write!(f, " ({})", values.iter().join(", "))?;
+                } else {
+                    write!(f, " ({} values)", values.len())?;
+                }
+            }
+            Self::KeyLookup { table, alias, keys } => {
+                write!(f, "KeyLookup: {}", table.name)?;
+                if let Some(alias) = alias {
+                    write!(f, " as {alias}")?;
+                }
+                if !keys.is_empty() && keys.len() < 10 {
+                    write!(f, " ({})", keys.iter().join(", "))?;
+                } else {
+                    write!(f, " ({} keys)", keys.len())?;
+                }
+            }
+            Self::Limit { source, limit } => {
+                write!(f, "Limit: {limit}")?;
+                source.format(f, prefix, false, true)?;
+            }
+            Self::NestedLoopJoin { left, right, predicate, outer, .. } => {
+                write!(f, "NestedLoopJoin: {}", if *outer { "outer" } else { "inner" })?;
+                if let Some(expr) = predicate {
+                    write!(f, " on {expr}")?;
+                }
+                left.format(f, prefix.clone(), false, false)?;
+                right.format(f, prefix, false, true)?;
+            }
+            Self::Nothing {} => {
+                write!(f, "Nothing")?;
+            }
+            Self::Offset { source, offset } => {
+                write!(f, "Offset: {offset}")?;
+                source.format(f, prefix, false, true)?;
+            }
+            Self::Order { source, orders } => {
+                let orders = orders.iter().map(|(expr, dir)| format!("{expr} {dir}")).join(", ");
+                write!(f, "Order: {orders}")?;
+                source.format(f, prefix, false, true)?;
+            }
+            Self::Projection { source, expressions, .. } => {
+                write!(f, "Projection: {}", expressions.iter().join(", "))?;
+                source.format(f, prefix, false, true)?;
+            }
+            Self::Scan { table, alias, filter } => {
+                write!(f, "Scan: {}", table.name)?;
+                if let Some(alias) = alias {
+                    write!(f, " as {alias}")?;
+                }
+                if let Some(expr) = filter {
+                    write!(f, " ({expr})")?;
+                }
+            }
+            Self::Values { rows, .. } => {
+                write!(f, "Values: {} rows", rows.len())?;
+            }
+        };
+        Ok(())
+    }
+}
+
+/// An aggregation function.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Aggregate {
     Average,

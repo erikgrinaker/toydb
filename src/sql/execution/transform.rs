@@ -22,13 +22,13 @@ pub(super) fn filter(source: QueryIterator, predicate: Expression) -> QueryItera
 }
 
 /// Limits the result to the given number of rows (i.e. LIMIT).
-pub(super) fn limit(source: QueryIterator, limit: u64) -> QueryIterator {
-    source.map_rows(|rows| rows.take(limit as usize))
+pub(super) fn limit(source: QueryIterator, limit: usize) -> QueryIterator {
+    source.map_rows(|rows| rows.take(limit))
 }
 
 /// Skips the given number of rows (i.e. OFFSET).
-pub(super) fn offset(source: QueryIterator, offset: u64) -> QueryIterator {
-    source.map_rows(|rows| rows.skip(offset as usize))
+pub(super) fn offset(source: QueryIterator, offset: usize) -> QueryIterator {
+    source.map_rows(|rows| rows.skip(offset))
 }
 
 /// Sorts the rows (i.e. ORDER BY).

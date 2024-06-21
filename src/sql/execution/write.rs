@@ -6,17 +6,17 @@ use crate::{errdata, errinput};
 
 use std::collections::HashMap;
 
-/// Deletes rows, taking primary keys from the source (i.e. DELETE).
-/// Returns the number of rows deleted.
+/// Deletes rows, taking primary keys from the source (i.e. DELETE) using the
+/// primary_key field index. Returns the number of rows deleted.
 pub(super) fn delete(
     txn: &impl Transaction,
     table: String,
-    key_index: usize,
+    primary_key: usize,
     source: QueryIterator,
 ) -> Result<u64> {
     let ids = source
         // TODO: consider moving this out to a QueryIterator helper.
-        .map(|r| r.and_then(|row| row.into_iter().nth(key_index).ok_or(errdata!("short row"))))
+        .map(|r| r.and_then(|row| row.into_iter().nth(primary_key).ok_or(errdata!("short row"))))
         .collect::<Result<Vec<_>>>()?;
     let count = ids.len() as u64;
     txn.delete(&table, &ids)?;
@@ -81,7 +81,7 @@ pub(super) fn insert(
 pub(super) fn update(
     txn: &impl Transaction,
     table: String,
-    key_index: usize,
+    primary_key: usize,
     mut source: QueryIterator,
     expressions: Vec<(usize, Expression)>,
 ) -> Result<u64> {
@@ -91,7 +91,7 @@ pub(super) fn update(
         for (field, expr) in &expressions {
             new[*field] = expr.evaluate(Some(&row))?;
         }
-        let id = row.into_iter().nth(key_index).ok_or::<Error>(errdata!("short row"))?;
+        let id = row.into_iter().nth(primary_key).ok_or::<Error>(errdata!("short row"))?;
         updates.insert(id, new);
     }
     let count = updates.len() as u64;
