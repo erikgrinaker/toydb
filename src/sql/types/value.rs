@@ -321,7 +321,7 @@ pub type Row = Vec<Value>;
 /// TODO: try to avoid boxing here.
 pub type Rows = Box<dyn Iterator<Item = Result<Row>>>;
 
-/// A column label, consisting of an option table name and a column name.
+/// A column label, consisting of an optional table name and a column name.
 ///
 /// TODO: use this more broadly.
 pub type Label = (Option<String>, String);

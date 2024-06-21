@@ -27,12 +27,9 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Nothing,
-        labels: [
-            None,
-        ],
         expressions: [
             Constant(
                 Integer(
@@ -40,15 +37,18 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Nothing,
-        labels: [
-            None,
-        ],
         expressions: [
             Constant(
                 Integer(
@@ -56,6 +56,12 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 

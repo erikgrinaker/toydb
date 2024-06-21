@@ -80,8 +80,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Scan {
             table: Table {
                 name: "movies",
@@ -160,36 +160,9 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
-        labels: [
-            None,
-            Some(
-                (
-                    None,
-                    "b",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "c",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "👋",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "some id",
-                ),
-            ),
-        ],
         expressions: [
             Constant(
                 Integer(
@@ -221,11 +194,65 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "b",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "c",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "👋",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "some id",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "b",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "c",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "👋",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "some id",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Scan {
             table: Table {
                 name: "movies",
@@ -304,36 +331,9 @@ Optimized plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
-        labels: [
-            None,
-            Some(
-                (
-                    None,
-                    "b",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "c",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "👋",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "some id",
-                ),
-            ),
-        ],
         expressions: [
             Constant(
                 Integer(
@@ -365,6 +365,60 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "b",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "c",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "👋",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "some id",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "b",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "c",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "👋",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "some id",
+            ),
+        ),
+    ],
+}
 

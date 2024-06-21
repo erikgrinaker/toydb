@@ -93,8 +93,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -176,14 +176,9 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Multiply(
                             Field(
@@ -216,16 +211,17 @@ Plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Sum,
                     Count,
                 ],
             },
-            labels: [
-                None,
-                None,
-            ],
             expressions: [
                 Field(
                     2,
@@ -260,6 +256,10 @@ Plan: Select(
                     ),
                 ),
             ],
+            labels: [
+                None,
+                None,
+            ],
         },
         orders: [
             (
@@ -278,10 +278,21 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -363,14 +374,9 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Multiply(
                             Field(
@@ -403,16 +409,17 @@ Optimized plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Sum,
                     Count,
                 ],
             },
-            labels: [
-                None,
-                None,
-            ],
             expressions: [
                 Field(
                     2,
@@ -447,6 +454,10 @@ Optimized plan: Select(
                     ),
                 ),
             ],
+            labels: [
+                None,
+                None,
+            ],
         },
         orders: [
             (
@@ -465,5 +476,16 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        None,
+    ],
+}
 

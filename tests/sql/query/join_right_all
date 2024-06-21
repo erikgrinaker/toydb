@@ -63,8 +63,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: NestedLoopJoin {
             left: Scan {
                 table: Table {
@@ -144,10 +144,10 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "m",
                 ),
-                filter: None,
             },
             left_size: 7,
             right: Scan {
@@ -175,10 +175,10 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "g",
                 ),
-                filter: None,
             },
             predicate: Some(
                 Equal(
@@ -208,17 +208,6 @@ Plan: Select(
             ),
             outer: true,
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 7,
@@ -320,11 +309,96 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "ultrahd",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: HashJoin {
             left: Scan {
                 table: Table {
@@ -404,10 +478,10 @@ Optimized plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "m",
                 ),
-                filter: None,
             },
             left_field: (
                 0,
@@ -445,10 +519,10 @@ Optimized plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "g",
                 ),
-                filter: None,
             },
             right_field: (
                 0,
@@ -463,17 +537,6 @@ Optimized plan: Select(
             ),
             outer: true,
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 7,
@@ -575,6 +638,91 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "ultrahd",
+            ),
+        ),
+    ],
+}
 

@@ -3,7 +3,7 @@ Query: SELECT studio_id * 2, MAX(rating) AS rating FROM movies GROUP BY studio_i
 Explain:
 Order: rating asc
 └─ Projection: studio_id * 2, #0
-   └─ Aggregation: maximum
+   └─ Aggregation: max
       └─ Projection: rating, studio_id
          └─ Scan: movies
 
@@ -73,8 +73,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -156,13 +156,9 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -183,20 +179,15 @@ Plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
-            labels: [
-                None,
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
-                ),
-            ],
             expressions: [
                 Multiply(
                     Field(
@@ -219,6 +210,15 @@ Plan: Select(
                     None,
                 ),
             ],
+            labels: [
+                None,
+                Some(
+                    (
+                        None,
+                        "rating",
+                    ),
+                ),
+            ],
         },
         orders: [
             (
@@ -235,10 +235,19 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "rating",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -320,13 +329,9 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -347,20 +352,15 @@ Optimized plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
-            labels: [
-                None,
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
-                ),
-            ],
             expressions: [
                 Multiply(
                     Field(
@@ -383,6 +383,15 @@ Optimized plan: Select(
                     None,
                 ),
             ],
+            labels: [
+                None,
+                Some(
+                    (
+                        None,
+                        "rating",
+                    ),
+                ),
+            ],
         },
         orders: [
             (
@@ -399,5 +408,14 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "rating",
+            ),
+        ),
+    ],
+}
 

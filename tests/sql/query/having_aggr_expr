@@ -5,7 +5,7 @@ Projection: #0, #1
 └─ Order: movies.studio_id asc
    └─ Filter: #2 - #3 < 1
       └─ Projection: movies.studio_id, #0, #1, #2
-         └─ Aggregation: maximum, maximum, minimum
+         └─ Aggregation: max, max, min
             └─ Projection: rating, rating, rating, studio_id
                └─ Scan: movies
 
@@ -95,8 +95,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Order {
             source: Filter {
                 source: Projection {
@@ -180,15 +180,9 @@ Plan: Select(
                                         },
                                     ],
                                 },
-                                alias: None,
                                 filter: None,
+                                alias: None,
                             },
-                            labels: [
-                                None,
-                                None,
-                                None,
-                                None,
-                            ],
                             expressions: [
                                 Field(
                                     5,
@@ -227,6 +221,12 @@ Plan: Select(
                                     ),
                                 ),
                             ],
+                            labels: [
+                                None,
+                                None,
+                                None,
+                                None,
+                            ],
                         },
                         aggregates: [
                             Max,
@@ -234,12 +234,6 @@ Plan: Select(
                             Min,
                         ],
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             3,
@@ -264,6 +258,12 @@ Plan: Select(
                             2,
                             None,
                         ),
+                    ],
+                    labels: [
+                        None,
+                        None,
+                        None,
+                        None,
                     ],
                 },
                 predicate: LessThan(
@@ -301,10 +301,6 @@ Plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -315,11 +311,26 @@ Plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Order {
             source: Filter {
                 source: Projection {
@@ -403,15 +414,9 @@ Optimized plan: Select(
                                         },
                                     ],
                                 },
-                                alias: None,
                                 filter: None,
+                                alias: None,
                             },
-                            labels: [
-                                None,
-                                None,
-                                None,
-                                None,
-                            ],
                             expressions: [
                                 Field(
                                     5,
@@ -450,6 +455,12 @@ Optimized plan: Select(
                                     ),
                                 ),
                             ],
+                            labels: [
+                                None,
+                                None,
+                                None,
+                                None,
+                            ],
                         },
                         aggregates: [
                             Max,
@@ -457,12 +468,6 @@ Optimized plan: Select(
                             Min,
                         ],
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             3,
@@ -487,6 +492,12 @@ Optimized plan: Select(
                             2,
                             None,
                         ),
+                    ],
+                    labels: [
+                        None,
+                        None,
+                        None,
+                        None,
                     ],
                 },
                 predicate: LessThan(
@@ -524,10 +535,6 @@ Optimized plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -538,6 +545,21 @@ Optimized plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        None,
+    ],
+}
 

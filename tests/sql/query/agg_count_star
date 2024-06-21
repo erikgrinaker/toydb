@@ -39,8 +39,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -121,12 +121,9 @@ Plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
-                labels: [
-                    None,
-                ],
                 expressions: [
                     Constant(
                         Boolean(
@@ -134,25 +131,31 @@ Plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                ],
             },
             aggregates: [
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Field(
                 0,
                 None,
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -233,12 +236,9 @@ Optimized plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
-                labels: [
-                    None,
-                ],
                 expressions: [
                     Constant(
                         Boolean(
@@ -246,20 +246,26 @@ Optimized plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                ],
             },
             aggregates: [
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Field(
                 0,
                 None,
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 

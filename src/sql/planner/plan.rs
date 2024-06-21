@@ -45,8 +45,8 @@ pub enum Plan {
         expressions: Vec<(usize, String, Expression)>,
     },
     /// A SELECT plan. Recursively executes the query plan tree and returns the
-    /// resulting rows.
-    Select(Node),
+    /// resulting rows. Also includes the output column labels.
+    Select { root: Node, labels: Vec<Option<Label>> },
 }
 
 impl Plan {
@@ -78,7 +78,7 @@ impl Plan {
             Self::Update { table, primary_key, source, expressions } => {
                 Self::Update { table, primary_key, source: optimize(source)?, expressions }
             }
-            Self::Select(root) => Self::Select(optimize(root)?),
+            Self::Select { root, labels } => Self::Select { root: optimize(root)?, labels },
         })
     }
 }
@@ -132,11 +132,14 @@ pub enum Node {
     /// the entire row set in memory.
     Order { source: Box<Node>, orders: Vec<(Expression, Direction)> },
     /// Projects the input rows by evaluating the given expressions.
-    Projection { source: Box<Node>, labels: Vec<Option<Label>>, expressions: Vec<Expression> },
-    /// A full table scan, with an optional filter pushdown.
-    Scan { table: Table, alias: Option<String>, filter: Option<Expression> },
+    /// The labels are only used when displaying the plan.
+    Projection { source: Box<Node>, expressions: Vec<Expression>, labels: Vec<Option<Label>> },
+    /// A full table scan, with an optional filter pushdown. The alias is only
+    /// used when displaying the plan.
+    Scan { table: Table, filter: Option<Expression>, alias: Option<String> },
     /// A constant set of values.
-    Values { labels: Vec<Option<Label>>, rows: Vec<Vec<Expression>> },
+    /// TODO: get rid of the labels.
+    Values { rows: Vec<Vec<Expression>>, labels: Vec<Option<Label>> },
 }
 
 impl Node {
@@ -272,7 +275,7 @@ impl std::fmt::Display for Plan {
                 write!(f, "Update: {table} ({expressions})")?;
                 source.format(f, String::new(), false, true)
             }
-            Self::Select(root) => root.fmt(f),
+            Self::Select { root, .. } => root.fmt(f),
         }
     }
 }
@@ -419,11 +422,24 @@ pub enum Aggregate {
 impl std::fmt::Display for Aggregate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Average => write!(f, "average"),
+            Self::Average => write!(f, "avg"),
             Self::Count => write!(f, "count"),
-            Self::Max => write!(f, "maximum"),
-            Self::Min => write!(f, "minimum"),
+            Self::Max => write!(f, "max"),
+            Self::Min => write!(f, "min"),
             Self::Sum => write!(f, "sum"),
+        }
+    }
+}
+
+impl Aggregate {
+    pub(super) fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "avg" => Some(Aggregate::Average),
+            "count" => Some(Aggregate::Count),
+            "max" => Some(Aggregate::Max),
+            "min" => Some(Aggregate::Min),
+            "sum" => Some(Aggregate::Sum),
+            _ => None,
         }
     }
 }

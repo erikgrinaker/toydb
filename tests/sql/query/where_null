@@ -25,8 +25,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Filter {
+Plan: Select {
+    root: Filter {
         source: Scan {
             table: Table {
                 name: "movies",
@@ -105,17 +105,75 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         predicate: Constant(
             Null,
         ),
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "ultrahd",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Scan {
+Optimized plan: Select {
+    root: Scan {
         table: Table {
             name: "movies",
             primary_key: 0,
@@ -193,12 +251,70 @@ Optimized plan: Select(
                 },
             ],
         },
-        alias: None,
         filter: Some(
             Constant(
                 Null,
             ),
         ),
+        alias: None,
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "ultrahd",
+            ),
+        ),
+    ],
+}
 

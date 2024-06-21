@@ -39,9 +39,21 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Nothing,
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+        ],
         labels: [
             Some(
                 (
@@ -56,24 +68,38 @@ Plan: Select(
                 ),
             ),
         ],
-        expressions: [
-            Constant(
-                Integer(
-                    1,
-                ),
-            ),
-            Constant(
-                Integer(
-                    2,
-                ),
-            ),
-        ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "a",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "a",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Nothing,
+        expressions: [
+            Constant(
+                Integer(
+                    1,
+                ),
+            ),
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+        ],
         labels: [
             Some(
                 (
@@ -88,18 +114,20 @@ Optimized plan: Select(
                 ),
             ),
         ],
-        expressions: [
-            Constant(
-                Integer(
-                    1,
-                ),
-            ),
-            Constant(
-                Integer(
-                    2,
-                ),
-            ),
-        ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "a",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "a",
+            ),
+        ),
+    ],
+}
 

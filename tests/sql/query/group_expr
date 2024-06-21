@@ -3,7 +3,7 @@ Query: SELECT MAX(rating) AS rating FROM movies GROUP BY studio_id * 2 ORDER BY 
 Explain:
 Order: rating asc
 └─ Projection: #0
-   └─ Aggregation: maximum
+   └─ Aggregation: max
       └─ Projection: rating, studio_id * 2
          └─ Scan: movies
 
@@ -66,8 +66,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -149,13 +149,9 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -183,23 +179,27 @@ Plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
+            expressions: [
+                Field(
+                    0,
+                    None,
+                ),
+            ],
             labels: [
                 Some(
                     (
                         None,
                         "rating",
                     ),
-                ),
-            ],
-            expressions: [
-                Field(
-                    0,
-                    None,
                 ),
             ],
         },
@@ -218,10 +218,18 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "rating",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -303,13 +311,9 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -337,23 +341,27 @@ Optimized plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
+            expressions: [
+                Field(
+                    0,
+                    None,
+                ),
+            ],
             labels: [
                 Some(
                     (
                         None,
                         "rating",
                     ),
-                ),
-            ],
-            expressions: [
-                Field(
-                    0,
-                    None,
                 ),
             ],
         },
@@ -372,5 +380,13 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "rating",
+            ),
+        ),
+    ],
+}
 

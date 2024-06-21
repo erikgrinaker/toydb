@@ -3,7 +3,7 @@ Query: SELECT studio_id * 2 AS twice, MAX(rating) FROM movies GROUP BY twice ORD
 Explain:
 Order: twice asc
 └─ Projection: twice, #0
-   └─ Aggregation: maximum
+   └─ Aggregation: max
       └─ Projection: rating, studio_id * 2
          └─ Scan: movies
 
@@ -73,8 +73,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -156,18 +156,9 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        Some(
-                            (
-                                None,
-                                "twice",
-                            ),
-                        ),
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -195,20 +186,20 @@ Plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        Some(
+                            (
+                                None,
+                                "twice",
+                            ),
+                        ),
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    (
-                        None,
-                        "twice",
-                    ),
-                ),
-                None,
-            ],
             expressions: [
                 Field(
                     1,
@@ -223,6 +214,15 @@ Plan: Select(
                     0,
                     None,
                 ),
+            ],
+            labels: [
+                Some(
+                    (
+                        None,
+                        "twice",
+                    ),
+                ),
+                None,
             ],
         },
         orders: [
@@ -240,10 +240,19 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "twice",
+            ),
+        ),
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -325,18 +334,9 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        Some(
-                            (
-                                None,
-                                "twice",
-                            ),
-                        ),
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -364,20 +364,20 @@ Optimized plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        Some(
+                            (
+                                None,
+                                "twice",
+                            ),
+                        ),
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    (
-                        None,
-                        "twice",
-                    ),
-                ),
-                None,
-            ],
             expressions: [
                 Field(
                     1,
@@ -392,6 +392,15 @@ Optimized plan: Select(
                     0,
                     None,
                 ),
+            ],
+            labels: [
+                Some(
+                    (
+                        None,
+                        "twice",
+                    ),
+                ),
+                None,
             ],
         },
         orders: [
@@ -409,5 +418,14 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "twice",
+            ),
+        ),
+        None,
+    ],
+}
 

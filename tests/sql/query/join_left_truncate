@@ -79,8 +79,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: NestedLoopJoin {
             left: Scan {
                 table: Table {
@@ -107,10 +107,10 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "g",
                 ),
-                filter: None,
             },
             left_size: 2,
             right: Scan {
@@ -191,10 +191,10 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "m",
                 ),
-                filter: None,
             },
             predicate: Some(
                 Equal(
@@ -224,20 +224,6 @@ Plan: Select(
             ),
             outer: true,
         },
-        labels: [
-            Some(
-                (
-                    None,
-                    "genre_id",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "movie_id",
-                ),
-            ),
-        ],
         expressions: [
             Field(
                 0,
@@ -262,11 +248,39 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            Some(
+                (
+                    None,
+                    "genre_id",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "movie_id",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "movie_id",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: HashJoin {
             left: Scan {
                 table: Table {
@@ -293,10 +307,10 @@ Optimized plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "g",
                 ),
-                filter: None,
             },
             left_field: (
                 0,
@@ -387,10 +401,10 @@ Optimized plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "m",
                 ),
-                filter: None,
             },
             right_field: (
                 0,
@@ -405,20 +419,6 @@ Optimized plan: Select(
             ),
             outer: true,
         },
-        labels: [
-            Some(
-                (
-                    None,
-                    "genre_id",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "movie_id",
-                ),
-            ),
-        ],
         expressions: [
             Field(
                 0,
@@ -443,6 +443,34 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            Some(
+                (
+                    None,
+                    "genre_id",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "movie_id",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "movie_id",
+            ),
+        ),
+    ],
+}
 

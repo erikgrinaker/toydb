@@ -1,6 +1,6 @@
 Query: SELECT movies.unknown FROM movies
 
-Error: invalid input: Unknown field movies.unknown
+Error: invalid input: unknown field movies.unknown
 
 AST: Select {
     select: [
@@ -28,4 +28,4 @@ AST: Select {
     limit: None,
 }
 
-Plan: InvalidInput("Unknown field movies.unknown")
+Plan: InvalidInput("unknown field movies.unknown")

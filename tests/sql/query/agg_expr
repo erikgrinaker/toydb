@@ -61,8 +61,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -143,13 +143,9 @@ Plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
                     Multiply(
                         Field(
@@ -173,15 +169,16 @@ Plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                ],
             },
             aggregates: [
                 Sum,
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Divide(
                 Field(
@@ -194,11 +191,17 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -279,13 +282,9 @@ Optimized plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
                     Multiply(
                         Field(
@@ -309,15 +308,16 @@ Optimized plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                ],
             },
             aggregates: [
                 Sum,
                 Count,
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Divide(
                 Field(
@@ -330,6 +330,12 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 

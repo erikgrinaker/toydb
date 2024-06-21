@@ -37,8 +37,8 @@ AST: Select {
     ),
 }
 
-Plan: Select(
-    Limit {
+Plan: Select {
+    root: Limit {
         source: Offset {
             source: Scan {
                 table: Table {
@@ -118,17 +118,75 @@ Plan: Select(
                         },
                     ],
                 },
-                alias: None,
                 filter: None,
+                alias: None,
             },
             offset: 1,
         },
         limit: 2,
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "ultrahd",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Limit {
+Optimized plan: Select {
+    root: Limit {
         source: Offset {
             source: Scan {
                 table: Table {
@@ -208,12 +266,70 @@ Optimized plan: Select(
                         },
                     ],
                 },
-                alias: None,
                 filter: None,
+                alias: None,
             },
             offset: 1,
         },
         limit: 2,
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "ultrahd",
+            ),
+        ),
+    ],
+}
 

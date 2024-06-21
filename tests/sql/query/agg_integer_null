@@ -2,7 +2,7 @@ Query: SELECT MIN(i), MAX(i), SUM(i), COUNT(i), AVG(i) FROM integers
 
 Explain:
 Projection: #0, #1, #2, #3, #4
-└─ Aggregation: minimum, maximum, sum, count, average
+└─ Aggregation: min, max, sum, count, avg
    └─ Projection: i, i, i, i, i
       └─ Scan: integers
 
@@ -86,8 +86,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -117,16 +117,9 @@ Plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         1,
@@ -174,6 +167,13 @@ Plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
             },
             aggregates: [
                 Min,
@@ -183,13 +183,6 @@ Plan: Select(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -212,11 +205,25 @@ Plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+        None,
+        None,
+        None,
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -246,16 +253,9 @@ Optimized plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         1,
@@ -303,6 +303,13 @@ Optimized plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
             },
             aggregates: [
                 Min,
@@ -312,13 +319,6 @@ Optimized plan: Select(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -341,6 +341,20 @@ Optimized plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+        None,
+        None,
+        None,
+        None,
+    ],
+}
 

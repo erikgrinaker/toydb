@@ -87,8 +87,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Projection {
             source: NestedLoopJoin {
                 left: Scan {
@@ -169,10 +169,10 @@ Plan: Select(
                             },
                         ],
                     },
+                    filter: None,
                     alias: Some(
                         "m",
                     ),
-                    filter: None,
                 },
                 left_size: 7,
                 right: Scan {
@@ -200,10 +200,10 @@ Plan: Select(
                             },
                         ],
                     },
+                    filter: None,
                     alias: Some(
                         "g",
                     ),
-                    filter: None,
                 },
                 predicate: Some(
                     Equal(
@@ -233,17 +233,6 @@ Plan: Select(
                 ),
                 outer: true,
             },
-            labels: [
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            ],
             expressions: [
                 Field(
                     7,
@@ -345,21 +334,18 @@ Plan: Select(
                     ),
                 ),
             ],
+            labels: [
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
         },
-        labels: [
-            Some(
-                (
-                    None,
-                    "genre_id",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "movie_id",
-                ),
-            ),
-        ],
         expressions: [
             Field(
                 0,
@@ -384,11 +370,39 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            Some(
+                (
+                    None,
+                    "genre_id",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "movie_id",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "movie_id",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Projection {
             source: HashJoin {
                 left: Scan {
@@ -469,10 +483,10 @@ Optimized plan: Select(
                             },
                         ],
                     },
+                    filter: None,
                     alias: Some(
                         "m",
                     ),
-                    filter: None,
                 },
                 left_field: (
                     0,
@@ -510,10 +524,10 @@ Optimized plan: Select(
                             },
                         ],
                     },
+                    filter: None,
                     alias: Some(
                         "g",
                     ),
-                    filter: None,
                 },
                 right_field: (
                     0,
@@ -528,17 +542,6 @@ Optimized plan: Select(
                 ),
                 outer: true,
             },
-            labels: [
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            ],
             expressions: [
                 Field(
                     7,
@@ -640,21 +643,18 @@ Optimized plan: Select(
                     ),
                 ),
             ],
+            labels: [
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
         },
-        labels: [
-            Some(
-                (
-                    None,
-                    "genre_id",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "movie_id",
-                ),
-            ),
-        ],
         expressions: [
             Field(
                 0,
@@ -679,6 +679,34 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            Some(
+                (
+                    None,
+                    "genre_id",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "movie_id",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "movie_id",
+            ),
+        ),
+    ],
+}
 

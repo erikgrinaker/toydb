@@ -37,8 +37,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    NestedLoopJoin {
+Plan: Select {
+    root: NestedLoopJoin {
         left: Scan {
             table: Table {
                 name: "movies",
@@ -117,8 +117,8 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         left_size: 7,
         right: Scan {
@@ -146,8 +146,8 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         predicate: Some(
             Constant(
@@ -158,10 +158,84 @@ Plan: Select(
         ),
         outer: false,
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "ultrahd",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    NestedLoopJoin {
+Optimized plan: Select {
+    root: NestedLoopJoin {
         left: Scan {
             table: Table {
                 name: "movies",
@@ -240,7 +314,6 @@ Optimized plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: Some(
                 Constant(
                     Boolean(
@@ -248,6 +321,7 @@ Optimized plan: Select(
                     ),
                 ),
             ),
+            alias: None,
         },
         left_size: 7,
         right: Scan {
@@ -275,11 +349,85 @@ Optimized plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         predicate: None,
         outer: false,
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "ultrahd",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 

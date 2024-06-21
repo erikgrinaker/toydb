@@ -77,8 +77,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Scan {
             table: Table {
                 name: "movies",
@@ -157,18 +157,9 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
-        labels: [
-            None,
-            Some(
-                (
-                    None,
-                    "age",
-                ),
-            ),
-        ],
         expressions: [
             Add(
                 Constant(
@@ -206,11 +197,29 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "age",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "age",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Scan {
             table: Table {
                 name: "movies",
@@ -289,18 +298,9 @@ Optimized plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
-        labels: [
-            None,
-            Some(
-                (
-                    None,
-                    "age",
-                ),
-            ),
-        ],
         expressions: [
             Constant(
                 Integer(
@@ -324,6 +324,24 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "age",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "age",
+            ),
+        ),
+    ],
+}
 

@@ -2,7 +2,7 @@ Query: SELECT MIN(b), MAX(b), SUM(b), COUNT(b), AVG(b) FROM booleans WHERE b IS 
 
 Explain:
 Projection: #0, #1, #2, #3, #4
-└─ Aggregation: minimum, maximum, sum, count, average
+└─ Aggregation: min, max, sum, count, avg
    └─ Projection: b, b, b, b, b
       └─ Scan: booleans (NOT b IS NULL)
 
@@ -98,8 +98,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Filter {
@@ -130,8 +130,8 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
                     predicate: Not(
                         IsNull(
@@ -147,13 +147,6 @@ Plan: Select(
                         ),
                     ),
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         1,
@@ -201,6 +194,13 @@ Plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
             },
             aggregates: [
                 Min,
@@ -210,13 +210,6 @@ Plan: Select(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -239,11 +232,25 @@ Plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+        None,
+        None,
+        None,
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Aggregation {
             source: Projection {
                 source: Scan {
@@ -273,7 +280,6 @@ Optimized plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: Some(
                         Not(
                             IsNull(
@@ -289,14 +295,8 @@ Optimized plan: Select(
                             ),
                         ),
                     ),
+                    alias: None,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         1,
@@ -344,6 +344,13 @@ Optimized plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
             },
             aggregates: [
                 Min,
@@ -353,13 +360,6 @@ Optimized plan: Select(
                 Average,
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -382,6 +382,20 @@ Optimized plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+        None,
+        None,
+        None,
+        None,
+    ],
+}
 

@@ -42,8 +42,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Scan {
             table: Table {
                 name: "movies",
@@ -122,12 +122,9 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -141,11 +138,24 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Scan {
             table: Table {
                 name: "movies",
@@ -224,12 +234,9 @@ Optimized plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -243,6 +250,19 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+    ],
+}
 

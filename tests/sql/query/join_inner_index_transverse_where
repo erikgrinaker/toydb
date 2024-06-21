@@ -68,8 +68,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Filter {
+Plan: Select {
+    root: Filter {
         source: NestedLoopJoin {
             left: Scan {
                 table: Table {
@@ -149,10 +149,10 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "m",
                 ),
-                filter: None,
             },
             left_size: 7,
             right: Scan {
@@ -180,10 +180,10 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "g",
                 ),
-                filter: None,
             },
             predicate: Some(
                 Equal(
@@ -232,10 +232,84 @@ Plan: Select(
             ),
         ),
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "ultrahd",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    HashJoin {
+Optimized plan: Select {
+    root: HashJoin {
         left: IndexLookup {
             table: Table {
                 name: "movies",
@@ -382,5 +456,79 @@ Optimized plan: Select(
         ),
         outer: false,
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "studio_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "genre_id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "released",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "ultrahd",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 

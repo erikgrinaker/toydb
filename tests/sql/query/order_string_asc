@@ -38,8 +38,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Scan {
             table: Table {
                 name: "strings",
@@ -67,8 +67,8 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         orders: [
             (
@@ -85,10 +85,28 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "strings",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "strings",
+                ),
+                "value",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Scan {
             table: Table {
                 name: "strings",
@@ -116,8 +134,8 @@ Optimized plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         orders: [
             (
@@ -134,5 +152,23 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "strings",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "strings",
+                ),
+                "value",
+            ),
+        ),
+    ],
+}
 

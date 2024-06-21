@@ -81,8 +81,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: NestedLoopJoin {
             left: Scan {
                 table: Table {
@@ -162,10 +162,10 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "m",
                 ),
-                filter: None,
             },
             left_size: 7,
             right: Scan {
@@ -193,18 +193,14 @@ Plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "g",
                 ),
-                filter: None,
             },
             predicate: None,
             outer: false,
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -229,11 +225,33 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: NestedLoopJoin {
             left: Scan {
                 table: Table {
@@ -313,10 +331,10 @@ Optimized plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "m",
                 ),
-                filter: None,
             },
             left_size: 7,
             right: Scan {
@@ -344,18 +362,14 @@ Optimized plan: Select(
                         },
                     ],
                 },
+                filter: None,
                 alias: Some(
                     "g",
                 ),
-                filter: None,
             },
             predicate: None,
             outer: false,
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -380,6 +394,28 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+    ],
+}
 

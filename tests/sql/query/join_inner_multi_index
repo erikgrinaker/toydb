@@ -172,8 +172,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: NestedLoopJoin {
                 left: NestedLoopJoin {
@@ -255,10 +255,10 @@ Plan: Select(
                                 },
                             ],
                         },
+                        filter: None,
                         alias: Some(
                             "m",
                         ),
-                        filter: None,
                     },
                     left_size: 7,
                     right: Scan {
@@ -286,10 +286,10 @@ Plan: Select(
                                 },
                             ],
                         },
+                        filter: None,
                         alias: Some(
                             "g",
                         ),
-                        filter: None,
                     },
                     predicate: Some(
                         And(
@@ -378,10 +378,10 @@ Plan: Select(
                             },
                         ],
                     },
+                    filter: None,
                     alias: Some(
                         "s",
                     ),
-                    filter: None,
                 },
                 predicate: Some(
                     And(
@@ -431,21 +431,6 @@ Plan: Select(
                 ),
                 outer: false,
             },
-            labels: [
-                None,
-                Some(
-                    (
-                        None,
-                        "genre",
-                    ),
-                ),
-                Some(
-                    (
-                        None,
-                        "studio",
-                    ),
-                ),
-            ],
             expressions: [
                 Field(
                     1,
@@ -481,6 +466,21 @@ Plan: Select(
                     ),
                 ),
             ],
+            labels: [
+                None,
+                Some(
+                    (
+                        None,
+                        "genre",
+                    ),
+                ),
+                Some(
+                    (
+                        None,
+                        "studio",
+                    ),
+                ),
+            ],
         },
         orders: [
             (
@@ -499,10 +499,32 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "genre",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "studio",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: HashJoin {
                 left: HashJoin {
@@ -743,21 +765,6 @@ Optimized plan: Select(
                 ),
                 outer: false,
             },
-            labels: [
-                None,
-                Some(
-                    (
-                        None,
-                        "genre",
-                    ),
-                ),
-                Some(
-                    (
-                        None,
-                        "studio",
-                    ),
-                ),
-            ],
             expressions: [
                 Field(
                     1,
@@ -793,6 +800,21 @@ Optimized plan: Select(
                     ),
                 ),
             ],
+            labels: [
+                None,
+                Some(
+                    (
+                        None,
+                        "genre",
+                    ),
+                ),
+                Some(
+                    (
+                        None,
+                        "studio",
+                    ),
+                ),
+            ],
         },
         orders: [
             (
@@ -811,5 +833,27 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "genre",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "studio",
+            ),
+        ),
+    ],
+}
 

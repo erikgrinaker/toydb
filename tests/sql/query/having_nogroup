@@ -66,8 +66,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Order {
             source: Filter {
                 source: Projection {
@@ -149,14 +149,9 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             0,
@@ -185,6 +180,11 @@ Plan: Select(
                                 ),
                             ),
                         ),
+                    ],
+                    labels: [
+                        None,
+                        None,
+                        None,
                     ],
                 },
                 predicate: GreaterThan(
@@ -223,10 +223,6 @@ Plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -237,11 +233,33 @@ Plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Order {
             source: Filter {
                 source: Projection {
@@ -323,14 +341,9 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             0,
@@ -359,6 +372,11 @@ Optimized plan: Select(
                                 ),
                             ),
                         ),
+                    ],
+                    labels: [
+                        None,
+                        None,
+                        None,
                     ],
                 },
                 predicate: GreaterThan(
@@ -397,10 +415,6 @@ Optimized plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -411,6 +425,28 @@ Optimized plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "rating",
+            ),
+        ),
+    ],
+}
 

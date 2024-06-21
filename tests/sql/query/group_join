@@ -100,8 +100,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -184,10 +184,10 @@ Plan: Select(
                                     },
                                 ],
                             },
+                            filter: None,
                             alias: Some(
                                 "m",
                             ),
-                            filter: None,
                         },
                         left_size: 7,
                         right: Scan {
@@ -228,10 +228,10 @@ Plan: Select(
                                     },
                                 ],
                             },
+                            filter: None,
                             alias: Some(
                                 "s",
                             ),
-                            filter: None,
                         },
                         predicate: Some(
                             Equal(
@@ -261,10 +261,6 @@ Plan: Select(
                         ),
                         outer: false,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Constant(
                             Boolean(
@@ -283,15 +279,15 @@ Plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Count,
                 ],
             },
-            labels: [
-                None,
-                None,
-            ],
             expressions: [
                 Field(
                     1,
@@ -308,6 +304,10 @@ Plan: Select(
                     0,
                     None,
                 ),
+            ],
+            labels: [
+                None,
+                None,
             ],
         },
         orders: [
@@ -327,10 +327,21 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "s",
+                ),
+                "name",
+            ),
+        ),
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -413,10 +424,10 @@ Optimized plan: Select(
                                     },
                                 ],
                             },
+                            filter: None,
                             alias: Some(
                                 "m",
                             ),
-                            filter: None,
                         },
                         left_field: (
                             2,
@@ -467,10 +478,10 @@ Optimized plan: Select(
                                     },
                                 ],
                             },
+                            filter: None,
                             alias: Some(
                                 "s",
                             ),
-                            filter: None,
                         },
                         right_field: (
                             0,
@@ -485,10 +496,6 @@ Optimized plan: Select(
                         ),
                         outer: false,
                     },
-                    labels: [
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Constant(
                             Boolean(
@@ -507,15 +514,15 @@ Optimized plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Count,
                 ],
             },
-            labels: [
-                None,
-                None,
-            ],
             expressions: [
                 Field(
                     1,
@@ -532,6 +539,10 @@ Optimized plan: Select(
                     0,
                     None,
                 ),
+            ],
+            labels: [
+                None,
+                None,
             ],
         },
         orders: [
@@ -551,5 +562,16 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "s",
+                ),
+                "name",
+            ),
+        ),
+        None,
+    ],
+}
 

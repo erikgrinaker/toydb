@@ -100,8 +100,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Order {
             source: Projection {
                 source: Filter {
@@ -184,8 +184,8 @@ Plan: Select(
                                     },
                                 ],
                             },
-                            alias: None,
                             filter: None,
+                            alias: None,
                         },
                         left_size: 7,
                         right: Scan {
@@ -213,8 +213,8 @@ Plan: Select(
                                     },
                                 ],
                             },
-                            alias: None,
                             filter: None,
+                            alias: None,
                         },
                         predicate: None,
                         outer: false,
@@ -244,13 +244,6 @@ Plan: Select(
                         ),
                     ),
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         0,
@@ -304,6 +297,13 @@ Plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
             },
             orders: [
                 (
@@ -336,11 +336,6 @@ Plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -355,11 +350,42 @@ Plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Order {
             source: Projection {
                 source: HashJoin {
@@ -441,8 +467,8 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
                     left_field: (
                         3,
@@ -480,8 +506,8 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
                     right_field: (
                         0,
@@ -496,13 +522,6 @@ Optimized plan: Select(
                     ),
                     outer: false,
                 },
-                labels: [
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         0,
@@ -556,6 +575,13 @@ Optimized plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
             },
             orders: [
                 (
@@ -588,11 +614,6 @@ Optimized plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -607,6 +628,37 @@ Optimized plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 

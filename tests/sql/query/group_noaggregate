@@ -56,8 +56,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -139,12 +139,9 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                    ],
                     expressions: [
                         Field(
                             1,
@@ -156,12 +153,12 @@ Plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                    ],
                 },
                 aggregates: [],
             },
-            labels: [
-                None,
-            ],
             expressions: [
                 Field(
                     0,
@@ -174,6 +171,9 @@ Plan: Select(
                         ),
                     ),
                 ),
+            ],
+            labels: [
+                None,
             ],
         },
         orders: [
@@ -193,10 +193,20 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -278,12 +288,9 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                    ],
                     expressions: [
                         Field(
                             1,
@@ -295,12 +302,12 @@ Optimized plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                    ],
                 },
                 aggregates: [],
             },
-            labels: [
-                None,
-            ],
             expressions: [
                 Field(
                     0,
@@ -313,6 +320,9 @@ Optimized plan: Select(
                         ),
                     ),
                 ),
+            ],
+            labels: [
+                None,
             ],
         },
         orders: [
@@ -332,5 +342,15 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+    ],
+}
 

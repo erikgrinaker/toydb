@@ -41,7 +41,10 @@ pub fn execute_plan(
             ExecutionResult::Insert { count }
         }
 
-        Plan::Select(node) => ExecutionResult::Select { iter: execute(node, txn)? },
+        Plan::Select { root, labels } => {
+            let iter = execute(root, txn)?;
+            ExecutionResult::Select { iter, labels }
+        }
 
         Plan::Update { table, primary_key, source, expressions } => {
             let source = execute(source, txn)?;
@@ -120,12 +123,12 @@ pub enum ExecutionResult {
     Delete { count: u64 },
     Insert { count: u64 },
     Update { count: u64 },
-    Select { iter: QueryIterator },
+    Select { iter: QueryIterator, labels: Vec<Option<Label>> },
 }
 
 /// A query result iterator, containing the columns and row iterator.
 ///
-/// TODO: if we resolve labels during planning, we can replace this with a
+/// TODO: now that we resolve labels during planning, we can replace this with a
 /// simple Rows iterator. We can probably also make that generic instead of a
 /// trait object, since we know the type when calling each executor.
 pub struct QueryIterator {

@@ -122,8 +122,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: NestedLoopJoin {
             left: NestedLoopJoin {
                 left: Scan {
@@ -204,8 +204,8 @@ Plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
                 left_size: 7,
                 right: Scan {
@@ -233,8 +233,8 @@ Plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
                 predicate: Some(
                     Equal(
@@ -303,8 +303,8 @@ Plan: Select(
                         },
                     ],
                 },
-                alias: None,
                 filter: None,
+                alias: None,
             },
             predicate: Some(
                 Equal(
@@ -334,21 +334,6 @@ Plan: Select(
             ),
             outer: false,
         },
-        labels: [
-            None,
-            Some(
-                (
-                    None,
-                    "genre",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "studio",
-                ),
-            ),
-        ],
         expressions: [
             Field(
                 1,
@@ -384,11 +369,48 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "genre",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "studio",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "genre",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "studio",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: HashJoin {
             left: HashJoin {
                 left: Scan {
@@ -469,8 +491,8 @@ Optimized plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
                 left_field: (
                     3,
@@ -508,8 +530,8 @@ Optimized plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
                 right_field: (
                     0,
@@ -573,8 +595,8 @@ Optimized plan: Select(
                         },
                     ],
                 },
-                alias: None,
                 filter: None,
+                alias: None,
             },
             right_field: (
                 0,
@@ -589,21 +611,6 @@ Optimized plan: Select(
             ),
             outer: false,
         },
-        labels: [
-            None,
-            Some(
-                (
-                    None,
-                    "genre",
-                ),
-            ),
-            Some(
-                (
-                    None,
-                    "studio",
-                ),
-            ),
-        ],
         expressions: [
             Field(
                 1,
@@ -639,6 +646,43 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "genre",
+                ),
+            ),
+            Some(
+                (
+                    None,
+                    "studio",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "genre",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "studio",
+            ),
+        ),
+    ],
+}
 

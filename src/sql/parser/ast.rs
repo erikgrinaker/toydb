@@ -76,6 +76,17 @@ pub enum JoinType {
     Right,
 }
 
+impl JoinType {
+    // If true, the join is an outer join -- rows with no join match are emitted
+    // with a NULL match.
+    pub fn is_outer(&self) -> bool {
+        match self {
+            Self::Left | Self::Right => true,
+            Self::Cross | Self::Inner => false,
+        }
+    }
+}
+
 /// Sort orders.
 #[derive(Debug)]
 pub enum Order {
@@ -144,6 +155,8 @@ pub enum Operator {
 impl Expression {
     /// Transforms the expression tree depth-first by applying a closure before
     /// and after descending.
+    ///
+    /// TODO: make closures non-mut.
     pub fn transform<B, A>(mut self, before: &mut B, after: &mut A) -> Result<Self>
     where
         B: FnMut(Self) -> Result<Self>,

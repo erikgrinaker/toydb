@@ -177,8 +177,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Filter {
             source: NestedLoopJoin {
                 left: NestedLoopJoin {
@@ -260,10 +260,10 @@ Plan: Select(
                                 },
                             ],
                         },
+                        filter: None,
                         alias: Some(
                             "m",
                         ),
-                        filter: None,
                     },
                     left_size: 7,
                     right: Scan {
@@ -291,10 +291,10 @@ Plan: Select(
                                 },
                             ],
                         },
+                        filter: None,
                         alias: Some(
                             "g",
                         ),
-                        filter: None,
                     },
                     predicate: None,
                     outer: false,
@@ -325,10 +325,10 @@ Plan: Select(
                             },
                         ],
                     },
+                    filter: None,
                     alias: Some(
                         "c",
                     ),
-                    filter: None,
                 },
                 predicate: None,
                 outer: false,
@@ -414,14 +414,6 @@ Plan: Select(
                 ),
             ),
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -490,11 +482,69 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "c",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "c",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: NestedLoopJoin {
             left: NestedLoopJoin {
                 left: Scan {
@@ -575,9 +625,6 @@ Optimized plan: Select(
                             },
                         ],
                     },
-                    alias: Some(
-                        "m",
-                    ),
                     filter: Some(
                         Or(
                             GreaterThan(
@@ -617,6 +664,9 @@ Optimized plan: Select(
                                 ),
                             ),
                         ),
+                    ),
+                    alias: Some(
+                        "m",
                     ),
                 },
                 left_size: 7,
@@ -683,9 +733,6 @@ Optimized plan: Select(
                         },
                     ],
                 },
-                alias: Some(
-                    "c",
-                ),
                 filter: Some(
                     Not(
                         Equal(
@@ -708,18 +755,13 @@ Optimized plan: Select(
                         ),
                     ),
                 ),
+                alias: Some(
+                    "c",
+                ),
             },
             predicate: None,
             outer: false,
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -788,6 +830,64 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "g",
+                ),
+                "name",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "c",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "c",
+                ),
+                "name",
+            ),
+        ),
+    ],
+}
 

@@ -35,8 +35,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Scan {
             table: Table {
                 name: "floats",
@@ -64,8 +64,8 @@ Plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         orders: [
             (
@@ -82,10 +82,28 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "floats",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "floats",
+                ),
+                "value",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Scan {
             table: Table {
                 name: "floats",
@@ -113,8 +131,8 @@ Optimized plan: Select(
                     },
                 ],
             },
-            alias: None,
             filter: None,
+            alias: None,
         },
         orders: [
             (
@@ -131,5 +149,23 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "floats",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "floats",
+                ),
+                "value",
+            ),
+        ),
+    ],
+}
 

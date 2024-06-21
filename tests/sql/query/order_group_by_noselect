@@ -4,7 +4,7 @@ Explain:
 Projection: #0
 └─ Order: movies.studio_id asc
    └─ Projection: #0, movies.studio_id
-      └─ Aggregation: maximum
+      └─ Aggregation: max
          └─ Projection: rating, studio_id
             └─ Scan: movies
 
@@ -56,8 +56,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Order {
             source: Projection {
                 source: Aggregation {
@@ -140,13 +140,9 @@ Plan: Select(
                                     },
                                 ],
                             },
-                            alias: None,
                             filter: None,
+                            alias: None,
                         },
-                        labels: [
-                            None,
-                            None,
-                        ],
                         expressions: [
                             Field(
                                 5,
@@ -167,15 +163,15 @@ Plan: Select(
                                 ),
                             ),
                         ],
+                        labels: [
+                            None,
+                            None,
+                        ],
                     },
                     aggregates: [
                         Max,
                     ],
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         0,
@@ -192,6 +188,10 @@ Plan: Select(
                             ),
                         ),
                     ),
+                ],
+                labels: [
+                    None,
+                    None,
                 ],
             },
             orders: [
@@ -211,20 +211,23 @@ Plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Field(
                 0,
                 None,
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Order {
             source: Projection {
                 source: Aggregation {
@@ -307,13 +310,9 @@ Optimized plan: Select(
                                     },
                                 ],
                             },
-                            alias: None,
                             filter: None,
+                            alias: None,
                         },
-                        labels: [
-                            None,
-                            None,
-                        ],
                         expressions: [
                             Field(
                                 5,
@@ -334,15 +333,15 @@ Optimized plan: Select(
                                 ),
                             ),
                         ],
+                        labels: [
+                            None,
+                            None,
+                        ],
                     },
                     aggregates: [
                         Max,
                     ],
                 },
-                labels: [
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         0,
@@ -359,6 +358,10 @@ Optimized plan: Select(
                             ),
                         ),
                     ),
+                ],
+                labels: [
+                    None,
+                    None,
                 ],
             },
             orders: [
@@ -378,15 +381,18 @@ Optimized plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-        ],
         expressions: [
             Field(
                 0,
                 None,
             ),
         ],
+        labels: [
+            None,
+        ],
     },
-)
+    labels: [
+        None,
+    ],
+}
 

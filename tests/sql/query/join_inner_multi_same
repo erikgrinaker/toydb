@@ -226,8 +226,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Order {
             source: Projection {
                 source: Filter {
@@ -311,10 +311,10 @@ Plan: Select(
                                         },
                                     ],
                                 },
+                                filter: None,
                                 alias: Some(
                                     "m",
                                 ),
-                                filter: None,
                             },
                             left_size: 7,
                             right: Scan {
@@ -342,10 +342,10 @@ Plan: Select(
                                         },
                                     ],
                                 },
+                                filter: None,
                                 alias: Some(
                                     "g",
                                 ),
-                                filter: None,
                             },
                             predicate: Some(
                                 Equal(
@@ -415,10 +415,10 @@ Plan: Select(
                                         },
                                     ],
                                 },
+                                filter: None,
                                 alias: Some(
                                     "s",
                                 ),
-                                filter: None,
                             },
                             left_size: 3,
                             right: Scan {
@@ -499,10 +499,10 @@ Plan: Select(
                                         },
                                     ],
                                 },
+                                filter: None,
                                 alias: Some(
                                     "good",
                                 ),
-                                filter: None,
                             },
                             predicate: Some(
                                 And(
@@ -600,24 +600,6 @@ Plan: Select(
                         ),
                     ),
                 },
-                labels: [
-                    None,
-                    None,
-                    Some(
-                        (
-                            None,
-                            "genre",
-                        ),
-                    ),
-                    Some(
-                        (
-                            None,
-                            "studio",
-                        ),
-                    ),
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         0,
@@ -686,6 +668,24 @@ Plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    Some(
+                        (
+                            None,
+                            "genre",
+                        ),
+                    ),
+                    Some(
+                        (
+                            None,
+                            "studio",
+                        ),
+                    ),
+                    None,
+                    None,
+                ],
             },
             orders: [
                 (
@@ -732,13 +732,6 @@ Plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -761,11 +754,56 @@ Plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "genre",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "studio",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: Order {
             source: Projection {
                 source: HashJoin {
@@ -848,10 +886,10 @@ Optimized plan: Select(
                                     },
                                 ],
                             },
+                            filter: None,
                             alias: Some(
                                 "m",
                             ),
-                            filter: None,
                         },
                         left_field: (
                             3,
@@ -889,10 +927,10 @@ Optimized plan: Select(
                                     },
                                 ],
                             },
+                            filter: None,
                             alias: Some(
                                 "g",
                             ),
-                            filter: None,
                         },
                         right_field: (
                             0,
@@ -957,10 +995,10 @@ Optimized plan: Select(
                                     },
                                 ],
                             },
+                            filter: None,
                             alias: Some(
                                 "s",
                             ),
-                            filter: None,
                         },
                         left_field: (
                             0,
@@ -1051,9 +1089,6 @@ Optimized plan: Select(
                                     },
                                 ],
                             },
-                            alias: Some(
-                                "good",
-                            ),
                             filter: Some(
                                 Or(
                                     GreaterThan(
@@ -1094,6 +1129,9 @@ Optimized plan: Select(
                                     ),
                                 ),
                             ),
+                            alias: Some(
+                                "good",
+                            ),
                         },
                         right_field: (
                             2,
@@ -1121,24 +1159,6 @@ Optimized plan: Select(
                     ),
                     outer: false,
                 },
-                labels: [
-                    None,
-                    None,
-                    Some(
-                        (
-                            None,
-                            "genre",
-                        ),
-                    ),
-                    Some(
-                        (
-                            None,
-                            "studio",
-                        ),
-                    ),
-                    None,
-                    None,
-                ],
                 expressions: [
                     Field(
                         0,
@@ -1207,6 +1227,24 @@ Optimized plan: Select(
                         ),
                     ),
                 ],
+                labels: [
+                    None,
+                    None,
+                    Some(
+                        (
+                            None,
+                            "genre",
+                        ),
+                    ),
+                    Some(
+                        (
+                            None,
+                            "studio",
+                        ),
+                    ),
+                    None,
+                    None,
+                ],
             },
             orders: [
                 (
@@ -1253,13 +1291,6 @@ Optimized plan: Select(
                 ),
             ],
         },
-        labels: [
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -1282,6 +1313,51 @@ Optimized plan: Select(
                 None,
             ),
         ],
+        labels: [
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "title",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "genre",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "studio",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "m",
+                ),
+                "rating",
+            ),
+        ),
+    ],
+}
 

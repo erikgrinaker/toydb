@@ -3,7 +3,7 @@ Query: SELECT studio_id + genre_id AS multi, MAX(rating) AS rating FROM movies G
 Explain:
 Order: rating asc, multi asc
 └─ Projection: studio_id + genre_id, #0
-   └─ Aggregation: maximum
+   └─ Aggregation: max
       └─ Projection: rating, studio_id, genre_id
          └─ Scan: movies
 
@@ -88,8 +88,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Order {
+Plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -171,14 +171,9 @@ Plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -208,25 +203,16 @@ Plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    (
-                        None,
-                        "multi",
-                    ),
-                ),
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
-                ),
-            ],
             expressions: [
                 Add(
                     Field(
@@ -251,6 +237,20 @@ Plan: Select(
                 Field(
                     0,
                     None,
+                ),
+            ],
+            labels: [
+                Some(
+                    (
+                        None,
+                        "multi",
+                    ),
+                ),
+                Some(
+                    (
+                        None,
+                        "rating",
+                    ),
                 ),
             ],
         },
@@ -281,10 +281,24 @@ Plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "multi",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "rating",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Order {
+Optimized plan: Select {
+    root: Order {
         source: Projection {
             source: Aggregation {
                 source: Projection {
@@ -366,14 +380,9 @@ Optimized plan: Select(
                                 },
                             ],
                         },
-                        alias: None,
                         filter: None,
+                        alias: None,
                     },
-                    labels: [
-                        None,
-                        None,
-                        None,
-                    ],
                     expressions: [
                         Field(
                             5,
@@ -403,25 +412,16 @@ Optimized plan: Select(
                             ),
                         ),
                     ],
+                    labels: [
+                        None,
+                        None,
+                        None,
+                    ],
                 },
                 aggregates: [
                     Max,
                 ],
             },
-            labels: [
-                Some(
-                    (
-                        None,
-                        "multi",
-                    ),
-                ),
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
-                ),
-            ],
             expressions: [
                 Add(
                     Field(
@@ -446,6 +446,20 @@ Optimized plan: Select(
                 Field(
                     0,
                     None,
+                ),
+            ],
+            labels: [
+                Some(
+                    (
+                        None,
+                        "multi",
+                    ),
+                ),
+                Some(
+                    (
+                        None,
+                        "rating",
+                    ),
                 ),
             ],
         },
@@ -476,5 +490,19 @@ Optimized plan: Select(
             ),
         ],
     },
-)
+    labels: [
+        Some(
+            (
+                None,
+                "multi",
+            ),
+        ),
+        Some(
+            (
+                None,
+                "rating",
+            ),
+        ),
+    ],
+}
 

@@ -64,18 +64,9 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Nothing,
-        labels: [
-            None,
-            Some(
-                (
-                    None,
-                    "nope",
-                ),
-            ),
-        ],
         expressions: [
             Add(
                 Constant(
@@ -109,12 +100,6 @@ Plan: Select(
                 ),
             ),
         ],
-    },
-)
-
-Optimized plan: Select(
-    Projection {
-        source: Nothing,
         labels: [
             None,
             Some(
@@ -124,6 +109,21 @@ Optimized plan: Select(
                 ),
             ),
         ],
+    },
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "nope",
+            ),
+        ),
+    ],
+}
+
+Optimized plan: Select {
+    root: Projection {
+        source: Nothing,
         expressions: [
             Constant(
                 Integer(
@@ -136,6 +136,24 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            Some(
+                (
+                    None,
+                    "nope",
+                ),
+            ),
+        ],
     },
-)
+    labels: [
+        None,
+        Some(
+            (
+                None,
+                "nope",
+            ),
+        ),
+    ],
+}
 

@@ -90,8 +90,8 @@ AST: Select {
     limit: None,
 }
 
-Plan: Select(
-    Projection {
+Plan: Select {
+    root: Projection {
         source: Filter {
             source: NestedLoopJoin {
                 left: Scan {
@@ -172,8 +172,8 @@ Plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
                 left_size: 7,
                 right: Scan {
@@ -201,8 +201,8 @@ Plan: Select(
                             },
                         ],
                     },
-                    alias: None,
                     filter: None,
+                    alias: None,
                 },
                 predicate: None,
                 outer: false,
@@ -266,10 +266,6 @@ Plan: Select(
                 ),
             ),
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -294,11 +290,33 @@ Plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "id",
+            ),
+        ),
+    ],
+}
 
-Optimized plan: Select(
-    Projection {
+Optimized plan: Select {
+    root: Projection {
         source: NestedLoopJoin {
             left: Scan {
                 table: Table {
@@ -378,7 +396,6 @@ Optimized plan: Select(
                         },
                     ],
                 },
-                alias: None,
                 filter: Some(
                     Or(
                         GreaterThan(
@@ -419,6 +436,7 @@ Optimized plan: Select(
                         ),
                     ),
                 ),
+                alias: None,
             },
             left_size: 7,
             right: KeyLookup {
@@ -456,10 +474,6 @@ Optimized plan: Select(
             predicate: None,
             outer: false,
         },
-        labels: [
-            None,
-            None,
-        ],
         expressions: [
             Field(
                 0,
@@ -484,6 +498,28 @@ Optimized plan: Select(
                 ),
             ),
         ],
+        labels: [
+            None,
+            None,
+        ],
     },
-)
+    labels: [
+        Some(
+            (
+                Some(
+                    "movies",
+                ),
+                "id",
+            ),
+        ),
+        Some(
+            (
+                Some(
+                    "genres",
+                ),
+                "id",
+            ),
+        ),
+    ],
+}
 
