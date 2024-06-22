@@ -233,6 +233,7 @@ Plan: Select {
                                 "s",
                             ),
                         },
+                        right_size: 3,
                         predicate: Some(
                             Equal(
                                 Field(
@@ -287,6 +288,7 @@ Plan: Select {
                 aggregates: [
                     Count,
                 ],
+                group_by: 1,
             },
             expressions: [
                 Field(
@@ -429,15 +431,13 @@ Optimized plan: Select {
                                 "m",
                             ),
                         },
-                        left_field: (
-                            2,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "studio_id",
+                        left_field: 2,
+                        left_label: Some(
+                            (
+                                Some(
+                                    "m",
                                 ),
+                                "studio_id",
                             ),
                         ),
                         right: Scan {
@@ -483,17 +483,16 @@ Optimized plan: Select {
                                 "s",
                             ),
                         },
-                        right_field: (
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "id",
+                        right_field: 0,
+                        right_label: Some(
+                            (
+                                Some(
+                                    "s",
                                 ),
+                                "id",
                             ),
                         ),
+                        right_size: 3,
                         outer: false,
                     },
                     expressions: [
@@ -522,6 +521,7 @@ Optimized plan: Select {
                 aggregates: [
                     Count,
                 ],
+                group_by: 1,
             },
             expressions: [
                 Field(

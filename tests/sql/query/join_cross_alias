@@ -296,6 +296,7 @@ Plan: Select {
                             "g",
                         ),
                     },
+                    right_size: 2,
                     predicate: None,
                     outer: false,
                 },
@@ -330,6 +331,7 @@ Plan: Select {
                         "c",
                     ),
                 },
+                right_size: 2,
                 predicate: None,
                 outer: false,
             },
@@ -671,39 +673,17 @@ Optimized plan: Select {
                 },
                 left_size: 7,
                 right: KeyLookup {
-                    table: Table {
-                        name: "genres",
-                        primary_key: 0,
-                        columns: [
-                            Column {
-                                name: "id",
-                                datatype: Integer,
-                                nullable: false,
-                                default: None,
-                                unique: true,
-                                index: false,
-                                references: None,
-                            },
-                            Column {
-                                name: "name",
-                                datatype: String,
-                                nullable: false,
-                                default: None,
-                                unique: false,
-                                index: false,
-                                references: None,
-                            },
-                        ],
-                    },
-                    alias: Some(
-                        "g",
-                    ),
+                    table: "genres",
                     keys: [
                         Integer(
                             2,
                         ),
                     ],
+                    alias: Some(
+                        "g",
+                    ),
                 },
+                right_size: 2,
                 predicate: None,
                 outer: false,
             },
@@ -759,6 +739,7 @@ Optimized plan: Select {
                     "c",
                 ),
             },
+            right_size: 2,
             predicate: None,
             outer: false,
         },

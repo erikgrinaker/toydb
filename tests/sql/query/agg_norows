@@ -246,6 +246,7 @@ Plan: Select {
                 Count,
                 Average,
             ],
+            group_by: 0,
         },
         expressions: [
             Field(
@@ -439,6 +440,7 @@ Optimized plan: Select {
                 Count,
                 Average,
             ],
+            group_by: 0,
         },
         expressions: [
             Field(

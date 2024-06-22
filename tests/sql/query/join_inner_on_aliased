@@ -178,6 +178,7 @@ Plan: Select {
                 "g",
             ),
         },
+        right_size: 2,
         predicate: Some(
             Equal(
                 Field(
@@ -367,15 +368,13 @@ Optimized plan: Select {
                 "m",
             ),
         },
-        left_field: (
-            3,
-            Some(
-                (
-                    Some(
-                        "m",
-                    ),
-                    "genre_id",
+        left_field: 3,
+        left_label: Some(
+            (
+                Some(
+                    "m",
                 ),
+                "genre_id",
             ),
         ),
         right: Scan {
@@ -408,17 +407,16 @@ Optimized plan: Select {
                 "g",
             ),
         },
-        right_field: (
-            0,
-            Some(
-                (
-                    Some(
-                        "g",
-                    ),
-                    "id",
+        right_field: 0,
+        right_label: Some(
+            (
+                Some(
+                    "g",
                 ),
+                "id",
             ),
         ),
+        right_size: 2,
         outer: false,
     },
     labels: [

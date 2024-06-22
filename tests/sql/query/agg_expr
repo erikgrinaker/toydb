@@ -178,6 +178,7 @@ Plan: Select {
                 Sum,
                 Count,
             ],
+            group_by: 0,
         },
         expressions: [
             Divide(
@@ -317,6 +318,7 @@ Optimized plan: Select {
                 Sum,
                 Count,
             ],
+            group_by: 0,
         },
         expressions: [
             Divide(

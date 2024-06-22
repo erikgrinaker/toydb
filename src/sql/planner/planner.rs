@@ -104,7 +104,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 }
             }
         }
-        let labels = vec![None; values.len()];
         let scope = Scope::new();
         let rows = values
             .into_iter()
@@ -112,7 +111,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 exprs.into_iter().map(|expr| Self::build_expression(expr, &scope)).collect()
             })
             .collect::<Result<_>>()?;
-        Ok(Plan::Insert { table, column_map, source: Node::Values { labels, rows } })
+        Ok(Plan::Insert { table, column_map, source: Node::Values { rows } })
     }
 
     /// Builds an UPDATE plan.
@@ -297,6 +296,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 left: Box::new(node),
                 left_size: scope.len(),
                 right: Box::new(right),
+                right_size: right_scope.len(),
                 predicate: None,
                 outer: false,
             };
@@ -328,11 +328,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let left = Box::new(self.build_from(*left, scope)?);
                 let left_size = scope.len();
                 let right = Box::new(self.build_from(*right, scope)?);
+                let right_size = scope.len() - left_size;
 
                 //  Build the join node.
                 let predicate = predicate.map(|e| Self::build_expression(e, scope)).transpose()?;
                 let outer = r#type.is_outer();
-                let mut node = Node::NestedLoopJoin { left, left_size, right, predicate, outer };
+                let mut node =
+                    Node::NestedLoopJoin { left, left_size, right, right_size, predicate, outer };
 
                 // For right joins, build a projection to swap the columns.
                 if matches!(r#type, ast::JoinType::Right) {
@@ -392,6 +394,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         )?;
         let node = Node::Aggregation {
             source: Box::new(Node::Projection { source: Box::new(source), labels, expressions }),
+            group_by: scope.len() - aggregates.len(),
             aggregates,
         };
         Ok(node)
@@ -700,8 +703,7 @@ impl Scope {
     }
 
     /// Fetches a column label by index, if any.
-    /// TODO: this can possibly be removed if execution doesn't have to pass
-    /// columns through QueryIterator.
+    /// TODO: this can possibly be removed.
     fn get_column_label(&self, index: usize) -> Result<Option<Label>> {
         if self.columns.is_empty() {
             return errinput!("expression must be constant, found column index {index}");

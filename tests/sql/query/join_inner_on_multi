@@ -182,6 +182,7 @@ Plan: Select {
             filter: None,
             alias: None,
         },
+        right_size: 2,
         predicate: Some(
             And(
                 Equal(
@@ -424,6 +425,7 @@ Optimized plan: Select {
             filter: None,
             alias: None,
         },
+        right_size: 2,
         predicate: Some(
             And(
                 Equal(

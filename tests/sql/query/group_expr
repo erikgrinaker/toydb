@@ -187,6 +187,7 @@ Plan: Select {
                 aggregates: [
                     Max,
                 ],
+                group_by: 1,
             },
             expressions: [
                 Field(
@@ -349,6 +350,7 @@ Optimized plan: Select {
                 aggregates: [
                     Max,
                 ],
+                group_by: 1,
             },
             expressions: [
                 Field(

@@ -209,6 +209,7 @@ Plan: Select {
                             Max,
                             Min,
                         ],
+                        group_by: 1,
                     },
                     expressions: [
                         Field(
@@ -421,6 +422,7 @@ Optimized plan: Select {
                             Max,
                             Min,
                         ],
+                        group_by: 1,
                     },
                     expressions: [
                         Field(

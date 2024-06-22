@@ -158,7 +158,10 @@ fn execute() -> Result<()> {
     assert_eq!(
         result,
         StatementResult::Select {
-            columns: vec![Some((None, "id".into())), Some((None, "name".into()))],
+            columns: vec![
+                Some((Some("genres".into()), "id".into())),
+                Some((Some("genres".into()), "name".into()))
+            ],
             rows: vec![
                 vec![Value::Integer(1), Value::String("Science Fiction".into())],
                 vec![Value::Integer(2), Value::String("Action".into())],
@@ -171,7 +174,10 @@ fn execute() -> Result<()> {
     assert_eq!(
         result,
         StatementResult::Select {
-            columns: vec![Some((None, "id".into())), Some((None, "name".into()))],
+            columns: vec![
+                Some((Some("genres".into()), "id".into())),
+                Some((Some("genres".into()), "name".into()))
+            ],
             rows: vec![],
         }
     );

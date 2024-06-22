@@ -88,10 +88,11 @@ impl Plan {
 pub enum Node {
     /// Aggregates the input rows by computing the given aggregates for the
     /// corresponding source columns. Additional columns in source for which
-    /// there are no aggregates are used as group by buckets.
+    /// there are no aggregates are used as group by buckets, the number of
+    /// such group by columns is given in group_by.
     ///
     /// TODO: consider making aggregates a field/aggregate pair.
-    Aggregation { source: Box<Node>, aggregates: Vec<Aggregate> },
+    Aggregation { source: Box<Node>, aggregates: Vec<Aggregate>, group_by: usize },
     /// Filters source rows, by only emitting rows for which the predicate
     /// evaluates to true.
     Filter { source: Box<Node>, predicate: Expression },
@@ -99,27 +100,33 @@ pub enum Node {
     /// in-memory hashmap of the right source and looking up matches for each
     /// row in the left source. When outer is true (e.g. LEFT JOIN), a left row
     /// without a right match is emitted anyway, with NULLs for the right row.
+    /// TODO: do we need the labels?
     HashJoin {
         left: Box<Node>,
-        left_field: (usize, Option<Label>),
+        left_field: usize,
+        left_label: Option<Label>,
         right: Box<Node>,
-        right_field: (usize, Option<Label>),
+        right_field: usize,
+        right_label: Option<Label>,
+        right_size: usize,
         outer: bool,
     },
     /// Looks up the given values in a secondary index and emits matching rows.
-    IndexLookup { table: Table, alias: Option<String>, column: String, values: Vec<Value> },
+    IndexLookup { table: String, column: String, values: Vec<Value>, alias: Option<String> },
     /// Looks up the given primary keys and emits their rows.
-    KeyLookup { table: Table, alias: Option<String>, keys: Vec<Value> },
+    KeyLookup { table: String, keys: Vec<Value>, alias: Option<String> },
     /// Only emits the first limit rows from the source, discards the rest.
     Limit { source: Box<Node>, limit: usize },
     /// Joins the left and right sources on the given predicate by buffering the
     /// right source and iterating over it for every row in the left source.
     /// When outer is true (e.g. LEFT JOIN), a left row without a right match is
     /// emitted anyway, with NULLs for the right row.
+    /// TODO: do we need left_size?
     NestedLoopJoin {
         left: Box<Node>,
         left_size: usize,
         right: Box<Node>,
+        right_size: usize,
         predicate: Option<Expression>,
         outer: bool,
     },
@@ -134,12 +141,11 @@ pub enum Node {
     /// Projects the input rows by evaluating the given expressions.
     /// The labels are only used when displaying the plan.
     Projection { source: Box<Node>, expressions: Vec<Expression>, labels: Vec<Option<Label>> },
-    /// A full table scan, with an optional filter pushdown. The alias is only
-    /// used when displaying the plan.
+    /// A full table scan, with an optional filter pushdown. The schema is used
+    /// during plan optimization. The alias is only used for formatting.
     Scan { table: Table, filter: Option<Expression>, alias: Option<String> },
     /// A constant set of values.
-    /// TODO: get rid of the labels.
-    Values { rows: Vec<Vec<Expression>>, labels: Vec<Option<Label>> },
+    Values { rows: Vec<Vec<Expression>> },
 }
 
 impl Node {
@@ -158,25 +164,38 @@ impl Node {
 
         self = before(self)?;
         self = match self {
-            Self::Aggregation { source, aggregates } => {
-                Self::Aggregation { source: transform(source)?, aggregates }
+            Self::Aggregation { source, aggregates, group_by } => {
+                Self::Aggregation { source: transform(source)?, aggregates, group_by }
             }
             Self::Filter { source, predicate } => {
                 Self::Filter { source: transform(source)?, predicate }
             }
-            Self::HashJoin { left, left_field, right, right_field, outer } => Self::HashJoin {
+            Self::HashJoin {
+                left,
+                left_field,
+                left_label,
+                right,
+                right_field,
+                right_label,
+                right_size,
+                outer,
+            } => Self::HashJoin {
                 left: transform(left)?,
                 left_field,
+                left_label,
                 right: transform(right)?,
                 right_field,
+                right_label,
+                right_size,
                 outer,
             },
             Self::Limit { source, limit } => Self::Limit { source: transform(source)?, limit },
-            Self::NestedLoopJoin { left, left_size, right, predicate, outer } => {
+            Self::NestedLoopJoin { left, left_size, right, right_size, predicate, outer } => {
                 Self::NestedLoopJoin {
                     left: transform(left)?,
                     left_size,
                     right: transform(right)?,
+                    right_size,
                     predicate,
                     outer,
                 }
@@ -215,15 +234,21 @@ impl Node {
                     .map(|(e, o)| e.transform(before, after).map(|e| (e, o)))
                     .collect::<Result<_>>()?,
             },
-            Self::NestedLoopJoin { left, left_size, right, predicate: Some(predicate), outer } => {
-                Self::NestedLoopJoin {
-                    left,
-                    left_size,
-                    right,
-                    predicate: Some(predicate.transform(before, after)?),
-                    outer,
-                }
-            }
+            Self::NestedLoopJoin {
+                left,
+                left_size,
+                right,
+                right_size,
+                predicate: Some(predicate),
+                outer,
+            } => Self::NestedLoopJoin {
+                left,
+                left_size,
+                right,
+                right_size,
+                predicate: Some(predicate.transform(before, after)?),
+                outer,
+            },
             Self::Projection { source, labels, expressions } => Self::Projection {
                 source,
                 labels,
@@ -235,8 +260,7 @@ impl Node {
             Self::Scan { table, alias, filter: Some(filter) } => {
                 Self::Scan { table, alias, filter: Some(filter.transform(before, after)?) }
             }
-            Self::Values { labels, rows } => Self::Values {
-                labels,
+            Self::Values { rows } => Self::Values {
                 rows: rows
                     .into_iter()
                     .map(|row| row.into_iter().map(|e| e.transform(before, after)).collect())
@@ -316,7 +340,7 @@ impl Node {
 
         // Format the node.
         match self {
-            Self::Aggregation { source, aggregates } => {
+            Self::Aggregation { source, aggregates, .. } => {
                 write!(f, "Aggregation: {}", aggregates.iter().join(", "))?;
                 source.format(f, prefix, false, true)?;
             }
@@ -324,25 +348,34 @@ impl Node {
                 write!(f, "Filter: {predicate}")?;
                 source.format(f, prefix, false, true)?;
             }
-            Self::HashJoin { left, left_field, right, right_field, outer } => {
+            Self::HashJoin {
+                left,
+                left_field,
+                left_label,
+                right,
+                right_field,
+                right_label,
+                outer,
+                ..
+            } => {
                 let kind = if *outer { "outer" } else { "inner" };
                 // TODO: make Label a proper type with formatting.
-                let left_label = match left_field {
-                    (_, Some((Some(t), n))) => format!("{t}.{n}"),
-                    (_, Some((None, n))) => n.clone(),
-                    (i, None) => format!("left #{}", i),
+                let left_label = match left_label {
+                    Some((Some(t), n)) => format!("{t}.{n}"),
+                    Some((None, n)) => n.clone(),
+                    None => format!("left #{left_field}"),
                 };
-                let right_label = match right_field {
-                    (_, Some((Some(t), n))) => format!("{t}.{n}"),
-                    (_, Some((None, n))) => n.clone(),
-                    (i, None) => format!("right #{}", i),
+                let right_label = match right_label {
+                    Some((Some(t), n)) => format!("{t}.{n}"),
+                    Some((None, n)) => n.clone(),
+                    None => format!("right #{right_field}"),
                 };
                 write!(f, "HashJoin: {kind} on {left_label} = {right_label}")?;
                 left.format(f, prefix.clone(), false, false)?;
                 right.format(f, prefix, false, true)?;
             }
             Self::IndexLookup { table, column, alias, values } => {
-                write!(f, "IndexLookup: {}", table.name)?;
+                write!(f, "IndexLookup: {table}")?;
                 if let Some(alias) = alias {
                     write!(f, " as {}", alias)?;
                 }
@@ -354,7 +387,7 @@ impl Node {
                 }
             }
             Self::KeyLookup { table, alias, keys } => {
-                write!(f, "KeyLookup: {}", table.name)?;
+                write!(f, "KeyLookup: {table}")?;
                 if let Some(alias) = alias {
                     write!(f, " as {alias}")?;
                 }

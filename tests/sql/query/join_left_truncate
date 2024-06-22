@@ -196,6 +196,7 @@ Plan: Select {
                     "m",
                 ),
             },
+            right_size: 7,
             predicate: Some(
                 Equal(
                     Field(
@@ -312,15 +313,13 @@ Optimized plan: Select {
                     "g",
                 ),
             },
-            left_field: (
-                0,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
+            left_field: 0,
+            left_label: Some(
+                (
+                    Some(
+                        "g",
                     ),
+                    "id",
                 ),
             ),
             right: Scan {
@@ -406,17 +405,16 @@ Optimized plan: Select {
                     "m",
                 ),
             },
-            right_field: (
-                0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
+            right_field: 0,
+            right_label: Some(
+                (
+                    Some(
+                        "m",
                     ),
+                    "id",
                 ),
             ),
+            right_size: 7,
             outer: true,
         },
         expressions: [

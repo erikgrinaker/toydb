@@ -1,62 +1,41 @@
-use super::QueryIterator;
 use crate::error::Result;
 use crate::sql::engine::Transaction;
-use crate::sql::types::{Expression, Label, Row, Table, Value};
+use crate::sql::types::{Expression, Row, Rows, Table, Value};
 
 /// A table scan source.
 pub(super) fn scan(
     txn: &impl Transaction,
     table: Table,
     filter: Option<Expression>,
-) -> Result<QueryIterator> {
-    Ok(QueryIterator {
-        columns: table.columns.into_iter().map(|c| Some((None, c.name))).collect(),
-        rows: Box::new(txn.scan(&table.name, filter)?),
-    })
+) -> Result<Rows> {
+    Ok(Box::new(txn.scan(&table.name, filter)?))
 }
 
 /// A primary key lookup source.
-pub(super) fn lookup_key(
-    txn: &impl Transaction,
-    table: Table,
-    keys: Vec<Value>,
-) -> Result<QueryIterator> {
-    Ok(QueryIterator {
-        columns: table.columns.into_iter().map(|c| Some((None, c.name))).collect(),
-        rows: Box::new(txn.get(&table.name, &keys)?.into_iter().map(Ok)),
-    })
+pub(super) fn lookup_key(txn: &impl Transaction, table: String, keys: Vec<Value>) -> Result<Rows> {
+    Ok(Box::new(txn.get(&table, &keys)?.into_iter().map(Ok)))
 }
 
 /// An index lookup source.
 pub(super) fn lookup_index(
     txn: &impl Transaction,
-    table: Table,
+    table: String,
     column: String,
     values: Vec<Value>,
-) -> Result<QueryIterator> {
-    let pks: Vec<_> = txn.lookup_index(&table.name, &column, &values)?.into_iter().collect();
-    let rows = txn.get(&table.name, &pks)?;
-
-    Ok(QueryIterator {
-        columns: table.columns.into_iter().map(|c| Some((None, c.name))).collect(),
-        rows: Box::new(rows.into_iter().map(Ok)),
-    })
+) -> Result<Rows> {
+    let ids: Vec<_> = txn.lookup_index(&table, &column, &values)?.into_iter().collect();
+    Ok(Box::new(txn.get(&table, &ids)?.into_iter().map(Ok)))
 }
 
 /// Produces a single empty row. Used for queries without a FROM clause, e.g.
 /// SELECT 1+1, in order to have something to project against.
 ///
 /// TODO: replace with values.
-pub(super) fn nothing() -> QueryIterator {
-    QueryIterator { columns: Vec::new(), rows: Box::new(std::iter::once(Ok(Row::new()))) }
+pub(super) fn nothing() -> Rows {
+    Box::new(std::iter::once(Ok(Row::new())))
 }
 
 /// Emits predefined constant values.
-pub(super) fn values(labels: Vec<Option<Label>>, rows: Vec<Vec<Expression>>) -> QueryIterator {
-    QueryIterator {
-        columns: labels,
-        rows: Box::new(
-            rows.into_iter().map(|row| row.into_iter().map(|expr| expr.evaluate(None)).collect()),
-        ),
-    }
+pub(super) fn values(rows: Vec<Vec<Expression>>) -> Rows {
+    Box::new(rows.into_iter().map(|row| row.into_iter().map(|expr| expr.evaluate(None)).collect()))
 }

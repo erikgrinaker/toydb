@@ -213,6 +213,7 @@ Plan: Select {
                     Sum,
                     Count,
                 ],
+                group_by: 1,
             },
             expressions: [
                 Field(
@@ -400,6 +401,7 @@ Optimized plan: Select {
                     Sum,
                     Count,
                 ],
+                group_by: 1,
             },
             expressions: [
                 Field(

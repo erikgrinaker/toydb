@@ -138,6 +138,7 @@ Plan: Select {
             aggregates: [
                 Count,
             ],
+            group_by: 0,
         },
         expressions: [
             Field(
@@ -253,6 +254,7 @@ Optimized plan: Select {
             aggregates: [
                 Count,
             ],
+            group_by: 0,
         },
         expressions: [
             Field(

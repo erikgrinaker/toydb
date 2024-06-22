@@ -179,6 +179,7 @@ Plan: Select {
             filter: None,
             alias: None,
         },
+        right_size: 2,
         predicate: Some(
             Constant(
                 Boolean(
@@ -382,6 +383,7 @@ Optimized plan: Select {
             filter: None,
             alias: None,
         },
+        right_size: 2,
         predicate: None,
         outer: false,
     },

@@ -54,11 +54,19 @@ impl Optimizer for FilterPushdown {
                     mut left,
                     left_size,
                     mut right,
+                    right_size,
                     predicate: Some(predicate),
                     outer,
                 } => {
                     let predicate = self.pushdown_join(predicate, &mut left, &mut right, left_size);
-                    Ok(Node::NestedLoopJoin { left, left_size, right, predicate, outer })
+                    Ok(Node::NestedLoopJoin {
+                        left,
+                        left_size,
+                        right,
+                        right_size,
+                        predicate,
+                        outer,
+                    })
                 }
                 n => Ok(n),
             },
@@ -181,17 +189,20 @@ impl Optimizer for IndexLookup {
                 for i in 0..cnf.len() {
                     if let Some(keys) = cnf[i].as_lookup(table.primary_key) {
                         cnf.remove(i);
-                        return Ok(self.wrap_cnf(Node::KeyLookup { table, alias, keys }, cnf));
+                        return Ok(self.wrap_cnf(
+                            Node::KeyLookup { table: table.name.clone(), keys, alias },
+                            cnf,
+                        ));
                     }
                     for (ci, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
                         if let Some(values) = cnf[i].as_lookup(ci) {
                             cnf.remove(i);
                             return Ok(self.wrap_cnf(
                                 Node::IndexLookup {
-                                    table: table.clone(),
-                                    alias,
+                                    table: table.name.clone(),
                                     column: column.name.clone(),
                                     values,
+                                    alias,
                                 },
                                 cnf,
                             ));
@@ -264,21 +275,32 @@ impl Optimizer for JoinType {
                     left,
                     left_size,
                     right,
+                    right_size,
                     predicate: Some(Expression::Equal(a, b)),
                     outer,
                 } => match (*a, *b) {
                     (Expression::Field(a, a_label), Expression::Field(b, b_label)) => {
-                        let (left_field, right_field) = if a < left_size {
-                            ((a, a_label), (b - left_size, b_label))
+                        let (left_field, left_label, right_field, right_label) = if a < left_size {
+                            (a, a_label, b - left_size, b_label)
                         } else {
-                            ((b, b_label), (a - left_size, a_label))
+                            (b, b_label, a - left_size, a_label)
                         };
-                        Ok(Node::HashJoin { left, left_field, right, right_field, outer })
+                        Ok(Node::HashJoin {
+                            left,
+                            left_field,
+                            left_label,
+                            right,
+                            right_field,
+                            right_label,
+                            right_size,
+                            outer,
+                        })
                     }
                     (a, b) => Ok(Node::NestedLoopJoin {
                         left,
                         left_size,
                         right,
+                        right_size,
                         predicate: Some(Expression::Equal(a.into(), b.into())),
                         outer,
                     }),

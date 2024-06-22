@@ -1,4 +1,3 @@
-use super::QueryIterator;
 use crate::errdata;
 use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Value};
@@ -13,16 +12,13 @@ use std::iter::Peekable;
 /// joined row with NULL values for the right source is returned (typically used
 /// for a LEFT JOIN).
 pub(super) fn nested_loop(
-    left: QueryIterator,
-    right: QueryIterator,
+    left: Rows,
+    right: Rows,
+    right_size: usize,
     predicate: Option<Expression>,
     outer: bool,
-) -> Result<QueryIterator> {
-    let right_size = right.columns.len();
-    let columns = left.columns.into_iter().chain(right.columns).collect();
-    let rows =
-        Box::new(NestedLoopIterator::new(left.rows, right.rows, right_size, predicate, outer)?);
-    Ok(QueryIterator { rows, columns })
+) -> Result<Rows> {
+    Ok(Box::new(NestedLoopIterator::new(left, right, right_size, predicate, outer)?))
 }
 
 /// NestedLoopIterator implements nested loop joins.
@@ -131,18 +127,15 @@ impl Iterator for NestedLoopIterator {
 ///
 /// TODO: add more tests for the multiple match case.
 pub(super) fn hash(
-    left: QueryIterator,
+    left: Rows,
     left_field: usize,
-    right: QueryIterator,
+    right: Rows,
     right_field: usize,
+    right_size: usize,
     outer: bool,
-) -> Result<QueryIterator> {
-    // Build the combined columns.
-    let right_size = right.columns.len();
-    let columns = left.columns.into_iter().chain(right.columns).collect();
-
+) -> Result<Rows> {
     // Build the hash table from the right source.
-    let mut rows = right.rows;
+    let mut rows = right;
     let mut right: HashMap<Value, Vec<Row>> = HashMap::new();
     while let Some(row) = rows.next().transpose()? {
         let id = row[right_field].clone();
@@ -153,7 +146,7 @@ pub(super) fn hash(
     let empty = std::iter::repeat(Value::Null).take(right_size);
 
     // Set up the join iterator.
-    let rows = Box::new(left.rows.flat_map(move |result| -> Rows {
+    Ok(Box::new(left.flat_map(move |result| -> Rows {
         // Pass through errors.
         let Ok(row) = result else {
             return Box::new(std::iter::once(result));
@@ -171,7 +164,5 @@ pub(super) fn hash(
             }
             None => Box::new(std::iter::empty()),
         }
-    }));
-
-    Ok(QueryIterator { columns, rows })
+    })))
 }

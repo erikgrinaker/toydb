@@ -1,7 +1,6 @@
-use super::QueryIterator;
 use crate::error::{Error, Result};
 use crate::sql::engine::Transaction;
-use crate::sql::types::{Expression, Table};
+use crate::sql::types::{Expression, Rows, Table};
 use crate::{errdata, errinput};
 
 use std::collections::HashMap;
@@ -12,10 +11,10 @@ pub(super) fn delete(
     txn: &impl Transaction,
     table: String,
     primary_key: usize,
-    source: QueryIterator,
+    source: Rows,
 ) -> Result<u64> {
     let ids = source
-        // TODO: consider moving this out to a QueryIterator helper.
+        // TODO: consider moving this out to a helper.
         .map(|r| r.and_then(|row| row.into_iter().nth(primary_key).ok_or(errdata!("short row"))))
         .collect::<Result<Vec<_>>>()?;
     let count = ids.len() as u64;
@@ -33,7 +32,7 @@ pub(super) fn insert(
     txn: &impl Transaction,
     table: Table,
     column_map: Option<HashMap<usize, usize>>,
-    mut source: QueryIterator,
+    mut source: Rows,
 ) -> Result<u64> {
     let mut rows = Vec::new();
     while let Some(values) = source.next().transpose()? {
@@ -82,7 +81,7 @@ pub(super) fn update(
     txn: &impl Transaction,
     table: String,
     primary_key: usize,
-    mut source: QueryIterator,
+    mut source: Rows,
     expressions: Vec<(usize, Expression)>,
 ) -> Result<u64> {
     let mut updates = HashMap::new();

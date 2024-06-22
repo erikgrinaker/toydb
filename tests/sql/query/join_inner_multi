@@ -236,6 +236,7 @@ Plan: Select {
                     filter: None,
                     alias: None,
                 },
+                right_size: 2,
                 predicate: Some(
                     Equal(
                         Field(
@@ -306,6 +307,7 @@ Plan: Select {
                 filter: None,
                 alias: None,
             },
+            right_size: 3,
             predicate: Some(
                 Equal(
                     Field(
@@ -494,15 +496,13 @@ Optimized plan: Select {
                     filter: None,
                     alias: None,
                 },
-                left_field: (
-                    3,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "genre_id",
+                left_field: 3,
+                left_label: Some(
+                    (
+                        Some(
+                            "movies",
                         ),
+                        "genre_id",
                     ),
                 ),
                 right: Scan {
@@ -533,28 +533,25 @@ Optimized plan: Select {
                     filter: None,
                     alias: None,
                 },
-                right_field: (
-                    0,
-                    Some(
-                        (
-                            Some(
-                                "genres",
-                            ),
-                            "id",
-                        ),
-                    ),
-                ),
-                outer: false,
-            },
-            left_field: (
-                2,
-                Some(
+                right_field: 0,
+                right_label: Some(
                     (
                         Some(
-                            "movies",
+                            "genres",
                         ),
-                        "studio_id",
+                        "id",
                     ),
+                ),
+                right_size: 2,
+                outer: false,
+            },
+            left_field: 2,
+            left_label: Some(
+                (
+                    Some(
+                        "movies",
+                    ),
+                    "studio_id",
                 ),
             ),
             right: Scan {
@@ -598,17 +595,16 @@ Optimized plan: Select {
                 filter: None,
                 alias: None,
             },
-            right_field: (
-                0,
-                Some(
-                    (
-                        Some(
-                            "studios",
-                        ),
-                        "id",
+            right_field: 0,
+            right_label: Some(
+                (
+                    Some(
+                        "studios",
                     ),
+                    "id",
                 ),
             ),
+            right_size: 3,
             outer: false,
         },
         expressions: [

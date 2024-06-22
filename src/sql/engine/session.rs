@@ -154,9 +154,9 @@ impl TryFrom<ExecutionResult> for StatementResult {
             ExecutionResult::Delete { count } => Self::Delete { count },
             ExecutionResult::Insert { count } => Self::Insert { count },
             ExecutionResult::Update { count } => Self::Update { count },
-            ExecutionResult::Select { iter, labels } => {
+            ExecutionResult::Select { rows, labels } => {
                 // We buffer the entire set of rows, for simplicity.
-                Self::Select { columns: labels, rows: iter.rows.collect::<Result<_>>()? }
+                Self::Select { columns: labels, rows: rows.collect::<Result<_>>()? }
             }
         })
     }

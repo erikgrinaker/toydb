@@ -185,6 +185,7 @@ Plan: Select {
                     "g",
                 ),
             },
+            right_size: 2,
             predicate: Some(
                 Equal(
                     Field(
@@ -311,149 +312,47 @@ Plan: Select {
 Optimized plan: Select {
     root: HashJoin {
         left: IndexLookup {
-            table: Table {
-                name: "movies",
-                primary_key: 0,
-                columns: [
-                    Column {
-                        name: "id",
-                        datatype: Integer,
-                        nullable: false,
-                        default: None,
-                        unique: true,
-                        index: false,
-                        references: None,
-                    },
-                    Column {
-                        name: "title",
-                        datatype: String,
-                        nullable: false,
-                        default: None,
-                        unique: false,
-                        index: false,
-                        references: None,
-                    },
-                    Column {
-                        name: "studio_id",
-                        datatype: Integer,
-                        nullable: false,
-                        default: None,
-                        unique: false,
-                        index: true,
-                        references: Some(
-                            "studios",
-                        ),
-                    },
-                    Column {
-                        name: "genre_id",
-                        datatype: Integer,
-                        nullable: false,
-                        default: None,
-                        unique: false,
-                        index: true,
-                        references: Some(
-                            "genres",
-                        ),
-                    },
-                    Column {
-                        name: "released",
-                        datatype: Integer,
-                        nullable: false,
-                        default: None,
-                        unique: false,
-                        index: false,
-                        references: None,
-                    },
-                    Column {
-                        name: "rating",
-                        datatype: Float,
-                        nullable: true,
-                        default: Some(
-                            Null,
-                        ),
-                        unique: false,
-                        index: false,
-                        references: None,
-                    },
-                    Column {
-                        name: "ultrahd",
-                        datatype: Boolean,
-                        nullable: true,
-                        default: Some(
-                            Null,
-                        ),
-                        unique: false,
-                        index: false,
-                        references: None,
-                    },
-                ],
-            },
-            alias: Some(
-                "m",
-            ),
+            table: "movies",
             column: "genre_id",
             values: [
                 Integer(
                     4,
                 ),
             ],
+            alias: Some(
+                "m",
+            ),
         },
-        left_field: (
-            3,
-            Some(
-                (
-                    Some(
-                        "m",
-                    ),
-                    "genre_id",
+        left_field: 3,
+        left_label: Some(
+            (
+                Some(
+                    "m",
                 ),
+                "genre_id",
             ),
         ),
         right: KeyLookup {
-            table: Table {
-                name: "genres",
-                primary_key: 0,
-                columns: [
-                    Column {
-                        name: "id",
-                        datatype: Integer,
-                        nullable: false,
-                        default: None,
-                        unique: true,
-                        index: false,
-                        references: None,
-                    },
-                    Column {
-                        name: "name",
-                        datatype: String,
-                        nullable: false,
-                        default: None,
-                        unique: false,
-                        index: false,
-                        references: None,
-                    },
-                ],
-            },
-            alias: Some(
-                "g",
-            ),
+            table: "genres",
             keys: [
                 Integer(
                     4,
                 ),
             ],
+            alias: Some(
+                "g",
+            ),
         },
-        right_field: (
-            0,
-            Some(
-                (
-                    Some(
-                        "g",
-                    ),
-                    "id",
+        right_field: 0,
+        right_label: Some(
+            (
+                Some(
+                    "g",
                 ),
+                "id",
             ),
         ),
+        right_size: 2,
         outer: false,
     },
     labels: [

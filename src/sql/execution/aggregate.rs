@@ -1,15 +1,15 @@
-use super::QueryIterator;
 use crate::error::Result;
 use crate::sql::planner::Aggregate;
-use crate::sql::types::{Row, Value};
+use crate::sql::types::{Row, Rows, Value};
 
 use std::collections::HashMap;
 
 /// Aggregates rows (i.e. GROUP BY).
 pub(super) fn aggregate(
-    mut source: QueryIterator,
+    mut source: Rows,
     aggregates: Vec<Aggregate>,
-) -> Result<QueryIterator> {
+    group_by: usize,
+) -> Result<Rows> {
     // Aggregate rows from source, grouped by non-aggregation columns. For
     // example, SELECT a, b, SUM(c), MAX(d) ... uses a,b as grouping buckets and
     // SUM(c),MAX(d) as accumulators for each a,b bucket.
@@ -25,28 +25,17 @@ pub(super) fn aggregate(
 
     // If there were no rows and no group-by columns, return a row of empty
     // accumulators, e.g.: SELECT COUNT(*) FROM t WHERE FALSE
-    if accumulators.is_empty() && aggregates.len() == source.columns.len() {
+    if accumulators.is_empty() && group_by == 0 {
         accumulators.insert(Vec::new(), aggregates.iter().map(Accumulator::new).collect());
     }
 
-    // Pass through non-aggregation column labels from the source.
-    let columns = source
-        .columns
-        .into_iter()
-        .enumerate()
-        .map(|(i, label)| if i < aggregates.len() { None } else { label })
-        .collect();
-
     // Emit the aggregate and row values for each row bucket.
-    Ok(QueryIterator {
-        columns,
-        rows: Box::new(accumulators.into_iter().map(|(row, accs)| {
-            accs.into_iter()
-                .map(|acc| acc.value())
-                .chain(row.into_iter().map(Ok))
-                .collect::<Result<_>>()
-        })),
-    })
+    Ok(Box::new(accumulators.into_iter().map(|(row, accs)| {
+        accs.into_iter()
+            .map(|acc| acc.value())
+            .chain(row.into_iter().map(Ok))
+            .collect::<Result<_>>()
+    })))
 }
 
 /// Accumulates aggregate values. Uses an enum rather than a trait since we need

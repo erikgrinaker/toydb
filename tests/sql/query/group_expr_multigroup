@@ -212,6 +212,7 @@ Plan: Select {
                 aggregates: [
                     Max,
                 ],
+                group_by: 2,
             },
             expressions: [
                 Add(
@@ -421,6 +422,7 @@ Optimized plan: Select {
                 aggregates: [
                     Max,
                 ],
+                group_by: 2,
             },
             expressions: [
                 Add(

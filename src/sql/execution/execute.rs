@@ -6,7 +6,7 @@ use super::write;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::planner::{Node, Plan};
-use crate::sql::types::{Label, Row, Rows};
+use crate::sql::types::{Label, Rows};
 
 /// Executes a plan, returning an execution result.
 ///
@@ -43,7 +43,7 @@ pub fn execute_plan(
 
         Plan::Select { root, labels } => {
             let iter = execute(root, txn)?;
-            ExecutionResult::Select { iter, labels }
+            ExecutionResult::Select { rows: iter, labels }
         }
 
         Plan::Update { table, primary_key, source, expressions } => {
@@ -55,14 +55,14 @@ pub fn execute_plan(
     })
 }
 
-/// Recursively executes a query plan node, returning a query iterator.
+/// Recursively executes a query plan node, returning a row iterator.
 ///
 /// TODO: since iterators are lazy, make this infallible if possible.
-pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
+pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
     match node {
-        Node::Aggregation { source, aggregates } => {
+        Node::Aggregation { source, aggregates, group_by } => {
             let source = execute(*source, txn)?;
-            aggregate::aggregate(source, aggregates)
+            aggregate::aggregate(source, aggregates, group_by)
         }
 
         Node::Filter { source, predicate } => {
@@ -70,27 +70,36 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
             Ok(transform::filter(source, predicate))
         }
 
-        Node::HashJoin { left, left_field, right, right_field, outer } => {
+        Node::HashJoin {
+            left,
+            left_field,
+            left_label: _,
+            right,
+            right_field,
+            right_label: _,
+            right_size,
+            outer,
+        } => {
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
-            join::hash(left, left_field.0, right, right_field.0, outer)
+            join::hash(left, left_field, right, right_field, right_size, outer)
         }
 
-        Node::IndexLookup { table, alias: _, column, values } => {
+        Node::IndexLookup { table, column, values, alias: _ } => {
             source::lookup_index(txn, table, column, values)
         }
 
-        Node::KeyLookup { table, alias: _, keys } => source::lookup_key(txn, table, keys),
+        Node::KeyLookup { table, keys, alias: _ } => source::lookup_key(txn, table, keys),
 
         Node::Limit { source, limit } => {
             let source = execute(*source, txn)?;
             Ok(transform::limit(source, limit))
         }
 
-        Node::NestedLoopJoin { left, left_size: _, right, predicate, outer } => {
+        Node::NestedLoopJoin { left, left_size: _, right, right_size, predicate, outer } => {
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
-            join::nested_loop(left, right, predicate, outer)
+            join::nested_loop(left, right, right_size, predicate, outer)
         }
 
         Node::Nothing => Ok(source::nothing()),
@@ -102,17 +111,17 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<QueryIterator> {
 
         Node::Order { source, orders } => {
             let source = execute(*source, txn)?;
-            Ok(transform::order(source, orders))
+            transform::order(source, orders)
         }
 
-        Node::Projection { source, labels, expressions } => {
+        Node::Projection { source, expressions, labels: _ } => {
             let source = execute(*source, txn)?;
-            Ok(transform::project(source, labels, expressions))
+            Ok(transform::project(source, expressions))
         }
 
-        Node::Scan { table, alias: _, filter } => source::scan(txn, table, filter),
+        Node::Scan { table, filter, alias: _ } => source::scan(txn, table, filter),
 
-        Node::Values { labels, rows } => Ok(source::values(labels, rows)),
+        Node::Values { rows } => Ok(source::values(rows)),
     }
 }
 
@@ -123,60 +132,5 @@ pub enum ExecutionResult {
     Delete { count: u64 },
     Insert { count: u64 },
     Update { count: u64 },
-    Select { iter: QueryIterator, labels: Vec<Option<Label>> },
-}
-
-/// A query result iterator, containing the columns and row iterator.
-///
-/// TODO: now that we resolve labels during planning, we can replace this with a
-/// simple Rows iterator. We can probably also make that generic instead of a
-/// trait object, since we know the type when calling each executor.
-pub struct QueryIterator {
-    /// Column names.
-    pub columns: Vec<Option<Label>>,
-    /// Row iterator.
-    pub rows: Rows,
-}
-
-impl Iterator for QueryIterator {
-    type Item = Result<Row>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.rows.next()
-    }
-}
-
-impl QueryIterator {
-    /// Replaces the columns with the result of the closure.
-    pub fn map_columns<F>(mut self, f: F) -> Self
-    where
-        F: FnOnce(Vec<Option<Label>>) -> Vec<Option<Label>>,
-    {
-        self.columns = f(self.columns);
-        self
-    }
-
-    /// Replaces the rows iterator with the result of the closure.
-    pub fn map_rows<F, I>(mut self, f: F) -> Self
-    where
-        I: Iterator<Item = Result<Row>> + 'static,
-        F: FnOnce(Rows) -> I,
-    {
-        self.rows = Box::new(f(self.rows));
-        self
-    }
-
-    /// Like map_rows, but if the closure errors the row iterator will yield a
-    /// single error item.
-    pub fn try_map_rows<F, I>(mut self, f: F) -> Self
-    where
-        I: Iterator<Item = Result<Row>> + 'static,
-        F: FnOnce(Rows) -> Result<I>,
-    {
-        self.rows = match f(self.rows) {
-            Ok(rows) => Box::new(rows),
-            Err(e) => Box::new(std::iter::once(Err(e))),
-        };
-        self
-    }
+    Select { rows: Rows, labels: Vec<Option<Label>> },
 }

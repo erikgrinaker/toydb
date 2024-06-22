@@ -5,4 +5,4 @@ mod source;
 mod transform;
 mod write;
 
-pub use execute::{execute_plan, ExecutionResult, QueryIterator};
+pub use execute::{execute_plan, ExecutionResult};

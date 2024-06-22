@@ -347,6 +347,7 @@ Plan: Select {
                                     "g",
                                 ),
                             },
+                            right_size: 2,
                             predicate: Some(
                                 Equal(
                                     Field(
@@ -504,6 +505,7 @@ Plan: Select {
                                     "good",
                                 ),
                             },
+                            right_size: 7,
                             predicate: Some(
                                 And(
                                     Equal(
@@ -572,6 +574,7 @@ Plan: Select {
                             ),
                             outer: false,
                         },
+                        right_size: 10,
                         predicate: None,
                         outer: false,
                     },
@@ -891,15 +894,13 @@ Optimized plan: Select {
                                 "m",
                             ),
                         },
-                        left_field: (
-                            3,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "genre_id",
+                        left_field: 3,
+                        left_label: Some(
+                            (
+                                Some(
+                                    "m",
                                 ),
+                                "genre_id",
                             ),
                         ),
                         right: Scan {
@@ -932,28 +933,25 @@ Optimized plan: Select {
                                 "g",
                             ),
                         },
-                        right_field: (
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "g",
-                                    ),
-                                    "id",
-                                ),
-                            ),
-                        ),
-                        outer: false,
-                    },
-                    left_field: (
-                        2,
-                        Some(
+                        right_field: 0,
+                        right_label: Some(
                             (
                                 Some(
-                                    "m",
+                                    "g",
                                 ),
-                                "studio_id",
+                                "id",
                             ),
+                        ),
+                        right_size: 2,
+                        outer: false,
+                    },
+                    left_field: 2,
+                    left_label: Some(
+                        (
+                            Some(
+                                "m",
+                            ),
+                            "studio_id",
                         ),
                     ),
                     right: HashJoin {
@@ -1000,15 +998,13 @@ Optimized plan: Select {
                                 "s",
                             ),
                         },
-                        left_field: (
-                            0,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "id",
+                        left_field: 0,
+                        left_label: Some(
+                            (
+                                Some(
+                                    "s",
                                 ),
+                                "id",
                             ),
                         ),
                         right: Scan {
@@ -1133,30 +1129,28 @@ Optimized plan: Select {
                                 "good",
                             ),
                         },
-                        right_field: (
-                            2,
-                            Some(
-                                (
-                                    Some(
-                                        "good",
-                                    ),
-                                    "studio_id",
-                                ),
-                            ),
-                        ),
-                        outer: false,
-                    },
-                    right_field: (
-                        0,
-                        Some(
+                        right_field: 2,
+                        right_label: Some(
                             (
                                 Some(
-                                    "s",
+                                    "good",
                                 ),
-                                "id",
+                                "studio_id",
                             ),
                         ),
+                        right_size: 7,
+                        outer: false,
+                    },
+                    right_field: 0,
+                    right_label: Some(
+                        (
+                            Some(
+                                "s",
+                            ),
+                            "id",
+                        ),
                     ),
+                    right_size: 10,
                     outer: false,
                 },
                 expressions: [
