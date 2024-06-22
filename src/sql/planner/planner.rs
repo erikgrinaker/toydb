@@ -164,10 +164,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build WHERE clause.
         if let Some(expr) = r#where {
-            node = Node::Filter {
-                source: Box::new(node),
-                predicate: Self::build_expression(expr, &scope)?,
-            };
+            let predicate = Self::build_expression(expr, &scope)?;
+            node = Node::Filter { source: Box::new(node), predicate };
         };
 
         // Build SELECT clause.
@@ -216,52 +214,39 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build HAVING clause.
         if let Some(expr) = having {
-            node = Node::Filter {
-                source: Box::new(node),
-                predicate: Self::build_expression(expr, &scope)?,
-            };
+            let predicate = Self::build_expression(expr, &scope)?;
+            node = Node::Filter { source: Box::new(node), predicate };
         };
 
         // Build ORDER clause.
         if !order.is_empty() {
             let orders = order
                 .into_iter()
-                .map(|(e, o)| {
-                    Ok((
-                        Self::build_expression(e, &scope)?,
-                        match o {
-                            ast::Order::Ascending => Direction::Ascending,
-                            ast::Order::Descending => Direction::Descending,
-                        },
-                    ))
-                })
+                .map(|(e, o)| Ok((Self::build_expression(e, &scope)?, Direction::from(o))))
                 .collect::<Result<_>>()?;
             node = Node::Order { source: Box::new(node), orders };
         }
 
         // Build OFFSET clause.
         if let Some(expr) = offset {
-            node = Node::Offset {
-                source: Box::new(node),
-                offset: match Self::evaluate_constant(expr)? {
-                    Value::Integer(offset) if offset >= 0 => Ok(offset as usize),
-                    value => errinput!("invalid offset {value}"),
-                }?,
-            }
+            let offset = match Self::evaluate_constant(expr)? {
+                Value::Integer(offset) if offset >= 0 => Ok(offset as usize),
+                value => errinput!("invalid offset {value}"),
+            }?;
+            node = Node::Offset { source: Box::new(node), offset }
         }
 
         // Build LIMIT clause.
         if let Some(expr) = limit {
-            node = Node::Limit {
-                source: Box::new(node),
-                limit: match Self::evaluate_constant(expr)? {
-                    Value::Integer(limit) if limit >= 0 => Ok(limit as usize),
-                    value => errinput!("invalid limit {value}"),
-                }?,
-            }
+            let limit = match Self::evaluate_constant(expr)? {
+                Value::Integer(limit) if limit >= 0 => Ok(limit as usize),
+                value => errinput!("invalid limit {value}"),
+            }?;
+            node = Node::Limit { source: Box::new(node), limit }
         }
 
-        // Remove any hidden columns.
+        // Add a final projection that removes hidden columns, only passing
+        // through the originally requested columns.
         if hidden > 0 {
             let columns = scope.len() - hidden;
             let labels = vec![Label::None; columns];
@@ -495,6 +480,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
         select: &mut Vec<(ast::Expression, Option<String>)>,
     ) -> Result<usize> {
         // Replace any identical expressions or label references with column references.
+        //
+        // TODO: instead of trying to deduplicate here, before the optimizer has
+        // normalized expressions and such, we should just go ahead and add new
+        // columns for all fields and expressions, and have a separate optimizer
+        // that looks at duplicate expressions in a single projection and
+        // collapses them, rewriting downstream field references.
         for (i, (sexpr, label)) in select.iter().enumerate() {
             if expr == sexpr {
                 *expr = ast::Expression::Column(i);

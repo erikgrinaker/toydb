@@ -489,3 +489,12 @@ impl std::fmt::Display for Direction {
         }
     }
 }
+
+impl From<ast::Order> for Direction {
+    fn from(order: ast::Order) -> Self {
+        match order {
+            ast::Order::Ascending => Self::Ascending,
+            ast::Order::Descending => Self::Descending,
+        }
+    }
+}
