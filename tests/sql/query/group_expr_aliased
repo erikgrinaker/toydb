@@ -162,21 +162,15 @@ Plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Multiply(
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                             Constant(
@@ -188,11 +182,8 @@ Plan: Select {
                     ],
                     labels: [
                         None,
-                        Some(
-                            (
-                                None,
-                                "twice",
-                            ),
+                        Unqualified(
+                            "twice",
                         ),
                     ],
                 },
@@ -204,11 +195,8 @@ Plan: Select {
             expressions: [
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "twice",
-                        ),
+                    Unqualified(
+                        "twice",
                     ),
                 ),
                 Field(
@@ -217,11 +205,8 @@ Plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "twice",
-                    ),
+                Unqualified(
+                    "twice",
                 ),
                 None,
             ],
@@ -230,11 +215,8 @@ Plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "twice",
-                        ),
+                    Unqualified(
+                        "twice",
                     ),
                 ),
                 Ascending,
@@ -242,11 +224,8 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "twice",
-            ),
+        Unqualified(
+            "twice",
         ),
         None,
     ],
@@ -341,21 +320,15 @@ Optimized plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Multiply(
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                             Constant(
@@ -367,11 +340,8 @@ Optimized plan: Select {
                     ],
                     labels: [
                         None,
-                        Some(
-                            (
-                                None,
-                                "twice",
-                            ),
+                        Unqualified(
+                            "twice",
                         ),
                     ],
                 },
@@ -383,11 +353,8 @@ Optimized plan: Select {
             expressions: [
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "twice",
-                        ),
+                    Unqualified(
+                        "twice",
                     ),
                 ),
                 Field(
@@ -396,11 +363,8 @@ Optimized plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "twice",
-                    ),
+                Unqualified(
+                    "twice",
                 ),
                 None,
             ],
@@ -409,11 +373,8 @@ Optimized plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "twice",
-                        ),
+                    Unqualified(
+                        "twice",
                     ),
                 ),
                 Ascending,
@@ -421,11 +382,8 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "twice",
-            ),
+        Unqualified(
+            "twice",
         ),
         None,
     ],

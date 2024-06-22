@@ -321,7 +321,56 @@ pub type Row = Vec<Value>;
 /// TODO: try to avoid boxing here.
 pub type Rows = Box<dyn Iterator<Item = Result<Row>>>;
 
-/// A column label, consisting of an optional table name and a column name.
-///
-/// TODO: use this more broadly.
-pub type Label = (Option<String>, String);
+/// A column label, used in result sets and query plans.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Label {
+    /// No label.
+    None,
+    /// An unqualified column name.
+    Unqualified(String),
+    /// A fully qualified column name.
+    Qualified(String, String),
+}
+
+impl std::fmt::Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => write!(f, ""),
+            Self::Unqualified(name) => write!(f, "{name}"),
+            Self::Qualified(table, column) => write!(f, "{table}.{column}"),
+        }
+    }
+}
+
+impl Label {
+    /// Creates an unqualified label for a Some.
+    pub fn maybe_name(name: Option<String>) -> Self {
+        name.map(Self::Unqualified).unwrap_or(Self::None)
+    }
+
+    /// Creates a qualified label if table is given, otherwise unqualified.
+    pub fn maybe_qualified(table: Option<String>, column: String) -> Self {
+        match table {
+            Some(table) => Self::Qualified(table, column),
+            None => Self::Unqualified(column),
+        }
+    }
+
+    /// Formats the label as a short column header.
+    pub fn as_header(&self) -> String {
+        match self {
+            Self::Qualified(_, column) | Self::Unqualified(column) => column.to_string(),
+            Self::None => "?".to_string(),
+        }
+    }
+
+    /// Returns true if the label is None.
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
+    /// Returns true if the label is not None.
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+}

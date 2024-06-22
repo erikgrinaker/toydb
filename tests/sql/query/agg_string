@@ -137,11 +137,8 @@ Plan: Select {
                         IsNull(
                             Field(
                                 1,
-                                Some(
-                                    (
-                                        None,
-                                        "s",
-                                    ),
+                                Unqualified(
+                                    "s",
                                 ),
                             ),
                         ),
@@ -150,47 +147,32 @@ Plan: Select {
                 expressions: [
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                 ],
@@ -286,11 +268,8 @@ Optimized plan: Select {
                             IsNull(
                                 Field(
                                     1,
-                                    Some(
-                                        (
-                                            None,
-                                            "s",
-                                        ),
+                                    Unqualified(
+                                        "s",
                                     ),
                                 ),
                             ),
@@ -301,47 +280,32 @@ Optimized plan: Select {
                 expressions: [
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "s",
-                            ),
+                        Unqualified(
+                            "s",
                         ),
                     ),
                 ],

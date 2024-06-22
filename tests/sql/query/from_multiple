@@ -274,93 +274,49 @@ Plan: Select {
         outer: false,
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "id",
-            ),
+        Qualified(
+            "genres",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "name",
-            ),
+        Qualified(
+            "genres",
+            "name",
         ),
-        Some(
-            (
-                Some(
-                    "countries",
-                ),
-                "id",
-            ),
+        Qualified(
+            "countries",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "countries",
-                ),
-                "name",
-            ),
+        Qualified(
+            "countries",
+            "name",
         ),
     ],
 }
@@ -516,93 +472,49 @@ Optimized plan: Select {
         outer: false,
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "id",
-            ),
+        Qualified(
+            "genres",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "name",
-            ),
+        Qualified(
+            "genres",
+            "name",
         ),
-        Some(
-            (
-                Some(
-                    "countries",
-                ),
-                "id",
-            ),
+        Qualified(
+            "countries",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "countries",
-                ),
-                "name",
-            ),
+        Qualified(
+            "countries",
+            "name",
         ),
     ],
 }

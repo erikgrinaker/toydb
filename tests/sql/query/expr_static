@@ -102,21 +102,15 @@ Plan: Select {
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "nope",
-                ),
+            Unqualified(
+                "nope",
             ),
         ],
     },
     labels: [
         None,
-        Some(
-            (
-                None,
-                "nope",
-            ),
+        Unqualified(
+            "nope",
         ),
     ],
 }
@@ -138,21 +132,15 @@ Optimized plan: Select {
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "nope",
-                ),
+            Unqualified(
+                "nope",
             ),
         ],
     },
     labels: [
         None,
-        Some(
-            (
-                None,
-                "nope",
-            ),
+        Unqualified(
+            "nope",
         ),
     ],
 }

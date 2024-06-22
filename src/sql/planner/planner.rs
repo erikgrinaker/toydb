@@ -205,7 +205,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             }
 
             // Build the remaining non-aggregate projection.
-            let labels = select.iter().map(|(_, l)| l.clone().map(|l| (None, l))).collect_vec();
+            let labels = select.iter().map(|(_, l)| Label::maybe_name(l.clone())).collect_vec();
             let expressions = select
                 .into_iter()
                 .map(|(e, _)| Self::build_expression(e, &scope))
@@ -264,8 +264,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Remove any hidden columns.
         if hidden > 0 {
             let columns = scope.len() - hidden;
-            let labels = vec![None; columns];
-            let expressions = (0..columns).map(|i| Expression::Field(i, None)).collect_vec();
+            let labels = vec![Label::None; columns];
+            let expressions = (0..columns).map(|i| Expression::Field(i, Label::None)).collect_vec();
             scope.project(&expressions, &labels)?;
             node = Node::Projection { source: Box::new(node), labels, expressions }
         }
@@ -338,7 +338,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
                 // For right joins, build a projection to swap the columns.
                 if matches!(r#type, ast::JoinType::Right) {
-                    let labels = vec![None; scope.len()];
+                    let labels = vec![Label::None; scope.len()];
                     let expressions = (left_size..scope.len())
                         .chain(0..left_size)
                         .map(|i| Ok(Expression::Field(i, scope.get_column_label(i)?)))
@@ -369,11 +369,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
         for (aggregate, expr) in aggregations {
             aggregates.push(aggregate);
             expressions.push(Self::build_expression(expr, scope)?);
-            labels.push(None);
+            labels.push(Label::None);
         }
         for (expr, label) in groups {
             expressions.push(Self::build_expression(expr, scope)?);
-            labels.push(label.map(|l| (None, l)));
+            labels.push(Label::maybe_name(label));
         }
         scope.project(
             &expressions
@@ -557,9 +557,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Literal::String(s) => Value::String(s),
             }),
             ast::Expression::Column(i) => Field(i, scope.get_column_label(i)?),
-            ast::Expression::Field(table, name) => {
-                Field(scope.get_column_index(table.as_deref(), &name)?, Some((table, name)))
-            }
+            ast::Expression::Field(table, name) => Field(
+                scope.get_column_index(table.as_deref(), &name)?,
+                Label::maybe_qualified(table, name),
+            ),
             // All functions are currently aggregate functions, which should be
             // processed separately.
             // TODO: consider adding some basic functions for fun.
@@ -624,7 +625,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 pub struct Scope {
     /// The currently visible columns. If empty, only constant expressions can
     /// be used (no field references).
-    columns: Vec<Option<Label>>,
+    columns: Vec<Label>,
     /// Index of currently visible tables, by query name (e.g. may be aliased).
     tables: HashSet<String>,
     /// Index of fully qualified table.column names to column indexes. Qualified
@@ -660,20 +661,20 @@ impl Scope {
             return errinput!("duplicate table name {label}");
         }
         for column in &table.columns {
-            self.add_column(Some((Some(label.to_string()), column.name.clone())));
+            self.add_column(Label::Qualified(label.to_string(), column.name.clone()))
         }
         self.tables.insert(label.to_string());
         Ok(())
     }
 
     /// Adds a column and label to the scope.
-    fn add_column(&mut self, label: Option<Label>) {
-        if let Some((table, column)) = &label {
-            let index = self.len();
-            if let Some(table) = table {
-                self.qualified.insert((table.clone(), column.clone()), index);
-            }
-            self.unqualified.entry(column.clone()).or_default().push(index)
+    fn add_column(&mut self, label: Label) {
+        let index = self.len();
+        if let Label::Qualified(table, column) = &label {
+            self.qualified.insert((table.clone(), column.clone()), index);
+        }
+        if let Label::Qualified(_, name) | Label::Unqualified(name) = &label {
+            self.unqualified.entry(name.clone()).or_default().push(index)
         }
         self.columns.push(label)
     }
@@ -704,7 +705,7 @@ impl Scope {
 
     /// Fetches a column label by index, if any.
     /// TODO: this can possibly be removed.
-    fn get_column_label(&self, index: usize) -> Result<Option<Label>> {
+    fn get_column_label(&self, index: usize) -> Result<Label> {
         if self.columns.is_empty() {
             return errinput!("expression must be constant, found column index {index}");
         }
@@ -741,7 +742,7 @@ impl Scope {
     /// Otherwise, for non-trivial field references, a new column is created for
     /// the expression. An explicit label may also be given for each column.
     /// Table sets are retained.
-    fn project(&mut self, expressions: &[Expression], labels: &[Option<Label>]) -> Result<()> {
+    fn project(&mut self, expressions: &[Expression], labels: &[Label]) -> Result<()> {
         assert_eq!(expressions.len(), labels.len());
 
         // Extract the old columns and clear the indexes. Keep the table index.
@@ -764,7 +765,7 @@ impl Scope {
             } else if let Some(f) = field_map.get(&i) {
                 self.add_column(columns[*f].clone()) // field reference
             } else {
-                self.add_column(None) // unlabeled expression
+                self.add_column(Label::None) // unlabeled expression
             }
         }
         Ok(())

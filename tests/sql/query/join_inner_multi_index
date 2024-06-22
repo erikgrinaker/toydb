@@ -297,37 +297,25 @@ Plan: Select {
                             Equal(
                                 Field(
                                     3,
-                                    Some(
-                                        (
-                                            Some(
-                                                "m",
-                                            ),
-                                            "genre_id",
-                                        ),
+                                    Qualified(
+                                        "m",
+                                        "genre_id",
                                     ),
                                 ),
                                 Field(
                                     7,
-                                    Some(
-                                        (
-                                            Some(
-                                                "g",
-                                            ),
-                                            "id",
-                                        ),
+                                    Qualified(
+                                        "g",
+                                        "id",
                                     ),
                                 ),
                             ),
                             Equal(
                                 Field(
                                     7,
-                                    Some(
-                                        (
-                                            Some(
-                                                "g",
-                                            ),
-                                            "id",
-                                        ),
+                                    Qualified(
+                                        "g",
+                                        "id",
                                     ),
                                 ),
                                 Constant(
@@ -390,37 +378,25 @@ Plan: Select {
                         Equal(
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "studio_id",
-                                    ),
+                                Qualified(
+                                    "m",
+                                    "studio_id",
                                 ),
                             ),
                             Field(
                                 9,
-                                Some(
-                                    (
-                                        Some(
-                                            "s",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "s",
+                                    "id",
                                 ),
                             ),
                         ),
                         Equal(
                             Field(
                                 9,
-                                Some(
-                                    (
-                                        Some(
-                                            "s",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "s",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -436,51 +412,33 @@ Plan: Select {
             expressions: [
                 Field(
                     1,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "m",
+                        "title",
                     ),
                 ),
                 Field(
                     8,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "g",
+                        "name",
                     ),
                 ),
                 Field(
                     10,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "s",
+                        "name",
                     ),
                 ),
             ],
             labels: [
                 None,
-                Some(
-                    (
-                        None,
-                        "genre",
-                    ),
+                Unqualified(
+                    "genre",
                 ),
-                Some(
-                    (
-                        None,
-                        "studio",
-                    ),
+                Unqualified(
+                    "studio",
                 ),
             ],
         },
@@ -488,13 +446,9 @@ Plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "m",
+                        "title",
                     ),
                 ),
                 Ascending,
@@ -502,25 +456,15 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                None,
-                "genre",
-            ),
+        Unqualified(
+            "genre",
         ),
-        Some(
-            (
-                None,
-                "studio",
-            ),
+        Unqualified(
+            "studio",
         ),
     ],
 }
@@ -546,13 +490,9 @@ Optimized plan: Select {
                         predicate: Equal(
                             Field(
                                 3,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "genre_id",
-                                    ),
+                                Qualified(
+                                    "m",
+                                    "genre_id",
                                 ),
                             ),
                             Constant(
@@ -563,13 +503,9 @@ Optimized plan: Select {
                         ),
                     },
                     left_field: 3,
-                    left_label: Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "genre_id",
-                        ),
+                    left_label: Qualified(
+                        "m",
+                        "genre_id",
                     ),
                     right: KeyLookup {
                         table: "genres",
@@ -583,25 +519,17 @@ Optimized plan: Select {
                         ),
                     },
                     right_field: 0,
-                    right_label: Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "id",
-                        ),
+                    right_label: Qualified(
+                        "g",
+                        "id",
                     ),
                     right_size: 2,
                     outer: false,
                 },
                 left_field: 2,
-                left_label: Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "studio_id",
-                    ),
+                left_label: Qualified(
+                    "m",
+                    "studio_id",
                 ),
                 right: KeyLookup {
                     table: "studios",
@@ -615,13 +543,9 @@ Optimized plan: Select {
                     ),
                 },
                 right_field: 0,
-                right_label: Some(
-                    (
-                        Some(
-                            "s",
-                        ),
-                        "id",
-                    ),
+                right_label: Qualified(
+                    "s",
+                    "id",
                 ),
                 right_size: 3,
                 outer: false,
@@ -629,51 +553,33 @@ Optimized plan: Select {
             expressions: [
                 Field(
                     1,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "m",
+                        "title",
                     ),
                 ),
                 Field(
                     8,
-                    Some(
-                        (
-                            Some(
-                                "g",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "g",
+                        "name",
                     ),
                 ),
                 Field(
                     10,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "s",
+                        "name",
                     ),
                 ),
             ],
             labels: [
                 None,
-                Some(
-                    (
-                        None,
-                        "genre",
-                    ),
+                Unqualified(
+                    "genre",
                 ),
-                Some(
-                    (
-                        None,
-                        "studio",
-                    ),
+                Unqualified(
+                    "studio",
                 ),
             ],
         },
@@ -681,13 +587,9 @@ Optimized plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "m",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "m",
+                        "title",
                     ),
                 ),
                 Ascending,
@@ -695,25 +597,15 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                None,
-                "genre",
-            ),
+        Unqualified(
+            "genre",
         ),
-        Some(
-            (
-                None,
-                "studio",
-            ),
+        Unqualified(
+            "studio",
         ),
     ],
 }

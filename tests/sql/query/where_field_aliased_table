@@ -221,13 +221,9 @@ Plan: Select {
                     GreaterThan(
                         Field(
                             0,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "id",
-                                ),
+                            Qualified(
+                                "m",
+                                "id",
                             ),
                         ),
                         Constant(
@@ -239,13 +235,9 @@ Plan: Select {
                     Equal(
                         Field(
                             0,
-                            Some(
-                                (
-                                    Some(
-                                        "m",
-                                    ),
-                                    "id",
-                                ),
+                            Qualified(
+                                "m",
+                                "id",
                             ),
                         ),
                         Constant(
@@ -258,13 +250,9 @@ Plan: Select {
                 Equal(
                     Field(
                         7,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "g",
+                            "id",
                         ),
                     ),
                     Constant(
@@ -278,24 +266,16 @@ Plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
         ],
@@ -305,21 +285,13 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
     ],
 }
@@ -410,13 +382,9 @@ Optimized plan: Select {
                         GreaterThan(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "m",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -428,13 +396,9 @@ Optimized plan: Select {
                         Equal(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "m",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -468,24 +432,16 @@ Optimized plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
         ],
@@ -495,21 +451,13 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
     ],
 }

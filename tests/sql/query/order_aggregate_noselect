@@ -158,29 +158,20 @@ Plan: Select {
                         expressions: [
                             Field(
                                 5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
+                                Unqualified(
+                                    "rating",
                                 ),
                             ),
                             Field(
                                 5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
+                                Unqualified(
+                                    "rating",
                                 ),
                             ),
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                         ],
@@ -199,13 +190,9 @@ Plan: Select {
                 expressions: [
                     Field(
                         2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "studio_id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "studio_id",
                         ),
                     ),
                     Field(
@@ -249,13 +236,9 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
         None,
     ],
@@ -351,29 +334,20 @@ Optimized plan: Select {
                         expressions: [
                             Field(
                                 5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
+                                Unqualified(
+                                    "rating",
                                 ),
                             ),
                             Field(
                                 5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
+                                Unqualified(
+                                    "rating",
                                 ),
                             ),
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                         ],
@@ -392,13 +366,9 @@ Optimized plan: Select {
                 expressions: [
                     Field(
                         2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "studio_id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "studio_id",
                         ),
                     ),
                     Field(
@@ -442,13 +412,9 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
         None,
     ],

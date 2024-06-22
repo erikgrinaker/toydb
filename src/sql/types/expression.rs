@@ -16,7 +16,7 @@ pub enum Expression {
     Constant(Value),
     /// A field reference (row index) with optional label. The label is only
     /// used for display purposes.
-    Field(usize, Option<Label>),
+    Field(usize, Label),
 
     /// Logical AND of two booleans: a AND b.
     And(Box<Expression>, Box<Expression>),
@@ -61,9 +61,8 @@ impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Constant(value) => write!(f, "{value}"),
-            Self::Field(index, None) => write!(f, "#{index}"),
-            Self::Field(_, Some((None, name))) => write!(f, "{name}"),
-            Self::Field(_, Some((Some(table), name))) => write!(f, "{table}.{name}"),
+            Self::Field(index, Label::None) => write!(f, "#{index}"),
+            Self::Field(_, label) => write!(f, "{label}"),
 
             Self::And(lhs, rhs) => write!(f, "{lhs} AND {rhs}"),
             Self::Or(lhs, rhs) => write!(f, "{lhs} OR {rhs}"),
@@ -446,7 +445,7 @@ impl Expression {
     }
 
     // Creates an expression from a list of field lookup values.
-    pub fn from_lookup(field: usize, label: Option<Label>, values: Vec<Value>) -> Self {
+    pub fn from_lookup(field: usize, label: Label, values: Vec<Value>) -> Self {
         if values.is_empty() {
             return Expression::Equal(
                 Expression::Field(field, label).into(),

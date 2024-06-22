@@ -145,11 +145,8 @@ Plan: Select {
                     expressions: [
                         Field(
                             1,
-                            Some(
-                                (
-                                    None,
-                                    "title",
-                                ),
+                            Unqualified(
+                                "title",
                             ),
                         ),
                     ],
@@ -163,13 +160,9 @@ Plan: Select {
             expressions: [
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "movies",
+                        "title",
                     ),
                 ),
             ],
@@ -181,13 +174,9 @@ Plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "movies",
+                        "title",
                     ),
                 ),
                 Ascending,
@@ -195,13 +184,9 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
     ],
 }
@@ -295,11 +280,8 @@ Optimized plan: Select {
                     expressions: [
                         Field(
                             1,
-                            Some(
-                                (
-                                    None,
-                                    "title",
-                                ),
+                            Unqualified(
+                                "title",
                             ),
                         ),
                     ],
@@ -313,13 +295,9 @@ Optimized plan: Select {
             expressions: [
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "movies",
+                        "title",
                     ),
                 ),
             ],
@@ -331,13 +309,9 @@ Optimized plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "movies",
-                            ),
-                            "title",
-                        ),
+                    Qualified(
+                        "movies",
+                        "title",
                     ),
                 ),
                 Ascending,
@@ -345,13 +319,9 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
     ],
 }

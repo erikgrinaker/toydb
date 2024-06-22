@@ -177,39 +177,27 @@ Plan: Select {
             expressions: [
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
+                    Unqualified(
+                        "id",
                     ),
                 ),
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "title",
-                        ),
+                    Unqualified(
+                        "title",
                     ),
                 ),
                 Field(
                     4,
-                    Some(
-                        (
-                            None,
-                            "released",
-                        ),
+                    Unqualified(
+                        "released",
                     ),
                 ),
                 Modulo(
                     Field(
                         4,
-                        Some(
-                            (
-                                None,
-                                "released",
-                            ),
+                        Unqualified(
+                            "released",
                         ),
                     ),
                     Constant(
@@ -223,11 +211,8 @@ Plan: Select {
                 None,
                 None,
                 None,
-                Some(
-                    (
-                        None,
-                        "ord",
-                    ),
+                Unqualified(
+                    "ord",
                 ),
             ],
         },
@@ -235,11 +220,8 @@ Plan: Select {
             (
                 Field(
                     3,
-                    Some(
-                        (
-                            None,
-                            "ord",
-                        ),
+                    Unqualified(
+                        "ord",
                     ),
                 ),
                 Ascending,
@@ -247,35 +229,20 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                None,
-                "ord",
-            ),
+        Unqualified(
+            "ord",
         ),
     ],
 }
@@ -367,39 +334,27 @@ Optimized plan: Select {
             expressions: [
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "id",
-                        ),
+                    Unqualified(
+                        "id",
                     ),
                 ),
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "title",
-                        ),
+                    Unqualified(
+                        "title",
                     ),
                 ),
                 Field(
                     4,
-                    Some(
-                        (
-                            None,
-                            "released",
-                        ),
+                    Unqualified(
+                        "released",
                     ),
                 ),
                 Modulo(
                     Field(
                         4,
-                        Some(
-                            (
-                                None,
-                                "released",
-                            ),
+                        Unqualified(
+                            "released",
                         ),
                     ),
                     Constant(
@@ -413,11 +368,8 @@ Optimized plan: Select {
                 None,
                 None,
                 None,
-                Some(
-                    (
-                        None,
-                        "ord",
-                    ),
+                Unqualified(
+                    "ord",
                 ),
             ],
         },
@@ -425,11 +377,8 @@ Optimized plan: Select {
             (
                 Field(
                     3,
-                    Some(
-                        (
-                            None,
-                            "ord",
-                        ),
+                    Unqualified(
+                        "ord",
                     ),
                 ),
                 Ascending,
@@ -437,35 +386,20 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                None,
-                "ord",
-            ),
+        Unqualified(
+            "ord",
         ),
     ],
 }

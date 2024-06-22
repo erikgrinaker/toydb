@@ -71,11 +71,8 @@ Plan: Select {
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "value",
-                        ),
+                    Unqualified(
+                        "value",
                     ),
                 ),
                 Ascending,
@@ -83,21 +80,13 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "integers",
-                ),
-                "id",
-            ),
+        Qualified(
+            "integers",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "integers",
-                ),
-                "value",
-            ),
+        Qualified(
+            "integers",
+            "value",
         ),
     ],
 }
@@ -138,11 +127,8 @@ Optimized plan: Select {
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "value",
-                        ),
+                    Unqualified(
+                        "value",
                     ),
                 ),
                 Ascending,
@@ -150,21 +136,13 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "integers",
-                ),
-                "id",
-            ),
+        Qualified(
+            "integers",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "integers",
-                ),
-                "value",
-            ),
+        Qualified(
+            "integers",
+            "value",
         ),
     ],
 }

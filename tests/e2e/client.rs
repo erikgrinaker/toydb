@@ -4,7 +4,7 @@ use toydb::error::{Error, Result};
 use toydb::raft;
 use toydb::server::Status;
 use toydb::sql::engine::StatementResult;
-use toydb::sql::types::{Column, DataType, Table, Value};
+use toydb::sql::types::{Column, DataType, Label, Table, Value};
 use toydb::storage::{engine, mvcc};
 
 use pretty_assertions::assert_eq;
@@ -159,8 +159,8 @@ fn execute() -> Result<()> {
         result,
         StatementResult::Select {
             columns: vec![
-                Some((Some("genres".into()), "id".into())),
-                Some((Some("genres".into()), "name".into()))
+                Label::Qualified("genres".into(), "id".into()),
+                Label::Qualified("genres".into(), "name".into()),
             ],
             rows: vec![
                 vec![Value::Integer(1), Value::String("Science Fiction".into())],
@@ -175,8 +175,8 @@ fn execute() -> Result<()> {
         result,
         StatementResult::Select {
             columns: vec![
-                Some((Some("genres".into()), "id".into())),
-                Some((Some("genres".into()), "name".into()))
+                Label::Qualified("genres".into(), "id".into()),
+                Label::Qualified("genres".into(), "name".into()),
             ],
             rows: vec![],
         }

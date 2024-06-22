@@ -127,11 +127,8 @@ Plan: Select {
             (
                 Field(
                     4,
-                    Some(
-                        (
-                            None,
-                            "released",
-                        ),
+                    Unqualified(
+                        "released",
                     ),
                 ),
                 Descending,
@@ -139,61 +136,33 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
     ],
 }
@@ -285,11 +254,8 @@ Optimized plan: Select {
             (
                 Field(
                     4,
-                    Some(
-                        (
-                            None,
-                            "released",
-                        ),
+                    Unqualified(
+                        "released",
                     ),
                 ),
                 Descending,
@@ -297,61 +263,33 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
     ],
 }

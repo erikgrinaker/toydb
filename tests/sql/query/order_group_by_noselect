@@ -146,20 +146,14 @@ Plan: Select {
                         expressions: [
                             Field(
                                 5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
+                                Unqualified(
+                                    "rating",
                                 ),
                             ),
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                         ],
@@ -180,13 +174,9 @@ Plan: Select {
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "studio_id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "studio_id",
                         ),
                     ),
                 ],
@@ -199,13 +189,9 @@ Plan: Select {
                 (
                     Field(
                         1,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "studio_id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "studio_id",
                         ),
                     ),
                     Ascending,
@@ -317,20 +303,14 @@ Optimized plan: Select {
                         expressions: [
                             Field(
                                 5,
-                                Some(
-                                    (
-                                        None,
-                                        "rating",
-                                    ),
+                                Unqualified(
+                                    "rating",
                                 ),
                             ),
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                         ],
@@ -351,13 +331,9 @@ Optimized plan: Select {
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "studio_id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "studio_id",
                         ),
                     ),
                 ],
@@ -370,13 +346,9 @@ Optimized plan: Select {
                 (
                     Field(
                         1,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "studio_id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "studio_id",
                         ),
                     ),
                     Ascending,

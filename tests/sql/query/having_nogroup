@@ -155,29 +155,20 @@ Plan: Select {
                     expressions: [
                         Field(
                             0,
-                            Some(
-                                (
-                                    None,
-                                    "id",
-                                ),
+                            Unqualified(
+                                "id",
                             ),
                         ),
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                     ],
@@ -190,13 +181,9 @@ Plan: Select {
                 predicate: GreaterThan(
                     Field(
                         2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "rating",
-                            ),
+                        Qualified(
+                            "movies",
+                            "rating",
                         ),
                     ),
                     Constant(
@@ -210,13 +197,9 @@ Plan: Select {
                 (
                     Field(
                         0,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "id",
                         ),
                     ),
                     Ascending,
@@ -239,21 +222,13 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
     ],
 }
@@ -347,29 +322,20 @@ Optimized plan: Select {
                     expressions: [
                         Field(
                             0,
-                            Some(
-                                (
-                                    None,
-                                    "id",
-                                ),
+                            Unqualified(
+                                "id",
                             ),
                         ),
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                     ],
@@ -382,13 +348,9 @@ Optimized plan: Select {
                 predicate: GreaterThan(
                     Field(
                         2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "rating",
-                            ),
+                        Qualified(
+                            "movies",
+                            "rating",
                         ),
                     ),
                     Constant(
@@ -402,13 +364,9 @@ Optimized plan: Select {
                 (
                     Field(
                         0,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "id",
                         ),
                     ),
                     Ascending,
@@ -431,21 +389,13 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
     ],
 }

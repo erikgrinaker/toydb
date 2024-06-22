@@ -241,24 +241,16 @@ Plan: Select {
                     Equal(
                         Field(
                             3,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "genre_id",
-                                ),
+                            Qualified(
+                                "movies",
+                                "genre_id",
                             ),
                         ),
                         Field(
                             7,
-                            Some(
-                                (
-                                    Some(
-                                        "genres",
-                                    ),
-                                    "id",
-                                ),
+                            Qualified(
+                                "genres",
+                                "id",
                             ),
                         ),
                     ),
@@ -312,24 +304,16 @@ Plan: Select {
                 Equal(
                     Field(
                         2,
-                        Some(
-                            (
-                                Some(
-                                    "movies",
-                                ),
-                                "studio_id",
-                            ),
+                        Qualified(
+                            "movies",
+                            "studio_id",
                         ),
                     ),
                     Field(
                         9,
-                        Some(
-                            (
-                                Some(
-                                    "studios",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "studios",
+                            "id",
                         ),
                     ),
                 ),
@@ -339,74 +323,46 @@ Plan: Select {
         expressions: [
             Field(
                 1,
-                Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "title",
-                    ),
+                Qualified(
+                    "movies",
+                    "title",
                 ),
             ),
             Field(
                 8,
-                Some(
-                    (
-                        Some(
-                            "genres",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "genres",
+                    "name",
                 ),
             ),
             Field(
                 10,
-                Some(
-                    (
-                        Some(
-                            "studios",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "studios",
+                    "name",
                 ),
             ),
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "genre",
-                ),
+            Unqualified(
+                "genre",
             ),
-            Some(
-                (
-                    None,
-                    "studio",
-                ),
+            Unqualified(
+                "studio",
             ),
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                None,
-                "genre",
-            ),
+        Unqualified(
+            "genre",
         ),
-        Some(
-            (
-                None,
-                "studio",
-            ),
+        Unqualified(
+            "studio",
         ),
     ],
 }
@@ -497,13 +453,9 @@ Optimized plan: Select {
                     alias: None,
                 },
                 left_field: 3,
-                left_label: Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "genre_id",
-                    ),
+                left_label: Qualified(
+                    "movies",
+                    "genre_id",
                 ),
                 right: Scan {
                     table: Table {
@@ -534,25 +486,17 @@ Optimized plan: Select {
                     alias: None,
                 },
                 right_field: 0,
-                right_label: Some(
-                    (
-                        Some(
-                            "genres",
-                        ),
-                        "id",
-                    ),
+                right_label: Qualified(
+                    "genres",
+                    "id",
                 ),
                 right_size: 2,
                 outer: false,
             },
             left_field: 2,
-            left_label: Some(
-                (
-                    Some(
-                        "movies",
-                    ),
-                    "studio_id",
-                ),
+            left_label: Qualified(
+                "movies",
+                "studio_id",
             ),
             right: Scan {
                 table: Table {
@@ -596,13 +540,9 @@ Optimized plan: Select {
                 alias: None,
             },
             right_field: 0,
-            right_label: Some(
-                (
-                    Some(
-                        "studios",
-                    ),
-                    "id",
-                ),
+            right_label: Qualified(
+                "studios",
+                "id",
             ),
             right_size: 3,
             outer: false,
@@ -610,74 +550,46 @@ Optimized plan: Select {
         expressions: [
             Field(
                 1,
-                Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "title",
-                    ),
+                Qualified(
+                    "movies",
+                    "title",
                 ),
             ),
             Field(
                 8,
-                Some(
-                    (
-                        Some(
-                            "genres",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "genres",
+                    "name",
                 ),
             ),
             Field(
                 10,
-                Some(
-                    (
-                        Some(
-                            "studios",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "studios",
+                    "name",
                 ),
             ),
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "genre",
-                ),
+            Unqualified(
+                "genre",
             ),
-            Some(
-                (
-                    None,
-                    "studio",
-                ),
+            Unqualified(
+                "studio",
             ),
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                None,
-                "genre",
-            ),
+        Unqualified(
+            "genre",
         ),
-        Some(
-            (
-                None,
-                "studio",
-            ),
+        Unqualified(
+            "studio",
         ),
     ],
 }

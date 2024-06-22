@@ -238,24 +238,16 @@ Plan: Select {
                             Equal(
                                 Field(
                                     2,
-                                    Some(
-                                        (
-                                            Some(
-                                                "m",
-                                            ),
-                                            "studio_id",
-                                        ),
+                                    Qualified(
+                                        "m",
+                                        "studio_id",
                                     ),
                                 ),
                                 Field(
                                     7,
-                                    Some(
-                                        (
-                                            Some(
-                                                "s",
-                                            ),
-                                            "id",
-                                        ),
+                                    Qualified(
+                                        "s",
+                                        "id",
                                     ),
                                 ),
                             ),
@@ -270,13 +262,9 @@ Plan: Select {
                         ),
                         Field(
                             8,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "name",
-                                ),
+                            Qualified(
+                                "s",
+                                "name",
                             ),
                         ),
                     ],
@@ -293,13 +281,9 @@ Plan: Select {
             expressions: [
                 Field(
                     1,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "s",
+                        "name",
                     ),
                 ),
                 Field(
@@ -316,13 +300,9 @@ Plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "s",
+                        "name",
                     ),
                 ),
                 Ascending,
@@ -330,13 +310,9 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "s",
-                ),
-                "name",
-            ),
+        Qualified(
+            "s",
+            "name",
         ),
         None,
     ],
@@ -432,13 +408,9 @@ Optimized plan: Select {
                             ),
                         },
                         left_field: 2,
-                        left_label: Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "studio_id",
-                            ),
+                        left_label: Qualified(
+                            "m",
+                            "studio_id",
                         ),
                         right: Scan {
                             table: Table {
@@ -484,13 +456,9 @@ Optimized plan: Select {
                             ),
                         },
                         right_field: 0,
-                        right_label: Some(
-                            (
-                                Some(
-                                    "s",
-                                ),
-                                "id",
-                            ),
+                        right_label: Qualified(
+                            "s",
+                            "id",
                         ),
                         right_size: 3,
                         outer: false,
@@ -503,13 +471,9 @@ Optimized plan: Select {
                         ),
                         Field(
                             8,
-                            Some(
-                                (
-                                    Some(
-                                        "s",
-                                    ),
-                                    "name",
-                                ),
+                            Qualified(
+                                "s",
+                                "name",
                             ),
                         ),
                     ],
@@ -526,13 +490,9 @@ Optimized plan: Select {
             expressions: [
                 Field(
                     1,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "s",
+                        "name",
                     ),
                 ),
                 Field(
@@ -549,13 +509,9 @@ Optimized plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            Some(
-                                "s",
-                            ),
-                            "name",
-                        ),
+                    Qualified(
+                        "s",
+                        "name",
                     ),
                 ),
                 Ascending,
@@ -563,13 +519,9 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "s",
-                ),
-                "name",
-            ),
+        Qualified(
+            "s",
+            "name",
         ),
         None,
     ],

@@ -190,24 +190,16 @@ Plan: Select {
                 Equal(
                     Field(
                         3,
-                        Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "genre_id",
-                            ),
+                        Qualified(
+                            "m",
+                            "genre_id",
                         ),
                     ),
                     Field(
                         7,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "g",
+                            "id",
                         ),
                     ),
                 ),
@@ -217,13 +209,9 @@ Plan: Select {
         predicate: Equal(
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
             Constant(
@@ -234,77 +222,41 @@ Plan: Select {
         ),
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "m",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "m",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "released",
-            ),
+        Qualified(
+            "m",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "m",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "m",
+            "ultrahd",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "name",
-            ),
+        Qualified(
+            "g",
+            "name",
         ),
     ],
 }
@@ -324,13 +276,9 @@ Optimized plan: Select {
             ),
         },
         left_field: 3,
-        left_label: Some(
-            (
-                Some(
-                    "m",
-                ),
-                "genre_id",
-            ),
+        left_label: Qualified(
+            "m",
+            "genre_id",
         ),
         right: KeyLookup {
             table: "genres",
@@ -344,89 +292,49 @@ Optimized plan: Select {
             ),
         },
         right_field: 0,
-        right_label: Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        right_label: Qualified(
+            "g",
+            "id",
         ),
         right_size: 2,
         outer: false,
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "m",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "m",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "released",
-            ),
+        Qualified(
+            "m",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "m",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "m",
+            "ultrahd",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "name",
-            ),
+        Qualified(
+            "g",
+            "name",
         ),
     ],
 }

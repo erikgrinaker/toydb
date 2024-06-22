@@ -69,11 +69,8 @@ Plan: Select {
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "value",
-                        ),
+                    Unqualified(
+                        "value",
                     ),
                 ),
                 Ascending,
@@ -81,21 +78,13 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "booleans",
-                ),
-                "id",
-            ),
+        Qualified(
+            "booleans",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "booleans",
-                ),
-                "value",
-            ),
+        Qualified(
+            "booleans",
+            "value",
         ),
     ],
 }
@@ -136,11 +125,8 @@ Optimized plan: Select {
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "value",
-                        ),
+                    Unqualified(
+                        "value",
                     ),
                 ),
                 Ascending,
@@ -148,21 +134,13 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "booleans",
-                ),
-                "id",
-            ),
+        Qualified(
+            "booleans",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "booleans",
-                ),
-                "value",
-            ),
+        Qualified(
+            "booleans",
+            "value",
         ),
     ],
 }

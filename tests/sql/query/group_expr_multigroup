@@ -177,29 +177,20 @@ Plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Field(
                             2,
-                            Some(
-                                (
-                                    None,
-                                    "studio_id",
-                                ),
+                            Unqualified(
+                                "studio_id",
                             ),
                         ),
                         Field(
                             3,
-                            Some(
-                                (
-                                    None,
-                                    "genre_id",
-                                ),
+                            Unqualified(
+                                "genre_id",
                             ),
                         ),
                     ],
@@ -218,20 +209,14 @@ Plan: Select {
                 Add(
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "studio_id",
-                            ),
+                        Unqualified(
+                            "studio_id",
                         ),
                     ),
                     Field(
                         2,
-                        Some(
-                            (
-                                None,
-                                "genre_id",
-                            ),
+                        Unqualified(
+                            "genre_id",
                         ),
                     ),
                 ),
@@ -241,17 +226,11 @@ Plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "multi",
-                    ),
+                Unqualified(
+                    "multi",
                 ),
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
+                Unqualified(
+                    "rating",
                 ),
             ],
         },
@@ -259,11 +238,8 @@ Plan: Select {
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "rating",
-                        ),
+                    Unqualified(
+                        "rating",
                     ),
                 ),
                 Ascending,
@@ -271,11 +247,8 @@ Plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "multi",
-                        ),
+                    Unqualified(
+                        "multi",
                     ),
                 ),
                 Ascending,
@@ -283,17 +256,11 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "multi",
-            ),
+        Unqualified(
+            "multi",
         ),
-        Some(
-            (
-                None,
-                "rating",
-            ),
+        Unqualified(
+            "rating",
         ),
     ],
 }
@@ -387,29 +354,20 @@ Optimized plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Field(
                             2,
-                            Some(
-                                (
-                                    None,
-                                    "studio_id",
-                                ),
+                            Unqualified(
+                                "studio_id",
                             ),
                         ),
                         Field(
                             3,
-                            Some(
-                                (
-                                    None,
-                                    "genre_id",
-                                ),
+                            Unqualified(
+                                "genre_id",
                             ),
                         ),
                     ],
@@ -428,20 +386,14 @@ Optimized plan: Select {
                 Add(
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "studio_id",
-                            ),
+                        Unqualified(
+                            "studio_id",
                         ),
                     ),
                     Field(
                         2,
-                        Some(
-                            (
-                                None,
-                                "genre_id",
-                            ),
+                        Unqualified(
+                            "genre_id",
                         ),
                     ),
                 ),
@@ -451,17 +403,11 @@ Optimized plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "multi",
-                    ),
+                Unqualified(
+                    "multi",
                 ),
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
+                Unqualified(
+                    "rating",
                 ),
             ],
         },
@@ -469,11 +415,8 @@ Optimized plan: Select {
             (
                 Field(
                     1,
-                    Some(
-                        (
-                            None,
-                            "rating",
-                        ),
+                    Unqualified(
+                        "rating",
                     ),
                 ),
                 Ascending,
@@ -481,11 +424,8 @@ Optimized plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "multi",
-                        ),
+                    Unqualified(
+                        "multi",
                     ),
                 ),
                 Ascending,
@@ -493,17 +433,11 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "multi",
-            ),
+        Unqualified(
+            "multi",
         ),
-        Some(
-            (
-                None,
-                "rating",
-            ),
+        Unqualified(
+            "rating",
         ),
     ],
 }

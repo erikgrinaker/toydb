@@ -146,20 +146,14 @@ Plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Field(
                             2,
-                            Some(
-                                (
-                                    None,
-                                    "studio_id",
-                                ),
+                            Unqualified(
+                                "studio_id",
                             ),
                         ),
                     ],
@@ -180,11 +174,8 @@ Plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "best",
-                    ),
+                Unqualified(
+                    "best",
                 ),
             ],
         },
@@ -192,11 +183,8 @@ Plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "best",
-                        ),
+                    Unqualified(
+                        "best",
                     ),
                 ),
                 Descending,
@@ -204,11 +192,8 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "best",
-            ),
+        Unqualified(
+            "best",
         ),
     ],
 }
@@ -302,20 +287,14 @@ Optimized plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Field(
                             2,
-                            Some(
-                                (
-                                    None,
-                                    "studio_id",
-                                ),
+                            Unqualified(
+                                "studio_id",
                             ),
                         ),
                     ],
@@ -336,11 +315,8 @@ Optimized plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "best",
-                    ),
+                Unqualified(
+                    "best",
                 ),
             ],
         },
@@ -348,11 +324,8 @@ Optimized plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "best",
-                        ),
+                    Unqualified(
+                        "best",
                     ),
                 ),
                 Descending,
@@ -360,11 +333,8 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "best",
-            ),
+        Unqualified(
+            "best",
         ),
     ],
 }

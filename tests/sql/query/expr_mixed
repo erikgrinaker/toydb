@@ -188,32 +188,23 @@ Plan: Select {
                 ),
                 Field(
                     4,
-                    Some(
-                        (
-                            None,
-                            "released",
-                        ),
+                    Unqualified(
+                        "released",
                     ),
                 ),
             ),
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "age",
-                ),
+            Unqualified(
+                "age",
             ),
         ],
     },
     labels: [
         None,
-        Some(
-            (
-                None,
-                "age",
-            ),
+        Unqualified(
+            "age",
         ),
     ],
 }
@@ -315,32 +306,23 @@ Optimized plan: Select {
                 ),
                 Field(
                     4,
-                    Some(
-                        (
-                            None,
-                            "released",
-                        ),
+                    Unqualified(
+                        "released",
                     ),
                 ),
             ),
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "age",
-                ),
+            Unqualified(
+                "age",
             ),
         ],
     },
     labels: [
         None,
-        Some(
-            (
-                None,
-                "age",
-            ),
+        Unqualified(
+            "age",
         ),
     ],
 }

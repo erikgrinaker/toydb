@@ -186,67 +186,40 @@ Plan: Select {
             ),
             Field(
                 0,
-                Some(
-                    (
-                        None,
-                        "id",
-                    ),
+                Unqualified(
+                    "id",
                 ),
             ),
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "b",
-                ),
+            Unqualified(
+                "b",
             ),
-            Some(
-                (
-                    None,
-                    "c",
-                ),
+            Unqualified(
+                "c",
             ),
-            Some(
-                (
-                    None,
-                    "👋",
-                ),
+            Unqualified(
+                "👋",
             ),
-            Some(
-                (
-                    None,
-                    "some id",
-                ),
+            Unqualified(
+                "some id",
             ),
         ],
     },
     labels: [
         None,
-        Some(
-            (
-                None,
-                "b",
-            ),
+        Unqualified(
+            "b",
         ),
-        Some(
-            (
-                None,
-                "c",
-            ),
+        Unqualified(
+            "c",
         ),
-        Some(
-            (
-                None,
-                "👋",
-            ),
+        Unqualified(
+            "👋",
         ),
-        Some(
-            (
-                None,
-                "some id",
-            ),
+        Unqualified(
+            "some id",
         ),
     ],
 }
@@ -357,67 +330,40 @@ Optimized plan: Select {
             ),
             Field(
                 0,
-                Some(
-                    (
-                        None,
-                        "id",
-                    ),
+                Unqualified(
+                    "id",
                 ),
             ),
         ],
         labels: [
             None,
-            Some(
-                (
-                    None,
-                    "b",
-                ),
+            Unqualified(
+                "b",
             ),
-            Some(
-                (
-                    None,
-                    "c",
-                ),
+            Unqualified(
+                "c",
             ),
-            Some(
-                (
-                    None,
-                    "👋",
-                ),
+            Unqualified(
+                "👋",
             ),
-            Some(
-                (
-                    None,
-                    "some id",
-                ),
+            Unqualified(
+                "some id",
             ),
         ],
     },
     labels: [
         None,
-        Some(
-            (
-                None,
-                "b",
-            ),
+        Unqualified(
+            "b",
         ),
-        Some(
-            (
-                None,
-                "c",
-            ),
+        Unqualified(
+            "c",
         ),
-        Some(
-            (
-                None,
-                "👋",
-            ),
+        Unqualified(
+            "👋",
         ),
-        Some(
-            (
-                None,
-                "some id",
-            ),
+        Unqualified(
+            "some id",
         ),
     ],
 }

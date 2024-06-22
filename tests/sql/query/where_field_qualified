@@ -213,13 +213,9 @@ Plan: Select {
                     GreaterThan(
                         Field(
                             0,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "id",
-                                ),
+                            Qualified(
+                                "movies",
+                                "id",
                             ),
                         ),
                         Constant(
@@ -231,13 +227,9 @@ Plan: Select {
                     Equal(
                         Field(
                             0,
-                            Some(
-                                (
-                                    Some(
-                                        "movies",
-                                    ),
-                                    "id",
-                                ),
+                            Qualified(
+                                "movies",
+                                "id",
                             ),
                         ),
                         Constant(
@@ -250,13 +242,9 @@ Plan: Select {
                 Equal(
                     Field(
                         7,
-                        Some(
-                            (
-                                Some(
-                                    "genres",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "genres",
+                            "id",
                         ),
                     ),
                     Constant(
@@ -270,24 +258,16 @@ Plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "movies",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "genres",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "genres",
+                    "id",
                 ),
             ),
         ],
@@ -297,21 +277,13 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "id",
-            ),
+        Qualified(
+            "genres",
+            "id",
         ),
     ],
 }
@@ -402,13 +374,9 @@ Optimized plan: Select {
                         GreaterThan(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        Some(
-                                            "movies",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "movies",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -420,13 +388,9 @@ Optimized plan: Select {
                         Equal(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        Some(
-                                            "movies",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "movies",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -456,24 +420,16 @@ Optimized plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "movies",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "genres",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "genres",
+                    "id",
                 ),
             ),
         ],
@@ -483,21 +439,13 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "id",
-            ),
+        Qualified(
+            "genres",
+            "id",
         ),
     ],
 }

@@ -196,11 +196,8 @@ Plan: Select {
                         Equal(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        None,
-                                        "id",
-                                    ),
+                                Unqualified(
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -212,11 +209,8 @@ Plan: Select {
                         Equal(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        None,
-                                        "id",
-                                    ),
+                                Unqualified(
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -229,11 +223,8 @@ Plan: Select {
                     Equal(
                         Field(
                             0,
-                            Some(
-                                (
-                                    None,
-                                    "id",
-                                ),
+                            Unqualified(
+                                "id",
                             ),
                         ),
                         Constant(
@@ -246,11 +237,8 @@ Plan: Select {
                 Equal(
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Constant(
@@ -263,11 +251,8 @@ Plan: Select {
             Equal(
                 Field(
                     3,
-                    Some(
-                        (
-                            None,
-                            "genre_id",
-                        ),
+                    Unqualified(
+                        "genre_id",
                     ),
                 ),
                 Constant(
@@ -279,61 +264,33 @@ Plan: Select {
         ),
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
     ],
 }
@@ -361,11 +318,8 @@ Optimized plan: Select {
         predicate: Equal(
             Field(
                 3,
-                Some(
-                    (
-                        None,
-                        "genre_id",
-                    ),
+                Unqualified(
+                    "genre_id",
                 ),
             ),
             Constant(
@@ -376,61 +330,33 @@ Optimized plan: Select {
         ),
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
     ],
 }

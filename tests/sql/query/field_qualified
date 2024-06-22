@@ -128,13 +128,9 @@ Plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "movies",
+                    "id",
                 ),
             ),
         ],
@@ -143,13 +139,9 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
     ],
 }
@@ -240,13 +232,9 @@ Optimized plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "movies",
+                    "id",
                 ),
             ),
         ],
@@ -255,13 +243,9 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
     ],
 }

@@ -46,7 +46,7 @@ pub enum Plan {
     },
     /// A SELECT plan. Recursively executes the query plan tree and returns the
     /// resulting rows. Also includes the output column labels.
-    Select { root: Node, labels: Vec<Option<Label>> },
+    Select { root: Node, labels: Vec<Label> },
 }
 
 impl Plan {
@@ -104,10 +104,10 @@ pub enum Node {
     HashJoin {
         left: Box<Node>,
         left_field: usize,
-        left_label: Option<Label>,
+        left_label: Label,
         right: Box<Node>,
         right_field: usize,
-        right_label: Option<Label>,
+        right_label: Label,
         right_size: usize,
         outer: bool,
     },
@@ -140,7 +140,7 @@ pub enum Node {
     Order { source: Box<Node>, orders: Vec<(Expression, Direction)> },
     /// Projects the input rows by evaluating the given expressions.
     /// The labels are only used when displaying the plan.
-    Projection { source: Box<Node>, expressions: Vec<Expression>, labels: Vec<Option<Label>> },
+    Projection { source: Box<Node>, expressions: Vec<Expression>, labels: Vec<Label> },
     /// A full table scan, with an optional filter pushdown. The schema is used
     /// during plan optimization. The alias is only used for formatting.
     Scan { table: Table, filter: Option<Expression>, alias: Option<String> },
@@ -359,16 +359,13 @@ impl Node {
                 ..
             } => {
                 let kind = if *outer { "outer" } else { "inner" };
-                // TODO: make Label a proper type with formatting.
                 let left_label = match left_label {
-                    Some((Some(t), n)) => format!("{t}.{n}"),
-                    Some((None, n)) => n.clone(),
-                    None => format!("left #{left_field}"),
+                    Label::None => format!("left #{left_field}"),
+                    label => format!("{label}"),
                 };
                 let right_label = match right_label {
-                    Some((Some(t), n)) => format!("{t}.{n}"),
-                    Some((None, n)) => n.clone(),
-                    None => format!("right #{right_field}"),
+                    Label::None => format!("right #{right_field}"),
+                    label => format!("{label}"),
                 };
                 write!(f, "HashJoin: {kind} on {left_label} = {right_label}")?;
                 left.format(f, prefix.clone(), false, false)?;

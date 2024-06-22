@@ -208,24 +208,16 @@ Plan: Select {
                 Equal(
                     Field(
                         0,
-                        Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "m",
+                            "id",
                         ),
                     ),
                     Field(
                         7,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "g",
+                            "id",
                         ),
                     ),
                 ),
@@ -235,54 +227,34 @@ Plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
         ],
         labels: [
-            Some(
-                (
-                    None,
-                    "movie_id",
-                ),
+            Unqualified(
+                "movie_id",
             ),
-            Some(
-                (
-                    None,
-                    "genre_id",
-                ),
+            Unqualified(
+                "genre_id",
             ),
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "movie_id",
-            ),
+        Unqualified(
+            "movie_id",
         ),
-        Some(
-            (
-                None,
-                "genre_id",
-            ),
+        Unqualified(
+            "genre_id",
         ),
     ],
 }
@@ -374,13 +346,9 @@ Optimized plan: Select {
                 ),
             },
             left_field: 0,
-            left_label: Some(
-                (
-                    Some(
-                        "m",
-                    ),
-                    "id",
-                ),
+            left_label: Qualified(
+                "m",
+                "id",
             ),
             right: Scan {
                 table: Table {
@@ -413,13 +381,9 @@ Optimized plan: Select {
                 ),
             },
             right_field: 0,
-            right_label: Some(
-                (
-                    Some(
-                        "g",
-                    ),
-                    "id",
-                ),
+            right_label: Qualified(
+                "g",
+                "id",
             ),
             right_size: 2,
             outer: true,
@@ -427,54 +391,34 @@ Optimized plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
         ],
         labels: [
-            Some(
-                (
-                    None,
-                    "movie_id",
-                ),
+            Unqualified(
+                "movie_id",
             ),
-            Some(
-                (
-                    None,
-                    "genre_id",
-                ),
+            Unqualified(
+                "genre_id",
             ),
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "movie_id",
-            ),
+        Unqualified(
+            "movie_id",
         ),
-        Some(
-            (
-                None,
-                "genre_id",
-            ),
+        Unqualified(
+            "genre_id",
         ),
     ],
 }

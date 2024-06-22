@@ -191,56 +191,38 @@ Plan: Select {
                 expressions: [
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                 ],
@@ -395,56 +377,38 @@ Optimized plan: Select {
                 expressions: [
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                     Field(
                         0,
-                        Some(
-                            (
-                                None,
-                                "id",
-                            ),
+                        Unqualified(
+                            "id",
                         ),
                     ),
                 ],

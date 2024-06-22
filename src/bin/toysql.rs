@@ -199,17 +199,10 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
             StatementResult::Explain(plan) => println!("{}", plan),
             StatementResult::Select { columns, rows } => {
                 if self.show_headers {
-                    println!(
-                        "{}",
-                        columns
-                            .iter()
-                            .map(|c| c.as_ref().map(|l| l.1.as_str()).unwrap_or("?"))
-                            .collect::<Vec<_>>()
-                            .join("|")
-                    );
+                    println!("{}", columns.into_iter().map(|c| c.as_header()).join("|"));
                 }
                 for row in rows {
-                    println!("{}", row.into_iter().map(|v| format!("{}", v)).join("|"));
+                    println!("{}", row.into_iter().map(|v| v.to_string()).join("|"));
                 }
             }
         }

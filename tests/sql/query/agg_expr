@@ -150,11 +150,8 @@ Plan: Select {
                     Multiply(
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Constant(
@@ -290,11 +287,8 @@ Optimized plan: Select {
                     Multiply(
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Constant(

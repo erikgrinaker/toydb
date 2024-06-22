@@ -123,47 +123,32 @@ Plan: Select {
                 expressions: [
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                 ],
@@ -260,47 +245,32 @@ Optimized plan: Select {
                 expressions: [
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                     Field(
                         1,
-                        Some(
-                            (
-                                None,
-                                "i",
-                            ),
+                        Unqualified(
+                            "i",
                         ),
                     ),
                 ],

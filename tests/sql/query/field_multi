@@ -133,20 +133,14 @@ Plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        None,
-                        "id",
-                    ),
+                Unqualified(
+                    "id",
                 ),
             ),
             Field(
                 1,
-                Some(
-                    (
-                        None,
-                        "title",
-                    ),
+                Unqualified(
+                    "title",
                 ),
             ),
         ],
@@ -156,21 +150,13 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
     ],
 }
@@ -261,20 +247,14 @@ Optimized plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        None,
-                        "id",
-                    ),
+                Unqualified(
+                    "id",
                 ),
             ),
             Field(
                 1,
-                Some(
-                    (
-                        None,
-                        "title",
-                    ),
+                Unqualified(
+                    "title",
                 ),
             ),
         ],
@@ -284,21 +264,13 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
     ],
 }

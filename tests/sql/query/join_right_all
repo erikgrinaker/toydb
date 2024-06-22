@@ -185,24 +185,16 @@ Plan: Select {
                 Equal(
                     Field(
                         0,
-                        Some(
-                            (
-                                Some(
-                                    "m",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "m",
+                            "id",
                         ),
                     ),
                     Field(
                         7,
-                        Some(
-                            (
-                                Some(
-                                    "g",
-                                ),
-                                "id",
-                            ),
+                        Qualified(
+                            "g",
+                            "id",
                         ),
                     ),
                 ),
@@ -212,101 +204,65 @@ Plan: Select {
         expressions: [
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
             Field(
                 8,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "g",
+                    "name",
                 ),
             ),
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 1,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "title",
-                    ),
+                Qualified(
+                    "m",
+                    "title",
                 ),
             ),
             Field(
                 2,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "studio_id",
-                    ),
+                Qualified(
+                    "m",
+                    "studio_id",
                 ),
             ),
             Field(
                 3,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "genre_id",
-                    ),
+                Qualified(
+                    "m",
+                    "genre_id",
                 ),
             ),
             Field(
                 4,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "released",
-                    ),
+                Qualified(
+                    "m",
+                    "released",
                 ),
             ),
             Field(
                 5,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "rating",
-                    ),
+                Qualified(
+                    "m",
+                    "rating",
                 ),
             ),
             Field(
                 6,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "ultrahd",
-                    ),
+                Qualified(
+                    "m",
+                    "ultrahd",
                 ),
             ),
         ],
@@ -323,77 +279,41 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "name",
-            ),
+        Qualified(
+            "g",
+            "name",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "m",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "m",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "released",
-            ),
+        Qualified(
+            "m",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "m",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "m",
+            "ultrahd",
         ),
     ],
 }
@@ -485,13 +405,9 @@ Optimized plan: Select {
                 ),
             },
             left_field: 0,
-            left_label: Some(
-                (
-                    Some(
-                        "m",
-                    ),
-                    "id",
-                ),
+            left_label: Qualified(
+                "m",
+                "id",
             ),
             right: Scan {
                 table: Table {
@@ -524,13 +440,9 @@ Optimized plan: Select {
                 ),
             },
             right_field: 0,
-            right_label: Some(
-                (
-                    Some(
-                        "g",
-                    ),
-                    "id",
-                ),
+            right_label: Qualified(
+                "g",
+                "id",
             ),
             right_size: 2,
             outer: true,
@@ -538,101 +450,65 @@ Optimized plan: Select {
         expressions: [
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
             Field(
                 8,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "g",
+                    "name",
                 ),
             ),
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 1,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "title",
-                    ),
+                Qualified(
+                    "m",
+                    "title",
                 ),
             ),
             Field(
                 2,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "studio_id",
-                    ),
+                Qualified(
+                    "m",
+                    "studio_id",
                 ),
             ),
             Field(
                 3,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "genre_id",
-                    ),
+                Qualified(
+                    "m",
+                    "genre_id",
                 ),
             ),
             Field(
                 4,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "released",
-                    ),
+                Qualified(
+                    "m",
+                    "released",
                 ),
             ),
             Field(
                 5,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "rating",
-                    ),
+                Qualified(
+                    "m",
+                    "rating",
                 ),
             ),
             Field(
                 6,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "ultrahd",
-                    ),
+                Qualified(
+                    "m",
+                    "ultrahd",
                 ),
             ),
         ],
@@ -649,77 +525,41 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "name",
-            ),
+        Qualified(
+            "g",
+            "name",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "m",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "m",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "released",
-            ),
+        Qualified(
+            "m",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "m",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "m",
+            "ultrahd",
         ),
     ],
 }

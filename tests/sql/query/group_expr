@@ -155,21 +155,15 @@ Plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Multiply(
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                             Constant(
@@ -196,11 +190,8 @@ Plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
+                Unqualified(
+                    "rating",
                 ),
             ],
         },
@@ -208,11 +199,8 @@ Plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "rating",
-                        ),
+                    Unqualified(
+                        "rating",
                     ),
                 ),
                 Ascending,
@@ -220,11 +208,8 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "rating",
-            ),
+        Unqualified(
+            "rating",
         ),
     ],
 }
@@ -318,21 +303,15 @@ Optimized plan: Select {
                     expressions: [
                         Field(
                             5,
-                            Some(
-                                (
-                                    None,
-                                    "rating",
-                                ),
+                            Unqualified(
+                                "rating",
                             ),
                         ),
                         Multiply(
                             Field(
                                 2,
-                                Some(
-                                    (
-                                        None,
-                                        "studio_id",
-                                    ),
+                                Unqualified(
+                                    "studio_id",
                                 ),
                             ),
                             Constant(
@@ -359,11 +338,8 @@ Optimized plan: Select {
                 ),
             ],
             labels: [
-                Some(
-                    (
-                        None,
-                        "rating",
-                    ),
+                Unqualified(
+                    "rating",
                 ),
             ],
         },
@@ -371,11 +347,8 @@ Optimized plan: Select {
             (
                 Field(
                     0,
-                    Some(
-                        (
-                            None,
-                            "rating",
-                        ),
+                    Unqualified(
+                        "rating",
                     ),
                 ),
                 Ascending,
@@ -383,11 +356,8 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "rating",
-            ),
+        Unqualified(
+            "rating",
         ),
     ],
 }

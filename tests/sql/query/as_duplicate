@@ -55,32 +55,20 @@ Plan: Select {
             ),
         ],
         labels: [
-            Some(
-                (
-                    None,
-                    "a",
-                ),
+            Unqualified(
+                "a",
             ),
-            Some(
-                (
-                    None,
-                    "a",
-                ),
+            Unqualified(
+                "a",
             ),
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "a",
-            ),
+        Unqualified(
+            "a",
         ),
-        Some(
-            (
-                None,
-                "a",
-            ),
+        Unqualified(
+            "a",
         ),
     ],
 }
@@ -101,32 +89,20 @@ Optimized plan: Select {
             ),
         ],
         labels: [
-            Some(
-                (
-                    None,
-                    "a",
-                ),
+            Unqualified(
+                "a",
             ),
-            Some(
-                (
-                    None,
-                    "a",
-                ),
+            Unqualified(
+                "a",
             ),
         ],
     },
     labels: [
-        Some(
-            (
-                None,
-                "a",
-            ),
+        Unqualified(
+            "a",
         ),
-        Some(
-            (
-                None,
-                "a",
-            ),
+        Unqualified(
+            "a",
         ),
     ],
 }

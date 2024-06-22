@@ -341,13 +341,9 @@ Plan: Select {
                         GreaterThan(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "m",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -359,13 +355,9 @@ Plan: Select {
                         Equal(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        Some(
-                                            "m",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "m",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -378,13 +370,9 @@ Plan: Select {
                     Equal(
                         Field(
                             7,
-                            Some(
-                                (
-                                    Some(
-                                        "g",
-                                    ),
-                                    "id",
-                                ),
+                            Qualified(
+                                "g",
+                                "id",
                             ),
                         ),
                         Constant(
@@ -398,13 +386,9 @@ Plan: Select {
                     Equal(
                         Field(
                             9,
-                            Some(
-                                (
-                                    Some(
-                                        "c",
-                                    ),
-                                    "id",
-                                ),
+                            Qualified(
+                                "c",
+                                "id",
                             ),
                         ),
                         Constant(
@@ -419,68 +403,44 @@ Plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 1,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "title",
-                    ),
+                Qualified(
+                    "m",
+                    "title",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
             Field(
                 8,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "g",
+                    "name",
                 ),
             ),
             Field(
                 9,
-                Some(
-                    (
-                        Some(
-                            "c",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "c",
+                    "id",
                 ),
             ),
             Field(
                 10,
-                Some(
-                    (
-                        Some(
-                            "c",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "c",
+                    "name",
                 ),
             ),
         ],
@@ -494,53 +454,29 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "name",
-            ),
+        Qualified(
+            "g",
+            "name",
         ),
-        Some(
-            (
-                Some(
-                    "c",
-                ),
-                "id",
-            ),
+        Qualified(
+            "c",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "c",
-                ),
-                "name",
-            ),
+        Qualified(
+            "c",
+            "name",
         ),
     ],
 }
@@ -632,13 +568,9 @@ Optimized plan: Select {
                             GreaterThan(
                                 Field(
                                     0,
-                                    Some(
-                                        (
-                                            Some(
-                                                "m",
-                                            ),
-                                            "id",
-                                        ),
+                                    Qualified(
+                                        "m",
+                                        "id",
                                     ),
                                 ),
                                 Constant(
@@ -650,13 +582,9 @@ Optimized plan: Select {
                             Equal(
                                 Field(
                                     0,
-                                    Some(
-                                        (
-                                            Some(
-                                                "m",
-                                            ),
-                                            "id",
-                                        ),
+                                    Qualified(
+                                        "m",
+                                        "id",
                                     ),
                                 ),
                                 Constant(
@@ -718,13 +646,9 @@ Optimized plan: Select {
                         Equal(
                             Field(
                                 0,
-                                Some(
-                                    (
-                                        Some(
-                                            "c",
-                                        ),
-                                        "id",
-                                    ),
+                                Qualified(
+                                    "c",
+                                    "id",
                                 ),
                             ),
                             Constant(
@@ -746,68 +670,44 @@ Optimized plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 1,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "title",
-                    ),
+                Qualified(
+                    "m",
+                    "title",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
             Field(
                 8,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "g",
+                    "name",
                 ),
             ),
             Field(
                 9,
-                Some(
-                    (
-                        Some(
-                            "c",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "c",
+                    "id",
                 ),
             ),
             Field(
                 10,
-                Some(
-                    (
-                        Some(
-                            "c",
-                        ),
-                        "name",
-                    ),
+                Qualified(
+                    "c",
+                    "name",
                 ),
             ),
         ],
@@ -821,53 +721,29 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "title",
-            ),
+        Qualified(
+            "m",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "name",
-            ),
+        Qualified(
+            "g",
+            "name",
         ),
-        Some(
-            (
-                Some(
-                    "c",
-                ),
-                "id",
-            ),
+        Qualified(
+            "c",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "c",
-                ),
-                "name",
-            ),
+        Qualified(
+            "c",
+            "name",
         ),
     ],
 }

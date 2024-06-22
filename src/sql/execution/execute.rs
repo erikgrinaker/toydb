@@ -132,5 +132,5 @@ pub enum ExecutionResult {
     Delete { count: u64 },
     Insert { count: u64 },
     Update { count: u64 },
-    Select { rows: Rows, labels: Vec<Option<Label>> },
+    Select { rows: Rows, labels: Vec<Label> },
 }

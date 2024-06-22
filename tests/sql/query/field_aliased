@@ -205,24 +205,16 @@ Plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
         ],
@@ -232,21 +224,13 @@ Plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
     ],
 }
@@ -375,24 +359,16 @@ Optimized plan: Select {
         expressions: [
             Field(
                 0,
-                Some(
-                    (
-                        Some(
-                            "m",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "m",
+                    "id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "g",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "g",
+                    "id",
                 ),
             ),
         ],
@@ -402,21 +378,13 @@ Optimized plan: Select {
         ],
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "m",
-                ),
-                "id",
-            ),
+        Qualified(
+            "m",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "g",
-                ),
-                "id",
-            ),
+        Qualified(
+            "g",
+            "id",
         ),
     ],
 }

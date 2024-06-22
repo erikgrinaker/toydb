@@ -174,100 +174,56 @@ Plan: Select {
         predicate: Equal(
             Field(
                 3,
-                Some(
-                    (
-                        Some(
-                            "movies",
-                        ),
-                        "genre_id",
-                    ),
+                Qualified(
+                    "movies",
+                    "genre_id",
                 ),
             ),
             Field(
                 7,
-                Some(
-                    (
-                        Some(
-                            "genres",
-                        ),
-                        "id",
-                    ),
+                Qualified(
+                    "genres",
+                    "id",
                 ),
             ),
         ),
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "id",
-            ),
+        Qualified(
+            "genres",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "name",
-            ),
+        Qualified(
+            "genres",
+            "name",
         ),
     ],
 }
@@ -356,13 +312,9 @@ Optimized plan: Select {
             alias: None,
         },
         left_field: 3,
-        left_label: Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        left_label: Qualified(
+            "movies",
+            "genre_id",
         ),
         right: Scan {
             table: Table {
@@ -393,89 +345,49 @@ Optimized plan: Select {
             alias: None,
         },
         right_field: 0,
-        right_label: Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "id",
-            ),
+        right_label: Qualified(
+            "genres",
+            "id",
         ),
         right_size: 2,
         outer: false,
     },
     labels: [
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "id",
-            ),
+        Qualified(
+            "movies",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "title",
-            ),
+        Qualified(
+            "movies",
+            "title",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "studio_id",
-            ),
+        Qualified(
+            "movies",
+            "studio_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "genre_id",
-            ),
+        Qualified(
+            "movies",
+            "genre_id",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "released",
-            ),
+        Qualified(
+            "movies",
+            "released",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "rating",
-            ),
+        Qualified(
+            "movies",
+            "rating",
         ),
-        Some(
-            (
-                Some(
-                    "movies",
-                ),
-                "ultrahd",
-            ),
+        Qualified(
+            "movies",
+            "ultrahd",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "id",
-            ),
+        Qualified(
+            "genres",
+            "id",
         ),
-        Some(
-            (
-                Some(
-                    "genres",
-                ),
-                "name",
-            ),
+        Qualified(
+            "genres",
+            "name",
         ),
     ],
 }

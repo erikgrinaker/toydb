@@ -140,7 +140,7 @@ pub enum StatementResult {
     // For simplicity, we buffer and send the entire set of rows as a vector
     // instead of streaming them to the client. Streaming reads haven't been
     // implemented from Raft either, so they're buffered all the way through.
-    Select { columns: Vec<Option<Label>>, rows: Vec<Row> },
+    Select { columns: Vec<Label>, rows: Vec<Row> },
 }
 
 /// Converts an execution result into a statement result.
