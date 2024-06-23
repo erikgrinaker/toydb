@@ -1,53 +1,44 @@
 #![allow(clippy::module_inception)]
 
 use super::ast;
-use super::lexer::{Keyword, Lexer, Token};
+use super::{Keyword, Lexer, Token};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::DataType;
 
-/// An SQL parser
+/// The SQL parser takes tokens from the lexer and parses the SQL syntax into an
+/// AST (Abstract Syntax Tree). This nested structure represents the semantic
+/// components of a SQL query (e.g. the SELECT and FROM clauses, values,
+/// arithmetic expressions, etc.), but only makes sure it is well-formed. It
+/// does not know e.g. whether a given table or column exists, or which kind of
+/// join to use -- that is the job of the planner.
 pub struct Parser<'a> {
     lexer: std::iter::Peekable<Lexer<'a>>,
 }
 
 impl<'a> Parser<'a> {
-    /// Creates a new parser for the given string input
-    pub fn new(query: &str) -> Parser {
-        Parser { lexer: Lexer::new(query).peekable() }
+    /// Creates a new parser for the given SQL string.
+    pub fn new(statement: &str) -> Parser {
+        Parser { lexer: Lexer::new(statement).peekable() }
     }
 
-    /// Parses the input string into an AST statement
+    /// Parses the input string into an AST statement. We expect to parse the
+    /// whole string as a single statement, ending with an optional semicolon.
     pub fn parse(&mut self) -> Result<ast::Statement> {
         let statement = self.parse_statement()?;
-        self.next_if_token(Token::Semicolon);
-        self.next_expect(None)?;
+        self.next_is(Token::Semicolon);
+        if let Some(token) = self.lexer.next().transpose()? {
+            return errinput!("unexpected token {token}");
+        }
         Ok(statement)
     }
 
-    /// Grabs the next lexer token, or throws an error if none is found.
+    /// Fetches the next lexer token, or throws an error if none is found.
     fn next(&mut self) -> Result<Token> {
-        self.lexer.next().unwrap_or_else(|| errinput!("unexpected end of input"))
+        self.lexer.next().transpose()?.ok_or_else(|| errinput!("unexpected end of input"))
     }
 
-    /// Grabs the next lexer token, and returns it if it was expected or
-    /// otherwise throws an error.
-    fn next_expect(&mut self, expect: Option<Token>) -> Result<Option<Token>> {
-        if let Some(t) = expect {
-            let token = self.next()?;
-            if token == t {
-                Ok(Some(token))
-            } else {
-                errinput!("expected token {t}, found {token}")
-            }
-        } else if let Some(token) = self.peek()? {
-            errinput!("unexpected token {token}")
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Grabs the next identifier, or errors if not found
+    /// Returns the next identifier, or errors if not found.
     fn next_ident(&mut self) -> Result<String> {
         match self.next()? {
             Token::Ident(ident) => Ok(ident),
@@ -55,127 +46,154 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Grabs the next lexer token if it satisfies the predicate function
-    fn next_if<F: Fn(&Token) -> bool>(&mut self, predicate: F) -> Option<Token> {
+    /// Returns the next lexer token if it satisfies the predicate.
+    fn next_if(&mut self, predicate: impl Fn(&Token) -> bool) -> Option<Token> {
         self.peek().unwrap_or(None).filter(|t| predicate(t))?;
         self.next().ok()
     }
 
-    /// Grabs the next operator if it satisfies the type and precedence
-    fn next_if_operator<O: Operator>(&mut self, min_prec: u8) -> Result<Option<O>> {
-        if let Some(operator) = self
-            .peek()
-            .unwrap_or(None)
-            .and_then(|token| O::from(&token))
-            .filter(|op| op.prec() >= min_prec)
-        {
+    /// Passes the next lexer token through the closure, consuming it if the
+    /// closure returns Some.
+    fn next_if_map<T>(&mut self, f: impl Fn(&Token) -> Option<T>) -> Result<Option<T>> {
+        let out = self.peek()?.and_then(f);
+        if out.is_some() {
             self.next()?;
-            Ok(Some(operator.augment(self)?))
-        } else {
-            Ok(None)
+        }
+        Ok(out)
+    }
+
+    /// Grabs the next keyword if there is one.
+    fn next_if_keyword(&mut self) -> Option<Keyword> {
+        match self.next_if(|t| matches!(t, Token::Keyword(_))) {
+            Some(Token::Keyword(keyword)) => Some(keyword),
+            Some(_) | None => None,
         }
     }
 
-    /// Grabs the next lexer token if it is a keyword
-    fn next_if_keyword(&mut self) -> Option<Token> {
-        self.next_if(|t| matches!(t, Token::Keyword(_)))
+    /// Consumes the next lexer token if it is the given token, returning true.
+    fn next_is(&mut self, token: Token) -> bool {
+        self.next_if(|t| t == &token).is_some()
     }
 
-    /// Grabs the next lexer token if it is a given token
-    fn next_if_token(&mut self, token: Token) -> Option<Token> {
-        self.next_if(|t| t == &token)
+    /// Consumes the next lexer token if it's the expected token, or errors.
+    fn expect(&mut self, expect: Token) -> Result<()> {
+        let token = self.next()?;
+        if token != expect {
+            return errinput!("expected token {expect}, found {token}");
+        }
+        Ok(())
     }
 
-    /// Peeks the next lexer token if any, but converts it from
-    /// Option<Result<Token>> to Result<Option<Token>> which is
-    /// more convenient to work with (the Iterator trait requires Option<T>).
-    fn peek(&mut self) -> Result<Option<Token>> {
-        self.lexer.peek().cloned().transpose()
+    /// Consumes the next lexer token if it is the given token. Mostly
+    /// equivalent to next_is(), but expresses intent better.
+    fn skip(&mut self, token: Token) {
+        self.next_is(token);
     }
 
-    /// Parses an SQL statement
+    /// Peeks the next lexer token if any, but transposes it for convenience.
+    fn peek(&mut self) -> Result<Option<&Token>> {
+        self.lexer.peek().map(|r| r.as_ref().map_err(|err| err.clone())).transpose()
+    }
+
+    /// Parses a SQL statement.
     fn parse_statement(&mut self) -> Result<ast::Statement> {
         match self.peek()? {
-            Some(Token::Keyword(Keyword::Begin)) => self.parse_transaction(),
-            Some(Token::Keyword(Keyword::Commit)) => self.parse_transaction(),
-            Some(Token::Keyword(Keyword::Rollback)) => self.parse_transaction(),
+            Some(Token::Keyword(Keyword::Begin)) => self.parse_begin(),
+            Some(Token::Keyword(Keyword::Commit)) => self.parse_commit(),
+            Some(Token::Keyword(Keyword::Rollback)) => self.parse_rollback(),
+            Some(Token::Keyword(Keyword::Explain)) => self.parse_explain(),
 
-            Some(Token::Keyword(Keyword::Create)) => self.parse_ddl(),
-            Some(Token::Keyword(Keyword::Drop)) => self.parse_ddl(),
+            Some(Token::Keyword(Keyword::Create)) => self.parse_create_table(),
+            Some(Token::Keyword(Keyword::Drop)) => self.parse_drop_table(),
 
-            Some(Token::Keyword(Keyword::Delete)) => self.parse_statement_delete(),
-            Some(Token::Keyword(Keyword::Insert)) => self.parse_statement_insert(),
-            Some(Token::Keyword(Keyword::Select)) => self.parse_statement_select(),
-            Some(Token::Keyword(Keyword::Update)) => self.parse_statement_update(),
-
-            Some(Token::Keyword(Keyword::Explain)) => self.parse_statement_explain(),
+            Some(Token::Keyword(Keyword::Delete)) => self.parse_delete(),
+            Some(Token::Keyword(Keyword::Insert)) => self.parse_insert(),
+            Some(Token::Keyword(Keyword::Select)) => self.parse_select(),
+            Some(Token::Keyword(Keyword::Update)) => self.parse_update(),
 
             Some(token) => errinput!("unexpected token {token}"),
             None => errinput!("unexpected end of input"),
         }
     }
 
-    /// Parses a DDL statement
-    fn parse_ddl(&mut self) -> Result<ast::Statement> {
-        match self.next()? {
-            Token::Keyword(Keyword::Create) => match self.next()? {
-                Token::Keyword(Keyword::Table) => self.parse_ddl_create_table(),
-                token => errinput!("unexpected token {token}"),
-            },
-            Token::Keyword(Keyword::Drop) => match self.next()? {
-                Token::Keyword(Keyword::Table) => self.parse_ddl_drop_table(),
-                token => errinput!("unexpected token {token}"),
-            },
-            token => errinput!("Unexpected token {token}"),
+    /// Parses a BEGIN statement.
+    fn parse_begin(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Begin.into())?;
+        self.skip(Keyword::Transaction.into());
+
+        let mut read_only = false;
+        if self.next_is(Keyword::Read.into()) {
+            match self.next()? {
+                Token::Keyword(Keyword::Only) => read_only = true,
+                Token::Keyword(Keyword::Write) => {}
+                token => return errinput!("unexpected token {token}"),
+            }
         }
+
+        let mut as_of = None;
+        if self.next_is(Keyword::As.into()) {
+            self.expect(Keyword::Of.into())?;
+            self.expect(Keyword::System.into())?;
+            self.expect(Keyword::Time.into())?;
+            match self.next()? {
+                Token::Number(n) => as_of = Some(n.parse()?),
+                token => return errinput!("unexpected token {token}, wanted number"),
+            }
+        }
+        Ok(ast::Statement::Begin { read_only, as_of })
     }
 
-    /// Parses a CREATE TABLE DDL statement. The CREATE TABLE prefix has
-    /// already been consumed.
-    fn parse_ddl_create_table(&mut self) -> Result<ast::Statement> {
-        let name = self.next_ident()?;
-        self.next_expect(Some(Token::OpenParen))?;
+    /// Parses a COMMIT statement.
+    fn parse_commit(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Commit.into())?;
+        Ok(ast::Statement::Commit)
+    }
 
+    /// Parses a ROLLBACK statement.
+    fn parse_rollback(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Rollback.into())?;
+        Ok(ast::Statement::Rollback)
+    }
+
+    /// Parses an EXPLAIN statement.
+    fn parse_explain(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Explain.into())?;
+        if self.next_is(Keyword::Explain.into()) {
+            return errinput!("cannot nest EXPLAIN statements");
+        }
+        Ok(ast::Statement::Explain(Box::new(self.parse_statement()?)))
+    }
+
+    /// Parses a CREATE TABLE statement.
+    fn parse_create_table(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Create.into())?;
+        self.expect(Keyword::Table.into())?;
+        let name = self.next_ident()?;
+        self.expect(Token::OpenParen)?;
         let mut columns = Vec::new();
         loop {
-            columns.push(self.parse_ddl_columnspec()?);
-            if self.next_if_token(Token::Comma).is_none() {
+            columns.push(self.parse_create_table_column()?);
+            if !self.next_is(Token::Comma) {
                 break;
             }
         }
-        self.next_expect(Some(Token::CloseParen))?;
+        self.expect(Token::CloseParen)?;
         Ok(ast::Statement::CreateTable { name, columns })
     }
 
-    /// Parses a DROP TABLE DDL statement. The DROP TABLE prefix has
-    /// already been consumed.
-    fn parse_ddl_drop_table(&mut self) -> Result<ast::Statement> {
-        let mut if_exists = false;
-        if let Some(Token::Keyword(Keyword::If)) = self.next_if_keyword() {
-            self.next_expect(Some(Token::Keyword(Keyword::Exists)))?;
-            if_exists = true;
-        }
+    /// Parses a CREATE TABLE column definition.
+    fn parse_create_table_column(&mut self) -> Result<ast::Column> {
         let name = self.next_ident()?;
-        Ok(ast::Statement::DropTable { name, if_exists })
-    }
-
-    /// Parses a column specification
-    fn parse_ddl_columnspec(&mut self) -> Result<ast::Column> {
+        let datatype = match self.next()? {
+            Token::Keyword(Keyword::Bool | Keyword::Boolean) => DataType::Boolean,
+            Token::Keyword(Keyword::Float | Keyword::Double) => DataType::Float,
+            Token::Keyword(Keyword::Int | Keyword::Integer) => DataType::Integer,
+            Token::Keyword(Keyword::String | Keyword::Text | Keyword::Varchar) => DataType::String,
+            token => return errinput!("unexpected token {token}"),
+        };
         let mut column = ast::Column {
-            name: self.next_ident()?,
-            datatype: match self.next()? {
-                Token::Keyword(Keyword::Bool) => DataType::Boolean,
-                Token::Keyword(Keyword::Boolean) => DataType::Boolean,
-                Token::Keyword(Keyword::Char) => DataType::String,
-                Token::Keyword(Keyword::Double) => DataType::Float,
-                Token::Keyword(Keyword::Float) => DataType::Float,
-                Token::Keyword(Keyword::Int) => DataType::Integer,
-                Token::Keyword(Keyword::Integer) => DataType::Integer,
-                Token::Keyword(Keyword::String) => DataType::String,
-                Token::Keyword(Keyword::Text) => DataType::String,
-                Token::Keyword(Keyword::Varchar) => DataType::String,
-                token => return errinput!("unexpected token {token}"),
-            },
+            name,
+            datatype,
             primary_key: false,
             nullable: None,
             default: None,
@@ -183,32 +201,26 @@ impl<'a> Parser<'a> {
             index: false,
             references: None,
         };
-        while let Some(Token::Keyword(keyword)) = self.next_if_keyword() {
+        while let Some(keyword) = self.next_if_keyword() {
             match keyword {
                 Keyword::Primary => {
-                    self.next_expect(Some(Keyword::Key.into()))?;
+                    self.expect(Keyword::Key.into())?;
                     column.primary_key = true;
                 }
                 Keyword::Null => {
-                    if let Some(false) = column.nullable {
-                        return errinput!(
-                            "column {} can't be both not nullable and nullable",
-                            column.name
-                        );
+                    if column.nullable.is_some() {
+                        return errinput!("nullability already set for column {}", column.name);
                     }
                     column.nullable = Some(true)
                 }
                 Keyword::Not => {
-                    self.next_expect(Some(Keyword::Null.into()))?;
-                    if let Some(true) = column.nullable {
-                        return errinput!(
-                            "column {} can't be both not nullable and nullable",
-                            column.name
-                        );
+                    self.expect(Keyword::Null.into())?;
+                    if column.nullable.is_some() {
+                        return errinput!("nullability already set for column {}", column.name);
                     }
                     column.nullable = Some(false)
                 }
-                Keyword::Default => column.default = Some(self.parse_expression(0)?),
+                Keyword::Default => column.default = Some(self.parse_expression()?),
                 Keyword::Unique => column.unique = true,
                 Keyword::Index => column.index = true,
                 Keyword::References => column.references = Some(self.next_ident()?),
@@ -218,59 +230,60 @@ impl<'a> Parser<'a> {
         Ok(column)
     }
 
-    /// Parses a delete statement
-    fn parse_statement_delete(&mut self) -> Result<ast::Statement> {
-        self.next_expect(Some(Keyword::Delete.into()))?;
-        self.next_expect(Some(Keyword::From.into()))?;
-        let table = self.next_ident()?;
-        Ok(ast::Statement::Delete { table, r#where: self.parse_clause_where()? })
-    }
-
-    /// Parses a delete statement
-    fn parse_statement_explain(&mut self) -> Result<ast::Statement> {
-        self.next_expect(Some(Keyword::Explain.into()))?;
-        if let Some(Token::Keyword(Keyword::Explain)) = self.peek()? {
-            return errinput!("cannot nest EXPLAIN statements");
+    /// Parses a DROP TABLE statement.
+    fn parse_drop_table(&mut self) -> Result<ast::Statement> {
+        self.expect(Token::Keyword(Keyword::Drop))?;
+        self.expect(Token::Keyword(Keyword::Table))?;
+        let mut if_exists = false;
+        if self.next_is(Keyword::If.into()) {
+            self.expect(Token::Keyword(Keyword::Exists))?;
+            if_exists = true;
         }
-        Ok(ast::Statement::Explain(Box::new(self.parse_statement()?)))
+        let name = self.next_ident()?;
+        Ok(ast::Statement::DropTable { name, if_exists })
     }
 
-    /// Parses an insert statement
-    fn parse_statement_insert(&mut self) -> Result<ast::Statement> {
-        self.next_expect(Some(Keyword::Insert.into()))?;
-        self.next_expect(Some(Keyword::Into.into()))?;
+    /// Parses a DELETE statement.
+    fn parse_delete(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Delete.into())?;
+        self.expect(Keyword::From.into())?;
+        let table = self.next_ident()?;
+        Ok(ast::Statement::Delete { table, r#where: self.parse_where_clause()? })
+    }
+
+    /// Parses an INSERT statement.
+    fn parse_insert(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Insert.into())?;
+        self.expect(Keyword::Into.into())?;
         let table = self.next_ident()?;
 
-        let columns = if self.next_if_token(Token::OpenParen).is_some() {
-            let mut cols = Vec::new();
+        let mut columns = None;
+        if self.next_is(Token::OpenParen) {
+            let columns = columns.insert(Vec::new());
             loop {
-                cols.push(self.next_ident()?.to_string());
-                match self.next()? {
-                    Token::CloseParen => break,
-                    Token::Comma => {}
-                    token => return errinput!("Unexpected token {token}"),
+                columns.push(self.next_ident()?);
+                if !self.next_is(Token::Comma) {
+                    break;
                 }
             }
-            Some(cols)
-        } else {
-            None
-        };
+            self.expect(Token::CloseParen)?;
+        }
 
-        self.next_expect(Some(Keyword::Values.into()))?;
+        self.expect(Keyword::Values.into())?;
+
         let mut values = Vec::new();
         loop {
-            self.next_expect(Some(Token::OpenParen))?;
-            let mut exprs = Vec::new();
+            let mut row = Vec::new();
+            self.expect(Token::OpenParen)?;
             loop {
-                exprs.push(self.parse_expression(0)?);
-                match self.next()? {
-                    Token::CloseParen => break,
-                    Token::Comma => {}
-                    token => return errinput!("unexpected token {token}"),
+                row.push(self.parse_expression()?);
+                if !self.next_is(Token::Comma) {
+                    break;
                 }
             }
-            values.push(exprs);
-            if self.next_if_token(Token::Comma).is_none() {
+            self.expect(Token::CloseParen)?;
+            values.push(row);
+            if !self.next_is(Token::Comma) {
                 break;
             }
         }
@@ -278,320 +291,279 @@ impl<'a> Parser<'a> {
         Ok(ast::Statement::Insert { table, columns, values })
     }
 
-    /// Parses a select statement
-    fn parse_statement_select(&mut self) -> Result<ast::Statement> {
-        Ok(ast::Statement::Select {
-            select: self.parse_clause_select()?,
-            from: self.parse_clause_from()?,
-            r#where: self.parse_clause_where()?,
-            group_by: self.parse_clause_group_by()?,
-            having: self.parse_clause_having()?,
-            order: self.parse_clause_order()?,
-            limit: if self.next_if_token(Keyword::Limit.into()).is_some() {
-                Some(self.parse_expression(0)?)
-            } else {
-                None
-            },
-            offset: if self.next_if_token(Keyword::Offset.into()).is_some() {
-                Some(self.parse_expression(0)?)
-            } else {
-                None
-            },
-        })
-    }
-
-    /// Parses an update statement
-    fn parse_statement_update(&mut self) -> Result<ast::Statement> {
-        self.next_expect(Some(Keyword::Update.into()))?;
+    /// Parses an UPDATE statement.
+    fn parse_update(&mut self) -> Result<ast::Statement> {
+        self.expect(Keyword::Update.into())?;
         let table = self.next_ident()?;
-        self.next_expect(Some(Keyword::Set.into()))?;
+        self.expect(Keyword::Set.into())?;
 
         let mut set = std::collections::BTreeMap::new();
         loop {
             let column = self.next_ident()?;
-            self.next_expect(Some(Token::Equal))?;
-            let expr = self.parse_expression(0)?;
+            self.expect(Token::Equal)?;
+            let expr = self.parse_expression()?;
             if set.contains_key(&column) {
-                return errinput!("duplicate values given for column {column}");
+                return errinput!("column {column} set multiple times");
             }
             set.insert(column, expr);
-            if self.next_if_token(Token::Comma).is_none() {
+            if !self.next_is(Token::Comma) {
                 break;
             }
         }
 
-        Ok(ast::Statement::Update { table, set, r#where: self.parse_clause_where()? })
+        Ok(ast::Statement::Update { table, set, r#where: self.parse_where_clause()? })
     }
 
-    /// Parses a transaction statement
-    fn parse_transaction(&mut self) -> Result<ast::Statement> {
-        match self.next()? {
-            Token::Keyword(Keyword::Begin) => {
-                let mut readonly = false;
-                let mut version = None;
-                self.next_if_token(Keyword::Transaction.into());
-                if self.next_if_token(Keyword::Read.into()).is_some() {
-                    match self.next()? {
-                        Token::Keyword(Keyword::Only) => readonly = true,
-                        Token::Keyword(Keyword::Write) => readonly = false,
-                        token => return errinput!("unexpected token {token}"),
-                    }
-                }
-                if self.next_if_token(Keyword::As.into()).is_some() {
-                    self.next_expect(Some(Keyword::Of.into()))?;
-                    self.next_expect(Some(Keyword::System.into()))?;
-                    self.next_expect(Some(Keyword::Time.into()))?;
-                    match self.next()? {
-                        Token::Number(n) => version = Some(n.parse::<u64>()?),
-                        token => return errinput!("unexpected token {token}, wanted number"),
-                    }
-                }
-                Ok(ast::Statement::Begin { read_only: readonly, as_of: version })
-            }
-            Token::Keyword(Keyword::Commit) => Ok(ast::Statement::Commit),
-            Token::Keyword(Keyword::Rollback) => Ok(ast::Statement::Rollback),
-            token => errinput!("unexpected token {token}"),
-        }
+    /// Parses a SELECT statement.
+    fn parse_select(&mut self) -> Result<ast::Statement> {
+        Ok(ast::Statement::Select {
+            select: self.parse_select_clause()?,
+            from: self.parse_from_clause()?,
+            r#where: self.parse_where_clause()?,
+            group_by: self.parse_group_by_clause()?,
+            having: self.parse_having_clause()?,
+            order: self.parse_order_by_clause()?,
+            limit: self
+                .next_is(Keyword::Limit.into())
+                .then(|| self.parse_expression())
+                .transpose()?,
+            offset: self
+                .next_is(Keyword::Offset.into())
+                .then(|| self.parse_expression())
+                .transpose()?,
+        })
     }
 
-    /// Parses a from clause
-    fn parse_clause_from(&mut self) -> Result<Vec<ast::From>> {
-        let mut from = Vec::new();
-        if self.next_if_token(Keyword::From.into()).is_none() {
-            return Ok(from);
-        }
-        loop {
-            let mut item = self.parse_clause_from_item()?;
-            while let Some(jointype) = self.parse_clause_from_jointype()? {
-                let left = Box::new(item);
-                let right = Box::new(self.parse_clause_from_item()?);
-                let predicate = match &jointype {
-                    ast::JoinType::Cross => None,
-                    _ => {
-                        self.next_expect(Some(Keyword::On.into()))?;
-                        Some(self.parse_expression(0)?)
-                    }
-                };
-                let r#type = jointype;
-                item = ast::From::Join { left, right, r#type, predicate };
-            }
-            from.push(item);
-            if self.next_if_token(Token::Comma).is_none() {
-                break;
-            }
-        }
-        Ok(from)
-    }
-
-    /// Parses a from clause item
-    fn parse_clause_from_item(&mut self) -> Result<ast::From> {
-        self.parse_clause_from_table()
-    }
-
-    // Parses a from clause table
-    fn parse_clause_from_table(&mut self) -> Result<ast::From> {
-        let name = self.next_ident()?;
-        let alias = if self.next_if_token(Keyword::As.into()).is_some() {
-            Some(self.next_ident()?)
-        } else if let Some(Token::Ident(_)) = self.peek()? {
-            Some(self.next_ident()?)
-        } else {
-            None
-        };
-        Ok(ast::From::Table { name, alias })
-    }
-
-    // Parses a from clause join type
-    fn parse_clause_from_jointype(&mut self) -> Result<Option<ast::JoinType>> {
-        if self.next_if_token(Keyword::Cross.into()).is_some() {
-            self.next_expect(Some(Keyword::Join.into()))?;
-            Ok(Some(ast::JoinType::Cross))
-        } else if self.next_if_token(Keyword::Inner.into()).is_some() {
-            self.next_expect(Some(Keyword::Join.into()))?;
-            Ok(Some(ast::JoinType::Inner))
-        } else if self.next_if_token(Keyword::Join.into()).is_some() {
-            Ok(Some(ast::JoinType::Inner))
-        } else if self.next_if_token(Keyword::Left.into()).is_some() {
-            self.next_if_token(Keyword::Outer.into());
-            self.next_expect(Some(Keyword::Join.into()))?;
-            Ok(Some(ast::JoinType::Left))
-        } else if self.next_if_token(Keyword::Right.into()).is_some() {
-            self.next_if_token(Keyword::Outer.into());
-            self.next_expect(Some(Keyword::Join.into()))?;
-            Ok(Some(ast::JoinType::Right))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Parses a group by clause
-    fn parse_clause_group_by(&mut self) -> Result<Vec<ast::Expression>> {
-        let mut exprs = Vec::new();
-        if self.next_if_token(Keyword::Group.into()).is_none() {
-            return Ok(exprs);
-        }
-        self.next_expect(Some(Keyword::By.into()))?;
-        loop {
-            exprs.push(self.parse_expression(0)?);
-            if self.next_if_token(Token::Comma).is_none() {
-                break;
-            }
-        }
-        Ok(exprs)
-    }
-
-    /// Parses a HAVING clause
-    fn parse_clause_having(&mut self) -> Result<Option<ast::Expression>> {
-        if self.next_if_token(Keyword::Having.into()).is_none() {
-            return Ok(None);
-        }
-        Ok(Some(self.parse_expression(0)?))
-    }
-
-    /// Parses an order clause
-    fn parse_clause_order(&mut self) -> Result<Vec<(ast::Expression, ast::Order)>> {
-        if self.next_if_token(Keyword::Order.into()).is_none() {
+    /// Parses a SELECT clause, if present.
+    fn parse_select_clause(&mut self) -> Result<Vec<(ast::Expression, Option<String>)>> {
+        if !self.next_is(Keyword::Select.into()) {
             return Ok(Vec::new());
         }
-        self.next_expect(Some(Keyword::By.into()))?;
-        let mut orders = Vec::new();
-        loop {
-            orders.push((
-                self.parse_expression(0)?,
-                if self.next_if_token(Keyword::Asc.into()).is_some() {
-                    ast::Order::Ascending
-                } else if self.next_if_token(Keyword::Desc.into()).is_some() {
-                    ast::Order::Descending
-                } else {
-                    ast::Order::Ascending
-                },
-            ));
-            if self.next_if_token(Token::Comma).is_none() {
-                break;
-            }
+        if self.next_is(Token::Asterisk) {
+            return Ok(Vec::new());
         }
-        Ok(orders)
-    }
-
-    /// Parses a select clause
-    fn parse_clause_select(&mut self) -> Result<Vec<(ast::Expression, Option<String>)>> {
         let mut select = Vec::new();
-        if self.next_if_token(Keyword::Select.into()).is_none() {
-            return Ok(select);
-        }
         loop {
-            if self.next_if_token(Token::Asterisk).is_some() && select.is_empty() {
-                break;
+            let expr = self.parse_expression()?;
+            let mut label = None;
+            if self.next_is(Keyword::As.into()) || matches!(self.peek()?, Some(Token::Ident(_))) {
+                label = Some(self.next_ident()?);
             }
-            let expr = self.parse_expression(0)?;
-            let label = match self.peek()? {
-                Some(Token::Keyword(Keyword::As)) => {
-                    self.next()?;
-                    Some(self.next_ident()?)
-                }
-                Some(Token::Ident(_)) => Some(self.next_ident()?),
-                _ => None,
-            };
             select.push((expr, label));
-            if self.next_if_token(Token::Comma).is_none() {
+            if !self.next_is(Token::Comma) {
                 break;
             }
         }
         Ok(select)
     }
 
-    /// Parses a WHERE clause
-    fn parse_clause_where(&mut self) -> Result<Option<ast::Expression>> {
-        if self.next_if_token(Keyword::Where.into()).is_none() {
+    /// Parses a FROM clause, if present.
+    fn parse_from_clause(&mut self) -> Result<Vec<ast::From>> {
+        if !self.next_is(Keyword::From.into()) {
+            return Ok(Vec::new());
+        }
+        let mut from = Vec::new();
+        loop {
+            let mut item = self.parse_from_table()?;
+            while let Some(r#type) = self.parse_from_join()? {
+                let left = Box::new(item);
+                let right = Box::new(self.parse_from_table()?);
+                let mut predicate = None;
+                if r#type != ast::JoinType::Cross {
+                    self.expect(Keyword::On.into())?;
+                    predicate = Some(self.parse_expression()?)
+                }
+                item = ast::From::Join { left, right, r#type, predicate };
+            }
+            from.push(item);
+            if !self.next_is(Token::Comma) {
+                break;
+            }
+        }
+        Ok(from)
+    }
+
+    // Parses a FROM table.
+    fn parse_from_table(&mut self) -> Result<ast::From> {
+        let name = self.next_ident()?;
+        let mut alias = None;
+        if self.next_is(Keyword::As.into()) || matches!(self.peek()?, Some(Token::Ident(_))) {
+            alias = Some(self.next_ident()?)
+        };
+        Ok(ast::From::Table { name, alias })
+    }
+
+    // Parses a FROM JOIN type, if present.
+    fn parse_from_join(&mut self) -> Result<Option<ast::JoinType>> {
+        if self.next_is(Keyword::Cross.into()) {
+            self.expect(Keyword::Join.into())?;
+            Ok(Some(ast::JoinType::Cross))
+        } else if self.next_is(Keyword::Inner.into()) {
+            self.expect(Keyword::Join.into())?;
+            Ok(Some(ast::JoinType::Inner))
+        } else if self.next_is(Keyword::Join.into()) {
+            Ok(Some(ast::JoinType::Inner))
+        } else if self.next_is(Keyword::Left.into()) {
+            self.skip(Keyword::Outer.into());
+            self.expect(Keyword::Join.into())?;
+            Ok(Some(ast::JoinType::Left))
+        } else if self.next_is(Keyword::Right.into()) {
+            self.skip(Keyword::Outer.into());
+            self.expect(Keyword::Join.into())?;
+            Ok(Some(ast::JoinType::Right))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Parses a WHERE clause, if present.
+    fn parse_where_clause(&mut self) -> Result<Option<ast::Expression>> {
+        if !self.next_is(Keyword::Where.into()) {
             return Ok(None);
         }
-        Ok(Some(self.parse_expression(0)?))
+        Ok(Some(self.parse_expression()?))
+    }
+
+    /// Parses a GROUP BY clause, if present.
+    fn parse_group_by_clause(&mut self) -> Result<Vec<ast::Expression>> {
+        if !self.next_is(Keyword::Group.into()) {
+            return Ok(Vec::new());
+        }
+        let mut group_by = Vec::new();
+        self.expect(Keyword::By.into())?;
+        loop {
+            group_by.push(self.parse_expression()?);
+            if !self.next_is(Token::Comma) {
+                break;
+            }
+        }
+        Ok(group_by)
+    }
+
+    /// Parses a HAVING clause, if present.
+    fn parse_having_clause(&mut self) -> Result<Option<ast::Expression>> {
+        if !self.next_is(Keyword::Having.into()) {
+            return Ok(None);
+        }
+        Ok(Some(self.parse_expression()?))
+    }
+
+    /// Parses an ORDER BY clause, if present.
+    fn parse_order_by_clause(&mut self) -> Result<Vec<(ast::Expression, ast::Order)>> {
+        if !self.next_is(Keyword::Order.into()) {
+            return Ok(Vec::new());
+        }
+        let mut order_by = Vec::new();
+        self.expect(Keyword::By.into())?;
+        loop {
+            let expr = self.parse_expression()?;
+            let order = if self.next_is(Keyword::Asc.into()) {
+                ast::Order::Ascending
+            } else if self.next_is(Keyword::Desc.into()) {
+                ast::Order::Descending
+            } else {
+                ast::Order::Ascending
+            };
+            order_by.push((expr, order));
+            if !self.next_is(Token::Comma) {
+                break;
+            }
+        }
+        Ok(order_by)
     }
 
     /// Parses an expression consisting of at least one atom operated on by any
     /// number of operators, using the precedence climbing algorithm.
-    fn parse_expression(&mut self, min_prec: u8) -> Result<ast::Expression> {
-        let mut lhs = if let Some(prefix) = self.next_if_operator::<PrefixOperator>(min_prec)? {
-            prefix.build(self.parse_expression(prefix.prec() + prefix.assoc())?)
+    /// TODO: write a description of the algorithm.
+    fn parse_expression(&mut self) -> Result<ast::Expression> {
+        self.parse_expression_at(0)
+    }
+
+    /// Parses an expression at the given minimum precedence.
+    fn parse_expression_at(&mut self, min_precedence: Precedence) -> Result<ast::Expression> {
+        // If there is a prefix operator, parse it and its right-hand operand.
+        // Otherwise, parse the left-hand atom.
+        let mut lhs = if let Some(prefix) = PrefixOperator::parse(self, min_precedence)? {
+            let at_precedence = prefix.precedence() + prefix.associativity();
+            prefix.build(self.parse_expression_at(at_precedence)?)
         } else {
             self.parse_expression_atom()?
         };
-        while let Some(postfix) = self.next_if_operator::<PostfixOperator>(min_prec)? {
+        // Apply any postfix operators.
+        while let Some(postfix) = PostfixOperator::parse(self, min_precedence)? {
             lhs = postfix.build(lhs)
         }
-        while let Some(infix) = self.next_if_operator::<InfixOperator>(min_prec)? {
-            lhs = infix.build(lhs, self.parse_expression(infix.prec() + infix.assoc())?)
+        // Apply any binary infix operators, parsing the right-hand operand.
+        while let Some(infix) = InfixOperator::parse(self, min_precedence)? {
+            let at_precedence = infix.precedence() + infix.associativity();
+            let rhs = self.parse_expression_at(at_precedence)?;
+            lhs = infix.build(lhs, rhs)
         }
         Ok(lhs)
     }
 
-    /// Parses an expression atom
+    /// Parses an expression atom. This is either:
+    ///
+    /// * A literal value.
+    /// * A field name.
+    /// * A function call.
+    /// * A parenthesized expression.
     fn parse_expression_atom(&mut self) -> Result<ast::Expression> {
         Ok(match self.next()? {
-            Token::Ident(i) => {
-                if self.next_if_token(Token::OpenParen).is_some() {
-                    let mut args = Vec::new();
-                    while self.next_if_token(Token::CloseParen).is_none() {
-                        if !args.is_empty() {
-                            self.next_expect(Some(Token::Comma))?;
-                        }
-                        if i == "count" && self.next_if_token(Token::Asterisk).is_some() {
-                            // FIXME Ugly hack to handle COUNT(*)
-                            args.push(ast::Expression::Literal(ast::Literal::Boolean(true)));
-                        } else {
-                            args.push(self.parse_expression(0)?);
-                        }
-                    }
-                    ast::Expression::Function(i, args)
-                } else {
-                    let mut relation = None;
-                    let mut field = i;
-                    if self.next_if_token(Token::Period).is_some() {
-                        relation = Some(field);
-                        field = self.next_ident()?;
-                    }
-                    ast::Expression::Field(relation, field)
-                }
+            // Literal value.
+            Token::Number(n) if n.chars().all(|c| c.is_ascii_digit()) => {
+                ast::Literal::Integer(n.parse()?).into()
             }
-            Token::Number(n) => {
-                if n.chars().all(|c| c.is_ascii_digit()) {
-                    ast::Literal::Integer(n.parse()?).into()
-                } else {
-                    ast::Literal::Float(n.parse()?).into()
-                }
-            }
-            Token::OpenParen => {
-                let expr = self.parse_expression(0)?;
-                self.next_expect(Some(Token::CloseParen))?;
-                expr
-            }
+            Token::Number(n) => ast::Literal::Float(n.parse()?).into(),
             Token::String(s) => ast::Literal::String(s).into(),
+            Token::Keyword(Keyword::True) => ast::Literal::Boolean(true).into(),
             Token::Keyword(Keyword::False) => ast::Literal::Boolean(false).into(),
             Token::Keyword(Keyword::Infinity) => ast::Literal::Float(std::f64::INFINITY).into(),
             Token::Keyword(Keyword::NaN) => ast::Literal::Float(std::f64::NAN).into(),
             Token::Keyword(Keyword::Null) => ast::Literal::Null.into(),
-            Token::Keyword(Keyword::True) => ast::Literal::Boolean(true).into(),
+
+            // Function call.
+            Token::Ident(name) if self.next_is(Token::OpenParen) => {
+                let mut args = Vec::new();
+                while !self.next_is(Token::CloseParen) {
+                    if !args.is_empty() {
+                        self.expect(Token::Comma)?;
+                    }
+                    if name == "count" && self.next_is(Token::Asterisk) {
+                        // TODO: ugly hack to handle COUNT(*).
+                        args.push(ast::Expression::Literal(ast::Literal::Boolean(true)));
+                    } else {
+                        args.push(self.parse_expression()?);
+                    }
+                }
+                ast::Expression::Function(name, args)
+            }
+
+            // Field name, either qualified as table.field or unqualified.
+            Token::Ident(table) if self.next_is(Token::Period) => {
+                ast::Expression::Field(Some(table), self.next_ident()?)
+            }
+            Token::Ident(field) => ast::Expression::Field(None, field),
+
+            // Parenthesized expression.
+            Token::OpenParen => {
+                let expr = self.parse_expression()?;
+                self.expect(Token::CloseParen)?;
+                expr
+            }
+
             token => return errinput!("expected expression atom, found {token}"),
         })
     }
 }
 
-/// An operator trait, to help with parsing of operators
-trait Operator: Sized {
-    /// Looks up the corresponding operator for a token, if one exists
-    fn from(token: &Token) -> Option<Self>;
-    /// Augments an operator by allowing it to parse any modifiers.
-    fn augment(self, parser: &mut Parser) -> Result<Self>;
-    /// Returns the operator's associativity
-    fn assoc(&self) -> u8;
-    /// Returns the operator's precedence
-    fn prec(&self) -> u8;
-}
+/// Operator precedence.
+type Precedence = u8;
 
-const ASSOC_LEFT: u8 = 1;
-const ASSOC_RIGHT: u8 = 0;
+const LEFT_ASSOCIATIVE: Precedence = 1;
+const RIGHT_ASSOCIATIVE: Precedence = 0;
 
-/// Prefix operators
+/// Prefix operators.
 enum PrefixOperator {
     Minus,
     Not,
@@ -599,38 +571,44 @@ enum PrefixOperator {
 }
 
 impl PrefixOperator {
-    fn build(&self, rhs: ast::Expression) -> ast::Expression {
-        match self {
-            Self::Plus => ast::Operator::Identity(Box::new(rhs)).into(),
-            Self::Minus => ast::Operator::Negate(Box::new(rhs)).into(),
-            Self::Not => ast::Operator::Not(Box::new(rhs)).into(),
-        }
-    }
-}
-
-impl Operator for PrefixOperator {
-    fn from(token: &Token) -> Option<Self> {
-        match token {
-            Token::Keyword(Keyword::Not) => Some(Self::Not),
-            Token::Minus => Some(Self::Minus),
-            Token::Plus => Some(Self::Plus),
-            _ => None,
-        }
+    /// Parses a prefix operator, if there is one and it's precedence is at
+    /// least min_precedence.
+    fn parse(parser: &mut Parser, min_precedence: Precedence) -> Result<Option<Self>> {
+        parser.next_if_map(|token| {
+            let operator = match token {
+                Token::Keyword(Keyword::Not) => Self::Not,
+                Token::Minus => Self::Minus,
+                Token::Plus => Self::Plus,
+                _ => return None,
+            };
+            Some(operator).filter(|op| op.precedence() >= min_precedence)
+        })
     }
 
-    fn augment(self, _parser: &mut Parser) -> Result<Self> {
-        Ok(self)
-    }
-
-    fn assoc(&self) -> u8 {
-        ASSOC_RIGHT
-    }
-
-    fn prec(&self) -> u8 {
+    /// The operator precedence. Prefix operators have the highest precedence.
+    fn precedence(&self) -> Precedence {
         9
     }
+
+    // The operator associativity. Prefix operators are right-associative by
+    // definition.
+    fn associativity(&self) -> Precedence {
+        RIGHT_ASSOCIATIVE
+    }
+
+    /// Builds an AST expression for the operator.
+    fn build(&self, rhs: ast::Expression) -> ast::Expression {
+        let rhs = Box::new(rhs);
+        let operator = match self {
+            Self::Plus => ast::Operator::Identity(rhs),
+            Self::Minus => ast::Operator::Negate(rhs),
+            Self::Not => ast::Operator::Not(rhs),
+        };
+        ast::Expression::Operator(operator)
+    }
 }
 
+/// Infix operators.
 enum InfixOperator {
     Add,
     And,
@@ -650,9 +628,61 @@ enum InfixOperator {
 }
 
 impl InfixOperator {
+    /// Parses an infix operator, if there is one and it's precedence is at
+    /// least min_precedence.
+    fn parse(parser: &mut Parser, min_precedence: Precedence) -> Result<Option<Self>> {
+        parser.next_if_map(|token| {
+            let operator = match token {
+                Token::Asterisk => Self::Multiply,
+                Token::Caret => Self::Exponentiate,
+                Token::Equal => Self::Equal,
+                Token::GreaterThan => Self::GreaterThan,
+                Token::GreaterThanOrEqual => Self::GreaterThanOrEqual,
+                Token::Keyword(Keyword::And) => Self::And,
+                Token::Keyword(Keyword::Like) => Self::Like,
+                Token::Keyword(Keyword::Or) => Self::Or,
+                Token::LessOrGreaterThan => Self::NotEqual,
+                Token::LessThan => Self::LessThan,
+                Token::LessThanOrEqual => Self::LessThanOrEqual,
+                Token::Minus => Self::Subtract,
+                Token::NotEqual => Self::NotEqual,
+                Token::Percent => Self::Modulo,
+                Token::Plus => Self::Add,
+                Token::Slash => Self::Divide,
+                _ => return None,
+            };
+            Some(operator).filter(|op| op.precedence() >= min_precedence)
+        })
+    }
+
+    /// The operator precedence.
+    fn precedence(&self) -> Precedence {
+        match self {
+            Self::Or => 1,
+            Self::And => 2,
+            Self::Equal | Self::NotEqual | Self::Like => 3,
+            Self::GreaterThan
+            | Self::GreaterThanOrEqual
+            | Self::LessThan
+            | Self::LessThanOrEqual => 4,
+            Self::Add | Self::Subtract => 5,
+            Self::Multiply | Self::Divide | Self::Modulo => 6,
+            Self::Exponentiate => 7,
+        }
+    }
+
+    /// The operator associativity.
+    fn associativity(&self) -> Precedence {
+        match self {
+            Self::Exponentiate => RIGHT_ASSOCIATIVE,
+            _ => LEFT_ASSOCIATIVE,
+        }
+    }
+
+    /// Builds an AST expression for the infix operator.
     fn build(&self, lhs: ast::Expression, rhs: ast::Expression) -> ast::Expression {
         let (lhs, rhs) = (Box::new(lhs), Box::new(rhs));
-        match self {
+        let operator = match self {
             Self::Add => ast::Operator::Add(lhs, rhs),
             Self::And => ast::Operator::And(lhs, rhs),
             Self::Divide => ast::Operator::Divide(lhs, rhs),
@@ -668,108 +698,60 @@ impl InfixOperator {
             Self::NotEqual => ast::Operator::NotEqual(lhs, rhs),
             Self::Or => ast::Operator::Or(lhs, rhs),
             Self::Subtract => ast::Operator::Subtract(lhs, rhs),
-        }
-        .into()
+        };
+        ast::Expression::Operator(operator)
     }
 }
 
-impl Operator for InfixOperator {
-    fn from(token: &Token) -> Option<Self> {
-        Some(match token {
-            Token::Asterisk => Self::Multiply,
-            Token::Caret => Self::Exponentiate,
-            Token::Equal => Self::Equal,
-            Token::GreaterThan => Self::GreaterThan,
-            Token::GreaterThanOrEqual => Self::GreaterThanOrEqual,
-            Token::Keyword(Keyword::And) => Self::And,
-            Token::Keyword(Keyword::Like) => Self::Like,
-            Token::Keyword(Keyword::Or) => Self::Or,
-            Token::LessOrGreaterThan => Self::NotEqual,
-            Token::LessThan => Self::LessThan,
-            Token::LessThanOrEqual => Self::LessThanOrEqual,
-            Token::Minus => Self::Subtract,
-            Token::NotEqual => Self::NotEqual,
-            Token::Percent => Self::Modulo,
-            Token::Plus => Self::Add,
-            Token::Slash => Self::Divide,
-            _ => return None,
-        })
-    }
-
-    fn augment(self, _parser: &mut Parser) -> Result<Self> {
-        Ok(self)
-    }
-
-    fn assoc(&self) -> u8 {
-        match self {
-            Self::Exponentiate => ASSOC_RIGHT,
-            _ => ASSOC_LEFT,
-        }
-    }
-
-    fn prec(&self) -> u8 {
-        match self {
-            Self::Or => 1,
-            Self::And => 2,
-            Self::Equal | Self::NotEqual | Self::Like => 3,
-            Self::GreaterThan
-            | Self::GreaterThanOrEqual
-            | Self::LessThan
-            | Self::LessThanOrEqual => 4,
-            Self::Add | Self::Subtract => 5,
-            Self::Multiply | Self::Divide | Self::Modulo => 6,
-            Self::Exponentiate => 7,
-        }
-    }
-}
-
+/// Postfix operators.
 enum PostfixOperator {
     Factorial,
-    IsNull { not: bool },
+    IsNotNull,
+    IsNull,
 }
 
 impl PostfixOperator {
+    /// Parses a postfix operator, if there is one and it's precedence is at
+    /// least min_precedence.
+    fn parse(parser: &mut Parser, min_precedence: Precedence) -> Result<Option<Self>> {
+        // Handle IS (NOT) NULL separately, since it's multiple tokens.
+        if let Some(Token::Keyword(Keyword::Is)) = parser.peek()? {
+            // We can't consume tokens unless the precedence is satisfied, so we
+            // assume IS NULL (they both have the same precedence).
+            if Self::IsNull.precedence() < min_precedence {
+                return Ok(None);
+            }
+            parser.expect(Keyword::Is.into())?;
+            if parser.next_is(Keyword::Not.into()) {
+                parser.expect(Keyword::Null.into())?;
+                return Ok(Some(Self::IsNotNull));
+            }
+            parser.expect(Keyword::Null.into())?;
+            return Ok(Some(Self::IsNull));
+        }
+
+        parser.next_if_map(|token| {
+            let op = match token {
+                Token::Exclamation => Self::Factorial,
+                _ => return None,
+            };
+            Some(op).filter(|op| op.precedence() >= min_precedence)
+        })
+    }
+
+    // The operator precedence. Postfix operators are below prefix operators.
+    fn precedence(&self) -> Precedence {
+        8
+    }
+
+    /// Builds an AST expression for the operator.
     fn build(&self, lhs: ast::Expression) -> ast::Expression {
         let lhs = Box::new(lhs);
-        match self {
-            Self::IsNull { not } => match not {
-                true => ast::Operator::Not(Box::new(ast::Operator::IsNull(lhs).into())),
-                false => ast::Operator::IsNull(lhs),
-            },
+        let operator = match self {
             Self::Factorial => ast::Operator::Factorial(lhs),
-        }
-        .into()
-    }
-}
-
-impl Operator for PostfixOperator {
-    fn from(token: &Token) -> Option<Self> {
-        match token {
-            Token::Exclamation => Some(Self::Factorial),
-            Token::Keyword(Keyword::Is) => Some(Self::IsNull { not: false }),
-            _ => None,
-        }
-    }
-
-    fn augment(mut self, parser: &mut Parser) -> Result<Self> {
-        #[allow(clippy::single_match)]
-        match &mut self {
-            Self::IsNull { ref mut not } => {
-                if parser.next_if_token(Keyword::Not.into()).is_some() {
-                    *not = true
-                };
-                parser.next_expect(Some(Keyword::Null.into()))?;
-            }
-            _ => {}
+            Self::IsNotNull => ast::Operator::Not(Box::new(ast::Operator::IsNull(lhs).into())),
+            Self::IsNull => ast::Operator::IsNull(lhs),
         };
-        Ok(self)
-    }
-
-    fn assoc(&self) -> u8 {
-        ASSOC_LEFT
-    }
-
-    fn prec(&self) -> u8 {
-        8
+        ast::Expression::Operator(operator)
     }
 }

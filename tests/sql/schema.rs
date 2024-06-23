@@ -59,7 +59,6 @@ test_schema! {
             id INTEGER PRIMARY KEY,
             "bool" BOOL,
             "boolean" BOOLEAN,
-            "char" CHAR,
             "double" DOUBLE,
             "float" FLOAT,
             "int" INT,

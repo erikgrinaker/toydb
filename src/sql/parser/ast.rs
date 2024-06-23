@@ -3,7 +3,9 @@ use crate::sql::types::DataType;
 
 use std::collections::BTreeMap;
 
-/// A SQL statement.
+/// The statement AST is the root node of the AST tree, which describes the
+/// syntactic structure of a SQL query. It is passed to the planner, which
+/// validates its contents and converts it into an execution plan.
 #[derive(Debug)]
 pub enum Statement {
     Begin {
@@ -32,7 +34,7 @@ pub enum Statement {
     },
     Update {
         table: String,
-        set: BTreeMap<String, Expression>,
+        set: BTreeMap<String, Expression>, // BTreeMap for test determinism
         r#where: Option<Expression>,
     },
     Select {
@@ -54,7 +56,7 @@ pub enum From {
     Join { left: Box<From>, right: Box<From>, r#type: JoinType, predicate: Option<Expression> },
 }
 
-/// A table column definition.
+/// A CREATE TABLE column definition.
 #[derive(Debug)]
 pub struct Column {
     pub name: String,
@@ -68,7 +70,7 @@ pub struct Column {
 }
 
 /// JOIN types.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum JoinType {
     Cross,
     Inner,

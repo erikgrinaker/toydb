@@ -85,7 +85,7 @@ impl From<Keyword> for Token {
 }
 
 /// Reserved SQL keywords.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Keyword {
     And,
     As,
@@ -94,7 +94,6 @@ pub enum Keyword {
     Bool,
     Boolean,
     By,
-    Char,
     Commit,
     Create,
     Cross,
@@ -172,7 +171,6 @@ impl TryFrom<&str> for Keyword {
             "bool" => Self::Bool,
             "boolean" => Self::Boolean,
             "by" => Self::By,
-            "char" => Self::Char,
             "commit" => Self::Commit,
             "create" => Self::Create,
             "cross" => Self::Cross,
@@ -248,7 +246,6 @@ impl std::fmt::Display for Keyword {
             Self::Bool => "BOOL",
             Self::Boolean => "BOOLEAN",
             Self::By => "BY",
-            Self::Char => "CHAR",
             Self::Commit => "COMMIT",
             Self::Create => "CREATE",
             Self::Cross => "CROSS",

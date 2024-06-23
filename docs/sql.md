@@ -7,7 +7,7 @@ The following data types are supported:
 * `BOOLEAN` (`BOOL`): logical truth values, i.e. true and false.
 * `FLOAT` (`DOUBLE`): 64-bit signed floating point numbers, using [IEEE 754 `binary64`](https://en.wikipedia.org/wiki/binary64) encoding. Supports magnitudes of 10⁻³⁰⁷ to 10³⁰⁸ with 53-bit precision (~15 significant figures), as well as the special values infinity and NaN.
 * `INTEGER` (`INT`): 64-bit signed integer numbers with a range of ±2⁶³-1.
-* `STRING` (`CHAR`, `TEXT`, `VARCHAR`): UTF-8 encoded strings.
+* `STRING` (`TEXT`, `VARCHAR`): UTF-8 encoded strings.
 
 In addition, the special `NULL` value is used for an unknown value, following the rules of [three-valued logic](https://en.wikipedia.org/wiki/Three-valued_logic).
 
@@ -19,7 +19,7 @@ Numeric types are not interchangable; a float value (even without a fractional p
 
 Keywords are reserved words with special meaning in SQL statements. They are case-insensitive, and must be quoted with `"` to be used as identifiers. The complete list is:
 
-`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `CHAR`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `EXISTS`, `EXPLAIN`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `IF`, `INDEX`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
+`AS`, `ASC`, `AND`, `BEGIN`, `BOOL`, `BOOLEAN`, `BY`, `COMMIT`, `CREATE`, `CROSS`, `DEFAULT`,`DELETE`, `DESC`, `DOUBLE`, `DROP`, `EXISTS`, `EXPLAIN`, `FALSE`, `FLOAT`, `FROM`, `GROUP`, `HAVING`, `IF`, `INDEX`, `INFINITY`, `INNER`, `INSERT`, `INT`, `INTEGER`, `INTO`, `IS`, `JOIN`, `KEY`, `LEFT`, `LIKE`, `LIMIT`, `NAN`, `NOT`, `NULL`, `OF`, `OFFSET`, `ON`, `ONLY`, `OR`, `ORDER`, `OUTER`, `PRIMARY`, `READ`, `REFERENCES`, `RIGHT`, `ROLLBACK`, `SELECT`, `SET`, `STRING`, `SYSTEM`, `TABLE`, `TEXT`, `TIME`, `TRANSACTION`, `TRUE`, `UNIQUE`, `UPDATE`, `VALUES`, `VARCHAR`, `WHERE`, `WRITE`
 
 ### Identifiers
 
