@@ -7,7 +7,7 @@ log_level: INFO
 listen_sql: 0.0.0.0:9605
 listen_raft: 0.0.0.0:9705
 
-# Node data directory, and the garbage ratio threshold at which to trigger
+# Node data directory, and the garbage fraction threshold at which to trigger
 # database compaction when opening the database (Bitcask only).
 data_dir: data
 compact_threshold: 0.2

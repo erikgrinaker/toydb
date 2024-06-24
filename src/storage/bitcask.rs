@@ -63,11 +63,9 @@ impl BitCask {
 
     /// Opens a BitCask database, and automatically compacts it if the amount
     /// of garbage exceeds the given ratio and byte size when opened.
-    ///
-    /// TODO rename garbage_min_ratio to fraction throughout.
     pub fn new_compact(
         path: PathBuf,
-        garbage_min_ratio: f64,
+        garbage_min_fraction: f64,
         garbage_min_bytes: u64,
     ) -> Result<Self> {
         let mut s = Self::new(path)?;
@@ -76,7 +74,7 @@ impl BitCask {
         if Self::should_compact(
             status.garbage_disk_size,
             status.total_disk_size,
-            garbage_min_ratio,
+            garbage_min_fraction,
             garbage_min_bytes,
         ) {
             log::info!(
@@ -98,9 +96,14 @@ impl BitCask {
     }
 
     /// Returns true if the log file should be compacted.
-    fn should_compact(garbage_size: u64, total_size: u64, min_ratio: f64, min_bytes: u64) -> bool {
-        let garbage_ratio = garbage_size as f64 / total_size as f64;
-        garbage_size > 0 && garbage_size >= min_bytes && garbage_ratio >= min_ratio
+    fn should_compact(
+        garbage_size: u64,
+        total_size: u64,
+        min_fraction: f64,
+        min_bytes: u64,
+    ) -> bool {
+        let garbage_fraction = garbage_size as f64 / total_size as f64;
+        garbage_size > 0 && garbage_size >= min_bytes && garbage_fraction >= min_fraction
     }
 }
 
@@ -471,14 +474,19 @@ mod tests {
     #[test_case(100, 100, 2.0, 0 => false; "ratio 2 all garbage")]
     #[test_case(0, 100, 0.0, 0 => false; "ratio 0 no garbage")]
     #[test_case(1, 100, 0.0, 0 => true; "ratio 0 tiny garbage")]
-    #[test_case(49, 100, 0.5, 0 => false; "below ratio")]
-    #[test_case(50, 100, 0.5, 0 => true; "at ratio")]
-    #[test_case(51, 100, 0.5, 0 => true; "above ratio")]
+    #[test_case(49, 100, 0.5, 0 => false; "below fraction")]
+    #[test_case(50, 100, 0.5, 0 => true; "at fraction")]
+    #[test_case(51, 100, 0.5, 0 => true; "above fraction")]
     #[test_case(49, 100, 0.0, 50 => false; "below min bytes")]
     #[test_case(50, 100, 0.0, 50 => true; "at min bytes")]
     #[test_case(51, 100, 0.0, 50 => true; "above min bytes")]
-    fn should_compact(garbage_size: u64, total_size: u64, min_ratio: f64, min_bytes: u64) -> bool {
-        BitCask::should_compact(garbage_size, total_size, min_ratio, min_bytes)
+    fn should_compact(
+        garbage_size: u64,
+        total_size: u64,
+        min_fraction: f64,
+        min_bytes: u64,
+    ) -> bool {
+        BitCask::should_compact(garbage_size, total_size, min_fraction, min_bytes)
     }
 
     /// A BitCask-specific goldenscript runner, which dispatches through to the
@@ -519,8 +527,8 @@ mod tests {
                     // with a temporary empty engine then reopen the file.
                     let path = self.inner.engine.log.path.clone();
                     self.inner.engine = BitCask::new(self.tempdir.path().join("empty"))?;
-                    if let Some(garbage_ratio) = compact_fraction {
-                        self.inner.engine = BitCask::new_compact(path, garbage_ratio, 0)?;
+                    if let Some(garbage_fraction) = compact_fraction {
+                        self.inner.engine = BitCask::new_compact(path, garbage_fraction, 0)?;
                     } else {
                         self.inner.engine = BitCask::new(path)?;
                     }
