@@ -47,9 +47,6 @@ pub trait State: Send {
     ///
     /// This is only executed on a single replica/node, so it must not result in
     /// any state changes (i.e. it must not write).
-    ///
-    /// TODO: consider making this &mut, since the storage engine requires
-    /// exclusive access anyway.
     fn read(&self, command: Vec<u8>) -> Result<Vec<u8>>;
 }
 

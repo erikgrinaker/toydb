@@ -1107,7 +1107,7 @@ pub mod tests {
         /// These characters are effectively represented as ISO-8859-1 rather
         /// than UTF-8, but it allows precise use of the entire u8 value range.
         ///
-        /// TODO: share this with engine::test::Runner.
+        /// TODO: share this and the below with engine::test::Runner.
         pub fn decode_binary(s: &str) -> Vec<u8> {
             let mut buf = [0; 4];
             let mut bytes = Vec::new();
@@ -1122,14 +1122,12 @@ pub mod tests {
         }
 
         /// Formats a raw binary byte vector, escaping special characters.
-        /// TODO: find a better way to manage and share formatting functions.
         fn format_bytes(bytes: &[u8]) -> String {
             let b: Vec<u8> = bytes.iter().copied().flat_map(std::ascii::escape_default).collect();
             String::from_utf8_lossy(&b).to_string()
         }
 
         /// Formats a key/value pair, or None if the value does not exist.
-        /// TODO: share with engine::test::Runner.
         fn format_key_value(key: &[u8], value: Option<&[u8]>) -> String {
             format!(
                 "{} → {}",
@@ -1139,7 +1137,6 @@ pub mod tests {
         }
 
         /// Parses an binary key range, using Rust range syntax.
-        /// TODO: share with engine::test:Runner.
         fn parse_key_range(s: &str) -> Result<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn Error>> {
             let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
             let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");

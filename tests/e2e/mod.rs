@@ -12,8 +12,6 @@ mod testcluster;
 use testcluster::TestCluster;
 
 /// Asserts that a resultset contains the expected rows.
-///
-/// TODO: get rid of these.
 fn assert_rows(result: toydb::StatementResult, expect: Vec<toydb::sql::types::Row>) {
     match result {
         toydb::StatementResult::Select { rows, .. } => {
