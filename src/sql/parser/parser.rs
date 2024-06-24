@@ -483,18 +483,18 @@ impl<'a> Parser<'a> {
     fn parse_expression_at(&mut self, min_precedence: Precedence) -> Result<ast::Expression> {
         // If there is a prefix operator, parse it and its right-hand operand.
         // Otherwise, parse the left-hand atom.
-        let mut lhs = if let Some(prefix) = PrefixOperator::parse(self, min_precedence)? {
+        let mut lhs = if let Some(prefix) = self.parse_prefix_operator(min_precedence)? {
             let at_precedence = prefix.precedence() + prefix.associativity();
             prefix.build(self.parse_expression_at(at_precedence)?)
         } else {
             self.parse_expression_atom()?
         };
         // Apply any postfix operators.
-        while let Some(postfix) = PostfixOperator::parse(self, min_precedence)? {
+        while let Some(postfix) = self.parse_postfix_operator(min_precedence)? {
             lhs = postfix.build(lhs)
         }
         // Apply any binary infix operators, parsing the right-hand operand.
-        while let Some(infix) = InfixOperator::parse(self, min_precedence)? {
+        while let Some(infix) = self.parse_infix_operator(min_precedence)? {
             let at_precedence = infix.precedence() + infix.associativity();
             let rhs = self.parse_expression_at(at_precedence)?;
             lhs = infix.build(lhs, rhs)
@@ -555,6 +555,84 @@ impl<'a> Parser<'a> {
             token => return errinput!("expected expression atom, found {token}"),
         })
     }
+
+    /// Parses a prefix operator, if there is one and it's precedence is at
+    /// least min_precedence.
+    fn parse_prefix_operator(
+        &mut self,
+        min_precedence: Precedence,
+    ) -> Result<Option<PrefixOperator>> {
+        self.next_if_map(|token| {
+            let operator = match token {
+                Token::Keyword(Keyword::Not) => PrefixOperator::Not,
+                Token::Minus => PrefixOperator::Minus,
+                Token::Plus => PrefixOperator::Plus,
+                _ => return None,
+            };
+            Some(operator).filter(|op| op.precedence() >= min_precedence)
+        })
+    }
+
+    /// Parses an infix operator, if there is one and it's precedence is at
+    /// least min_precedence.
+    fn parse_infix_operator(
+        &mut self,
+        min_precedence: Precedence,
+    ) -> Result<Option<InfixOperator>> {
+        self.next_if_map(|token| {
+            let operator = match token {
+                Token::Asterisk => InfixOperator::Multiply,
+                Token::Caret => InfixOperator::Exponentiate,
+                Token::Equal => InfixOperator::Equal,
+                Token::GreaterThan => InfixOperator::GreaterThan,
+                Token::GreaterThanOrEqual => InfixOperator::GreaterThanOrEqual,
+                Token::Keyword(Keyword::And) => InfixOperator::And,
+                Token::Keyword(Keyword::Like) => InfixOperator::Like,
+                Token::Keyword(Keyword::Or) => InfixOperator::Or,
+                Token::LessOrGreaterThan => InfixOperator::NotEqual,
+                Token::LessThan => InfixOperator::LessThan,
+                Token::LessThanOrEqual => InfixOperator::LessThanOrEqual,
+                Token::Minus => InfixOperator::Subtract,
+                Token::NotEqual => InfixOperator::NotEqual,
+                Token::Percent => InfixOperator::Modulo,
+                Token::Plus => InfixOperator::Add,
+                Token::Slash => InfixOperator::Divide,
+                _ => return None,
+            };
+            Some(operator).filter(|op| op.precedence() >= min_precedence)
+        })
+    }
+
+    /// Parses a postfix operator, if there is one and it's precedence is at
+    /// least min_precedence.
+    fn parse_postfix_operator(
+        &mut self,
+        min_precedence: Precedence,
+    ) -> Result<Option<PostfixOperator>> {
+        // Handle IS (NOT) NULL separately, since it's multiple tokens.
+        if let Some(Token::Keyword(Keyword::Is)) = self.peek()? {
+            // We can't consume tokens unless the precedence is satisfied, so we
+            // assume IS NULL (they both have the same precedence).
+            if PostfixOperator::IsNull.precedence() < min_precedence {
+                return Ok(None);
+            }
+            self.expect(Keyword::Is.into())?;
+            if self.next_is(Keyword::Not.into()) {
+                self.expect(Keyword::Null.into())?;
+                return Ok(Some(PostfixOperator::IsNotNull));
+            }
+            self.expect(Keyword::Null.into())?;
+            return Ok(Some(PostfixOperator::IsNull));
+        }
+
+        self.next_if_map(|token| {
+            let operator = match token {
+                Token::Exclamation => PostfixOperator::Factorial,
+                _ => return None,
+            };
+            Some(operator).filter(|op| op.precedence() >= min_precedence)
+        })
+    }
 }
 
 /// Operator precedence.
@@ -571,20 +649,6 @@ enum PrefixOperator {
 }
 
 impl PrefixOperator {
-    /// Parses a prefix operator, if there is one and it's precedence is at
-    /// least min_precedence.
-    fn parse(parser: &mut Parser, min_precedence: Precedence) -> Result<Option<Self>> {
-        parser.next_if_map(|token| {
-            let operator = match token {
-                Token::Keyword(Keyword::Not) => Self::Not,
-                Token::Minus => Self::Minus,
-                Token::Plus => Self::Plus,
-                _ => return None,
-            };
-            Some(operator).filter(|op| op.precedence() >= min_precedence)
-        })
-    }
-
     /// The operator precedence. Prefix operators have the highest precedence.
     fn precedence(&self) -> Precedence {
         9
@@ -599,12 +663,11 @@ impl PrefixOperator {
     /// Builds an AST expression for the operator.
     fn build(&self, rhs: ast::Expression) -> ast::Expression {
         let rhs = Box::new(rhs);
-        let operator = match self {
-            Self::Plus => ast::Operator::Identity(rhs),
-            Self::Minus => ast::Operator::Negate(rhs),
-            Self::Not => ast::Operator::Not(rhs),
-        };
-        ast::Expression::Operator(operator)
+        match self {
+            Self::Plus => ast::Operator::Identity(rhs).into(),
+            Self::Minus => ast::Operator::Negate(rhs).into(),
+            Self::Not => ast::Operator::Not(rhs).into(),
+        }
     }
 }
 
@@ -628,33 +691,6 @@ enum InfixOperator {
 }
 
 impl InfixOperator {
-    /// Parses an infix operator, if there is one and it's precedence is at
-    /// least min_precedence.
-    fn parse(parser: &mut Parser, min_precedence: Precedence) -> Result<Option<Self>> {
-        parser.next_if_map(|token| {
-            let operator = match token {
-                Token::Asterisk => Self::Multiply,
-                Token::Caret => Self::Exponentiate,
-                Token::Equal => Self::Equal,
-                Token::GreaterThan => Self::GreaterThan,
-                Token::GreaterThanOrEqual => Self::GreaterThanOrEqual,
-                Token::Keyword(Keyword::And) => Self::And,
-                Token::Keyword(Keyword::Like) => Self::Like,
-                Token::Keyword(Keyword::Or) => Self::Or,
-                Token::LessOrGreaterThan => Self::NotEqual,
-                Token::LessThan => Self::LessThan,
-                Token::LessThanOrEqual => Self::LessThanOrEqual,
-                Token::Minus => Self::Subtract,
-                Token::NotEqual => Self::NotEqual,
-                Token::Percent => Self::Modulo,
-                Token::Plus => Self::Add,
-                Token::Slash => Self::Divide,
-                _ => return None,
-            };
-            Some(operator).filter(|op| op.precedence() >= min_precedence)
-        })
-    }
-
     /// The operator precedence.
     fn precedence(&self) -> Precedence {
         match self {
@@ -682,24 +718,23 @@ impl InfixOperator {
     /// Builds an AST expression for the infix operator.
     fn build(&self, lhs: ast::Expression, rhs: ast::Expression) -> ast::Expression {
         let (lhs, rhs) = (Box::new(lhs), Box::new(rhs));
-        let operator = match self {
-            Self::Add => ast::Operator::Add(lhs, rhs),
-            Self::And => ast::Operator::And(lhs, rhs),
-            Self::Divide => ast::Operator::Divide(lhs, rhs),
-            Self::Equal => ast::Operator::Equal(lhs, rhs),
-            Self::Exponentiate => ast::Operator::Exponentiate(lhs, rhs),
-            Self::GreaterThan => ast::Operator::GreaterThan(lhs, rhs),
-            Self::GreaterThanOrEqual => ast::Operator::GreaterThanOrEqual(lhs, rhs),
-            Self::LessThan => ast::Operator::LessThan(lhs, rhs),
-            Self::LessThanOrEqual => ast::Operator::LessThanOrEqual(lhs, rhs),
-            Self::Like => ast::Operator::Like(lhs, rhs),
-            Self::Modulo => ast::Operator::Modulo(lhs, rhs),
-            Self::Multiply => ast::Operator::Multiply(lhs, rhs),
-            Self::NotEqual => ast::Operator::NotEqual(lhs, rhs),
-            Self::Or => ast::Operator::Or(lhs, rhs),
-            Self::Subtract => ast::Operator::Subtract(lhs, rhs),
-        };
-        ast::Expression::Operator(operator)
+        match self {
+            Self::Add => ast::Operator::Add(lhs, rhs).into(),
+            Self::And => ast::Operator::And(lhs, rhs).into(),
+            Self::Divide => ast::Operator::Divide(lhs, rhs).into(),
+            Self::Equal => ast::Operator::Equal(lhs, rhs).into(),
+            Self::Exponentiate => ast::Operator::Exponentiate(lhs, rhs).into(),
+            Self::GreaterThan => ast::Operator::GreaterThan(lhs, rhs).into(),
+            Self::GreaterThanOrEqual => ast::Operator::GreaterThanOrEqual(lhs, rhs).into(),
+            Self::LessThan => ast::Operator::LessThan(lhs, rhs).into(),
+            Self::LessThanOrEqual => ast::Operator::LessThanOrEqual(lhs, rhs).into(),
+            Self::Like => ast::Operator::Like(lhs, rhs).into(),
+            Self::Modulo => ast::Operator::Modulo(lhs, rhs).into(),
+            Self::Multiply => ast::Operator::Multiply(lhs, rhs).into(),
+            Self::NotEqual => ast::Operator::NotEqual(lhs, rhs).into(),
+            Self::Or => ast::Operator::Or(lhs, rhs).into(),
+            Self::Subtract => ast::Operator::Subtract(lhs, rhs).into(),
+        }
     }
 }
 
@@ -711,34 +746,6 @@ enum PostfixOperator {
 }
 
 impl PostfixOperator {
-    /// Parses a postfix operator, if there is one and it's precedence is at
-    /// least min_precedence.
-    fn parse(parser: &mut Parser, min_precedence: Precedence) -> Result<Option<Self>> {
-        // Handle IS (NOT) NULL separately, since it's multiple tokens.
-        if let Some(Token::Keyword(Keyword::Is)) = parser.peek()? {
-            // We can't consume tokens unless the precedence is satisfied, so we
-            // assume IS NULL (they both have the same precedence).
-            if Self::IsNull.precedence() < min_precedence {
-                return Ok(None);
-            }
-            parser.expect(Keyword::Is.into())?;
-            if parser.next_is(Keyword::Not.into()) {
-                parser.expect(Keyword::Null.into())?;
-                return Ok(Some(Self::IsNotNull));
-            }
-            parser.expect(Keyword::Null.into())?;
-            return Ok(Some(Self::IsNull));
-        }
-
-        parser.next_if_map(|token| {
-            let op = match token {
-                Token::Exclamation => Self::Factorial,
-                _ => return None,
-            };
-            Some(op).filter(|op| op.precedence() >= min_precedence)
-        })
-    }
-
     // The operator precedence. Postfix operators are below prefix operators.
     fn precedence(&self) -> Precedence {
         8
@@ -747,11 +754,10 @@ impl PostfixOperator {
     /// Builds an AST expression for the operator.
     fn build(&self, lhs: ast::Expression) -> ast::Expression {
         let lhs = Box::new(lhs);
-        let operator = match self {
-            Self::Factorial => ast::Operator::Factorial(lhs),
-            Self::IsNotNull => ast::Operator::Not(Box::new(ast::Operator::IsNull(lhs).into())),
-            Self::IsNull => ast::Operator::IsNull(lhs),
-        };
-        ast::Expression::Operator(operator)
+        match self {
+            Self::Factorial => ast::Operator::Factorial(lhs).into(),
+            Self::IsNotNull => ast::Operator::Not(ast::Operator::IsNull(lhs).into()).into(),
+            Self::IsNull => ast::Operator::IsNull(lhs).into(),
+        }
     }
 }

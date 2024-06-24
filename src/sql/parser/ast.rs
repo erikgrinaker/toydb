@@ -284,3 +284,9 @@ impl core::convert::From<Operator> for Expression {
         Self::Operator(op)
     }
 }
+
+impl core::convert::From<Operator> for Box<Expression> {
+    fn from(value: Operator) -> Self {
+        Box::new(value.into())
+    }
+}
