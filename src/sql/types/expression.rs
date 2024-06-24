@@ -288,137 +288,107 @@ impl Expression {
         Ok(self)
     }
 
-    // TODO: clean up the transformations below when the optimizer is cleaned up.
-
-    /// Converts the expression into its negation normal form. This pushes NOT operators into the
-    /// tree using De Morgan's laws, such that they never occur before other logical operators.
-    pub fn into_nnf(self) -> Self {
-        use Expression::*;
-        // FIXME This should use a single match, but it's not possible to match on the boxed
-        // children without box pattern syntax, which is unstable.
-        self.transform(
-            &|e| match e {
-                Not(expr) => match *expr {
-                    And(lhs, rhs) => Ok(Or(Not(lhs).into(), Not(rhs).into())),
-                    Or(lhs, rhs) => Ok(And(Not(lhs).into(), Not(rhs).into())),
-                    Not(inner) => Ok(*inner),
-                    _ => Ok(Not(expr)),
-                },
-                _ => Ok(e),
-            },
-            &Ok,
-        )
-        .unwrap()
-    }
-
-    /// Converts the expression into conjunctive normal form, i.e. an AND of ORs. This is done by
-    /// converting to negation normal form and then applying the distributive law:
-    /// (x AND y) OR z = (x OR z) AND (y OR z).
+    /// Converts the expression into conjunctive normal form, i.e. an AND of
+    /// ORs, which is useful when optimizing plans. This is done by converting
+    /// to negation normal form and then applying De Morgan's distributive law.
     pub fn into_cnf(self) -> Self {
         use Expression::*;
-        self.into_nnf()
-            .transform(
-                &|e| match e {
-                    Or(lhs, rhs) => match (*lhs, *rhs) {
-                        (And(ll, lr), r) => {
-                            Ok(And(Or(ll, r.clone().into()).into(), Or(lr, r.into()).into()))
-                        }
-                        (l, And(rl, rr)) => {
-                            Ok(And(Or(l.clone().into(), rl).into(), Or(l.into(), rr).into()))
-                        }
-                        (lhs, rhs) => Ok(Or(lhs.into(), rhs.into())),
-                    },
-                    e => Ok(e),
-                },
-                &Ok,
-            )
-            .unwrap()
+        let transform = |expr| {
+            // We can't use a single match, since it needs deref patterns.
+            let Or(lhs, rhs) = expr else { return expr };
+            match (*lhs, *rhs) {
+                // (x AND y) OR z → (x OR z) AND (y OR z)
+                (And(l, r), rhs) => And(Or(l, rhs.clone().into()).into(), Or(r, rhs.into()).into()),
+                // x OR (y AND z) → (x OR y) AND (x OR z)
+                (lhs, And(l, r)) => And(Or(lhs.clone().into(), l).into(), Or(lhs.into(), r).into()),
+                // Otherwise, do nothing.
+                (lhs, rhs) => Or(lhs.into(), rhs.into()),
+            }
+        };
+        self.into_nnf().transform(&|e| Ok(transform(e)), &Ok).unwrap() // never fails
     }
 
-    /// Converts the expression into conjunctive normal form as a vector.
+    /// Converts the expression into disjunctive normal form, i.e. an OR of
+    /// ANDs. This isn't currently used, but is included for completeness. This
+    /// is done by converting to negation normal form and then applying
+    /// DeMorgan's distributive law.
+    pub fn into_dnf(self) -> Self {
+        use Expression::*;
+        let transform = |expr| {
+            let And(lhs, rhs) = expr else { return expr };
+            match (*lhs, *rhs) {
+                // (x OR y) AND z → (x AND z) OR (y AND z)
+                (Or(l, r), rhs) => Or(And(l, rhs.clone().into()).into(), And(r, rhs.into()).into()),
+                // x AND (y OR z) → (x AND y) OR (x AND z)
+                (lhs, Or(l, r)) => Or(And(lhs.clone().into(), l).into(), And(lhs.into(), r).into()),
+                // Otherwise, do nothing.
+                (lhs, rhs) => And(lhs.into(), rhs.into()),
+            }
+        };
+        self.into_nnf().transform(&|e| Ok(transform(e)), &Ok).unwrap() // never fails
+    }
+
+    /// Converts the expression into negation normal form. This pushes NOT
+    /// operators into the tree using De Morgan's laws, such that they're always
+    /// below other logical operators. It is a useful intermediate form for
+    /// applying other logical normalizations.
+    pub fn into_nnf(self) -> Self {
+        use Expression::*;
+        let transform = |expr| {
+            let Not(inner) = expr else { return expr };
+            match *inner {
+                // NOT (x AND y) → (NOT x) OR (NOT y)
+                And(lhs, rhs) => Or(Not(lhs).into(), Not(rhs).into()),
+                // NOT (x OR y) → (NOT x) AND (NOT y)
+                Or(lhs, rhs) => And(Not(lhs).into(), Not(rhs).into()),
+                // NOT NOT x → x
+                Not(inner) => *inner,
+                // Otherwise, do nothing.
+                expr => Not(expr.into()),
+            }
+        };
+        self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // never fails
+    }
+
+    /// Converts the expression into conjunctive normal form as a vector of
+    /// ANDed expressions (instead of nested ANDs).
     pub fn into_cnf_vec(self) -> Vec<Self> {
         let mut cnf = Vec::new();
         let mut stack = vec![self.into_cnf()];
         while let Some(expr) = stack.pop() {
-            match expr {
-                Self::And(lhs, rhs) => {
-                    stack.push(*rhs);
-                    stack.push(*lhs);
-                }
-                expr => cnf.push(expr),
+            if let Self::And(lhs, rhs) = expr {
+                stack.extend([*rhs, *lhs]); // put LHS last to process next
+            } else {
+                cnf.push(expr);
             }
         }
         cnf
     }
 
-    /// Converts the expression into disjunctive normal form, i.e. an OR of ANDs. This is done by
-    /// converting to negation normal form and then applying the distributive law:
-    /// (x OR y) AND z = (x AND z) OR (y AND z).
-    pub fn into_dnf(self) -> Self {
-        use Expression::*;
-        self.into_nnf()
-            .transform(
-                &|e| match e {
-                    And(lhs, rhs) => match (*lhs, *rhs) {
-                        (Or(ll, lr), r) => {
-                            Ok(Or(And(ll, r.clone().into()).into(), And(lr, r.into()).into()))
-                        }
-                        (l, Or(rl, rr)) => {
-                            Ok(Or(And(l.clone().into(), rl).into(), And(l.into(), rr).into()))
-                        }
-                        (lhs, rhs) => Ok(And(lhs.into(), rhs.into())),
-                    },
-                    e => Ok(e),
-                },
-                &Ok,
-            )
-            .unwrap()
-    }
-
-    /// Converts the expression into disjunctive normal form as a vector.
-    pub fn into_dnf_vec(self) -> Vec<Self> {
-        let mut dnf = Vec::new();
-        let mut stack = vec![self.into_dnf()];
-        while let Some(expr) = stack.pop() {
-            match expr {
-                Self::Or(lhs, rhs) => {
-                    stack.push(*rhs);
-                    stack.push(*lhs);
-                }
-                expr => dnf.push(expr),
-            }
+    /// Creates an expression by ANDing together a vector, or None if empty.
+    pub fn and_vec(exprs: Vec<Expression>) -> Option<Self> {
+        let mut iter = exprs.into_iter();
+        let mut expr = iter.next()?;
+        for rhs in iter {
+            expr = Expression::And(expr.into(), rhs.into());
         }
-        dnf
+        Some(expr)
     }
 
-    /// Creates an expression by joining a vector in conjunctive normal form as an And.
-    pub fn from_cnf_vec(mut cnf: Vec<Expression>) -> Option<Self> {
-        if !cnf.is_empty() {
-            let mut expr = cnf.remove(0);
-            for rhs in cnf {
-                expr = Expression::And(expr.into(), rhs.into());
-            }
-            Some(expr)
-        } else {
-            None
+    /// Creates an expression by ORing together a vector, or None if empty,
+    pub fn or_vec(exprs: Vec<Expression>) -> Option<Self> {
+        let mut iter = exprs.into_iter();
+        let mut expr = iter.next()?;
+        for rhs in iter {
+            expr = Expression::Or(expr.into(), rhs.into());
         }
+        Some(expr)
     }
 
-    /// Creates an expression by joining a vector in disjunctive normal form as an Or.
-    pub fn from_dnf_vec(mut dnf: Vec<Expression>) -> Option<Self> {
-        if !dnf.is_empty() {
-            let mut expr = dnf.remove(0);
-            for rhs in dnf {
-                expr = Expression::Or(expr.into(), rhs.into());
-            }
-            Some(expr)
-        } else {
-            None
-        }
-    }
-
-    // Checks if the expression is a field lookup, and returns the list of values looked up.
-    // Expressions must be a combination of =, IS NULL, OR to be converted.
+    /// Checks if the expression is a field lookup, and returns the list of
+    /// values looked up.  Expressions must be a combination of =, IS NULL, OR
+    /// to be converted.
+    /// TODO: consider moving this and the below into the optimizer module.
     pub fn as_lookup(&self, field: usize) -> Option<Vec<Value>> {
         use Expression::*;
         // FIXME This should use a single match level, but since the child expressions are boxed
@@ -452,7 +422,7 @@ impl Expression {
                 Expression::Constant(Value::Null).into(),
             );
         }
-        Self::from_dnf_vec(
+        Self::or_vec(
             values
                 .into_iter()
                 .map(|v| {

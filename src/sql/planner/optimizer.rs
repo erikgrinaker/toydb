@@ -140,12 +140,12 @@ impl FilterPushdown {
         }
 
         // Push predicates down into the sources.
-        if let Some(push_left) = Expression::from_cnf_vec(push_left) {
+        if let Some(push_left) = Expression::and_vec(push_left) {
             if let Some(remainder) = self.pushdown(push_left, left) {
                 cnf.push(remainder)
             }
         }
-        if let Some(mut push_right) = Expression::from_cnf_vec(push_right) {
+        if let Some(mut push_right) = Expression::and_vec(push_right) {
             // All field references to the right must be shifted left.
             push_right = push_right
                 .transform(
@@ -160,7 +160,7 @@ impl FilterPushdown {
                 cnf.push(remainder)
             }
         }
-        Expression::from_cnf_vec(cnf)
+        Expression::and_vec(cnf)
     }
 }
 
@@ -170,7 +170,7 @@ pub struct IndexLookup;
 impl IndexLookup {
     // Wraps a node in a filter for the given CNF vector, if any, otherwise returns the bare node.
     fn wrap_cnf(&self, node: Node, cnf: Vec<Expression>) -> Node {
-        if let Some(predicate) = Expression::from_cnf_vec(cnf) {
+        if let Some(predicate) = Expression::and_vec(cnf) {
             Node::Filter { source: Box::new(node), predicate }
         } else {
             node
