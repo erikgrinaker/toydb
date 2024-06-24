@@ -1,7 +1,7 @@
 Query: SELECT * FROM movies WHERE TRUE
 
 Explain:
-Scan: movies (TRUE)
+Scan: movies
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd"]
 [Integer(1), String("Stalker"), Integer(1), Integer(1), Integer(1979), Float(8.2), Null]
@@ -237,13 +237,7 @@ Optimized plan: Select {
                 },
             ],
         },
-        filter: Some(
-            Constant(
-                Boolean(
-                    true,
-                ),
-            ),
-        ),
+        filter: None,
         alias: None,
     },
     labels: [

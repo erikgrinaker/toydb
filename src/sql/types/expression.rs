@@ -308,26 +308,6 @@ impl Expression {
         self.into_nnf().transform(&|e| Ok(transform(e)), &Ok).unwrap() // never fails
     }
 
-    /// Converts the expression into disjunctive normal form, i.e. an OR of
-    /// ANDs. This isn't currently used, but is included for completeness. This
-    /// is done by converting to negation normal form and then applying
-    /// DeMorgan's distributive law.
-    pub fn into_dnf(self) -> Self {
-        use Expression::*;
-        let transform = |expr| {
-            let And(lhs, rhs) = expr else { return expr };
-            match (*lhs, *rhs) {
-                // (x OR y) AND z → (x AND z) OR (y AND z)
-                (Or(l, r), rhs) => Or(And(l, rhs.clone().into()).into(), And(r, rhs.into()).into()),
-                // x AND (y OR z) → (x AND y) OR (x AND z)
-                (lhs, Or(l, r)) => Or(And(lhs.clone().into(), l).into(), And(lhs.into(), r).into()),
-                // Otherwise, do nothing.
-                (lhs, rhs) => And(lhs.into(), rhs.into()),
-            }
-        };
-        self.into_nnf().transform(&|e| Ok(transform(e)), &Ok).unwrap() // never fails
-    }
-
     /// Converts the expression into negation normal form. This pushes NOT
     /// operators into the tree using De Morgan's laws, such that they're always
     /// below other logical operators. It is a useful intermediate form for
@@ -375,38 +355,42 @@ impl Expression {
         Some(expr)
     }
 
-    /// Creates an expression by ORing together a vector, or None if empty,
-    pub fn or_vec(exprs: Vec<Expression>) -> Option<Self> {
-        let mut iter = exprs.into_iter();
-        let mut expr = iter.next()?;
-        for rhs in iter {
-            expr = Expression::Or(expr.into(), rhs.into());
-        }
-        Some(expr)
-    }
-
-    /// Checks if the expression is a field lookup, and returns the list of
-    /// values looked up.  Expressions must be a combination of =, IS NULL, OR
-    /// to be converted.
-    /// TODO: consider moving this and the below into the optimizer module.
-    pub fn as_lookup(&self, field: usize) -> Option<Vec<Value>> {
+    /// Checks if an expression is a single field lookup (i.e. a disjunction of
+    /// = or IS NULL referencing a single field), returning the field index.
+    pub fn is_field_lookup(&self) -> Option<usize> {
         use Expression::*;
-        // FIXME This should use a single match level, but since the child expressions are boxed
-        // that would require box patterns, which are unstable.
         match &self {
-            Equal(lhs, rhs) => match (&**lhs, &**rhs) {
-                (Field(i, _), Constant(v)) if i == &field => Some(vec![v.clone()]),
-                (Constant(v), Field(i, _)) if i == &field => Some(vec![v.clone()]),
-                (_, _) => None,
-            },
-            IsNull(e) => match &**e {
-                Field(i, _) if i == &field => Some(vec![Value::Null]),
+            Equal(lhs, rhs) => match (lhs.as_ref(), rhs.as_ref()) {
+                (Field(f, _), Constant(_)) | (Constant(_), Field(f, _)) => Some(*f),
                 _ => None,
             },
-            Or(lhs, rhs) => match (lhs.as_lookup(field), rhs.as_lookup(field)) {
-                (Some(mut lvalues), Some(mut rvalues)) => {
-                    lvalues.append(&mut rvalues);
-                    Some(lvalues)
+            IsNull(expr) => match expr.as_ref() {
+                Field(f, _) => Some(*f),
+                _ => None,
+            },
+            Or(lhs, rhs) => match (lhs.is_field_lookup(), rhs.is_field_lookup()) {
+                (Some(l), Some(r)) if l == r => Some(l),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Converts the expression into a set of single-field lookup values if possible.
+    pub fn into_field_values(self) -> Option<(usize, Vec<Value>)> {
+        use Expression::*;
+        match self {
+            Equal(lhs, rhs) => match (*lhs, *rhs) {
+                (Field(f, _), Constant(v)) | (Constant(v), Field(f, _)) => Some((f, vec![v])),
+                _ => None,
+            },
+            IsNull(expr) => match *expr {
+                Field(f, _) => Some((f, vec![Value::Null])),
+                _ => None,
+            },
+            Or(lhs, rhs) => match (lhs.into_field_values(), rhs.into_field_values()) {
+                (Some((l, lvec)), Some((r, rvec))) if l == r => {
+                    Some((l, lvec.into_iter().chain(rvec).collect()))
                 }
                 _ => None,
             },
@@ -414,26 +398,22 @@ impl Expression {
         }
     }
 
-    // Creates an expression from a list of field lookup values.
-    pub fn from_lookup(field: usize, label: Label, values: Vec<Value>) -> Self {
-        if values.is_empty() {
-            return Expression::Equal(
-                Expression::Field(field, label).into(),
-                Expression::Constant(Value::Null).into(),
-            );
-        }
-        Self::or_vec(
-            values
-                .into_iter()
-                .map(|v| {
-                    Expression::Equal(
-                        Expression::Field(field, label.clone()).into(),
-                        Expression::Constant(v).into(),
-                    )
-                })
-                .collect(),
-        )
-        .unwrap()
+    /// Replaces field references with the given field.
+    pub fn replace_field(self, from: usize, to: usize, label: &Label) -> Self {
+        let transform = |expr| match expr {
+            Expression::Field(i, _) if i == from => Expression::Field(to, label.clone()),
+            expr => expr,
+        };
+        self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible
+    }
+
+    /// Shifts any field indexes by the given amount.
+    pub fn shift_field(self, diff: isize) -> Self {
+        let transform = |expr| match expr {
+            Expression::Field(i, label) => Expression::Field((i as isize + diff) as usize, label),
+            expr => expr,
+        };
+        self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible
     }
 }
 

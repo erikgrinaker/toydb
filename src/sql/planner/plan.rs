@@ -1,4 +1,4 @@
-use super::optimizer::{self, Optimizer as _};
+use super::optimizer;
 use super::planner::Planner;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
@@ -63,11 +63,10 @@ impl Plan {
     /// Optimizes the plan, consuming it.
     pub fn optimize(self) -> Result<Self> {
         let optimize = |mut node| -> Result<Node> {
-            node = optimizer::ConstantFolder.optimize(node)?;
-            node = optimizer::FilterPushdown.optimize(node)?;
-            node = optimizer::IndexLookup.optimize(node)?;
-            node = optimizer::NoopCleaner.optimize(node)?;
-            node = optimizer::JoinType.optimize(node)?;
+            node = optimizer::fold_constants(node)?;
+            node = optimizer::push_filters(node)?;
+            node = optimizer::index_lookup(node)?;
+            node = optimizer::join_type(node)?;
             Ok(node)
         };
         Ok(match self {
@@ -121,7 +120,6 @@ pub enum Node {
     /// right source and iterating over it for every row in the left source.
     /// When outer is true (e.g. LEFT JOIN), a left row without a right match is
     /// emitted anyway, with NULLs for the right row.
-    /// TODO: do we need left_size?
     NestedLoopJoin {
         left: Box<Node>,
         left_size: usize,

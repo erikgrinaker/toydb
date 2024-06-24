@@ -1,313 +1,289 @@
-use super::super::types::{Expression, Value};
-use super::plan::Node;
+use super::Node;
 use crate::error::Result;
+use crate::sql::types::{Expression, Value};
 
-use std::mem::replace;
+use std::collections::HashMap;
 
-/// A plan optimizer
-pub trait Optimizer {
-    fn optimize(&self, node: Node) -> Result<Node>;
-}
+/// Folds constant (sub)expressions by pre-evaluating them, instead of
+/// re-evaluating then for every row during execution.
+pub(super) fn fold_constants(node: Node) -> Result<Node> {
+    use Expression::*;
+    use Value::*;
 
-/// A constant folding optimizer, which replaces constant expressions with their evaluated value, to
-/// prevent it from being re-evaluated over and over again during plan execution.
-pub struct ConstantFolder;
-
-impl Optimizer for ConstantFolder {
-    fn optimize(&self, node: Node) -> Result<Node> {
-        node.transform(&Ok, &|n| {
-            n.transform_expressions(
-                &|e| {
-                    if !e.contains(&|expr| matches!(expr, Expression::Field(_, _))) {
-                        Ok(Expression::Constant(e.evaluate(None)?))
-                    } else {
-                        Ok(e)
-                    }
-                },
-                &Ok,
-            )
-        })
-    }
-}
-
-/// A filter pushdown optimizer, which moves filter predicates into or closer to the source node.
-pub struct FilterPushdown;
-
-impl Optimizer for FilterPushdown {
-    fn optimize(&self, node: Node) -> Result<Node> {
-        node.transform(
-            &|n| match n {
-                Node::Filter { mut source, predicate } => {
-                    // We don't replace the filter node here, since doing so would cause transform()
-                    // to skip the source as it won't reapply the transform to the "same" node.
-                    // We leave a noop filter node instead, which will be cleaned up by NoopCleaner.
-                    if let Some(remainder) = self.pushdown(predicate, &mut source) {
-                        Ok(Node::Filter { source, predicate: remainder })
-                    } else {
-                        Ok(Node::Filter {
-                            source,
-                            predicate: Expression::Constant(Value::Boolean(true)),
-                        })
-                    }
+    // Transforms expressions.
+    let transform = |expr: Expression| {
+        // If the expression is constant, evaulate it.
+        if !expr.contains(&|e| matches!(e, Expression::Field(_, _))) {
+            return expr.evaluate(None).map(Expression::Constant);
+        }
+        // If the expression is a logical operator, and one of the sides is
+        // known, we may be able to short-circuit it.
+        Ok(match expr {
+            And(lhs, rhs) => match (*lhs, *rhs) {
+                // If either side of an AND is false, the AND is false.
+                (Constant(Boolean(false)), _) | (_, Constant(Boolean(false))) => {
+                    Constant(Boolean(false))
                 }
-                Node::NestedLoopJoin {
-                    mut left,
-                    left_size,
-                    mut right,
-                    right_size,
-                    predicate: Some(predicate),
-                    outer,
-                } => {
-                    let predicate = self.pushdown_join(predicate, &mut left, &mut right, left_size);
-                    Ok(Node::NestedLoopJoin {
-                        left,
-                        left_size,
-                        right,
-                        right_size,
-                        predicate,
-                        outer,
-                    })
-                }
-                n => Ok(n),
+                // If either side of an AND is true, the AND is redundant.
+                (Constant(Boolean(true)), expr) | (expr, Constant(Boolean(true))) => expr,
+                (lhs, rhs) => And(lhs.into(), rhs.into()),
             },
-            &Ok,
-        )
-    }
+            Or(lhs, rhs) => match (*lhs, *rhs) {
+                // If either side of an OR is true, the OR is true.
+                (Constant(Boolean(true)), _) | (_, Constant(Boolean(true))) => {
+                    Constant(Boolean(true))
+                }
+                // If either side of an OR is false, the OR is redundant.
+                (Constant(Boolean(false)), expr) | (expr, Constant(Boolean(false))) => expr,
+                (lhs, rhs) => Or(lhs.into(), rhs.into()),
+            },
+            expr => expr,
+        })
+    };
+
+    // Removes noop nodes.
+    // TODO: this can replace false predicates with nothing nodes.
+    let remove_noops = |node| match node {
+        Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
+        node => node,
+    };
+
+    // Transform expressions after descending, both to perform the logical
+    // short-circuiting on child expressions that have already been folded, and
+    // to reduce the quadratic cost when an expression contains a field.
+    node.transform(&|n| n.transform_expressions(&Ok, &transform), &|n| Ok(remove_noops(n)))
 }
 
-impl FilterPushdown {
-    /// Attempts to push an expression down into a target node, returns any remaining expression.
-    fn pushdown(&self, mut expression: Expression, target: &mut Node) -> Option<Expression> {
+/// Pushes filter predicates down into child nodes where possible. In
+/// particular, this can allow filtering during storage scans (below Raft).
+pub(super) fn push_filters(node: Node) -> Result<Node> {
+    /// Pushes an expression into a node if possible. Otherwise, returns the the
+    /// unpushed expression.
+    fn push_into(expr: Expression, target: &mut Node) -> Option<Expression> {
         match target {
-            Node::Scan { ref mut filter, .. } => {
-                if let Some(filter) = filter.take() {
-                    expression = Expression::And(Box::new(expression), Box::new(filter))
-                }
-                filter.replace(expression)
+            Node::Filter { predicate, .. } => {
+                // Temporarily swap the predicate to take ownership.
+                let rhs = std::mem::replace(predicate, Expression::Constant(Value::Null));
+                *predicate = Expression::And(expr.into(), rhs.into());
             }
-            Node::NestedLoopJoin { ref mut predicate, .. } => {
-                if let Some(predicate) = predicate.take() {
-                    expression = Expression::And(Box::new(expression), Box::new(predicate));
-                }
-                predicate.replace(expression)
+            Node::NestedLoopJoin { predicate, .. } => {
+                *predicate = match predicate.take() {
+                    Some(predicate) => Some(Expression::And(expr.into(), predicate.into())),
+                    None => Some(expr),
+                };
             }
-            Node::Filter { ref mut predicate, .. } => {
-                let p = replace(predicate, Expression::Constant(Value::Null));
-                *predicate = Expression::And(Box::new(p), Box::new(expression));
-                None
+            Node::Scan { filter, .. } => {
+                *filter = match filter.take() {
+                    Some(filter) => Some(Expression::And(expr.into(), filter.into())),
+                    None => Some(expr),
+                };
             }
-            _ => Some(expression),
+            // We don't handle HashJoin here, since we assume the join_type()
+            // optimizer runs after this.
+            Node::HashJoin { .. } => panic!("filter pushdown must run before join optimizer"),
+            // Unable to push down, just return the original expression.
+            _ => return Some(expr),
         }
+        None
     }
 
-    /// Attempts to partition a join predicate and push parts of it down into either source,
-    /// returning any remaining expression.
-    fn pushdown_join(
-        &self,
-        predicate: Expression,
-        left: &mut Node,
-        right: &mut Node,
-        boundary: usize,
-    ) -> Option<Expression> {
-        // Convert the predicate into conjunctive normal form, and partition into expressions
-        // only referencing the left or right sources, leaving cross-source expressions.
+    /// Pushes down a filter node if possible.
+    fn push_filter(node: Node) -> Node {
+        let Node::Filter { mut source, predicate } = node else { return node };
+        // Attempt to push the filter into the source.
+        if let Some(predicate) = push_into(predicate, &mut source) {
+            // Push failed, return the original filter node.
+            return Node::Filter { source, predicate };
+        }
+        // Push succeded, return the source that was pushed into. When we
+        // replace this filter node with the source node, Node.transform() will
+        // skip the source node since it now takes the place of the original
+        // filter node. Transform the source manually.
+        transform(*source)
+    }
+
+    // Pushes down parts of a join predicate into the left or right sources
+    // where possible.
+    fn push_join(node: Node) -> Node {
+        let Node::NestedLoopJoin {
+            mut left,
+            left_size,
+            mut right,
+            right_size,
+            predicate: Some(predicate),
+            outer,
+        } = node
+        else {
+            return node;
+        };
+        // Convert the predicate into conjunctive normal form (an AND vector).
         let cnf = predicate.into_cnf_vec();
-        let (mut push_left, cnf): (Vec<Expression>, Vec<Expression>) =
-            cnf.into_iter().partition(|e| {
-                // Partition only if no expressions reference the right-hand source.
-                !e.contains(&|e| matches!(e, Expression::Field(i, _) if i >= &boundary))
-            });
-        let (mut push_right, mut cnf): (Vec<Expression>, Vec<Expression>) =
-            cnf.into_iter().partition(|e| {
-                // Partition only if no expressions reference the left-hand source.
-                !e.contains(&|e| matches!(e, Expression::Field(i, _) if i < &boundary))
-            });
 
-        // Look for equijoins that have constant lookups on either side, and transfer the constants
-        // to the other side of the join as well. This allows index lookup optimization in both
-        // sides. We already know that the remaining cnf expressions span both sources.
-        for e in &cnf {
-            if let Expression::Equal(ref lhs, ref rhs) = e {
-                if let (Expression::Field(l, ln), Expression::Field(r, rn)) = (&**lhs, &**rhs) {
-                    let (l, ln, r, rn) = if l > r { (r, rn, l, ln) } else { (l, ln, r, rn) };
-                    if let Some(lvals) = push_left.iter().find_map(|e| e.as_lookup(*l)) {
-                        push_right.push(Expression::from_lookup(*r, rn.clone(), lvals));
-                    } else if let Some(rvals) = push_right.iter().find_map(|e| e.as_lookup(*r)) {
-                        push_left.push(Expression::from_lookup(*l, ln.clone(), rvals));
-                    }
-                }
+        // Split out expressions that only reference a single source.
+        let (mut push_left, mut push_right, mut predicate) = (Vec::new(), Vec::new(), Vec::new());
+        for expr in cnf {
+            if !expr.contains(&|e| matches!(e, Expression::Field(i, _) if i >= &left_size)) {
+                push_left.push(expr)
+            } else if !expr.contains(&|e| matches!(e, Expression::Field(i, _) if i < &left_size)) {
+                push_right.push(expr)
+            } else {
+                predicate.push(expr)
             }
         }
 
-        // Push predicates down into the sources.
-        if let Some(push_left) = Expression::and_vec(push_left) {
-            if let Some(remainder) = self.pushdown(push_left, left) {
-                cnf.push(remainder)
+        // In the remaining cross-source expressions, look for equijoins where
+        // one side also has constant value lookups. In this case we can copy
+        // the constant lookups to the other side, to allow index lookups. This
+        // commonly happens when joining a foreign key (which is indexed) on a
+        // primary key, and we want to make use of the foreign key index, e.g.:
+        // SELECT m.name, g.name FROM movies m JOIN genres g ON m.genre_id = g.id AND g.id = 7;
+        let left_lookups: HashMap<usize, usize> = push_left // field → push_left index
+            .iter()
+            .enumerate()
+            .filter_map(|(i, expr)| expr.is_field_lookup().map(|field| (field, i)))
+            .collect();
+        let right_lookups: HashMap<usize, usize> = push_right // field → push_right index
+            .iter()
+            .enumerate()
+            .filter_map(|(i, expr)| expr.is_field_lookup().map(|field| (field, i)))
+            .collect();
+
+        for expr in &predicate {
+            // Find equijoins.
+            let Expression::Equal(lhs, rhs) = expr else { continue };
+            let Expression::Field(l, lname) = lhs.as_ref() else { continue };
+            let Expression::Field(r, rname) = rhs.as_ref() else { continue };
+
+            // The lhs may be a reference to the right source; swap them.
+            let (l, lname, r, rname) =
+                if l > r { (r, rname, l, lname) } else { (l, lname, r, rname) };
+
+            // Check if either side is a field lookup, and copy it over.
+            if let Some(expr) = left_lookups.get(l).map(|i| push_left[*i].clone()) {
+                push_right.push(expr.replace_field(*l, *r, rname));
+            }
+            if let Some(expr) = right_lookups.get(r).map(|i| push_right[*i].clone()) {
+                push_left.push(expr.replace_field(*r, *l, lname));
             }
         }
-        if let Some(mut push_right) = Expression::and_vec(push_right) {
-            // All field references to the right must be shifted left.
-            push_right = push_right
-                .transform(
-                    &|e| match e {
-                        Expression::Field(i, label) => Ok(Expression::Field(i - boundary, label)),
-                        e => Ok(e),
-                    },
-                    &Ok,
-                )
-                .unwrap();
-            if let Some(remainder) = self.pushdown(push_right, right) {
-                cnf.push(remainder)
+
+        // Push predicates down into the sources if possible.
+        if let Some(expr) = Expression::and_vec(push_left) {
+            if let Some(expr) = push_into(expr, &mut left) {
+                // Pushdown failed, put it back into the join predicate.
+                predicate.push(expr)
             }
         }
-        Expression::and_vec(cnf)
+
+        if let Some(mut expr) = Expression::and_vec(push_right) {
+            // Right fields have indexes in the joined row; shift them left.
+            expr = expr.shift_field(-(left_size as isize));
+            if let Some(mut expr) = push_into(expr, &mut right) {
+                // Pushdown failed, undo the field index shift.
+                expr = expr.shift_field(left_size as isize);
+                predicate.push(expr)
+            }
+        }
+
+        // Leave any remaining predicates in the join node.
+        let predicate = Expression::and_vec(predicate);
+        Node::NestedLoopJoin { left, left_size, right, right_size, predicate, outer }
     }
+
+    /// Applies pushdown transformations to a node.
+    fn transform(mut node: Node) -> Node {
+        node = push_filter(node);
+        node = push_join(node);
+        node
+    }
+
+    // Push down before descending, so we can keep recursively pushing down.
+    node.transform(&|n| Ok(transform(n)), &Ok)
 }
 
-/// An index lookup optimizer, which converts table scans to index lookups.
-pub struct IndexLookup;
+/// Uses an index or primary key lookup for a filter when possible.
+pub(super) fn index_lookup(node: Node) -> Result<Node> {
+    let transform = |mut node| {
+        // Only handle scan filters. filter_pushdown() must have pushed filters
+        // into scan nodes first.
+        let Node::Scan { table, alias, filter: Some(filter) } = node else { return node };
 
-impl IndexLookup {
-    // Wraps a node in a filter for the given CNF vector, if any, otherwise returns the bare node.
-    fn wrap_cnf(&self, node: Node, cnf: Vec<Expression>) -> Node {
-        if let Some(predicate) = Expression::and_vec(cnf) {
-            Node::Filter { source: Box::new(node), predicate }
+        // Convert the filter into conjunctive normal form (a list of ANDs).
+        let mut cnf = filter.clone().into_cnf_vec();
+
+        // Find the first expression that's either a primary key or secondary
+        // index lookup. We could be more clever here, but this is fine.
+        let Some(i) = cnf.iter().enumerate().find_map(|(i, e)| {
+            e.is_field_lookup()
+                .filter(|f| *f == table.primary_key || table.columns[*f].index)
+                .and(Some(i))
+        }) else {
+            return Node::Scan { table, alias, filter: Some(filter) };
+        };
+
+        // Extract the lookup values and expression from the cnf vector.
+        let (field, values) = cnf.remove(i).into_field_values().expect("field lookup failed");
+
+        // Build the primary key or secondary index lookup node.
+        if field == table.primary_key {
+            node = Node::KeyLookup { table: table.name, keys: values, alias };
         } else {
-            node
+            let column = table.columns.into_iter().nth(field).unwrap().name;
+            node = Node::IndexLookup { table: table.name, column, values, alias };
         }
-    }
+
+        // If there's any remaining CNF expressions add a filter node for them.
+        if let Some(predicate) = Expression::and_vec(cnf) {
+            node = Node::Filter { source: Box::new(node), predicate };
+        }
+
+        node
+    };
+    node.transform(&Ok, &|n| Ok(transform(n)))
 }
 
-impl Optimizer for IndexLookup {
-    fn optimize(&self, node: Node) -> Result<Node> {
-        node.transform(&Ok, &|n| match n {
-            Node::Scan { table, alias, filter: Some(filter) } => {
-                // Convert the filter into conjunctive normal form, and try to convert each
-                // sub-expression into a lookup. If a lookup is found, return a lookup node and then
-                // apply the remaining conjunctions as a filter node, if any.
-                let mut cnf = filter.clone().into_cnf_vec();
-                for i in 0..cnf.len() {
-                    if let Some(keys) = cnf[i].as_lookup(table.primary_key) {
-                        cnf.remove(i);
-                        return Ok(self.wrap_cnf(
-                            Node::KeyLookup { table: table.name.clone(), keys, alias },
-                            cnf,
-                        ));
-                    }
-                    for (ci, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
-                        if let Some(values) = cnf[i].as_lookup(ci) {
-                            cnf.remove(i);
-                            return Ok(self.wrap_cnf(
-                                Node::IndexLookup {
-                                    table: table.name.clone(),
-                                    column: column.name.clone(),
-                                    values,
-                                    alias,
-                                },
-                                cnf,
-                            ));
-                        }
-                    }
+/// Uses a hash join instead of a nested loop join for single-field equijoins.
+pub(super) fn join_type(node: Node) -> Result<Node> {
+    let transform = |node| match node {
+        // We could use a single match if we had deref patterns, but alas.
+        Node::NestedLoopJoin {
+            left,
+            left_size,
+            right,
+            right_size,
+            predicate: Some(Expression::Equal(lhs, rhs)),
+            outer,
+        } => match (*lhs, *rhs) {
+            (
+                Expression::Field(mut left_field, mut left_label),
+                Expression::Field(mut right_field, mut right_label),
+            ) => {
+                // The LHS field may be a field in the right table; swap them.
+                if right_field < left_field {
+                    (left_field, right_field) = (right_field, left_field);
+                    (left_label, right_label) = (right_label, left_label);
                 }
-                Ok(Node::Scan { table, alias, filter: Some(filter) })
-            }
-            n => Ok(n),
-        })
-    }
-}
-
-/// Cleans up noops, e.g. filters with constant true/false predicates.
-/// FIXME This should perhaps replace nodes that can never return anything with a Nothing node,
-/// but that requires propagating the column names.
-pub struct NoopCleaner;
-
-impl Optimizer for NoopCleaner {
-    fn optimize(&self, node: Node) -> Result<Node> {
-        use Expression::*;
-        node.transform(
-            // While descending the node tree, clean up boolean expressions.
-            &|n| {
-                n.transform_expressions(&Ok, &|e| match &e {
-                    And(lhs, rhs) => match (&**lhs, &**rhs) {
-                        (Constant(Value::Boolean(false)), _)
-                        | (Constant(Value::Null), _)
-                        | (_, Constant(Value::Boolean(false)))
-                        | (_, Constant(Value::Null)) => Ok(Constant(Value::Boolean(false))),
-                        (Constant(Value::Boolean(true)), e)
-                        | (e, Constant(Value::Boolean(true))) => Ok(e.clone()),
-                        _ => Ok(e),
-                    },
-                    Or(lhs, rhs) => match (&**lhs, &**rhs) {
-                        (Constant(Value::Boolean(false)), e)
-                        | (Constant(Value::Null), e)
-                        | (e, Constant(Value::Boolean(false)))
-                        | (e, Constant(Value::Null)) => Ok(e.clone()),
-                        (Constant(Value::Boolean(true)), _)
-                        | (_, Constant(Value::Boolean(true))) => Ok(Constant(Value::Boolean(true))),
-                        _ => Ok(e),
-                    },
-                    // No need to handle Not, constant folder should have evaluated it already.
-                    _ => Ok(e),
-                })
-            },
-            // While ascending the node tree, remove any unnecessary filters or nodes.
-            // FIXME This should replace scan and join predicates with None as well.
-            &|n| match n {
-                Node::Filter { source, predicate } => match predicate {
-                    Expression::Constant(Value::Boolean(true)) => Ok(*source),
-                    predicate => Ok(Node::Filter { source, predicate }),
-                },
-                n => Ok(n),
-            },
-        )
-    }
-}
-
-// Optimizes join types, currently by swapping nested-loop joins with hash joins where appropriate.
-pub struct JoinType;
-
-impl Optimizer for JoinType {
-    fn optimize(&self, node: Node) -> Result<Node> {
-        node.transform(
-            &|n| match n {
-                // Replace nested-loop equijoins with hash joins.
-                Node::NestedLoopJoin {
+                // The NestedLoopJoin predicate uses field indexes in the joined
+                // row, while the HashJoin uses field indexes for each table
+                // individually. Adjust the RHS field reference.
+                right_field -= left_size;
+                Node::HashJoin {
                     left,
-                    left_size,
+                    left_field,
+                    left_label,
                     right,
+                    right_field,
+                    right_label,
                     right_size,
-                    predicate: Some(Expression::Equal(a, b)),
                     outer,
-                } => match (*a, *b) {
-                    (Expression::Field(a, a_label), Expression::Field(b, b_label)) => {
-                        let (left_field, left_label, right_field, right_label) = if a < left_size {
-                            (a, a_label, b - left_size, b_label)
-                        } else {
-                            (b, b_label, a - left_size, a_label)
-                        };
-                        Ok(Node::HashJoin {
-                            left,
-                            left_field,
-                            left_label,
-                            right,
-                            right_field,
-                            right_label,
-                            right_size,
-                            outer,
-                        })
-                    }
-                    (a, b) => Ok(Node::NestedLoopJoin {
-                        left,
-                        left_size,
-                        right,
-                        right_size,
-                        predicate: Some(Expression::Equal(a.into(), b.into())),
-                        outer,
-                    }),
-                },
-                n => Ok(n),
-            },
-            &Ok,
-        )
-    }
+                }
+            }
+            (lhs, rhs) => {
+                let predicate = Some(Expression::Equal(lhs.into(), rhs.into()));
+                Node::NestedLoopJoin { left, left_size, right, right_size, predicate, outer }
+            }
+        },
+        node => node,
+    };
+    node.transform(&|n| Ok(transform(n)), &Ok)
 }
