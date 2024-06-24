@@ -349,6 +349,18 @@ impl TransactionState {
     }
 }
 
+impl From<TransactionState> for Cow<'_, TransactionState> {
+    fn from(txn: TransactionState) -> Self {
+        Cow::Owned(txn)
+    }
+}
+
+impl<'a> From<&'a TransactionState> for Cow<'a, TransactionState> {
+    fn from(txn: &'a TransactionState) -> Self {
+        Cow::Borrowed(txn)
+    }
+}
+
 impl<E: Engine> Transaction<E> {
     /// Begins a new transaction in read-write mode. This will allocate a new
     /// version that the transaction can write at, add it to the active set, and

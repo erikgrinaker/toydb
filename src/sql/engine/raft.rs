@@ -8,6 +8,7 @@ use crate::storage::{self, mvcc};
 
 use crossbeam::channel::Sender;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 /// A Raft-based SQL engine. This dispatches to the `Local` engine for local
@@ -138,49 +139,49 @@ impl<'a> super::Transaction for Transaction<'a> {
         if self.state.read_only {
             return Ok(()); // noop
         }
-        self.engine.write(Write::Commit(self.state.clone()))
+        self.engine.write(Write::Commit(self.state.into()))
     }
 
     fn rollback(self) -> Result<()> {
         if self.state.read_only {
             return Ok(()); // noop
         }
-        self.engine.write(Write::Rollback(self.state.clone()))
+        self.engine.write(Write::Rollback(self.state.into()))
     }
 
     fn delete(&self, table: &str, ids: &[Value]) -> Result<()> {
         self.engine.write(Write::Delete {
-            txn: self.state.clone(),
-            table: table.to_string(),
-            ids: ids.to_vec(),
+            txn: (&self.state).into(),
+            table: table.into(),
+            ids: ids.into(),
         })
     }
 
     fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>> {
         self.engine.read(Read::Get {
-            txn: self.state.clone(),
-            table: table.to_string(),
-            ids: ids.to_vec(),
+            txn: (&self.state).into(),
+            table: table.into(),
+            ids: ids.into(),
         })
     }
 
     fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()> {
-        self.engine.write(Write::Insert { txn: self.state.clone(), table: table.to_string(), rows })
+        self.engine.write(Write::Insert { txn: (&self.state).into(), table: table.into(), rows })
     }
 
     fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>> {
         self.engine.read(Read::LookupIndex {
-            txn: self.state.clone(),
-            table: table.to_string(),
-            column: column.to_string(),
-            values: values.to_vec(),
+            txn: (&self.state).into(),
+            table: table.into(),
+            column: column.into(),
+            values: values.into(),
         })
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
         let scan: Vec<_> = self.engine.read(Read::Scan {
-            txn: self.state.clone(),
-            table: table.to_string(),
+            txn: (&self.state).into(),
+            table: table.into(),
             filter,
         })?;
         Ok(Box::new(scan.into_iter().map(Ok)))
@@ -188,37 +189,37 @@ impl<'a> super::Transaction for Transaction<'a> {
 
     fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan> {
         let scan: Vec<_> = self.engine.read(Read::ScanIndex {
-            txn: self.state.clone(),
-            table: table.to_string(),
-            column: column.to_string(),
+            txn: (&self.state).into(),
+            table: table.into(),
+            column: column.into(),
         })?;
         Ok(Box::new(scan.into_iter().map(Ok)))
     }
 
     fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()> {
-        self.engine.write(Write::Update { txn: self.state.clone(), table: table.to_string(), rows })
+        self.engine.write(Write::Update { txn: (&self.state).into(), table: table.into(), rows })
     }
 }
 
 impl<'a> Catalog for Transaction<'a> {
     fn create_table(&self, schema: Table) -> Result<()> {
-        self.engine.write(Write::CreateTable { txn: self.state.clone(), schema })
+        self.engine.write(Write::CreateTable { txn: (&self.state).into(), schema })
     }
 
     fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool> {
         self.engine.write(Write::DeleteTable {
-            txn: self.state.clone(),
-            table: table.to_string(),
+            txn: (&self.state).into(),
+            table: table.into(),
             if_exists,
         })
     }
 
     fn get_table(&self, table: &str) -> Result<Option<Table>> {
-        self.engine.read(Read::GetTable { txn: self.state.clone(), table: table.to_string() })
+        self.engine.read(Read::GetTable { txn: (&self.state).into(), table: table.into() })
     }
 
     fn list_tables(&self) -> Result<Vec<Table>> {
-        self.engine.read(Read::ListTables { txn: self.state.clone() })
+        self.engine.read(Read::ListTables { txn: (&self.state).into() })
     }
 }
 
@@ -255,25 +256,29 @@ impl<E: storage::Engine> State<E> {
     fn write(&self, command: Write) -> Result<Vec<u8>> {
         Ok(match command {
             Write::Begin => self.local.begin()?.state().encode(),
-            Write::Commit(txn) => bincode::serialize(&self.local.resume(txn)?.commit()?),
-            Write::Rollback(txn) => bincode::serialize(&self.local.resume(txn)?.rollback()?),
+            Write::Commit(txn) => {
+                bincode::serialize(&self.local.resume(txn.into_owned())?.commit()?)
+            }
+            Write::Rollback(txn) => {
+                bincode::serialize(&self.local.resume(txn.into_owned())?.rollback()?)
+            }
 
             Write::Delete { txn, table, ids } => {
-                bincode::serialize(&self.local.resume(txn)?.delete(&table, &ids)?)
+                bincode::serialize(&self.local.resume(txn.into_owned())?.delete(&table, &ids)?)
             }
             Write::Insert { txn, table, rows } => {
-                bincode::serialize(&self.local.resume(txn)?.insert(&table, rows)?)
+                bincode::serialize(&self.local.resume(txn.into_owned())?.insert(&table, rows)?)
             }
             Write::Update { txn, table, rows } => {
-                bincode::serialize(&self.local.resume(txn)?.update(&table, rows)?)
+                bincode::serialize(&self.local.resume(txn.into_owned())?.update(&table, rows)?)
             }
 
             Write::CreateTable { txn, schema } => {
-                bincode::serialize(&self.local.resume(txn)?.create_table(schema)?)
+                bincode::serialize(&self.local.resume(txn.into_owned())?.create_table(schema)?)
             }
-            Write::DeleteTable { txn, table, if_exists } => {
-                bincode::serialize(&self.local.resume(txn)?.drop_table(&table, if_exists)?)
-            }
+            Write::DeleteTable { txn, table, if_exists } => bincode::serialize(
+                &self.local.resume(txn.into_owned())?.drop_table(&table, if_exists)?,
+            ),
         })
     }
 }
@@ -317,66 +322,98 @@ impl<E: storage::Engine> raft::State for State<E> {
             }
             Read::Status => self.local.mvcc.status()?.encode(),
 
-            Read::Get { txn, table, ids } => self.local.resume(txn)?.get(&table, &ids)?.encode(),
-            Read::LookupIndex { txn, table, column, values } => {
-                self.local.resume(txn)?.lookup_index(&table, &column, &values)?.encode()
+            Read::Get { txn, table, ids } => {
+                self.local.resume(txn.into_owned())?.get(&table, &ids)?.encode()
             }
+            Read::LookupIndex { txn, table, column, values } => self
+                .local
+                .resume(txn.into_owned())?
+                .lookup_index(&table, &column, &values)?
+                .encode(),
             Read::Scan { txn, table, filter } => {
                 // For simplicity, buffer the entire scan. See `State` comment.
-                self.local.resume(txn)?.scan(&table, filter)?.collect::<Result<Vec<_>>>()?.encode()
+                self.local
+                    .resume(txn.into_owned())?
+                    .scan(&table, filter)?
+                    .collect::<Result<Vec<_>>>()?
+                    .encode()
             }
             Read::ScanIndex { txn, table, column } => self
                 .local
-                .resume(txn)?
+                .resume(txn.into_owned())?
                 .scan_index(&table, &column)?
                 .collect::<Result<Vec<_>>>()?
                 .encode(),
 
-            Read::GetTable { txn, table } => self.local.resume(txn)?.get_table(&table)?.encode(),
-            Read::ListTables { txn } => self.local.resume(txn)?.list_tables()?.encode(),
+            Read::GetTable { txn, table } => {
+                self.local.resume(txn.into_owned())?.get_table(&table)?.encode()
+            }
+            Read::ListTables { txn } => {
+                self.local.resume(txn.into_owned())?.list_tables()?.encode()
+            }
         })
     }
 }
 
-/// A Raft engine read. Values correspond to engine method parameters.
-///
-/// The values must be owned to allow decoding into the struct. This incurs a
-/// clone on the encode path. We could avoid this by using Cows, but we'll keep
-/// it simple.
+/// A Raft engine read. Values correspond to engine method parameters. Uses
+/// Cows to allow borrowed encoding and owned decoding.
 #[derive(Serialize, Deserialize)]
-enum Read {
-    BeginReadOnly { as_of: Option<mvcc::Version> },
+enum Read<'a> {
+    BeginReadOnly {
+        as_of: Option<mvcc::Version>,
+    },
     Status,
 
-    Get { txn: mvcc::TransactionState, table: String, ids: Vec<Value> },
-    LookupIndex { txn: mvcc::TransactionState, table: String, column: String, values: Vec<Value> },
-    Scan { txn: mvcc::TransactionState, table: String, filter: Option<Expression> },
-    ScanIndex { txn: mvcc::TransactionState, table: String, column: String },
+    Get {
+        txn: Cow<'a, mvcc::TransactionState>,
+        table: Cow<'a, str>,
+        ids: Cow<'a, [Value]>,
+    },
+    LookupIndex {
+        txn: Cow<'a, mvcc::TransactionState>,
+        table: Cow<'a, str>,
+        column: Cow<'a, str>,
+        values: Cow<'a, [Value]>,
+    },
+    Scan {
+        txn: Cow<'a, mvcc::TransactionState>,
+        table: Cow<'a, str>,
+        filter: Option<Expression>,
+    },
+    ScanIndex {
+        txn: Cow<'a, mvcc::TransactionState>,
+        table: Cow<'a, str>,
+        column: Cow<'a, str>,
+    },
 
-    GetTable { txn: mvcc::TransactionState, table: String },
-    ListTables { txn: mvcc::TransactionState },
+    GetTable {
+        txn: Cow<'a, mvcc::TransactionState>,
+        table: Cow<'a, str>,
+    },
+    ListTables {
+        txn: Cow<'a, mvcc::TransactionState>,
+    },
 }
 
-impl encoding::Value for Read {}
+impl<'a> encoding::Value for Read<'a> {}
 
-/// A Raft engine write. Values correspond to engine method parameters.
-///
-/// TODO: consider using Cows here.
+/// A Raft engine write. Values correspond to engine method parameters. Uses
+/// Cows to allow borrowed encoding (for borrowed params) and owned decoding.
 #[derive(Serialize, Deserialize)]
-enum Write {
+enum Write<'a> {
     Begin,
-    Commit(mvcc::TransactionState),
-    Rollback(mvcc::TransactionState),
+    Commit(Cow<'a, mvcc::TransactionState>),
+    Rollback(Cow<'a, mvcc::TransactionState>),
 
-    Delete { txn: mvcc::TransactionState, table: String, ids: Vec<Value> },
-    Insert { txn: mvcc::TransactionState, table: String, rows: Vec<Row> },
-    Update { txn: mvcc::TransactionState, table: String, rows: HashMap<Value, Row> },
+    Delete { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, ids: Cow<'a, [Value]> },
+    Insert { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, rows: Vec<Row> },
+    Update { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, rows: HashMap<Value, Row> },
 
-    CreateTable { txn: mvcc::TransactionState, schema: Table },
-    DeleteTable { txn: mvcc::TransactionState, table: String, if_exists: bool },
+    CreateTable { txn: Cow<'a, mvcc::TransactionState>, schema: Table },
+    DeleteTable { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, if_exists: bool },
 }
 
-impl encoding::Value for Write {}
+impl<'a> encoding::Value for Write<'a> {}
 
 /// Raft SQL engine status.
 #[derive(Serialize, Deserialize)]

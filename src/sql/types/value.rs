@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::encoding;
 use crate::errdata;
 use crate::errinput;
@@ -300,16 +302,9 @@ impl TryFrom<Value> for String {
     }
 }
 
-// TODO: reconsider use of Cow, it's unnecessary.
-impl<'a> From<Value> for std::borrow::Cow<'a, Value> {
-    fn from(v: Value) -> Self {
-        std::borrow::Cow::Owned(v)
-    }
-}
-
-impl<'a> From<&'a Value> for std::borrow::Cow<'a, Value> {
+impl<'a> From<&'a Value> for Cow<'a, Value> {
     fn from(v: &'a Value) -> Self {
-        std::borrow::Cow::Borrowed(v)
+        Cow::Borrowed(v)
     }
 }
 
