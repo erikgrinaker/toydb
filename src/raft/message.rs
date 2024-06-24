@@ -27,11 +27,6 @@ impl encoding::Value for Envelope {}
 /// ensuring messages are not dropped or reordered as long as the connection
 /// remains intact. A message and its response are sent across separate TCP
 /// connections (outbound from their respective senders).
-///
-/// TODO: add a Read(Response) message type for reads, to avoid sending
-/// heartbeats on every read -- these could otherwise cause spurious replication
-/// probes for behind followers. We still need the read_seq in the heartbeat for
-/// retries.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Message {
     /// Candidates campaign for leadership by soliciting votes from peers.
@@ -53,17 +48,11 @@ pub enum Message {
         vote: bool,
     },
 
-    /// Leaders send heartbeats periodically, and on client read requests. This
-    /// serves several purposes:
+    /// Leaders send periodic heartbeats. This serves several purposes:
     ///
     /// * Inform nodes about the leader, and prevent elections.
-    /// * Probe follower log progress, and trigger append/ack retries.
+    /// * Detect lost appends and reads, as a retry mechanism.
     /// * Advance followers' commit indexes, so they can apply entries.
-    /// * Confirm leadership for client reads, to avoid stale reads.
-    ///
-    /// While some of this could be split out to other messages, the heartbeat
-    /// periodicity implicitly provides retries, so it is convenient to
-    /// piggyback on it.
     ///
     /// The Raft paper does not have a distinct heartbeat message, and instead
     /// uses an empty AppendEntries RPC, but we choose to add one for better
@@ -79,8 +68,7 @@ pub enum Message {
         /// to commit this if the local log matches last_index, such that the
         /// follower's log is identical to the leader at the commit index.
         commit_index: Index,
-        /// The leader's latest read sequence number in this term. Read requests
-        /// are served once the sequence number has been confirmed by a quorum.
+        /// The leader's latest read sequence number in this term.
         read_seq: ReadSequence,
     },
 
@@ -131,6 +119,15 @@ pub enum Message {
         /// missing index.
         reject_index: Index,
     },
+
+    /// Leaders need to confirm they are still the leader before serving reads,
+    /// to guarantee linearizability in case a different leader has been
+    /// estalished elsewhere. Read requests are served once the sequence number
+    /// has been confirmed by a quorum.
+    Read { seq: ReadSequence },
+
+    /// Followers confirm leadership at the read sequence numbers.
+    ReadResponse { seq: ReadSequence },
 
     /// A client request. This can be submitted to the leader, or to a follower
     /// which will forward it to its leader. If there is no leader, or the

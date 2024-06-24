@@ -417,6 +417,18 @@ impl RawNode<Follower> {
                 self.send(msg.from, Message::AppendResponse { reject_index, match_index })?;
             }
 
+            // Confirm the leader's read sequence number.
+            Message::Read { seq } => {
+                // Make sure the read is from our leader, or follow it.
+                match self.role.leader {
+                    Some(leader) => assert_eq!(msg.from, leader, "multiple leaders in term"),
+                    None => self = self.into_follower(msg.term, Some(msg.from))?,
+                }
+
+                // Confirm the read.
+                self.send(msg.from, Message::ReadResponse { seq })?;
+            }
+
             // A candidate is requesting our vote. We'll only grant one.
             Message::Campaign { last_index, last_term } => {
                 // Don't vote if we already voted for someone else in this term.
@@ -472,7 +484,9 @@ impl RawNode<Follower> {
             Message::CampaignResponse { .. } => {}
 
             // We're not leader this term, so we shouldn't see these.
-            Message::HeartbeatResponse { .. } | Message::AppendResponse { .. } => {
+            Message::HeartbeatResponse { .. }
+            | Message::AppendResponse { .. }
+            | Message::ReadResponse { .. } => {
                 panic!("unexpected message {msg:?}")
             }
         };
@@ -606,7 +620,7 @@ impl RawNode<Candidate> {
 
             // If we hear from a leader in this term, we lost the election.
             // Follow it and step the message.
-            Message::Heartbeat { .. } | Message::Append { .. } => {
+            Message::Heartbeat { .. } | Message::Append { .. } | Message::Read { .. } => {
                 return self.into_follower(msg.term, Some(msg.from))?.step(msg);
             }
 
@@ -619,6 +633,7 @@ impl RawNode<Candidate> {
             // so we shouldn't see these.
             Message::HeartbeatResponse { .. }
             | Message::AppendResponse { .. }
+            | Message::ReadResponse { .. }
             | Message::ClientResponse { .. } => panic!("unexpected message {msg:?}"),
         }
         Ok(self.into())
@@ -658,8 +673,8 @@ pub struct Leader {
     writes: HashMap<Index, Write>,
     /// Tracks pending read requests. For linearizability, read requests are
     /// assigned a sequence number and only executed once a quorum of nodes have
-    /// confirmed it via leader heartbeats. Otherwise, an old leader may serve
-    /// stale reads if a new leader has been elected elsewhere.
+    /// confirmed it. Otherwise, an old leader may serve stale reads if a new
+    /// leader has been elected elsewhere.
     reads: VecDeque<Read>,
     /// The read sequence number used for the last read. Initialized to 0 in
     /// this term, and incremented for every read command.
@@ -846,6 +861,14 @@ impl RawNode<Leader> {
                 self.maybe_send_append(msg.from, false)?;
             }
 
+            // A follower confirmed our read sequence number. If it advances,
+            // try to execute reads.
+            Message::ReadResponse { seq } => {
+                if self.progress(msg.from).advance_read(seq) {
+                    self.maybe_read()?;
+                }
+            }
+
             // A follower rejected an append because the base entry in
             // reject_index did not match its log. Probe the previous entry by
             // sending an empty append until we find a common base.
@@ -885,13 +908,13 @@ impl RawNode<Leader> {
             }
 
             // A client submitted a read request. To ensure linearizability, we
-            // must confirm that we are still the leader by sending a heartbeat
-            // with the read's sequence number and wait for quorum confirmation.
+            // must confirm that we are still the leader by sending the read's
+            // sequence number and wait for quorum confirmation.
             Message::ClientRequest { id, request: Request::Read(command) } => {
                 self.role.read_seq += 1;
                 let read = Read { seq: self.role.read_seq, from: msg.from, id, command };
                 self.role.reads.push_back(read);
-                self.heartbeat()?;
+                self.broadcast(Message::Read { seq: self.role.read_seq })?;
                 if self.cluster_size() == 1 {
                     self.maybe_read()?;
                 }
@@ -912,7 +935,7 @@ impl RawNode<Leader> {
             Message::CampaignResponse { .. } => {}
 
             // There can't be another leader in this term.
-            Message::Heartbeat { .. } | Message::Append { .. } => {
+            Message::Heartbeat { .. } | Message::Append { .. } | Message::Read { .. } => {
                 panic!("saw other leader {} in term {}", msg.from, msg.term);
             }
 
@@ -2035,6 +2058,12 @@ mod tests {
                         (0, reject_index) => format!("AppendResponse reject_index={reject_index}"),
                         (_, _) => panic!("match_index and reject_index both set"),
                     }
+                }
+                Message::Read { seq } => {
+                    format!("Read seq={seq}")
+                }
+                Message::ReadResponse { seq } => {
+                    format!("ReadResponse seq={seq}")
                 }
                 Message::ClientRequest { id, request } => {
                     format!(

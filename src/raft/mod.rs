@@ -196,10 +196,10 @@
 //! Otherwise, it's possible that a new leader has been elected elsewhere and
 //! executed writes without us knowing about it. It does this by assigning an
 //! incrementing sequence number to each read, keeping track of the request in a
-//! `Read` struct, and immediately sending a heartbeat with the latest sequence
-//! number in `Heartbeat.read_seq`. Followers include the `read_seq` in their
-//! `HeartbeatResponse`, and once a quorum have confirmed a sequence number the
-//! read is executed and the result returned to the client.
+//! `Read` struct, and immediately sending a `Read` message with the latest
+//! sequence number. Followers respond with the sequence number, and once a
+//! quorum have confirmed a sequence number the read is executed and the result
+//! returned to the client.
 //!
 //! IMPLEMENTATION CAVEATS
 //! ======================

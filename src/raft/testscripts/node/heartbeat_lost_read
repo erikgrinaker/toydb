@@ -1,0 +1,57 @@
+# Heartbeats will recover from a lost read message.
+
+cluster nodes=5 leader=1
+---
+n1@1 leader last=1@1 commit=1@1 applied=1 progress={2:1→2 3:1→2 4:1→2 5:1→2}
+n2@1 follower(n1) last=1@1 commit=1@1 applied=1
+n3@1 follower(n1) last=1@1 commit=1@1 applied=1
+n4@1 follower(n1) last=1@1 commit=1@1 applied=1
+n5@1 follower(n1) last=1@1 commit=1@1 applied=1
+
+# Write a key and replicate it.
+(put 1 foo=bar)
+(stabilize heartbeat=true)
+---
+ok
+
+# Partition the leader, and submit a read.
+partition 1
+---
+n1 ⇹ n2 n3 n4 n5
+
+get 1 foo
+---
+c1@1 → n1 ClientRequest id=0x02 read 0x0003666f6f
+n1@1 ⇥ n2 R̶e̶a̶d̶ ̶s̶e̶q̶=̶1̶
+n1@1 ⇥ n3 R̶e̶a̶d̶ ̶s̶e̶q̶=̶1̶
+n1@1 ⇥ n4 R̶e̶a̶d̶ ̶s̶e̶q̶=̶1̶
+n1@1 ⇥ n5 R̶e̶a̶d̶ ̶s̶e̶q̶=̶1̶
+
+heal
+---
+n1 n2 n3 n4 n5 fully connected
+
+# The next heartbeat will detect the failed read, and serve it when
+# it has a quorum.
+heartbeat 1
+deliver
+---
+n1@1 → n2 Heartbeat last_index=2 commit_index=2 read_seq=1
+n1@1 → n3 Heartbeat last_index=2 commit_index=2 read_seq=1
+n1@1 → n4 Heartbeat last_index=2 commit_index=2 read_seq=1
+n1@1 → n5 Heartbeat last_index=2 commit_index=2 read_seq=1
+n2@1 → n1 HeartbeatResponse match_index=2 read_seq=1
+n3@1 → n1 HeartbeatResponse match_index=2 read_seq=1
+n4@1 → n1 HeartbeatResponse match_index=2 read_seq=1
+n5@1 → n1 HeartbeatResponse match_index=2 read_seq=1
+
+# The first response does not provide quorum.
+deliver 1 from=2
+---
+ok
+
+# The second does, and the read is served.
+deliver 1 from=3
+---
+n1@1 → c1 ClientResponse id=0x02 read 0x000103626172
+c1@1 get foo ⇒ bar

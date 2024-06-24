@@ -12,10 +12,10 @@ stabilize
 ---
 c2@1 → n2 ClientRequest id=0x01 read 0x0003666f6f
 n2@1 → n1 ClientRequest id=0x01 read 0x0003666f6f
-n1@1 → n2 Heartbeat last_index=1 commit_index=1 read_seq=1
-n1@1 → n3 Heartbeat last_index=1 commit_index=1 read_seq=1
-n2@1 → n1 HeartbeatResponse match_index=1 read_seq=1
-n3@1 → n1 HeartbeatResponse match_index=1 read_seq=1
+n1@1 → n2 Read seq=1
+n1@1 → n3 Read seq=1
+n2@1 → n1 ReadResponse seq=1
+n3@1 → n1 ReadResponse seq=1
 n1@1 → n2 ClientResponse id=0x01 read 0x0000
 n2@1 → c2 ClientResponse id=0x01 read 0x0000
 c2@1 get foo ⇒ None
@@ -46,10 +46,10 @@ stabilize
 ---
 c2@1 → n2 ClientRequest id=0x03 read 0x0003666f6f
 n2@1 → n1 ClientRequest id=0x03 read 0x0003666f6f
-n1@1 → n2 Heartbeat last_index=2 commit_index=2 read_seq=2
-n1@1 → n3 Heartbeat last_index=2 commit_index=2 read_seq=2
-n2@1 → n1 HeartbeatResponse match_index=2 read_seq=2
-n3@1 → n1 HeartbeatResponse match_index=2 read_seq=2
+n1@1 → n2 Read seq=2
+n1@1 → n3 Read seq=2
+n2@1 → n1 ReadResponse seq=2
+n3@1 → n1 ReadResponse seq=2
 n1@1 → n2 ClientResponse id=0x03 read 0x000103626172
 n2@1 → c2 ClientResponse id=0x03 read 0x000103626172
 c2@1 get foo ⇒ bar

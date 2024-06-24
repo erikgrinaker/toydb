@@ -22,8 +22,8 @@ n1@1 append 2@1 put foo=bar
 n1@1 ⇥ n2 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 n1@1 ⇥ n3 A̶p̶p̶e̶n̶d̶ ̶b̶a̶s̶e̶=̶1̶@̶1̶ ̶[̶2̶@̶1̶]̶
 c1@1 → n1 ClientRequest id=0x02 read 0x0003666f6f
-n1@1 ⇥ n2 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶l̶a̶s̶t̶_̶i̶n̶d̶e̶x̶=̶2̶ ̶c̶o̶m̶m̶i̶t̶_̶i̶n̶d̶e̶x̶=̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶1̶
-n1@1 ⇥ n3 H̶e̶a̶r̶t̶b̶e̶a̶t̶ ̶l̶a̶s̶t̶_̶i̶n̶d̶e̶x̶=̶2̶ ̶c̶o̶m̶m̶i̶t̶_̶i̶n̶d̶e̶x̶=̶1̶ ̶r̶e̶a̶d̶_̶s̶e̶q̶=̶1̶
+n1@1 ⇥ n2 R̶e̶a̶d̶ ̶s̶e̶q̶=̶1̶
+n1@1 ⇥ n3 R̶e̶a̶d̶ ̶s̶e̶q̶=̶1̶
 
 # Heal the partition and heartbeat. The requests eventually return results.
 heal
