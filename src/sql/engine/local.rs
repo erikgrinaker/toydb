@@ -96,7 +96,8 @@ impl<E: storage::Engine> Transaction<E> {
 
     /// Returns true if the given secondary index exists.
     fn has_index(&self, table: &str, column: &str) -> Result<bool> {
-        Ok(self.must_get_table(table)?.get_column(column)?.index)
+        let table = self.must_get_table(table)?;
+        Ok(table.columns.iter().find(|c| c.name == column).map(|c| c.index).unwrap_or(false))
     }
 
     /// Stores a secondary index entry for the given column value, replacing the

@@ -45,7 +45,6 @@ pub struct Column {
     pub index: bool,
     /// If set, this column is a foreign key reference to the given table's
     /// primary key. Must be of the same type as the target primary key.
-    /// TODO: enforce an index for foreign keys.
     pub references: Option<String>,
 }
 
@@ -83,16 +82,6 @@ impl std::fmt::Display for Table {
 }
 
 impl Table {
-    /// Fetches a column by name.
-    ///
-    /// TODO: consider getting rid of this helper.
-    pub fn get_column(&self, name: &str) -> Result<&Column> {
-        self.columns
-            .iter()
-            .find(|c| c.name == name)
-            .ok_or(errinput!("column {name} not found in table {}", self.name))
-    }
-
     /// Validates the table schema.
     pub fn validate(&self, catalog: &impl Catalog) -> Result<()> {
         if self.name.is_empty() {
