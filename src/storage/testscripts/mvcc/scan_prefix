@@ -53,15 +53,6 @@ t5: ba → ba4
 t5: bc → bc2
 t5: c → c1
 
-# Full reverse scan at version 3.
-t3: scan_prefix reverse=true ""
----
-t3: c → c1
-t3: bc → bc2
-t3: bb → bb2
-t3: ba → ba2
-t3: B → B1
-
 # Various prefixes at version 3.
 t3: scan_prefix B
 ---
@@ -95,10 +86,3 @@ t4: bc → bc2
 t4: scan_prefix bb
 ---
 ok
-
-# Reverse prefix scan at version 4.
-t4: scan_prefix reverse=true b
----
-t4: bc → bc2
-t4: ba → ba2
-t4: b → b3

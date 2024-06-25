@@ -657,20 +657,17 @@ impl<'a, E: Engine + 'a> Scan<'a, E> {
 }
 
 /// An iterator over the latest live and visible key/value pairs at the txn
-/// version.
+/// version. Does not implement DoubleEndedIterator (reverse scans), since the
+/// SQL layer doesn't use it.
 pub struct ScanIterator<'a, E: Engine + 'a> {
     /// Decodes and filters visible MVCC versions from the inner engine iterator.
     inner: std::iter::Peekable<VersionIterator<'a, E>>,
-    /// The previous key emitted by try_next_back(). Note that try_next() does
-    /// not affect reverse positioning: double-ended iterators consume from each
-    /// end independently.
-    last_back: Option<Vec<u8>>,
 }
 
 impl<'a, E: Engine + 'a> ScanIterator<'a, E> {
     /// Creates a new scan iterator.
     fn new(txn: &'a TransactionState, inner: E::ScanIterator<'a>) -> Self {
-        Self { inner: VersionIterator::new(txn, inner).peekable(), last_back: None }
+        Self { inner: VersionIterator::new(txn, inner).peekable() }
     }
 
     /// Fallible next(), emitting the next item, or None if exhausted.
@@ -689,39 +686,12 @@ impl<'a, E: Engine + 'a> ScanIterator<'a, E> {
         }
         Ok(None)
     }
-
-    /// Fallible next_back(), emitting the next item from the back, or None if
-    /// exhausted.
-    fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        while let Some((key, _version, value)) = self.inner.next_back().transpose()? {
-            // If this key is the same as the last emitted key from the back,
-            // this must be an older version, so skip it.
-            if let Some(last) = &self.last_back {
-                if last == &key {
-                    continue;
-                }
-            }
-            self.last_back = Some(key.clone());
-
-            // If the key is live (not a tombstone), emit it.
-            if let Some(value) = bincode::deserialize(&value)? {
-                return Ok(Some((key, value)));
-            }
-        }
-        Ok(None)
-    }
 }
 
 impl<'a, E: Engine> Iterator for ScanIterator<'a, E> {
     type Item = Result<(Vec<u8>, Vec<u8>)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
-    }
-}
-
-impl<'a, E: Engine> DoubleEndedIterator for ScanIterator<'a, E> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.try_next_back().transpose()
     }
 }
 
@@ -764,28 +734,12 @@ impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
         }
         Ok(None)
     }
-
-    // Fallible next_back(), emitting the previous item, or None if exhausted.
-    fn try_next_back(&mut self) -> Result<Option<(Vec<u8>, Version, Vec<u8>)>> {
-        while let Some((key, value)) = self.inner.next_back().transpose()? {
-            if let Some((key, version)) = self.decode_visible(&key)? {
-                return Ok(Some((key, version, value)));
-            }
-        }
-        Ok(None)
-    }
 }
 
 impl<'a, E: Engine> Iterator for VersionIterator<'a, E> {
     type Item = Result<(Vec<u8>, Version, Vec<u8>)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
-    }
-}
-
-impl<'a, E: Engine> DoubleEndedIterator for VersionIterator<'a, E> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.try_next_back().transpose()
     }
 }
 
@@ -964,40 +918,32 @@ pub mod tests {
                     txn.rollback()?;
                 }
 
-                // txn: scan [reverse=BOOL] [RANGE]
+                // txn: scan [RANGE]
                 "scan" => {
                     let txn = self.get_txn(&command.prefix)?;
                     let mut args = command.consume_args();
-                    let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
                     let range = Self::parse_key_range(
                         args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."),
                     )?;
                     args.reject_rest()?;
 
                     let mut scan = txn.scan(range);
-                    let kvs: Vec<_> = match reverse {
-                        false => scan.iter().collect::<crate::error::Result<_>>()?,
-                        true => scan.iter().rev().collect::<crate::error::Result<_>>()?,
-                    };
+                    let kvs: Vec<_> = scan.iter().collect::<crate::error::Result<_>>()?;
                     for (key, value) in kvs {
                         writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
                     }
                 }
 
-                // txn: scan_prefix [reverse=BOOL] PREFIX
+                // txn: scan_prefix PREFIX
                 "scan_prefix" => {
                     let txn = self.get_txn(&command.prefix)?;
                     let mut args = command.consume_args();
                     let prefix =
                         Self::decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
-                    let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
                     args.reject_rest()?;
 
                     let mut scan = txn.scan_prefix(&prefix);
-                    let kvs: Vec<_> = match reverse {
-                        false => scan.iter().collect::<crate::error::Result<_>>()?,
-                        true => scan.iter().rev().collect::<crate::error::Result<_>>()?,
-                    };
+                    let kvs: Vec<_> = scan.iter().collect::<crate::error::Result<_>>()?;
                     for (key, value) in kvs {
                         writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
                     }

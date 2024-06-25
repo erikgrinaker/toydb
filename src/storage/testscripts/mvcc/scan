@@ -53,15 +53,6 @@ t5: ba → ba4
 t5: bc → bc2
 t5: c → c1
 
-# Full reverse scan at version 3.
-t3: scan reverse=true
----
-t3: c → c1
-t3: bc → bc2
-t3: bb → bb2
-t3: ba → ba2
-t3: B → B1
-
 # Various bounded scans around ba-bc at version 3.
 t3: scan ba..bc
 ---
@@ -73,12 +64,6 @@ t3: scan "ba..=bc"
 t3: ba → ba2
 t3: bb → bb2
 t3: bc → bc2
-
-t3: scan "ba..=bc" reverse=true
----
-t3: bc → bc2
-t3: bb → bb2
-t3: ba → ba2
 
 t3: scan ba..
 ---
