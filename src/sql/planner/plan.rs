@@ -129,6 +129,8 @@ pub enum Node {
         predicate: Option<Expression>,
         outer: bool,
     },
+    /// Nothing does not emit anything.
+    Nothing,
     /// Emits a single empty row. Used for SELECT queries with no FROM clause.
     /// TODO: remove this.
     EmptyRow,
@@ -208,6 +210,7 @@ impl Node {
             node @ (Self::IndexLookup { .. }
             | Self::KeyLookup { .. }
             | Self::EmptyRow
+            | Self::Nothing
             | Self::Scan { .. }
             | Self::Values { .. }) => node,
         };
@@ -266,15 +269,16 @@ impl Node {
                     .collect::<Result<_>>()?,
             },
 
-            node @ Self::Aggregation { .. }
-            | node @ Self::HashJoin { .. }
-            | node @ Self::IndexLookup { .. }
-            | node @ Self::KeyLookup { .. }
-            | node @ Self::Limit { .. }
-            | node @ Self::NestedLoopJoin { predicate: None, .. }
-            | node @ Self::EmptyRow
-            | node @ Self::Offset { .. }
-            | node @ Self::Scan { filter: None, .. } => node,
+            node @ (Self::Aggregation { .. }
+            | Self::HashJoin { .. }
+            | Self::IndexLookup { .. }
+            | Self::KeyLookup { .. }
+            | Self::Limit { .. }
+            | Self::NestedLoopJoin { predicate: None, .. }
+            | Self::Nothing
+            | Self::EmptyRow
+            | Self::Offset { .. }
+            | Self::Scan { filter: None, .. }) => node,
         })
     }
 }
@@ -405,7 +409,10 @@ impl Node {
                 left.format(f, prefix.clone(), false, false)?;
                 right.format(f, prefix, false, true)?;
             }
-            Self::EmptyRow {} => {
+            Self::Nothing => {
+                write!(f, "Nothing")?;
+            }
+            Self::EmptyRow => {
                 write!(f, "EmptyRow")?;
             }
             Self::Offset { source, offset } => {

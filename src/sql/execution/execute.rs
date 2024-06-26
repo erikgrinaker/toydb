@@ -102,6 +102,8 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             join::nested_loop(left, right, right_size, predicate, outer)
         }
 
+        Node::Nothing => Ok(source::nothing()),
+
         Node::EmptyRow => Ok(source::empty_row()),
 
         Node::Offset { source, offset } => {

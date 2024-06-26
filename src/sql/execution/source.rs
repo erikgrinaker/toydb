@@ -27,6 +27,11 @@ pub(super) fn lookup_index(
     Ok(Box::new(txn.get(&table, &ids)?.into_iter().map(Ok)))
 }
 
+/// Returns nothing. Used to short-circuit nodes that can't produce any rows.
+pub(super) fn nothing() -> Rows {
+    Box::new(std::iter::empty())
+}
+
 /// Produces a single empty row. Used for queries without a FROM clause, e.g.
 /// SELECT 1+1, in order to have something to project against.
 /// TODO: remove this.
