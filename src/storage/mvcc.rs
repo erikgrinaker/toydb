@@ -139,7 +139,7 @@
 //! forever, both out of laziness and also because it allows unlimited time
 //! travel queries (it's a feature, not a bug!).
 
-use super::engine::{prefix_range, Engine};
+use super::engine::Engine;
 use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::{Error, Result};
 use crate::{errdata, errinput};
@@ -598,7 +598,8 @@ impl<E: Engine> Transaction<E> {
         // the KeyCode byte slice terminator 0x0000 at the end.
         let mut prefix = KeyPrefix::Version(prefix.into()).encode();
         prefix.truncate(prefix.len() - 2);
-        ScanIterator::<E>::new(self.engine.clone(), self.state().clone(), prefix_range(&prefix))
+        let range = encoding::prefix_range(&prefix);
+        ScanIterator::<E>::new(self.engine.clone(), self.state().clone(), range)
     }
 }
 

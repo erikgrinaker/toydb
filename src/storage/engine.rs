@@ -1,3 +1,4 @@
+use crate::encoding;
 use crate::error::Result;
 
 use serde::{Deserialize, Serialize};
@@ -41,7 +42,7 @@ pub trait Engine: Send {
     where
         Self: Sized, // omit in trait objects, for object safety
     {
-        self.scan(prefix_range(prefix))
+        self.scan(encoding::prefix_range(prefix))
     }
 
     /// Sets a value for a key, replacing the existing value if any.
@@ -55,18 +56,6 @@ pub trait Engine: Send {
 pub trait ScanIterator: DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>> {}
 
 impl<I: DoubleEndedIterator<Item = Result<(Vec<u8>, Vec<u8>)>>> ScanIterator for I {}
-
-/// Generates a key range for a prefix scan.
-pub(super) fn prefix_range(prefix: &[u8]) -> (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>) {
-    let start = std::ops::Bound::Included(prefix.to_vec());
-    let end = match prefix.iter().rposition(|b| *b != 0xff) {
-        Some(i) => std::ops::Bound::Excluded(
-            prefix.iter().take(i).copied().chain(std::iter::once(prefix[i] + 1)).collect(),
-        ),
-        None => std::ops::Bound::Unbounded,
-    };
-    (start, end)
-}
 
 /// Engine status.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
