@@ -41,7 +41,7 @@ impl Raft {
 
     /// Creates the Raft-managed state machine for the Raft engine. Receives
     /// commands from the Raft engine and executes them on a `Local` engine.
-    pub fn new_state<E: storage::Engine>(engine: E) -> Result<State<E>> {
+    pub fn new_state<E: storage::Engine + 'static>(engine: E) -> Result<State<E>> {
         State::new(engine)
     }
 
@@ -232,7 +232,7 @@ impl<'a> Catalog for Transaction<'a> {
 /// full table scan will pull the entire table into memory, serialize it, and
 /// send it across the network as one message. The simplest way to address this
 /// would likely be to send batches of e.g. 1000 rows at a time.
-pub struct State<E: storage::Engine> {
+pub struct State<E: storage::Engine + 'static> {
     /// The local SQL engine.
     local: super::Local<E>,
     /// The last applied index. This tells Raft which command to apply next.

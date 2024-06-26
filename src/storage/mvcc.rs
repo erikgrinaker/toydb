@@ -139,14 +139,14 @@
 //! forever, both out of laziness and also because it allows unlimited time
 //! travel queries (it's a feature, not a bug!).
 
-use super::engine::Engine;
+use super::engine::{prefix_range, Engine};
 use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::{Error, Result};
 use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -577,7 +577,7 @@ impl<E: Engine> Transaction<E> {
 
     /// Returns an iterator over the latest visible key/value pairs at the
     /// transaction's version.
-    pub fn scan<R: RangeBounds<Vec<u8>>>(&self, range: R) -> Scan<E> {
+    pub fn scan(&self, range: impl RangeBounds<Vec<u8>>) -> ScanIterator<E> {
         let start = match range.start_bound() {
             Bound::Excluded(k) => Bound::Excluded(Key::Version(k.into(), u64::MAX).encode()),
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), 0).encode()),
@@ -588,110 +588,105 @@ impl<E: Engine> Transaction<E> {
             Bound::Included(k) => Bound::Included(Key::Version(k.into(), u64::MAX).encode()),
             Bound::Unbounded => Bound::Excluded(KeyPrefix::Unversioned.encode()),
         };
-        let engine = self.engine.lock().expect("mutex failed");
-        Scan::new(engine, self.state(), start, end)
+        ScanIterator::new(self.engine.clone(), self.state().clone(), (start, end))
     }
 
     /// Scans keys under a given prefix.
-    pub fn scan_prefix(&self, prefix: &[u8]) -> Scan<E> {
+    pub fn scan_prefix(&self, prefix: &[u8]) -> ScanIterator<E> {
         // Normally, KeyPrefix::Version will only match all versions of the
         // exact given key. We want all keys maching the prefix, so we chop off
         // the KeyCode byte slice terminator 0x0000 at the end.
         let mut prefix = KeyPrefix::Version(prefix.into()).encode();
         prefix.truncate(prefix.len() - 2);
-        let engine = self.engine.lock().expect("mutex error");
-        Scan::new_prefix(engine, self.state(), prefix)
+        ScanIterator::<E>::new(self.engine.clone(), self.state().clone(), prefix_range(&prefix))
     }
 }
 
-/// A scan result. Can produce an iterator or collect an owned Vec.
+/// An iterator over the latest live and visible key/value pairs for the txn.
 ///
-/// This intermediate struct is unfortunately needed to hold the MutexGuard for
-/// the scan() caller, since placing it in ScanIterator along with the inner
-/// iterator borrowing from it would create a self-referential struct.
+/// The (single-threaded) engine is protected by a mutex, and holding the mutex
+/// for the duration of the iteration can cause deadlocks (e.g. when the local
+/// SQL engine pulls from two tables concurrently during a join). Instead, we
+/// pull and buffer 100 rows at a time, and release the mutex in between.
 ///
-/// TODO: is there a better way?
-pub struct Scan<'a, E: Engine + 'a> {
-    /// Access to the locked engine.
-    engine: MutexGuard<'a, E>,
+/// This does not implement DoubleEndedIterator (reverse scans), since the SQL
+/// layer doesn't currently need it.
+pub struct ScanIterator<E: Engine> {
+    /// The engine.
+    engine: Arc<Mutex<E>>,
     /// The transaction state.
-    txn: &'a TransactionState,
-    /// The scan type and parameter.
-    param: ScanType,
+    txn: TransactionState,
+    /// A buffer of live and visible key/value pairs to emit.
+    buffer: VecDeque<(UserKey, UserValue)>,
+    /// The remaining range after the buffer.
+    remainder: Option<(Bound<RawKey>, Bound<RawKey>)>,
 }
 
-enum ScanType {
-    Range((Bound<Vec<u8>>, Bound<Vec<u8>>)),
-    Prefix(Vec<u8>),
-}
+// Helper types to distinguish raw engine key/values from encoded user
+// key/values (which are encoded inside mvcc::Key). Mostly to appease Clippy's
+// type complexity lint, but TODO: consider using elsewhere.
+type RawKey = Vec<u8>;
+type UserKey = Vec<u8>;
+type UserValue = Vec<u8>;
 
-impl<'a, E: Engine + 'a> Scan<'a, E> {
-    /// Creates a new range scan.
-    fn new(
-        engine: MutexGuard<'a, E>,
-        txn: &'a TransactionState,
-        start: Bound<Vec<u8>>,
-        end: Bound<Vec<u8>>,
-    ) -> Self {
-        Self { engine, txn, param: ScanType::Range((start, end)) }
-    }
+impl<E: Engine> ScanIterator<E> {
+    /// The number of live keys to pull from the engine at a time.
+    /// TODO: add tests that either exceed or vary this.
+    const BUFFER_SIZE: usize = 100;
 
-    /// Creates a new prefix scan.
-    fn new_prefix(engine: MutexGuard<'a, E>, txn: &'a TransactionState, prefix: Vec<u8>) -> Self {
-        Self { engine, txn, param: ScanType::Prefix(prefix) }
-    }
-
-    /// Returns an iterator over the result.
-    pub fn iter(&mut self) -> ScanIterator<'_, E> {
-        let inner = match &self.param {
-            ScanType::Range(range) => self.engine.scan(range.clone()),
-            ScanType::Prefix(prefix) => self.engine.scan_prefix(prefix),
-        };
-        ScanIterator::new(self.txn, inner)
-    }
-
-    /// Collects the result to a vector.
-    pub fn to_vec(&mut self) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        self.iter().collect()
-    }
-}
-
-/// An iterator over the latest live and visible key/value pairs at the txn
-/// version. Does not implement DoubleEndedIterator (reverse scans), since the
-/// SQL layer doesn't use it.
-pub struct ScanIterator<'a, E: Engine + 'a> {
-    /// Decodes and filters visible MVCC versions from the inner engine iterator.
-    inner: std::iter::Peekable<VersionIterator<'a, E>>,
-}
-
-impl<'a, E: Engine + 'a> ScanIterator<'a, E> {
     /// Creates a new scan iterator.
-    fn new(txn: &'a TransactionState, inner: E::ScanIterator<'a>) -> Self {
-        Self { inner: VersionIterator::new(txn, inner).peekable() }
+    fn new(
+        engine: Arc<Mutex<E>>,
+        txn: TransactionState,
+        range: (Bound<RawKey>, Bound<RawKey>),
+    ) -> Self {
+        let buffer = VecDeque::with_capacity(Self::BUFFER_SIZE);
+        Self { engine, txn, buffer, remainder: Some(range) }
     }
 
-    /// Fallible next(), emitting the next item, or None if exhausted.
-    fn try_next(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>> {
-        while let Some((key, _version, value)) = self.inner.next().transpose()? {
+    /// Fills the buffer, if there's any pending items.
+    fn fill_buffer(&mut self) -> Result<()> {
+        // Check if there's anything to buffer.
+        if self.buffer.len() >= Self::BUFFER_SIZE {
+            return Ok(());
+        }
+        let Some(range) = self.remainder.take() else { return Ok(()) };
+        let range_end = range.1.clone();
+
+        let mut engine = self.engine.lock()?;
+        let mut iter = VersionIterator::<E>::new(&self.txn, engine.scan(range)).peekable();
+        while let Some((key, _, value)) = iter.next().transpose()? {
             // If the next key equals this one, we're not at the latest version.
-            match self.inner.peek() {
+            match iter.peek() {
                 Some(Ok((next, _, _))) if next == &key => continue,
                 Some(Err(err)) => return Err(err.clone()),
                 Some(Ok(_)) | None => {}
             }
-            // If the key is live (not a tombstone), emit it.
-            if let Some(value) = bincode::deserialize(&value)? {
-                return Ok(Some((key, value)));
+            // If the key is live (not a tombstone), buffer it.
+            let Some(value) = bincode::deserialize(&value)? else { continue };
+            self.buffer.push_back((key, value));
+            // If we filled the buffer, save the remaining range (if any) and
+            // return. peek() has already buffered next(), so pull it.
+            if self.buffer.len() == Self::BUFFER_SIZE {
+                if let Some((next, _, _)) = iter.next().transpose()? {
+                    self.remainder = Some((Bound::Included(next), range_end));
+                }
+                return Ok(());
             }
         }
-        Ok(None)
+        Ok(())
     }
 }
 
-impl<'a, E: Engine> Iterator for ScanIterator<'a, E> {
-    type Item = Result<(Vec<u8>, Vec<u8>)>;
+impl<E: Engine> Iterator for ScanIterator<E> {
+    type Item = Result<(UserKey, UserValue)>;
     fn next(&mut self) -> Option<Self::Item> {
-        self.try_next().transpose()
+        if self.buffer.is_empty() {
+            if let Err(error) = self.fill_buffer() {
+                return Some(Err(error));
+            }
+        }
+        self.buffer.pop_front().map(Ok)
     }
 }
 
@@ -704,7 +699,6 @@ struct VersionIterator<'a, E: Engine + 'a> {
     inner: E::ScanIterator<'a>,
 }
 
-#[allow(clippy::type_complexity)]
 impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
     /// Creates a new MVCC version iterator for the given engine iterator.
     fn new(txn: &'a TransactionState, inner: E::ScanIterator<'a>) -> Self {
@@ -713,7 +707,7 @@ impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
 
     /// Decodes a raw engine key into an MVCC key and version, returning None if
     /// the version is not visible.
-    fn decode_visible(&self, key: &[u8]) -> Result<Option<(Vec<u8>, Version)>> {
+    fn decode_visible(&self, key: &[u8]) -> Result<Option<(UserKey, Version)>> {
         let (key, version) = match Key::decode(key)? {
             Key::Version(key, version) => (key.into_owned(), version),
             key => return errdata!("expected Key::Version got {key:?}"),
@@ -726,7 +720,7 @@ impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
     }
 
     // Fallible next(), emitting the next item, or None if exhausted.
-    fn try_next(&mut self) -> Result<Option<(Vec<u8>, Version, Vec<u8>)>> {
+    fn try_next(&mut self) -> Result<Option<(UserKey, Version, UserValue)>> {
         while let Some((key, value)) = self.inner.next().transpose()? {
             if let Some((key, version)) = self.decode_visible(&key)? {
                 return Ok(Some((key, version, value)));
@@ -737,7 +731,7 @@ impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
 }
 
 impl<'a, E: Engine> Iterator for VersionIterator<'a, E> {
-    type Item = Result<(Vec<u8>, Version, Vec<u8>)>;
+    type Item = Result<(UserKey, Version, UserValue)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
     }
@@ -927,8 +921,7 @@ pub mod tests {
                     )?;
                     args.reject_rest()?;
 
-                    let mut scan = txn.scan(range);
-                    let kvs: Vec<_> = scan.iter().collect::<crate::error::Result<_>>()?;
+                    let kvs: Vec<_> = txn.scan(range).collect::<crate::error::Result<_>>()?;
                     for (key, value) in kvs {
                         writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
                     }
@@ -942,8 +935,8 @@ pub mod tests {
                         Self::decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
                     args.reject_rest()?;
 
-                    let mut scan = txn.scan_prefix(&prefix);
-                    let kvs: Vec<_> = scan.iter().collect::<crate::error::Result<_>>()?;
+                    let kvs: Vec<_> =
+                        txn.scan_prefix(&prefix).collect::<crate::error::Result<_>>()?;
                     for (key, value) in kvs {
                         writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
                     }
