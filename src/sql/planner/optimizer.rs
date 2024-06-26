@@ -41,17 +41,10 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
         })
     };
 
-    // Removes noop nodes.
-    // TODO: this can replace false predicates with nothing nodes.
-    let remove_noops = |node| match node {
-        Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
-        node => node,
-    };
-
     // Transform expressions after descending, both to perform the logical
     // short-circuiting on child expressions that have already been folded, and
     // to reduce the quadratic cost when an expression contains a field.
-    node.transform(&|n| n.transform_expressions(&Ok, &transform), &|n| Ok(remove_noops(n)))
+    node.transform(&|n| n.transform_expressions(&Ok, &transform), &Ok)
 }
 
 /// Pushes filter predicates down into child nodes where possible. In
@@ -286,4 +279,31 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
         node => node,
     };
     node.transform(&|n| Ok(transform(n)), &Ok)
+}
+
+/// Short-circuits useless nodes and expressions.
+///
+/// TODO: this should replace e.g. Filter(false) nodes with Nothing nodes, but
+/// Nothing nodes currently emit a single row (for non-table queries). Once
+/// Nothing doesn't emit anything, extend this to transform false filters with
+/// Nothing, and then pull this upwards in the tree (e.g. a join or projection
+/// with Nothing is useless).
+pub(super) fn short_circuit(node: Node) -> Result<Node> {
+    const TRUE: Expression = Expression::Constant(Value::Boolean(true));
+    const TRUEOPT: Option<Expression> = Some(TRUE);
+
+    let transform = |node| match node {
+        // Filter nodes that always yield true are unnecessary.
+        Node::Filter { source, predicate: TRUE } => *source,
+
+        // Predicates that always yield true are unnecessary.
+        Node::Scan { table, filter: TRUEOPT, alias } => Node::Scan { table, filter: None, alias },
+        Node::NestedLoopJoin { left, left_size, right, right_size, predicate: TRUEOPT, outer } => {
+            Node::NestedLoopJoin { left, left_size, right, right_size, predicate: None, outer }
+        }
+        node => node,
+    };
+
+    // Transform after descending, to (eventually) pull Nothing nodes upwards.
+    node.transform(&Ok, &|n| Ok(transform(n)))
 }

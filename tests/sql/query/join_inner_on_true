@@ -2,7 +2,7 @@ Query: SELECT * FROM movies INNER JOIN genres ON TRUE
 
 Explain:
 NestedLoopJoin: inner
-├─ Scan: movies (TRUE)
+├─ Scan: movies
 └─ Scan: genres
 
 Result: ["id", "title", "studio_id", "genre_id", "released", "rating", "ultrahd", "id", "name"]
@@ -309,13 +309,7 @@ Optimized plan: Select {
                     },
                 ],
             },
-            filter: Some(
-                Constant(
-                    Boolean(
-                        true,
-                    ),
-                ),
-            ),
+            filter: None,
             alias: None,
         },
         left_size: 7,

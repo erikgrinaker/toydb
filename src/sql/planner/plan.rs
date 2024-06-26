@@ -67,6 +67,7 @@ impl Plan {
             node = optimizer::push_filters(node)?;
             node = optimizer::index_lookup(node)?;
             node = optimizer::join_type(node)?;
+            node = optimizer::short_circuit(node)?;
             Ok(node)
         };
         Ok(match self {
@@ -129,7 +130,8 @@ pub enum Node {
         outer: bool,
     },
     /// Emits a single empty row. Used for SELECT queries with no FROM clause.
-    /// TODO: replace with Values, but requires changes to aggregate planning.
+    /// TODO: this shouldn't emit anything, and be used with the short circuit
+    /// optimizer instead.
     Nothing,
     /// Discards the first offset rows from source, emits the rest.
     Offset { source: Box<Node>, offset: usize },
