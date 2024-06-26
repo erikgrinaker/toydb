@@ -470,15 +470,15 @@ impl<E: Engine> Transaction<E> {
         if self.st.read_only {
             return Ok(());
         }
-        let mut session = self.engine.lock()?;
-        let remove = session
+        let mut engine = self.engine.lock()?;
+        let remove = engine
             .scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode())
             .map(|r| r.map(|(k, _)| k))
             .collect::<Result<Vec<_>>>()?;
         for key in remove {
-            session.delete(&key)?
+            engine.delete(&key)?
         }
-        session.delete(&Key::TxnActive(self.st.version).encode())
+        engine.delete(&Key::TxnActive(self.st.version).encode())
     }
 
     /// Rolls back the transaction, by undoing all written versions and removing
@@ -488,9 +488,9 @@ impl<E: Engine> Transaction<E> {
         if self.st.read_only {
             return Ok(());
         }
-        let mut session = self.engine.lock()?;
+        let mut engine = self.engine.lock()?;
         let mut rollback = Vec::new();
-        let mut scan = session.scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode());
+        let mut scan = engine.scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode());
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::TxnWrite(_, key) => {
@@ -502,9 +502,9 @@ impl<E: Engine> Transaction<E> {
         }
         drop(scan);
         for key in rollback.into_iter() {
-            session.delete(&key)?;
+            engine.delete(&key)?;
         }
-        session.delete(&Key::TxnActive(self.st.version).encode()) // remove from active set
+        engine.delete(&Key::TxnActive(self.st.version).encode()) // remove from active set
     }
 
     /// Deletes a key.
@@ -525,7 +525,7 @@ impl<E: Engine> Transaction<E> {
         if self.st.read_only {
             return Err(Error::ReadOnly);
         }
-        let mut session = self.engine.lock()?;
+        let mut engine = self.engine.lock()?;
 
         // Check for write conflicts, i.e. if the latest key is invisible to us
         // (either a newer version, or an uncommitted version in our past). We
@@ -537,7 +537,7 @@ impl<E: Engine> Transaction<E> {
         )
         .encode();
         let to = Key::Version(key.into(), u64::MAX).encode();
-        if let Some((key, _)) = session.scan(from..=to).last().transpose()? {
+        if let Some((key, _)) = engine.scan(from..=to).last().transpose()? {
             match Key::decode(&key)? {
                 Key::Version(_, version) => {
                     if !self.st.is_visible(version) {
@@ -552,16 +552,16 @@ impl<E: Engine> Transaction<E> {
         //
         // NB: TxnWrite contains the provided user key, not the encoded engine
         // key, since we can construct the engine key using the version.
-        session.set(&Key::TxnWrite(self.st.version, key.into()).encode(), vec![])?;
-        session.set(&Key::Version(key.into(), self.st.version).encode(), bincode::serialize(&value))
+        engine.set(&Key::TxnWrite(self.st.version, key.into()).encode(), vec![])?;
+        engine.set(&Key::Version(key.into(), self.st.version).encode(), bincode::serialize(&value))
     }
 
     /// Fetches a key's value, or None if it does not exist.
     pub fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let mut session = self.engine.lock()?;
+        let mut engine = self.engine.lock()?;
         let from = Key::Version(key.into(), 0).encode();
         let to = Key::Version(key.into(), self.st.version).encode();
-        let mut scan = session.scan(from..=to).rev();
+        let mut scan = engine.scan(from..=to).rev();
         while let Some((key, value)) = scan.next().transpose()? {
             match Key::decode(&key)? {
                 Key::Version(_, version) => {
