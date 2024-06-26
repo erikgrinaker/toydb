@@ -410,9 +410,6 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
 /// table/column names, so this is fine.
 ///
 /// Uses Cow to allow encoding borrowed values but decoding owned values.
-///
-/// TODO: add helper methods here to encode borrowed keys. This should also
-/// encode into a reused byte buffer, see keycode::serialize() comment.
 #[derive(Deserialize, Serialize)]
 enum Key<'a> {
     /// A table schema by table name.

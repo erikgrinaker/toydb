@@ -11,6 +11,7 @@
 use crate::error::{Error, Result};
 
 use bincode::Options as _;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Returns the default Bincode options, initialized on first use.
 fn bincode() -> &'static bincode::DefaultOptions {
@@ -19,18 +20,18 @@ fn bincode() -> &'static bincode::DefaultOptions {
 }
 
 /// Deserializes a value using Bincode.
-pub fn deserialize<'de, T: serde::Deserialize<'de>>(bytes: &'de [u8]) -> Result<T> {
+pub fn deserialize<'de, T: Deserialize<'de>>(bytes: &'de [u8]) -> Result<T> {
     Ok(bincode().deserialize(bytes)?)
 }
 
 /// Deserializes a value from a reader using Bincode.
-pub fn deserialize_from<R: std::io::Read, T: serde::de::DeserializeOwned>(reader: R) -> Result<T> {
+pub fn deserialize_from<R: std::io::Read, T: DeserializeOwned>(reader: R) -> Result<T> {
     Ok(bincode().deserialize_from(reader)?)
 }
 
 /// Deserializes a value from a reader using Bincode, or returns None if the
 /// reader is closed.
-pub fn maybe_deserialize_from<R: std::io::Read, T: serde::de::DeserializeOwned>(
+pub fn maybe_deserialize_from<R: std::io::Read, T: DeserializeOwned>(
     reader: R,
 ) -> Result<Option<T>> {
     match bincode().deserialize_from(reader) {
@@ -47,13 +48,13 @@ pub fn maybe_deserialize_from<R: std::io::Read, T: serde::de::DeserializeOwned>(
 }
 
 /// Serializes a value using Bincode.
-pub fn serialize<T: serde::Serialize>(value: &T) -> Vec<u8> {
+pub fn serialize<T: Serialize>(value: &T) -> Vec<u8> {
     // Panic on serialization failures, as this is typically an issue with the
     // provided data structure.
     bincode().serialize(value).expect("bincode serialization failed")
 }
 
 /// Serializes a value to a writer using Bincode.
-pub fn serialize_into<W: std::io::Write, T: serde::Serialize>(writer: W, value: &T) -> Result<()> {
+pub fn serialize_into<W: std::io::Write, T: Serialize>(writer: W, value: &T) -> Result<()> {
     Ok(bincode().serialize_into(writer, value)?)
 }

@@ -11,8 +11,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Adds automatic Keycode encode/decode methods to key enums. These are
 /// primarily meant for keys stored in key/value storage engines.
-///
-/// TODO: consider making this DeserializeOwned instead.
 pub trait Key<'de>: Serialize + Deserialize<'de> {
     /// Decodes a key from a byte slice using Keycode.
     fn decode(bytes: &'de [u8]) -> Result<Self> {
@@ -20,6 +18,11 @@ pub trait Key<'de>: Serialize + Deserialize<'de> {
     }
 
     /// Encodes a key to a byte vector using Keycode.
+    ///
+    /// In the common case, the encoded key is borrowed for a storage engine
+    /// call and then thrown away. We could avoid a bunch of allocations by
+    /// taking a reusable byte vector to encode into and return a reference to
+    /// it, but we keep it simple.
     fn encode(&self) -> Vec<u8> {
         keycode::serialize(self)
     }

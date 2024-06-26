@@ -44,21 +44,18 @@
 //! serde_bytes::ByteBuf or use the #[serde(with="serde_bytes")] attribute. See
 //! https://github.com/serde-rs/bytes
 
-use de::IntoDeserializer;
-use serde::{de, ser};
-
 use crate::errdata;
 use crate::error::{Error, Result};
 
+use serde::{de, de::IntoDeserializer as _, ser};
+
 /// Serializes a key to a binary KeyCode representation.
 ///
-/// This will allocate a new byte vector for every call. Often, keys are used
-/// immediately and then discarded, so we could reuse a byte buffer between
-/// calls to avoid the allocations. We don't, for simplicity.
-///
-/// TODO: given lifetime enforcement, it would be trivial to hand out references
-/// to the reused byte buffer. Consider adding this.
-pub fn serialize<T: serde::Serialize>(key: &T) -> Vec<u8> {
+/// In the common case, the encoded key is borrowed for a storage engine call
+/// and then thrown away. We could avoid a bunch of allocations by taking a
+/// reusable byte vector to encode into and return a reference to it, but we
+/// keep it simple.
+pub fn serialize<T: ser::Serialize>(key: &T) -> Vec<u8> {
     let mut serializer = Serializer { output: Vec::new() };
     // Panic on serialization failures, as this is typically an issue with the
     // provided data structure.
@@ -67,7 +64,7 @@ pub fn serialize<T: serde::Serialize>(key: &T) -> Vec<u8> {
 }
 
 /// Deserializes a key from a binary KeyCode representation.
-pub fn deserialize<'a, T: serde::Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
+pub fn deserialize<'a, T: de::Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
     let mut deserializer = Deserializer::from_bytes(input);
     let t = T::deserialize(&mut deserializer)?;
     if !deserializer.input.is_empty() {
@@ -84,7 +81,7 @@ struct Serializer {
     output: Vec<u8>,
 }
 
-impl<'a> serde::Serializer for &'a mut Serializer {
+impl<'a> ser::Serializer for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
@@ -192,7 +189,7 @@ impl<'a> serde::Serializer for &'a mut Serializer {
         unimplemented!()
     }
 
-    fn serialize_some<T: serde::Serialize + ?Sized>(self, _: &T) -> Result<()> {
+    fn serialize_some<T: ser::Serialize + ?Sized>(self, _: &T) -> Result<()> {
         unimplemented!()
     }
 
@@ -210,7 +207,7 @@ impl<'a> serde::Serializer for &'a mut Serializer {
         Ok(())
     }
 
-    fn serialize_newtype_struct<T: serde::Serialize + ?Sized>(
+    fn serialize_newtype_struct<T: ser::Serialize + ?Sized>(
         self,
         _: &'static str,
         _: &T,
@@ -219,7 +216,7 @@ impl<'a> serde::Serializer for &'a mut Serializer {
     }
 
     /// Newtype variants are serialized using the variant index and inner type.
-    fn serialize_newtype_variant<T: serde::Serialize + ?Sized>(
+    fn serialize_newtype_variant<T: ser::Serialize + ?Sized>(
         self,
         name: &'static str,
         index: u32,
@@ -285,7 +282,7 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: serde::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
+    fn serialize_element<T: ser::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
         value.serialize(&mut **self)
     }
 
@@ -299,7 +296,7 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: serde::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
+    fn serialize_element<T: ser::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
         value.serialize(&mut **self)
     }
 
@@ -313,7 +310,7 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: serde::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
+    fn serialize_field<T: ser::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
         value.serialize(&mut **self)
     }
 
@@ -370,7 +367,7 @@ impl<'de> Deserializer<'de> {
 }
 
 /// For details on serialization formats, see Serializer.
-impl<'de, 'a> serde::Deserializer<'de> for &'a mut Deserializer<'de> {
+impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
