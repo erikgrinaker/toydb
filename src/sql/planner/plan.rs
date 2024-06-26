@@ -130,9 +130,8 @@ pub enum Node {
         outer: bool,
     },
     /// Emits a single empty row. Used for SELECT queries with no FROM clause.
-    /// TODO: this shouldn't emit anything, and be used with the short circuit
-    /// optimizer instead.
-    Nothing,
+    /// TODO: remove this.
+    EmptyRow,
     /// Discards the first offset rows from source, emits the rest.
     Offset { source: Box<Node>, offset: usize },
     /// Sorts the source rows by the given expression/direction pairs. Buffers
@@ -208,7 +207,7 @@ impl Node {
 
             node @ (Self::IndexLookup { .. }
             | Self::KeyLookup { .. }
-            | Self::Nothing
+            | Self::EmptyRow
             | Self::Scan { .. }
             | Self::Values { .. }) => node,
         };
@@ -273,7 +272,7 @@ impl Node {
             | node @ Self::KeyLookup { .. }
             | node @ Self::Limit { .. }
             | node @ Self::NestedLoopJoin { predicate: None, .. }
-            | node @ Self::Nothing
+            | node @ Self::EmptyRow
             | node @ Self::Offset { .. }
             | node @ Self::Scan { filter: None, .. } => node,
         })
@@ -406,8 +405,8 @@ impl Node {
                 left.format(f, prefix.clone(), false, false)?;
                 right.format(f, prefix, false, true)?;
             }
-            Self::Nothing {} => {
-                write!(f, "Nothing")?;
+            Self::EmptyRow {} => {
+                write!(f, "EmptyRow")?;
             }
             Self::Offset { source, offset } => {
                 write!(f, "Offset: {offset}")?;

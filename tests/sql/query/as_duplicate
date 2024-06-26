@@ -2,7 +2,7 @@ Query: SELECT 1 AS a, 2 AS a
 
 Explain:
 Projection: 1, 2
-└─ Nothing
+└─ EmptyRow
 
 Result: ["a", "a"]
 [Integer(1), Integer(2)]
@@ -41,7 +41,7 @@ AST: Select {
 
 Plan: Select {
     root: Projection {
-        source: Nothing,
+        source: EmptyRow,
         expressions: [
             Constant(
                 Integer(
@@ -75,7 +75,7 @@ Plan: Select {
 
 Optimized plan: Select {
     root: Projection {
-        source: Nothing,
+        source: EmptyRow,
         expressions: [
             Constant(
                 Integer(

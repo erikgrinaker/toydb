@@ -29,8 +29,8 @@ pub(super) fn lookup_index(
 
 /// Produces a single empty row. Used for queries without a FROM clause, e.g.
 /// SELECT 1+1, in order to have something to project against.
-/// TODO: should actually return nothing.
-pub(super) fn nothing() -> Rows {
+/// TODO: remove this.
+pub(super) fn empty_row() -> Rows {
     Box::new(std::iter::once(Ok(Row::new())))
 }
 

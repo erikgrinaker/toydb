@@ -159,7 +159,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         } else if select.is_empty() {
             return errinput!("can't select * without a table");
         } else {
-            Node::Nothing
+            Node::EmptyRow
         };
 
         // Build WHERE clause.

@@ -2,7 +2,7 @@ Query: SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope
 
 Explain:
 Projection: 7, FALSE
-└─ Nothing
+└─ EmptyRow
 
 Result: ["?", "nope"]
 [Integer(7), Boolean(false)]
@@ -66,7 +66,7 @@ AST: Select {
 
 Plan: Select {
     root: Projection {
-        source: Nothing,
+        source: EmptyRow,
         expressions: [
             Add(
                 Constant(
@@ -117,7 +117,7 @@ Plan: Select {
 
 Optimized plan: Select {
     root: Projection {
-        source: Nothing,
+        source: EmptyRow,
         expressions: [
             Constant(
                 Integer(

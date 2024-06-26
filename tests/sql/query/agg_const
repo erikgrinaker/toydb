@@ -4,7 +4,7 @@ Explain:
 Projection: #0, #1, #2, #3, #4
 └─ Aggregation: min, max, sum, count, avg
    └─ Projection: 3, 3, 3, 3, 3
-      └─ Nothing
+      └─ EmptyRow
 
 Result: ["?", "?", "?", "?", "?"]
 [Integer(3), Integer(3), Integer(3), Integer(1), Integer(3)]
@@ -90,7 +90,7 @@ Plan: Select {
     root: Projection {
         source: Aggregation {
             source: Projection {
-                source: Nothing,
+                source: EmptyRow,
                 expressions: [
                     Constant(
                         Integer(
@@ -178,7 +178,7 @@ Optimized plan: Select {
     root: Projection {
         source: Aggregation {
             source: Projection {
-                source: Nothing,
+                source: EmptyRow,
                 expressions: [
                     Constant(
                         Integer(
