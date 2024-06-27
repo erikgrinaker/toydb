@@ -531,7 +531,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     }
 
     /// Builds an expression from an AST expression.
-    fn build_expression(expr: ast::Expression, scope: &Scope) -> Result<Expression> {
+    pub fn build_expression(expr: ast::Expression, scope: &Scope) -> Result<Expression> {
         use Expression::*;
 
         // Helper for building a boxed expression.
@@ -627,7 +627,7 @@ pub struct Scope {
 
 impl Scope {
     /// Creates a new, empty scope.
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             columns: Vec::new(),
             tables: HashSet::new(),

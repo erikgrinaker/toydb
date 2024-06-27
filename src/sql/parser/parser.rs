@@ -475,7 +475,7 @@ impl<'a> Parser<'a> {
     /// Parses an expression consisting of at least one atom operated on by any
     /// number of operators, using the precedence climbing algorithm.
     /// TODO: write a description of the algorithm.
-    fn parse_expression(&mut self) -> Result<ast::Expression> {
+    pub fn parse_expression(&mut self) -> Result<ast::Expression> {
         self.parse_expression_at(0)
     }
 

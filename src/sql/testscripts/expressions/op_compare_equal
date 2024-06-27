@@ -1,0 +1,83 @@
+# Tests the = equality operator.
+
+# Booleans.
+> TRUE = TRUE
+> TRUE = FALSE
+> FALSE = TRUE
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+
+# Integers.
+> 1 = 1
+> 1 = 2
+---
+Boolean(true)
+Boolean(false)
+
+# Floats.
+> 3.14 = 3.14
+> 3.14 = 2.718
+---
+Boolean(true)
+Boolean(false)
+
+# Float special values.
+> 0.0 = -0.0
+> INFINITY = INFINITY
+> NAN = NAN
+---
+Boolean(true)
+Boolean(true)
+Boolean(false)
+
+# Mixed integers and floats.
+> 3.0 = 3
+> 3.01 = 3
+> 3 = 3.01
+> -0.0 = 0
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+Boolean(true)
+
+# Strings.
+> 'abc' = 'abc'
+> 'abc' = 'ab'
+> 'abc' = 'abcd'
+> 'abc' = 'ABC'
+> '😀' = '😀'
+> '😀' = '🙁'
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+Boolean(true)
+Boolean(false)
+
+# NULLs.
+> 1 = NULL
+> 3.14 = NULL
+> FALSE = NULL
+> '' = NULL
+> NULL = NULL
+> NAN = NULL
+> INFINITY = NULL
+---
+Null
+Null
+Null
+Null
+Null
+Null
+Null
+
+# Type mismatches.
+!> true = 1
+!> 'true' = true
+---
+Error: invalid input: can't compare TRUE and 1
+Error: invalid input: can't compare true and TRUE

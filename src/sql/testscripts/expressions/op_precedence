@@ -1,0 +1,365 @@
+# Tests operator precedence. Test each precedence level against the operators
+# immediately below it, in order. The levels are:
+#
+# 9: prefix +, -, NOT
+# 8: postfix !, IS NULL, IS NOT NULL
+# 7: ^ (left-associative)
+# 6: *, /, %
+# 5: +, -
+# 4: >, >=, <, <=
+# 3: =, !=, LIKE
+# 2: AND
+# 1: OR
+#
+# Only ^ is left-associative (and postfix operators by definition).
+
+# Parenthesis can boost a low precedence operator (e.g. addition) above the
+# highest precedence (e.g. prefix/postfix and ^).
+> 1 + 2 ^ 2
+> (1 + 2) ^ 2
+> -1 + 2
+> -(1 + 2)
+> 2 + 3!
+> (2 + 3)!
+---
+Integer(5)
+Integer(9)
+Integer(1)
+Integer(-3)
+Integer(8)
+Integer(120)
+
+# Prefix -.
+> -3 ^ 2
+> -(3 ^ 2)
+---
+Integer(9)
+Integer(-9)
+
+# NOT.
+> NOT NULL IS NULL
+> NOT (NULL IS NULL)
+---
+Boolean(true)
+Boolean(false)
+
+# Postfix !.
+> 2 ^ 3!
+> (2 ^ 3)!
+---
+Integer(64)
+Integer(40320)
+
+# IS NULL.
+!> 2 ^ NULL IS NULL
+> (2 ^ NULL) IS NULL
+---
+Error: invalid input: can't exponentiate 2 and TRUE
+Boolean(true)
+
+# IS NOT NULL.
+!> 2 ^ NULL IS NOT NULL
+> (2 ^ NULL) IS NOT NULL
+---
+Error: invalid input: can't exponentiate 2 and FALSE
+Boolean(false)
+
+# ^, which is also left-associative.
+> 2 ^ 3 ^ 2
+> (2 ^ 3) ^ 2
+> 2 ^ 3 * 4
+> 2 ^ (3 * 4)
+> 2 ^ 4 / 2
+> 2 ^ (4 / 2)
+> 2 ^ 5 % 2
+> 2 ^ (5 % 2)
+---
+Integer(512)
+Integer(64)
+Integer(32)
+Integer(4096)
+Integer(8)
+Integer(4)
+Integer(0)
+Integer(2)
+
+# *
+> 3 * 4 / 2
+> 3 * (4 / 2)
+> 3 * 4 % 3
+> 3 * (4 % 3)
+> 1 + 2 * 3
+> (1 + 2) * 3
+> 1 - 2 * 3
+> (1 - 2) * 3
+---
+Integer(6)
+Integer(6)
+Integer(0)
+Integer(3)
+Integer(7)
+Integer(9)
+Integer(-5)
+Integer(-3)
+
+# /
+> 4 / 2 * 3
+> 4 / (2 * 3)
+> 8 / 4 % 3
+> 8 / (4 % 3)
+> 2 + 4 / 2
+> (2 + 4) / 2
+> 4 - 2 / 2
+> (4 - 2) / 2
+---
+Integer(6)
+Integer(0)
+Integer(2)
+Integer(8)
+Integer(4)
+Integer(3)
+Integer(3)
+Integer(1)
+
+# %
+> 4 % 3 * 3
+> 4 % (3 * 3)
+> 8 % 3 / 2
+> 8 % (3 / 2)
+> 2 + 4 % 3
+> (2 + 4) % 3
+> 8 - 5 % 3
+> (8 - 5) % 3
+---
+Integer(3)
+Integer(4)
+Integer(1)
+Integer(0)
+Integer(3)
+Integer(0)
+Integer(6)
+Integer(0)
+
+# +
+> 1 + 2 - 3
+> 1 + (2 - 3)
+> 1 + 2 > 2
+!> 1 + (2 > 2)
+> 1 + 2 >= 2
+!> 1 + (2 >= 2)
+> 1 + 2 < 2
+!> 1 + (2 < 2)
+> 1 + 2 <= 2
+!> 1 + (2 <= 2)
+---
+Integer(0)
+Integer(0)
+Boolean(true)
+Error: invalid input: can't add 1 and FALSE
+Boolean(true)
+Error: invalid input: can't add 1 and TRUE
+Boolean(false)
+Error: invalid input: can't add 1 and FALSE
+Boolean(false)
+Error: invalid input: can't add 1 and TRUE
+
+# -
+> 3 - 2 + 1
+> 3 - (2 + 1)
+> 2 - 1 > 2
+!> 2 - (1 > 2)
+> 2 - 1 >= 2
+!> 2 - (1 >= 2)
+> 2 - 1 < 2
+!> 2 - (1 < 2)
+> 2 - 1 <= 2
+!> 2 - (1 <= 2)
+---
+Integer(2)
+Integer(0)
+Boolean(false)
+Error: invalid input: can't subtract 2 and FALSE
+Boolean(false)
+Error: invalid input: can't subtract 2 and FALSE
+Boolean(true)
+Error: invalid input: can't subtract 2 and TRUE
+Boolean(true)
+Error: invalid input: can't subtract 2 and TRUE
+
+# >
+> 5 > 3 < TRUE
+!> 5 > (3 < TRUE)
+> 5 > 3 <= TRUE
+!> 5 > (3 <= TRUE)
+> 5 > 3 > TRUE
+!> 5 > (3 > TRUE)
+> 5 > 3 >= TRUE
+!> 5 > (3 >= TRUE)
+> 5 > 3 = TRUE
+!> 5 > (3 = TRUE)
+> 5 > 3 != TRUE
+!> 5 > (3 != TRUE)
+!> 5 > 3 LIKE 'abc'
+!> 5 > (3 LIKE 'abc')
+---
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Error: invalid input: can't LIKE TRUE and abc
+Error: invalid input: can't LIKE 3 and abc
+
+# >=
+> 5 >= 3 < TRUE
+!> 5 >= (3 < TRUE)
+> 5 >= 3 <= TRUE
+!> 5 >= (3 <= TRUE)
+> 5 >= 3 > TRUE
+!> 5 >= (3 > TRUE)
+> 5 >= 3 >= TRUE
+!> 5 >= (3 >= TRUE)
+> 5 >= 3 = TRUE
+!> 5 >= (3 = TRUE)
+> 5 >= 3 != TRUE
+!> 5 >= (3 != TRUE)
+!> 5 >= 3 LIKE 'abc'
+!> 5 >= (3 LIKE 'abc')
+---
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Error: invalid input: can't LIKE TRUE and abc
+Error: invalid input: can't LIKE 3 and abc
+
+# <
+> 5 < 3 < TRUE
+!> 5 < (3 < TRUE)
+> 5 < 3 <= TRUE
+!> 5 < (3 <= TRUE)
+> 5 < 3 > TRUE
+!> 5 < (3 > TRUE)
+> 5 < 3 >= TRUE
+!> 5 < (3 >= TRUE)
+> 5 < 3 = TRUE
+!> 5 < (3 = TRUE)
+> 5 < 3 != TRUE
+!> 5 < (3 != TRUE)
+!> 5 < 3 LIKE 'abc'
+!> 5 < (3 LIKE 'abc')
+---
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Error: invalid input: can't LIKE FALSE and abc
+Error: invalid input: can't LIKE 3 and abc
+
+# <=
+> 5 <= 3 < TRUE
+!> 5 <= (3 < TRUE)
+> 5 <= 3 <= TRUE
+!> 5 <= (3 <= TRUE)
+> 5 <= 3 > TRUE
+!> 5 <= (3 > TRUE)
+> 5 <= 3 >= TRUE
+!> 5 <= (3 >= TRUE)
+> 5 <= 3 = TRUE
+!> 5 <= (3 = TRUE)
+> 5 <= 3 != TRUE
+!> 5 <= (3 != TRUE)
+!> 5 <= 3 LIKE 'abc'
+!> 5 <= (3 LIKE 'abc')
+---
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(false)
+Error: invalid input: can't compare 3 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 3 and TRUE
+Error: invalid input: can't LIKE FALSE and abc
+Error: invalid input: can't LIKE 3 and abc
+
+# =
+> 1 = 1 != FALSE
+!> 1 = (1 != FALSE)
+!> 1 = 1 LIKE 'abc'
+!> 1 = (1 LIKE 'abc')
+> 1 = 1 AND TRUE
+!> 1 = (1 AND TRUE)
+---
+Boolean(true)
+Error: invalid input: can't compare 1 and FALSE
+Error: invalid input: can't LIKE TRUE and abc
+Error: invalid input: can't LIKE 1 and abc
+Boolean(true)
+Error: invalid input: can't and 1 and TRUE
+
+# !=
+> 1 != 1 != FALSE
+!> 1 != (1 != FALSE)
+!> 1 != 1 LIKE 'abc'
+!> 1 != (1 LIKE 'abc')
+> 1 != 1 AND TRUE
+!> 1 != (1 AND TRUE)
+---
+Boolean(false)
+Error: invalid input: can't compare 1 and FALSE
+Error: invalid input: can't LIKE FALSE and abc
+Error: invalid input: can't LIKE 1 and abc
+Boolean(false)
+Error: invalid input: can't and 1 and TRUE
+
+# LIKE
+> 'abc' LIKE 'abc' = TRUE
+!> 'abc' LIKE ('abc' = TRUE)
+> 'abc' LIKE 'abc' != TRUE
+!> 'abc' LIKE ('abc' != TRUE)
+> 'abc' LIKE 'abc' AND TRUE
+!> 'abc' LIKE ('abc' AND TRUE)
+---
+Boolean(true)
+Error: invalid input: can't compare abc and TRUE
+Boolean(false)
+Error: invalid input: can't compare abc and TRUE
+Boolean(true)
+Error: invalid input: can't and abc and TRUE
+
+# AND
+> FALSE AND TRUE OR TRUE
+> FALSE AND (TRUE OR TRUE)
+---
+Boolean(true)
+Boolean(false)
+
+# OR has the lowest precedence, so nothing to test.

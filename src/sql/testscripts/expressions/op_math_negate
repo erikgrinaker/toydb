@@ -1,0 +1,31 @@
+# Tests the - negation prefix operator.
+
+# Integer and float works.
+[expr]> -1
+[expr]> -3.14
+---
+Integer(-1) ← Negate(Constant(Integer(1)))
+Float(-3.14) ← Negate(Constant(Float(3.14)))
+
+# NULL, infinity and NaN.
+> -NULL
+> -INFINITY
+> -NAN
+---
+Null
+Float(-inf)
+Float(NaN)
+
+# Multiple applications work.
+[expr]> ---1
+[expr]> ----1
+---
+Integer(-1) ← Negate(Negate(Negate(Constant(Integer(1)))))
+Integer(1) ← Negate(Negate(Negate(Negate(Constant(Integer(1))))))
+
+# Bool and string fails.
+!> -TRUE
+!> -'a'
+---
+Error: invalid input: can't negate TRUE
+Error: invalid input: can't negate a

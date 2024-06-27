@@ -1,0 +1,17 @@
+# Tests the IS NULL equality operator.
+
+> FALSE IS NULL
+> 0 IS NULL
+> 0.0 IS NULL
+> '' IS NULL
+> 'null' IS NULL
+> NAN IS NULL
+> NULL IS NULL
+---
+Boolean(false)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+Boolean(true)

@@ -1,0 +1,38 @@
+# Tests the ! factorial suffix operator.
+
+# Integer works.
+[expr]> 3!
+---
+Integer(6) ← Factorial(Constant(Integer(3)))
+
+# But float, bool, and string fails.
+!> 3.14!
+!> 3.0!
+!> TRUE!
+!> 'a'!
+---
+Error: invalid input: can't take factorial of 3.14
+Error: invalid input: can't take factorial of 3
+Error: invalid input: can't take factorial of TRUE
+Error: invalid input: can't take factorial of a
+
+# NULL yields null, infinity and NaN error.
+> NULL!
+!> INFINITY!
+!> NAN!
+---
+Null
+Error: invalid input: can't take factorial of inf
+Error: invalid input: can't take factorial of NaN
+
+# Multiple applications work.
+[expr]> 3!!
+[expr]> 2!!!!!!
+---
+Integer(720) ← Factorial(Factorial(Constant(Integer(3))))
+Integer(2) ← Factorial(Factorial(Factorial(Factorial(Factorial(Factorial(Constant(Integer(2))))))))
+
+# Overflow.
+[expr]!> 3!!!
+---
+Panic: attempt to multiply with overflow

@@ -1,0 +1,136 @@
+# Tests the > greater than operator.
+
+# Booleans.
+> TRUE > FALSE
+> FALSE > TRUE
+> TRUE > TRUE
+> FALSE > FALSE
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+
+# Integers.
+> 3 > 2
+> 3 > 3
+> 3 > 4
+> -1 > 0
+> 0 > -1
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+Boolean(true)
+
+# Floats.
+> 3.14 > 3.13
+> 3.14 > 3.14
+> 3.14 > 3.15
+> 0.0 > -0.0
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+
+# Float special values.
+> INFINITY > 1e300
+> INFINITY > INFINITY
+> INFINITY > -INFINITY
+> NAN > NAN
+> NAN > INFINITY
+> INFINITY > NAN
+> NAN > 0.0
+---
+Boolean(true)
+Boolean(false)
+Boolean(true)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+
+# Mixed integer/float values.
+> 3 > 3.0
+> 3 > 2.9
+> 3 > 3.1
+> 0 > -0.0
+---
+Boolean(false)
+Boolean(true)
+Boolean(false)
+Boolean(false)
+
+# Strings.
+> 'abc' > 'abc'
+> 'abc' > 'abb'
+> 'abc' > 'ab'
+> 'b' > 'abc'
+---
+Boolean(false)
+Boolean(true)
+Boolean(true)
+Boolean(true)
+
+# Empty strings.
+> '' > ''
+> 'a' > ''
+> '' > 'a'
+---
+Boolean(false)
+Boolean(true)
+Boolean(false)
+
+# String case comparisons.
+> 'a' > 'B'
+> 'z' > 'B'
+> 'A' > 'b'
+> 'Z' > 'b'
+---
+Boolean(true)
+Boolean(true)
+Boolean(false)
+Boolean(false)
+
+# Unicode strings.
+> '🙁' > '😀'
+> '😀' > '😀'
+> '😀' > '🙁'
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+
+# NULLs.
+> TRUE > NULL
+> NULL > TRUE
+> 1 > NULL
+> NULL > 1
+> 3.14 > NULL
+> NULL > 3.14
+> '' > NULl
+> NULL > ''
+> NULL > NULL
+> NULL > NAN
+---
+Null
+Null
+Null
+Null
+Null
+Null
+Null
+Null
+Null
+Null
+
+# Type conflicts.
+!> TRUE > 1
+!> TRUE > ''
+!> '' > 1
+---
+Error: invalid input: can't compare TRUE and 1
+Error: invalid input: can't compare TRUE and 
+Error: invalid input: can't compare  and 1
