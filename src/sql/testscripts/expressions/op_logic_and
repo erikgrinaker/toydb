@@ -1,0 +1,46 @@
+# Tests the AND logical operator.
+
+# Basic truth table.
+> TRUE AND TRUE
+> TRUE AND FALSE
+> FALSE AND TRUE
+> FALSE AND FALSE
+---
+Boolean(true)
+Boolean(false)
+Boolean(false)
+Boolean(false)
+
+# Trinary logic.
+> TRUE AND NULL
+> NULL AND TRUE
+> FALSE AND NULL
+> NULL AND FALSE
+> NULL AND NULL
+---
+Null
+Null
+Boolean(false)
+Boolean(false)
+Null
+
+# Non-booleans.
+!> 1 AND TRUE
+!> TRUE AND 1
+!> 1 AND 1
+!> 3.14 AND TRUE
+!> TRUE AND 3.14
+!> 3.14 AND 3.14
+!> 'true' AND TRUE
+!> TRUE AND 'true'
+!> 'true' AND 'true'
+---
+Error: invalid input: can't and 1 and TRUE
+Error: invalid input: can't and TRUE and 1
+Error: invalid input: can't and 1 and 1
+Error: invalid input: can't and 3.14 and TRUE
+Error: invalid input: can't and TRUE and 3.14
+Error: invalid input: can't and 3.14 and 3.14
+Error: invalid input: can't and true and TRUE
+Error: invalid input: can't and TRUE and true
+Error: invalid input: can't and true and true

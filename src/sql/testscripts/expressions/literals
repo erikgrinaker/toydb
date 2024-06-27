@@ -1,0 +1,107 @@
+# Tests parsing and evaluation of literals and constants.
+
+# Boolean and float constants.
+true
+false
+null
+infinity
+nan
+---
+Boolean(true)
+Boolean(false)
+Null
+Float(inf)
+Float(NaN)
+
+# Constants are case-insensitive.
+NULL
+NaN
+---
+Null
+Float(NaN)
+
+# Integers.
+3
+314
+03
+---
+Integer(3)
+Integer(314)
+Integer(3)
+
+# Floats with decimal points.
+3.72
+3.
+3.0
+---
+Float(3.72)
+Float(3.0)
+Float(3.0)
+
+# Negative or explicit positive numbers are parsed as prefix operators.
+[expr]> -3
+[expr]> +3
+[expr]> -3.14
+[expr]> +3.14
+---
+Integer(-3) ← Negate(Constant(Integer(3)))
+Integer(3) ← Identity(Constant(Integer(3)))
+Float(-3.14) ← Negate(Constant(Float(3.14)))
+Float(3.14) ← Identity(Constant(Float(3.14)))
+
+# Floats with exponents.
+3.14e3
+2.718E-2
+---
+Float(3140.0)
+Float(0.02718)
+
+# Integer overflow/underflow.
+>  9223372036854775807
+!> 9223372036854775808
+>  -9223372036854775807
+!> -9223372036854775808
+---
+Integer(9223372036854775807)
+Error: invalid input: number too large to fit in target type
+Integer(-9223372036854775807)
+Error: invalid input: number too large to fit in target type
+
+# Float overflow/underflow.
+> 1.23456789012345e308
+> 1e309
+> -1.23456789012345e308
+> -1e309
+---
+Float(1.23456789012345e308)
+Float(inf)
+Float(-1.23456789012345e308)
+Float(-inf)
+
+# Float precision.
+> 1.23456789012345e-307
+> -1.23456789012345e-307
+> 1.23456789012345e-323
+> 0.12345678901234567890
+> 1e-325
+---
+Float(1.23456789012345e-307)
+Float(-1.23456789012345e-307)
+Float(1e-323)
+Float(0.12345678901234568)
+Float(0.0)
+
+# Strings, using single quotes. Only '' is supported as an escape sequence.
+> 'Hi! 👋'
+> 'Has ''single'' and "double" quotes'
+> 'Try \n newlines and \t tabs'
+---
+String("Hi! 👋")
+String("Has 'single' and \"double\" quotes")
+String("Try \\n newlines and \\t tabs")
+
+# Double quotes are identifiers, not string literals. This fails to evaluate as
+# a constant expression.
+!> "Hi!"
+---
+Error: invalid input: expression must be constant, found field Hi!

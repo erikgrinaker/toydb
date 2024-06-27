@@ -1,0 +1,70 @@
+# Tests the + addition operator.
+
+# Simple integer addition.
+[expr]> 1 + 2
+[expr]> 1 + -3
+[expr]> 1 + -2 + 3
+---
+Integer(3) ← Add(Constant(Integer(1)), Constant(Integer(2)))
+Integer(-2) ← Add(Constant(Integer(1)), Negate(Constant(Integer(3))))
+Integer(2) ← Add(Add(Constant(Integer(1)), Negate(Constant(Integer(2)))), Constant(Integer(3)))
+
+# Simple float addition.
+[expr]> 3.1 + 2.71
+[expr]> 3.1 + -2.71
+---
+Float(5.8100000000000005) ← Add(Constant(Float(3.1)), Constant(Float(2.71)))
+Float(0.3900000000000001) ← Add(Constant(Float(3.1)), Negate(Constant(Float(2.71))))
+
+# Combined int/float addition yields floats.
+> 3.72 + 1
+> 1 + 3.72
+> 1 + 3.0
+> -1 + 3.72
+---
+Float(4.720000000000001)
+Float(4.720000000000001)
+Float(4.0)
+Float(2.72)
+
+# Addition with nulls yields null.
+> 1 + NULL
+> NULL + 3.14
+> NULL + NULL
+---
+Null
+Null
+Null
+
+# Addition with infinity and NaN.
+> 1 + INFINITY
+> 1 + -INFINITY
+> -1 + INFINITY
+> 1 + NAN
+> 3.14 + -NAN
+> INFINITY + NAN
+---
+Float(inf)
+Float(-inf)
+Float(inf)
+Float(NaN)
+Float(NaN)
+Float(NaN)
+
+# Overflow and underflow.
+!> 9223372036854775807 + 1
+!> -9223372036854775807 + -2
+> 9223372036854775807 + 1.0
+> 2e308 + 2e308
+---
+Error: invalid input: integer overflow
+Error: invalid input: integer overflow
+Float(9.223372036854776e18)
+Float(inf)
+
+# Bools and strings error.
+!> TRUE + FALSE
+!> 'a' + 'b'
+---
+Error: invalid input: can't add TRUE and FALSE
+Error: invalid input: can't add a and b

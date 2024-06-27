@@ -1,0 +1,46 @@
+# Tests the OR logical operator.
+
+# Basic truth table.
+> TRUE OR TRUE
+> TRUE OR FALSE
+> FALSE OR TRUE
+> FALSE OR FALSE
+---
+Boolean(true)
+Boolean(true)
+Boolean(true)
+Boolean(false)
+
+# Trinary logic.
+> TRUE OR NULL
+> NULL OR TRUE
+> FALSE OR NULL
+> NULL OR FALSE
+> NULL OR NULL
+---
+Boolean(true)
+Boolean(true)
+Null
+Null
+Null
+
+# Non-booleans.
+!> 1 OR TRUE
+!> TRUE OR 1
+!> 1 OR 1
+!> 3.14 OR TRUE
+!> TRUE OR 3.14
+!> 3.14 OR 3.14
+!> 'true' OR TRUE
+!> TRUE OR 'true'
+!> 'true' OR 'true'
+---
+Error: invalid input: can't or 1 and TRUE
+Error: invalid input: can't or TRUE and 1
+Error: invalid input: can't or 1 and 1
+Error: invalid input: can't or 3.14 and TRUE
+Error: invalid input: can't or TRUE and 3.14
+Error: invalid input: can't or 3.14 and 3.14
+Error: invalid input: can't or true and TRUE
+Error: invalid input: can't or TRUE and true
+Error: invalid input: can't or true and true

@@ -1,0 +1,72 @@
+# Tests the ^ exponentiation operator.
+
+# Integers.
+[expr]> 2 ^ 3
+[expr]> 2 ^ 0
+[expr]> 0 ^ 2
+[expr]> 9 ^ -3
+---
+Integer(8) ← Exponentiate(Constant(Integer(2)), Constant(Integer(3)))
+Integer(1) ← Exponentiate(Constant(Integer(2)), Constant(Integer(0)))
+Integer(0) ← Exponentiate(Constant(Integer(0)), Constant(Integer(2)))
+Float(0.0013717421124828531) ← Exponentiate(Constant(Integer(9)), Negate(Constant(Integer(3))))
+
+# Floats.
+[expr]> 6.25 ^ 0.5
+[expr]> 6.25 ^ 3.14
+---
+Float(2.5) ← Exponentiate(Constant(Float(6.25)), Constant(Float(0.5)))
+Float(315.5464179407336) ← Exponentiate(Constant(Float(6.25)), Constant(Float(3.14)))
+
+# Mixed.
+> 6.25 ^ 2
+> 9 ^ 0.5
+---
+Float(39.0625)
+Float(3.0)
+
+# Overflow and underflow.
+!> 2 ^ 10000000000
+!> 9223372036854775807 ^ 2
+> 10e200 ^ 2
+---
+Error: invalid input: integer overflow
+Error: invalid input: integer overflow
+Float(inf)
+
+# Nulls.
+> 1 ^ NULL
+> 3.14 ^ NULL
+> NULL ^ 2
+> NULL ^ 3.14
+> NULL ^ NULL
+---
+Null
+Null
+Null
+Null
+Null
+
+# Infinity and NaN.
+> 2 ^ INFINITY
+> INFINITY ^ 2
+> INFINITY ^ INFINITY
+> 2 ^ -INFINITY
+> 2 ^ NAN
+> NAN ^ 2
+> NAN ^ NAN
+---
+Float(inf)
+Float(inf)
+Float(inf)
+Float(0.0)
+Float(NaN)
+Float(NaN)
+Float(NaN)
+
+# Bools and strings.
+!> TRUE ^ FALSE
+!> 'a' ^ 'b'
+---
+Error: invalid input: can't exponentiate TRUE and FALSE
+Error: invalid input: can't exponentiate a and b

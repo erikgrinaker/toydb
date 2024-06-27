@@ -1,0 +1,18 @@
+# Tests the NOT logical operator.
+
+> NOT TRUE
+> NOT FALSE
+> NOT NULL
+---
+Boolean(false)
+Boolean(true)
+Null
+
+# Non-booleans.
+!> NOT 1
+!> NOT 3.14
+!> NOT 'true'
+---
+Error: invalid input: can't negate 1
+Error: invalid input: can't negate 3.14
+Error: invalid input: can't negate true

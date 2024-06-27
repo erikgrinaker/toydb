@@ -1,0 +1,70 @@
+# Tests the - subtraction operator.
+
+# Simple integer subtraction.
+[expr]> 2 - 1
+[expr]> 2 - 3
+[expr]> 1 - -3 - 2
+---
+Integer(1) ← Subtract(Constant(Integer(2)), Constant(Integer(1)))
+Integer(-1) ← Subtract(Constant(Integer(2)), Constant(Integer(3)))
+Integer(2) ← Subtract(Subtract(Constant(Integer(1)), Negate(Constant(Integer(3)))), Constant(Integer(2)))
+
+# Simple float subtraction.
+[expr]> 3.1 - 2.71
+[expr]> 3.1 - -2.71
+---
+Float(0.3900000000000001) ← Subtract(Constant(Float(3.1)), Constant(Float(2.71)))
+Float(5.8100000000000005) ← Subtract(Constant(Float(3.1)), Negate(Constant(Float(2.71))))
+
+# Combined int/float subtraction yields floats.
+> 3.72 - 1
+> 1 - 3.72
+> 1 - 3.0
+> -1 - 3.72
+---
+Float(2.72)
+Float(-2.72)
+Float(-2.0)
+Float(-4.720000000000001)
+
+# Subtraction with nulls yields null.
+> 1 - NULL
+> NULL - 3.14
+> NULL - NULL
+---
+Null
+Null
+Null
+
+# Subtraction with infinity and NaN.
+> 1 - INFINITY
+> -1 - INFINITY
+> -1 - -INFINITY
+> 1 - NAN
+> 3.14 - -NAN
+> INFINITY - NAN
+---
+Float(-inf)
+Float(-inf)
+Float(inf)
+Float(NaN)
+Float(NaN)
+Float(NaN)
+
+# Overflow and underflow.
+!> 9223372036854775807 - -1
+!> -9223372036854775807 - 2
+> 9223372036854775807 - -1.0
+> -2e308 - 2e308
+---
+Error: invalid input: integer overflow
+Error: invalid input: integer overflow
+Float(9.223372036854776e18)
+Float(-inf)
+
+# Bools and strings error.
+!> TRUE - FALSE
+!> 'a' - 'b'
+---
+Error: invalid input: can't subtract TRUE and FALSE
+Error: invalid input: can't subtract a and b

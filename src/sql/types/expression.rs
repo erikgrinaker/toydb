@@ -174,6 +174,7 @@ impl Expression {
             Self::Exponentiate(lhs, rhs) => lhs.evaluate(row)?.checked_pow(&rhs.evaluate(row)?)?,
             Self::Factorial(expr) => match expr.evaluate(row)? {
                 Integer(i) if i < 0 => return errinput!("can't take factorial of negative number"),
+                // TODO: handle overflow.
                 Integer(i) => Integer((1..=i).product()),
                 Null => Null,
                 value => return errinput!("can't take factorial of {value}"),
@@ -195,6 +196,8 @@ impl Expression {
             // LIKE pattern matching, using _ and % as single- and
             // multi-character wildcards. Can be escaped as __ and %%. Inputs
             // must be strings. NULLs yield NULL.
+            //
+            // TODO: the escape characters should be \% not %%, same with __.
             Self::Like(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (String(lhs), String(rhs)) => {
                     let pattern = format!(

@@ -1,0 +1,68 @@
+# Tests the % remainder operator.
+
+# Integers.
+[expr]> 5 % 3
+[expr]> -5 % 3
+[expr]> 5 % -3
+---
+Integer(2) ← Modulo(Constant(Integer(5)), Constant(Integer(3)))
+Integer(-2) ← Modulo(Negate(Constant(Integer(5))), Constant(Integer(3)))
+Integer(2) ← Modulo(Constant(Integer(5)), Negate(Constant(Integer(3))))
+
+# Floats.
+[expr]> 6.28 % 2.2
+[expr]> 6.28 % -2.2
+---
+Float(1.88) ← Modulo(Constant(Float(6.28)), Constant(Float(2.2)))
+Float(1.88) ← Modulo(Constant(Float(6.28)), Negate(Constant(Float(2.2))))
+
+# Mixed.
+> 3.15 % 2
+> 6 % 3.15
+> 3.15 % -2
+---
+Float(1.15)
+Float(2.85)
+Float(1.15)
+
+# Division by zero.
+!> 7 % 0
+> 6.28 % 0.0
+---
+Error: invalid input: can't divide by zero
+Float(NaN)
+
+# NULLs.
+> 1 % NULL
+> NULL % 3
+> 3.14 % NULL
+> NULL % NULL
+---
+Null
+Null
+Null
+Null
+
+# Infinity and NaN.
+> INFINITY % 7
+> 7 % INFINITY
+> 7 % -INFINITY
+> INFINITY % INFINITY
+> 7 % NAN
+> NAN % 7
+> NAN % NAN
+---
+Float(NaN)
+Float(7.0)
+Float(7.0)
+Float(NaN)
+Float(NaN)
+Float(NaN)
+Float(NaN)
+
+# Bools and strings.
+!> TRUE % FALSE
+!> 'a' % 'b'
+---
+Error: invalid input: can't take modulo of TRUE and FALSE
+Error: invalid input: can't take modulo of a and b
