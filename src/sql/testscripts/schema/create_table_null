@@ -1,0 +1,33 @@
+# Tests column nullability.
+
+# All datatypes can be nullable. Their default value is NULL.
+> CREATE TABLE datatypes ( \
+    id INTEGER PRIMARY KEY, \
+    "bool" BOOLEAN NULL, \
+    "float" FLOAT NULL, \
+    "int" INTEGER NULL, \
+    "string" STRING NULL \
+)
+schema datatypes
+---
+CREATE TABLE datatypes (
+  id INTEGER PRIMARY KEY,
+  "bool" BOOLEAN DEFAULT NULL,
+  "float" FLOAT DEFAULT NULL,
+  "int" INTEGER DEFAULT NULL,
+  "string" STRING DEFAULT NULL
+)
+
+# Column can be made explicitly non-nullable.
+> CREATE TABLE non_null (id INTEGER PRIMARY KEY, value STRING NOT NULL)
+schema non_null
+---
+CREATE TABLE non_null (
+  id INTEGER PRIMARY KEY,
+  value STRING NOT NULL
+)
+
+# Column can't be both nullable and non-nullable.
+!> CREATE TABLE test (id INTEGER PRIMARY KEY, value STRING NULL NOT NULL)
+---
+Error: invalid input: nullability already set for column value

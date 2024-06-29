@@ -1,0 +1,45 @@
+# Tests that CREATE TABLE is transactional.
+
+> BEGIN
+[ops]> CREATE TABLE name (id INT PRIMARY KEY, value STRING)
+---
+storage set mvcc:TxnWrite(1, sql:Table("name")) → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xffname\x00\xff\x00\xff\x00\x00" → ""]
+storage set mvcc:Version(sql:Table("name"), 1) → CREATE TABLE name ( id INTEGER PRIMARY KEY, value STRING DEFAULT NULL ) ["\x04\x00\xffname\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x1d\x04name\x00\x02\x02id\x01\x00\x00\x01\x00\x00\x05value\x03\x01\x01\x00\x00\x00\x00"]
+
+schema name
+---
+CREATE TABLE name (
+  id INTEGER PRIMARY KEY,
+  value STRING DEFAULT NULL
+)
+
+dump
+---
+mvcc:NextVersion → 2 ["\x00" → "\x02"]
+mvcc:TxnActive(1) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x01" → ""]
+mvcc:TxnWrite(1, sql:Table("name")) → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xffname\x00\xff\x00\xff\x00\x00" → ""]
+mvcc:Version(sql:Table("name"), 1) → CREATE TABLE name ( id INTEGER PRIMARY KEY, value STRING DEFAULT NULL ) ["\x04\x00\xffname\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x1d\x04name\x00\x02\x02id\x01\x00\x00\x01\x00\x00\x05value\x03\x01\x01\x00\x00\x00\x00"]
+
+# Rolling it back undoes it.
+[ops]> ROLLBACK
+---
+storage delete mvcc:Version(sql:Table("name"), 1) ["\x04\x00\xffname\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"]
+storage delete mvcc:TxnWrite(1, sql:Table("name")) ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xffname\x00\xff\x00\xff\x00\x00"]
+storage delete mvcc:TxnActive(1) ["\x01\x00\x00\x00\x00\x00\x00\x00\x01"]
+
+dump
+---
+mvcc:NextVersion → 2 ["\x00" → "\x02"]
+
+# Committing a table also works.
+> BEGIN
+> CREATE TABLE name (id INT PRIMARY KEY, value STRING)
+[ops]> COMMIT
+---
+storage delete mvcc:TxnWrite(2, sql:Table("name")) ["\x03\x00\x00\x00\x00\x00\x00\x00\x02\x00\xffname\x00\xff\x00\xff\x00\x00"]
+storage delete mvcc:TxnActive(2) ["\x01\x00\x00\x00\x00\x00\x00\x00\x02"]
+
+dump
+---
+mvcc:NextVersion → 3 ["\x00" → "\x03"]
+mvcc:Version(sql:Table("name"), 2) → CREATE TABLE name ( id INTEGER PRIMARY KEY, value STRING DEFAULT NULL ) ["\x04\x00\xffname\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x01\x1d\x04name\x00\x02\x02id\x01\x00\x00\x01\x00\x00\x05value\x03\x01\x01\x00\x00\x00\x00"]

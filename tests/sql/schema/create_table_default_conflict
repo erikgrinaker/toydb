@@ -1,4 +1,0 @@
-Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING DEFAULT 7)
-Error: InvalidInput("invalid datatype INTEGER for STRING column value")
-
-Storage:

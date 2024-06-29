@@ -224,7 +224,7 @@ impl<'a> encoding::Key<'a> for KeyPrefix<'a> {}
 /// MVCC engine applies commands one at a time from the Raft log, which will
 /// serialize them anyway.
 pub struct MVCC<E: Engine> {
-    engine: Arc<Mutex<E>>,
+    pub(crate) engine: Arc<Mutex<E>>,
 }
 
 impl<E: Engine> MVCC<E> {

@@ -1,4 +1,0 @@
-Query: CREATE TABLE name (id INTEGER PRIMARY KEY NULL)
-Error: InvalidInput("primary key id cannot be nullable")
-
-Storage:

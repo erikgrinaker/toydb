@@ -1,0 +1,38 @@
+# Tests CREATE TABLE datatypes.
+
+# Create columns with all datatypes.
+> CREATE TABLE datatypes ( \
+    id INTEGER PRIMARY KEY, \
+    "bool" BOOL, \
+    "boolean" BOOLEAN, \
+    "double" DOUBLE, \
+    "float" FLOAT, \
+    "int" INT, \
+    "integer" INTEGER, \
+    "string" STRING, \
+    "text" TEXT, \
+    "varchar" VARCHAR \
+)
+schema
+---
+CREATE TABLE datatypes (
+  id INTEGER PRIMARY KEY,
+  "bool" BOOLEAN DEFAULT NULL,
+  "boolean" BOOLEAN DEFAULT NULL,
+  "double" FLOAT DEFAULT NULL,
+  "float" FLOAT DEFAULT NULL,
+  "int" INTEGER DEFAULT NULL,
+  "integer" INTEGER DEFAULT NULL,
+  "string" STRING DEFAULT NULL,
+  "text" STRING DEFAULT NULL,
+  "varchar" STRING DEFAULT NULL
+)
+
+# Missing or unknown datatype errors.
+!> CREATE TABLE test (id INTEGER PRIMARY KEY, value)
+!> CREATE TABLE test (id INTEGER PRIMARY KEY, value FOO)
+!> CREATE TABLE test (id INTEGER PRIMARY KEY, value INDEX)
+---
+Error: invalid input: unexpected token )
+Error: invalid input: unexpected token foo
+Error: invalid input: unexpected token INDEX

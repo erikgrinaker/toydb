@@ -1,8 +1,0 @@
-Query: CREATE TABLE 表 (身元 INTEGER PRIMARY KEY, 名前 STRING)
-Result: CreateTable { name: "表" }
-
-Storage:
-CREATE TABLE 表 (
-  身元 INTEGER PRIMARY KEY,
-  名前 STRING DEFAULT NULL
-)

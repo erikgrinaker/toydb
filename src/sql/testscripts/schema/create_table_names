@@ -1,0 +1,72 @@
+# Tests CREATE TABLE table and column name validation.
+
+# A couple of valid names.
+> CREATE TABLE a_123 (a_123 INTEGER PRIMARY KEY)
+> CREATE TABLE 表 (身元 INTEGER PRIMARY KEY, 名前 STRING)
+schema
+---
+CREATE TABLE a_123 (
+  a_123 INTEGER PRIMARY KEY
+)
+CREATE TABLE 表 (
+  身元 INTEGER PRIMARY KEY,
+  名前 STRING DEFAULT NULL
+)
+
+# Mixed case is valid, but interpreted as lower case. Quoted identifiers retain
+# their case.
+> CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)
+> CREATE TABLE "mIxEd_cAsE" ("ÄÅÆ" STRING PRIMARY KEY)
+schema mixed_case
+schema mIxEd_cAsE
+---
+CREATE TABLE mixed_case (
+  äåæ STRING PRIMARY KEY
+)
+CREATE TABLE mIxEd_cAsE (
+  ÄÅÆ STRING PRIMARY KEY
+)
+
+# Unquoted _, number, keyword, and emoji errors.
+!> CREATE TABLE _name (id INTEGER PRIMARY KEY)
+!> CREATE TABLE 123 (1 INTEGER PRIMARY KEY)
+!> CREATE TABLE table (primary INTEGER PRIMARY KEY)
+!> CREATE TABLE 👋 (🆔 INTEGER PRIMARY KEY)
+---
+Error: invalid input: unexpected character _
+Error: invalid input: expected identifier, got 123
+Error: invalid input: expected identifier, got TABLE
+Error: invalid input: unexpected character 👋
+
+# Double quotes allow them.
+> CREATE TABLE "_name" (id INTEGER PRIMARY KEY)
+> CREATE TABLE "123" ("1" INTEGER PRIMARY KEY)
+> CREATE TABLE "table" ("primary" INTEGER PRIMARY KEY)
+> CREATE TABLE "👋" ("🆔" INTEGER PRIMARY KEY)
+schema _name 123 table "👋"
+---
+CREATE TABLE "_name" (
+  id INTEGER PRIMARY KEY
+)
+CREATE TABLE "123" (
+  "1" INTEGER PRIMARY KEY
+)
+CREATE TABLE "table" (
+  "primary" INTEGER PRIMARY KEY
+)
+CREATE TABLE "👋" (
+  "🆔" INTEGER PRIMARY KEY
+)
+
+# "" escapes " in identifiers.
+> CREATE TABLE "name with ""quotes""" (id INTEGER PRIMARY KEY);
+schema 'name with "quotes"'
+---
+CREATE TABLE "name with ""quotes""" (
+  id INTEGER PRIMARY KEY
+)
+
+# ' are for string literals, not identifiers.
+!> CREATE TABLE 'name' (id INTEGER PRIMARY KEY)
+---
+Error: invalid input: expected identifier, got name

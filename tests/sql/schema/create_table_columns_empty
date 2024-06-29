@@ -1,4 +1,0 @@
-Query: CREATE TABLE name ()
-Error: InvalidInput("expected identifier, got )")
-
-Storage:

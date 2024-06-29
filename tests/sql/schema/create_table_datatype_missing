@@ -1,4 +1,0 @@
-Query: CREATE TABLE name (id)
-Error: InvalidInput("unexpected token )")
-
-Storage:

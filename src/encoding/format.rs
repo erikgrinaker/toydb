@@ -3,6 +3,7 @@
 
 use super::{bincode, Key as _};
 use crate::raft;
+use crate::sql;
 use crate::storage::mvcc;
 
 use itertools::Itertools as _;
@@ -146,6 +147,43 @@ impl<I: Formatter> Formatter for MVCC<I> {
                 Err(_) => Raw::bytes(value),
             },
             mvcc::Key::Unversioned(userkey) => I::value(&userkey, value),
+        }
+    }
+}
+
+/// Formats SQL keys/values.
+/// TODO: consider more terse formatting, e.g. dropping the value type names and
+/// instead relying on unambiguous string formatting.
+pub struct SQL;
+
+impl Formatter for SQL {
+    fn key(key: &[u8]) -> String {
+        let Ok(key) = sql::engine::Key::decode(key) else { return Raw::key(key) };
+        format!("sql:{key:?}")
+    }
+
+    fn value(key: &[u8], value: &[u8]) -> String {
+        let Ok(key) = sql::engine::Key::decode(key) else { return Raw::key(value) };
+        match key {
+            sql::engine::Key::Table(_) => {
+                let Ok(table) = bincode::deserialize::<sql::types::Table>(value) else {
+                    return Raw::bytes(value);
+                };
+                let re = regex::Regex::new(r#"\n\s*"#).expect("regex failed");
+                re.replace_all(&format!("{table}"), " ").into_owned()
+            }
+            sql::engine::Key::Row(_, _) => {
+                let Ok(row) = bincode::deserialize::<sql::types::Row>(value) else {
+                    return Raw::bytes(value);
+                };
+                row.into_iter().map(|v| format!("{v:?}")).join(",")
+            }
+            sql::engine::Key::Index(_, _, _) => {
+                let Ok(index) = bincode::deserialize::<BTreeSet<sql::types::Value>>(value) else {
+                    return Raw::bytes(value);
+                };
+                index.into_iter().map(|v| format!("{v:?}")).join(",")
+            }
         }
     }
 }

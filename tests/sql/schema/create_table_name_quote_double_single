@@ -1,7 +1,0 @@
-Query: CREATE TABLE "name with ' quote" (id INTEGER PRIMARY KEY)
-Result: CreateTable { name: "name with ' quote" }
-
-Storage:
-CREATE TABLE "name with ' quote" (
-  id INTEGER PRIMARY KEY
-)

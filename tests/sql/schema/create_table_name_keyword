@@ -1,4 +1,0 @@
-Query: CREATE TABLE table (id INTEGER PRIMARY KEY)
-Error: InvalidInput("expected identifier, got TABLE")
-
-Storage:

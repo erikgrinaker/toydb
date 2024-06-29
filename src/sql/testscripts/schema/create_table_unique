@@ -1,0 +1,37 @@
+# Creating a table with a unique index only results in a single schema entry (no
+# separate index).
+[ops]> CREATE TABLE indexed (id INTEGER PRIMARY KEY, "index" INTEGER UNIQUE)
+---
+storage set mvcc:NextVersion → 2 ["\x00" → "\x02"]
+storage set mvcc:TxnActive(1) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x01" → ""]
+storage set mvcc:TxnWrite(1, sql:Table("indexed")) → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xffindexed\x00\xff\x00\xff\x00\x00" → ""]
+storage set mvcc:Version(sql:Table("indexed"), 1) → CREATE TABLE indexed ( id INTEGER PRIMARY KEY, "index" INTEGER DEFAULT NULL UNIQUE INDEX ) ["\x04\x00\xffindexed\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01 \x07indexed\x00\x02\x02id\x01\x00\x00\x01\x00\x00\x05index\x01\x01\x01\x00\x01\x01\x00"]
+storage delete mvcc:TxnWrite(1, sql:Table("indexed")) ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xffindexed\x00\xff\x00\xff\x00\x00"]
+storage delete mvcc:TxnActive(1) ["\x01\x00\x00\x00\x00\x00\x00\x00\x01"]
+
+# The column gets an implicit secondary index marker.
+schema
+---
+CREATE TABLE indexed (
+  id INTEGER PRIMARY KEY,
+  "index" INTEGER DEFAULT NULL UNIQUE INDEX
+)
+
+# Unique indexes work for primary key, foreign key, nullable, non-nullable, and
+# default columns.
+> CREATE TABLE "unique" ( \
+  id INTEGER PRIMARY KEY UNIQUE, \
+  ref INTEGER REFERENCES indexed UNIQUE, \
+  nullable INTEGER NULL UNIQUE, \
+  non_nullable INTEGER NOT NULL UNIQUE, \
+  "default" INTEGER DEFAULT 7 UNIQUE \
+)
+schema unique
+---
+CREATE TABLE "unique" (
+  id INTEGER PRIMARY KEY,
+  ref INTEGER DEFAULT NULL UNIQUE INDEX REFERENCES indexed,
+  nullable INTEGER DEFAULT NULL UNIQUE INDEX,
+  non_nullable INTEGER NOT NULL UNIQUE INDEX,
+  "default" INTEGER DEFAULT 7 UNIQUE INDEX
+)

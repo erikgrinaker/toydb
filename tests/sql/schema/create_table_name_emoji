@@ -1,4 +1,0 @@
-Query: CREATE TABLE 👋 (🆔 INTEGER PRIMARY KEY)
-Error: InvalidInput("unexpected character 👋")
-
-Storage:

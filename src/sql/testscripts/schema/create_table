@@ -1,0 +1,45 @@
+# Tests basic CREATE TABLE functionality.
+
+# The result contains the table name. The table is written to storage. Also
+# output the plan, which is trivial.
+[plan,result,ops]> CREATE TABLE test (id INTEGER PRIMARY KEY)
+---
+CreateTable: test
+CreateTable { name: "test" }
+storage set mvcc:NextVersion → 2 ["\x00" → "\x02"]
+storage set mvcc:TxnActive(1) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x01" → ""]
+storage set mvcc:TxnWrite(1, sql:Table("test")) → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xfftest\x00\xff\x00\xff\x00\x00" → ""]
+storage set mvcc:Version(sql:Table("test"), 1) → CREATE TABLE test ( id INTEGER PRIMARY KEY ) ["\x04\x00\xfftest\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x10\x04test\x00\x01\x02id\x01\x00\x00\x01\x00\x00"]
+storage delete mvcc:TxnWrite(1, sql:Table("test")) ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xfftest\x00\xff\x00\xff\x00\x00"]
+storage delete mvcc:TxnActive(1) ["\x01\x00\x00\x00\x00\x00\x00\x00\x01"]
+
+dump
+---
+mvcc:NextVersion → 2 ["\x00" → "\x02"]
+mvcc:Version(sql:Table("test"), 1) → CREATE TABLE test ( id INTEGER PRIMARY KEY ) ["\x04\x00\xfftest\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x10\x04test\x00\x01\x02id\x01\x00\x00\x01\x00\x00"]
+
+# Errors if table already exists.
+!> CREATE TABLE test (id INTEGER PRIMARY KEY)
+---
+Error: invalid input: table test already exists
+
+# No table name or columns errors.
+!> CREATE TABLE
+!> CREATE TABLE name
+!> CREATE TABLE name ()
+---
+Error: invalid input: unexpected end of input
+Error: invalid input: unexpected end of input
+Error: invalid input: expected identifier, got )
+
+# Missing table or column names error.
+!> CREATE TABLE (id INTEGER PRIMARY KEY)
+!> CREATE TABLE name (INTEGER PRIMARY KEY)
+---
+Error: invalid input: expected identifier, got (
+Error: invalid input: expected identifier, got INTEGER
+
+# Unterminated identifier errors.
+!> CREATE TABLE "name (id INTEGER PRIMARY KEY)
+---
+Error: invalid input: unexpected end of quoted identifier
