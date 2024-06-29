@@ -16,8 +16,8 @@ ok
 
 t1: scan_prefix b
 ---
-t1: ba → 0
-t1: bb → 0
+t1: "ba" → "0"
+t1: "bb" → "0"
 
 t2: delete ba
 t2: set bc=2
@@ -27,5 +27,5 @@ ok
 
 t1: scan_prefix b
 ---
-t1: ba → 0
-t1: bb → 0
+t1: "ba" → "0"
+t1: "bb" → "0"

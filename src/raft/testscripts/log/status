@@ -19,9 +19,9 @@ append bar
 commit 2
 ---
 append → 1@1 None
-append → 2@1 foo
-append → 3@2 bar
-commit → 2@1 foo
+append → 2@1 "foo"
+append → 3@2 "bar"
+commit → 2@1 "foo"
 
 # Status gives correct info.
 status engine=true

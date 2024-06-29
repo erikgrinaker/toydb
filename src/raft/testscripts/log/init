@@ -9,9 +9,9 @@ set_term 2 7
 append bar
 commit 1
 ---
-append → 1@1 foo
-append → 2@2 bar
-commit → 1@1 foo
+append → 1@1 "foo"
+append → 2@2 "bar"
+commit → 1@1 "foo"
 
 status
 ---
@@ -27,5 +27,5 @@ term=2 last=2@2 commit=1@1 vote=7
 
 scan
 ---
-1@1 foo
-2@2 bar
+1@1 "foo"
+2@2 "bar"

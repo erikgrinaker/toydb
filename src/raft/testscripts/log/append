@@ -8,15 +8,15 @@ Panic: can't append entry in term 0
 set_term 2
 append foo [ops]
 ---
-append → 1@2 foo
-engine set Entry(1) 0x000000000000000001 = 0x01020103666f6f
+append → 1@2 "foo"
+engine set raft:Entry(1) → 1@2 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x02\x01\x03foo"]
 engine flush
 
 # Appending a noop entry (no command) also works.
 append [ops]
 ---
 append → 2@2 None
-engine set Entry(2) 0x000000000000000002 = 0x020200
+engine set raft:Entry(2) → 2@2 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x02\x00"]
 engine flush
 
 # Check that the last index/term is updated (commit index isn't), and that
@@ -26,11 +26,11 @@ scan
 dump
 ---
 term=2 last=2@2 commit=0@0 vote=None
-1@2 foo
+1@2 "foo"
 2@2 None
-Entry(1) 0x000000000000000001 = 0x01020103666f6f
-Entry(2) 0x000000000000000002 = 0x020200
-TermVote 0x01 = 0x0200
+raft:Entry(1) → 1@2 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x02\x01\x03foo"]
+raft:Entry(2) → 2@2 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x02\x00"]
+raft:TermVote → term=2 vote=None ["\x01" → "\x02\x00"]
 
 # Skipping a term then appending is allowed.
 set_term 3
@@ -38,7 +38,7 @@ append command
 set_term 5
 append
 ---
-append → 3@3 command
+append → 3@3 "command"
 append → 4@5 None
 
 # Dump the final status and data.
@@ -47,12 +47,12 @@ scan
 dump
 ---
 term=5 last=4@5 commit=0@0 vote=None
-1@2 foo
+1@2 "foo"
 2@2 None
-3@3 command
+3@3 "command"
 4@5 None
-Entry(1) 0x000000000000000001 = 0x01020103666f6f
-Entry(2) 0x000000000000000002 = 0x020200
-Entry(3) 0x000000000000000003 = 0x03030107636f6d6d616e64
-Entry(4) 0x000000000000000004 = 0x040500
-TermVote 0x01 = 0x0500
+raft:Entry(1) → 1@2 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x02\x01\x03foo"]
+raft:Entry(2) → 2@2 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x02\x00"]
+raft:Entry(3) → 3@3 "command" ["\x00\x00\x00\x00\x00\x00\x00\x00\x03" → "\x03\x03\x01\x07command"]
+raft:Entry(4) → 4@5 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x04" → "\x04\x05\x00"]
+raft:TermVote → term=5 vote=None ["\x01" → "\x05\x00"]

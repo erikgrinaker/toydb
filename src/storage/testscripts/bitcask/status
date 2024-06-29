@@ -12,8 +12,8 @@ ok
 
 scan
 ---
-baz → 3
-foo → 123
+"baz" → "3"
+"foo" → "123"
 
 status
 ---

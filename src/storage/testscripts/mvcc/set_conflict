@@ -25,15 +25,15 @@ t2: Error: serialization failure, retry transaction
 
 dump
 ---
-NextVersion → 5
-TxnActive(1) → []
-TxnActive(2) → []
-TxnActive(3) → []
-TxnActiveSnapshot(2) → {1}
-TxnActiveSnapshot(3) → {1,2}
-TxnActiveSnapshot(4) → {1,2,3}
-TxnWrite(1, "a") → []
-TxnWrite(3, "c") → []
-Version("a", 1) → "1"
-Version("c", 3) → "3"
-Version("d", 4) → "4"
+mvcc:NextVersion → 5 ["\x00" → "\x05"]
+mvcc:TxnActive(1) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x01" → ""]
+mvcc:TxnActive(2) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x02" → ""]
+mvcc:TxnActive(3) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x03" → ""]
+mvcc:TxnActiveSnapshot(2) → {1} ["\x02\x00\x00\x00\x00\x00\x00\x00\x02" → "\x01\x01"]
+mvcc:TxnActiveSnapshot(3) → {1,2} ["\x02\x00\x00\x00\x00\x00\x00\x00\x03" → "\x02\x01\x02"]
+mvcc:TxnActiveSnapshot(4) → {1,2,3} ["\x02\x00\x00\x00\x00\x00\x00\x00\x04" → "\x03\x01\x02\x03"]
+mvcc:TxnWrite(1, "a") → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01a\x00\x00" → ""]
+mvcc:TxnWrite(3, "c") → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x03c\x00\x00" → ""]
+mvcc:Version("a", 1) → "1" ["\x04a\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x011"]
+mvcc:Version("c", 3) → "3" ["\x04c\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03" → "\x01\x013"]
+mvcc:Version("d", 4) → "4" ["\x04d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04" → "\x01\x014"]

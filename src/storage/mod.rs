@@ -1,5 +1,4 @@
 mod bitcask;
-pub mod debug;
 pub mod engine;
 mod memory;
 pub mod mvcc;

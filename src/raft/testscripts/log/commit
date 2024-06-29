@@ -7,7 +7,7 @@ Panic: commit index 1 does not exist
 set_term 2
 splice 1@1= 2@1=foo 3@2=bar
 ---
-splice → 3@2 bar
+splice → 3@2 "bar"
 
 # Committing entry 0 fails.
 !commit 0
@@ -22,17 +22,17 @@ commit 1 [ops]
 status
 ---
 commit → 1@1 None
-engine set CommitIndex 0x02 = 0x0101
+engine set raft:CommitIndex → 1@1 ["\x02" → "\x01\x01"]
 term=2 last=3@2 commit=1@1 vote=None
 
-# Dump the raw engine contents tdump
+# Dump the raw engine contents.
 dump
 ---
-Entry(1) 0x000000000000000001 = 0x010100
-Entry(2) 0x000000000000000002 = 0x02010103666f6f
-Entry(3) 0x000000000000000003 = 0x03020103626172
-TermVote 0x01 = 0x0200
-CommitIndex 0x02 = 0x0101
+raft:Entry(1) → 1@1 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x01\x00"]
+raft:Entry(2) → 2@1 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x01\x01\x03foo"]
+raft:Entry(3) → 3@2 "bar" ["\x00\x00\x00\x00\x00\x00\x00\x00\x03" → "\x03\x02\x01\x03bar"]
+raft:TermVote → term=2 vote=None ["\x01" → "\x02\x00"]
+raft:CommitIndex → 1@1 ["\x02" → "\x01\x01"]
 
 # Commits are idempotent, which doesn't incur an engine set.
 commit 1 [ops]
@@ -45,7 +45,7 @@ term=2 last=3@2 commit=1@1 vote=None
 commit 3
 status
 ---
-commit → 3@2 bar
+commit → 3@2 "bar"
 term=2 last=3@2 commit=3@2 vote=None
 
 # Commit regressions error.
@@ -65,8 +65,8 @@ term=2 last=3@2 commit=3@2 vote=None
 # Dump the raw values.
 dump
 ---
-Entry(1) 0x000000000000000001 = 0x010100
-Entry(2) 0x000000000000000002 = 0x02010103666f6f
-Entry(3) 0x000000000000000003 = 0x03020103626172
-TermVote 0x01 = 0x0200
-CommitIndex 0x02 = 0x0302
+raft:Entry(1) → 1@1 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x01\x00"]
+raft:Entry(2) → 2@1 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x01\x01\x03foo"]
+raft:Entry(3) → 3@2 "bar" ["\x00\x00\x00\x00\x00\x00\x00\x00\x03" → "\x03\x02\x01\x03bar"]
+raft:TermVote → term=2 vote=None ["\x01" → "\x02\x00"]
+raft:CommitIndex → 3@2 ["\x02" → "\x03\x02"]

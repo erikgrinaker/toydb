@@ -16,12 +16,12 @@ delete d
 set d=4
 scan
 ---
- → 
-a → 1
-b → 2
-c → 3
-d → 4
-foo → bar
+"" → ""
+"a" → "1"
+"b" → "2"
+"c" → "3"
+"d" → "4"
+"foo" → "bar"
 
 # Show status.
 status
@@ -85,12 +85,12 @@ ok
 # Scan should still give same results.
 scan
 ---
- → 
-a → 1
-b → 2
-c → 3
-d → 4
-foo → bar
+"" → ""
+"a" → "1"
+"b" → "2"
+"c" → "3"
+"d" → "4"
+"foo" → "bar"
 
 # Status should show no garbage.
 status
@@ -129,9 +129,9 @@ dump
 reopen
 scan
 ---
- → 
-a → 1
-b → 2
-c → 3
-d → 4
-foo → bar
+"" → ""
+"a" → "1"
+"b" → "2"
+"c" → "3"
+"d" → "4"
+"foo" → "bar"

@@ -13,7 +13,7 @@ Panic: can't set term 0
 set_term 3 [ops]
 get_term
 ---
-engine set TermVote 0x01 = 0x0300
+engine set raft:TermVote → term=3 vote=None ["\x01" → "\x03\x00"]
 engine flush
 term=3 vote=None
 
@@ -21,7 +21,7 @@ term=3 vote=None
 set_term 3 7 [ops]
 get_term
 ---
-engine set TermVote 0x01 = 0x030107
+engine set raft:TermVote → term=3 vote=7 ["\x01" → "\x03\x01\x07"]
 engine flush
 term=3 vote=7
 
@@ -63,4 +63,4 @@ get_term
 dump
 ---
 term=9 vote=1
-TermVote 0x01 = 0x090101
+raft:TermVote → term=9 vote=1 ["\x01" → "\t\x01\x01"]

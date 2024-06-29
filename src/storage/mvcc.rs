@@ -740,9 +740,10 @@ impl<'a, E: Engine> Iterator for VersionIterator<'a, E> {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::engine::test::{Emit, Mirror, Operation};
-    use super::super::{debug, BitCask, Memory};
     use super::*;
+    use crate::encoding::format::{self, Formatter as _};
+    use crate::storage::engine::test::{Emit, Mirror, Operation};
+    use crate::storage::{BitCask, Memory};
     use crossbeam::channel::Receiver;
     use itertools::Itertools as _;
     use regex::Regex;
@@ -835,11 +836,9 @@ pub mod tests {
                     let mut engine = self.mvcc.engine.lock().unwrap();
                     let mut scan = engine.scan(..);
                     while let Some((key, value)) = scan.next().transpose()? {
-                        let (fkey, Some(fvalue)) = debug::format_key_value(&key, &Some(value))
-                        else {
-                            panic!("expected option");
-                        };
-                        writeln!(output, "{fkey} → {fvalue}")?;
+                        let fmtkv = format::MVCC::<format::Raw>::key_value(&key, &value);
+                        let rawkv = format::Raw::key_value(&key, &value);
+                        writeln!(output, "{fmtkv} [{rawkv}]")?;
                     }
                 }
 
@@ -850,7 +849,8 @@ pub mod tests {
                     for arg in args.rest_pos() {
                         let key = Self::decode_binary(&arg.value);
                         let value = txn.get(&key)?;
-                        writeln!(output, "{}", Self::format_key_value(&key, value.as_deref()))?;
+                        let fmtkv = format::Raw::key_maybe_value(&key, value.as_deref());
+                        writeln!(output, "{fmtkv}")?;
                     }
                     args.reject_rest()?;
                 }
@@ -862,7 +862,8 @@ pub mod tests {
                     for arg in args.rest_pos() {
                         let key = Self::decode_binary(&arg.value);
                         let value = self.mvcc.get_unversioned(&key)?;
-                        writeln!(output, "{}", Self::format_key_value(&key, value.as_deref()))?;
+                        let fmtkv = format::Raw::key_maybe_value(&key, value.as_deref());
+                        writeln!(output, "{fmtkv}")?;
                     }
                     args.reject_rest()?;
                 }
@@ -924,7 +925,7 @@ pub mod tests {
 
                     let kvs: Vec<_> = txn.scan(range).collect::<crate::error::Result<_>>()?;
                     for (key, value) in kvs {
-                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                        writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
                     }
                 }
 
@@ -939,7 +940,7 @@ pub mod tests {
                     let kvs: Vec<_> =
                         txn.scan_prefix(&prefix).collect::<crate::error::Result<_>>()?;
                     for (key, value) in kvs {
-                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                        writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
                     }
                 }
 
@@ -1012,13 +1013,15 @@ pub mod tests {
                 match op {
                     _ if !show_ops => {}
                     Operation::Delete { key } => {
-                        let (fkey, _) = debug::format_key_value(&key, &None);
-                        writeln!(output, "engine delete {fkey}")?
+                        let fmtkey = format::MVCC::<format::Raw>::key(&key);
+                        let rawkey = format::Raw::key(&key);
+                        writeln!(output, "engine delete {fmtkey} [{rawkey}]")?
                     }
                     Operation::Flush => writeln!(output, "engine flush")?,
                     Operation::Set { key, value } => {
-                        let (fkey, fvalue) = debug::format_key_value(&key, &Some(value));
-                        writeln!(output, "engine set {} → {}", fkey, fvalue.unwrap())?
+                        let fmtkv = format::MVCC::<format::Raw>::key_value(&key, &value);
+                        let rawkv = format::Raw::key_value(&key, &value);
+                        writeln!(output, "engine set {fmtkv} [{rawkv}]")?
                     }
                 }
             }
@@ -1059,21 +1062,6 @@ pub mod tests {
                 }
             }
             bytes
-        }
-
-        /// Formats a raw binary byte vector, escaping special characters.
-        fn format_bytes(bytes: &[u8]) -> String {
-            let b: Vec<u8> = bytes.iter().copied().flat_map(std::ascii::escape_default).collect();
-            String::from_utf8_lossy(&b).to_string()
-        }
-
-        /// Formats a key/value pair, or None if the value does not exist.
-        fn format_key_value(key: &[u8], value: Option<&[u8]>) -> String {
-            format!(
-                "{} → {}",
-                Self::format_bytes(key),
-                value.map(Self::format_bytes).unwrap_or("None".to_string())
-            )
         }
 
         /// Parses an binary key range, using Rust range syntax.
