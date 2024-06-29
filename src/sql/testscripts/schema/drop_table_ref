@@ -1,0 +1,31 @@
+# Tests DROP TABLE with references.
+
+# Create a reference table and foreign key table.
+> CREATE TABLE "ref" (id INT PRIMARY KEY)
+> CREATE TABLE name (id INT PRIMARY KEY, ref_if INT REFERENCES "ref")
+---
+ok
+
+# Dropping a table with a foreign key reference to it errors.
+!> DROP TABLE "ref"
+---
+Error: invalid input: table ref is referenced from name.ref_if
+
+# But it works if the source table is dropped first.
+> DROP TABLE name
+> DROP TABLE "ref"
+---
+ok
+
+# Dropping a table with a self reference also works.
+> CREATE TABLE self (id INT PRIMARY KEY, self_id INT REFERENCES self)
+---
+ok
+
+> DROP TABLE self
+---
+ok
+
+schema
+---
+ok

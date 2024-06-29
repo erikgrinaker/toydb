@@ -1,4 +1,0 @@
-Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value STRING NULL NOT NULL)
-Error: InvalidInput("nullability already set for column value")
-
-Storage:

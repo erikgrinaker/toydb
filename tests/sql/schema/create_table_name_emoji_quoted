@@ -1,7 +1,0 @@
-Query: CREATE TABLE "👋" ("🆔" INTEGER PRIMARY KEY)
-Result: CreateTable { name: "👋" }
-
-Storage:
-CREATE TABLE "👋" (
-  "🆔" INTEGER PRIMARY KEY
-)

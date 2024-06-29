@@ -1,7 +1,0 @@
-Query: CREATE TABLE test (id INTEGER PRIMARY KEY)
-Error: InvalidInput("table test already exists")
-
-Storage:
-CREATE TABLE test (
-  id INTEGER PRIMARY KEY
-)

@@ -1,7 +1,0 @@
-Query: CREATE TABLE a_123 (id INTEGER PRIMARY KEY)
-Result: ok
-
-Storage:
-CREATE TABLE a_123 (
-  id INTEGER PRIMARY KEY NOT NULL
-)

@@ -14,7 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// node-local SQL storage.
 pub struct Local<E: storage::Engine + 'static> {
     /// The local MVCC storage engine.
-    pub(super) mvcc: mvcc::MVCC<E>,
+    pub(crate) mvcc: mvcc::MVCC<E>,
 }
 
 impl<E: storage::Engine> Local<E> {
@@ -410,8 +410,8 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
 /// table/column names, so this is fine.
 ///
 /// Uses Cow to allow encoding borrowed values but decoding owned values.
-#[derive(Deserialize, Serialize)]
-enum Key<'a> {
+#[derive(Debug, Deserialize, Serialize)]
+pub enum Key<'a> {
     /// A table schema by table name.
     Table(Cow<'a, str>),
     /// An index entry, by table name, index name, and index value.

@@ -1,8 +1,0 @@
-Query: CREATE TABLE name (id INTEGER PRIMARY KEY, value BOOLEAN DEFAULT TRUE)
-Result: CreateTable { name: "name" }
-
-Storage:
-CREATE TABLE name (
-  id INTEGER PRIMARY KEY,
-  value BOOLEAN DEFAULT TRUE
-)

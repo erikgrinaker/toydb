@@ -1,7 +1,0 @@
-Query: CREATE TABLE "table" (id INTEGER PRIMARY KEY)
-Result: CreateTable { name: "table" }
-
-Storage:
-CREATE TABLE "table" (
-  id INTEGER PRIMARY KEY
-)

@@ -1,4 +1,0 @@
-Query: CREATE TABLE name (id INTEGER)
-Error: InvalidInput("no primary key for table name")
-
-Storage:

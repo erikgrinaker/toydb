@@ -1,7 +1,0 @@
-Query: CREATE TABLE other (id INTEGER PRIMARY KEY, missing_id INTEGER REFERENCES missing)
-Error: InvalidInput("unknown table missing referenced by column missing_id")
-
-Storage:
-CREATE TABLE test (
-  id INTEGER PRIMARY KEY
-)

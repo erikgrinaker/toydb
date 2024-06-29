@@ -1,0 +1,54 @@
+# Tests column defaults.
+
+# All datatypes.
+> CREATE TABLE datatypes ( \
+    id INT PRIMARY KEY, \
+    "bool" BOOLEAN DEFAULT true, \
+    "float" FLOAT DEFAULT 3.14, \
+    "int" INTEGER DEFAULT 7, \
+    "string" STRING DEFAULT 'foo' \
+)
+schema datatypes
+---
+CREATE TABLE datatypes (
+  id INTEGER PRIMARY KEY,
+  "bool" BOOLEAN DEFAULT TRUE,
+  "float" FLOAT DEFAULT 3.14,
+  "int" INTEGER DEFAULT 7,
+  "string" STRING DEFAULT foo
+)
+
+# Default datatypes must match column. This includes float/integer types.
+!> CREATE TABLE name (id INT PRIMARY KEY, value STRING DEFAULT 7)
+!> CREATE TABLE name (id INT PRIMARY KEY, value INTEGER DEFAULT 3.14)
+!> CREATE TABLE name (id INT PRIMARY KEY, value FLOAT DEFAULT 7)
+---
+Error: invalid input: invalid datatype INTEGER for STRING column value
+Error: invalid input: invalid datatype FLOAT for INTEGER column value
+Error: invalid input: invalid datatype INTEGER for FLOAT column value
+
+# Default values can be expressions.
+> CREATE TABLE expr (id INT PRIMARY KEY, value INT DEFAULT 7 + 3 * 2)
+schema expr
+---
+CREATE TABLE expr (
+  id INTEGER PRIMARY KEY,
+  value INTEGER DEFAULT 13
+)
+
+# NULL is a value default for a nullable column (and is the implicit default).
+> CREATE TABLE "nullable" (id INT PRIMARY KEY, value STRING DEFAULT NULL, implicit STRING)
+schema nullable
+---
+CREATE TABLE nullable (
+  id INTEGER PRIMARY KEY,
+  value STRING DEFAULT NULL,
+  implicit STRING DEFAULT NULL
+)
+
+# A NULL default errors for a non-nullable column, including primary keys.
+!> CREATE TABLE name (id INT PRIMARY KEY DEFAULT NULL)
+!> CREATE TABLE name (id INT PRIMARY KEY, value STRING NOT NULL DEFAULT NULL)
+---
+Error: invalid input: invalid NULL default for non-nullable column id
+Error: invalid input: invalid NULL default for non-nullable column value

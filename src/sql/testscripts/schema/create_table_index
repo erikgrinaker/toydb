@@ -1,0 +1,32 @@
+# Creating a table with an index only results in a single schema entry (no
+# separate index).
+[ops]> CREATE TABLE indexed (id INTEGER PRIMARY KEY, "index" INTEGER INDEX)
+---
+storage set mvcc:NextVersion → 2 ["\x00" → "\x02"]
+storage set mvcc:TxnActive(1) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x01" → ""]
+storage set mvcc:TxnWrite(1, sql:Table("indexed")) → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xffindexed\x00\xff\x00\xff\x00\x00" → ""]
+storage set mvcc:Version(sql:Table("indexed"), 1) → CREATE TABLE indexed ( id INTEGER PRIMARY KEY, "index" INTEGER DEFAULT NULL INDEX ) ["\x04\x00\xffindexed\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01 \x07indexed\x00\x02\x02id\x01\x00\x00\x01\x00\x00\x05index\x01\x01\x01\x00\x00\x01\x00"]
+storage delete mvcc:TxnWrite(1, sql:Table("indexed")) ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xffindexed\x00\xff\x00\xff\x00\x00"]
+storage delete mvcc:TxnActive(1) ["\x01\x00\x00\x00\x00\x00\x00\x00\x01"]
+
+schema
+---
+CREATE TABLE indexed (
+  id INTEGER PRIMARY KEY,
+  "index" INTEGER DEFAULT NULL INDEX
+)
+
+# Explicit indexes can be given for primary keys, foreign keys,
+# and unique columns.
+> CREATE TABLE explicit ( \
+    id INTEGER PRIMARY KEY INDEX, \
+    "unique" INTEGER UNIQUE INDEX, \
+    "reference" INTEGER REFERENCES indexed INDEX \
+)
+schema explicit
+---
+CREATE TABLE explicit (
+  id INTEGER PRIMARY KEY,
+  "unique" INTEGER DEFAULT NULL UNIQUE INDEX,
+  reference INTEGER DEFAULT NULL INDEX REFERENCES indexed
+)

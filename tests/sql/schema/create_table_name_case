@@ -1,7 +1,0 @@
-Query: CREATE TABLE mIxEd_cAsE (ÄÅÆ STRING PRIMARY KEY)
-Result: CreateTable { name: "mixed_case" }
-
-Storage:
-CREATE TABLE mixed_case (
-  äåæ STRING PRIMARY KEY
-)
