@@ -244,7 +244,7 @@ mod message;
 mod node;
 mod state;
 
-pub use log::{Entry, Index, Log};
+pub use log::{Entry, Index, Key, Log};
 pub use message::{Envelope, Message, ReadSequence, Request, RequestID, Response, Status};
 pub use node::{Node, NodeID, Options, Term, Ticks};
 pub use state::State;

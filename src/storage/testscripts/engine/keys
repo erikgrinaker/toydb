@@ -5,15 +5,15 @@ set a=1
 get a
 get A
 ---
-a → 1
-A → None
+"a" → "1"
+"A" → None
 
 set A=2
 get a
 get A
 ---
-a → 1
-A → 2
+"a" → "1"
+"A" → "2"
 
 delete a
 delete A
@@ -27,8 +27,8 @@ get ""
 scan
 delete ""
 ---
- → 
- → 
+"" → ""
+"" → ""
 
 scan
 ---
@@ -40,8 +40,8 @@ get "\0"
 scan
 delete "\0"
 ---
-\x00 → \x00
-\x00 → \x00
+"\x00" → "\x00"
+"\x00" → "\x00"
 
 scan
 ---
@@ -53,8 +53,8 @@ get "👋"
 scan
 delete "👋"
 ---
-\xf0\x9f\x91\x8b → \xf0\x9f\x91\x8b
-\xf0\x9f\x91\x8b → \xf0\x9f\x91\x8b
+"\xf0\x9f\x91\x8b" → "\xf0\x9f\x91\x8b"
+"\xf0\x9f\x91\x8b" → "\xf0\x9f\x91\x8b"
 
 scan
 ---

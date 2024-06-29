@@ -16,36 +16,36 @@ set "\xff\xff\xff"=fff
 set "\xff\xff\xff\xff"=ffff
 scan
 ---
-a → 1
-b → 2
-ba → 21
-bb → 22
-b\xff → 2f
-b\xff\x00 → 2f0
-b\xffb → 2fb
-b\xff\xff → 2ff
-c → 3
-\xff → f
-\xff\xff → ff
-\xff\xff\xff → fff
-\xff\xff\xff\xff → ffff
+"a" → "1"
+"b" → "2"
+"ba" → "21"
+"bb" → "22"
+"b\xff" → "2f"
+"b\xff\x00" → "2f0"
+"b\xffb" → "2fb"
+"b\xff\xff" → "2ff"
+"c" → "3"
+"\xff" → "f"
+"\xff\xff" → "ff"
+"\xff\xff\xff" → "fff"
+"\xff\xff\xff\xff" → "ffff"
 
 # An empty prefix returns everything.
 scan_prefix ""
 ---
-a → 1
-b → 2
-ba → 21
-bb → 22
-b\xff → 2f
-b\xff\x00 → 2f0
-b\xffb → 2fb
-b\xff\xff → 2ff
-c → 3
-\xff → f
-\xff\xff → ff
-\xff\xff\xff → fff
-\xff\xff\xff\xff → ffff
+"a" → "1"
+"b" → "2"
+"ba" → "21"
+"bb" → "22"
+"b\xff" → "2f"
+"b\xff\x00" → "2f0"
+"b\xffb" → "2fb"
+"b\xff\xff" → "2ff"
+"c" → "3"
+"\xff" → "f"
+"\xff\xff" → "ff"
+"\xff\xff\xff" → "fff"
+"\xff\xff\xff\xff" → "ffff"
 
 # A missing prefix returns nothing.
 scan_prefix bx
@@ -56,55 +56,55 @@ ok
 # handles 0xff bytes properly.
 scan_prefix b
 ---
-b → 2
-ba → 21
-bb → 22
-b\xff → 2f
-b\xff\x00 → 2f0
-b\xffb → 2fb
-b\xff\xff → 2ff
+"b" → "2"
+"ba" → "21"
+"bb" → "22"
+"b\xff" → "2f"
+"b\xff\x00" → "2f0"
+"b\xffb" → "2fb"
+"b\xff\xff" → "2ff"
 
 scan_prefix bb
 ---
-bb → 22
+"bb" → "22"
 
 scan_prefix "b\xff"
 ---
-b\xff → 2f
-b\xff\x00 → 2f0
-b\xffb → 2fb
-b\xff\xff → 2ff
+"b\xff" → "2f"
+"b\xff\x00" → "2f0"
+"b\xffb" → "2fb"
+"b\xff\xff" → "2ff"
 
 scan_prefix "b\xff\x00"
 ---
-b\xff\x00 → 2f0
+"b\xff\x00" → "2f0"
 
 scan_prefix "b\xff\xff"
 ---
-b\xff\xff → 2ff
+"b\xff\xff" → "2ff"
 
 # Chains of \xff prefixes.
 scan_prefix "\xff"
 ---
-\xff → f
-\xff\xff → ff
-\xff\xff\xff → fff
-\xff\xff\xff\xff → ffff
+"\xff" → "f"
+"\xff\xff" → "ff"
+"\xff\xff\xff" → "fff"
+"\xff\xff\xff\xff" → "ffff"
 
 scan_prefix "\xff\xff"
 ---
-\xff\xff → ff
-\xff\xff\xff → fff
-\xff\xff\xff\xff → ffff
+"\xff\xff" → "ff"
+"\xff\xff\xff" → "fff"
+"\xff\xff\xff\xff" → "ffff"
 
 scan_prefix "\xff\xff\xff"
 ---
-\xff\xff\xff → fff
-\xff\xff\xff\xff → ffff
+"\xff\xff\xff" → "fff"
+"\xff\xff\xff\xff" → "ffff"
 
 scan_prefix "\xff\xff\xff\xff"
 ---
-\xff\xff\xff\xff → ffff
+"\xff\xff\xff\xff" → "ffff"
 
 scan_prefix "\xff\xff\xff\xff\xff"
 ---

@@ -4,6 +4,7 @@
 //! * bincode: used for values in the key/value store and network protocols.
 
 pub mod bincode;
+pub mod format;
 pub mod keycode;
 
 use crate::error::Result;

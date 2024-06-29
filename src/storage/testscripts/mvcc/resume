@@ -37,29 +37,29 @@ t5: v3 rw active={2}
 # t5 can see its own changes, but not the others.
 t5: scan
 ---
-t5: a → 1
-t5: b → 3
+t5: "a" → "1"
+t5: "b" → "3"
 
 # A new transaction should not see t3/5's uncommitted changes.
 t6: begin
 t6: scan
 ---
-t6: a → 2
-t6: b → 1
-t6: c → 4
+t6: "a" → "2"
+t6: "b" → "1"
+t6: "c" → "4"
 
 # Once t5 commits, a separate transaction should see its changes.
 t5: commit [ops]
 ---
-t5: engine delete TxnWrite(3, "b")
-t5: engine delete TxnActive(3)
+t5: engine delete mvcc:TxnWrite(3, "b") ["\x03\x00\x00\x00\x00\x00\x00\x00\x03b\x00\x00"]
+t5: engine delete mvcc:TxnActive(3) ["\x01\x00\x00\x00\x00\x00\x00\x00\x03"]
 
 t7: begin
 t7: scan
 ---
-t7: a → 2
-t7: b → 3
-t7: c → 4
+t7: "a" → "2"
+t7: "b" → "3"
+t7: "c" → "4"
 
 # Resuming a committed transaction should error.
 t8: !resume '{"version":3, "read_only":false, "active":[2]}'
@@ -75,8 +75,8 @@ t8: v3 ro active={2}
 
 t8: scan
 ---
-t8: a → 1
-t8: b → 1
+t8: "a" → "1"
+t8: "b" → "1"
 
 t9: resume '{"version":3, "read_only":true, "active":[2]}'
 t9: state
@@ -85,5 +85,5 @@ t9: v3 ro active={2}
 
 t9: scan
 ---
-t9: a → 1
-t9: b → 1
+t9: "a" → "1"
+t9: "b" → "1"

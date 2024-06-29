@@ -37,10 +37,10 @@ ok
 # Get each key.
 t3: get a b c d e f g
 ---
-t3: a → 1
-t3: b → 1
-t3: c → None
-t3: d → 1
-t3: e → 1
-t3: f → None
-t3: g → None
+t3: "a" → "1"
+t3: "b" → "1"
+t3: "c" → None
+t3: "d" → "1"
+t3: "e" → "1"
+t3: "f" → None
+t3: "g" → None

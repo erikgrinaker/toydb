@@ -12,21 +12,21 @@ set_term 2
 append bar
 ---
 append → 1@1 None
-append → 2@1 foo
-append → 3@2 bar
+append → 2@1 "foo"
+append → 3@2 "bar"
 
 # Full scan.
 scan
 ---
 1@1 None
-2@1 foo
-3@2 bar
+2@1 "foo"
+3@2 "bar"
 
 # Start bound.
 scan 2..
 ---
-2@1 foo
-3@2 bar
+2@1 "foo"
+3@2 "bar"
 
 scan 4..
 ---
@@ -35,8 +35,8 @@ ok
 scan 0..
 ---
 1@1 None
-2@1 foo
-3@2 bar
+2@1 "foo"
+3@2 "bar"
 
 # End bound.
 scan "..2"
@@ -46,13 +46,13 @@ scan "..2"
 scan "..=2"
 ---
 1@1 None
-2@1 foo
+2@1 "foo"
 
 scan "..7"
 ---
 1@1 None
-2@1 foo
-3@2 bar
+2@1 "foo"
+3@2 "bar"
 
 scan "..1"
 ---
@@ -70,13 +70,13 @@ scan 1..2
 scan "1..=2"
 ---
 1@1 None
-2@1 foo
+2@1 "foo"
 
 scan 0..7
 ---
 1@1 None
-2@1 foo
-3@2 bar
+2@1 "foo"
+3@2 "bar"
 
 scan 1..1
 ---

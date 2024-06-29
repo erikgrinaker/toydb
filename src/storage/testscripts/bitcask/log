@@ -16,12 +16,12 @@ delete d
 set d=4
 scan
 ---
- → 
-a → 1
-b → 2
-c → 3
-d → 4
-foo → bar
+"" → ""
+"a" → "1"
+"b" → "2"
+"c" → "3"
+"d" → "4"
+"foo" → "bar"
 
 # Dump the log.
 dump
@@ -69,12 +69,12 @@ dump
 reopen
 scan
 ---
- → 
-a → 1
-b → 2
-c → 3
-d → 4
-foo → bar
+"" → ""
+"a" → "1"
+"b" → "2"
+"c" → "3"
+"d" → "4"
+"foo" → "bar"
 
 dump
 ---

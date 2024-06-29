@@ -9,4 +9,4 @@ ok
 t2: begin
 t2: get key
 ---
-t2: key → None
+t2: "key" → None

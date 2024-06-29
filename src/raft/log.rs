@@ -341,6 +341,7 @@ impl<'a> std::iter::Iterator for Iterator<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoding::format::{self, Formatter as _};
     use crossbeam::channel::Receiver;
     use regex::Regex;
     use std::fmt::Write as _;
@@ -374,7 +375,7 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.append(command)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!("append → {}\n", Self::format_entry(&entry)));
+                    output.push_str(&format!("append → {}\n", format::Raft::entry(&entry)));
                 }
 
                 // commit INDEX
@@ -384,7 +385,7 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.commit(index)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!("commit → {}\n", Self::format_entry(&entry)));
+                    output.push_str(&format!("commit → {}\n", format::Raft::entry(&entry)));
                 }
 
                 // dump
@@ -393,8 +394,12 @@ mod tests {
                     let range = (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded);
                     let mut scan = self.log.engine.scan_dyn(range);
                     while let Some((key, value)) = scan.next().transpose()? {
-                        output.push_str(&Self::format_key_value(&key, &value));
-                        output.push('\n');
+                        writeln!(
+                            output,
+                            "{} [{}]",
+                            format::Raft::key_value(&key, &value),
+                            format::Raw::key_value(&key, &value)
+                        )?;
                     }
                 }
 
@@ -409,7 +414,7 @@ mod tests {
                             .log
                             .get(index)?
                             .as_ref()
-                            .map(Self::format_entry)
+                            .map(format::Raft::entry)
                             .unwrap_or("None".to_string());
                         output.push_str(&format!("{entry}\n"));
                     }
@@ -459,7 +464,7 @@ mod tests {
                     args.reject_rest()?;
                     let mut scan = self.log.scan(range);
                     while let Some(entry) = scan.next().transpose()? {
-                        output.push_str(&format!("{}\n", Self::format_entry(&entry)));
+                        output.push_str(&format!("{}\n", format::Raft::entry(&entry)));
                     }
                 }
 
@@ -471,7 +476,7 @@ mod tests {
                     args.reject_rest()?;
                     let mut scan = self.log.scan_apply(applied_index);
                     while let Some(entry) = scan.next().transpose()? {
-                        output.push_str(&format!("{}\n", Self::format_entry(&entry)));
+                        output.push_str(&format!("{}\n", format::Raft::entry(&entry)));
                     }
                 }
 
@@ -499,7 +504,7 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.splice(entries)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!("splice → {}\n", Self::format_entry(&entry)));
+                    output.push_str(&format!("splice → {}\n", format::Raft::entry(&entry)));
                 }
 
                 // status [engine=BOOL]
@@ -544,13 +549,19 @@ mod tests {
             while let Ok(op) = self.op_rx.try_recv() {
                 match op {
                     _ if !show_ops => {}
-                    Operation::Delete { key } => {
-                        writeln!(output, "engine delete {}", Self::format_key(&key))?
-                    }
+                    Operation::Delete { key } => writeln!(
+                        output,
+                        "engine delete {} [{}]",
+                        format::Raft::key(&key),
+                        format::Raw::key(&key)
+                    )?,
                     Operation::Flush => writeln!(output, "engine flush")?,
-                    Operation::Set { key, value } => {
-                        writeln!(output, "engine set {}", Self::format_key_value(&key, &value))?
-                    }
+                    Operation::Set { key, value } => writeln!(
+                        output,
+                        "engine set {} [{}]",
+                        format::Raft::key_value(&key, &value),
+                        format::Raw::key_value(&key, &value)
+                    )?,
                 }
             }
             Ok(output)
@@ -569,25 +580,6 @@ mod tests {
             let engine = testengine::Emit::new(testengine::Mirror::new(bitcask, memory), op_tx);
             let log = Log::new(Box::new(engine)).expect("log init failed");
             Self { log, op_rx, tempdir }
-        }
-
-        /// Formats a log entry.
-        fn format_entry(entry: &Entry) -> String {
-            let command = match entry.command.as_ref() {
-                Some(raw) => std::str::from_utf8(raw).expect("invalid command"),
-                None => "None",
-            };
-            format!("{}@{} {command}", entry.index, entry.term)
-        }
-
-        /// Formats a raw key.
-        fn format_key(key: &[u8]) -> String {
-            format!("{:?} 0x{}", Key::decode(key).expect("invalid key"), hex::encode(key))
-        }
-
-        /// Formats a raw key/value pair.
-        fn format_key_value(key: &[u8], value: &[u8]) -> String {
-            format!("{} = 0x{}", Self::format_key(key), hex::encode(value))
         }
 
         /// Parses an index@term pair.

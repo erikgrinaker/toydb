@@ -6,8 +6,8 @@
 t1: begin [ops]
 t1: state
 ---
-t1: engine set NextVersion → 2
-t1: engine set TxnActive(1) → []
+t1: engine set mvcc:NextVersion → 2 ["\x00" → "\x02"]
+t1: engine set mvcc:TxnActive(1) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x01" → ""]
 t1: v1 rw active={}
 
 # t2 should have v2, and t1 in its active set. It should persist a snapshot of
@@ -15,24 +15,24 @@ t1: v1 rw active={}
 t2: begin [ops]
 t2: state
 ---
-t2: engine set NextVersion → 3
-t2: engine set TxnActiveSnapshot(2) → {1}
-t2: engine set TxnActive(2) → []
+t2: engine set mvcc:NextVersion → 3 ["\x00" → "\x03"]
+t2: engine set mvcc:TxnActiveSnapshot(2) → {1} ["\x02\x00\x00\x00\x00\x00\x00\x00\x02" → "\x01\x01"]
+t2: engine set mvcc:TxnActive(2) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x02" → ""]
 t2: v2 rw active={1}
 
 # Similarly for t3.
 t3: begin [ops]
 t3: state
 ---
-t3: engine set NextVersion → 4
-t3: engine set TxnActiveSnapshot(3) → {1,2}
-t3: engine set TxnActive(3) → []
+t3: engine set mvcc:NextVersion → 4 ["\x00" → "\x04"]
+t3: engine set mvcc:TxnActiveSnapshot(3) → {1,2} ["\x02\x00\x00\x00\x00\x00\x00\x00\x03" → "\x02\x01\x02"]
+t3: engine set mvcc:TxnActive(3) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x03" → ""]
 t3: v3 rw active={1,2}
 
 # Now, commit t2, which unregisters it.
 t2: commit [ops]
 ---
-t2: engine delete TxnActive(2)
+t2: engine delete mvcc:TxnActive(2) ["\x01\x00\x00\x00\x00\x00\x00\x00\x02"]
 
 # It should still be in t3's active set.
 t3: state
@@ -43,7 +43,7 @@ t3: v3 rw active={1,2}
 t4: begin [ops]
 t4: state
 ---
-t4: engine set NextVersion → 5
-t4: engine set TxnActiveSnapshot(4) → {1,3}
-t4: engine set TxnActive(4) → []
+t4: engine set mvcc:NextVersion → 5 ["\x00" → "\x05"]
+t4: engine set mvcc:TxnActiveSnapshot(4) → {1,3} ["\x02\x00\x00\x00\x00\x00\x00\x00\x04" → "\x02\x01\x03"]
+t4: engine set mvcc:TxnActive(4) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x04" → ""]
 t4: v4 rw active={1,3}

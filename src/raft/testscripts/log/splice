@@ -24,23 +24,23 @@ splice 1@2= 2@2=command [ops]
 status
 scan
 ---
-splice → 2@2 command
-engine set Entry(1) 0x000000000000000001 = 0x010200
-engine set Entry(2) 0x000000000000000002 = 0x02020107636f6d6d616e64
+splice → 2@2 "command"
+engine set raft:Entry(1) → 1@2 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x02\x00"]
+engine set raft:Entry(2) → 2@2 "command" ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x02\x01\x07command"]
 engine flush
 term=2 last=2@2 commit=0@0 vote=None
 1@2 None
-2@2 command
+2@2 "command"
 
 # Splicing an empty list should work and be a noop.
 splice [ops]
 status
 scan
 ---
-splice → 2@2 command
+splice → 2@2 "command"
 term=2 last=2@2 commit=0@0 vote=None
 1@2 None
-2@2 command
+2@2 "command"
 
 # Splicing multiple duplicate entries should fail.
 !splice 3@2= 3@2=
@@ -78,25 +78,25 @@ Panic: splice term 4 beyond current 2
 splice 1@2= 2@2=command [ops]
 scan
 ---
-splice → 2@2 command
+splice → 2@2 "command"
 1@2 None
-2@2 command
+2@2 "command"
 
 # An overlapping prefix is a noop.
 splice 1@2= [ops]
 scan
 ---
-splice → 2@2 command
+splice → 2@2 "command"
 1@2 None
-2@2 command
+2@2 "command"
 
 # An overlapping suffix is a noop.
 splice 2@2=command [ops]
 scan
 ---
-splice → 2@2 command
+splice → 2@2 "command"
 1@2 None
-2@2 command
+2@2 "command"
 
 # Changing a command with the same term/index should fail.
 !splice 2@2=foo
@@ -104,7 +104,7 @@ scan
 ---
 Panic: command mismatch at Entry { index: 2, term: 2, command: Some([99, 111, 109, 109, 97, 110, 100]) }
 1@2 None
-2@2 command
+2@2 "command"
 
 # Appending a new entry in the same term should work, as should
 # appending one in a new term.
@@ -113,27 +113,27 @@ set_term 3
 splice 4@3=
 scan
 ---
-splice → 3@2 bar
+splice → 3@2 "bar"
 splice → 4@3 None
 1@2 None
-2@2 command
-3@2 bar
+2@2 "command"
+3@2 "bar"
 4@3 None
 
 # Splicing with suffix overlap should work, and only write the new entries.
 splice 3@2=bar 4@3= 5@3=foo 6@3=bar [ops]
 scan
 ---
-splice → 6@3 bar
-engine set Entry(5) 0x000000000000000005 = 0x05030103666f6f
-engine set Entry(6) 0x000000000000000006 = 0x06030103626172
+splice → 6@3 "bar"
+engine set raft:Entry(5) → 5@3 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x05" → "\x05\x03\x01\x03foo"]
+engine set raft:Entry(6) → 6@3 "bar" ["\x00\x00\x00\x00\x00\x00\x00\x00\x06" → "\x06\x03\x01\x03bar"]
 engine flush
 1@2 None
-2@2 command
-3@2 bar
+2@2 "command"
+3@2 "bar"
 4@3 None
-5@3 foo
-6@3 bar
+5@3 "foo"
+6@3 "bar"
 
 # Splicing at an existing index with a new term should replace the tail.
 set_term 4
@@ -142,14 +142,14 @@ status
 scan
 ---
 splice → 4@4 None
-engine set Entry(4) 0x000000000000000004 = 0x040400
-engine delete Entry(5) 0x000000000000000005
-engine delete Entry(6) 0x000000000000000006
+engine set raft:Entry(4) → 4@4 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x04" → "\x04\x04\x00"]
+engine delete raft:Entry(5) ["\x00\x00\x00\x00\x00\x00\x00\x00\x05"]
+engine delete raft:Entry(6) ["\x00\x00\x00\x00\x00\x00\x00\x00\x06"]
 engine flush
 term=4 last=4@4 commit=0@0 vote=None
 1@2 None
-2@2 command
-3@2 bar
+2@2 "command"
+3@2 "bar"
 4@4 None
 
 # This also holds at the start of the log.
@@ -158,16 +158,16 @@ splice 1@5= 2@5=foo 3@5=bar [ops]
 status
 scan
 ---
-splice → 3@5 bar
-engine set Entry(1) 0x000000000000000001 = 0x010500
-engine set Entry(2) 0x000000000000000002 = 0x02050103666f6f
-engine set Entry(3) 0x000000000000000003 = 0x03050103626172
-engine delete Entry(4) 0x000000000000000004
+splice → 3@5 "bar"
+engine set raft:Entry(1) → 1@5 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x05\x00"]
+engine set raft:Entry(2) → 2@5 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x05\x01\x03foo"]
+engine set raft:Entry(3) → 3@5 "bar" ["\x00\x00\x00\x00\x00\x00\x00\x00\x03" → "\x03\x05\x01\x03bar"]
+engine delete raft:Entry(4) ["\x00\x00\x00\x00\x00\x00\x00\x00\x04"]
 engine flush
 term=5 last=3@5 commit=0@0 vote=None
 1@5 None
-2@5 foo
-3@5 bar
+2@5 "foo"
+3@5 "bar"
 
 # Splicing across the commit index should work, as long as the entries match.
 commit 2
@@ -175,12 +175,12 @@ splice 1@5= 2@5=foo 3@5=bar 4@5=
 status
 scan
 ---
-commit → 2@5 foo
+commit → 2@5 "foo"
 splice → 4@5 None
 term=5 last=4@5 commit=2@5 vote=None
 1@5 None
-2@5 foo
-3@5 bar
+2@5 "foo"
+3@5 "bar"
 4@5 None
 
 # Splicing across the commit index can replace a tail after the commit index.
@@ -189,12 +189,12 @@ splice 3@6= 4@6=bar
 status
 scan
 ---
-splice → 4@6 bar
+splice → 4@6 "bar"
 term=9 last=4@6 commit=2@5 vote=None
 1@5 None
-2@5 foo
+2@5 "foo"
 3@6 None
-4@6 bar
+4@6 "bar"
 
 # But replacing a tail at or before the commit index should fail.
 !splice 2@7=
@@ -206,9 +206,9 @@ Panic: spliced entries below commit index
 # Dump the raw data.
 dump
 ---
-Entry(1) 0x000000000000000001 = 0x010500
-Entry(2) 0x000000000000000002 = 0x02050103666f6f
-Entry(3) 0x000000000000000003 = 0x030600
-Entry(4) 0x000000000000000004 = 0x04060103626172
-TermVote 0x01 = 0x0900
-CommitIndex 0x02 = 0x0205
+raft:Entry(1) → 1@5 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x05\x00"]
+raft:Entry(2) → 2@5 "foo" ["\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x02\x05\x01\x03foo"]
+raft:Entry(3) → 3@6 None ["\x00\x00\x00\x00\x00\x00\x00\x00\x03" → "\x03\x06\x00"]
+raft:Entry(4) → 4@6 "bar" ["\x00\x00\x00\x00\x00\x00\x00\x00\x04" → "\x04\x06\x01\x03bar"]
+raft:TermVote → term=9 vote=None ["\x01" → "\t\x00"]
+raft:CommitIndex → 2@5 ["\x02" → "\x02\x05"]

@@ -364,6 +364,7 @@ impl Log {
 mod tests {
     use super::super::engine::test::Runner;
     use super::*;
+    use crate::encoding::format::{self, Formatter as _};
     use std::error::Error as StdError;
     use std::fmt::Write as _;
     use std::result::Result as StdResult;
@@ -580,15 +581,15 @@ mod tests {
                 let size = 4 + 4 + key_len as u64 + value_len as u64;
                 writeln!(
                     output,
-                    "{:<7} key=\"{}\" [{}] {}",
+                    "{:<7} key={} [{}] {}",
                     format!("{size}b"),
-                    Runner::<BitCask>::format_bytes(&key),
+                    format::Raw::key(&key),
                     hex::encode(key),
                     match value_len_or_tombstone {
                         -1 => "tombstone".to_string(),
                         _ => format!(
-                            "value=\"{}\" [{}]",
-                            Runner::<BitCask>::format_bytes(&value),
+                            "value={} [{}]",
+                            format::Raw::bytes(&value),
                             hex::encode(&value)
                         ),
                     },

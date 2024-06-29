@@ -8,14 +8,14 @@ ok
 t1: begin readonly
 t1: scan
 ---
-t1: key → 1
-t1: updated → 2
+t1: "key" → "1"
+t1: "updated" → "2"
 
 # Get results should mirror scan.
 t1: get key updated deleted tombstone missing
 ---
-t1: key → 1
-t1: updated → 2
-t1: deleted → None
-t1: tombstone → None
-t1: missing → None
+t1: "key" → "1"
+t1: "updated" → "2"
+t1: "deleted" → None
+t1: "tombstone" → None
+t1: "missing" → None

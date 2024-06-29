@@ -11,8 +11,8 @@ set_term 2
 append bar
 ---
 append → 1@1 None
-append → 2@1 foo
-append → 3@2 bar
+append → 2@1 "foo"
+append → 3@2 "bar"
 
 # has returns true both for noop entries and regular entries.
 has 1@1 2@1

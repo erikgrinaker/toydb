@@ -4,12 +4,12 @@
 t1: begin
 t1: get key
 ---
-t1: key → None
+t1: "key" → None
 
 t2: begin
 t2: get key
 ---
-t2: key → None
+t2: "key" → None
 
 t1: set key=1
 t2: !set key=2

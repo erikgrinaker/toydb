@@ -12,8 +12,8 @@ set_term 2
 append bar
 ---
 append → 1@1 None
-append → 2@1 foo
-append → 3@2 bar
+append → 2@1 "foo"
+append → 3@2 "bar"
 
 # Nothing is committed, so scan_applied yields nothing.
 scan_apply 0
@@ -24,9 +24,9 @@ ok
 commit 2
 scan_apply 0
 ---
-commit → 2@1 foo
+commit → 2@1 "foo"
 1@1 None
-2@1 foo
+2@1 "foo"
 
 # Passing the commit index yields nothing.
 scan_apply 2
@@ -43,17 +43,17 @@ ok
 commit 3
 scan_apply 2
 ---
-commit → 3@2 bar
-3@2 bar
+commit → 3@2 "bar"
+3@2 "bar"
 
 # Scanning from a lower commit index again works.
 scan_apply 1
 ---
-2@1 foo
-3@2 bar
+2@1 "foo"
+3@2 "bar"
 
 scan_apply 0
 ---
 1@1 None
-2@1 foo
-3@2 bar
+2@1 "foo"
+3@2 "bar"

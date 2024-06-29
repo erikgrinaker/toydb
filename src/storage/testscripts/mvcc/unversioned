@@ -3,14 +3,14 @@
 # Getting a missing unversioned key returns None.
 get_unversioned a
 ---
-a → None
+"a" → None
 
 # Setting and getting an unversioned key should work. Dump engine operations.
 set_unversioned a=0 [ops]
 get_unversioned a
 ---
-engine set Unversioned("a") → "0"
-a → 0
+engine set mvcc:Unversioned("a") → "0" ["\x05a\x00\x00" → "0"]
+"a" → "0"
 
 # Write some versioned keys with the same keys, interleaved between unversioned.
 # The raw engine writes show that the internal keys are different.
@@ -18,38 +18,38 @@ t1: begin
 t1: set a=1 b=1 c=1 [ops]
 t1: commit
 ---
-t1: engine set TxnWrite(1, "a") → []
-t1: engine set Version("a", 1) → "1"
-t1: engine set TxnWrite(1, "b") → []
-t1: engine set Version("b", 1) → "1"
-t1: engine set TxnWrite(1, "c") → []
-t1: engine set Version("c", 1) → "1"
+t1: engine set mvcc:TxnWrite(1, "a") → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01a\x00\x00" → ""]
+t1: engine set mvcc:Version("a", 1) → "1" ["\x04a\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x011"]
+t1: engine set mvcc:TxnWrite(1, "b") → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01b\x00\x00" → ""]
+t1: engine set mvcc:Version("b", 1) → "1" ["\x04b\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x011"]
+t1: engine set mvcc:TxnWrite(1, "c") → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01c\x00\x00" → ""]
+t1: engine set mvcc:Version("c", 1) → "1" ["\x04c\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x011"]
 
 # Set another unversioned key overlapping a versioned key.
 set_unversioned b=0 d=0 [ops]
 ---
-engine set Unversioned("b") → "0"
-engine set Unversioned("d") → "0"
+engine set mvcc:Unversioned("b") → "0" ["\x05b\x00\x00" → "0"]
+engine set mvcc:Unversioned("d") → "0" ["\x05d\x00\x00" → "0"]
 
 # An MVCC scan shouldn't see the unversioned keys.
 t2: begin readonly
 t2: scan
 ---
-t2: a → 1
-t2: b → 1
-t2: c → 1
+t2: "a" → "1"
+t2: "b" → "1"
+t2: "c" → "1"
 
 # Unversioned gets should not see versioned keys.
 get_unversioned a b c d
 ---
-a → 0
-b → 0
-c → None
-d → 0
+"a" → "0"
+"b" → "0"
+"c" → None
+"d" → "0"
 
 # Replacing an unversioned key should work too.
 set_unversioned a=2 [ops]
 get_unversioned a
 ---
-engine set Unversioned("a") → "2"
-a → 2
+engine set mvcc:Unversioned("a") → "2" ["\x05a\x00\x00" → "2"]
+"a" → "2"

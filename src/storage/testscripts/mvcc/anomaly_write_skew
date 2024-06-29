@@ -16,8 +16,8 @@ ok
 t1: get a
 t2: get b
 ---
-t1: a → 1
-t2: b → 2
+t1: "a" → "1"
+t2: "b" → "2"
 
 t1: set b=1
 t2: set a=2
@@ -32,5 +32,5 @@ ok
 t3: begin readonly
 t3: scan
 ---
-t3: a → 2
-t3: b → 1
+t3: "a" → "2"
+t3: "b" → "1"

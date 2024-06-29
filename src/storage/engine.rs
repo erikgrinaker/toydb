@@ -78,6 +78,7 @@ pub struct Status {
 #[cfg(test)]
 pub mod test {
     use super::*;
+    use crate::encoding::format::{self, Formatter as _};
     use crossbeam::channel::Sender;
     use regex::Regex;
     use std::error::Error as StdError;
@@ -109,7 +110,7 @@ pub mod test {
                     let key = Self::decode_binary(&args.next_pos().ok_or("key not given")?.value);
                     args.reject_rest()?;
                     let value = self.engine.get(&key)?;
-                    output.push_str(&Self::format_key_value(&key, value.as_deref()))
+                    writeln!(output, "{}", format::Raw::key_maybe_value(&key, value.as_deref()))?;
                 }
 
                 // scan [reverse=BOOL] RANGE
@@ -126,7 +127,7 @@ pub mod test {
                         self.engine.scan(range).collect::<Result<_>>()?
                     };
                     for (key, value) in items {
-                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                        writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
                     }
                 }
 
@@ -138,7 +139,7 @@ pub mod test {
                     args.reject_rest()?;
                     let mut scan = self.engine.scan_prefix(&prefix);
                     while let Some((key, value)) = scan.next().transpose()? {
-                        writeln!(output, "{}", Self::format_key_value(&key, Some(&value)))?;
+                        writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
                     }
                 }
 
@@ -187,22 +188,6 @@ pub mod test {
                 }
             }
             bytes
-        }
-
-        /// Formats a raw binary byte vector, escaping special characters.
-        /// TODO: find a better way to manage and share formatting functions.
-        pub fn format_bytes(bytes: &[u8]) -> String {
-            let b: Vec<u8> = bytes.iter().copied().flat_map(std::ascii::escape_default).collect();
-            String::from_utf8_lossy(&b).to_string()
-        }
-
-        /// Formats a key/value pair, or None if the value does not exist.
-        pub fn format_key_value(key: &[u8], value: Option<&[u8]>) -> String {
-            format!(
-                "{} → {}",
-                Self::format_bytes(key),
-                value.map(Self::format_bytes).unwrap_or("None".to_string())
-            )
         }
 
         /// Parses an binary key range, using Rust range syntax.
