@@ -5,7 +5,8 @@
 use super::mvcc::{self, TransactionState};
 use crate::encoding::{bincode, Key as _};
 
-use std::collections::HashSet;
+use itertools::Itertools as _;
+use std::collections::BTreeSet;
 
 /// Formats a raw byte string, either as a UTF-8 string (if valid and
 /// printable), otherwise hex-encoded.
@@ -27,16 +28,14 @@ pub fn format_txn(state: &TransactionState) -> String {
         "v{} {} active={}",
         state.version,
         if state.read_only { "read-only" } else { "read-write" },
-        format_hashset(&state.active)
+        format_set(&state.active)
     )
 }
 
-/// Formats a HashSet with sorted elements.
-pub fn format_hashset<T: Copy + Ord + std::fmt::Display>(set: &HashSet<T>) -> String {
-    let mut elements: Vec<T> = set.iter().copied().collect();
-    elements.sort();
-    let elements: Vec<String> = elements.into_iter().map(|v| v.to_string()).collect();
-    format!("{{{}}}", elements.join(","))
+/// Formats a BTreeSet.
+pub fn format_set<T: Copy + Ord + std::fmt::Display>(set: &BTreeSet<T>) -> String {
+    let elements = set.iter().map(|v| v.to_string()).join(",");
+    format!("{{{elements}}}")
 }
 
 /// Formats a raw engine key/value pair, or just the key if the value is None.
@@ -64,8 +63,8 @@ pub fn format_key_value(key: &[u8], value: &Option<Vec<u8>>) -> (String, Option<
             mvcc::Key::TxnActive(_) => {}
             mvcc::Key::TxnActiveSnapshot(_) => {
                 if let Some(ref v) = value {
-                    if let Ok(active) = bincode::deserialize::<HashSet<u64>>(v) {
-                        fvalue = Some(format_hashset(&active));
+                    if let Ok(active) = bincode::deserialize::<BTreeSet<mvcc::Version>>(v) {
+                        fvalue = Some(format_set(&active));
                     }
                 }
             }

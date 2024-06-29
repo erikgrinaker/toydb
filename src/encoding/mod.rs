@@ -8,6 +8,7 @@ pub mod keycode;
 
 use crate::error::Result;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::collections::{BTreeSet, HashSet};
 
 /// Adds automatic Keycode encode/decode methods to key enums. These are
 /// primarily meant for keys stored in key/value storage engines.
@@ -82,4 +83,5 @@ impl<V: Value> Value for Option<V> {}
 impl<V: Value> Value for Result<V> {}
 impl<V: Value> Value for Vec<V> {}
 impl<V1: Value, V2: Value> Value for (V1, V2) {}
-impl<V: Value + std::cmp::Eq + std::hash::Hash> Value for std::collections::HashSet<V> {}
+impl<V: Value + std::cmp::Eq + std::hash::Hash> Value for HashSet<V> {}
+impl<V: Value + std::cmp::Eq + std::cmp::Ord + std::hash::Hash> Value for BTreeSet<V> {}

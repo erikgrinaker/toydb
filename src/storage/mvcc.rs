@@ -146,7 +146,7 @@ use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeSet, VecDeque};
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -319,8 +319,8 @@ pub struct TransactionState {
     /// The set of concurrent active (uncommitted) transactions, as of the start
     /// of this transaction. Their writes should be invisible to this
     /// transaction even if they're writing at a lower version, since they're
-    /// not committed yet.
-    pub active: HashSet<Version>,
+    /// not committed yet. Uses a BTreeSet for test determinism.
+    pub active: BTreeSet<Version>,
 }
 
 impl encoding::Value for TransactionState {}
@@ -403,14 +403,14 @@ impl<E: Engine> Transaction<E> {
         // If requested, create the transaction as of a past version, restoring
         // the active snapshot as of the beginning of that version. Otherwise,
         // use the latest version and get the current, real-time snapshot.
-        let mut active = HashSet::new();
+        let mut active = BTreeSet::new();
         if let Some(as_of) = as_of {
             if as_of >= version {
                 return errinput!("version {as_of} does not exist");
             }
             version = as_of;
             if let Some(value) = session.get(&Key::TxnActiveSnapshot(version).encode())? {
-                active = HashSet::<Version>::decode(&value)?;
+                active = BTreeSet::<Version>::decode(&value)?;
             }
         } else {
             active = Self::scan_active(&mut session)?;
@@ -432,8 +432,8 @@ impl<E: Engine> Transaction<E> {
     }
 
     /// Fetches the set of currently active transactions.
-    fn scan_active(session: &mut MutexGuard<E>) -> Result<HashSet<Version>> {
-        let mut active = HashSet::new();
+    fn scan_active(session: &mut MutexGuard<E>) -> Result<BTreeSet<Version>> {
+        let mut active = BTreeSet::new();
         let mut scan = session.scan_prefix(&KeyPrefix::TxnActive.encode());
         while let Some((key, _)) = scan.next().transpose()? {
             match Key::decode(&key)? {
