@@ -1,0 +1,105 @@
+# Tests filtered DELETE statements.
+
+# Create a table with some data.
+> CREATE TABLE name (id INT PRIMARY KEY, value STRING, "index" INT INDEX)
+> INSERT INTO name VALUES (1, 'a', 1), (2, 'b', 2), (3, 'c', 3), (0, NULL, NULL)
+---
+ok
+
+# Boolean filters work, and are trivial.
+> BEGIN
+[plan]> DELETE FROM name WHERE true
+> SELECT * FROM name
+> ROLLBACK
+---
+Delete: name
+└─ Scan: name
+
+[plan]> DELETE FROM name WHERE false
+> SELECT * FROM name
+---
+Delete: name
+└─ Nothing
+0,NULL,NULL
+1,a,1
+2,b,2
+3,c,3
+
+# Deleting by primary key lookup works.
+> BEGIN
+[plan]> DELETE FROM name WHERE id = 1 OR id = 3
+> SELECT * FROM name
+> ROLLBACK
+---
+Delete: name
+└─ KeyLookup: name (1, 3)
+0,NULL,NULL
+2,b,2
+
+# Deleting by secondary index lookup works.
+> BEGIN
+[plan]> DELETE FROM name WHERE "index" = 3
+> SELECT * FROM name
+> ROLLBACK
+---
+Delete: name
+└─ IndexLookup: name column index (3)
+0,NULL,NULL
+1,a,1
+2,b,2
+
+# Including IS NULL predicates.
+> BEGIN
+[plan]> DELETE FROM name WHERE "index" IS NULL
+> SELECT * FROM name
+> ROLLBACK
+---
+Delete: name
+└─ IndexLookup: name column index (NULL)
+1,a,1
+2,b,2
+3,c,3
+
+# Deleting by arbitrary predicate works.
+> BEGIN
+[plan]> DELETE FROM name WHERE id >= 5 - 2 OR (value LIKE 'a') IS NULL
+> SELECT * FROM name
+> ROLLBACK
+---
+Delete: name
+└─ Scan: name (id > 3 OR id = 3 OR value LIKE a IS NULL)
+1,a,1
+2,b,2
+
+# Other types error, except NULL which is equivalent to false.
+!> DELETE FROM name WHERE 0
+!> DELETE FROM name WHERE 1
+!> DELETE FROM name WHERE 3.14
+!> DELETE FROM name WHERE NaN
+!> DELETE FROM name WHERE ''
+!> DELETE FROM name WHERE 'true'
+---
+Error: invalid input: filter returned 0, expected boolean
+Error: invalid input: filter returned 1, expected boolean
+Error: invalid input: filter returned 3.14, expected boolean
+Error: invalid input: filter returned NaN, expected boolean
+Error: invalid input: filter returned , expected boolean
+Error: invalid input: filter returned true, expected boolean
+
+> DELETE FROM name WHERE NULL
+> SELECT * FROM name
+---
+0,NULL,NULL
+1,a,1
+2,b,2
+3,c,3
+
+# Bare WHERE errors.
+!> DELETE FROM name WHERE
+---
+Error: invalid input: unexpected end of input
+
+# Missing column errors.
+!> DELETE FROM name WHERE missing = 'foo'
+---
+Error: invalid input: unknown field missing

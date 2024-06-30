@@ -1,0 +1,99 @@
+# Tests UPDATE primary key handling.
+# TODO: this should test both single-key and all key updates.
+
+# Boolean.
+> CREATE TABLE "bool" (id BOOLEAN PRIMARY KEY)
+> INSERT INTO "bool" VALUES (TRUE)
+> UPDATE "bool" SET id = FALSE
+> SELECT * FROM "bool"
+---
+FALSE
+
+> INSERT INTO "bool" VALUES (TRUE)
+!> UPDATE "bool" SET id = FALSE
+!> UPDATE "bool" SET id = FALSE WHERE id = TRUE
+---
+Error: invalid input: primary key FALSE already exists
+Error: invalid input: primary key FALSE already exists
+
+# Integer.
+> CREATE TABLE "int" (id INT PRIMARY KEY)
+> INSERT INTO "int" VALUES (0)
+> UPDATE "int" SET id = 1
+> UPDATE "int" SET id = -1
+> UPDATE "int" SET id = 9223372036854775807
+> UPDATE "int" SET id = -9223372036854775807
+> SELECT * FROM "int"
+---
+-9223372036854775807
+
+# TODO: these are supposed to error, but the id=0 row isn't updated for some
+# reason. Fix it. There is a similar case with floats.
+> INSERT INTO "int" VALUES (0)
+> UPDATE "int" SET id = 1
+> UPDATE "int" SET id = 1 WHERE id = -9223372036854775807
+> SELECT * FROM "int"
+---
+0
+1
+
+# Float.
+# TODO: these updates don't work properly.
+> CREATE TABLE "float" (id FLOAT PRIMARY KEY)
+> INSERT INTO "float" VALUES (0.0)
+> UPDATE "float" SET id = 3.14
+> UPDATE "float" SET id = -3.14
+> UPDATE "float" SET id = 0.0
+> UPDATE "float" SET id = -0.0
+> UPDATE "float" SET id = 1.23456789012345e308
+> UPDATE "float" SET id = -1.23456789012345e308
+> UPDATE "float" SET id = INFINITY
+> UPDATE "float" SET id = -INFINITY
+> UPDATE "float" SET id = NAN
+> SELECT * FROM "float"
+---
+-0
+123456789012345000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+inf
+NaN
+
+# TODO: similarly, these are supposed to error.
+> INSERT INTO "float" VALUES (1.0)
+> UPDATE "float" SET id = 3.14
+> UPDATE "float" SET id = -3.14
+!> UPDATE "float" SET id = 0.0
+> UPDATE "float" SET id = -0.0
+!> UPDATE "float" SET id = 1.23456789012345e308
+> UPDATE "float" SET id = -1.23456789012345e308
+!> UPDATE "float" SET id = INFINITY
+> UPDATE "float" SET id = -INFINITY
+!> UPDATE "float" SET id = NAN
+!> UPDATE "float" SET id = NULL
+---
+Error: invalid input: primary key 0 already exists
+Error: invalid input: primary key 123456789012345000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 already exists
+Error: invalid input: primary key inf already exists
+Error: invalid input: primary key NaN already exists
+Error: invalid input: NULL value not allowed for column id
+
+# String. TODO: this doesn't work either.
+> CREATE TABLE "string" (id STRING PRIMARY KEY)
+> INSERT INTO "string" VALUES ('')
+> UPDATE "string" SET id = ''
+> UPDATE "string" SET id = '  '
+> UPDATE "string" SET id = 'abc'
+> UPDATE "string" SET id = 'ABC'
+> UPDATE "string" SET id = 'Hi! 👋'
+> SELECT * FROM "string"
+---
+Hi! 👋
+
+# TODO: these are supposed to error.
+> INSERT INTO "string" VALUES ('')
+> UPDATE "string" SET id = '  '
+> UPDATE "string" SET id = 'abc'
+> UPDATE "string" SET id = 'ABC'
+> UPDATE "string" SET id = 'Hi! 👋'
+!> UPDATE "string" SET id = NULL
+---
+Error: invalid input: NULL value not allowed for column id

@@ -1,9 +1,0 @@
-Query: INSERT INTO "integer" VALUES (NULL)
-Error: InvalidInput("NULL value not allowed for column pk")
-
-Storage:
-CREATE TABLE "integer" (
-  pk INTEGER PRIMARY KEY
-)
-[Integer(1)]
-[Integer(2)]

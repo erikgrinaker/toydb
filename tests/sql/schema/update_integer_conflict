@@ -1,9 +1,0 @@
-Query: UPDATE test SET value = 'abc'
-Error: InvalidInput("invalid datatype STRING for INTEGER column value")
-
-Storage:
-CREATE TABLE test (
-  id INTEGER PRIMARY KEY,
-  value INTEGER DEFAULT NULL
-)
-[Integer(1), Integer(7)]

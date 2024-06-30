@@ -1,0 +1,2 @@
+# TODO: test expression evaluation, in particular that it uses values from the
+# old row not the new.

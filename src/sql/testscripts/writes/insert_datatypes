@@ -1,0 +1,128 @@
+# Tests INSERT of all datatypes.
+
+# Create columns with all datatypes.
+> CREATE TABLE datatypes ( \
+    id INTEGER PRIMARY KEY, \
+    "bool" BOOL, \
+    "int" INT, \
+    "float" FLOAT, \
+    "string" STRING \
+)
+---
+ok
+
+# Booleans.
+> BEGIN
+> INSERT INTO datatypes (id, "bool") VALUES (1, true)
+> INSERT INTO datatypes (id, "bool") VALUES (2, false)
+> INSERT INTO datatypes (id, "bool") VALUES (3, NULL)
+---
+ok
+
+> SELECT * FROM datatypes
+> ROLLBACK
+---
+1,TRUE,NULL,NULL,NULL
+2,FALSE,NULL,NULL,NULL
+3,NULL,NULL,NULL,NULL
+
+!> INSERT INTO datatypes (id, "bool") VALUES (0, 1)
+!> INSERT INTO datatypes (id, "bool") VALUES (0, 3.14)
+!> INSERT INTO datatypes (id, "bool") VALUES (0, 'false')
+---
+Error: invalid input: invalid datatype INTEGER for BOOLEAN column bool
+Error: invalid input: invalid datatype FLOAT for BOOLEAN column bool
+Error: invalid input: invalid datatype STRING for BOOLEAN column bool
+
+# Integers.
+> BEGIN
+> INSERT INTO datatypes (id, "int") VALUES (1, 1)
+> INSERT INTO datatypes (id, "int") VALUES (2, 0)
+> INSERT INTO datatypes (id, "int") VALUES (3, -1)
+> INSERT INTO datatypes (id, "int") VALUES (4, 9223372036854775807)
+> INSERT INTO datatypes (id, "int") VALUES (5, -9223372036854775807)
+> INSERT INTO datatypes (id, "int") VALUES (6, NULL)
+---
+ok
+
+> SELECT * FROM datatypes
+> ROLLBACK
+---
+1,NULL,1,NULL,NULL
+2,NULL,0,NULL,NULL
+3,NULL,-1,NULL,NULL
+4,NULL,9223372036854775807,NULL,NULL
+5,NULL,-9223372036854775807,NULL,NULL
+6,NULL,NULL,NULL,NULL
+
+!> INSERT INTO datatypes (id, "int") VALUES (0, false)
+!> INSERT INTO datatypes (id, "int") VALUES (0, 3.0)
+!> INSERT INTO datatypes (id, "int") VALUES (0, '0')
+---
+Error: invalid input: invalid datatype BOOLEAN for INTEGER column int
+Error: invalid input: invalid datatype FLOAT for INTEGER column int
+Error: invalid input: invalid datatype STRING for INTEGER column int
+
+# Floats.
+> BEGIN
+> INSERT INTO datatypes (id, "float") VALUES (1, 3.14)
+> INSERT INTO datatypes (id, "float") VALUES (2, -3.14)
+> INSERT INTO datatypes (id, "float") VALUES (3, 0.0)
+> INSERT INTO datatypes (id, "float") VALUES (4, -0.0)
+> INSERT INTO datatypes (id, "float") VALUES (5, 1.23456789012345e308)
+> INSERT INTO datatypes (id, "float") VALUES (6, -1.23456789012345e308)
+> INSERT INTO datatypes (id, "float") VALUES (7, INFINITY)
+> INSERT INTO datatypes (id, "float") VALUES (8, -INFINITY)
+> INSERT INTO datatypes (id, "float") VALUES (9, NAN)
+> INSERT INTO datatypes (id, "float") VALUES (10, NULL)
+---
+ok
+
+> SELECT * FROM datatypes
+> ROLLBACK
+---
+1,NULL,NULL,3.14,NULL
+2,NULL,NULL,-3.14,NULL
+3,NULL,NULL,0,NULL
+4,NULL,NULL,-0,NULL
+5,NULL,NULL,123456789012345000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,NULL
+6,NULL,NULL,-123456789012345000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,NULL
+7,NULL,NULL,inf,NULL
+8,NULL,NULL,-inf,NULL
+9,NULL,NULL,NaN,NULL
+10,NULL,NULL,NULL,NULL
+
+!> INSERT INTO datatypes (id, "float") VALUES (0, false)
+!> INSERT INTO datatypes (id, "float") VALUES (0, 3)
+!> INSERT INTO datatypes (id, "float") VALUES (0, '0')
+---
+Error: invalid input: invalid datatype BOOLEAN for FLOAT column float
+Error: invalid input: invalid datatype INTEGER for FLOAT column float
+Error: invalid input: invalid datatype STRING for FLOAT column float
+
+# Strings.
+> BEGIN
+> INSERT INTO datatypes (id, "string") VALUES (1, '')
+> INSERT INTO datatypes (id, "string") VALUES (2, '  ')
+> INSERT INTO datatypes (id, "string") VALUES (3, 'abc')
+> INSERT INTO datatypes (id, "string") VALUES (4, 'Hi! 👋')
+> INSERT INTO datatypes (id, "string") VALUES (5, NULL)
+---
+ok
+
+> SELECT * FROM datatypes
+> ROLLBACK
+---
+1,NULL,NULL,NULL,
+2,NULL,NULL,NULL,  
+3,NULL,NULL,NULL,abc
+4,NULL,NULL,NULL,Hi! 👋
+5,NULL,NULL,NULL,NULL
+
+!> INSERT INTO datatypes (id, "string") VALUES (0, false)
+!> INSERT INTO datatypes (id, "string") VALUES (0, 3)
+!> INSERT INTO datatypes (id, "string") VALUES (0, 3.14)
+---
+Error: invalid input: invalid datatype BOOLEAN for STRING column string
+Error: invalid input: invalid datatype INTEGER for STRING column string
+Error: invalid input: invalid datatype FLOAT for STRING column string

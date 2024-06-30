@@ -1,9 +1,0 @@
-Query: INSERT INTO "string" VALUES (NULL)
-Error: InvalidInput("NULL value not allowed for column pk")
-
-Storage:
-CREATE TABLE "string" (
-  pk STRING PRIMARY KEY
-)
-[String("bar")]
-[String("foo")]

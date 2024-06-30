@@ -24,6 +24,7 @@ mod tests {
 
     // Run goldenscript tests in src/sql/testscripts.
     test_each_path! { in "src/sql/testscripts/schema" as schema => test_goldenscript }
+    test_each_path! { in "src/sql/testscripts/writes" as writes => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/expressions" as expressions => test_goldenscript_expr }
 
     fn test_goldenscript(path: &std::path::Path) {
@@ -124,8 +125,16 @@ mod tests {
                 writeln!(output, "{plan}")?;
             }
 
-            // Output the result if requested.
-            if tags.remove("result") {
+            // Output the result if requested. SELECT results are always output,
+            // but the columns only if result is given.
+            if let StatementResult::Select { columns, rows } = result {
+                if tags.remove("columns") {
+                    writeln!(output, "{}", columns.into_iter().map(|c| c.to_string()).join(","))?;
+                }
+                for row in rows {
+                    writeln!(output, "{}", row.into_iter().map(|v| v.to_string()).join(","))?;
+                }
+            } else if tags.remove("result") {
                 writeln!(output, "{result:?}")?;
             }
 

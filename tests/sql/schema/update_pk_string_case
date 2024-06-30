@@ -1,9 +1,0 @@
-Query: UPDATE "string" SET pk = 'Bar' WHERE pk = 'foo'
-Result: Update { count: 1 }
-
-Storage:
-CREATE TABLE "string" (
-  pk STRING PRIMARY KEY
-)
-[String("Bar")]
-[String("bar")]

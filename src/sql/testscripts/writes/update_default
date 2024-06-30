@@ -1,0 +1,19 @@
+# UPDATE does not currently support setting DEFAULT.
+# TODO: consider adding this.
+
+> CREATE TABLE defaults ( \
+    id INTEGER PRIMARY KEY, \
+    required BOOLEAN NOT NULL, \
+    "null" BOOLEAN, \
+    "boolean" BOOLEAN DEFAULT TRUE, \
+    "float" FLOAT DEFAULT 3.14, \
+    "integer" INTEGER DEFAULT 7, \
+    "string" STRING DEFAULT 'foo' \
+)
+> INSERT INTO defaults VALUES (1, true, NULL, NULL, NULL, NULL, NULL)
+---
+ok
+
+!> UPDATE defaults SET "boolean" = DEFAULT
+---
+Error: invalid input: expected expression atom, found DEFAULT

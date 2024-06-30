@@ -1,0 +1,64 @@
+# Tests INSERT handling of DEFAULT values.
+
+> CREATE TABLE defaults ( \
+    id INTEGER PRIMARY KEY, \
+    required BOOLEAN NOT NULL, \
+    "null" BOOLEAN, \
+    "boolean" BOOLEAN DEFAULT TRUE, \
+    "float" FLOAT DEFAULT 3.14, \
+    "integer" INTEGER DEFAULT 7, \
+    "string" STRING DEFAULT 'foo' \
+)
+---
+ok
+
+# INSERT without specifying default columns fills in defaults.
+> INSERT INTO defaults (id, required) VALUES (1, true)
+> INSERT INTO defaults VALUES (2, false)
+---
+ok
+
+> SELECT * FROM defaults
+---
+1,TRUE,NULL,TRUE,3.14,7,foo
+2,FALSE,NULL,TRUE,3.14,7,foo
+
+# INSERT only specifying some default columns fills in rest.
+> INSERT INTO defaults ("integer", id, "null", required) VALUES (9, 3, NULL, false)
+---
+ok
+
+> SELECT * FROM defaults
+---
+1,TRUE,NULL,TRUE,3.14,7,foo
+2,FALSE,NULL,TRUE,3.14,7,foo
+3,FALSE,NULL,TRUE,3.14,9,foo
+
+# Using a variable number of values works.
+> INSERT INTO defaults VALUES (4, false, NULL, false), (5, true), (6, true, false, true, 3.14, 9, 'bar')
+---
+ok
+
+> SELECT * FROM defaults
+---
+1,TRUE,NULL,TRUE,3.14,7,foo
+2,FALSE,NULL,TRUE,3.14,7,foo
+3,FALSE,NULL,TRUE,3.14,9,foo
+4,FALSE,NULL,FALSE,3.14,7,foo
+5,TRUE,NULL,TRUE,3.14,7,foo
+6,TRUE,FALSE,TRUE,3.14,9,bar
+
+# INSERT with all NULLs does not yield default values.
+> INSERT INTO defaults VALUES (7, false, NULL, NULL, NULL, NULL, NULL)
+---
+ok
+
+> SELECT * FROM defaults
+---
+1,TRUE,NULL,TRUE,3.14,7,foo
+2,FALSE,NULL,TRUE,3.14,7,foo
+3,FALSE,NULL,TRUE,3.14,9,foo
+4,FALSE,NULL,FALSE,3.14,7,foo
+5,TRUE,NULL,TRUE,3.14,7,foo
+6,TRUE,FALSE,TRUE,3.14,9,bar
+7,FALSE,NULL,NULL,NULL,NULL,NULL

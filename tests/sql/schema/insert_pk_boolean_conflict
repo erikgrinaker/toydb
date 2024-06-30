@@ -1,8 +1,0 @@
-Query: INSERT INTO "boolean" VALUES (FALSE)
-Error: InvalidInput("primary key FALSE already exists")
-
-Storage:
-CREATE TABLE "boolean" (
-  pk BOOLEAN PRIMARY KEY
-)
-[Boolean(false)]
