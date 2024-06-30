@@ -9,7 +9,7 @@ use crate::storage::{self, mvcc};
 use crossbeam::channel::Sender;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 /// A Raft-based SQL engine. This dispatches to the `Local` engine for local
 /// processing and storage on each node, but plumbs read/write commands through
@@ -169,7 +169,7 @@ impl<'a> super::Transaction for Transaction<'a> {
         self.engine.write(Write::Insert { txn: (&self.state).into(), table: table.into(), rows })
     }
 
-    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>> {
+    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<BTreeSet<Value>> {
         self.engine.read(Read::LookupIndex {
             txn: (&self.state).into(),
             table: table.into(),

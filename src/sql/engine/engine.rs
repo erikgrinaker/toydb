@@ -6,7 +6,7 @@ use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::mvcc;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 /// A SQL engine. This provides low-level CRUD (create, read, update, delete)
 /// operations for table rows, a schema catalog for accessing and modifying
@@ -54,8 +54,9 @@ pub trait Transaction {
     fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>>;
     /// Inserts new table rows.
     fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()>;
-    /// Looks up a set of primary keys by index values.
-    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>>;
+    /// Looks up a set of primary keys by index values. Uses a BTreeSet for test
+    /// determinism.
+    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<BTreeSet<Value>>;
     /// Scans a table's rows, optionally applying the given filter.
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
     /// Updates table rows by primary key.
@@ -67,7 +68,7 @@ pub trait Transaction {
 }
 
 /// An index scan iterator.
-pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, HashSet<Value>)>>>;
+pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, BTreeSet<Value>)>>>;
 
 /// The catalog stores table schema information. It is required for
 /// Engine::Transaction, and thus fully transactional. For simplicity, it only

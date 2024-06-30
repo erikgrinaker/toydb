@@ -7,7 +7,7 @@ use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 /// A SQL engine using local storage. This provides the main SQL storage logic,
 /// including with the Raft SQL engine which dispatches to this engine for
@@ -76,12 +76,12 @@ impl<E: storage::Engine> Transaction<E> {
 
     /// Fetches the matching primary keys for the given secondary index value,
     /// or an empty set if there is none.
-    fn get_index(&self, table: &str, column: &str, value: &Value) -> Result<HashSet<Value>> {
+    fn get_index(&self, table: &str, column: &str, value: &Value) -> Result<BTreeSet<Value>> {
         debug_assert!(self.has_index(table, column)?, "no index on {table}.{column}");
         Ok(self
             .txn
             .get(&Key::Index(table.into(), column.into(), value.into()).encode())?
-            .map(|v| HashSet::decode(&v))
+            .map(|v| BTreeSet::decode(&v))
             .transpose()?
             .unwrap_or_default())
     }
@@ -107,7 +107,7 @@ impl<E: storage::Engine> Transaction<E> {
         table: &str,
         column: &str,
         value: &Value,
-        ids: HashSet<Value>,
+        ids: BTreeSet<Value>,
     ) -> Result<()> {
         debug_assert!(self.has_index(table, column)?, "no index on {table}.{column}");
         let key = Key::Index(table.into(), column.into(), value.into()).encode();
@@ -239,9 +239,9 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         Ok(())
     }
 
-    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<HashSet<Value>> {
+    fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<BTreeSet<Value>> {
         debug_assert!(self.has_index(table, column)?, "index lookup without index");
-        let mut pks = HashSet::new();
+        let mut pks = BTreeSet::new();
         for v in values {
             pks.extend(self.get_index(table, column, v)?)
         }
@@ -277,7 +277,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                         let Key::Index(_, _, value) = Key::decode(&k)? else {
                             return errdata!("invalid index key");
                         };
-                        Ok((value.into_owned(), HashSet::decode(&v)?))
+                        Ok((value.into_owned(), BTreeSet::decode(&v)?))
                     })
                 },
             ),
