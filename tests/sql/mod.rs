@@ -1,6 +1,4 @@
-mod mutation;
 mod query;
-mod schema;
 
 use toydb::error::Result;
 use toydb::sql::engine::{Engine, Local};

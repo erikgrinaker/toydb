@@ -1,9 +1,0 @@
-Query: UPDATE "string" SET pk = NULL WHERE pk = 'foo'
-Error: InvalidInput("NULL value not allowed for column pk")
-
-Storage:
-CREATE TABLE "string" (
-  pk STRING PRIMARY KEY
-)
-[String("bar")]
-[String("foo")]

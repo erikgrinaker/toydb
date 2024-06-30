@@ -1,8 +1,0 @@
-Query: UPDATE "boolean" SET pk = NULL WHERE pk = FALSE
-Error: InvalidInput("NULL value not allowed for column pk")
-
-Storage:
-CREATE TABLE "boolean" (
-  pk BOOLEAN PRIMARY KEY
-)
-[Boolean(false)]

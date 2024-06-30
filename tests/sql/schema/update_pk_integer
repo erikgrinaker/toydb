@@ -1,9 +1,0 @@
-Query: UPDATE "integer" SET pk = 3 WHERE pk = 2
-Result: Update { count: 1 }
-
-Storage:
-CREATE TABLE "integer" (
-  pk INTEGER PRIMARY KEY
-)
-[Integer(1)]
-[Integer(3)]

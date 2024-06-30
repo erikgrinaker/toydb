@@ -1,8 +1,0 @@
-Query: UPDATE "boolean" SET pk = TRUE WHERE pk = FALSE
-Result: Update { count: 1 }
-
-Storage:
-CREATE TABLE "boolean" (
-  pk BOOLEAN PRIMARY KEY
-)
-[Boolean(true)]

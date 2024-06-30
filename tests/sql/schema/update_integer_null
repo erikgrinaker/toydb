@@ -1,9 +1,0 @@
-Query: UPDATE test SET value = NULL
-Result: Update { count: 1 }
-
-Storage:
-CREATE TABLE test (
-  id INTEGER PRIMARY KEY,
-  value INTEGER DEFAULT NULL
-)
-[Integer(1), Null]

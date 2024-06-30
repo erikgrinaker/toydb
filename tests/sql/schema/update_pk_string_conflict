@@ -1,9 +1,0 @@
-Query: UPDATE "string" SET pk = 'bar' WHERE pk = 'foo'
-Error: InvalidInput("primary key bar already exists")
-
-Storage:
-CREATE TABLE "string" (
-  pk STRING PRIMARY KEY
-)
-[String("bar")]
-[String("foo")]

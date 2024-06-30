@@ -1,0 +1,36 @@
+# Tests nullability handling of INSERT.
+
+# Create a table with NULL constraints.
+> CREATE TABLE name ( \
+    id INT PRIMARY KEY, \
+    "null" STRING NULL, \
+    not_null STRING NOT NULL \
+)
+---
+ok
+
+# INSERT with NULL works.
+> INSERT INTO name VALUES (1, NULL, 'foo')
+---
+ok
+
+> SELECT * FROM name
+---
+1,NULL,foo
+
+# INSERT with NULL into non-NULL columns errors.
+!> INSERT INTO name VALUES (NULL, 'foo', 'bar')
+!> INSERT INTO name VALUES (2, 'foo', NULL)
+---
+Error: invalid input: NULL value not allowed for column id
+Error: invalid input: NULL value not allowed for column not_null
+
+# Omitting a NULLable column works.
+> INSERT INTO name (id, not_null) VALUES (2, 'foo')
+---
+ok
+
+> SELECT * FROM name
+---
+1,NULL,foo
+2,NULL,foo

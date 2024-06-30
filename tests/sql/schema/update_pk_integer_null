@@ -1,9 +1,0 @@
-Query: UPDATE "integer" SET pk = NULL WHERE pk = 2
-Error: InvalidInput("NULL value not allowed for column pk")
-
-Storage:
-CREATE TABLE "integer" (
-  pk INTEGER PRIMARY KEY
-)
-[Integer(1)]
-[Integer(2)]

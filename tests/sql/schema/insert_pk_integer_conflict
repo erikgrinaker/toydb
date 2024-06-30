@@ -1,9 +1,0 @@
-Query: INSERT INTO "integer" VALUES (1)
-Error: InvalidInput("primary key 1 already exists")
-
-Storage:
-CREATE TABLE "integer" (
-  pk INTEGER PRIMARY KEY
-)
-[Integer(1)]
-[Integer(2)]

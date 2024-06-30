@@ -1,0 +1,81 @@
+# Tests UPDATE of all datatypes.
+
+# Create columns and a row with all datatypes.
+> CREATE TABLE datatypes ( \
+    id INTEGER PRIMARY KEY, \
+    "bool" BOOL, \
+    "int" INT, \
+    "float" FLOAT, \
+    "string" STRING \
+)
+> INSERT INTO datatypes VALUES (1)
+---
+ok
+
+# Booleans.
+> UPDATE datatypes SET "bool" = NULL
+> UPDATE datatypes SET "bool" = FALSE
+> UPDATE datatypes SET "bool" = TRUE
+> SELECT * FROM datatypes
+---
+1,TRUE,NULL,NULL,NULL
+
+!> UPDATE datatypes SET "bool" = 1
+!> UPDATE datatypes SET "bool" = 3.14
+!> UPDATE datatypes SET "bool" = 'false'
+---
+Error: invalid input: invalid datatype INTEGER for BOOLEAN column bool
+Error: invalid input: invalid datatype FLOAT for BOOLEAN column bool
+Error: invalid input: invalid datatype STRING for BOOLEAN column bool
+
+# Integers.
+> UPDATE datatypes SET "int" = NULL
+> UPDATE datatypes SET "int" = 1
+> UPDATE datatypes SET "int" = 0
+> UPDATE datatypes SET "int" = -1
+> UPDATE datatypes SET "int" = 9223372036854775807
+> UPDATE datatypes SET "int" = -9223372036854775807
+> SELECT * FROM datatypes
+---
+1,TRUE,-9223372036854775807,NULL,NULL
+
+!> UPDATE datatypes SET "int" = false
+!> UPDATE datatypes SET "int" = 3.0
+!> UPDATE datatypes SET "int" = '0'
+---
+Error: invalid input: invalid datatype BOOLEAN for INTEGER column int
+Error: invalid input: invalid datatype FLOAT for INTEGER column int
+Error: invalid input: invalid datatype STRING for INTEGER column int
+
+# Floats.
+> UPDATE datatypes SET "float" = NULL
+> UPDATE datatypes SET "float" = 3.14
+> UPDATE datatypes SET "float" = -3.14
+> UPDATE datatypes SET "float" = 0.0
+> UPDATE datatypes SET "float" = -0.0
+> UPDATE datatypes SET "float" = 1.23456789012345e308
+> UPDATE datatypes SET "float" = -1.23456789012345e308
+> UPDATE datatypes SET "float" = INFINITY
+> UPDATE datatypes SET "float" = -INFINITY
+> UPDATE datatypes SET "float" = NAN
+> SELECT * FROM datatypes
+---
+1,TRUE,-9223372036854775807,NaN,NULL
+
+# Strings.
+> UPDATE datatypes SET "string" = NULL
+> UPDATE datatypes SET "string" = ''
+> UPDATE datatypes SET "string" = '  '
+> UPDATE datatypes SET "string" = 'abc'
+> UPDATE datatypes SET "string" = 'Hi! 👋'
+> SELECT * FROM datatypes
+---
+1,TRUE,-9223372036854775807,NaN,Hi! 👋
+
+!> UPDATE datatypes SET "string" = false
+!> UPDATE datatypes SET "string" = 3
+!> UPDATE datatypes SET "string" = 3.14
+---
+Error: invalid input: invalid datatype BOOLEAN for STRING column string
+Error: invalid input: invalid datatype INTEGER for STRING column string
+Error: invalid input: invalid datatype FLOAT for STRING column string
