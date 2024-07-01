@@ -9,7 +9,7 @@ use crate::storage::{self, mvcc};
 use crossbeam::channel::Sender;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A Raft-based SQL engine. This dispatches to the `Local` engine for local
 /// processing and storage on each node, but plumbs read/write commands through
@@ -196,7 +196,7 @@ impl<'a> super::Transaction for Transaction<'a> {
         Ok(Box::new(scan.into_iter().map(Ok)))
     }
 
-    fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()> {
+    fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()> {
         self.engine.write(Write::Update { txn: (&self.state).into(), table: table.into(), rows })
     }
 }
@@ -407,7 +407,7 @@ enum Write<'a> {
 
     Delete { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, ids: Cow<'a, [Value]> },
     Insert { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, rows: Vec<Row> },
-    Update { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, rows: HashMap<Value, Row> },
+    Update { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, rows: BTreeMap<Value, Row> },
 
     CreateTable { txn: Cow<'a, mvcc::TransactionState>, schema: Table },
     DeleteTable { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, if_exists: bool },

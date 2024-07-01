@@ -6,7 +6,7 @@ use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::mvcc;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A SQL engine. This provides low-level CRUD (create, read, update, delete)
 /// operations for table rows, a schema catalog for accessing and modifying
@@ -59,8 +59,8 @@ pub trait Transaction {
     fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<BTreeSet<Value>>;
     /// Scans a table's rows, optionally applying the given filter.
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
-    /// Updates table rows by primary key.
-    fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()>;
+    /// Updates table rows by primary key. Uses a BTreeMap for test determinism.
+    fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()>;
 
     /// Scans a column's index entries.
     /// TODO: this is only used for tests, remove it.

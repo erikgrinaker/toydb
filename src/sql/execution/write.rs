@@ -3,7 +3,7 @@ use crate::sql::engine::Transaction;
 use crate::sql::types::{Expression, Rows, Table};
 use crate::{errdata, errinput};
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE) using the
 /// primary_key field index. Returns the number of rows deleted.
@@ -84,7 +84,7 @@ pub(super) fn update(
     mut source: Rows,
     expressions: Vec<(usize, Expression)>,
 ) -> Result<u64> {
-    let mut updates = HashMap::new();
+    let mut updates = BTreeMap::new();
     while let Some(row) = source.next().transpose()? {
         let mut new = row.clone();
         for (field, expr) in &expressions {

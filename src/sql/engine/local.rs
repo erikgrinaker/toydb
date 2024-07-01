@@ -7,7 +7,7 @@ use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A SQL engine using local storage. This provides the main SQL storage logic,
 /// including with the Raft SQL engine which dispatches to this engine for
@@ -284,7 +284,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         ))
     }
 
-    fn update(&self, table: &str, rows: HashMap<Value, Row>) -> Result<()> {
+    fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()> {
         let table = self.must_get_table(table)?;
 
         for (id, row) in rows {
