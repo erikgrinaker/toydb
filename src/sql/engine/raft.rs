@@ -1,4 +1,4 @@
-use super::{Catalog, Engine as _, IndexScan, Transaction as _};
+use super::{Catalog, Engine as _, Transaction as _};
 use crate::encoding::{self, bincode, Value as _};
 use crate::errdata;
 use crate::error::Result;
@@ -187,15 +187,6 @@ impl<'a> super::Transaction for Transaction<'a> {
         Ok(Box::new(scan.into_iter().map(Ok)))
     }
 
-    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan> {
-        let scan: Vec<_> = self.engine.read(Read::ScanIndex {
-            txn: (&self.state).into(),
-            table: table.into(),
-            column: column.into(),
-        })?;
-        Ok(Box::new(scan.into_iter().map(Ok)))
-    }
-
     fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()> {
         self.engine.write(Write::Update { txn: (&self.state).into(), table: table.into(), rows })
     }
@@ -338,13 +329,6 @@ impl<E: storage::Engine> raft::State for State<E> {
                     .collect::<Result<Vec<_>>>()?
                     .encode()
             }
-            Read::ScanIndex { txn, table, column } => self
-                .local
-                .resume(txn.into_owned())?
-                .scan_index(&table, &column)?
-                .collect::<Result<Vec<_>>>()?
-                .encode(),
-
             Read::GetTable { txn, table } => {
                 self.local.resume(txn.into_owned())?.get_table(&table)?.encode()
             }
@@ -379,11 +363,6 @@ enum Read<'a> {
         txn: Cow<'a, mvcc::TransactionState>,
         table: Cow<'a, str>,
         filter: Option<Expression>,
-    },
-    ScanIndex {
-        txn: Cow<'a, mvcc::TransactionState>,
-        table: Cow<'a, str>,
-        column: Cow<'a, str>,
     },
 
     GetTable {
