@@ -61,14 +61,7 @@ pub trait Transaction {
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
     /// Updates table rows by primary key. Uses a BTreeMap for test determinism.
     fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()>;
-
-    /// Scans a column's index entries.
-    /// TODO: this is only used for tests, remove it.
-    fn scan_index(&self, table: &str, column: &str) -> Result<IndexScan>;
 }
-
-/// An index scan iterator.
-pub type IndexScan = Box<dyn Iterator<Item = Result<(Value, BTreeSet<Value>)>>>;
 
 /// The catalog stores table schema information. It is required for
 /// Engine::Transaction, and thus fully transactional. For simplicity, it only

@@ -1,9 +1,9 @@
 use super::Catalog;
 use crate::encoding::{self, Key as _, Value as _};
+use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::{self, mvcc};
-use crate::{errdata, errinput};
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -265,22 +265,6 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                     },
                     err => Some(err),
                 }),
-        ))
-    }
-
-    fn scan_index(&self, table: &str, column: &str) -> Result<super::IndexScan> {
-        debug_assert!(self.has_index(table, column)?, "index scan without index");
-        Ok(Box::new(
-            self.txn.scan_prefix(&KeyPrefix::Index(table.into(), column.into()).encode()).map(
-                |r| {
-                    r.and_then(|(k, v)| {
-                        let Key::Index(_, _, value) = Key::decode(&k)? else {
-                            return errdata!("invalid index key");
-                        };
-                        Ok((value.into_owned(), BTreeSet::decode(&v)?))
-                    })
-                },
-            ),
         ))
     }
 
