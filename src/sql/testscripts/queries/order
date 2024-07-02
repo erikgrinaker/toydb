@@ -1,0 +1,350 @@
+# Tests ORDER BY clauses.
+
+# Create a table with representative values of all types.
+> CREATE TABLE test ( \
+    id INT PRIMARY KEY, \
+    "bool" BOOLEAN, \
+    "int" INTEGER, \
+    "float" FLOAT, \
+    "string" STRING, \
+    static INT \
+)
+> INSERT INTO test VALUES (0, NULL,  NULL,  NULL,      NULL,  1)
+> INSERT INTO test VALUES (1, TRUE,  0,     3.14,      'a',   1)
+> INSERT INTO test VALUES (2, FALSE, -1,    -2.718,    'ab',  1)
+> INSERT INTO test VALUES (3, NULL,  1,     0.0,       'aaa', 1)
+> INSERT INTO test VALUES (4, NULL,  1000,  -0.0,      'A',   1)
+> INSERT INTO test VALUES (5, NULL,  -1000, INFINITY,  'aB',  1)
+> INSERT INTO test VALUES (6, NULL,  7,     -INFINITY, 'åa',  1)
+> INSERT INTO test VALUES (7, NULL,  -9,    NAN,       'Åa',  1)
+> INSERT INTO test VALUES (8, NULL,  NULL,  NULL,      'B',   1)
+> INSERT INTO test VALUES (9, NULL,  NULL,  NULL,      '👍',  1)
+---
+ok
+
+# Order by constant values. There's only one row, but it should be valid.
+[plan]> SELECT 1 AS value ORDER BY value ASC
+---
+Order: value asc
+└─ Projection: 1
+   └─ EmptyRow
+1
+
+[plan]> SELECT 1 AS value ORDER BY value DESC
+---
+Order: value desc
+└─ Projection: 1
+   └─ EmptyRow
+1
+
+# Order by primary key.
+[plan]> SELECT * FROM test ORDER BY id ASC
+---
+Order: id asc
+└─ Scan: test
+0, NULL, NULL, NULL, NULL, 1
+1, TRUE, 0, 3.14, a, 1
+2, FALSE, -1, -2.718, ab, 1
+3, NULL, 1, 0, aaa, 1
+4, NULL, 1000, -0, A, 1
+5, NULL, -1000, inf, aB, 1
+6, NULL, 7, -inf, åa, 1
+7, NULL, -9, NaN, Åa, 1
+8, NULL, NULL, NULL, B, 1
+9, NULL, NULL, NULL, 👍, 1
+
+[plan]> SELECT * FROM test ORDER BY id DESC
+---
+Order: id desc
+└─ Scan: test
+9, NULL, NULL, NULL, 👍, 1
+8, NULL, NULL, NULL, B, 1
+7, NULL, -9, NaN, Åa, 1
+6, NULL, 7, -inf, åa, 1
+5, NULL, -1000, inf, aB, 1
+4, NULL, 1000, -0, A, 1
+3, NULL, 1, 0, aaa, 1
+2, FALSE, -1, -2.718, ab, 1
+1, TRUE, 0, 3.14, a, 1
+0, NULL, NULL, NULL, NULL, 1
+
+# Booleans.
+> SELECT id, "bool" FROM test ORDER BY "bool" ASC
+---
+0, NULL
+3, NULL
+4, NULL
+5, NULL
+6, NULL
+7, NULL
+8, NULL
+9, NULL
+2, FALSE
+1, TRUE
+
+> SELECT id, "bool" FROM test ORDER BY "bool" DESC
+---
+1, TRUE
+2, FALSE
+0, NULL
+3, NULL
+4, NULL
+5, NULL
+6, NULL
+7, NULL
+8, NULL
+9, NULL
+
+# Integers.
+> SELECT id, "int" FROM test ORDER BY "int" ASC
+---
+0, NULL
+8, NULL
+9, NULL
+5, -1000
+7, -9
+2, -1
+1, 0
+3, 1
+6, 7
+4, 1000
+
+> SELECT id, "int" FROM test ORDER BY "int" DESC
+---
+4, 1000
+6, 7
+3, 1
+1, 0
+2, -1
+7, -9
+5, -1000
+0, NULL
+8, NULL
+9, NULL
+
+# Floats.
+> SELECT id, "float" FROM test ORDER BY "float" ASC
+---
+0, NULL
+8, NULL
+9, NULL
+6, -inf
+2, -2.718
+4, -0
+3, 0
+1, 3.14
+5, inf
+7, NaN
+
+> SELECT id, "float" FROM test ORDER BY "float" DESC
+---
+7, NaN
+5, inf
+1, 3.14
+3, 0
+4, -0
+2, -2.718
+6, -inf
+0, NULL
+8, NULL
+9, NULL
+
+# Strings.
+> SELECT id, "string" FROM test ORDER BY "string" ASC
+---
+0, NULL
+4, A
+8, B
+1, a
+5, aB
+3, aaa
+2, ab
+7, Åa
+6, åa
+9, 👍
+
+> SELECT id, "string" FROM test ORDER BY "string" DESC
+---
+9, 👍
+6, åa
+7, Åa
+2, ab
+3, aaa
+5, aB
+1, a
+8, B
+4, A
+0, NULL
+
+# When all values are equal, they are stably ordered by the primary key in
+# ascending order (the scan order).
+> SELECT id, static FROM test ORDER BY static ASC
+---
+0, 1
+1, 1
+2, 1
+3, 1
+4, 1
+5, 1
+6, 1
+7, 1
+8, 1
+9, 1
+
+
+> SELECT id, static FROM test ORDER BY static DESC
+---
+0, 1
+1, 1
+2, 1
+3, 1
+4, 1
+5, 1
+6, 1
+7, 1
+8, 1
+9, 1
+
+# Order by multiple columns. Again, the ascending primary key is tiebreaker.
+> SELECT id, static, "bool", "int", "string" FROM test \
+  ORDER BY static ASC, "bool" DESC, "int" ASC, "string" DESC
+---
+1, 1, TRUE, 0, a
+2, 1, FALSE, -1, ab
+9, 1, NULL, NULL, 👍
+8, 1, NULL, NULL, B
+0, 1, NULL, NULL, NULL
+5, 1, NULL, -1000, aB
+7, 1, NULL, -9, Åa
+3, 1, NULL, 1, aaa
+6, 1, NULL, 7, åa
+4, 1, NULL, 1000, A
+
+> SELECT id, static, "bool", "int", "string" FROM test \
+  ORDER BY static DESC, "bool" ASC, "int" DESC, "string" ASC
+---
+4, 1, NULL, 1000, A
+6, 1, NULL, 7, åa
+3, 1, NULL, 1, aaa
+7, 1, NULL, -9, Åa
+5, 1, NULL, -1000, aB
+0, 1, NULL, NULL, NULL
+8, 1, NULL, NULL, B
+9, 1, NULL, NULL, 👍
+2, 1, FALSE, -1, ab
+1, 1, TRUE, 0, a
+
+# Can order by expressions.
+# TODO: the additional float projection here is unnecessary.
+[plan]> SELECT id, "float" FROM test ORDER BY "float" ^ 2
+---
+Projection: #0, #1
+└─ Order: test.float ^ 2 asc
+   └─ Projection: id, float, float
+      └─ Scan: test
+0, NULL
+8, NULL
+9, NULL
+3, 0
+4, -0
+2, -2.718
+1, 3.14
+5, inf
+6, -inf
+7, NaN
+
+# Can order by columns not in the result.
+[plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC
+---
+Projection: #0, #1
+└─ Order: test.bool desc
+   └─ Projection: id, int, bool
+      └─ Scan: test
+1, 0
+2, -1
+0, NULL
+3, 1
+4, 1000
+5, -1000
+6, 7
+7, -9
+8, NULL
+9, NULL
+
+# Order by aliased table or column.
+> SELECT id, "int" AS foo FROM test ORDER BY foo
+---
+0, NULL
+8, NULL
+9, NULL
+5, -1000
+7, -9
+2, -1
+1, 0
+3, 1
+6, 7
+4, 1000
+
+> SELECT id, "int" FROM test AS t ORDER BY t."int"
+---
+0, NULL
+8, NULL
+9, NULL
+5, -1000
+7, -9
+2, -1
+1, 0
+3, 1
+6, 7
+4, 1000
+
+# Order by an aliased expression.
+> SELECT id, "int" ^ 2 AS square FROM test ORDER BY square ASC
+---
+0, NULL
+8, NULL
+9, NULL
+1, 0
+2, 1
+3, 1
+6, 49
+7, 81
+4, 1000000
+5, 1000000
+
+# Errors if the field is ambiguous.
+# TODO: this should error.
+# TODO: when fixed, test qualified field names, and aliases vs unqualified columns.
+> SELECT id, "int" ^ 2 AS foo, "int" AS foo FROM test ORDER BY foo ASC
+---
+0, NULL, NULL
+8, NULL, NULL
+9, NULL, NULL
+1, 0, 0
+2, 1, -1
+3, 1, 1
+6, 49, 7
+7, 81, -9
+4, 1000000, 1000
+5, 1000000, -1000
+
+# Errors on unknown table or column, even the original table name when aliased.
+!> SELECT * FROM test ORDER BY unknown
+!> SELECT * FROM test ORDER BY test.unknown
+!> SELECT * FROM test ORDER BY unknown.id
+!> SELECT * FROM test AS t ORDER BY test."int"
+---
+Error: invalid input: unknown field unknown
+Error: invalid input: unknown field test.unknown
+Error: invalid input: unknown table unknown
+Error: invalid input: unknown table test
+
+# Errors on unknown direction.
+!> SELECT * FROM test ORDER BY id UNKNOWN
+---
+Error: invalid input: unexpected token unknown
+
+# Errors on trailing comma.
+!> SELECT * FROM test ORDER BY id,
+---
+Error: invalid input: unexpected end of input

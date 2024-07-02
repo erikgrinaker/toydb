@@ -113,7 +113,7 @@ ok
 
 > SELECT * FROM name
 ---
-1,NULL,NULL,NULL,NULL
+1, NULL, NULL, NULL, NULL
 
 # Self references are fine.
 > CREATE TABLE self (id INT PRIMARY KEY, self_id INT REFERENCES self)

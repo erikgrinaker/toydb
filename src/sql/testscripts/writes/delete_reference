@@ -29,9 +29,9 @@ Error: invalid input: row referenced by name.ref_id for name.id=1
 
 > SELECT * FROM ref
 ---
-1,a
-2,b
-3,c
+1, a
+2, b
+3, c
 
 # DELETE of an unreferenced row succeeds.
 [ops]> DELETE FROM ref WHERE id = 3
@@ -45,8 +45,8 @@ storage delete mvcc:TxnActive(13) ["\x01\x00\x00\x00\x00\x00\x00\x00\r"]
 
 > SELECT * FROM ref
 ---
-1,a
-2,b
+1, a
+2, b
 
 # DELETE in the source table succeeds. It also removes the index entries.
 [ops]> DELETE FROM name WHERE id = 2 OR id = 3
@@ -111,8 +111,8 @@ ok
 
 > SELECT * FROM self
 ---
-2,2
-3,2
+2, 2
+3, 2
 
 # Dump the raw dataset.
 dump

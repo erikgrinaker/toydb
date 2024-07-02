@@ -106,11 +106,11 @@ ok
 
 > SELECT * FROM name
 ---
-1,TRUE,1,3.14,foo
-2,NULL,NULL,NaN,NULL
-3,NULL,NULL,inf,NULL
-5,NULL,NULL,NULL,
-6,NULL,NULL,NULL,NULL
+1, TRUE, 1, 3.14, foo
+2, NULL, NULL, NaN, NULL
+3, NULL, NULL, inf, NULL
+5, NULL, NULL, NULL, 
+6, NULL, NULL, NULL, NULL
 
 # Self references are fine.
 > CREATE TABLE self (id INT PRIMARY KEY, self_id INT REFERENCES self)

@@ -129,8 +129,8 @@ storage delete mvcc:TxnActive(13) ["\x01\x00\x00\x00\x00\x00\x00\x00\r"]
 
 > SELECT * FROM "unique"
 ---
-1,NULL,NULL,NULL,NULL
-2,NULL,NULL,NULL,NULL
+1, NULL, NULL, NULL, NULL
+2, NULL, NULL, NULL, NULL
 
 # Float NaNs are considered different and allowed.
 # TODO: should these be considered equal?
@@ -158,8 +158,8 @@ storage delete mvcc:TxnActive(14) ["\x01\x00\x00\x00\x00\x00\x00\x00\x0e"]
 
 > SELECT * FROM "unique"
 ---
-1,NULL,NULL,NaN,NULL
-2,NULL,NULL,NaN,NULL
+1, NULL, NULL, NaN, NULL
+2, NULL, NULL, NaN, NULL
 
 # Float 0.0 and -0.0 are considered different.
 [ops]> UPDATE "unique" SET "float" = 0.0 WHERE id = 1
@@ -192,8 +192,8 @@ storage delete mvcc:TxnActive(16) ["\x01\x00\x00\x00\x00\x00\x00\x00\x10"]
 
 > SELECT * FROM "unique"
 ---
-1,NULL,NULL,0,NULL
-2,NULL,NULL,-0,NULL
+1, NULL, NULL, 0, NULL
+2, NULL, NULL, -0, NULL
 
 # Float INFINITY is considered equal.
 [ops]> UPDATE "unique" SET "float" = INFINITY WHERE id = 1
@@ -226,8 +226,8 @@ storage delete mvcc:TxnActive(18) ["\x01\x00\x00\x00\x00\x00\x00\x00\x12"]
 
 > SELECT * FROM "unique"
 ---
-1,NULL,NULL,inf,NULL
-2,NULL,NULL,-inf,NULL
+1, NULL, NULL, inf, NULL
+2, NULL, NULL, -inf, NULL
 
 !> UPDATE "unique" SET "float" = INFINITY WHERE id = 2
 ---
@@ -270,5 +270,5 @@ storage delete mvcc:TxnActive(23) ["\x01\x00\x00\x00\x00\x00\x00\x00\x17"]
 
 > SELECT * FROM "unique"
 ---
-1,NULL,NULL,inf,case
-2,NULL,NULL,-inf,CaSe
+1, NULL, NULL, inf, case
+2, NULL, NULL, -inf, CaSe

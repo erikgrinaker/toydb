@@ -283,6 +283,8 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
 
 /// Short-circuits useless nodes and expressions, by removing them and/or
 /// replacing them with Nothing nodes that yield no rows.
+///
+/// TODO: omit order by primary key, limit 0.
 pub(super) fn short_circuit(node: Node) -> Result<Node> {
     const TRUE: Expression = Expression::Constant(Value::Boolean(true));
     const TRUEOPT: Option<Expression> = Some(TRUE);

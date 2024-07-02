@@ -145,36 +145,11 @@ macro_rules! test_query {
 }
 
 test_query! {
-    all: "SELECT * FROM movies",
-    bare: "SELECT",
-    trailing_comma: "SELECT 1,",
-    lowercase: "select 1",
-
-    field_single: "SELECT id FROM movies",
-    field_multi: "SELECT id, title FROM movies",
     field_ambiguous: "SELECT id FROM movies, genres",
-    field_qualified: "SELECT movies.id FROM movies",
     field_qualified_multi: "SELECT movies.id, genres.id FROM movies, genres",
-    field_qualified_nested: "SELECT movies.id.value FROM movies",
-    field_unknown: "SELECT unknown FROM movies",
-    field_unknown_aliased: "SELECT movies.id FROM movies AS m",
-    field_unknown_qualified: "SELECT movies.unknown FROM movies",
-    field_unknown_table: "SELECT unknown.id FROM movies",
     field_aliased: "SELECT m.id, g.id FROM movies AS m, genres g",
 
-    expr_dynamic: "SELECT 2020 - year AS age FROM movies",
-    expr_static: "SELECT 1 + 2 * 3, 'abc' LIKE 'x%' AS nope",
-    expr_mixed: "SELECT 1 + 2 * 3, 2020 - released AS age FROM movies",
-
-    as_: r#"SELECT 1, 2 b, 3 AS c, 4 AS "👋", id AS "some id" FROM movies"#,
-    as_bare: "SELECT 1 AS",
-    as_all: "SELECT * AS all FROM movies",
-    as_duplicate: "SELECT 1 AS a, 2 AS a",
-    as_qualified: r#"SELECT 1 AS a.b FROM movies"#,
-
-    from_bare: "SELECT * FROM",
     from_multiple: "SELECT * FROM movies, genres, countries",
-    from_unknown: "SELECT * FROM unknown",
     from_alias_duplicate: "SELECT * FROM movies a, genres a",
     from_alias_duplicate_join: "SELECT * FROM movies a JOIN genres a ON TRUE",
     from_duplicate: "SELECT * FROM movies, movies",
@@ -201,87 +176,12 @@ test_query! {
     where_field_aliased_table: "SELECT m.id, g.id FROM movies m, genres g WHERE m.id >= 3 AND g.id = 1",
     where_join_inner: "SELECT * FROM movies, genres WHERE movies.genre_id = genres.id",
 
-    order: "SELECT * FROM movies ORDER BY released",
-    order_asc: "SELECT * FROM movies ORDER BY released ASC",
-    order_asc_lowercase: "SELECT * FROM movies ORDER BY released asc",
-    order_desc: "SELECT * FROM movies ORDER BY released DESC",
-    order_desc_lowercase: "SELECT * FROM movies ORDER BY released desc",
-    order_expr: "SELECT id, title, released, released % 4 AS ord FROM movies ORDER BY released % 4 ASC",
-    order_multi: "SELECT * FROM movies ORDER BY ultrahd ASC, id DESC",
-    order_noselect: "SELECT id, title FROM movies ORDER BY released",
-    order_unknown_dir: "SELECT * FROM movies ORDER BY id X",
-    order_field_unknown: "SELECT * FROM movies ORDER BY unknown",
-    order_field_qualified: "SELECT movies.id, title, name FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genres.name, movies.title",
-    order_field_aliased: "SELECT movies.id, title, genres.name AS genre FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY genre, title",
     order_field_ambiguous: "SELECT * FROM movies, genres WHERE movies.genre_id = genres.id ORDER BY id",
-    order_trailing_comma: "SELECT * FROM movies ORDER BY id,",
     order_aggregate: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MAX(rating)",
     order_aggregate_noselect: "SELECT studio_id, MAX(rating) FROM movies GROUP BY studio_id ORDER BY MIN(rating)",
     order_group_by_noselect: "SELECT MAX(rating) FROM movies GROUP BY studio_id ORDER BY studio_id",
 }
-test_query! { with [
-        "CREATE TABLE booleans (id INTEGER PRIMARY KEY, value BOOLEAN)",
-        "INSERT INTO booleans VALUES (1, TRUE), (2, NULL), (3, FALSE)",
-    ];
-    order_boolean_asc: "SELECT * FROM booleans ORDER BY value ASC",
-    order_boolean_desc: "SELECT * FROM booleans ORDER BY value DESC",
-}
-test_query! { with [
-        "CREATE TABLE floats (id INTEGER PRIMARY KEY, value FLOAT)",
-        "INSERT INTO floats VALUES (1, 3.14), (2, -2.718), (3, NULL), (4, 1.618), (5, 0.0)",
-    ];
-    order_float_asc: "SELECT * FROM floats ORDER BY value ASC",
-    order_float_desc: "SELECT * FROM floats ORDER BY value DESC",
-}
-test_query! { with [
-        "CREATE TABLE integers (id INTEGER PRIMARY KEY, value INTEGER)",
-        "INSERT INTO integers VALUES (1, 7), (2, NULL), (3, -3), (4, 3), (5, 0)",
-    ];
-    order_integer_asc: "SELECT * FROM integers ORDER BY value ASC",
-    order_integer_desc: "SELECT * FROM integers ORDER BY value DESC",
-}
-test_query! { with [
-        "CREATE TABLE strings (id INTEGER PRIMARY KEY, value STRING)",
-        "INSERT INTO strings VALUES
-            (1, 'a'),
-            (2, 'ab'),
-            (3, 'aaa'),
-            (4, 'A'),
-            (5, NULL),
-            (6, 'aA'),
-            (7, 'åa'),
-            (8, 'Åa')
-        ",
-    ];
-    order_string_asc: "SELECT * FROM strings ORDER BY value ASC",
-    order_string_desc: "SELECT * FROM strings ORDER BY value DESC",
-}
 test_query! {
-    limit: "SELECT * FROM movies LIMIT 3",
-    limit_zero: "SELECT * FROM movies LIMIT 0",
-    limit_neg: "SELECT * FROM movies LIMIT -1",
-    limit_large: "SELECT * FROM movies LIMIT 9223372036854775807",
-    limit_expr: "SELECT * FROM movies LIMIT 1 + 2",
-    limit_dynamic: "SELECT * FROM movies LIMIT 2000 - released",
-    limit_offset: "SELECT * FROM movies LIMIT 2 OFFSET 1",
-    limit_multi: "SELECT * FROM movies LIMIT 3, 4",
-    limit_null: "SELECT * FROM movies LIMIT NULL",
-    limit_boolean: "SELECT * FROM movies LIMIT TRUE",
-    limit_float: "SELECT * FROM movies LIMIT 3.14",
-    limit_string: "SELECT * FROM movies LIMIT 'abc'",
-
-    offset: "SELECT * FROM movies OFFSET 3",
-    offset_zero: "SELECT * FROM movies OFFSET 0",
-    offset_neg: "SELECT * FROM movies OFFSET -1",
-    offset_large: "SELECT * FROM movies OFFSET 9223372036854775807",
-    offset_expr: "SELECT * FROM movies OFFSET 1 + 2",
-    offset_dynamic: "SELECT * FROM movies OFFSET 2000 - released",
-    offset_multi: "SELECT * FROM movies OFFSET 3, 4",
-    offset_null: "SELECT * FROM movies OFFSET NULL",
-    offset_boolean: "SELECT * FROM movies OFFSET TRUE",
-    offset_float: "SELECT * FROM movies OFFSET 3.14",
-    offset_string: "SELECT * FROM movies OFFSET 'abc'",
-
     join_cross: "SELECT * FROM movies CROSS JOIN genres",
     join_cross_alias: r#"
         SELECT m.id, m.title, g.id, g.name, c.id, c.name
