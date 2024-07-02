@@ -1,0 +1,322 @@
+# Tests aggregate functions.
+
+> CREATE TABLE test ( \
+    id INT PRIMARY KEY, \
+    "bool" BOOLEAN, \
+    "int" INTEGER, \
+    "float" FLOAT, \
+    "string" STRING \
+)
+> INSERT INTO test VALUES (0, NULL, NULL,   NULL,      NULL)
+> INSERT INTO test VALUES (1, TRUE,   -1,   3.14,      '')
+> INSERT INTO test VALUES (2, FALSE,  0,    2.718,     'abc')
+> INSERT INTO test VALUES (3, TRUE,   3,    -0.0,      'AB')
+> INSERT INTO test VALUES (4, NULL,   42,   INFINITY,  '👋')
+> INSERT INTO test VALUES (5, NULL,   NULL, NAN,       NULL)
+---
+ok
+
+# COUNT(*) returns the row count.
+# TODO: revisit the plan here.
+[plan]> SELECT COUNT(*) FROM test
+---
+Projection: #0
+└─ Aggregation: count
+   └─ Projection: TRUE
+      └─ Scan: test
+6
+
+# COUNT works on constant values.
+# TODO: revisit the plan here.
+[plan,header]> SELECT COUNT(NULL), COUNT(TRUE), COUNT(1), COUNT(3.14), COUNT(NAN), COUNT('')
+---
+Projection: #0, #1, #2, #3, #4, #5
+└─ Aggregation: count, count, count, count, count, count
+   └─ Projection: NULL, TRUE, 1, 3.14, NaN, 
+      └─ EmptyRow
+, , , , , 
+0, 1, 1, 1, 1, 1
+
+# COUNT works on no rows.
+[plan]> SELECT COUNT(id), COUNT("bool"), COUNT("float"), COUNT("string") FROM test WHERE false
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: count, count, count, count
+   └─ Nothing
+0, 0, 0, 0
+
+# COUNT returns number of non-NULL values.
+# TODO: revisit the plan here, the last projection is unnecessary.
+[plan,header]> SELECT COUNT(id), COUNT("bool"), COUNT("float"), COUNT("string") FROM test
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: count, count, count, count
+   └─ Projection: id, bool, float, string
+      └─ Scan: test
+, , , 
+6, 3, 5, 4
+
+# MAX works on constant values.
+[plan]> SELECT MAX(NULL), MAX(TRUE), MAX(1), MAX(3.14), MAX(NAN), MAX('foo') FROM test
+---
+Projection: #0, #1, #2, #3, #4, #5
+└─ Aggregation: max, max, max, max, max, max
+   └─ Projection: NULL, TRUE, 1, 3.14, NaN, foo
+      └─ Scan: test
+NULL, TRUE, 1, 3.14, NaN, foo
+
+# MAX works on no rows.
+[plan]> SELECT MAX(id), MAX("bool"), MAX("float"), MAX("string") FROM test WHERE false
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: max, max, max, max
+   └─ Nothing
+NULL, NULL, NULL, NULL
+
+# MAX returns the max value, or NULL if any value is NULL.
+[plan]> SELECT MAX(id) FROM test
+---
+Projection: #0
+└─ Aggregation: max
+   └─ Projection: id
+      └─ Scan: test
+5
+
+> SELECT MAX("bool") FROM test
+> SELECT MAX("bool") FROM test WHERE "bool" IS NOT NULL
+---
+NULL
+TRUE
+
+> SELECT MAX("int") FROM test
+> SELECT MAX("int") FROM test WHERE "int" IS NOT NULL
+---
+NULL
+42
+
+# TODO: deal with the NAN case here.
+> SELECT MAX("float") FROM test
+> SELECT MAX("float") FROM test WHERE "float" IS NOT NULL
+> SELECT MAX("float") FROM test WHERE "float" != NAN AND "float" IS NOT NULL
+---
+NULL
+NaN
+NaN
+
+> SELECT MAX("string") FROM test
+> SELECT MAX("string") FROM test WHERE "string" IS NOT NULL
+---
+NULL
+👋
+
+# MIN works on constant values.
+[plan]> SELECT MIN(NULL), MIN(TRUE), MIN(1), MIN(3.14), MIN(NAN), MIN('foo') FROM test
+---
+Projection: #0, #1, #2, #3, #4, #5
+└─ Aggregation: min, min, min, min, min, min
+   └─ Projection: NULL, TRUE, 1, 3.14, NaN, foo
+      └─ Scan: test
+NULL, TRUE, 1, 3.14, NaN, foo
+
+# MIN works on no rows.
+[plan]> SELECT MIN(id), MIN("bool"), MIN("float"), MIN("string") FROM test WHERE false
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: min, min, min, min
+   └─ Nothing
+NULL, NULL, NULL, NULL
+
+# MIN returns the min value, or NULL if any value is NULL.
+[plan]> SELECT MIN(id) FROM test
+---
+Projection: #0
+└─ Aggregation: min
+   └─ Projection: id
+      └─ Scan: test
+0
+
+> SELECT MIN("bool") FROM test
+> SELECT MIN("bool") FROM test WHERE "bool" IS NOT NULL
+---
+NULL
+FALSE
+
+> SELECT MIN("int") FROM test
+> SELECT MIN("int") FROM test WHERE "int" IS NOT NULL
+---
+NULL
+-1
+
+> SELECT MIN("float") FROM test
+> SELECT MIN("float") FROM test WHERE "float" IS NOT NULL
+---
+NULL
+-0
+
+> SELECT MIN("string") FROM test
+> SELECT MIN("string") FROM test WHERE "string" IS NOT NULL
+---
+> NULL
+> 
+
+# SUM works on constant values, but only numbers.
+[plan]> SELECT SUM(NULL), SUM(1), SUM(3.14), SUM(NAN) FROM test
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: sum, sum, sum, sum
+   └─ Projection: NULL, 1, 3.14, NaN
+      └─ Scan: test
+NULL, 6, 18.84, NaN
+
+!> SELECT SUM(TRUE)
+!> SELECT SUM('foo')
+---
+Error: invalid input: can't add 0 and TRUE
+Error: invalid input: can't add 0 and foo
+
+# SUM works on no rows.
+[plan]> SELECT SUM(id), SUM("bool"), SUM("float"), SUM("string") FROM test WHERE false
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: sum, sum, sum, sum
+   └─ Nothing
+NULL, NULL, NULL, NULL
+
+# SUM returns the sum, or NULL if any value is NULL. Errors
+# on booleans or strings.
+[plan]> SELECT SUM(id) FROM test
+---
+Projection: #0
+└─ Aggregation: sum
+   └─ Projection: id
+      └─ Scan: test
+15
+
+!> SELECT SUM("bool") FROM test
+!> SELECT SUM("bool") FROM test WHERE "bool" IS NOT NULL
+> SELECT SUM("bool") FROM test WHERE "bool" IS NULL
+---
+Error: invalid input: can't add NULL and TRUE
+Error: invalid input: can't add 0 and TRUE
+NULL
+
+> SELECT SUM("int") FROM test
+> SELECT SUM("int") FROM test WHERE "int" IS NOT NULL
+---
+NULL
+44
+
+# TODO: deal with the NAN case here.
+> SELECT SUM("float") FROM test
+> SELECT SUM("float") FROM test WHERE "float" IS NOT NULL
+> SELECT SUM("float") FROM test WHERE "float" != NAN AND "float" IS NOT NULL
+---
+NULL
+NaN
+NaN
+
+!> SELECT SUM("string") FROM test
+!> SELECT SUM("string") FROM test WHERE "string" IS NOT NULL
+> SELECT SUM("string") FROM test WHERE "string" IS NULL
+---
+Error: invalid input: can't add NULL and 
+Error: invalid input: can't add 0 and 
+NULL
+
+# AVG works on constant values, but only numbers.
+[plan]> SELECT AVG(NULL), AVG(1), AVG(3.14), AVG(NAN) FROM test
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: avg, avg, avg, avg
+   └─ Projection: NULL, 1, 3.14, NaN
+      └─ Scan: test
+NULL, 1, 3.14, NaN
+
+!> SELECT AVG(TRUE)
+!> SELECT AVG('foo')
+---
+Error: invalid input: can't add 0 and TRUE
+Error: invalid input: can't add 0 and foo
+
+# AVG works on no rows.
+[plan]> SELECT AVG(id), AVG("bool"), AVG("float"), AVG("string") FROM test WHERE false
+---
+Projection: #0, #1, #2, #3
+└─ Aggregation: avg, avg, avg, avg
+   └─ Nothing
+NULL, NULL, NULL, NULL
+
+# AVG returns the average, or NULL if any value is NULL. Errors
+# on booleans or strings.
+[plan]> SELECT AVG(id) FROM test
+---
+Projection: #0
+└─ Aggregation: avg
+   └─ Projection: id
+      └─ Scan: test
+2
+
+# TODO: the first case here should error.
+> SELECT AVG("bool") FROM test
+!> SELECT AVG("bool") FROM test WHERE "bool" IS NOT NULL
+> SELECT AVG("bool") FROM test WHERE "bool" IS NULL
+---
+NULL
+Error: invalid input: can't add 0 and TRUE
+NULL
+
+> SELECT AVG("int") FROM test
+> SELECT AVG("int") FROM test WHERE "int" IS NOT NULL
+---
+NULL
+11
+
+# TODO: deal with the NAN case here.
+> SELECT AVG("float") FROM test
+> SELECT AVG("float") FROM test WHERE "float" IS NOT NULL
+> SELECT AVG("float") FROM test WHERE "float" != NAN AND "float" IS NOT NULL
+---
+NULL
+NaN
+NaN
+
+# TODO: the first case here should error.
+> SELECT AVG("string") FROM test
+!> SELECT AVG("string") FROM test WHERE "string" IS NOT NULL
+> SELECT AVG("string") FROM test WHERE "string" IS NULL
+---
+NULL
+Error: invalid input: can't add 0 and 
+NULL
+
+# Constant aggregates can be used with rows.
+[plan]> SELECT COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test
+---
+Projection: #0, #1, #2, #3, #4
+└─ Aggregation: count, min, max, sum, avg
+   └─ Projection: 1, 1, 1, 1, 1
+      └─ Scan: test
+6, 1, 1, 6, 1
+
+# Constant aggregates can be used with rows including values.
+# TODO: this doesn't work with SELECT *. It also doesn't work with fields.
+# It shouldn't, but the error message count be better.
+[plan]!> SELECT *, COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test
+[plan]!> SELECT id, COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test
+---
+Error: invalid input: unexpected token ,
+Error: invalid input: unknown field id
+
+# Aggregate can be expression, both inside and outside the aggregate.
+[plan]> SELECT SUM("int" * 10) / COUNT("int") + 7 FROM test WHERE "int" IS NOT NULL
+---
+Projection: #0 / #1 + 7
+└─ Aggregation: sum, count
+   └─ Projection: int * 10, int
+      └─ Scan: test (NOT int IS NULL)
+117
+
+# Aggregate functions can't be nested.
+!> SELECT MIN(MAX("int")) FROM test
+---
+Error: invalid input: aggregate functions can't be nested

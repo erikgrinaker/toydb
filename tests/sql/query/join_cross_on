@@ -1,5 +1,0 @@
-Query: SELECT * FROM movies CROSS JOIN genres ON movies.genre_id = genres.id
-
-Error: invalid input: unexpected token ON
-
-AST: InvalidInput("unexpected token ON")

@@ -1,0 +1,217 @@
+# Tests the index_lookup optimizer.
+# TODO: test the expression handling better, e.g. CNF.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING INDEX)
+> INSERT INTO test VALUES (0, NULL), (1, 'a'), (2, 'b'), (3, 'c')
+> CREATE TABLE other (id INT PRIMARY KEY, test_id INT REFERENCES test)
+> INSERT INTO other VALUES (1, 1), (2, 2), (3, 3)
+---
+ok
+
+# Primary key lookups.
+[opt]> SELECT * FROM test WHERE id = 2
+---
+Initial:
+   Filter: id = 2
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (id = 2)
+Index lookup:
+   KeyLookup: test (2)
+2, b
+
+[opt]> SELECT * FROM test WHERE id = 1 OR id = 3
+---
+Initial:
+   Filter: id = 1 OR id = 3
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (id = 1 OR id = 3)
+Index lookup:
+   KeyLookup: test (1, 3)
+1, a
+3, c
+
+# Can combine lookups with other predicates, but only AND.
+[opt]> SELECT * FROM test WHERE (id = 1 OR id = 3) AND value > 'a'
+---
+Initial:
+   Filter: id = 1 OR id = 3 AND value > a
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (id = 1 OR id = 3 AND value > a)
+Index lookup:
+   Filter: value > a
+   └─ KeyLookup: test (1, 3)
+3, c
+
+[opt]> SELECT * FROM test WHERE id = 1 OR id = 3 OR value > 'a'
+---
+Initial:
+   Filter: id = 1 OR id = 3 OR value > a
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (id = 1 OR id = 3 OR value > a)
+1, a
+2, b
+3, c
+
+# Same story with secondary indexes.
+[opt]> SELECT * FROM test WHERE value = 'b'
+---
+Initial:
+   Filter: value = b
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (value = b)
+Index lookup:
+   IndexLookup: test column value (b)
+2, b
+
+[opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c'
+---
+Initial:
+   Filter: value = a OR value = c
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (value = a OR value = c)
+Index lookup:
+   IndexLookup: test column value (a, c)
+1, a
+3, c
+
+[opt]> SELECT * FROM test WHERE (value = 'a' OR value = 'c') AND id > 1
+---
+Initial:
+   Filter: value = a OR value = c AND id > 1
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (value = a OR value = c AND id > 1)
+Index lookup:
+   Filter: id > 1
+   └─ IndexLookup: test column value (a, c)
+3, c
+
+[opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c' OR id > 1
+---
+Initial:
+   Filter: value = a OR value = c OR id > 1
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (value = a OR value = c OR id > 1)
+1, a
+2, b
+3, c
+
+# NULL lookups should match for IS NULL, but not for = NULL. IS NOT NULL
+# incurs a table scan.
+# TODO: this shouldn't return a result for = NULL.
+# TODO: add NAN testing.
+[opt]> SELECT * FROM test WHERE value IS NULL
+---
+Initial:
+   Filter: value IS NULL
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (value IS NULL)
+Index lookup:
+   IndexLookup: test column value (NULL)
+0, NULL
+
+[opt]> SELECT * FROM test WHERE value = NULL
+---
+Initial:
+   Filter: value = NULL
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (value = NULL)
+Index lookup:
+   IndexLookup: test column value (NULL)
+0, NULL
+
+[opt]> SELECT * FROM test WHERE value IS NOT NULL
+---
+Initial:
+   Filter: NOT value IS NULL
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (NOT value IS NULL)
+1, a
+2, b
+3, c
+
+# Inner joins on foreign keys with index lookups are transferred across.
+[opt]> SELECT * FROM test JOIN other ON other.test_id = test.id WHERE test_id = 1 OR test_id = 3
+---
+Initial:
+   Filter: test_id = 1 OR test_id = 3
+   └─ NestedLoopJoin: inner on other.test_id = test.id
+      ├─ Scan: test
+      └─ Scan: other
+Filter pushdown:
+   NestedLoopJoin: inner on other.test_id = test.id
+   ├─ Scan: test (test.id = 1 OR test.id = 3)
+   └─ Scan: other (test_id = 1 OR test_id = 3)
+Index lookup:
+   NestedLoopJoin: inner on other.test_id = test.id
+   ├─ KeyLookup: test (1, 3)
+   └─ IndexLookup: other column test_id (1, 3)
+Join type:
+   HashJoin: inner on test.id = other.test_id
+   ├─ KeyLookup: test (1, 3)
+   └─ IndexLookup: other column test_id (1, 3)
+1, a, 1, 1
+3, c, 3, 3
+
+# It's the same if the index lookups are given in the join predicate.
+[opt]> SELECT * FROM test JOIN other ON other.test_id = test.id AND (test_id = 1 OR test_id = 3)
+---
+Initial:
+   NestedLoopJoin: inner on other.test_id = test.id AND test_id = 1 OR test_id = 3
+   ├─ Scan: test
+   └─ Scan: other
+Filter pushdown:
+   NestedLoopJoin: inner on other.test_id = test.id
+   ├─ Scan: test (test.id = 1 OR test.id = 3)
+   └─ Scan: other (test_id = 1 OR test_id = 3)
+Index lookup:
+   NestedLoopJoin: inner on other.test_id = test.id
+   ├─ KeyLookup: test (1, 3)
+   └─ IndexLookup: other column test_id (1, 3)
+Join type:
+   HashJoin: inner on test.id = other.test_id
+   ├─ KeyLookup: test (1, 3)
+   └─ IndexLookup: other column test_id (1, 3)
+1, a, 1, 1
+3, c, 3, 3
+
+# It also works with three tables.
+[opt]> SELECT * FROM test \
+    JOIN other a ON a.test_id = test.id AND a.test_id = 2 \
+    JOIN other b ON b.test_id = test.id AND b.test_id = 1 OR b.test_id = 3
+---
+Initial:
+   NestedLoopJoin: inner on b.test_id = test.id AND b.test_id = 1 OR b.test_id = 3
+   ├─ NestedLoopJoin: inner on a.test_id = test.id AND a.test_id = 2
+   │  ├─ Scan: test
+   │  └─ Scan: other as a
+   └─ Scan: other as b
+Filter pushdown:
+   NestedLoopJoin: inner on b.test_id = test.id OR b.test_id = 3
+   ├─ NestedLoopJoin: inner on a.test_id = test.id
+   │  ├─ Scan: test (test.id = 2)
+   │  └─ Scan: other as a (a.test_id = 2)
+   └─ Scan: other as b (b.test_id = 1 OR b.test_id = 3)
+Index lookup:
+   NestedLoopJoin: inner on b.test_id = test.id OR b.test_id = 3
+   ├─ NestedLoopJoin: inner on a.test_id = test.id
+   │  ├─ KeyLookup: test (2)
+   │  └─ IndexLookup: other as a column test_id (2)
+   └─ IndexLookup: other as b column test_id (1, 3)
+Join type:
+   NestedLoopJoin: inner on b.test_id = test.id OR b.test_id = 3
+   ├─ HashJoin: inner on test.id = a.test_id
+   │  ├─ KeyLookup: test (2)
+   │  └─ IndexLookup: other as a column test_id (2)
+   └─ IndexLookup: other as b column test_id (1, 3)
+2, b, 2, 2, 3, 3

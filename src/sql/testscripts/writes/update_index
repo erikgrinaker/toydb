@@ -98,8 +98,8 @@ storage delete mvcc:TxnActive(6) ["\x01\x00\x00\x00\x00\x00\x00\x00\x06"]
 
 > SELECT * FROM "index"
 ---
-1,TRUE,1,2.718,bar
-2,FALSE,7,3.14,abc
+1, TRUE, 1, 2.718, bar
+2, FALSE, 7, 3.14, abc
 
 # Updates with same values merges the index entries.
 [ops]> UPDATE "index" SET "bool" = TRUE, "int" = 7, "float" = 3.14, "string" = 'foo'
@@ -145,8 +145,8 @@ storage delete mvcc:TxnActive(7) ["\x01\x00\x00\x00\x00\x00\x00\x00\x07"]
 
 > SELECT * FROM "index"
 ---
-1,TRUE,7,3.14,foo
-2,TRUE,7,3.14,foo
+1, TRUE, 7, 3.14, foo
+2, TRUE, 7, 3.14, foo
 
 # Updates with all NULLs work and get indexed.
 [ops]> UPDATE "index" SET "bool" = NULL, "int" = NULL, "float" = NULL, "string" = NULL
@@ -203,5 +203,5 @@ storage delete mvcc:TxnActive(8) ["\x01\x00\x00\x00\x00\x00\x00\x00\x08"]
 
 > SELECT * FROM "index"
 ---
-1,NULL,NULL,NULL,NULL
-2,NULL,NULL,NULL,NULL
+1, NULL, NULL, NULL, NULL
+2, NULL, NULL, NULL, NULL

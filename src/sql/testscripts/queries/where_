@@ -1,0 +1,114 @@
+# Tests basic WHERE clauses.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a'), (2, 'b'), (3, 'c')
+
+> CREATE TABLE other (id INT PRIMARY KEY, "bool" BOOLEAN)
+> INSERT INTO other VALUES (1, FALSE), (2, TRUE)
+---
+ok
+
+# Constant TRUE and FALSE filters work as expected.
+[plan]> SELECT * FROM test WHERE TRUE
+---
+Scan: test
+1, a
+2, b
+3, c
+
+[plan]> SELECT * FROM test WHERE FALSE
+---
+Nothing
+
+# NULL is treated as FALSE.
+[plan]> SELECT * FROM test WHERE NULL
+---
+Nothing
+
+# Field predicate expressions work as expected.
+[plan]> SELECT * FROM test WHERE id > 1
+---
+Scan: test (id > 1)
+2, b
+3, c
+
+[plan]> SELECT * FROM test WHERE id > 1 AND value < 'c'
+---
+Scan: test (id > 1 AND value < c)
+2, b
+
+# Errors on non-boolean type.
+!> SELECT * FROM test WHERE 1
+!> SELECT * FROM test WHERE 1.0
+!> SELECT * FROM test WHERE ''
+---
+Error: invalid input: filter returned 1, expected boolean
+Error: invalid input: filter returned 1, expected boolean
+Error: invalid input: filter returned , expected boolean
+
+# Errors on bare WHERE clause or multiple predicates.
+!> SELECT * FROM test WHERE
+!> SELECT * FROM test WHERE TRUE, TRUE
+---
+Error: invalid input: unexpected end of input
+Error: invalid input: unexpected token ,
+
+# Errors on unknown tables and fields.
+!> SELECT * FROM test WHERE unknown > 0
+!> SELECT * FROM test WHERE unknown.id > 0
+---
+Error: invalid input: unknown field unknown
+Error: invalid input: unknown table unknown
+
+# Qualified names are valid.
+> SELECT * FROM test WHERE test.value = 'b'
+---
+2, b
+
+# Expression and column aliases aren't visible.
+!> SELECT value AS v FROM test WHERE v = 'b'
+!> SELECT 1 + 1 AS two WHERE two = 2
+---
+Error: invalid input: unknown field v
+Error: invalid input: expression must be constant, found field two
+
+# Table aliases are visible.
+> SELECT * FROM test AS t WHERE t.id = 2
+---
+2, b
+
+# Ambiguous fields error.
+!> SELECT * FROM test, other WHERE id > 1
+---
+Error: invalid input: ambiguous field id
+
+# Unambiguous fields work.
+> SELECT * FROM test, other WHERE value = 'b'
+---
+2, b, 1, FALSE
+2, b, 2, TRUE
+
+
+# Qualified fields work, also when aliased.
+> SELECT * FROM test, other WHERE test.id = 2 AND other.id = 2
+---
+2, b, 2, TRUE
+
+> SELECT * FROM test t, other o WHERE t.id = 2 AND o.id = 2
+---
+2, b, 2, TRUE
+
+# WHERE can be combined with joins, even when aliased.
+[plan]> SELECT * FROM test JOIN other ON test.id = other.id WHERE test.id > 1
+---
+HashJoin: inner on test.id = other.id
+├─ Scan: test (test.id > 1)
+└─ Scan: other
+2, b, 2, TRUE
+
+[plan]> SELECT * FROM test t JOIN other o ON t.id = o.id WHERE t.id > 1
+---
+HashJoin: inner on t.id = o.id
+├─ Scan: test as t (t.id > 1)
+└─ Scan: other as o
+2, b, 2, TRUE

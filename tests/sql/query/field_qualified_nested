@@ -1,5 +1,0 @@
-Query: SELECT movies.id.value FROM movies
-
-Error: invalid input: unexpected token .
-
-AST: InvalidInput("unexpected token .")

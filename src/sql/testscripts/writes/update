@@ -23,8 +23,8 @@ storage delete mvcc:TxnActive(3) ["\x01\x00\x00\x00\x00\x00\x00\x00\x03"]
 
 > SELECT * FROM name
 ---
-1,foo
-2,foo
+1, foo
+2, foo
 
 dump
 ---

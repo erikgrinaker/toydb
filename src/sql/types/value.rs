@@ -49,7 +49,8 @@ pub enum Value {
 impl encoding::Value for Value {}
 
 // TODO: revisit and document the f64 handling here. FWIW, PostgreSQL considers
-// NaN = NaN, maybe we should too.
+// NaN = NaN, maybe we should too. However, a better option is probably to cast
+// NaN to NULL.
 impl std::cmp::Eq for Value {}
 
 impl std::hash::Hash for Value {

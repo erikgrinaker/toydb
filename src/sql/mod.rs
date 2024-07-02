@@ -21,8 +21,11 @@ mod tests {
 
     use super::engine::{Catalog as _, Session};
     use super::parser::Parser;
+    use super::planner::{Node, Plan, OPTIMIZERS};
 
     // Run goldenscript tests in src/sql/testscripts.
+    test_each_path! { in "src/sql/testscripts/optimizer" as optimizer => test_goldenscript }
+    test_each_path! { in "src/sql/testscripts/queries" as queries => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/schema" as schema => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/writes" as writes => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/expressions" as expressions => test_goldenscript_expr }
@@ -116,6 +119,28 @@ mod tests {
             // Execute the statement.
             let result = self.session.execute(input)?;
 
+            // Output optimizations if requested.
+            if tags.remove("opt") {
+                if tags.contains("plan") {
+                    return Err("no point using both plan and opt".into());
+                }
+                let ast = Parser::new(input).parse()?;
+                let plan = self.session.with_txn(true, |txn| Planner::new(txn).build(ast))?;
+                let Plan::Select { mut root, labels: _ } = plan else {
+                    return Err("can only use opt with SELECT plans".into());
+                };
+
+                let fmtplan = |name, node: &Node| format!("{name}:\n{node}").replace('\n', "\n   ");
+                writeln!(output, "{}", fmtplan("Initial", &root))?;
+                for (name, optimizer) in OPTIMIZERS {
+                    let old = root.clone();
+                    root = optimizer(root)?;
+                    if root != old {
+                        writeln!(output, "{}", fmtplan(name, &root))?;
+                    }
+                }
+            }
+
             // Output the plan if requested.
             if tags.remove("plan") {
                 let query = format!("EXPLAIN {input}");
@@ -126,13 +151,13 @@ mod tests {
             }
 
             // Output the result if requested. SELECT results are always output,
-            // but the columns only if result is given.
+            // but the column only if result is given.
             if let StatementResult::Select { columns, rows } = result {
-                if tags.remove("columns") {
-                    writeln!(output, "{}", columns.into_iter().map(|c| c.to_string()).join(","))?;
+                if tags.remove("header") {
+                    writeln!(output, "{}", columns.into_iter().map(|c| c.to_string()).join(", "))?;
                 }
                 for row in rows {
-                    writeln!(output, "{}", row.into_iter().map(|v| v.to_string()).join(","))?;
+                    writeln!(output, "{}", row.into_iter().map(|v| v.to_string()).join(", "))?;
                 }
             } else if tags.remove("result") {
                 writeln!(output, "{result:?}")?;

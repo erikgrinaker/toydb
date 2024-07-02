@@ -1,0 +1,95 @@
+# Tests HAVING clauses. See "aggregate" and "group_by" for related tests.
+
+> CREATE TABLE test ( \
+    id INT PRIMARY KEY, \
+    "group" STRING, \
+    "bool" BOOLEAN, \
+    "int" INTEGER, \
+    "float" FLOAT, \
+    "string" STRING \
+)
+> INSERT INTO test VALUES (0, NULL,   NULL, NULL,   NULL,      NULL)
+> INSERT INTO test VALUES (1, 'a',    TRUE,   -1,   3.14,      '')
+> INSERT INTO test VALUES (2, 'b',    FALSE,  0,    NAN,       'abc')
+> INSERT INTO test VALUES (3, 'a',    TRUE,   3,    -0.0,      'AB')
+> INSERT INTO test VALUES (4, 'b',    TRUE,   42,   INFINITY,  '👋')
+> INSERT INTO test VALUES (5, 'a',    FALSE,  7,    NAN,       '')
+> INSERT INTO test VALUES (6, 'b',    FALSE,  -1,   0.0,       'abc')
+---
+ok
+
+# Having without a GROUP BY clause is valid, and behaves as if every column is
+# grouped by.
+[plan]> SELECT * FROM test HAVING id > 3
+---
+Scan: test (id > 3)
+4, b, TRUE, 42, inf, 👋
+5, a, FALSE, 7, NaN, 
+6, b, FALSE, -1, 0, abc
+
+# Having works with a column not in the result.
+# TODO: should it?
+[plan]> SELECT id FROM test HAVING "int" > 3
+---
+Projection: #0
+└─ Filter: test.int > 3
+   └─ Projection: id, int
+      └─ Scan: test
+4
+5
+
+# Having works with an aggregate function.
+# TODO: it's unnecessary do duplicate the aggregation here.
+# TODO: test without a GROUP BY clause.
+[plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") > 10
+---
+Projection: #0, #1
+└─ Filter: #2 > 10
+   └─ Projection: test.group, #0, #1
+      └─ Aggregation: max, max
+         └─ Projection: int, int, group
+            └─ Scan: test
+b, 42
+
+# Having works with SELECT aliases.
+[plan]> SELECT "group", MAX("int") AS m FROM test GROUP BY "group" HAVING m > 10
+---
+Filter: m > 10
+└─ Projection: test.group, #0
+   └─ Aggregation: max
+      └─ Projection: int, group
+         └─ Scan: test
+b, 42
+
+# Having works with an aggregate function not in the SELECT clause.
+[plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") > 10
+---
+Projection: #0, #1
+└─ Filter: #2 > 10
+   └─ Projection: test.group, #0, #1
+      └─ Aggregation: count, max
+         └─ Projection: TRUE, int, group
+            └─ Scan: test
+b, 3
+
+# Having works with compound expressions.
+[plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") / COUNT(*) > 3
+---
+Projection: #0, #1
+└─ Filter: #2 / #3 > 3
+   └─ Projection: test.group, #0, #1, #2
+      └─ Aggregation: count, max, count
+         └─ Projection: TRUE, int, TRUE, group
+            └─ Scan: test
+b, 3
+
+# Having errors on nested aggregate functions.
+!> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX(MIN("int")) > 0
+---
+Error: invalid input: aggregate functions can't be nested
+
+# Having errors on fields not in the SELECT or GROUP BY clauses.
+# TODO: improve the error message.
+!> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING id > 3
+---
+Error: invalid input: unknown field id

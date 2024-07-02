@@ -1,5 +1,0 @@
-Query: SELECT * FROM
-
-Error: invalid input: unexpected end of input
-
-AST: InvalidInput("unexpected end of input")

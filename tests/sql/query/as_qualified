@@ -1,5 +1,0 @@
-Query: SELECT 1 AS a.b FROM movies
-
-Error: invalid input: unexpected token .
-
-AST: InvalidInput("unexpected token .")

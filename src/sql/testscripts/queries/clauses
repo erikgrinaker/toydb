@@ -1,0 +1,66 @@
+# Tests the ordering of SELECT clauses.
+
+> CREATE TABLE test ( \
+    id INT PRIMARY KEY, \
+    "bool" BOOLEAN, \
+    "float" FLOAT, \
+    "int" INT, \
+    "string" STRING \
+)
+> INSERT INTO test VALUES (1, true, 3.14, 7, 'foo')
+> INSERT INTO test VALUES (2, false, 2.718, 1, '👍')
+> INSERT INTO test VALUES (3, NULL, NULL, NULL, NULL)
+---
+ok
+
+# This is the only valid order of all clauses:
+> SELECT * FROM test WHERE TRUE HAVING TRUE ORDER BY TRUE LIMIT 1 OFFSET 1
+---
+2, FALSE, 2.718, 1, 👍
+
+# All clauses except SELECT are optional.
+> SELECT 1 WHERE TRUE HAVING TRUE ORDER BY 1 LIMIT 1 OFFSET 1
+---
+ok
+
+> SELECT * FROM test HAVING TRUE ORDER BY id LIMIT 1 OFFSET 1
+---
+2, FALSE, 2.718, 1, 👍
+
+> SELECT * FROM test WHERE TRUE ORDER BY id LIMIT 1 OFFSET 1
+---
+2, FALSE, 2.718, 1, 👍
+
+> SELECT * FROM test WHERE TRUE HAVING TRUE LIMIT 1 OFFSET 1
+---
+2, FALSE, 2.718, 1, 👍
+
+> SELECT * FROM test WHERE TRUE HAVING TRUE ORDER BY TRUE OFFSET 1
+---
+2, FALSE, 2.718, 1, 👍
+3, NULL, NULL, NULL, NULL
+
+> SELECT * FROM test WHERE TRUE HAVING TRUE ORDER BY TRUE LIMIT 1
+---
+1, TRUE, 3.14, 7, foo
+
+# The clause order is required. Moving any clause to the next position errors.
+!> FROM test SELECT * WHERE TRUE HAVING TRUE ORDER BY TRUE LIMIT 1 OFFSET 1
+---
+Error: invalid input: unexpected token FROM
+
+!> SELECT * FROM test HAVING TRUE WHERE TRUE ORDER BY TRUE LIMIT 1 OFFSET 1
+---
+Error: invalid input: unexpected token WHERE
+
+!> SELECT * FROM test WHERE TRUE ORDER BY TRUE HAVING TRUE LIMIT 1 OFFSET 1
+---
+Error: invalid input: unexpected token HAVING
+
+!> SELECT * FROM test WHERE TRUE HAVING TRUE LIMIT 1 ORDER BY TRUE OFFSET 1
+---
+Error: invalid input: unexpected token ORDER
+
+!> SELECT * FROM test WHERE TRUE HAVING TRUE ORDER BY TRUE OFFSET 1 LIMIT 1 
+---
+Error: invalid input: unexpected token LIMIT

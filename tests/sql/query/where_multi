@@ -1,5 +1,0 @@
-Query: SELECT * FROM movies WHERE TRUE, TRUE
-
-Error: invalid input: unexpected token ,
-
-AST: InvalidInput("unexpected token ,")

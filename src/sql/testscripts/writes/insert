@@ -38,10 +38,10 @@ storage delete mvcc:TxnActive(3) ["\x01\x00\x00\x00\x00\x00\x00\x00\x03"]
 
 > SELECT * FROM name
 ---
-1,a
-2,b
-3,c
-4,d
+1, a
+2, b
+3, c
+4, d
 
 dump
 ---
@@ -56,11 +56,11 @@ mvcc:Version(sql:Row("name", Integer(4)), 3) → Integer(4),String("d") ["\x04\x
 > INSERT INTO name VALUES (2^2+1, 'abc')
 > SELECT * FROM name
 ---
-1,a
-2,b
-3,c
-4,d
-5,abc
+1, a
+2, b
+3, c
+4, d
+5, abc
 
 !> INSERT INTO name VALUES (id + 2, 'abc')
 ---

@@ -1,0 +1,202 @@
+# Tests the SELECT part of queries.
+
+# Create a basic test table, and a secondary table for join field lookups.
+> CREATE TABLE test ( \
+    id INT PRIMARY KEY, \
+    "bool" BOOLEAN, \
+    "float" FLOAT, \
+    "int" INT, \
+    "string" STRING \
+)
+> INSERT INTO test VALUES (1, true, 3.14, 7, 'foo')
+> INSERT INTO test VALUES (2, false, 2.718, 1, '👍')
+> INSERT INTO test VALUES (3, NULL, NULL, NULL, NULL)
+
+> CREATE TABLE other (id INT PRIMARY KEY, value STRING)
+> INSERT INTO other VALUES (1, 'a'), (2, 'b')
+---
+ok
+
+# Select constant values.
+[plan]> select 1
+---
+Projection: 1
+└─ EmptyRow
+1
+
+[plan]> SELECT NULL, NOT FALSE, 2^2+1, 3.14*2, 'Hi 👋'
+---
+Projection: NULL, TRUE, 5, 6.28, Hi 👋
+└─ EmptyRow
+NULL, TRUE, 5, 6.28, Hi 👋
+
+# Bare select errors, as does trailing comma and identifier without a table.
+!> SELECT
+!> SELECT 1,
+!> SELECT foo
+---
+Error: invalid input: unexpected end of input
+Error: invalid input: unexpected end of input
+Error: invalid input: expression must be constant, found field foo
+
+# Select from a table.
+[plan,header]> SELECT * FROM test
+---
+Scan: test
+test.id, test.bool, test.float, test.int, test.string
+1, TRUE, 3.14, 7, foo
+2, FALSE, 2.718, 1, 👍
+3, NULL, NULL, NULL, NULL
+
+[plan,header]> SELECT "bool" FROM test
+---
+Projection: bool
+└─ Scan: test
+test.bool
+TRUE
+FALSE
+NULL
+
+# A SELECT * without a table errors, as does a bare FROM.
+!> SELECT *
+!> SELECT * FROM
+---
+Error: invalid input: can't select * without a table
+Error: invalid input: unexpected end of input
+
+# Mix fields, field expressions, and constant expressions.
+[plan,header]> SELECT id, 7-4, "float"^2 FROM test
+---
+Projection: id, 3, float ^ 2
+└─ Scan: test
+test.id, , 
+1, 3, 9.8596
+2, 3, 7.387524
+3, 3, NULL
+
+# Column names may be qualified or unqualified.
+[header]> SELECT id, test."bool" FROM test
+---
+test.id, test.bool
+1, TRUE
+2, FALSE
+3, NULL
+
+# The table may be aliased, and qualified using the alias. The AS alias keyword
+# is optional.
+[header,plan]> SELECT id, t."bool" FROM test AS t
+---
+Projection: id, t.bool
+└─ Scan: test as t
+t.id, t.bool
+1, TRUE
+2, FALSE
+3, NULL
+
+[header]> SELECT id, t."bool" FROM test t
+---
+t.id, t.bool
+1, TRUE
+2, FALSE
+3, NULL
+
+# Unknown tables or columns error. Including the original table when aliased.
+!> SELECT * FROM unknown
+!> SELECT unknown FROM test
+!> SELECT test.unknown FROM test
+!> SELECT test.id.unknown FROM test
+!> SELECT unknown.id FROM test
+!> SELECT test.id FROM test AS t
+---
+Error: invalid input: table unknown does not exist
+Error: invalid input: unknown field unknown
+Error: invalid input: unknown field test.unknown
+Error: invalid input: unexpected token .
+Error: invalid input: unknown table unknown
+Error: invalid input: unknown table test
+
+# Columns, both constant and from tables, can be aliased.
+# The AS keyword is optional.
+[header,plan]> SELECT 1 AS one, test."int" value FROM test
+---
+Projection: 1, test.int
+└─ Scan: test
+one, value
+1, 7
+1, 1
+1, NULL
+
+# Aliases can have special characters and keywords if quoted.
+[header]> SELECT 1 AS "integer", 2 AS "hi 👋"
+---
+integer, hi 👋
+1, 2
+
+# Expressions can't reference aliases.
+!> SELECT 1 AS one, one + 1
+!> SELECT id AS alias, alias + 1 FROM test
+---
+Error: invalid input: expression must be constant, found field one
+Error: invalid input: unknown field alias
+
+# Aliases can have the same name as table columns, but won't shadow them.
+[header]> SELECT 'foo' AS id, id, id + 3 FROM test
+---
+id, test.id, 
+foo, 1, 4
+foo, 2, 5
+foo, 3, 6
+
+# Multiple aliases can have the same name.
+[header]> SELECT 1 AS id, id, "float" AS id FROM test
+---
+id, test.id, id
+1, 1, 3.14
+1, 2, 2.718
+1, 3, NULL
+
+# Aliases can't be qualified.
+!> SELECT 1 AS foo.bar
+---
+Error: invalid input: unexpected token .
+
+# Bare and * aliases error.
+!> SELECT 1 AS
+!> SELECT * AS all FROM test
+---
+Error: invalid input: unexpected end of input
+Error: invalid input: unexpected token AS
+
+# Ambiguous fields error.
+!> SELECT id FROM test, other
+---
+Error: invalid input: ambiguous field id
+
+# Unambiguous fields don't, resulting in a cross join.
+> SELECT "bool", value FROM test, other
+---
+TRUE, a
+TRUE, b
+FALSE, a
+FALSE, b
+NULL, a
+NULL, b
+
+# Qualified fields work, also when aliased.
+> SELECT test.id, other.id FROM test, other
+---
+1, 1
+1, 2
+2, 1
+2, 2
+3, 1
+3, 2
+
+> SELECT t.id, o.id FROM test t, other o
+---
+1, 1
+1, 2
+2, 1
+2, 2
+3, 1
+3, 2

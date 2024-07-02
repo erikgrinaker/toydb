@@ -1,0 +1,87 @@
+# Tests OFFSET clauses.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a'), (2, 'b'), (3, 'c')
+---
+ok
+
+# Test all offsets from 4 to 0.
+[plan]> SELECT * FROM test OFFSET 4
+---
+Offset: 4
+└─ Scan: test
+
+> SELECT * FROM test OFFSET 3
+---
+ok
+
+> SELECT * FROM test OFFSET 2
+---
+3, c
+
+> SELECT * FROM test OFFSET 1
+---
+2, b
+3, c
+
+[plan]> SELECT * FROM test OFFSET 0
+---
+Offset: 0
+└─ Scan: test
+1, a
+2, b
+3, c
+
+# A max i64 offset works.
+> SELECT * FROM test OFFSET 9223372036854775807
+---
+ok
+
+# Offsets can also be used with constant values.
+[plan]> SELECT 1, 2, 3 OFFSET 1
+---
+Offset: 1
+└─ Projection: 1, 2, 3
+   └─ EmptyRow
+
+[plan]> SELECT 1, 2, 3 OFFSET 0
+---
+Offset: 0
+└─ Projection: 1, 2, 3
+   └─ EmptyRow
+1, 2, 3
+
+# Offsets can be expressions, but only constant ones.
+[plan]> SELECT * FROM test OFFSET 2 - 1
+---
+Offset: 1
+└─ Scan: test
+2, b
+3, c
+
+!> SELECT * FROM test OFFSET id
+---
+Error: invalid input: expression must be constant, found field id
+
+# Negative and NULL offset error.
+!> SELECT * FROM test OFFSET -1
+!> SELECT * FROM test OFFSET NULL
+---
+Error: invalid input: invalid offset -1
+Error: invalid input: invalid offset NULL
+
+# Non-integer offsets error.
+!> SELECT * FROM test OFFSET FALSE
+!> SELECT * FROM test OFFSET 1.0
+!> SELECT * FROM test OFFSET '1'
+---
+Error: invalid input: invalid offset FALSE
+Error: invalid input: invalid offset 1
+Error: invalid input: invalid offset 1
+
+# Multiple offsets error.
+!> SELECT * FROM test OFFSET 1 2
+!> SELECT * FROM test OFFSET 1,2
+---
+Error: invalid input: unexpected token 2
+Error: invalid input: unexpected token ,

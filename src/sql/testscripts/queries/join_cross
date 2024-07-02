@@ -1,0 +1,663 @@
+# Tests cross joins.
+
+# Set up a movies dataset.
+> CREATE TABLE countries ( \
+    id STRING PRIMARY KEY, \
+    name STRING NOT NULL \
+)
+> INSERT INTO countries VALUES \
+    ('fr', 'France'), \
+    ('ru', 'Russia'), \
+    ('us', 'United States of America')
+>CREATE TABLE genres ( \
+    id INTEGER PRIMARY KEY, \
+    name STRING NOT NULL \
+)
+> INSERT INTO genres VALUES \
+    (1, 'Science Fiction'), \
+    (2, 'Action'), \
+    (3, 'Comedy')
+> CREATE TABLE studios ( \
+    id INTEGER PRIMARY KEY, \
+    name STRING NOT NULL, \
+    country_id STRING INDEX REFERENCES countries \
+)
+> INSERT INTO studios VALUES \
+    (1, 'Mosfilm', 'ru'), \
+    (2, 'Lionsgate', 'us'), \
+    (3, 'StudioCanal', 'fr'), \
+    (4, 'Warner Bros', 'us')
+> CREATE TABLE movies ( \
+    id INTEGER PRIMARY KEY, \
+    title STRING NOT NULL, \
+    studio_id INTEGER NOT NULL INDEX REFERENCES studios, \
+    genre_id INTEGER NOT NULL INDEX REFERENCES genres, \
+    released INTEGER NOT NULL, \
+    rating FLOAT, \
+    ultrahd BOOLEAN \
+)
+> INSERT INTO movies VALUES \
+    (1, 'Stalker', 1, 1, 1979, 8.2, NULL), \
+    (2, 'Sicario', 2, 2, 2015, 7.6, TRUE), \
+    (3, 'Primer', 3, 1, 2004, 6.9, NULL), \
+    (4, 'Heat', 4, 2, 1995, 8.2, TRUE), \
+    (5, 'The Fountain', 4, 1, 2006, 7.2, FALSE), \
+    (6, 'Solaris', 1, 1, 1972, 8.1, NULL), \
+    (7, 'Gravity', 4, 1, 2013, 7.7, TRUE), \
+    (8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE), \
+    (9, 'Birdman', 4, 3, 2014, 7.7, TRUE), \
+    (10, 'Inception', 4, 1, 2010, 8.8, TRUE)
+---
+ok
+
+# Explicit cross join.
+[plan,header]> SELECT * FROM movies CROSS JOIN genres
+---
+NestedLoopJoin: inner
+├─ Scan: movies
+└─ Scan: genres
+movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy
+
+# Explicit triple cross join.
+[plan,header]> SELECT * FROM movies CROSS JOIN genres CROSS JOIN studios
+---
+NestedLoopJoin: inner
+├─ NestedLoopJoin: inner
+│  ├─ Scan: movies
+│  └─ Scan: genres
+└─ Scan: studios
+movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name, studios.id, studios.name, studios.country_id
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 4, Warner Bros, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 4, Warner Bros, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 4, Warner Bros, us
+
+# Explicit cross join with other order.
+[plan,header]> SELECT * FROM studios CROSS JOIN movies CROSS JOIN genres
+---
+NestedLoopJoin: inner
+├─ NestedLoopJoin: inner
+│  ├─ Scan: studios
+│  └─ Scan: movies
+└─ Scan: genres
+studios.id, studios.name, studios.country_id, movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name
+1, Mosfilm, ru, 1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
+1, Mosfilm, ru, 1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action
+1, Mosfilm, ru, 1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy
+1, Mosfilm, ru, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction
+1, Mosfilm, ru, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
+1, Mosfilm, ru, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy
+1, Mosfilm, ru, 3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
+1, Mosfilm, ru, 3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action
+1, Mosfilm, ru, 3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy
+1, Mosfilm, ru, 4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction
+1, Mosfilm, ru, 4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
+1, Mosfilm, ru, 4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy
+1, Mosfilm, ru, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
+1, Mosfilm, ru, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action
+1, Mosfilm, ru, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy
+1, Mosfilm, ru, 6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
+1, Mosfilm, ru, 6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action
+1, Mosfilm, ru, 6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy
+1, Mosfilm, ru, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
+1, Mosfilm, ru, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action
+1, Mosfilm, ru, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy
+1, Mosfilm, ru, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction
+1, Mosfilm, ru, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action
+1, Mosfilm, ru, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
+1, Mosfilm, ru, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction
+1, Mosfilm, ru, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action
+1, Mosfilm, ru, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
+1, Mosfilm, ru, 10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+1, Mosfilm, ru, 10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action
+1, Mosfilm, ru, 10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy
+2, Lionsgate, us, 1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
+2, Lionsgate, us, 1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action
+2, Lionsgate, us, 1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy
+2, Lionsgate, us, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction
+2, Lionsgate, us, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
+2, Lionsgate, us, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy
+2, Lionsgate, us, 3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
+2, Lionsgate, us, 3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action
+2, Lionsgate, us, 3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy
+2, Lionsgate, us, 4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction
+2, Lionsgate, us, 4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
+2, Lionsgate, us, 4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy
+2, Lionsgate, us, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
+2, Lionsgate, us, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action
+2, Lionsgate, us, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy
+2, Lionsgate, us, 6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
+2, Lionsgate, us, 6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action
+2, Lionsgate, us, 6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy
+2, Lionsgate, us, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
+2, Lionsgate, us, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action
+2, Lionsgate, us, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy
+2, Lionsgate, us, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction
+2, Lionsgate, us, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action
+2, Lionsgate, us, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
+2, Lionsgate, us, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction
+2, Lionsgate, us, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action
+2, Lionsgate, us, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
+2, Lionsgate, us, 10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+2, Lionsgate, us, 10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action
+2, Lionsgate, us, 10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy
+3, StudioCanal, fr, 1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
+3, StudioCanal, fr, 1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action
+3, StudioCanal, fr, 1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy
+3, StudioCanal, fr, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction
+3, StudioCanal, fr, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
+3, StudioCanal, fr, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy
+3, StudioCanal, fr, 3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
+3, StudioCanal, fr, 3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action
+3, StudioCanal, fr, 3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy
+3, StudioCanal, fr, 4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction
+3, StudioCanal, fr, 4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
+3, StudioCanal, fr, 4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy
+3, StudioCanal, fr, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
+3, StudioCanal, fr, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action
+3, StudioCanal, fr, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy
+3, StudioCanal, fr, 6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
+3, StudioCanal, fr, 6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action
+3, StudioCanal, fr, 6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy
+3, StudioCanal, fr, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
+3, StudioCanal, fr, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action
+3, StudioCanal, fr, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy
+3, StudioCanal, fr, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction
+3, StudioCanal, fr, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action
+3, StudioCanal, fr, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
+3, StudioCanal, fr, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction
+3, StudioCanal, fr, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action
+3, StudioCanal, fr, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
+3, StudioCanal, fr, 10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+3, StudioCanal, fr, 10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action
+3, StudioCanal, fr, 10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy
+4, Warner Bros, us, 1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
+4, Warner Bros, us, 1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action
+4, Warner Bros, us, 1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy
+4, Warner Bros, us, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction
+4, Warner Bros, us, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
+4, Warner Bros, us, 2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy
+4, Warner Bros, us, 3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
+4, Warner Bros, us, 3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action
+4, Warner Bros, us, 3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy
+4, Warner Bros, us, 4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction
+4, Warner Bros, us, 4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
+4, Warner Bros, us, 4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy
+4, Warner Bros, us, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
+4, Warner Bros, us, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action
+4, Warner Bros, us, 5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy
+4, Warner Bros, us, 6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
+4, Warner Bros, us, 6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action
+4, Warner Bros, us, 6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy
+4, Warner Bros, us, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
+4, Warner Bros, us, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action
+4, Warner Bros, us, 7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy
+4, Warner Bros, us, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction
+4, Warner Bros, us, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action
+4, Warner Bros, us, 8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
+4, Warner Bros, us, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction
+4, Warner Bros, us, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action
+4, Warner Bros, us, 9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
+4, Warner Bros, us, 10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+4, Warner Bros, us, 10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action
+4, Warner Bros, us, 10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy
+
+# Implicit cross join.
+[plan,header]> SELECT * FROM movies, genres, studios
+---
+NestedLoopJoin: inner
+├─ NestedLoopJoin: inner
+│  ├─ Scan: movies
+│  └─ Scan: genres
+└─ Scan: studios
+movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name, studios.id, studios.name, studios.country_id
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 4, Warner Bros, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 4, Warner Bros, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 4, Warner Bros, us
+
+# Aliased cross join.
+[plan,header]> SELECT * FROM movies m, genres AS g, studios s
+---
+NestedLoopJoin: inner
+├─ NestedLoopJoin: inner
+│  ├─ Scan: movies as m
+│  └─ Scan: genres as g
+└─ Scan: studios as s
+m.id, m.title, m.studio_id, m.genre_id, m.released, m.rating, m.ultrahd, g.id, g.name, s.id, s.name, s.country_id
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 4, Warner Bros, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action, 4, Warner Bros, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 1, Mosfilm, ru
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 2, Lionsgate, us
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 3, StudioCanal, fr
+1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 4, Warner Bros, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 1, Mosfilm, ru
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 2, Lionsgate, us
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 3, StudioCanal, fr
+2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action, 4, Warner Bros, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 1, Mosfilm, ru
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 2, Lionsgate, us
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 3, StudioCanal, fr
+3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 4, Warner Bros, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 1, Mosfilm, ru
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 2, Lionsgate, us
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 3, StudioCanal, fr
+4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action, 4, Warner Bros, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 1, Mosfilm, ru
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 2, Lionsgate, us
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 3, StudioCanal, fr
+5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action, 4, Warner Bros, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 1, Mosfilm, ru
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 2, Lionsgate, us
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 3, StudioCanal, fr
+6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action, 4, Warner Bros, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 1, Mosfilm, ru
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 2, Lionsgate, us
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 3, StudioCanal, fr
+7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action, 4, Warner Bros, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 1, Mosfilm, ru
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 2, Lionsgate, us
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 3, StudioCanal, fr
+8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action, 4, Warner Bros, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 1, Mosfilm, ru
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 2, Lionsgate, us
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 3, StudioCanal, fr
+9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action, 4, Warner Bros, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 1, Mosfilm, ru
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 2, Lionsgate, us
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 3, StudioCanal, fr
+10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy, 4, Warner Bros, us
+
+# Cross join with self errors.
+!> SELECT * FROM genres, genres
+---
+Error: invalid input: duplicate table name genres
+
+# But it works when aliased.
+[plan,header]> SELECT * FROM genres AS a, genres AS b, genres AS c
+---
+NestedLoopJoin: inner
+├─ NestedLoopJoin: inner
+│  ├─ Scan: genres as a
+│  └─ Scan: genres as b
+└─ Scan: genres as c
+a.id, a.name, b.id, b.name, c.id, c.name
+1, Science Fiction, 1, Science Fiction, 1, Science Fiction
+1, Science Fiction, 1, Science Fiction, 2, Action
+1, Science Fiction, 1, Science Fiction, 3, Comedy
+1, Science Fiction, 2, Action, 1, Science Fiction
+1, Science Fiction, 2, Action, 2, Action
+1, Science Fiction, 2, Action, 3, Comedy
+1, Science Fiction, 3, Comedy, 1, Science Fiction
+1, Science Fiction, 3, Comedy, 2, Action
+1, Science Fiction, 3, Comedy, 3, Comedy
+2, Action, 1, Science Fiction, 1, Science Fiction
+2, Action, 1, Science Fiction, 2, Action
+2, Action, 1, Science Fiction, 3, Comedy
+2, Action, 2, Action, 1, Science Fiction
+2, Action, 2, Action, 2, Action
+2, Action, 2, Action, 3, Comedy
+2, Action, 3, Comedy, 1, Science Fiction
+2, Action, 3, Comedy, 2, Action
+2, Action, 3, Comedy, 3, Comedy
+3, Comedy, 1, Science Fiction, 1, Science Fiction
+3, Comedy, 1, Science Fiction, 2, Action
+3, Comedy, 1, Science Fiction, 3, Comedy
+3, Comedy, 2, Action, 1, Science Fiction
+3, Comedy, 2, Action, 2, Action
+3, Comedy, 2, Action, 3, Comedy
+3, Comedy, 3, Comedy, 1, Science Fiction
+3, Comedy, 3, Comedy, 2, Action
+3, Comedy, 3, Comedy, 3, Comedy
+
+# Duplicate aliases error.
+!> SELECT * FROM movies a, genres a
+!> SELECT * FROM movies a CROSS JOIN genres a
+---
+Error: invalid input: duplicate table name a
+Error: invalid input: duplicate table name a
+
+# An explicit CROSS JOIN with an ON predicate should error. It's not a cross join.
+!> SELECT * FROM movies CROSS JOIN genres ON movies.genre_id = genres.id
+---
+Error: invalid input: unexpected token ON

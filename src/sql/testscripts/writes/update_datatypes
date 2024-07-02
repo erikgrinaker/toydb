@@ -18,7 +18,7 @@ ok
 > UPDATE datatypes SET "bool" = TRUE
 > SELECT * FROM datatypes
 ---
-1,TRUE,NULL,NULL,NULL
+1, TRUE, NULL, NULL, NULL
 
 !> UPDATE datatypes SET "bool" = 1
 !> UPDATE datatypes SET "bool" = 3.14
@@ -37,7 +37,7 @@ Error: invalid input: invalid datatype STRING for BOOLEAN column bool
 > UPDATE datatypes SET "int" = -9223372036854775807
 > SELECT * FROM datatypes
 ---
-1,TRUE,-9223372036854775807,NULL,NULL
+1, TRUE, -9223372036854775807, NULL, NULL
 
 !> UPDATE datatypes SET "int" = false
 !> UPDATE datatypes SET "int" = 3.0
@@ -60,7 +60,7 @@ Error: invalid input: invalid datatype STRING for INTEGER column int
 > UPDATE datatypes SET "float" = NAN
 > SELECT * FROM datatypes
 ---
-1,TRUE,-9223372036854775807,NaN,NULL
+1, TRUE, -9223372036854775807, NaN, NULL
 
 # Strings.
 > UPDATE datatypes SET "string" = NULL
@@ -70,7 +70,7 @@ Error: invalid input: invalid datatype STRING for INTEGER column int
 > UPDATE datatypes SET "string" = 'Hi! 👋'
 > SELECT * FROM datatypes
 ---
-1,TRUE,-9223372036854775807,NaN,Hi! 👋
+1, TRUE, -9223372036854775807, NaN, Hi! 👋
 
 !> UPDATE datatypes SET "string" = false
 !> UPDATE datatypes SET "string" = 3

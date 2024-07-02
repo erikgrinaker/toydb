@@ -1,0 +1,158 @@
+# Tests WHERE index lookups.
+
+# Create a table with representative values of all types.
+> CREATE TABLE test ( \
+    id INT PRIMARY KEY, \
+    "bool" BOOLEAN INDEX, \
+    "int" INTEGER INDEX, \
+    "float" FLOAT INDEX, \
+    "string" STRING INDEX \
+)
+> INSERT INTO test VALUES (0, NULL,  NULL,  NULL,      NULL)
+> INSERT INTO test VALUES (1, TRUE,  0,     3.14,      'abc')
+> INSERT INTO test VALUES (2, FALSE, -1,    -2.718,    'a')
+> INSERT INTO test VALUES (3, TRUE,  1,     0.0,       'ABC')
+> INSERT INTO test VALUES (4, NULL,  1,     -0.0,      '👍')
+> INSERT INTO test VALUES (5, NULL,  NULL,  INFINITY,  'å')
+> INSERT INTO test VALUES (6, NULL,  NULL,  NAN,       '')
+---
+ok
+
+# Boolean lookups.
+[plan]> SELECT * FROM test WHERE "bool" = TRUE
+---
+IndexLookup: test column bool (TRUE)
+1, TRUE, 0, 3.14, abc
+3, TRUE, 1, 0, ABC
+
+[plan]> SELECT * FROM test WHERE "bool" = FALSE
+---
+IndexLookup: test column bool (FALSE)
+2, FALSE, -1, -2.718, a
+
+# Integer lookups, including multiple matches and missing values.
+[plan]> SELECT * FROM test WHERE "int" = -1
+---
+IndexLookup: test column int (-1)
+2, FALSE, -1, -2.718, a
+
+[plan]> SELECT * FROM test WHERE "int" = 0
+---
+IndexLookup: test column int (0)
+1, TRUE, 0, 3.14, abc
+
+[plan]> SELECT * FROM test WHERE "int" = 1
+---
+IndexLookup: test column int (1)
+3, TRUE, 1, 0, ABC
+4, NULL, 1, -0, 👍
+
+[plan]> SELECT * FROM test WHERE "int" = 7
+---
+IndexLookup: test column int (7)
+
+# Floats. In particular, NAN lookups should work since we consider them equal.
+# 0.0 and -0.0 should also be considered equal.
+# TODO: fix 0.0 and -0.0 lookups.
+# TODO: fix NaN to be unequal to itself.
+[plan]> SELECT * FROM test WHERE "float" = -2.718
+---
+IndexLookup: test column float (-2.718)
+2, FALSE, -1, -2.718, a
+
+[plan]> SELECT * FROM test WHERE "float" = -0.0
+---
+IndexLookup: test column float (-0)
+4, NULL, 1, -0, 👍
+
+[plan]> SELECT * FROM test WHERE "float" = 0.0
+---
+IndexLookup: test column float (0)
+3, TRUE, 1, 0, ABC
+
+[plan]> SELECT * FROM test WHERE "float" = 3.14
+---
+IndexLookup: test column float (3.14)
+1, TRUE, 0, 3.14, abc
+
+[plan]> SELECT * FROM test WHERE "float" = INFINITY
+---
+IndexLookup: test column float (inf)
+5, NULL, NULL, inf, å
+
+[plan]> SELECT * FROM test WHERE "float" = NAN
+---
+IndexLookup: test column float (NaN)
+6, NULL, NULL, NaN, 
+
+# Strings. Should be case-insensitive.
+[plan]> SELECT * FROM test WHERE "string" = 'abc'
+---
+IndexLookup: test column string (abc)
+1, TRUE, 0, 3.14, abc
+
+[plan]> SELECT * FROM test WHERE "string" = 'a'
+---
+IndexLookup: test column string (a)
+2, FALSE, -1, -2.718, a
+
+[plan]> SELECT * FROM test WHERE "string" = 'å'
+---
+IndexLookup: test column string (å)
+5, NULL, NULL, inf, å
+
+[plan]> SELECT * FROM test WHERE "string" = '👍'
+---
+IndexLookup: test column string (👍)
+4, NULL, 1, -0, 👍
+
+[plan]> SELECT * FROM test WHERE "string" = ''
+---
+IndexLookup: test column string ()
+6, NULL, NULL, NaN, 
+
+# LIKE does not use an index.
+[plan]> SELECT * FROM test WHERE "string" LIKE 'a%'
+---
+Scan: test (string LIKE a%)
+1, TRUE, 0, 3.14, abc
+2, FALSE, -1, -2.718, a
+
+# IS NULL lookups should use an index. = NULL should give no matches.
+# TODO: fix the = NULL case.
+[plan]> SELECT * FROM test WHERE "int" IS NULL
+---
+IndexLookup: test column int (NULL)
+0, NULL, NULL, NULL, NULL
+5, NULL, NULL, inf, å
+6, NULL, NULL, NaN, 
+
+[plan]> SELECT * FROM test WHERE "int" = NULL
+---
+IndexLookup: test column int (NULL)
+0, NULL, NULL, NULL, NULL
+5, NULL, NULL, inf, å
+6, NULL, NULL, NaN, 
+
+# Multiple lookups work and use the index.
+[plan]> SELECT * FROM test WHERE "int" = -1 OR "int" = 0 OR "int" = 1 OR "int" = 7
+---
+IndexLookup: test column int (-1, 0, 1, 7)
+1, TRUE, 0, 3.14, abc
+2, FALSE, -1, -2.718, a
+3, TRUE, 1, 0, ABC
+4, NULL, 1, -0, 👍
+
+# > or < predicates don't use an index.
+[plan]> SELECT * FROM test WHERE "int" < 1
+---
+Scan: test (int < 1)
+1, TRUE, 0, 3.14, abc
+2, FALSE, -1, -2.718, a
+
+[plan]> SELECT * FROM test WHERE "int" > -1
+---
+Scan: test (int > -1)
+1, TRUE, 0, 3.14, abc
+3, TRUE, 1, 0, ABC
+4, NULL, 1, -0, 👍
