@@ -1,4 +1,4 @@
-use super::optimizer;
+use super::optimizer::OPTIMIZERS;
 use super::planner::Planner;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// A statement execution plan. Primarily made up of a tree of query plan Nodes,
 /// which process and stream rows, but the root nodes can perform data
 /// modifications or schema changes.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Plan {
     /// A CREATE TABLE plan. Creates a new table with the given schema. Errors
     /// if the table already exists or the schema is invalid.
@@ -63,11 +63,9 @@ impl Plan {
     /// Optimizes the plan, consuming it.
     pub fn optimize(self) -> Result<Self> {
         let optimize = |mut node| -> Result<Node> {
-            node = optimizer::fold_constants(node)?;
-            node = optimizer::push_filters(node)?;
-            node = optimizer::index_lookup(node)?;
-            node = optimizer::join_type(node)?;
-            node = optimizer::short_circuit(node)?;
+            for (_, optimizer) in OPTIMIZERS {
+                node = optimizer(node)?;
+            }
             Ok(node)
         };
         Ok(match self {
@@ -84,7 +82,7 @@ impl Plan {
 }
 
 /// A query plan node. These return row iterators and can be nested.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
     /// Aggregates the input rows by computing the given aggregates for the
     /// corresponding source columns. Additional columns in source for which
@@ -446,7 +444,7 @@ impl Node {
 }
 
 /// An aggregation function.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Aggregate {
     Average,
     Count,
@@ -481,7 +479,7 @@ impl Aggregate {
 }
 
 /// A sort order direction.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Direction {
     Ascending,
     Descending,

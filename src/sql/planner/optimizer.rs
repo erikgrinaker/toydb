@@ -4,6 +4,18 @@ use crate::sql::types::{Expression, Value};
 
 use std::collections::HashMap;
 
+/// A plan optimizer, which takes a root node and recursively transforms it.
+pub type Optimizer = fn(Node) -> Result<Node>;
+
+/// The set of optimizers, and the order in which they are applied.
+pub static OPTIMIZERS: &[(&str, Optimizer)] = &[
+    ("Constant folding", fold_constants),
+    ("Filter pushdown", push_filters),
+    ("Index lookup", index_lookup),
+    ("Join type", join_type),
+    ("Short circuit", short_circuit),
+];
+
 /// Folds constant (sub)expressions by pre-evaluating them, instead of
 /// re-evaluating then for every row during execution.
 pub(super) fn fold_constants(node: Node) -> Result<Node> {
