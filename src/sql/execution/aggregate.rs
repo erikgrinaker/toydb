@@ -2,7 +2,7 @@ use crate::error::Result;
 use crate::sql::planner::Aggregate;
 use crate::sql::types::{Row, Rows, Value};
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Aggregates rows (i.e. GROUP BY).
 pub(super) fn aggregate(
@@ -12,8 +12,9 @@ pub(super) fn aggregate(
 ) -> Result<Rows> {
     // Aggregate rows from source, grouped by non-aggregation columns. For
     // example, SELECT a, b, SUM(c), MAX(d) ... uses a,b as grouping buckets and
-    // SUM(c),MAX(d) as accumulators for each a,b bucket.
-    let mut accumulators: HashMap<Row, Vec<Accumulator>> = HashMap::new();
+    // SUM(c),MAX(d) as accumulators for each a,b bucket. Uses a BTreeMap for
+    // test determinism.
+    let mut accumulators: BTreeMap<Row, Vec<Accumulator>> = BTreeMap::new();
     while let Some(mut row) = source.next().transpose()? {
         accumulators
             .entry(row.split_off(aggregates.len()))
