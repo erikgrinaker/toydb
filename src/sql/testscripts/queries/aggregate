@@ -94,14 +94,13 @@ TRUE
 NULL
 42
 
-# TODO: deal with the NAN case here.
 > SELECT MAX("float") FROM test
 > SELECT MAX("float") FROM test WHERE "float" IS NOT NULL
-> SELECT MAX("float") FROM test WHERE "float" != NAN AND "float" IS NOT NULL
+> SELECT MAX("float") FROM test WHERE "float" IS NOT NAN AND "float" IS NOT NULL
 ---
 NULL
 NaN
-NaN
+inf
 
 > SELECT MAX("string") FROM test
 > SELECT MAX("string") FROM test WHERE "string" IS NOT NULL
@@ -206,14 +205,13 @@ NULL
 NULL
 44
 
-# TODO: deal with the NAN case here.
 > SELECT SUM("float") FROM test
 > SELECT SUM("float") FROM test WHERE "float" IS NOT NULL
-> SELECT SUM("float") FROM test WHERE "float" != NAN AND "float" IS NOT NULL
+> SELECT SUM("float") FROM test WHERE "float" IS NOT NAN AND "float" IS NOT NULL
 ---
 NULL
 NaN
-NaN
+inf
 
 !> SELECT SUM("string") FROM test
 !> SELECT SUM("string") FROM test WHERE "string" IS NOT NULL
@@ -271,14 +269,13 @@ NULL
 NULL
 11
 
-# TODO: deal with the NAN case here.
 > SELECT AVG("float") FROM test
 > SELECT AVG("float") FROM test WHERE "float" IS NOT NULL
-> SELECT AVG("float") FROM test WHERE "float" != NAN AND "float" IS NOT NULL
+> SELECT AVG("float") FROM test WHERE "float" IS NOT NAN AND "float" IS NOT NULL
 ---
 NULL
 NaN
-NaN
+inf
 
 # TODO: the first case here should error.
 > SELECT AVG("string") FROM test
