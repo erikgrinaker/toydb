@@ -43,10 +43,9 @@ KeyLookup: int (7)
 
 # Floats. NAN matches should fail (and be illegal for primary keys).
 # 0.0 and -0.0 should be considered equal.
-# TODO: fix 0.0 and -0.0 lookups.
 # TODO: fix NaN to be unequal to itself.
 > CREATE TABLE "float" (id FLOAT PRIMARY KEY)
-> INSERT INTO "float" VALUES (-2.718), (0.0), (3.14), (INFINITY)
+> INSERT INTO "float" VALUES (-2.718), (-0.0), (3.14), (INFINITY)
 
 [plan]> SELECT * FROM "float" WHERE id = -2.718
 ---
@@ -56,6 +55,7 @@ KeyLookup: float (-2.718)
 [plan]> SELECT * FROM "float" WHERE id = -0.0
 ---
 KeyLookup: float (-0)
+0
 
 [plan]> SELECT * FROM "float" WHERE id = 0.0
 ---

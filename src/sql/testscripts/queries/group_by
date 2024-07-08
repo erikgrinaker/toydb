@@ -84,15 +84,13 @@ Projection: test.int, #0
 42, 1
 
 # GROUP BY works with floats, including a NAN group and -0.0 and 0.0 being equal.
-# TODO: fix this?
 [plan]> SELECT "float", COUNT(*) FROM test WHERE id != 0 GROUP BY "float"
 ---
 Projection: test.float, #0
 └─ Aggregation: count
    └─ Projection: TRUE, float
       └─ Scan: test (NOT id = 0)
--0, 1
-0, 1
+0, 2
 3.14, 1
 inf, 1
 NaN, 2

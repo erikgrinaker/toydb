@@ -69,10 +69,10 @@ Error: invalid input: reference 7 not in table int
 Error: invalid input: reference 2.718 not in table float
 Error: invalid input: reference bar not in table string
 
-# -0.0 is not 0.0.
-!> UPDATE name SET "float" = -0.0
+# -0.0 equals 0.0.
+> UPDATE name SET "float" = -0.0
 ---
-Error: invalid input: reference -0 not in table float
+ok
 
 # NaN is not valid as a missing reference marker.
 !> UPDATE name SET "float" = NAN

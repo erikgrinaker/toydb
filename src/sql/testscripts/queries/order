@@ -49,7 +49,7 @@ Order: id asc
 1, TRUE, 0, 3.14, a, 1
 2, FALSE, -1, -2.718, ab, 1
 3, NULL, 1, 0, aaa, 1
-4, NULL, 1000, -0, A, 1
+4, NULL, 1000, 0, A, 1
 5, NULL, -1000, inf, , 1
 6, NULL, 7, -inf, åa, 1
 7, NULL, -9, NaN, Åa, 1
@@ -65,7 +65,7 @@ Order: id desc
 7, NULL, -9, NaN, Åa, 1
 6, NULL, 7, -inf, åa, 1
 5, NULL, -1000, inf, , 1
-4, NULL, 1000, -0, A, 1
+4, NULL, 1000, 0, A, 1
 3, NULL, 1, 0, aaa, 1
 2, FALSE, -1, -2.718, ab, 1
 1, TRUE, 0, 3.14, a, 1
@@ -133,8 +133,8 @@ Order: id desc
 9, NULL
 6, -inf
 2, -2.718
-4, -0
 3, 0
+4, 0
 1, 3.14
 5, inf
 7, NaN
@@ -145,7 +145,7 @@ Order: id desc
 5, inf
 1, 3.14
 3, 0
-4, -0
+4, 0
 2, -2.718
 6, -inf
 0, NULL
@@ -249,7 +249,7 @@ Projection: #0, #1
 8, NULL
 9, NULL
 3, 0
-4, -0
+4, 0
 2, -2.718
 1, 3.14
 5, inf
@@ -386,7 +386,7 @@ Order: other.id desc
 1, TRUE, 0, 3.14, a, 1, 2, b
 2, FALSE, -1, -2.718, ab, 1, 2, b
 3, NULL, 1, 0, aaa, 1, 2, b
-4, NULL, 1000, -0, A, 1, 2, b
+4, NULL, 1000, 0, A, 1, 2, b
 5, NULL, -1000, inf, , 1, 2, b
 6, NULL, 7, -inf, åa, 1, 2, b
 7, NULL, -9, NaN, Åa, 1, 2, b
@@ -396,7 +396,7 @@ Order: other.id desc
 1, TRUE, 0, 3.14, a, 1, 1, a
 2, FALSE, -1, -2.718, ab, 1, 1, a
 3, NULL, 1, 0, aaa, 1, 1, a
-4, NULL, 1000, -0, A, 1, 1, a
+4, NULL, 1000, 0, A, 1, 1, a
 5, NULL, -1000, inf, , 1, 1, a
 6, NULL, 7, -inf, åa, 1, 1, a
 7, NULL, -9, NaN, Åa, 1, 1, a
@@ -413,7 +413,7 @@ Order: o.id desc, t.id asc
 1, TRUE, 0, 3.14, a, 1, 2, b
 2, FALSE, -1, -2.718, ab, 1, 2, b
 3, NULL, 1, 0, aaa, 1, 2, b
-4, NULL, 1000, -0, A, 1, 2, b
+4, NULL, 1000, 0, A, 1, 2, b
 5, NULL, -1000, inf, , 1, 2, b
 6, NULL, 7, -inf, åa, 1, 2, b
 7, NULL, -9, NaN, Åa, 1, 2, b
@@ -423,7 +423,7 @@ Order: o.id desc, t.id asc
 1, TRUE, 0, 3.14, a, 1, 1, a
 2, FALSE, -1, -2.718, ab, 1, 1, a
 3, NULL, 1, 0, aaa, 1, 1, a
-4, NULL, 1000, -0, A, 1, 1, a
+4, NULL, 1000, 0, A, 1, 1, a
 5, NULL, -1000, inf, , 1, 1, a
 6, NULL, 7, -inf, åa, 1, 1, a
 7, NULL, -9, NaN, Åa, 1, 1, a

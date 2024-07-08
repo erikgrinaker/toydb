@@ -32,6 +32,8 @@ impl std::fmt::Display for DataType {
 }
 
 /// A primitive value.
+///
+/// Float -0.0 is considered equal to 0.0. It is normalized to 0.0 when stored.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     /// An unknown value of unknown type.
@@ -56,12 +58,12 @@ impl std::cmp::Eq for Value {}
 impl std::hash::Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.datatype().hash(state);
-        match self {
-            Value::Null => self.hash(state),
-            Value::Boolean(v) => v.hash(state),
-            Value::Integer(v) => v.hash(state),
-            Value::Float(v) => v.to_be_bytes().hash(state),
-            Value::String(v) => v.hash(state),
+        match self.normalize_ref().as_ref() {
+            Self::Null => self.hash(state),
+            Self::Boolean(v) => v.hash(state),
+            Self::Integer(v) => v.hash(state),
+            Self::Float(v) => v.to_be_bytes().hash(state),
+            Self::String(v) => v.hash(state),
         }
     }
 }
@@ -221,6 +223,33 @@ impl Value {
             Self::Float(f) if f.is_nan() => true,
             _ => false,
         }
+    }
+
+    /// Normalizes a value. Currently only normalizes -0.0 to 0.0, since these
+    /// values are equivalent and should be handled as such e.g. in primary key
+    /// and index lookups.
+    pub fn normalize(self) -> Self {
+        match self.normalize_ref() {
+            Cow::Borrowed(_) => self, // no change
+            Cow::Owned(v) => v,
+        }
+    }
+
+    /// Normalizes a borrowed value. Currently only normalizes -0.0 to 0.0,
+    /// since these values are equivalent and should be handled as such e.g. in
+    /// primary key and index lookups. Returns a Cow to avoid allocating in the
+    /// common case where the value doesn't change.
+    pub fn normalize_ref(&self) -> Cow<'_, Self> {
+        match self {
+            // TODO: NaN and -NaN may be different too, normalize them.
+            Self::Float(f) if *f == 0.0 && f.is_sign_negative() => Cow::Owned(Self::Float(0.0)),
+            v => Cow::Borrowed(v),
+        }
+    }
+
+    // Returns true if the value is already normalized.
+    pub fn is_normalized(&self) -> bool {
+        matches!(self.normalize_ref(), Cow::Borrowed(_))
     }
 }
 

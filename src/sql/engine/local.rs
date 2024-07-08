@@ -75,9 +75,10 @@ impl<E: storage::Engine> Transaction<E> {
     }
 
     /// Fetches the matching primary keys for the given secondary index value,
-    /// or an empty set if there is none.
+    /// or an empty set if there is none. The value must already be normalized.
     fn get_index(&self, table: &str, column: &str, value: &Value) -> Result<BTreeSet<Value>> {
         debug_assert!(self.has_index(table, column)?, "no index on {table}.{column}");
+        debug_assert!(value.is_normalized(), "value not normalized");
         Ok(self
             .txn
             .get(&Key::Index(table.into(), column.into(), value.into()).encode())?
@@ -86,8 +87,10 @@ impl<E: storage::Engine> Transaction<E> {
             .unwrap_or_default())
     }
 
-    /// Fetches a single row by primary key, or None if it doesn't exist.
+    /// Fetches a single row by primary key, or None if it doesn't exist. The key
+    /// must already be normalized.
     fn get_row(&self, table: &str, id: &Value) -> Result<Option<Row>> {
+        debug_assert!(id.is_normalized(), "value not normalized");
         self.txn
             .get(&Key::Row(table.into(), id.into()).encode())?
             .map(|v| Row::decode(&v))
@@ -101,7 +104,7 @@ impl<E: storage::Engine> Transaction<E> {
     }
 
     /// Stores a secondary index entry for the given column value, replacing the
-    /// existing entry.
+    /// existing entry. The value and ids must already be normalized.
     fn set_index(
         &self,
         table: &str,
@@ -110,6 +113,8 @@ impl<E: storage::Engine> Transaction<E> {
         ids: BTreeSet<Value>,
     ) -> Result<()> {
         debug_assert!(self.has_index(table, column)?, "no index on {table}.{column}");
+        debug_assert!(value.is_normalized(), "value not normalized");
+        debug_assert!(ids.iter().all(|v| v.is_normalized()), "value not normalized");
         let key = Key::Index(table.into(), column.into(), value.into()).encode();
         if ids.is_empty() {
             self.txn.delete(&key)
@@ -196,34 +201,40 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         }
 
         for id in ids {
-            // Remove the primary key from any index entries. There must be
-            // an index entry for each row.
+            // Normalize the ID.
             //
-            // TODO: NULL entries shouldn't be indexed, we can skip
-            // those. But they're currently indexed.
+            // NB: We don't need to normalize in the above loop, because we're
+            // calling methods that themselves perform normalization.
+            let id = id.normalize_ref();
+
+            // Remove the primary key from any index entries. There must be an
+            // index entry for each row.
             if !indexes.is_empty() {
-                if let Some(row) = self.get_row(&table.name, id)? {
+                if let Some(row) = self.get_row(&table.name, &id)? {
                     for (i, column) in indexes.iter().copied() {
                         let mut index = self.get_index(&table.name, &column.name, &row[i])?;
-                        index.remove(id);
+                        index.remove(&id);
                         self.set_index(&table.name, &column.name, &row[i], index)?;
                     }
                 }
             }
 
             // Delete the row.
-            self.txn.delete(&Key::Row((&table.name).into(), id.into()).encode())?;
+            self.txn.delete(&Key::Row((&table.name).into(), id).encode())?;
         }
         Ok(())
     }
 
     fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>> {
-        ids.iter().filter_map(|id| self.get_row(table, id).transpose()).collect()
+        ids.iter().filter_map(|id| self.get_row(table, &id.normalize_ref()).transpose()).collect()
     }
 
     fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()> {
         let table = self.must_get_table(table)?;
-        for row in rows {
+        for mut row in rows {
+            // Normalize the row.
+            row = row.into_iter().map(|v| v.normalize()).collect();
+
             // Insert the row.
             table.validate_row(&row, false, self)?;
             let id = &row[table.primary_key];
@@ -243,7 +254,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         debug_assert!(self.has_index(table, column)?, "index lookup without index");
         let mut pks = BTreeSet::new();
         for v in values {
-            pks.extend(self.get_index(table, column, v)?)
+            pks.extend(self.get_index(table, column, &v.normalize_ref())?)
         }
         Ok(pks)
     }
@@ -271,7 +282,11 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()> {
         let table = self.must_get_table(table)?;
 
-        for (id, row) in rows {
+        for (mut id, mut row) in rows {
+            // Normalize the ID and row.
+            id = id.normalize();
+            row = row.into_iter().map(|v| v.normalize()).collect();
+
             // If the primary key changes, we simply do a delete and insert.
             // This simplifies constraint validation.
             if id != row[table.primary_key] {

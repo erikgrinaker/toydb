@@ -110,6 +110,8 @@ pub enum Node {
         outer: bool,
     },
     /// Looks up the given values in a secondary index and emits matching rows.
+    /// NULL and NaN values are considered equal, to allow IS NULL and IS NAN
+    /// index lookups, as is -0.0 and 0.0.
     IndexLookup { table: String, column: String, values: Vec<Value>, alias: Option<String> },
     /// Looks up the given primary keys and emits their rows.
     KeyLookup { table: String, keys: Vec<Value>, alias: Option<String> },

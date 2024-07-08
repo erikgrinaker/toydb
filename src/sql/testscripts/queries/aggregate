@@ -151,7 +151,7 @@ NULL
 > SELECT MIN("float") FROM test WHERE "float" IS NOT NULL
 ---
 NULL
--0
+0
 
 > SELECT MIN("string") FROM test
 > SELECT MIN("string") FROM test WHERE "string" IS NOT NULL

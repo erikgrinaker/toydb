@@ -45,15 +45,13 @@ IndexLookup: test column int (0)
 ---
 IndexLookup: test column int (1)
 3, TRUE, 1, 0, ABC
-4, NULL, 1, -0, 👍
+4, NULL, 1, 0, 👍
 
 [plan]> SELECT * FROM test WHERE "int" = 7
 ---
 IndexLookup: test column int (7)
 
-# Floats. In particular, NAN lookups should work since we consider them equal.
-# 0.0 and -0.0 should also be considered equal.
-# TODO: fix 0.0 and -0.0 lookups.
+# Floats. 0.0 and -0.0 should be equal. NAN should be unequal.
 # TODO: fix NaN to be unequal to itself.
 [plan]> SELECT * FROM test WHERE "float" = -2.718
 ---
@@ -63,12 +61,14 @@ IndexLookup: test column float (-2.718)
 [plan]> SELECT * FROM test WHERE "float" = -0.0
 ---
 IndexLookup: test column float (-0)
-4, NULL, 1, -0, 👍
+3, TRUE, 1, 0, ABC
+4, NULL, 1, 0, 👍
 
 [plan]> SELECT * FROM test WHERE "float" = 0.0
 ---
 IndexLookup: test column float (0)
 3, TRUE, 1, 0, ABC
+4, NULL, 1, 0, 👍
 
 [plan]> SELECT * FROM test WHERE "float" = 3.14
 ---
@@ -104,7 +104,7 @@ IndexLookup: test column string (å)
 [plan]> SELECT * FROM test WHERE "string" = '👍'
 ---
 IndexLookup: test column string (👍)
-4, NULL, 1, -0, 👍
+4, NULL, 1, 0, 👍
 
 [plan]> SELECT * FROM test WHERE "string" = ''
 ---
@@ -141,7 +141,7 @@ IndexLookup: test column int (-1, 0, 1, 7)
 1, TRUE, 0, 3.14, abc
 2, FALSE, -1, -2.718, a
 3, TRUE, 1, 0, ABC
-4, NULL, 1, -0, 👍
+4, NULL, 1, 0, 👍
 
 # > or < predicates don't use an index.
 [plan]> SELECT * FROM test WHERE "int" < 1
@@ -155,4 +155,4 @@ Scan: test (int < 1)
 Scan: test (int > -1)
 1, TRUE, 0, 3.14, abc
 3, TRUE, 1, 0, ABC
-4, NULL, 1, -0, 👍
+4, NULL, 1, 0, 👍
