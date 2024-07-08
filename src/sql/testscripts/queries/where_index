@@ -51,8 +51,8 @@ IndexLookup: test column int (1)
 ---
 IndexLookup: test column int (7)
 
-# Floats. 0.0 and -0.0 should be equal. NAN should be unequal.
-# TODO: fix NaN to be unequal to itself.
+# Floats. 0.0 and -0.0 should be equal. NAN should be unequal,
+# but IS NAN should yield lookups.
 [plan]> SELECT * FROM test WHERE "float" = -2.718
 ---
 IndexLookup: test column float (-2.718)
@@ -81,6 +81,14 @@ IndexLookup: test column float (inf)
 5, NULL, NULL, inf, å
 
 [plan]> SELECT * FROM test WHERE "float" = NAN
+---
+Nothing
+
+[plan]> SELECT * FROM test WHERE "float" = -NAN
+---
+Nothing
+
+[plan]> SELECT * FROM test WHERE "float" IS NAN
 ---
 IndexLookup: test column float (NaN)
 6, NULL, NULL, NaN, 
@@ -119,7 +127,6 @@ Scan: test (string LIKE a%)
 2, FALSE, -1, -2.718, a
 
 # IS NULL lookups should use an index. = NULL should give no matches.
-# TODO: fix the = NULL case.
 [plan]> SELECT * FROM test WHERE "int" IS NULL
 ---
 IndexLookup: test column int (NULL)
@@ -129,10 +136,7 @@ IndexLookup: test column int (NULL)
 
 [plan]> SELECT * FROM test WHERE "int" = NULL
 ---
-IndexLookup: test column int (NULL)
-0, NULL, NULL, NULL, NULL
-5, NULL, NULL, inf, å
-6, NULL, NULL, NaN, 
+Nothing
 
 # Multiple lookups work and use the index.
 [plan]> SELECT * FROM test WHERE "int" = -1 OR "int" = 0 OR "int" = 1 OR "int" = 7

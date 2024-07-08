@@ -369,18 +369,24 @@ impl Expression {
     }
 
     /// Checks if an expression is a single field lookup (i.e. a disjunction of
-    /// = or IS NULL referencing a single field), returning the field index.
+    /// = or IS NULL/NAN referencing a single field), returning the field index.
     pub fn is_field_lookup(&self) -> Option<usize> {
         use Expression::*;
         match &self {
+            // Equality comparisons with = between field and constant value can
+            // use index lookups. NULL and NaN won't return any matches, but we
+            // handle this in into_field_values().
             Equal(lhs, rhs) => match (lhs.as_ref(), rhs.as_ref()) {
                 (Field(f, _), Constant(_)) | (Constant(_), Field(f, _)) => Some(*f),
                 _ => None,
             },
-            IsNull(expr) => match expr.as_ref() {
+            // IS NULL and IS NAN can use index lookups, since we index these.
+            IsNull(expr) | IsNaN(expr) => match expr.as_ref() {
                 Field(f, _) => Some(*f),
                 _ => None,
             },
+            // For OR branches, check if all branches are lookups on the same
+            // field, i.e. foo = 1 OR foo = 2 OR foo = 3.
             Or(lhs, rhs) => match (lhs.is_field_lookup(), rhs.is_field_lookup()) {
                 (Some(l), Some(r)) if l == r => Some(l),
                 _ => None,
@@ -394,11 +400,23 @@ impl Expression {
         use Expression::*;
         match self {
             Equal(lhs, rhs) => match (*lhs, *rhs) {
+                // NULL and NAN index lookups are for IS NULL and IS NAN.
+                // Equality comparisons with = shouldn't yield any results, so
+                // just return an empty value set for these.
+                (Field(f, _), Constant(v)) | (Constant(v), Field(f, _)) if v.is_undefined() => {
+                    Some((f, Vec::new()))
+                }
                 (Field(f, _), Constant(v)) | (Constant(v), Field(f, _)) => Some((f, vec![v])),
                 _ => None,
             },
+            // IS NULL index lookups should look up NULL.
             IsNull(expr) => match *expr {
                 Field(f, _) => Some((f, vec![Value::Null])),
+                _ => None,
+            },
+            // IS NAN index lookups should look up NAN.
+            IsNaN(expr) => match *expr {
+                Field(f, _) => Some((f, vec![Value::Float(f64::NAN)])),
                 _ => None,
             },
             Or(lhs, rhs) => match (lhs.into_field_values(), rhs.into_field_values()) {
