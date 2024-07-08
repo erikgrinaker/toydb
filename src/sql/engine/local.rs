@@ -316,7 +316,6 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                     self.set_index(&table.name, &column.name, &old[i], index)?;
 
                     // Insert the new value into the index entry.
-                    // TODO: consider whether Null values should be indexed.
                     let mut index = self.get_index(&table.name, &column.name, &row[i])?;
                     index.insert(id.clone());
                     self.set_index(&table.name, &column.name, &row[i], index)?;
