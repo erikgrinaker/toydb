@@ -298,30 +298,35 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
 ///
 /// TODO: omit order by primary key, limit 0, NULL comparison.
 pub(super) fn short_circuit(node: Node) -> Result<Node> {
-    const TRUE: Expression = Expression::Constant(Value::Boolean(true));
-    const TRUEOPT: Option<Expression> = Some(TRUE);
-    const FALSE: Expression = Expression::Constant(Value::Boolean(false));
-    const FALSEOPT: Option<Expression> = Some(FALSE);
-    const NULL: Expression = Expression::Constant(Value::Null);
-    const NULLOPT: Option<Expression> = Some(NULL);
+    use Expression::Constant;
+    use Value::{Boolean, Null};
 
     let transform = |node| match node {
         // Filter nodes that always yield true are unnecessary: remove them .
-        Node::Filter { source, predicate: TRUE } => *source,
+        Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
 
         // Predicates that always yield true are unnecessary: remove them.
-        Node::Scan { table, filter: TRUEOPT, alias } => Node::Scan { table, filter: None, alias },
-        Node::NestedLoopJoin { left, left_size, right, right_size, predicate: TRUEOPT, outer } => {
-            Node::NestedLoopJoin { left, left_size, right, right_size, predicate: None, outer }
+        Node::Scan { table, filter: Some(Constant(Boolean(true))), alias } => {
+            Node::Scan { table, filter: None, alias }
         }
+        Node::NestedLoopJoin {
+            left,
+            left_size,
+            right,
+            right_size,
+            predicate: Some(Constant(Boolean(true))),
+            outer,
+        } => Node::NestedLoopJoin { left, left_size, right, right_size, predicate: None, outer },
 
         // Short-circuit nodes that can't produce anything by replacing them
         // with a Nothing node.
-        Node::Filter { predicate: FALSE | NULL, .. } => Node::Nothing,
+        Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => Node::Nothing,
         Node::IndexLookup { values, .. } if values.is_empty() => Node::Nothing,
         Node::KeyLookup { keys, .. } if keys.is_empty() => Node::Nothing,
-        Node::NestedLoopJoin { predicate: FALSEOPT | NULLOPT, .. } => Node::Nothing,
-        Node::Scan { filter: FALSEOPT | NULLOPT, .. } => Node::Nothing,
+        Node::NestedLoopJoin { predicate: Some(Constant(Boolean(false) | Null)), .. } => {
+            Node::Nothing
+        }
+        Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => Node::Nothing,
         Node::Values { rows, .. } if rows.is_empty() => Node::Nothing,
 
         // Short-circuit nodes that pull from a Nothing node.
