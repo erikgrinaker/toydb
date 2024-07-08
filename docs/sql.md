@@ -108,6 +108,9 @@ Unary operators:
 
 * `IS NULL`: checks if the value is `NULL`, e.g. `NULL IS NULL` yields `TRUE`.
 * `IS NOT NULL`: checks if the value is not `NULL`, e.g. `TRUE IS NOT NULL` yields `TRUE`.
+* `IS NAN`: checks if the value is a float `NAN`, e.g. `NAN IS NAN` yields `TRUE`. Errors on 
+  non-float datatypes, except `NULL` which yields `NULL`.
+* `IS NOT NAN`: checks if the value is not a float `NAN`, e.g. `3.14 IS NOT NAN` yields `TRUE`.
 
 ### Mathematical operators
 

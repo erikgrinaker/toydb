@@ -136,6 +136,7 @@ pub enum Operator {
     Equal(Box<Expression>, Box<Expression>),
     GreaterThan(Box<Expression>, Box<Expression>),
     GreaterThanOrEqual(Box<Expression>, Box<Expression>),
+    IsNaN(Box<Expression>),
     IsNull(Box<Expression>),
     LessThan(Box<Expression>, Box<Expression>),
     LessThanOrEqual(Box<Expression>, Box<Expression>),
@@ -193,6 +194,7 @@ impl Expression {
                     GreaterThanOrEqual(transform(lhs)?, transform(rhs)?)
                 }
                 Identity(expr) => Identity(transform(expr)?),
+                IsNaN(expr) => IsNaN(transform(expr)?),
                 IsNull(expr) => IsNull(transform(expr)?),
                 LessThan(lhs, rhs) => LessThan(transform(lhs)?, transform(rhs)?),
                 LessThanOrEqual(lhs, rhs) => LessThanOrEqual(transform(lhs)?, transform(rhs)?),
@@ -256,6 +258,7 @@ impl Expression {
 
             Self::Operator(Factorial(expr))
             | Self::Operator(Identity(expr))
+            | Self::Operator(IsNaN(expr))
             | Self::Operator(IsNull(expr))
             | Self::Operator(Negate(expr))
             | Self::Operator(Not(expr)) => expr.walk(visitor),

@@ -31,8 +31,10 @@ pub enum Expression {
     GreaterThan(Box<Expression>, Box<Expression>),
     /// < comparison of two values: a < b.
     LessThan(Box<Expression>, Box<Expression>),
-    /// Returns true if the value is null: a IS NULL.
+    /// Returns true if the value is null.
     IsNull(Box<Expression>),
+    /// Returns true if the value is a f64 NaN.
+    IsNaN(Box<Expression>),
 
     /// Adds two numbers: a + b.
     Add(Box<Expression>, Box<Expression>),
@@ -72,6 +74,7 @@ impl std::fmt::Display for Expression {
             Self::GreaterThan(lhs, rhs) => write!(f, "{lhs} > {rhs}"),
             Self::LessThan(lhs, rhs) => write!(f, "{lhs} < {rhs}"),
             Self::IsNull(expr) => write!(f, "{expr} IS NULL"),
+            Self::IsNaN(expr) => write!(f, "{expr} IS NAN"),
 
             Self::Add(lhs, rhs) => write!(f, "{lhs} + {rhs}"),
             Self::Divide(lhs, rhs) => write!(f, "{lhs} / {rhs}"),
@@ -128,7 +131,7 @@ impl Expression {
             },
 
             // Comparisons. Must be of same type, except floats and integers
-            // which are interchangeable. NULLs yield NULL.
+            // which are interchangeable. NULLs yield NULL, NaNs yield NaN.
             //
             // Does not dispatch to Value.cmp() because sorting and comparisons
             // are different for f64 NaN and -0 values.
@@ -166,6 +169,11 @@ impl Expression {
                 (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
             Self::IsNull(expr) => Boolean(expr.evaluate(row)? == Null),
+            Self::IsNaN(expr) => match expr.evaluate(row)? {
+                Float(f) => Boolean(f.is_nan()),
+                Null => Null,
+                v => return errinput!("IS NAN can't be used with {}", v.datatype().unwrap()),
+            },
 
             // Mathematical operations. Inputs must be numbers, but integers and
             // floats are interchangeable (float when mixed). NULLs yield NULL.
@@ -236,6 +244,7 @@ impl Expression {
 
                 Self::Factorial(expr)
                 | Self::Identity(expr)
+                | Self::IsNaN(expr)
                 | Self::IsNull(expr)
                 | Self::Negate(expr)
                 | Self::Not(expr) => expr.walk(visitor),
@@ -281,6 +290,7 @@ impl Expression {
 
             Self::Factorial(expr) => Self::Factorial(transform(expr)?),
             Self::Identity(expr) => Self::Identity(transform(expr)?),
+            Self::IsNaN(expr) => Self::IsNaN(transform(expr)?),
             Self::IsNull(expr) => Self::IsNull(transform(expr)?),
             Self::Negate(expr) => Self::Negate(transform(expr)?),
             Self::Not(expr) => Self::Not(transform(expr)?),

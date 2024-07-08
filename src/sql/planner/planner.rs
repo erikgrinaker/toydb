@@ -567,6 +567,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     GreaterThan(build(lhs.clone())?, build(rhs.clone())?).into(),
                     Equal(build(lhs)?, build(rhs)?).into(),
                 ),
+                ast::Operator::IsNaN(expr) => IsNaN(build(expr)?),
                 ast::Operator::IsNull(expr) => IsNull(build(expr)?),
                 ast::Operator::LessThan(lhs, rhs) => LessThan(build(lhs)?, build(rhs)?),
                 ast::Operator::LessThanOrEqual(lhs, rhs) => Or(

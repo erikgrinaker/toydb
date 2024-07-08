@@ -2,7 +2,7 @@
 # immediately below it, in order. The levels are:
 #
 # 9: prefix +, -, NOT
-# 8: postfix !, IS NULL, IS NOT NULL
+# 8: postfix !, IS NULL, IS NOT NULL, IS NAN, IS NOT NAN
 # 7: ^ (left-associative)
 # 6: *, /, %
 # 5: +, -
@@ -39,8 +39,12 @@ Integer(-9)
 # NOT.
 > NOT NULL IS NULL
 > NOT (NULL IS NULL)
+!> NOT NAN IS NAN
+> NOT (NAN IS NAN)
 ---
 Boolean(true)
+Boolean(false)
+Error: invalid input: can't negate NaN
 Boolean(false)
 
 # Postfix !.
@@ -49,6 +53,21 @@ Boolean(false)
 ---
 Integer(64)
 Integer(40320)
+
+# IS NAN.
+!> 2.0 ^ NAN IS NAN
+> (2.0 ^ NAN) IS NAN
+---
+Error: invalid input: can't exponentiate 2 and TRUE
+Boolean(true)
+
+# IS NOT NAN.
+!> 2.0 ^ NAN IS NOT NAN
+> (2.0 ^ NAN) IS NOT NAN
+---
+Error: invalid input: can't exponentiate 2 and FALSE
+Boolean(false)
+
 
 # IS NULL.
 !> 2 ^ NULL IS NULL

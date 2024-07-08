@@ -1,0 +1,19 @@
+# Tests the IS NAN equality operator.
+
+> 0.0 IS NAN
+> NAN IS NAN
+> NULL IS NAN
+---
+Boolean(false)
+Boolean(true)
+Null
+
+!> FALSE IS NAN
+!> 0 IS NAN
+!> '' IS NAN
+!> 'nan' IS NAN
+---
+Error: invalid input: IS NAN can't be used with BOOLEAN
+Error: invalid input: IS NAN can't be used with INTEGER
+Error: invalid input: IS NAN can't be used with STRING
+Error: invalid input: IS NAN can't be used with STRING

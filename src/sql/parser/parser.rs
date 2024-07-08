@@ -609,20 +609,22 @@ impl<'a> Parser<'a> {
         &mut self,
         min_precedence: Precedence,
     ) -> Result<Option<PostfixOperator>> {
-        // Handle IS (NOT) NULL separately, since it's multiple tokens.
+        // Handle IS (NOT) NULL/NAN separately, since it's multiple tokens.
         if let Some(Token::Keyword(Keyword::Is)) = self.peek()? {
             // We can't consume tokens unless the precedence is satisfied, so we
-            // assume IS NULL (they both have the same precedence).
+            // assume IS NULL (they all have the same precedence).
             if PostfixOperator::IsNull.precedence() < min_precedence {
                 return Ok(None);
             }
             self.expect(Keyword::Is.into())?;
-            if self.next_is(Keyword::Not.into()) {
-                self.expect(Keyword::Null.into())?;
-                return Ok(Some(PostfixOperator::IsNotNull));
-            }
-            self.expect(Keyword::Null.into())?;
-            return Ok(Some(PostfixOperator::IsNull));
+            let not = self.next_is(Keyword::Not.into());
+            return Ok(match self.next()? {
+                Token::Keyword(Keyword::NaN) if not => Some(PostfixOperator::IsNotNaN),
+                Token::Keyword(Keyword::NaN) => Some(PostfixOperator::IsNaN),
+                Token::Keyword(Keyword::Null) if not => Some(PostfixOperator::IsNotNull),
+                Token::Keyword(Keyword::Null) => Some(PostfixOperator::IsNull),
+                token => return errinput!("unexpected token {token}"),
+            });
         }
 
         self.next_if_map(|token| {
@@ -741,6 +743,8 @@ impl InfixOperator {
 /// Postfix operators.
 enum PostfixOperator {
     Factorial,
+    IsNaN,
+    IsNotNaN,
     IsNotNull,
     IsNull,
 }
@@ -756,6 +760,8 @@ impl PostfixOperator {
         let lhs = Box::new(lhs);
         match self {
             Self::Factorial => ast::Operator::Factorial(lhs).into(),
+            Self::IsNaN => ast::Operator::IsNaN(lhs).into(),
+            Self::IsNotNaN => ast::Operator::Not(ast::Operator::IsNaN(lhs).into()).into(),
             Self::IsNotNull => ast::Operator::Not(ast::Operator::IsNull(lhs).into()).into(),
             Self::IsNull => ast::Operator::IsNull(lhs).into(),
         }
