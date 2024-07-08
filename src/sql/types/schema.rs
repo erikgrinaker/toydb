@@ -196,7 +196,9 @@ impl Table {
             // Validate outgoing references.
             if let Some(target) = &column.references {
                 match value {
-                    v if v.is_undefined() => {}
+                    // NB: NaN is not a valid primary key, and not valid as a
+                    // missing foreign key marker.
+                    Value::Null => {}
                     v if target == &self.name && v == id => {}
                     v if txn.get(target, valueslice)?.is_empty() => {
                         return errinput!("reference {v} not in table {target}");
