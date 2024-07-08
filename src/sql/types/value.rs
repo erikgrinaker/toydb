@@ -33,8 +33,15 @@ impl std::fmt::Display for DataType {
 
 /// A primitive value.
 ///
+/// Unlike SQL and IEEE 754 floating point, Null and NaN are considered equal
+/// and comparable in code. This is necessary to allow sorting and processing of
+/// these values (e.g. in index lookups, aggregation buckets, etc.). SQL
+/// expression evaluation have special handling of these values to produce the
+/// desired NULL != NULL and NAN != NAN semantics in SQL queries.
+///
 /// Float -0.0 is considered equal to 0.0. It is normalized to 0.0 when stored.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Similarly, -NaN is normalized to NaN.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Value {
     /// An unknown value of unknown type.
     Null,
@@ -50,14 +57,27 @@ pub enum Value {
 
 impl encoding::Value for Value {}
 
-// TODO: revisit and document the f64 handling here. FWIW, PostgreSQL considers
-// NaN = NaN, maybe we should too. However, a better option is probably to cast
-// NaN to NULL.
+// In code, consider Null and NaN equal, so that we can detect and process these
+// values (e.g. in index lookups, aggregation groups, etc). SQL expressions
+// handle them specially to provide their undefined value semantics.
+impl std::cmp::PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Boolean(l), Self::Boolean(r)) => l == r,
+            (Self::Integer(l), Self::Integer(r)) => l == r,
+            (Self::Float(l), Self::Float(r)) => l.is_nan() && r.is_nan() || l == r,
+            (Self::String(l), Self::String(r)) => l == r,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
 impl std::cmp::Eq for Value {}
 
 impl std::hash::Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.datatype().hash(state);
+        // Normalize to treat +/-0.0 and +/-NAN as equal when hashing.
         match self.normalize_ref().as_ref() {
             Self::Null => self.hash(state),
             Self::Boolean(v) => v.hash(state),
@@ -68,12 +88,13 @@ impl std::hash::Hash for Value {
     }
 }
 
+// For ordering purposes, we consider NULL and NaN equal. We establish a total
+// order across all types, even though mixed types will rarely/never come up.
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::Ordering;
+        #[allow(unreachable_patterns)]
         match (self, other) {
-            // For ordering purposes, we consider e.g. NULL and NaN equal, and
-            // establish a total order.
             (Self::Null, Self::Null) => Ordering::Equal,
             (Self::Boolean(a), Self::Boolean(b)) => a.cmp(b),
             (Self::Integer(a), Self::Integer(b)) => a.cmp(b),
@@ -82,9 +103,6 @@ impl Ord for Value {
             (Self::Float(a), Self::Float(b)) => a.total_cmp(b),
             (Self::String(a), Self::String(b)) => a.cmp(b),
 
-            // Mixed types. Should rarely come up, but we may as well establish
-            // an order, especially since we also implement Eq. We can handle
-            // any special cases during expression evaluation.
             (Self::Null, _) => Ordering::Less,
             (_, Self::Null) => Ordering::Greater,
             (Self::Boolean(_), _) => Ordering::Less,
@@ -93,9 +111,7 @@ impl Ord for Value {
             (_, Self::Float(_)) => Ordering::Greater,
             (Self::Integer(_), _) => Ordering::Less,
             (_, Self::Integer(_)) => Ordering::Greater,
-            #[allow(unreachable_patterns)]
             (Self::String(_), _) => Ordering::Less,
-            #[allow(unreachable_patterns)]
             (_, Self::String(_)) => Ordering::Greater,
         }
     }
@@ -225,9 +241,9 @@ impl Value {
         }
     }
 
-    /// Normalizes a value. Currently only normalizes -0.0 to 0.0, since these
-    /// values are equivalent and should be handled as such e.g. in primary key
-    /// and index lookups.
+    /// Normalizes a value. Currently normalizes -0.0 and -NAN to 0.0 and NAN
+    /// respectively, which is the canonical value used e.g. in primary key and
+    /// index lookups.
     pub fn normalize(self) -> Self {
         match self.normalize_ref() {
             Cow::Borrowed(_) => self, // no change
@@ -235,16 +251,17 @@ impl Value {
         }
     }
 
-    /// Normalizes a borrowed value. Currently only normalizes -0.0 to 0.0,
-    /// since these values are equivalent and should be handled as such e.g. in
-    /// primary key and index lookups. Returns a Cow to avoid allocating in the
-    /// common case where the value doesn't change.
+    /// Normalizes a borrowed value. Currently normalizes -0.0 and -NAN to 0.0
+    /// and NAN respectively, which is the canonical value used e.g. in primary
+    /// key and index lookups. Returns a Cow to avoid allocating in the common
+    /// case where the value doesn't change.
     pub fn normalize_ref(&self) -> Cow<'_, Self> {
-        match self {
-            // TODO: NaN and -NaN may be different too, normalize them.
-            Self::Float(f) if *f == 0.0 && f.is_sign_negative() => Cow::Owned(Self::Float(0.0)),
-            v => Cow::Borrowed(v),
+        if let Self::Float(f) = self {
+            if f.is_sign_negative() && (f.is_nan() || *f == -0.0) {
+                return Cow::Owned(Self::Float(-f));
+            }
         }
+        Cow::Borrowed(self)
     }
 
     // Returns true if the value is already normalized.

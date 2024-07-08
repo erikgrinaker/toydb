@@ -63,7 +63,7 @@ Error: invalid input: invalid datatype BOOLEAN for INTEGER column int
 Error: invalid input: invalid datatype FLOAT for INTEGER column int
 Error: invalid input: invalid datatype STRING for INTEGER column int
 
-# Floats. -0.0 is normalized as 0.0.
+# Floats. -0.0 and -NaN is normalized as 0.0 and NaN.
 > BEGIN
 > INSERT INTO datatypes (id, "float") VALUES (1, 3.14)
 > INSERT INTO datatypes (id, "float") VALUES (2, -3.14)
@@ -73,8 +73,9 @@ Error: invalid input: invalid datatype STRING for INTEGER column int
 > INSERT INTO datatypes (id, "float") VALUES (6, -1.23456789012345e308)
 > INSERT INTO datatypes (id, "float") VALUES (7, INFINITY)
 > INSERT INTO datatypes (id, "float") VALUES (8, -INFINITY)
-> INSERT INTO datatypes (id, "float") VALUES (9, NAN)
-> INSERT INTO datatypes (id, "float") VALUES (10, NULL)
+> INSERT INTO datatypes (id, "float") VALUES (9, -NAN)
+> INSERT INTO datatypes (id, "float") VALUES (10, NAN)
+> INSERT INTO datatypes (id, "float") VALUES (11, NULL)
 ---
 ok
 
@@ -90,7 +91,8 @@ ok
 7, NULL, NULL, inf, NULL
 8, NULL, NULL, -inf, NULL
 9, NULL, NULL, NaN, NULL
-10, NULL, NULL, NULL, NULL
+10, NULL, NULL, NaN, NULL
+11, NULL, NULL, NULL, NULL
 
 !> INSERT INTO datatypes (id, "float") VALUES (0, false)
 !> INSERT INTO datatypes (id, "float") VALUES (0, 3)

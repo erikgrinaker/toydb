@@ -51,16 +51,27 @@ Error: invalid input: invalid datatype STRING for INTEGER column int
 > UPDATE datatypes SET "float" = NULL
 > UPDATE datatypes SET "float" = 3.14
 > UPDATE datatypes SET "float" = -3.14
-> UPDATE datatypes SET "float" = 0.0
-> UPDATE datatypes SET "float" = -0.0
 > UPDATE datatypes SET "float" = 1.23456789012345e308
 > UPDATE datatypes SET "float" = -1.23456789012345e308
 > UPDATE datatypes SET "float" = INFINITY
 > UPDATE datatypes SET "float" = -INFINITY
-> UPDATE datatypes SET "float" = NAN
 > SELECT * FROM datatypes
 ---
-1, TRUE, -9223372036854775807, NaN, NULL
+1, TRUE, -9223372036854775807, -inf, NULL
+
+> UPDATE datatypes SET "float" = NAN
+> SELECT "float" FROM datatypes
+> UPDATE datatypes SET "float" = -NAN
+> SELECT "float" FROM datatypes
+> UPDATE datatypes SET "float" = 0.0
+> SELECT "float" FROM datatypes
+> UPDATE datatypes SET "float" = -0.0
+> SELECT "float" FROM datatypes
+---
+NaN
+NaN
+0
+0
 
 # Strings.
 > UPDATE datatypes SET "string" = NULL
@@ -70,7 +81,7 @@ Error: invalid input: invalid datatype STRING for INTEGER column int
 > UPDATE datatypes SET "string" = 'Hi! 👋'
 > SELECT * FROM datatypes
 ---
-1, TRUE, -9223372036854775807, NaN, Hi! 👋
+1, TRUE, -9223372036854775807, 0, Hi! 👋
 
 !> UPDATE datatypes SET "string" = false
 !> UPDATE datatypes SET "string" = 3
