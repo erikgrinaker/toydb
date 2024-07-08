@@ -8,7 +8,7 @@
 > INSERT INTO "int" VALUES (-1), (0), (1)
 
 > CREATE TABLE "float" (id FLOAT PRIMARY KEY)
-> INSERT INTO "float" VALUES (3.14), (0.0), (NAN), (INFINITY)
+> INSERT INTO "float" VALUES (3.14), (0.0), (INFINITY)
 
 > CREATE TABLE "string" (id STRING PRIMARY KEY)
 > INSERT INTO "string" VALUES (''), ('foo')
@@ -74,8 +74,8 @@ Error: invalid input: reference bar not in table string
 ---
 Error: invalid input: reference -0 not in table float
 
-# NAN is considered equal.
-# TODO: possibly shouldn't.
+# NAN is valid when missing.
+# TODO: it shouldn't be.
 [ops]> UPDATE name SET "float" = NAN
 ---
 storage set mvcc:NextVersion → 18 ["\x00" → "\x12"]

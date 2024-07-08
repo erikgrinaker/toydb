@@ -13,7 +13,7 @@ ok
 ---
 Error: invalid input: primary key TRUE already exists
 Error: invalid input: primary key FALSE already exists
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NULL
 
 # Integer.
 > CREATE TABLE "int" (id INT PRIMARY KEY)
@@ -37,7 +37,7 @@ Error: invalid input: primary key 0 already exists
 Error: invalid input: primary key -1 already exists
 Error: invalid input: primary key 9223372036854775807 already exists
 Error: invalid input: primary key -9223372036854775807 already exists
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NULL
 
 # Float.
 > CREATE TABLE "float" (id FLOAT PRIMARY KEY)
@@ -49,7 +49,6 @@ Error: invalid input: NULL value not allowed for column id
 > INSERT INTO "float" VALUES (-1.23456789012345e308)
 > INSERT INTO "float" VALUES (INFINITY)
 > INSERT INTO "float" VALUES (-INFINITY)
-> INSERT INTO "float" VALUES (NAN)
 ---
 ok
 
@@ -72,8 +71,8 @@ Error: invalid input: primary key 1234567890123450000000000000000000000000000000
 Error: invalid input: primary key -123456789012345000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 already exists
 Error: invalid input: primary key inf already exists
 Error: invalid input: primary key -inf already exists
-Error: invalid input: primary key NaN already exists
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NaN
+Error: invalid input: invalid primary key NULL
 
 # String.
 > CREATE TABLE "string" (id STRING PRIMARY KEY)
@@ -97,4 +96,4 @@ Error: invalid input: primary key    already exists
 Error: invalid input: primary key abc already exists
 Error: invalid input: primary key ABC already exists
 Error: invalid input: primary key Hi! 👋 already exists
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NULL

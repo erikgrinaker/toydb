@@ -20,5 +20,5 @@ ok
 !> UPDATE name SET id = NULL
 !> UPDATE name SET non_null = NULL
 ---
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NULL
 Error: invalid input: unknown field non_null

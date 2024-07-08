@@ -22,7 +22,7 @@ ok
 !> INSERT INTO name VALUES (NULL, 'foo', 'bar')
 !> INSERT INTO name VALUES (2, 'foo', NULL)
 ---
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NULL
 Error: invalid input: NULL value not allowed for column not_null
 
 # Omitting a NULLable column works.

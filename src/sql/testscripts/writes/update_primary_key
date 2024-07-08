@@ -49,13 +49,12 @@ Error: invalid input: primary key FALSE already exists
 > UPDATE "float" SET id = -1.23456789012345e308
 > UPDATE "float" SET id = INFINITY
 > UPDATE "float" SET id = -INFINITY
-> UPDATE "float" SET id = NAN
 > SELECT * FROM "float"
 ---
+-inf
 -0
 123456789012345000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 inf
-NaN
 
 # TODO: similarly, these are supposed to error.
 > INSERT INTO "float" VALUES (1.0)
@@ -73,8 +72,8 @@ NaN
 Error: invalid input: primary key 0 already exists
 Error: invalid input: primary key 123456789012345000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 already exists
 Error: invalid input: primary key inf already exists
-Error: invalid input: primary key NaN already exists
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NaN
+Error: invalid input: invalid primary key NULL
 
 # String. TODO: this doesn't work either.
 > CREATE TABLE "string" (id STRING PRIMARY KEY)
@@ -96,4 +95,4 @@ Hi! 👋
 > UPDATE "string" SET id = 'Hi! 👋'
 !> UPDATE "string" SET id = NULL
 ---
-Error: invalid input: NULL value not allowed for column id
+Error: invalid input: invalid primary key NULL

@@ -172,6 +172,9 @@ impl Table {
         // Validate primary key.
         let id = &row[self.primary_key];
         let idslice = &row[self.primary_key..=self.primary_key];
+        if id.is_undefined() {
+            return errinput!("invalid primary key {id}");
+        }
         if !update && !txn.get(&self.name, idslice)?.is_empty() {
             return errinput!("primary key {id} already exists");
         }
