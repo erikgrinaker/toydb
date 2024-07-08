@@ -193,7 +193,7 @@ impl Table {
             // Validate outgoing references.
             if let Some(target) = &column.references {
                 match value {
-                    v if v.is_unknown() => {}
+                    v if v.is_undefined() => {}
                     v if target == &self.name && v == id => {}
                     v if txn.get(target, valueslice)?.is_empty() => {
                         return errinput!("reference {v} not in table {target}");
@@ -203,7 +203,7 @@ impl Table {
             }
 
             // Validate uniqueness constraints. Unique columns are indexed.
-            if column.unique && i != self.primary_key && !value.is_unknown() {
+            if column.unique && i != self.primary_key && !value.is_undefined() {
                 let mut index = txn.lookup_index(&self.name, &column.name, valueslice)?;
                 if update {
                     index.remove(id); // ignore existing version of this row

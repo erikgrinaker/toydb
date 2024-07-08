@@ -214,8 +214,8 @@ impl Value {
         }
     }
 
-    /// Returns true if the value is unknown (NULL or NaN).
-    pub fn is_unknown(&self) -> bool {
+    /// Returns true if the value is undefined (NULL or NaN).
+    pub fn is_undefined(&self) -> bool {
         match self {
             Self::Null => true,
             Self::Float(f) if f.is_nan() => true,
