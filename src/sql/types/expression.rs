@@ -202,20 +202,12 @@ impl Expression {
             Self::Subtract(lhs, rhs) => lhs.evaluate(row)?.checked_sub(&rhs.evaluate(row)?)?,
 
             // LIKE pattern matching, using _ and % as single- and
-            // multi-character wildcards. Can be escaped as __ and %%. Inputs
-            // must be strings. NULLs yield NULL.
-            //
-            // TODO: the escape characters should be \% not %%, same with __.
+            // multi-character wildcards. Inputs must be strings. NULLs yield
+            // NULL. There's no support for escaping an _ and %.
             Self::Like(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (String(lhs), String(rhs)) => {
-                    let pattern = format!(
-                        "^{}$",
-                        regex::escape(&rhs)
-                            .replace('%', ".*")
-                            .replace('_', ".")
-                            .replace(".*.*", "%") // escaped %%
-                            .replace("..", "_") // escaped __
-                    );
+                    let pattern =
+                        format!("^{}$", regex::escape(&rhs).replace('%', ".*").replace('_', "."));
                     Boolean(regex::Regex::new(&pattern)?.is_match(&lhs))
                 }
                 (String(_), Null) | (Null, String(_)) | (Null, Null) => Null,

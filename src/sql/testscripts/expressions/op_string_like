@@ -22,7 +22,7 @@ Boolean(false)
 Boolean(false)
 Boolean(false)
 
-# Multi-character wildcards require at least one match.
+# Multi-character wildcards match 0 characters.
 > 'abcde' LIKE 'abc%de'
 > 'abcde' LIKE '%abcde'
 > 'abcde' LIKE 'abcde%'
@@ -78,33 +78,18 @@ Boolean(false)
 Boolean(false)
 Boolean(false)
 
-# Wildcards can be mixed and used multiple times, but must match at least one.
-# TODO: %% and __ are currently escape characters, so these results are bogus.
-# Use \ instead.
+# Wildcards can be mixed and used multiple times, and % can match nothing.
 > 'abcde' LIKE 'a%c%e'
 > 'abcde' LIKE '%%e'
-> 'abcde' LIKE 'a___e'
+> 'abcde' LIKE '%%abcde'
 > 'abcde' LIKE 'a___e'
 > 'abcdefghijklmno' LIKE 'a_c%f%i_kl%m_o'
-> 'abcde' LIKE '%%bcde'
----
-Boolean(true)
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(true)
-Boolean(false)
-
-# Escape characters.
-> 'a%b' LIKE 'a%%b'
-> 'a_b' LIKE 'a__b'
-> 'abcde' LIKE 'a%%e'
-> 'abcde' LIKE 'a___e'
 ---
 Boolean(true)
 Boolean(true)
-Boolean(false)
-Boolean(false)
+Boolean(true)
+Boolean(true)
+Boolean(true)
 
 # NULLs.
 > NULL LIKE '%'

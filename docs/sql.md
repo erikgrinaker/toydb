@@ -137,7 +137,7 @@ Unary operators:
 
 String operators operate on string operands.
 
-* `LIKE`: compares a string with the given pattern, using `%` as multi-character wildcard and `_` as single-character wildcard, returning `TRUE` if the string matches the pattern - e.g. `'abc' LIKE 'a%'` yields `TRUE`.  Literal `%` and `_` can be escaped as `%%` and `__`.
+* `LIKE`: compares a string with the given pattern, using `%` as multi-character wildcard and `_` as single-character wildcard, returning `TRUE` if the string matches the pattern - e.g. `'abc' LIKE 'a%'` yields `TRUE`.
 
 ### Operator precedence
 
