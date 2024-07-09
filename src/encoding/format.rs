@@ -240,7 +240,7 @@ impl Formatter for SQLCommand {
             | sql::engine::Write::Insert { txn, .. }
             | sql::engine::Write::Update { txn, .. }
             | sql::engine::Write::CreateTable { txn, .. }
-            | sql::engine::Write::DeleteTable { txn, .. } => Some(txn),
+            | sql::engine::Write::DropTable { txn, .. } => Some(txn),
         };
         let ftxn =
             txn.filter(|t| !t.read_only).map(|t| format!("t{} ", t.version)).unwrap_or_default();
@@ -263,7 +263,7 @@ impl Formatter for SQLCommand {
                 rows.into_iter().map(|(id, row)| format!("{id}→({})", SQL::values(row))).join(" ")
             ),
             sql::engine::Write::CreateTable { schema, .. } => SQL::schema(schema),
-            sql::engine::Write::DeleteTable { table, .. } => format!("DROP TABLE {table}"),
+            sql::engine::Write::DropTable { table, .. } => format!("DROP TABLE {table}"),
         };
         format!("{ftxn}{fcommand}")
     }

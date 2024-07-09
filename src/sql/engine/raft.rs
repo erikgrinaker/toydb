@@ -202,7 +202,7 @@ impl<'a> Catalog for Transaction<'a> {
     }
 
     fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool> {
-        self.engine.write(Write::DeleteTable {
+        self.engine.write(Write::DropTable {
             txn: (&self.state).into(),
             table: table.into(),
             if_exists,
@@ -271,7 +271,7 @@ impl<E: storage::Engine> State<E> {
             Write::CreateTable { txn, schema } => {
                 bincode::serialize(&self.local.resume(txn.into_owned())?.create_table(schema)?)
             }
-            Write::DeleteTable { txn, table, if_exists } => bincode::serialize(
+            Write::DropTable { txn, table, if_exists } => bincode::serialize(
                 &self.local.resume(txn.into_owned())?.drop_table(&table, if_exists)?,
             ),
         })
@@ -393,8 +393,7 @@ pub enum Write<'a> {
     Update { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, rows: BTreeMap<Value, Row> },
 
     CreateTable { txn: Cow<'a, mvcc::TransactionState>, schema: Table },
-    // TODO: rename to DropTable.
-    DeleteTable { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, if_exists: bool },
+    DropTable { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, if_exists: bool },
 }
 
 impl<'a> encoding::Value for Write<'a> {}
