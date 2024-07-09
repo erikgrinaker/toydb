@@ -54,6 +54,8 @@ impl Formatter for Raw {
 }
 
 /// Formats Raft log entries.
+///
+/// TODO: decode the commands as well.
 pub struct Raft;
 
 impl Raft {
@@ -152,8 +154,11 @@ impl<I: Formatter> Formatter for MVCC<I> {
 }
 
 /// Formats SQL keys/values.
+///
 /// TODO: consider more terse formatting, e.g. dropping the value type names and
 /// instead relying on unambiguous string formatting.
+///
+/// TODO: decode and format the applied_index key.
 pub struct SQL;
 
 impl Formatter for SQL {
