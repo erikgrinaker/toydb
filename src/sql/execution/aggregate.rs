@@ -2,6 +2,7 @@ use crate::error::Result;
 use crate::sql::planner::Aggregate;
 use crate::sql::types::{Row, Rows, Value};
 
+use itertools::Itertools as _;
 use std::collections::BTreeMap;
 
 /// Aggregates rows (i.e. GROUP BY).
@@ -30,7 +31,9 @@ pub(super) fn aggregate(
         accumulators.insert(Vec::new(), aggregates.iter().map(Accumulator::new).collect());
     }
 
-    // Emit the aggregate and row values for each row bucket.
+    // Emit the aggregate and row values for each row bucket. We use an
+    // intermediate vec since btree_map::IntoIter doesn't implement Clone.
+    let accumulators = accumulators.into_iter().collect_vec();
     Ok(Box::new(accumulators.into_iter().map(|(row, accs)| {
         accs.into_iter()
             .map(|acc| acc.value())
@@ -41,6 +44,7 @@ pub(super) fn aggregate(
 
 /// Accumulates aggregate values. Uses an enum rather than a trait since we need
 /// to keep these in a vector (could use boxed trait objects too).
+#[derive(Clone)]
 pub enum Accumulator {
     Average { count: i64, sum: Value },
     Count(i64),

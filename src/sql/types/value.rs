@@ -5,6 +5,7 @@ use crate::errdata;
 use crate::errinput;
 use crate::error::{Error, Result};
 
+use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 
 /// A primitive data type.
@@ -361,7 +362,15 @@ pub type Row = Vec<Value>;
 /// A row iterator.
 ///
 /// TODO: try to avoid boxing here.
-pub type Rows = Box<dyn Iterator<Item = Result<Row>>>;
+pub type Rows = Box<dyn RowIterator>;
+
+/// A row iterator trait, which requires it to be clonable and object-safe. It
+/// has a blanket implementation for all iterators.
+pub trait RowIterator: Iterator<Item = Result<Row>> + DynClone {}
+
+dyn_clone::clone_trait_object!(RowIterator);
+
+impl<I: Iterator<Item = Result<Row>> + DynClone> RowIterator for I {}
 
 /// A column label, used in result sets and query plans.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

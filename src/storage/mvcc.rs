@@ -623,6 +623,18 @@ pub struct ScanIterator<E: Engine> {
     remainder: Option<(Bound<RawKey>, Bound<RawKey>)>,
 }
 
+/// Implement Clone manually. Deriving it requires Engine: Clone.
+impl<E: Engine> Clone for ScanIterator<E> {
+    fn clone(&self) -> Self {
+        Self {
+            engine: self.engine.clone(),
+            txn: self.txn.clone(),
+            buffer: self.buffer.clone(),
+            remainder: self.remainder.clone(),
+        }
+    }
+}
+
 // Helper types to distinguish raw engine key/values from encoded user
 // key/values (which are encoded inside mvcc::Key). Mostly to appease Clippy's
 // type complexity lint, but TODO: consider using elsewhere.

@@ -26,13 +26,14 @@ pub(super) fn nested_loop(
 /// This could be trivially implemented with carthesian_product(), but we need
 /// to handle the left outer join case where there is no match in the right
 /// source.
+#[derive(Clone)]
 struct NestedLoopIterator {
     /// The left source.
     left: Peekable<Rows>,
     /// The right source.
-    right: std::vec::IntoIter<Row>,
-    /// The buffered right result.
-    right_vec: Vec<Row>,
+    right: Rows,
+    /// The initial right iterator state. Cloned to reset right.
+    right_init: Rows,
     /// The column width of the right source.
     right_size: usize,
     /// True if a right match has been seen for the current left row.
@@ -51,16 +52,9 @@ impl NestedLoopIterator {
         predicate: Option<Expression>,
         outer: bool,
     ) -> Result<Self> {
-        // Collect the right source into a vector. We could use a borrowing
-        // iterator into the vec instead of cloning an owned iterator, but it
-        // comes with lifetime hassles and we end up cloning each row when
-        // iterating anyway.
-        //
-        // TODO: consider making the iterators clonable.
-        let right_vec = right.collect::<Result<Vec<_>>>()?;
-        let right = right_vec.clone().into_iter();
         let left = left.peekable();
-        Ok(Self { left, right, right_vec, right_size, right_match: false, predicate, outer })
+        let right_init = right.clone();
+        Ok(Self { left, right, right_init, right_size, right_match: false, predicate, outer })
     }
 
     // Returns the next joined row, if any, with error handling.
@@ -68,7 +62,7 @@ impl NestedLoopIterator {
         // While there is a valid left row, look for a right-hand match to return.
         while let Some(Ok(left_row)) = self.left.peek() {
             // If there is a match in the remaining right rows, return it.
-            for right_row in &mut self.right {
+            while let Some(right_row) = self.right.next().transpose()? {
                 // We could avoid cloning here unless we're actually emitting
                 // the row, but we keep it simple.
                 let row = left_row.iter().cloned().chain(right_row).collect();
@@ -87,7 +81,7 @@ impl NestedLoopIterator {
             }
 
             // We reached the end of the right source, reset it.
-            self.right = self.right_vec.clone().into_iter();
+            self.right = self.right_init.clone();
 
             // If there was no match for this row, and this is an outer join,
             // emit a row with right NULLs.
