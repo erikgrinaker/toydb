@@ -301,7 +301,12 @@ impl<'a> Parser<'a> {
         loop {
             let column = self.next_ident()?;
             self.expect(Token::Equal)?;
-            let expr = self.parse_expression()?;
+            let expr = if self.next_is(Keyword::Default.into()) {
+                None
+            } else {
+                Some(self.parse_expression()?)
+            };
+
             if set.contains_key(&column) {
                 return errinput!("column {column} set multiple times");
             }

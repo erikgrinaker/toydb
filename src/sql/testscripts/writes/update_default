@@ -1,5 +1,4 @@
-# UPDATE does not currently support setting DEFAULT.
-# TODO: consider adding this.
+# UPDATE can set default values.
 
 > CREATE TABLE defaults ( \
     id INTEGER PRIMARY KEY, \
@@ -14,6 +13,12 @@
 ---
 ok
 
-!> UPDATE defaults SET "boolean" = DEFAULT
+> UPDATE defaults SET "null" = DEFAULT, "boolean" = DEFAULT, "float" = DEFAULT, "integer" = DEFAULT, "string" = DEFAULT
+> SELECT * FROM defaults
 ---
-Error: invalid input: expected expression atom, found DEFAULT
+1, TRUE, NULL, TRUE, 3.14, 7, foo
+
+# Errors on columns with no default.
+!> UPDATE defaults SET required = DEFAULT
+---
+Error: invalid input: column required has no default value

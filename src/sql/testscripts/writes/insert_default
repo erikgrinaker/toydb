@@ -62,3 +62,8 @@ ok
 5, TRUE, NULL, TRUE, 3.14, 7, foo
 6, TRUE, FALSE, TRUE, 3.14, 9, bar
 7, FALSE, NULL, NULL, NULL, NULL, NULL
+
+# Errors if required column isn't given.
+!> INSERT INTO defaults VALUES (8)
+---
+Error: invalid input: no value given for column required with no default

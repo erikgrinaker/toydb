@@ -118,18 +118,24 @@ impl<'a, C: Catalog> Planner<'a, C> {
     fn build_update(
         &self,
         table: String,
-        set: BTreeMap<String, ast::Expression>,
+        set: BTreeMap<String, Option<ast::Expression>>,
         r#where: Option<ast::Expression>,
     ) -> Result<Plan> {
         let table = self.catalog.must_get_table(&table)?;
         let scope = Scope::from_table(&table)?;
         let filter = r#where.map(|e| Self::build_expression(e, &scope)).transpose()?;
-        let expressions = set
-            .into_iter()
-            .map(|(c, e)| {
-                Ok((scope.get_column_index(None, &c)?, c, Self::build_expression(e, &scope)?))
-            })
-            .collect::<Result<_>>()?;
+        let mut expressions = Vec::with_capacity(set.len());
+        for (column, expr) in set {
+            let index = scope.get_column_index(None, &column)?;
+            let expr = match expr {
+                Some(expr) => Self::build_expression(expr, &scope)?,
+                None => match &table.columns[index].default {
+                    Some(default) => Expression::Constant(default.clone()),
+                    None => return errinput!("column {column} has no default value"),
+                },
+            };
+            expressions.push((index, column, expr));
+        }
         Ok(Plan::Update {
             table: table.name.clone(),
             primary_key: table.primary_key,

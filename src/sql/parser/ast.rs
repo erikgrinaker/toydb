@@ -34,7 +34,7 @@ pub enum Statement {
     },
     Update {
         table: String,
-        set: BTreeMap<String, Expression>, // BTreeMap for test determinism
+        set: BTreeMap<String, Option<Expression>>, // None for DEFAULT value
         r#where: Option<Expression>,
     },
     Select {
