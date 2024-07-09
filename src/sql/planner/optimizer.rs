@@ -295,14 +295,12 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
 
 /// Short-circuits useless nodes and expressions, by removing them and/or
 /// replacing them with Nothing nodes that yield no rows.
-///
-/// TODO: omit order by primary key, limit 0, NULL comparison.
 pub(super) fn short_circuit(node: Node) -> Result<Node> {
     use Expression::Constant;
     use Value::{Boolean, Null};
 
     let transform = |node| match node {
-        // Filter nodes that always yield true are unnecessary: remove them .
+        // Filter nodes that always yield true are unnecessary: remove them.
         Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
 
         // Predicates that always yield true are unnecessary: remove them.
@@ -323,6 +321,7 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
         Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => Node::Nothing,
         Node::IndexLookup { values, .. } if values.is_empty() => Node::Nothing,
         Node::KeyLookup { keys, .. } if keys.is_empty() => Node::Nothing,
+        Node::Limit { limit: 0, .. } => Node::Nothing,
         Node::NestedLoopJoin { predicate: Some(Constant(Boolean(false) | Null)), .. } => {
             Node::Nothing
         }

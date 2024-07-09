@@ -31,8 +31,7 @@ Limit: 4
 
 [plan]> SELECT * FROM test LIMIT 0
 ---
-Limit: 0
-└─ Scan: test
+Nothing
 
 # A max i64 limit works.
 > SELECT * FROM test LIMIT 9223372036854775807
@@ -51,9 +50,7 @@ Limit: 1
 
 [plan]> SELECT 1, 2, 3 LIMIT 0
 ---
-Limit: 0
-└─ Projection: 1, 2, 3
-   └─ EmptyRow
+Nothing
 
 # Limits can be expressions, but only constant ones.
 [plan]> SELECT * FROM test LIMIT 1 + 1

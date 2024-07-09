@@ -1,0 +1,16 @@
+# Tests the short circuiting optimizer.
+# TODO: add more test cases.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a'), (2, 'b'), (3, 'c')
+---
+ok
+
+# LIMIT 0 → Nothing
+[opt]> SELECT * FROM test LIMIT 0
+---
+Initial:
+   Limit: 0
+   └─ Scan: test
+Short circuit:
+   Nothing
