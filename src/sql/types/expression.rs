@@ -182,8 +182,7 @@ impl Expression {
             Self::Exponentiate(lhs, rhs) => lhs.evaluate(row)?.checked_pow(&rhs.evaluate(row)?)?,
             Self::Factorial(expr) => match expr.evaluate(row)? {
                 Integer(i) if i < 0 => return errinput!("can't take factorial of negative number"),
-                // TODO: handle overflow.
-                Integer(i) => Integer((1..=i).product()),
+                Integer(i) => (1..=i).try_fold(Integer(1), |p, i| p.checked_mul(&Integer(i)))?,
                 Null => Null,
                 value => return errinput!("can't take factorial of {value}"),
             },

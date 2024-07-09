@@ -35,4 +35,4 @@ Integer(2) ← Factorial(Factorial(Factorial(Factorial(Factorial(Factorial(Const
 # Overflow.
 [expr]!> 3!!!
 ---
-Panic: attempt to multiply with overflow
+Error: invalid input: integer overflow
