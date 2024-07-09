@@ -292,7 +292,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             if id != row[table.primary_key] {
                 self.delete(&table.name, &[id])?;
                 self.insert(&table.name, vec![row])?;
-                return Ok(());
+                continue;
             }
 
             // Validate the row, but don't write it yet since we may need to
