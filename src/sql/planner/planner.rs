@@ -277,29 +277,29 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build and implicitly join additional items.
         for from in items {
-            // Each item is evaluated in its own, initially empty scope, and
-            // can't reference previous items. Consider e.g. "SELECT * FROM a,
-            // b JOIN c ON c.id = a.id" which is illegal (the join predicate can
-            // reference b or c, but not a).
-            let mut right_scope = Scope::new();
-            let right = self.build_from(from, &mut right_scope)?;
+            let left_size = scope.len();
+            let right = self.build_from(from, scope)?;
+            let right_size = scope.len() - left_size;
             node = Node::NestedLoopJoin {
                 left: Box::new(node),
-                left_size: scope.len(),
+                left_size,
                 right: Box::new(right),
-                right_size: right_scope.len(),
+                right_size,
                 predicate: None,
                 outer: false,
             };
-            scope.merge(right_scope)?;
         }
         Ok(node)
     }
 
     /// Builds FROM items, which can either be a single table or a chained join
     /// of multiple tables, e.g. "SELECT * FROM a LEFT JOIN b ON b.a_id = a.id".
-    fn build_from(&self, from: ast::From, scope: &mut Scope) -> Result<Node> {
-        Ok(match from {
+    fn build_from(&self, from: ast::From, parent_scope: &mut Scope) -> Result<Node> {
+        // Each from item is built in its own scope, such that a join node only
+        // sees the columns of its children. It's then merged into the parent.
+        let mut scope = Scope::new();
+
+        let node = match from {
             // A full table scan.
             ast::From::Table { name, alias } => {
                 let table = self.catalog.must_get_table(&name)?;
@@ -316,13 +316,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 }
 
                 // Build the left and right nodes.
-                let left = Box::new(self.build_from(*left, scope)?);
+                let left = Box::new(self.build_from(*left, &mut scope)?);
                 let left_size = scope.len();
-                let right = Box::new(self.build_from(*right, scope)?);
+                let right = Box::new(self.build_from(*right, &mut scope)?);
                 let right_size = scope.len() - left_size;
 
-                //  Build the join node.
-                let predicate = predicate.map(|e| Self::build_expression(e, scope)).transpose()?;
+                // Build the join node.
+                let predicate = predicate.map(|e| Self::build_expression(e, &scope)).transpose()?;
                 let outer = r#type.is_outer();
                 let mut node =
                     Node::NestedLoopJoin { left, left_size, right, right_size, predicate, outer };
@@ -339,7 +339,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 }
                 node
             }
-        })
+        };
+
+        parent_scope.merge(scope)?;
+        Ok(node)
     }
 
     /// Builds an aggregation node. All aggregate parameters and GROUP BY expressions are evaluated
