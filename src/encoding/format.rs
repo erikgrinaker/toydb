@@ -1,7 +1,7 @@
 //! Decodes and formats raw keys and values, recursively as needed. Handles both
 //! both Raft, MVCC, SQL, and raw binary data.
 
-use super::{bincode, Key as _};
+use super::{bincode, Key as _, Value as _};
 use crate::raft;
 use crate::sql;
 use crate::storage::mvcc;
@@ -19,9 +19,7 @@ pub trait Formatter {
 
     /// Formats a key/value pair.
     fn key_value(key: &[u8], value: &[u8]) -> String {
-        let fkey = Self::key(key);
-        let fvalue = Self::value(key, value);
-        format!("{fkey} → {fvalue}")
+        Self::key_maybe_value(key, Some(value))
     }
 
     /// Formats a key/value pair, where the value may not exist.
@@ -53,23 +51,18 @@ impl Formatter for Raw {
     }
 }
 
-/// Formats Raft log entries.
-///
-/// TODO: decode the commands as well.
-pub struct Raft;
+/// Formats Raft log entries. Dispatches to I for command formatting.
+pub struct Raft<I: Formatter>(std::marker::PhantomData<I>);
 
-impl Raft {
+impl<I: Formatter> Raft<I> {
     pub fn entry(entry: &raft::Entry) -> String {
-        format!(
-            "{}@{} {}",
-            entry.index,
-            entry.term,
-            entry.command.as_deref().map(Raw::bytes).unwrap_or("None".to_string())
-        )
+        let fcommand =
+            entry.command.as_deref().map(|c| I::value(&[], c)).unwrap_or("None".to_string());
+        format!("{}@{} {fcommand}", entry.index, entry.term)
     }
 }
 
-impl Formatter for Raft {
+impl<I: Formatter> Formatter for Raft<I> {
     fn key(key: &[u8]) -> String {
         let Ok(key) = raft::Key::decode(key) else {
             return Raw::key(key);
@@ -154,41 +147,124 @@ impl<I: Formatter> Formatter for MVCC<I> {
 }
 
 /// Formats SQL keys/values.
-///
-/// TODO: consider more terse formatting, e.g. dropping the value type names and
-/// instead relying on unambiguous string formatting.
-///
-/// TODO: decode and format the applied_index key.
 pub struct SQL;
+
+impl SQL {
+    fn literal(value: &sql::types::Value) -> String {
+        match value {
+            sql::types::Value::String(s) => format!("{s:?}"), // quoted string
+            value => value.to_string(),
+        }
+    }
+
+    fn values(values: impl IntoIterator<Item = sql::types::Value>) -> String {
+        values.into_iter().map(|v| Self::literal(&v)).join(",")
+    }
+
+    fn schema(table: sql::types::Table) -> String {
+        let re = regex::Regex::new(r#"\n\s*"#).expect("regex failed");
+        re.replace_all(&table.to_string(), " ").into_owned()
+    }
+}
 
 impl Formatter for SQL {
     fn key(key: &[u8]) -> String {
+        // Special-case the applied_index key.
+        if key == sql::engine::Raft::APPLIED_INDEX_KEY {
+            return String::from_utf8_lossy(key).into_owned();
+        }
+
         let Ok(key) = sql::engine::Key::decode(key) else { return Raw::key(key) };
-        format!("sql:{key:?}")
+        match key {
+            sql::engine::Key::Table(name) => format!("sql:Table({name})"),
+            sql::engine::Key::Index(table, column, value) => {
+                format!("sql:Index({table}.{column}, {})", Self::literal(&value))
+            }
+            sql::engine::Key::Row(table, id) => {
+                format!("sql:Row({table}, {})", Self::literal(&id))
+            }
+        }
     }
 
     fn value(key: &[u8], value: &[u8]) -> String {
+        // Special-case the applied_index key.
+        if key == sql::engine::Raft::APPLIED_INDEX_KEY {
+            if let Ok(applied_index) = bincode::deserialize::<raft::Index>(value) {
+                return applied_index.to_string();
+            }
+        }
+
         let Ok(key) = sql::engine::Key::decode(key) else { return Raw::key(value) };
         match key {
             sql::engine::Key::Table(_) => {
                 let Ok(table) = bincode::deserialize::<sql::types::Table>(value) else {
                     return Raw::bytes(value);
                 };
-                let re = regex::Regex::new(r#"\n\s*"#).expect("regex failed");
-                re.replace_all(&format!("{table}"), " ").into_owned()
+                Self::schema(table)
             }
             sql::engine::Key::Row(_, _) => {
                 let Ok(row) = bincode::deserialize::<sql::types::Row>(value) else {
                     return Raw::bytes(value);
                 };
-                row.into_iter().map(|v| format!("{v:?}")).join(",")
+                Self::values(row)
             }
             sql::engine::Key::Index(_, _, _) => {
                 let Ok(index) = bincode::deserialize::<BTreeSet<sql::types::Value>>(value) else {
                     return Raw::bytes(value);
                 };
-                index.into_iter().map(|v| format!("{v:?}")).join(",")
+                Self::values(index)
             }
         }
+    }
+}
+
+/// Formats SQL Raft write commands, from the Raft log.
+pub struct SQLCommand;
+
+impl Formatter for SQLCommand {
+    /// There is no key, since they're wrapped in a Raft log entry.
+    fn key(_: &[u8]) -> String {
+        panic!("SQL commands don't have a key");
+    }
+
+    fn value(_: &[u8], value: &[u8]) -> String {
+        let Ok(write) = sql::engine::Write::decode(value) else {
+            return Raw::bytes(value);
+        };
+
+        let txn = match &write {
+            sql::engine::Write::Begin => None,
+            sql::engine::Write::Commit(txn)
+            | sql::engine::Write::Rollback(txn)
+            | sql::engine::Write::Delete { txn, .. }
+            | sql::engine::Write::Insert { txn, .. }
+            | sql::engine::Write::Update { txn, .. }
+            | sql::engine::Write::CreateTable { txn, .. }
+            | sql::engine::Write::DeleteTable { txn, .. } => Some(txn),
+        };
+        let ftxn =
+            txn.filter(|t| !t.read_only).map(|t| format!("t{} ", t.version)).unwrap_or_default();
+
+        let fcommand = match write {
+            sql::engine::Write::Begin => "BEGIN".to_string(),
+            sql::engine::Write::Commit(_) => "COMMIT".to_string(),
+            sql::engine::Write::Rollback(_) => "ROLLBACK".to_string(),
+            sql::engine::Write::Delete { table, ids, .. } => {
+                format!("DELETE {table} {}", ids.iter().map(|id| id.to_string()).join(","))
+            }
+            sql::engine::Write::Insert { table, rows, .. } => {
+                format!(
+                    "INSERT {table} {}",
+                    rows.into_iter().map(|row| format!("({})", SQL::values(row))).join(" ")
+                )
+            }
+            sql::engine::Write::Update { table, rows, .. } => format!(
+                "UPDATE {table} {}",
+                rows.into_iter().map(|(id, row)| format!("{id}→({})", SQL::values(row))).join(" ")
+            ),
+            sql::engine::Write::CreateTable { schema, .. } => SQL::schema(schema),
+            sql::engine::Write::DeleteTable { table, .. } => format!("DROP TABLE {table}"),
+        };
+        format!("{ftxn}{fcommand}")
     }
 }

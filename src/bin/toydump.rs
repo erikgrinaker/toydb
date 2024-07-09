@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     let mut scan = engine.scan(..);
     while let Some((key, value)) = scan.next().transpose()? {
         let mut string = match raft {
-            true => format::Raft::key_value(&key, &value),
+            true => format::Raft::<format::SQLCommand>::key_value(&key, &value),
             false => format::MVCC::<format::SQL>::key_value(&key, &value),
         };
         if raw {

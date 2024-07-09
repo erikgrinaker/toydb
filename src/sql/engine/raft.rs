@@ -33,6 +33,10 @@ pub struct Raft {
 }
 
 impl Raft {
+    /// The unversioned key used to store the applied index. Just use a string
+    /// for simplicity.
+    pub const APPLIED_INDEX_KEY: &'static [u8] = b"applied_index";
+
     /// Creates a new Raft-based SQL engine, given a Raft request channel to the
     /// local Raft node.
     pub fn new(tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>) -> Self {
@@ -236,7 +240,7 @@ impl<E: storage::Engine> State<E> {
     pub fn new(engine: E) -> Result<Self> {
         let local = super::Local::new(engine);
         let applied_index = local
-            .get_unversioned(b"applied_index")?
+            .get_unversioned(Raft::APPLIED_INDEX_KEY)?
             .map(|b| bincode::deserialize(&b))
             .transpose()?
             .unwrap_or(0);
@@ -298,7 +302,7 @@ impl<E: storage::Engine> raft::State for State<E> {
         // lose a tail of the state machine writes (e.g. if the machine
         // crashes). Raft will replay the log from the last known applied index.
         self.applied_index = entry.index;
-        self.local.set_unversioned(b"applied_index", bincode::serialize(&entry.index))?;
+        self.local.set_unversioned(Raft::APPLIED_INDEX_KEY, bincode::serialize(&entry.index))?;
         result
     }
 
@@ -341,8 +345,8 @@ impl<E: storage::Engine> raft::State for State<E> {
 
 /// A Raft engine read. Values correspond to engine method parameters. Uses
 /// Cows to allow borrowed encoding and owned decoding.
-#[derive(Serialize, Deserialize)]
-enum Read<'a> {
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Read<'a> {
     BeginReadOnly {
         as_of: Option<mvcc::Version>,
     },
@@ -378,8 +382,8 @@ impl<'a> encoding::Value for Read<'a> {}
 
 /// A Raft engine write. Values correspond to engine method parameters. Uses
 /// Cows to allow borrowed encoding (for borrowed params) and owned decoding.
-#[derive(Serialize, Deserialize)]
-enum Write<'a> {
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Write<'a> {
     Begin,
     Commit(Cow<'a, mvcc::TransactionState>),
     Rollback(Cow<'a, mvcc::TransactionState>),
@@ -389,6 +393,7 @@ enum Write<'a> {
     Update { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, rows: BTreeMap<Value, Row> },
 
     CreateTable { txn: Cow<'a, mvcc::TransactionState>, schema: Table },
+    // TODO: rename to DropTable.
     DeleteTable { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, if_exists: bool },
 }
 

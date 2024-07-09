@@ -375,7 +375,10 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.append(command)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!("append → {}\n", format::Raft::entry(&entry)));
+                    output.push_str(&format!(
+                        "append → {}\n",
+                        format::Raft::<format::Raw>::entry(&entry)
+                    ));
                 }
 
                 // commit INDEX
@@ -385,7 +388,10 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.commit(index)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!("commit → {}\n", format::Raft::entry(&entry)));
+                    output.push_str(&format!(
+                        "commit → {}\n",
+                        format::Raft::<format::Raw>::entry(&entry)
+                    ));
                 }
 
                 // dump
@@ -397,7 +403,7 @@ mod tests {
                         writeln!(
                             output,
                             "{} [{}]",
-                            format::Raft::key_value(&key, &value),
+                            format::Raft::<format::Raw>::key_value(&key, &value),
                             format::Raw::key_value(&key, &value)
                         )?;
                     }
@@ -414,7 +420,7 @@ mod tests {
                             .log
                             .get(index)?
                             .as_ref()
-                            .map(format::Raft::entry)
+                            .map(format::Raft::<format::Raw>::entry)
                             .unwrap_or("None".to_string());
                         output.push_str(&format!("{entry}\n"));
                     }
@@ -464,7 +470,8 @@ mod tests {
                     args.reject_rest()?;
                     let mut scan = self.log.scan(range);
                     while let Some(entry) = scan.next().transpose()? {
-                        output.push_str(&format!("{}\n", format::Raft::entry(&entry)));
+                        output
+                            .push_str(&format!("{}\n", format::Raft::<format::Raw>::entry(&entry)));
                     }
                 }
 
@@ -476,7 +483,8 @@ mod tests {
                     args.reject_rest()?;
                     let mut scan = self.log.scan_apply(applied_index);
                     while let Some(entry) = scan.next().transpose()? {
-                        output.push_str(&format!("{}\n", format::Raft::entry(&entry)));
+                        output
+                            .push_str(&format!("{}\n", format::Raft::<format::Raw>::entry(&entry)));
                     }
                 }
 
@@ -504,7 +512,10 @@ mod tests {
                     args.reject_rest()?;
                     let index = self.log.splice(entries)?;
                     let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!("splice → {}\n", format::Raft::entry(&entry)));
+                    output.push_str(&format!(
+                        "splice → {}\n",
+                        format::Raft::<format::Raw>::entry(&entry)
+                    ));
                 }
 
                 // status [engine=BOOL]
@@ -552,14 +563,14 @@ mod tests {
                     Operation::Delete { key } => writeln!(
                         output,
                         "engine delete {} [{}]",
-                        format::Raft::key(&key),
+                        format::Raft::<format::Raw>::key(&key),
                         format::Raw::key(&key)
                     )?,
                     Operation::Flush => writeln!(output, "engine flush")?,
                     Operation::Set { key, value } => writeln!(
                         output,
                         "engine set {} [{}]",
-                        format::Raft::key_value(&key, &value),
+                        format::Raft::<format::Raw>::key_value(&key, &value),
                         format::Raw::key_value(&key, &value)
                     )?,
                 }
