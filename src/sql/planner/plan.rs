@@ -375,11 +375,10 @@ impl Node {
                 right.format(f, prefix, false, true)?;
             }
             Self::IndexLookup { table, column, alias, values } => {
-                write!(f, "IndexLookup: {table}")?;
+                write!(f, "IndexLookup: {table}.{column}")?;
                 if let Some(alias) = alias {
-                    write!(f, " as {}", alias)?;
+                    write!(f, " as {alias}.{column}")?;
                 }
-                write!(f, " column {}", column)?;
                 if !values.is_empty() && values.len() < 10 {
                     write!(f, " ({})", values.iter().join(", "))?;
                 } else {

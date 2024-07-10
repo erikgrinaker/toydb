@@ -65,7 +65,7 @@ Initial:
 Filter pushdown:
    Scan: test (value = b)
 Index lookup:
-   IndexLookup: test column value (b)
+   IndexLookup: test.value (b)
 2, b, NaN
 
 [opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c'
@@ -76,7 +76,7 @@ Initial:
 Filter pushdown:
    Scan: test (value = a OR value = c)
 Index lookup:
-   IndexLookup: test column value (a, c)
+   IndexLookup: test.value (a, c)
 1, a, 3.14
 3, c, 0
 
@@ -89,7 +89,7 @@ Filter pushdown:
    Scan: test (value = a OR value = c AND id > 1)
 Index lookup:
    Filter: id > 1
-   └─ IndexLookup: test column value (a, c)
+   └─ IndexLookup: test.value (a, c)
 3, c, 0
 
 [opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c' OR id > 1
@@ -113,7 +113,7 @@ Initial:
 Filter pushdown:
    Scan: test (value IS NULL)
 Index lookup:
-   IndexLookup: test column value (NULL)
+   IndexLookup: test.value (NULL)
 0, NULL, NULL
 
 [opt]> SELECT * FROM test WHERE value = NULL
@@ -124,7 +124,7 @@ Initial:
 Filter pushdown:
    Scan: test (value = NULL)
 Index lookup:
-   IndexLookup: test column value (0 values)
+   IndexLookup: test.value (0 values)
 Short circuit:
    Nothing
 
@@ -156,7 +156,7 @@ Initial:
 Filter pushdown:
    Scan: test (float IS NAN)
 Index lookup:
-   IndexLookup: test column float (NaN)
+   IndexLookup: test.float (NaN)
 2, b, NaN
 
 [opt]> SELECT * FROM test WHERE "float" = NAN
@@ -167,7 +167,7 @@ Initial:
 Filter pushdown:
    Scan: test (float = NaN)
 Index lookup:
-   IndexLookup: test column float (0 values)
+   IndexLookup: test.float (0 values)
 Short circuit:
    Nothing
 
@@ -182,7 +182,7 @@ Constant folding:
 Filter pushdown:
    Scan: test (float = NaN)
 Index lookup:
-   IndexLookup: test column float (0 values)
+   IndexLookup: test.float (0 values)
 Short circuit:
    Nothing
 
@@ -224,11 +224,11 @@ Filter pushdown:
 Index lookup:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ KeyLookup: test (1, 3)
-   └─ IndexLookup: other column test_id (1, 3)
+   └─ IndexLookup: other.test_id (1, 3)
 Join type:
    HashJoin: inner on test.id = other.test_id
    ├─ KeyLookup: test (1, 3)
-   └─ IndexLookup: other column test_id (1, 3)
+   └─ IndexLookup: other.test_id (1, 3)
 1, a, 3.14, 1, 1
 3, c, 0, 3, 3
 
@@ -246,11 +246,11 @@ Filter pushdown:
 Index lookup:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ KeyLookup: test (1, 3)
-   └─ IndexLookup: other column test_id (1, 3)
+   └─ IndexLookup: other.test_id (1, 3)
 Join type:
    HashJoin: inner on test.id = other.test_id
    ├─ KeyLookup: test (1, 3)
-   └─ IndexLookup: other column test_id (1, 3)
+   └─ IndexLookup: other.test_id (1, 3)
 1, a, 3.14, 1, 1
 3, c, 0, 3, 3
 
@@ -275,12 +275,12 @@ Index lookup:
    NestedLoopJoin: inner on b.test_id = test.id OR b.test_id = 3
    ├─ NestedLoopJoin: inner on a.test_id = test.id
    │  ├─ KeyLookup: test (2)
-   │  └─ IndexLookup: other as a column test_id (2)
-   └─ IndexLookup: other as b column test_id (1, 3)
+   │  └─ IndexLookup: other.test_id as a.test_id (2)
+   └─ IndexLookup: other.test_id as b.test_id (1, 3)
 Join type:
    NestedLoopJoin: inner on b.test_id = test.id OR b.test_id = 3
    ├─ HashJoin: inner on test.id = a.test_id
    │  ├─ KeyLookup: test (2)
-   │  └─ IndexLookup: other as a column test_id (2)
-   └─ IndexLookup: other as b column test_id (1, 3)
+   │  └─ IndexLookup: other.test_id as a.test_id (2)
+   └─ IndexLookup: other.test_id as b.test_id (1, 3)
 2, b, NaN, 2, 2, 3, 3

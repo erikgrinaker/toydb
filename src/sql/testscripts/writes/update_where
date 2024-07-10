@@ -46,7 +46,7 @@ Update: name (value=foo)
 > ROLLBACK
 ---
 Update: name (value=foo)
-└─ IndexLookup: name column index (2)
+└─ IndexLookup: name.index (2)
 1, a, 1
 2, foo, 2
 3, c, NULL
@@ -58,7 +58,7 @@ Update: name (value=foo)
 > ROLLBACK
 ---
 Update: name (value=foo)
-└─ IndexLookup: name column index (NULL)
+└─ IndexLookup: name.index (NULL)
 1, a, 1
 2, b, 2
 3, foo, NULL

@@ -43,7 +43,7 @@ Delete: name
 > ROLLBACK
 ---
 Delete: name
-└─ IndexLookup: name column index (3)
+└─ IndexLookup: name.index (3)
 0, NULL, NULL
 1, a, 1
 2, b, 2
@@ -55,7 +55,7 @@ Delete: name
 > ROLLBACK
 ---
 Delete: name
-└─ IndexLookup: name column index (NULL)
+└─ IndexLookup: name.index (NULL)
 1, a, 1
 2, b, 2
 3, c, 3
