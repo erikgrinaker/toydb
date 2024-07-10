@@ -1,0 +1,170 @@
+# Tests the constant folding optimizer.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a'), (2, 'b'), (3, 'c')
+---
+ok
+
+# Constant folding is applied in all places where expressions are used.
+[opt]> SELECT 1+1
+---
+Initial:
+   Projection: 1 + 1
+   └─ EmptyRow
+Constant folding:
+   Projection: 2
+   └─ EmptyRow
+2
+
+[opt]> SELECT 1+1 FROM test
+---
+Initial:
+   Projection: 1 + 1
+   └─ Scan: test
+Constant folding:
+   Projection: 2
+   └─ Scan: test
+2
+2
+2
+
+[opt]> SELECT * FROM test a JOIN test b ON 1+1 > 1
+---
+Initial:
+   NestedLoopJoin: inner on 1 + 1 > 1
+   ├─ Scan: test as a
+   └─ Scan: test as b
+Constant folding:
+   NestedLoopJoin: inner on TRUE
+   ├─ Scan: test as a
+   └─ Scan: test as b
+Filter pushdown:
+   NestedLoopJoin: inner
+   ├─ Scan: test as a (TRUE)
+   └─ Scan: test as b (TRUE)
+Short circuit:
+   NestedLoopJoin: inner
+   ├─ Scan: test as a
+   └─ Scan: test as b
+1, a, 1, a
+1, a, 2, b
+1, a, 3, c
+2, b, 1, a
+2, b, 2, b
+2, b, 3, c
+3, c, 1, a
+3, c, 2, b
+3, c, 3, c
+
+[opt]> SELECT * FROM test WHERE 1+1 > 1
+---
+Initial:
+   Filter: 1 + 1 > 1
+   └─ Scan: test
+Constant folding:
+   Filter: TRUE
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (TRUE)
+Short circuit:
+   Scan: test
+1, a
+2, b
+3, c
+
+[opt]> SELECT * FROM test ORDER BY 1+1
+---
+Initial:
+   Order: 1 + 1 asc
+   └─ Scan: test
+Constant folding:
+   Order: 2 asc
+   └─ Scan: test
+1, a
+2, b
+3, c
+
+[opt]> SELECT * FROM test LIMIT 1+1
+---
+Initial:
+   Limit: 2
+   └─ Scan: test
+1, a
+2, b
+
+[opt]> SELECT * FROM test OFFSET 1+1
+---
+Initial:
+   Offset: 2
+   └─ Scan: test
+3, c
+
+# Constant folding folds the constant parts of a variable expression.
+# TODO: this should fold 4 - 6, needs to reorder commutative operations.
+[opt]> SELECT 2*2 + id - 3 * 2 FROM test
+---
+Initial:
+   Projection: 2 * 2 + id - 3 * 2
+   └─ Scan: test
+Constant folding:
+   Projection: 4 + id - 6
+   └─ Scan: test
+-1
+0
+1
+
+# Constant folding short-circuits variable logical operations.
+[opt]> SELECT * FROM test WHERE 1+1 > 1 OR id > 1
+---
+Initial:
+   Filter: 1 + 1 > 1 OR id > 1
+   └─ Scan: test
+Constant folding:
+   Filter: TRUE
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (TRUE)
+Short circuit:
+   Scan: test
+1, a
+2, b
+3, c
+
+[opt]> SELECT * FROM test WHERE 1+1 < 1 OR id > 1
+---
+Initial:
+   Filter: 1 + 1 < 1 OR id > 1
+   └─ Scan: test
+Constant folding:
+   Filter: id > 1
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (id > 1)
+2, b
+3, c
+
+[opt]> SELECT * FROM test WHERE 1+1 > 1 AND id > 1
+---
+Initial:
+   Filter: 1 + 1 > 1 AND id > 1
+   └─ Scan: test
+Constant folding:
+   Filter: id > 1
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (id > 1)
+2, b
+3, c
+
+[opt]> SELECT * FROM test WHERE 1+1 < 1 AND id > 1
+---
+Initial:
+   Filter: 1 + 1 < 1 AND id > 1
+   └─ Scan: test
+Constant folding:
+   Filter: FALSE
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (FALSE)
+Short circuit:
+   Nothing
