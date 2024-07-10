@@ -1,10 +1,159 @@
 # Tests the short circuiting optimizer.
-# TODO: add more test cases.
 
 > CREATE TABLE test (id INT PRIMARY KEY, value STRING)
 > INSERT INTO test VALUES (1, 'a'), (2, 'b'), (3, 'c')
+> CREATE TABLE ref (id INT PRIMARY KEY, test_id INT REFERENCES test)
+> INSERT INTO ref VALUES (1, 1), (2, 2), (3, 3)
 ---
 ok
+
+# TRUE predicates are removed.
+[opt]> SELECT * FROM test WHERE TRUE
+---
+Initial:
+   Filter: TRUE
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (TRUE)
+Short circuit:
+   Scan: test
+1, a
+2, b
+3, c
+
+[opt]> SELECT 1, 2, 3 WHERE TRUE
+---
+Initial:
+   Projection: 1, 2, 3
+   └─ Filter: TRUE
+      └─ EmptyRow
+Short circuit:
+   Projection: 1, 2, 3
+   └─ EmptyRow
+1, 2, 3
+
+[opt]> SELECT * FROM test JOIN ref ON TRUE
+---
+Initial:
+   NestedLoopJoin: inner on TRUE
+   ├─ Scan: test
+   └─ Scan: ref
+Filter pushdown:
+   NestedLoopJoin: inner
+   ├─ Scan: test (TRUE)
+   └─ Scan: ref (TRUE)
+Short circuit:
+   NestedLoopJoin: inner
+   ├─ Scan: test
+   └─ Scan: ref
+1, a, 1, 1
+1, a, 2, 2
+1, a, 3, 3
+2, b, 1, 1
+2, b, 2, 2
+2, b, 3, 3
+3, c, 1, 1
+3, c, 2, 2
+3, c, 3, 3
+
+# FALSE predicates → Nothing
+[opt]> SELECT * FROM test WHERE FALSE
+---
+Initial:
+   Filter: FALSE
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (FALSE)
+Short circuit:
+   Nothing
+
+[opt]> SELECT 1, 2, 3 WHERE FALSE
+---
+Initial:
+   Projection: 1, 2, 3
+   └─ Filter: FALSE
+      └─ EmptyRow
+Short circuit:
+   Nothing
+
+[opt]> SELECT * FROM test JOIN ref ON ref.test_id = test.id AND FALSE
+---
+Initial:
+   NestedLoopJoin: inner on ref.test_id = test.id AND FALSE
+   ├─ Scan: test
+   └─ Scan: ref
+Constant folding:
+   NestedLoopJoin: inner on FALSE
+   ├─ Scan: test
+   └─ Scan: ref
+Filter pushdown:
+   NestedLoopJoin: inner
+   ├─ Scan: test (FALSE)
+   └─ Scan: ref (FALSE)
+Short circuit:
+   Nothing
+
+# NULL predicates → Nothing
+[opt]> SELECT * FROM test WHERE NULL
+---
+Initial:
+   Filter: NULL
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (NULL)
+Short circuit:
+   Nothing
+
+[opt]> SELECT 1, 2, 3 WHERE NULL
+---
+Initial:
+   Projection: 1, 2, 3
+   └─ Filter: NULL
+      └─ EmptyRow
+Short circuit:
+   Nothing
+
+[opt]> SELECT * FROM test JOIN ref ON ref.test_id = test.id AND NULL
+---
+Initial:
+   NestedLoopJoin: inner on ref.test_id = test.id AND NULL
+   ├─ Scan: test
+   └─ Scan: ref
+Filter pushdown:
+   NestedLoopJoin: inner on ref.test_id = test.id
+   ├─ Scan: test (NULL)
+   └─ Scan: ref (NULL)
+Join type:
+   HashJoin: inner on test.id = ref.test_id
+   ├─ Scan: test (NULL)
+   └─ Scan: ref (NULL)
+Short circuit:
+   Nothing
+
+# Empty key/index lookups.
+[opt]> SELECT * FROM test WHERE id = NULL
+---
+Initial:
+   Filter: id = NULL
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (id = NULL)
+Index lookup:
+   KeyLookup: test (0 keys)
+Short circuit:
+   Nothing
+
+[opt]> SELECT * FROM ref WHERE test_id = NULL
+---
+Initial:
+   Filter: test_id = NULL
+   └─ Scan: ref
+Filter pushdown:
+   Scan: ref (test_id = NULL)
+Index lookup:
+   IndexLookup: ref.test_id (0 values)
+Short circuit:
+   Nothing
 
 # LIMIT 0 → Nothing
 [opt]> SELECT * FROM test LIMIT 0
@@ -12,5 +161,19 @@ ok
 Initial:
    Limit: 0
    └─ Scan: test
+Short circuit:
+   Nothing
+
+# Constant folding happens before short-circuiting.
+[opt]> SELECT * FROM test WHERE 1 != 1 OR 0 > 3 AND NOT NULL
+---
+Initial:
+   Filter: NOT 1 = 1 OR 0 > 3 AND NOT NULL
+   └─ Scan: test
+Constant folding:
+   Filter: FALSE
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (FALSE)
 Short circuit:
    Nothing
