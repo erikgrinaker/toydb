@@ -217,7 +217,7 @@ impl Expression {
 
     /// Recursively walks the expression tree depth-first, calling the given
     /// closure until it returns false. Returns true otherwise.
-    pub fn walk(&self, visitor: &impl Fn(&Expression) -> bool) -> bool {
+    pub fn walk(&self, visitor: &mut impl FnMut(&Expression) -> bool) -> bool {
         visitor(self)
             && match self {
                 Self::Add(lhs, rhs)
@@ -248,7 +248,7 @@ impl Expression {
     /// closure until it returns true. Returns false otherwise. This is the
     /// inverse of walk().
     pub fn contains(&self, visitor: &impl Fn(&Expression) -> bool) -> bool {
-        !self.walk(&|e| !visitor(e))
+        !self.walk(&mut |e| !visitor(e))
     }
 
     /// Transforms the expression tree by recursively applying the given
