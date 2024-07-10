@@ -124,15 +124,26 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         // Convert the predicate into conjunctive normal form (an AND vector).
         let cnf = predicate.into_cnf_vec();
 
-        // Split out expressions that only reference a single source.
+        // Push down expressions that don't reference both sources. Constant
+        // expressions can be pushed down into both.
         let (mut push_left, mut push_right, mut predicate) = (Vec::new(), Vec::new(), Vec::new());
         for expr in cnf {
-            if !expr.contains(&|e| matches!(e, Expression::Field(i, _) if i >= &left_size)) {
-                push_left.push(expr)
-            } else if !expr.contains(&|e| matches!(e, Expression::Field(i, _) if i < &left_size)) {
-                push_right.push(expr)
-            } else {
-                predicate.push(expr)
+            let (mut ref_left, mut ref_right) = (false, false);
+            expr.walk(&mut |e| {
+                if let Expression::Field(index, _) = e {
+                    ref_left = ref_left || *index < left_size;
+                    ref_right = ref_right || *index >= left_size;
+                }
+                !(ref_left && ref_right) // exit once both are referenced
+            });
+            match (ref_left, ref_right) {
+                (true, true) => predicate.push(expr),
+                (true, false) => push_left.push(expr),
+                (false, true) => push_right.push(expr),
+                (false, false) => {
+                    push_left.push(expr.clone());
+                    push_right.push(expr);
+                }
             }
         }
 
