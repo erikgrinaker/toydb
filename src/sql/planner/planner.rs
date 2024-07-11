@@ -153,7 +153,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         r#where: Option<ast::Expression>,
         group_by: Vec<ast::Expression>,
         mut having: Option<ast::Expression>,
-        mut order: Vec<(ast::Expression, ast::Order)>,
+        order: Vec<(ast::Expression, ast::Order)>,
         offset: Option<ast::Expression>,
         limit: Option<ast::Expression>,
     ) -> Result<Plan> {
@@ -183,9 +183,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
             if let Some(ref mut expr) = having {
                 hidden += self.inject_hidden(expr, &mut select)?;
             }
-            for (expr, _) in order.iter_mut() {
-                hidden += self.inject_hidden(expr, &mut select)?;
-            }
 
             // Extract any aggregate functions and GROUP BY expressions, replacing them with
             // Column placeholders. Aggregations are handled by evaluating group expressions
@@ -202,6 +199,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // - Projection: rating * 100, rating * 100, released - 2000
             // - Aggregation: max(#0), min(#1) group by #2
             // - Projection: (#0 - #1) / 100
+            //
+            // TODO: handle ORDER BY aggregates.
             let aggregates = self.extract_aggregates(&mut select)?;
             let groups = self.extract_groups(&mut select, group_by, aggregates.len())?;
             if !aggregates.is_empty() || !groups.is_empty() {
@@ -210,11 +209,21 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             // Build the remaining non-aggregate projection.
             let labels = select.iter().map(|(_, l)| Label::maybe_name(l.clone())).collect_vec();
-            let expressions = select
+            let mut expressions = select
                 .into_iter()
                 .map(|(e, _)| Self::build_expression(e, &scope))
                 .collect::<Result<Vec<_>>>()?;
-            scope = scope.project(&expressions, &labels)?;
+            let parent_scope = scope;
+            scope = parent_scope.project(&expressions, &labels)?;
+
+            // Add hidden columns for any ORDER BY fields not in the projection.
+            // TODO: track hidden fields in Scope.
+            let size = expressions.len();
+            for (expr, _) in &order {
+                self.build_hidden(&mut scope, &parent_scope, &mut expressions, expr);
+            }
+            hidden += expressions.len() - size;
+
             node = Node::Projection { source: Box::new(node), expressions, labels };
         };
 
@@ -253,6 +262,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Add a final projection that removes hidden columns, only passing
         // through the originally requested columns.
+        //
+        // TODO: add a separate plan node kind for this, and also use it for
+        // RIGHT JOIN projections.
         if hidden > 0 {
             let columns = scope.len() - hidden;
             let labels = vec![Label::None; columns];
@@ -476,6 +488,47 @@ impl<'a, C: Catalog> Planner<'a, C> {
             }
         }
         Ok(groups)
+    }
+
+    /// Adds hidden columns to a projection to pass through fields that are used
+    /// by downstream nodes. Consider e.g.:
+    ///
+    /// SELECT id FROM table ORDER BY value
+    ///
+    /// The ORDER BY node is evaluated after the projection (it may need to
+    /// order on projected fields like "foo + bar AS alias"), but "value" isn't
+    /// projected and so isn't available to the ORDER BY node. We add a hidden
+    /// column to the projection such that the effective projection is:
+    ///
+    /// SELECT id, value FROM table ORDER BY value
+    fn build_hidden(
+        &self,
+        scope: &mut Scope,
+        parent_scope: &Scope,
+        projection: &mut Vec<Expression>,
+        expr: &ast::Expression,
+    ) {
+        expr.walk(&mut |e| {
+            // Look for field references.
+            let ast::Expression::Field(table, name) = e else {
+                return true;
+            };
+            // If the field already exists post-projection, do nothing.
+            if scope.get_column_index(table.as_deref(), name).is_ok() {
+                return true;
+            }
+            // If the field doesn't exist in the parent scope either, we simply
+            // don't build a hidden column for it. The field evaluation will
+            // error when building the downstream node (e.g. ORDER BY).
+            let Ok(index) = parent_scope.get_column_index(table.as_deref(), name) else {
+                return true;
+            };
+            // Add a hidden column to the projection.
+            let label = Label::maybe_qualified(table.clone(), name.clone());
+            scope.add_column(label.clone());
+            projection.push(Expression::Field(index, label));
+            true
+        });
     }
 
     /// Injects hidden expressions into SELECT expressions. This is used for ORDER BY and HAVING, in

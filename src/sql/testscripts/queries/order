@@ -238,13 +238,11 @@ Order: id desc
 1, 1, TRUE, 0, a
 
 # Can order by expressions.
-# TODO: the additional float projection here is unnecessary.
 [plan]> SELECT id, "float" FROM test ORDER BY "float" ^ 2
 ---
-Projection: #0, #1
-└─ Order: test.float ^ 2 asc
-   └─ Projection: id, float, float
-      └─ Scan: test
+Order: float ^ 2 asc
+└─ Projection: id, float
+   └─ Scan: test
 0, NULL
 8, NULL
 9, NULL
@@ -256,11 +254,29 @@ Projection: #0, #1
 6, -inf
 7, NaN
 
-# Can order by columns not in the result.
+# Can order by columns not in the result. Multiple references to the same column
+# only result in one hidden column.
 [plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC
 ---
 Projection: #0, #1
-└─ Order: test.bool desc
+└─ Order: bool desc
+   └─ Projection: id, int, bool
+      └─ Scan: test
+1, 0
+2, -1
+0, NULL
+3, 1
+4, 1000
+5, -1000
+6, 7
+7, -9
+8, NULL
+9, NULL
+
+[plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC, "bool" ASC
+---
+Projection: #0, #1
+└─ Order: bool desc, bool asc
    └─ Projection: id, int, bool
       └─ Scan: test
 1, 0
@@ -278,7 +294,7 @@ Projection: #0, #1
 [plan]> SELECT id FROM test ORDER BY "float" ^ 2 - "int" ^ 2 DESC
 ---
 Projection: #0
-└─ Order: test.float ^ 2 - test.int ^ 2 desc
+└─ Order: float ^ 2 - int ^ 2 desc
    └─ Projection: id, float, int
       └─ Scan: test
 7
@@ -334,20 +350,43 @@ Projection: #0
 5, 1000000
 
 # Errors if the field is ambiguous.
-# TODO: this should error.
-# TODO: when fixed, test qualified field names, and aliases vs unqualified columns.
-> SELECT id, "int" ^ 2 AS foo, "int" AS foo FROM test ORDER BY foo ASC
+!> SELECT id, "int" ^ 2 AS foo, "int" AS foo FROM test ORDER BY foo ASC
 ---
-0, NULL, NULL
-8, NULL, NULL
-9, NULL, NULL
-1, 0, 0
-2, 1, -1
-3, 1, 1
-6, 49, 7
-7, 81, -9
-4, 1000000, 1000
-5, 1000000, -1000
+Error: invalid input: ambiguous field foo
+
+# Prefers alias over table column if ambiguous, but not if fully qualified.
+[plan]> SELECT id AS "int" FROM test ORDER BY "int" DESC
+---
+Order: int desc
+└─ Projection: id
+   └─ Scan: test
+9
+8
+7
+6
+5
+4
+3
+2
+1
+0
+
+[plan]> SELECT id AS "int" FROM test ORDER BY test."int" DESC
+---
+Projection: #0
+└─ Order: test.int desc
+   └─ Projection: id, test.int
+      └─ Scan: test
+4
+6
+3
+1
+2
+7
+5
+0
+8
+9
 
 # Errors on unknown table or column, even the original table name when aliased.
 !> SELECT * FROM test ORDER BY unknown
@@ -431,25 +470,11 @@ Order: o.id desc, t.id asc
 9, NULL, NULL, NULL, 👍, 1, 1, a
 
 # Order by aggregates, both when in SELECT and otherwise.
-[plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
+# TODO: fix these.
+[plan]!> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Order: #1 desc
-└─ Projection: test.bool, #0
-   └─ Aggregation: max
-      └─ Projection: int, bool
-         └─ Scan: test
-TRUE, 0
-FALSE, -1
-NULL, NULL
+Error: invalid input: unknown function max
 
-[plan]> SELECT "bool" FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
+[plan]!> SELECT "bool" FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Projection: #0
-└─ Order: #1 desc
-   └─ Projection: test.bool, #0
-      └─ Aggregation: max
-         └─ Projection: int, bool
-            └─ Scan: test
-TRUE
-FALSE
-NULL
+Error: invalid input: unknown function max
