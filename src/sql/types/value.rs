@@ -80,7 +80,7 @@ impl std::hash::Hash for Value {
         self.datatype().hash(state);
         // Normalize to treat +/-0.0 and +/-NAN as equal when hashing.
         match self.normalize_ref().as_ref() {
-            Self::Null => self.hash(state),
+            Self::Null => {}
             Self::Boolean(v) => v.hash(state),
             Self::Integer(v) => v.hash(state),
             Self::Float(v) => v.to_be_bytes().hash(state),
