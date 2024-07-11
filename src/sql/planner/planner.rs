@@ -214,7 +214,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 .into_iter()
                 .map(|(e, _)| Self::build_expression(e, &scope))
                 .collect::<Result<Vec<_>>>()?;
-            scope.project(&expressions, &labels)?;
+            scope = scope.project(&expressions, &labels)?;
             node = Node::Projection { source: Box::new(node), expressions, labels };
         };
 
@@ -257,7 +257,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             let columns = scope.len() - hidden;
             let labels = vec![Label::None; columns];
             let expressions = (0..columns).map(|i| Expression::Field(i, Label::None)).collect_vec();
-            scope.project(&expressions, &labels)?;
+            scope = scope.project(&expressions, &labels)?;
             node = Node::Projection { source: Box::new(node), labels, expressions }
         }
 
@@ -334,7 +334,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                         .chain(0..left_size)
                         .map(|i| Ok(Expression::Field(i, scope.get_column_label(i)?)))
                         .collect::<Result<Vec<_>>>()?;
-                    scope.project(&expressions, &labels)?;
+                    scope = scope.project(&expressions, &labels)?;
                     node = Node::Projection { source: Box::new(node), expressions, labels }
                 }
                 node
@@ -369,7 +369,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             expressions.push(Self::build_expression(expr, scope)?);
             labels.push(Label::maybe_name(label));
         }
-        scope.project(
+        *scope = scope.project(
             &expressions
                 .iter()
                 .cloned()
@@ -741,13 +741,12 @@ impl Scope {
     /// Otherwise, for non-trivial field references, a new column is created for
     /// the expression. An explicit label may also be given for each column.
     /// Table sets are retained.
-    fn project(&mut self, expressions: &[Expression], labels: &[Label]) -> Result<()> {
+    fn project(&self, expressions: &[Expression], labels: &[Label]) -> Result<Self> {
         assert_eq!(expressions.len(), labels.len());
 
-        // Extract the old columns and clear the indexes. Keep the table index.
-        let columns = std::mem::take(&mut self.columns);
-        self.qualified.clear();
-        self.unqualified.clear();
+        // Copy the table index.
+        let mut new = Scope::new();
+        new.tables = self.tables.clone();
 
         // Map projected field references to old columns.
         let mut field_map: HashMap<usize, usize> = HashMap::new();
@@ -760,13 +759,13 @@ impl Scope {
         // Construct the new columns and labels.
         for (i, label) in labels.iter().enumerate() {
             if label.is_some() {
-                self.add_column(label.clone()); // explicit label
+                new.add_column(label.clone()); // explicit label
             } else if let Some(f) = field_map.get(&i) {
-                self.add_column(columns[*f].clone()) // field reference
+                new.add_column(self.columns[*f].clone()) // field reference
             } else {
-                self.add_column(Label::None) // unlabeled expression
+                new.add_column(Label::None) // unlabeled expression
             }
         }
-        Ok(())
+        Ok(new)
     }
 }
