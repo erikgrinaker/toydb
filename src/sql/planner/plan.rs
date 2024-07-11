@@ -84,13 +84,9 @@ impl Plan {
 /// A query plan node. These return row iterators and can be nested.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
-    /// Aggregates the input rows by computing the given aggregates for the
-    /// corresponding source columns. Additional columns in source for which
-    /// there are no aggregates are used as group by buckets, the number of
-    /// such group by columns is given in group_by.
-    ///
-    /// TODO: consider making aggregates a field/aggregate pair.
-    Aggregation { source: Box<Node>, aggregates: Vec<Aggregate>, group_by: usize },
+    /// Computes the given aggregates for the given source columns across all
+    /// rows, using the group_by column values as buckets.
+    Aggregation { source: Box<Node>, aggregates: Vec<(usize, Aggregate)>, group_by: Vec<usize> },
     /// Filters source rows, by only emitting rows for which the predicate
     /// evaluates to true.
     Filter { source: Box<Node>, predicate: Expression },
@@ -344,7 +340,11 @@ impl Node {
         // Format the node.
         match self {
             Self::Aggregation { source, aggregates, .. } => {
-                write!(f, "Aggregation: {}", aggregates.iter().join(", "))?;
+                write!(
+                    f,
+                    "Aggregation: {}",
+                    aggregates.iter().map(|(i, a)| format!("{a}(#{i})")).join(", ")
+                )?;
                 source.format(f, prefix, false, true)?;
             }
             Self::Filter { source, predicate } => {

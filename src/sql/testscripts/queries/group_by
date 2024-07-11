@@ -25,14 +25,14 @@ ok
 [plan]> SELECT COUNT(id), MIN(id), MAX(id), SUM(id), AVG(id) FROM test WHERE FALSE GROUP BY id
 ---
 Projection: #0, #1, #2, #3, #4
-└─ Aggregation: count, min, max, sum, avg
+└─ Aggregation: count(#0), min(#1), max(#2), sum(#3), avg(#4)
    └─ Nothing
 
 # Simple GROUP BY.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group"
 ---
 Projection: test.group, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, group
       └─ Scan: test
 NULL, 1
@@ -43,7 +43,7 @@ b, 3
     FROM test WHERE id != 0 GROUP BY "group"
 ---
 Projection: test.group, #0, #1, #2, #3, #4
-└─ Aggregation: count, min, max, sum, avg
+└─ Aggregation: count(#0), min(#1), max(#2), sum(#3), avg(#4)
    └─ Projection: TRUE, bool, string, int, float, group
       └─ Scan: test (NOT id = 0)
 a, 3, FALSE, AB, 9, NaN
@@ -53,7 +53,7 @@ b, 3, FALSE, 👋, 41, NaN
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group"
 ---
 Projection: test.group, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, group
       └─ Scan: test
 NULL, 1
@@ -64,7 +64,7 @@ b, 3
 [plan]> SELECT "bool", COUNT(*) FROM test WHERE id != 0 GROUP BY "bool"
 ---
 Projection: test.bool, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, bool
       └─ Scan: test (NOT id = 0)
 FALSE, 3
@@ -74,7 +74,7 @@ TRUE, 3
 [plan]> SELECT "int", COUNT(*) FROM test WHERE id != 0 GROUP BY "int"
 ---
 Projection: test.int, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, int
       └─ Scan: test (NOT id = 0)
 -1, 2
@@ -87,7 +87,7 @@ Projection: test.int, #0
 [plan]> SELECT "float", COUNT(*) FROM test WHERE id != 0 GROUP BY "float"
 ---
 Projection: test.float, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, float
       └─ Scan: test (NOT id = 0)
 0, 2
@@ -99,7 +99,7 @@ NaN, 2
 [plan]> SELECT "string", COUNT(*) FROM test WHERE id != 0 GROUP BY "string"
 ---
 Projection: test.string, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, string
       └─ Scan: test (NOT id = 0)
 , 2
@@ -111,7 +111,7 @@ abc, 2
 [plan]> SELECT COUNT(*) FROM test WHERE id != 0 GROUP BY "group"
 ---
 Projection: #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, group
       └─ Scan: test (NOT id = 0)
 3
@@ -131,7 +131,7 @@ b
 [plan]> SELECT "group" AS g, COUNT(*) FROM test GROUP BY g
 ---
 Projection: g, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, group
       └─ Scan: test
 NULL, 1
@@ -141,7 +141,7 @@ b, 3
 [plan]> SELECT "group", COUNT(*) FROM test AS t GROUP BY t."group"
 ---
 Projection: group, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, t.group
       └─ Scan: test as t
 NULL, 1
@@ -169,7 +169,7 @@ Error: invalid input: unknown table unknown
 [plan]> SELECT COUNT(*) FROM test GROUP BY 1
 ---
 Projection: #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, 1
       └─ Scan: test
 7
@@ -177,7 +177,7 @@ Projection: #0
 [plan]> SELECT COUNT(*) FROM test GROUP BY id % 2
 ---
 Projection: #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, id % 2
       └─ Scan: test
 4
@@ -187,7 +187,7 @@ Projection: #0
 [plan]> SELECT id % 2, COUNT(*) FROM test GROUP BY id % 2
 ---
 Projection: #1, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, id % 2
       └─ Scan: test
 0, 4
@@ -197,7 +197,7 @@ Projection: #1, #0
 [plan]> SELECT id % 2 AS mod, COUNT(*) FROM test GROUP BY mod
 ---
 Projection: mod, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, id % 2
       └─ Scan: test
 0, 4
@@ -212,7 +212,7 @@ Error: invalid input: group expression cannot contain aggregates
 [plan]> SELECT "group", "bool", COUNT(*) FROM test WHERE id != 0 GROUP BY "group", "bool"
 ---
 Projection: test.group, test.bool, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, group, bool
       └─ Scan: test (NOT id = 0)
 a, FALSE, 1
@@ -224,7 +224,7 @@ b, TRUE, 1
 [plan]> SELECT t.id % 2, COUNT(*) FROM test t JOIN other o ON t.id % 2 = o.id GROUP BY t.id % 2
 ---
 Projection: #1, #0
-└─ Aggregation: count
+└─ Aggregation: count(#0)
    └─ Projection: TRUE, t.id % 2
       └─ NestedLoopJoin: inner on t.id % 2 = o.id
          ├─ Scan: test as t

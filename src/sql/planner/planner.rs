@@ -372,8 +372,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
         let mut aggregates = Vec::new();
         let mut expressions = Vec::new();
         let mut labels = Vec::new();
-        for (aggregate, expr) in aggregations {
-            aggregates.push(aggregate);
+        for (i, (aggregate, expr)) in aggregations.into_iter().enumerate() {
+            aggregates.push((i, aggregate));
             expressions.push(Self::build_expression(expr, scope)?);
             labels.push(Label::None);
         }
@@ -400,7 +400,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         )?;
         let node = Node::Aggregation {
             source: Box::new(Node::Projection { source: Box::new(source), labels, expressions }),
-            group_by: scope.len() - aggregates.len(),
+            group_by: (aggregates.len()..scope.len()).collect(),
             aggregates,
         };
         Ok(node)

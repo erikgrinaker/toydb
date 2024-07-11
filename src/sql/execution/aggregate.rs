@@ -5,30 +5,31 @@ use crate::sql::types::{Row, Rows, Value};
 use itertools::Itertools as _;
 use std::collections::BTreeMap;
 
-/// Aggregates rows (i.e. GROUP BY).
+/// Aggregates row values from the source according to the aggregates, using the
+/// group_by column values as buckets.
 pub(super) fn aggregate(
     mut source: Rows,
-    aggregates: Vec<Aggregate>,
-    group_by: usize,
+    aggregates: Vec<(usize, Aggregate)>,
+    group_by: Vec<usize>,
 ) -> Result<Rows> {
-    // Aggregate rows from source, grouped by non-aggregation columns. For
-    // example, SELECT a, b, SUM(c), MAX(d) ... uses a,b as grouping buckets and
-    // SUM(c),MAX(d) as accumulators for each a,b bucket. Uses a BTreeMap for
-    // test determinism.
+    // Keep a set of accumulators keyed by bucket.
     let mut accumulators: BTreeMap<Row, Vec<Accumulator>> = BTreeMap::new();
-    while let Some(mut row) = source.next().transpose()? {
+    while let Some(row) = source.next().transpose()? {
+        let bucket = group_by.iter().map(|i| row[*i].clone()).collect();
         accumulators
-            .entry(row.split_off(aggregates.len()))
-            .or_insert(aggregates.iter().map(Accumulator::new).collect())
+            .entry(bucket)
+            .or_insert_with(|| aggregates.iter().map(|(_, agg)| Accumulator::new(agg)).collect())
             .iter_mut()
-            .zip(row)
-            .try_for_each(|(acc, value)| acc.add(value))?
+            .enumerate()
+            .map(|(i, agg)| (aggregates[i].0, agg))
+            .try_for_each(|(i, acc)| acc.add(row[i].clone()))?
     }
 
     // If there were no rows and no group-by columns, return a row of empty
     // accumulators, e.g.: SELECT COUNT(*) FROM t WHERE FALSE
-    if accumulators.is_empty() && group_by == 0 {
-        accumulators.insert(Vec::new(), aggregates.iter().map(Accumulator::new).collect());
+    if accumulators.is_empty() && group_by.is_empty() {
+        accumulators
+            .insert(Vec::new(), aggregates.iter().map(|(_, agg)| Accumulator::new(agg)).collect());
     }
 
     // Emit the aggregate and row values for each row bucket. We use an
@@ -79,6 +80,7 @@ impl Accumulator {
     }
 
     /// Adds a value to the accumulator.
+    /// TODO: have this take &Value.
     fn add(&mut self, value: Value) -> Result<()> {
         use std::cmp::Ordering;
         match (self, value) {
