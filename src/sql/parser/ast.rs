@@ -234,7 +234,7 @@ impl Expression {
 
     /// Walks the expression tree depth-first, calling a closure for every node.
     /// Halts and returns false if the closure returns false.
-    pub fn walk(&self, visitor: &impl Fn(&Expression) -> bool) -> bool {
+    pub fn walk(&self, visitor: &mut impl FnMut(&Expression) -> bool) -> bool {
         use Operator::*;
         if !visitor(self) {
             return false;
@@ -272,7 +272,7 @@ impl Expression {
     /// Walks the expression tree depth-first while calling a closure until it
     /// returns true. This is the inverse of walk().
     pub fn contains(&self, visitor: &impl Fn(&Expression) -> bool) -> bool {
-        !self.walk(&|expr| !visitor(expr))
+        !self.walk(&mut |expr| !visitor(expr))
     }
 }
 
