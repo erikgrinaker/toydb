@@ -184,24 +184,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 hidden += self.inject_hidden(expr, &mut select)?;
             }
 
-            // Extract any aggregate functions and GROUP BY expressions, replacing them with
-            // Column placeholders. Aggregations are handled by evaluating group expressions
-            // and aggregate function arguments in a pre-projection, passing the results
-            // to an aggregation node, and then evaluating the final SELECT expressions
-            // in the post-projection. For example:
-            //
-            // SELECT (MAX(rating * 100) - MIN(rating * 100)) / 100
-            // FROM movies
-            // GROUP BY released - 2000
-            //
-            // Results in the following nodes:
-            //
-            // - Projection: rating * 100, rating * 100, released - 2000
-            // - Aggregation: max(#0), min(#1) group by #2
-            // - Projection: (#0 - #1) / 100
+            // Extract any aggregate functions and GROUP BY expressions and
+            // build an aggregation node for them, replacing them with Column
+            // placeholders.
             //
             // TODO: handle ORDER BY aggregates.
-            let aggregates = self.extract_aggregates(&mut select)?;
+            let aggregates = self.extract_aggregates(&scope, &mut select)?;
             let groups = self.extract_groups(&mut select, group_by, aggregates.len())?;
             if !aggregates.is_empty() || !groups.is_empty() {
                 node = self.build_aggregation(&mut scope, node, groups, aggregates)?;
@@ -357,9 +345,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         Ok(node)
     }
 
-    /// Builds an aggregation node. All aggregate parameters and GROUP BY expressions are evaluated
-    /// in a pre-projection, whose results are fed into an Aggregate node. This node computes the
-    /// aggregates for the given groups, passing the group values through directly.
+    /// Builds an aggregate node.
     ///
     /// TODO: revisit this.
     fn build_aggregation(
@@ -367,42 +353,23 @@ impl<'a, C: Catalog> Planner<'a, C> {
         scope: &mut Scope,
         source: Node,
         groups: Vec<(ast::Expression, Option<String>)>,
-        aggregations: Vec<(Aggregate, ast::Expression)>,
+        aggregates: Vec<Aggregate>,
     ) -> Result<Node> {
-        let mut aggregates = Vec::new();
+        let mut group_by = Vec::new();
         let mut expressions = Vec::new();
         let mut labels = Vec::new();
-        for (i, (aggregate, expr)) in aggregations.into_iter().enumerate() {
-            aggregates.push((i, aggregate));
-            expressions.push(Self::build_expression(expr, scope)?);
+        for _ in &aggregates {
+            expressions.push(Expression::Constant(Value::Null));
             labels.push(Label::None);
         }
         for (expr, label) in groups {
-            expressions.push(Self::build_expression(expr, scope)?);
+            let expr = Self::build_expression(expr, scope)?;
+            expressions.push(expr.clone());
+            group_by.push(expr);
             labels.push(Label::maybe_name(label));
         }
-        *scope = scope.project(
-            &expressions
-                .iter()
-                .cloned()
-                .enumerate()
-                .map(|(i, e)| {
-                    if i < aggregates.len() {
-                        // We pass null values here since we don't want field references to hit
-                        // the fields in scope before the aggregation.
-                        Expression::Constant(Value::Null)
-                    } else {
-                        e
-                    }
-                })
-                .collect::<Vec<_>>(),
-            &labels,
-        )?;
-        let node = Node::Aggregation {
-            source: Box::new(Node::Projection { source: Box::new(source), labels, expressions }),
-            group_by: (aggregates.len()..scope.len()).collect(),
-            aggregates,
-        };
+        let node = Node::Aggregation { source: Box::new(source), group_by, aggregates };
+        *scope = scope.project(&expressions, &labels)?;
         Ok(node)
     }
 
@@ -411,29 +378,31 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// to aggregates, and returns them along with their argument expressions.
     fn extract_aggregates(
         &self,
+        scope: &Scope,
         exprs: &mut [(ast::Expression, Option<String>)],
-    ) -> Result<Vec<(Aggregate, ast::Expression)>> {
+    ) -> Result<Vec<Aggregate>> {
         let mut aggregates = Vec::new();
         for (expr, _) in exprs {
             expr.transform_mut(
-                &mut |mut e| match &mut e {
-                    ast::Expression::Function(f, args) if args.len() == 1 => {
-                        if let Some(aggregate) = Aggregate::from_name(f) {
-                            aggregates.push((aggregate, args.remove(0)));
-                            Ok(ast::Expression::Column(aggregates.len() - 1))
-                        } else {
-                            Ok(e)
-                        }
+                &mut |e| match e {
+                    ast::Expression::Function(f, mut args)
+                        if Aggregate::is(&f) && args.len() == 1 =>
+                    {
+                        let expr = Self::build_expression(args.remove(0), scope)?;
+                        aggregates.push(match f.as_str() {
+                            "avg" => Aggregate::Average(expr),
+                            "count" => Aggregate::Count(expr),
+                            "min" => Aggregate::Min(expr),
+                            "max" => Aggregate::Max(expr),
+                            "sum" => Aggregate::Sum(expr),
+                            f => panic!("invalid aggregate function {f}"),
+                        });
+                        Ok(ast::Expression::Column(aggregates.len() - 1))
                     }
                     _ => Ok(e),
                 },
                 &mut Ok,
             )?;
-        }
-        for (_, expr) in &aggregates {
-            if Self::is_aggregate(expr) {
-                return errinput!("aggregate functions can't be nested");
-            }
         }
         Ok(aggregates)
     }
@@ -570,7 +539,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         let mut hidden = 0;
         expr.transform_mut(
             &mut |e| match &e {
-                ast::Expression::Function(f, a) if Aggregate::from_name(f).is_some() => {
+                ast::Expression::Function(f, a) if Aggregate::is(f) => {
                     if let ast::Expression::Column(c) = a[0] {
                         if Self::is_aggregate(&select[c].0) {
                             return errinput!("aggregate function cannot reference aggregate");
@@ -659,9 +628,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
     /// Checks whether a given expression is an aggregate expression.
     fn is_aggregate(expr: &ast::Expression) -> bool {
-        expr.contains(
-            &|e| matches!(e, ast::Expression::Function(f, _) if Aggregate::from_name(f).is_some()),
-        )
+        expr.contains(&|e| matches!(e, ast::Expression::Function(f, _) if Aggregate::is(f)))
     }
 }
 

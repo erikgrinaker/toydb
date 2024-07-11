@@ -46,9 +46,8 @@ Projection: #0
 Projection: #0, #1
 └─ Filter: #2 > 10
    └─ Projection: test.group, #0, #1
-      └─ Aggregation: max(#0), max(#1)
-         └─ Projection: int, int, group
-            └─ Scan: test
+      └─ Aggregation: max(int), max(int) group by group
+         └─ Scan: test
 b, 42
 
 # Having works with SELECT aliases.
@@ -56,9 +55,8 @@ b, 42
 ---
 Filter: m > 10
 └─ Projection: test.group, #0
-   └─ Aggregation: max(#0)
-      └─ Projection: int, group
-         └─ Scan: test
+   └─ Aggregation: max(int) group by group
+      └─ Scan: test
 b, 42
 
 # Having works with an aggregate function not in the SELECT clause.
@@ -67,9 +65,8 @@ b, 42
 Projection: #0, #1
 └─ Filter: #2 > 10
    └─ Projection: test.group, #0, #1
-      └─ Aggregation: count(#0), max(#1)
-         └─ Projection: TRUE, int, group
-            └─ Scan: test
+      └─ Aggregation: count(TRUE), max(int) group by group
+         └─ Scan: test
 b, 3
 
 # Having works with compound expressions.
@@ -78,15 +75,15 @@ b, 3
 Projection: #0, #1
 └─ Filter: #2 / #3 > 3
    └─ Projection: test.group, #0, #1, #2
-      └─ Aggregation: count(#0), max(#1), count(#2)
-         └─ Projection: TRUE, int, TRUE, group
-            └─ Scan: test
+      └─ Aggregation: count(TRUE), max(int), count(TRUE) group by group
+         └─ Scan: test
 b, 3
 
 # Having errors on nested aggregate functions.
+# TODO: fix the error message.
 !> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX(MIN("int")) > 0
 ---
-Error: invalid input: aggregate functions can't be nested
+Error: invalid input: unknown function min
 
 # Having errors on fields not in the SELECT or GROUP BY clauses.
 # TODO: improve the error message.

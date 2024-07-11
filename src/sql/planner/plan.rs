@@ -84,9 +84,9 @@ impl Plan {
 /// A query plan node. These return row iterators and can be nested.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
-    /// Computes the given aggregates for the given source columns across all
-    /// rows, using the group_by column values as buckets.
-    Aggregation { source: Box<Node>, aggregates: Vec<(usize, Aggregate)>, group_by: Vec<usize> },
+    /// Computes aggregate values for the given expressions and group_by
+    /// buckets across all rows in the source nod3.
+    Aggregation { source: Box<Node>, aggregates: Vec<Aggregate>, group_by: Vec<Expression> },
     /// Filters source rows, by only emitting rows for which the predicate
     /// evaluates to true.
     Filter { source: Box<Node>, predicate: Expression },
@@ -339,12 +339,11 @@ impl Node {
 
         // Format the node.
         match self {
-            Self::Aggregation { source, aggregates, .. } => {
-                write!(
-                    f,
-                    "Aggregation: {}",
-                    aggregates.iter().map(|(i, a)| format!("{a}(#{i})")).join(", ")
-                )?;
+            Self::Aggregation { source, aggregates, group_by } => {
+                write!(f, "Aggregation: {}", aggregates.iter().join(", "))?;
+                if !group_by.is_empty() {
+                    write!(f, " group by {}", group_by.iter().join(", "))?;
+                }
                 source.format(f, prefix, false, true)?;
             }
             Self::Filter { source, predicate } => {
@@ -444,38 +443,44 @@ impl Node {
     }
 }
 
-/// An aggregation function.
+/// An aggregate function.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Aggregate {
-    Average,
-    Count,
-    Max,
-    Min,
-    Sum,
+    Average(Expression),
+    Count(Expression),
+    Max(Expression),
+    Min(Expression),
+    Sum(Expression),
 }
 
 impl std::fmt::Display for Aggregate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Average => write!(f, "avg"),
-            Self::Count => write!(f, "count"),
-            Self::Max => write!(f, "max"),
-            Self::Min => write!(f, "min"),
-            Self::Sum => write!(f, "sum"),
+            Self::Average(expr) => write!(f, "avg({expr})"),
+            Self::Count(expr) => write!(f, "count({expr})"),
+            Self::Max(expr) => write!(f, "max({expr})"),
+            Self::Min(expr) => write!(f, "min({expr})"),
+            Self::Sum(expr) => write!(f, "sum({expr})"),
         }
     }
 }
 
 impl Aggregate {
-    pub(super) fn from_name(name: &str) -> Option<Self> {
-        match name {
-            "avg" => Some(Aggregate::Average),
-            "count" => Some(Aggregate::Count),
-            "max" => Some(Aggregate::Max),
-            "min" => Some(Aggregate::Min),
-            "sum" => Some(Aggregate::Sum),
-            _ => None,
+    /// Returns the inner aggregate expression. Currently, all aggregate
+    /// functions take a single input expression.
+    pub fn into_inner(self) -> Expression {
+        match self {
+            Self::Average(expr)
+            | Self::Count(expr)
+            | Self::Max(expr)
+            | Self::Min(expr)
+            | Self::Sum(expr) => expr,
         }
+    }
+
+    // TODO: get rid of this.
+    pub(super) fn is(name: &str) -> bool {
+        ["avg", "count", "max", "min", "sum"].contains(&name)
     }
 }
 
