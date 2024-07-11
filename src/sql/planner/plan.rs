@@ -84,9 +84,9 @@ impl Plan {
 /// A query plan node. These return row iterators and can be nested.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
-    /// Computes aggregate values for the given expressions and group_by
-    /// buckets across all rows in the source nod3.
-    Aggregation { source: Box<Node>, aggregates: Vec<Aggregate>, group_by: Vec<Expression> },
+    /// Computes aggregate values for the given expressions and group_by buckets
+    /// across all rows in the source node.
+    Aggregate { source: Box<Node>, aggregates: Vec<Aggregate>, group_by: Vec<Expression> },
     /// Filters source rows, by only emitting rows for which the predicate
     /// evaluates to true.
     Filter { source: Box<Node>, predicate: Expression },
@@ -161,8 +161,8 @@ impl Node {
 
         self = before(self)?;
         self = match self {
-            Self::Aggregation { source, aggregates, group_by } => {
-                Self::Aggregation { source: transform(source)?, aggregates, group_by }
+            Self::Aggregate { source, aggregates, group_by } => {
+                Self::Aggregate { source: transform(source)?, aggregates, group_by }
             }
             Self::Filter { source, predicate } => {
                 Self::Filter { source: transform(source)?, predicate }
@@ -265,7 +265,7 @@ impl Node {
                     .collect::<Result<_>>()?,
             },
 
-            node @ (Self::Aggregation { .. }
+            node @ (Self::Aggregate { .. }
             | Self::HashJoin { .. }
             | Self::IndexLookup { .. }
             | Self::KeyLookup { .. }
@@ -339,8 +339,8 @@ impl Node {
 
         // Format the node.
         match self {
-            Self::Aggregation { source, aggregates, group_by } => {
-                write!(f, "Aggregation: {}", aggregates.iter().join(", "))?;
+            Self::Aggregate { source, aggregates, group_by } => {
+                write!(f, "Aggregate: {}", aggregates.iter().join(", "))?;
                 if !group_by.is_empty() {
                     write!(f, " group by {}", group_by.iter().join(", "))?;
                 }

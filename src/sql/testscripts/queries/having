@@ -46,7 +46,7 @@ Projection: #0
 Projection: #0, #1
 └─ Filter: #2 > 10
    └─ Projection: test.group, #0, #1
-      └─ Aggregation: max(int), max(int) group by group
+      └─ Aggregate: max(int), max(int) group by group
          └─ Scan: test
 b, 42
 
@@ -55,7 +55,7 @@ b, 42
 ---
 Filter: m > 10
 └─ Projection: test.group, #0
-   └─ Aggregation: max(int) group by group
+   └─ Aggregate: max(int) group by group
       └─ Scan: test
 b, 42
 
@@ -65,7 +65,7 @@ b, 42
 Projection: #0, #1
 └─ Filter: #2 > 10
    └─ Projection: test.group, #0, #1
-      └─ Aggregation: count(TRUE), max(int) group by group
+      └─ Aggregate: count(TRUE), max(int) group by group
          └─ Scan: test
 b, 3
 
@@ -75,7 +75,7 @@ b, 3
 Projection: #0, #1
 └─ Filter: #2 / #3 > 3
    └─ Projection: test.group, #0, #1, #2
-      └─ Aggregation: count(TRUE), max(int), count(TRUE) group by group
+      └─ Aggregate: count(TRUE), max(int), count(TRUE) group by group
          └─ Scan: test
 b, 3
 

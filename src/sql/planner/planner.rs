@@ -368,7 +368,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             group_by.push(expr);
             labels.push(Label::maybe_name(label));
         }
-        let node = Node::Aggregation { source: Box::new(source), group_by, aggregates };
+        let node = Node::Aggregate { source: Box::new(source), group_by, aggregates };
         *scope = scope.project(&expressions, &labels)?;
         Ok(node)
     }
