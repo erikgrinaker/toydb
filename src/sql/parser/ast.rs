@@ -97,7 +97,7 @@ pub enum Order {
 }
 
 /// Expressions. Can be nested.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Expression {
     /// A field reference, with an optional table qualifier.
     Field(Option<String>, String),
@@ -113,7 +113,7 @@ pub enum Expression {
 }
 
 /// Expression literals.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Literal {
     Null,
     Boolean(bool),
@@ -122,12 +122,44 @@ pub enum Literal {
     String(String),
 }
 
+/// To allow Expressions and Literals in e.g. hashmap lookups, implement simple
+/// equality and hash for all types, including Null and f64::NAN. This is not
+/// used for expression evaluation (handled by sql::types::Expression), where
+/// these values should not be considered equal, only in lookups.
+impl std::cmp::PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Boolean(l), Self::Boolean(r)) => l == r,
+            (Self::Integer(l), Self::Integer(r)) => l == r,
+            // Consider e.g. NaN equal to NaN for comparison purposes.
+            (Self::Float(l), Self::Float(r)) => l.to_bits() == r.to_bits(),
+            (Self::String(l), Self::String(r)) => l == r,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+impl std::cmp::Eq for Literal {}
+
+impl std::hash::Hash for Literal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            Self::Null => {}
+            Self::Boolean(v) => v.hash(state),
+            Self::Integer(v) => v.hash(state),
+            Self::Float(v) => v.to_be_bytes().hash(state),
+            Self::String(v) => v.hash(state),
+        }
+    }
+}
+
 /// Expression operators.
 ///
 /// Since this is a recursive data structure, we have to box each child
 /// expression, which incurs a heap allocation. There are clever ways to get
 /// around this, but we keep it simple.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Operator {
     And(Box<Expression>, Box<Expression>),
     Not(Box<Expression>),
