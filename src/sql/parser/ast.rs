@@ -306,6 +306,51 @@ impl Expression {
     pub fn contains(&self, visitor: &impl Fn(&Expression) -> bool) -> bool {
         !self.walk(&mut |expr| !visitor(expr))
     }
+
+    /// Find and collects expressions for which the given closure returns true,
+    /// adding them to c. Does not recurse into matching expressions.
+    pub fn collect<'a>(
+        &'a self,
+        visitor: &impl Fn(&Expression) -> bool,
+        c: &mut Vec<&'a Expression>,
+    ) {
+        if visitor(self) {
+            c.push(self);
+            return;
+        }
+        use Operator::*;
+        match self {
+            Self::Operator(Add(lhs, rhs))
+            | Self::Operator(And(lhs, rhs))
+            | Self::Operator(Divide(lhs, rhs))
+            | Self::Operator(Equal(lhs, rhs))
+            | Self::Operator(Exponentiate(lhs, rhs))
+            | Self::Operator(GreaterThan(lhs, rhs))
+            | Self::Operator(GreaterThanOrEqual(lhs, rhs))
+            | Self::Operator(LessThan(lhs, rhs))
+            | Self::Operator(LessThanOrEqual(lhs, rhs))
+            | Self::Operator(Like(lhs, rhs))
+            | Self::Operator(Modulo(lhs, rhs))
+            | Self::Operator(Multiply(lhs, rhs))
+            | Self::Operator(NotEqual(lhs, rhs))
+            | Self::Operator(Or(lhs, rhs))
+            | Self::Operator(Subtract(lhs, rhs)) => {
+                lhs.collect(visitor, c);
+                rhs.collect(visitor, c);
+            }
+
+            Self::Operator(Factorial(expr))
+            | Self::Operator(Identity(expr))
+            | Self::Operator(IsNaN(expr))
+            | Self::Operator(IsNull(expr))
+            | Self::Operator(Negate(expr))
+            | Self::Operator(Not(expr)) => expr.collect(visitor, c),
+
+            Self::Function(_, exprs) => exprs.iter().for_each(|expr| expr.collect(visitor, c)),
+
+            Self::Literal(_) | Self::Field(_, _) | Self::Column(_) => {}
+        }
+    }
 }
 
 impl core::convert::From<Literal> for Expression {
