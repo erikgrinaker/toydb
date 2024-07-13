@@ -77,7 +77,7 @@ impl std::cmp::Eq for Value {}
 
 impl std::hash::Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.datatype().hash(state);
+        core::mem::discriminant(self).hash(state);
         // Normalize to treat +/-0.0 and +/-NAN as equal when hashing.
         match self.normalize_ref().as_ref() {
             Self::Null => {}
