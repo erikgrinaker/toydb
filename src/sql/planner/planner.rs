@@ -126,7 +126,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         let filter = r#where.map(|e| Self::build_expression(e, &scope)).transpose()?;
         let mut expressions = Vec::with_capacity(set.len());
         for (column, expr) in set {
-            let index = scope.get_column_index(None, &column)?;
+            let index = scope.lookup_column(None, &column)?;
             let expr = match expr {
                 Some(expr) => Self::build_expression(expr, &scope)?,
                 None => match &table.columns[index].default {
@@ -483,13 +483,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 return true;
             };
             // If the field already exists post-projection, do nothing.
-            if scope.get_column_index(table.as_deref(), name).is_ok() {
+            if scope.lookup_column(table.as_deref(), name).is_ok() {
                 return true;
             }
             // If the field doesn't exist in the parent scope either, we simply
             // don't build a hidden column for it. The field evaluation will
             // error when building the downstream node (e.g. ORDER BY).
-            let Ok(index) = parent_scope.get_column_index(table.as_deref(), name) else {
+            let Ok(index) = parent_scope.lookup_column(table.as_deref(), name) else {
                 return true;
             };
             // Add a hidden column to the projection.
@@ -580,7 +580,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             }),
             ast::Expression::Column(i) => Field(i, scope.get_column_label(i)?),
             ast::Expression::Field(table, name) => Field(
-                scope.get_column_index(table.as_deref(), &name)?,
+                scope.lookup_column(table.as_deref(), &name)?,
                 Label::maybe_qualified(table, name),
             ),
             // All functions are currently aggregate functions, which should be
@@ -680,14 +680,14 @@ impl Scope {
             return errinput!("duplicate table name {label}");
         }
         for column in &table.columns {
-            self.add_column(Label::Qualified(label.to_string(), column.name.clone()))
+            self.add_column(Label::Qualified(label.to_string(), column.name.clone()));
         }
         self.tables.insert(label.to_string());
         Ok(())
     }
 
-    /// Adds a column and label to the scope.
-    fn add_column(&mut self, label: Label) {
+    /// Adds a column and label to the scope. Returns the column index.
+    fn add_column(&mut self, label: Label) -> usize {
         let index = self.len();
         if let Label::Qualified(table, column) = &label {
             self.qualified.insert((table.clone(), column.clone()), index);
@@ -695,11 +695,12 @@ impl Scope {
         if let Label::Qualified(_, name) | Label::Unqualified(name) = &label {
             self.unqualified.entry(name.clone()).or_default().push(index)
         }
-        self.columns.push(label)
+        self.columns.push(label);
+        index
     }
 
     /// Looks up a column index by name, if possible.
-    fn get_column_index(&self, table: Option<&str>, name: &str) -> Result<usize> {
+    fn lookup_column(&self, table: Option<&str>, name: &str) -> Result<usize> {
         if self.columns.is_empty() {
             let field = table.map(|t| format!("{t}.{name}")).unwrap_or(name.to_string());
             return errinput!("expression must be constant, found field {field}");
@@ -734,7 +735,6 @@ impl Scope {
         }
     }
 
-    /// Resolves a name, optionally qualified by a table name.
     /// Number of columns currently in the scope.
     fn len(&self) -> usize {
         self.columns.len()
@@ -781,9 +781,9 @@ impl Scope {
             if label.is_some() {
                 new.add_column(label.clone()); // explicit label
             } else if let Some(f) = field_map.get(&i) {
-                new.add_column(self.columns[*f].clone()) // field reference
+                new.add_column(self.columns[*f].clone()); // field reference
             } else {
-                new.add_column(Label::None) // unlabeled expression
+                new.add_column(Label::None); // unlabeled expression
             }
         }
         Ok(new)
