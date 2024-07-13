@@ -477,9 +477,9 @@ Projection: #0, #1
    └─ Projection: test.bool, #0, #0
       └─ Aggregate: max(int) group by bool
          └─ Scan: test
+NULL, 1000
 TRUE, 0
 FALSE, -1
-NULL, NULL
 
 [plan]> SELECT "bool" FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
@@ -488,9 +488,9 @@ Projection: #0
    └─ Projection: test.bool, #0
       └─ Aggregate: max(int) group by bool
          └─ Scan: test
+NULL
 TRUE
 FALSE
-NULL
 
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") - MIN("int") DESC
 ---
@@ -499,9 +499,9 @@ Projection: #0, #1
    └─ Projection: test.bool, #0, #0, #1
       └─ Aggregate: max(int), min(int) group by bool
          └─ Scan: test
+NULL, 1000
 FALSE, -1
 TRUE, 0
-NULL, NULL
 
 # ORDER BY works with compound expressions using complex GROUP BY expressions
 # that are not on the SELECT clause.

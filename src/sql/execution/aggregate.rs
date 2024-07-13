@@ -107,40 +107,38 @@ impl Accumulator {
     }
 
     /// Adds a value to the accumulator.
-    /// TODO: NULL values should possibly be ignored, not yield NULL (see Postgres?).
     fn add(&mut self, value: Value) -> Result<()> {
         use std::cmp::Ordering;
-        match (self, value) {
-            (Self::Average { sum: Value::Null, count: _ }, _) => {}
-            (Self::Average { sum, count: _ }, Value::Null) => *sum = Value::Null,
-            (Self::Average { sum, count }, value) => {
+
+        // NULL values are ignored in aggregates.
+        if value == Value::Null {
+            return Ok(());
+        }
+
+        match self {
+            Self::Average { sum, count } => {
                 *sum = sum.checked_add(&value)?;
                 *count += 1;
             }
 
-            (Self::Count(_), Value::Null) => {}
-            (Self::Count(c), _) => *c += 1,
+            Self::Count(c) => *c += 1,
 
-            (Self::Max(Some(Value::Null)), _) => {}
-            (Self::Max(max), Value::Null) => *max = Some(Value::Null),
-            (Self::Max(max @ None), value) => *max = Some(value),
-            (Self::Max(Some(max)), value) => {
+            Self::Max(max @ None) => *max = Some(value),
+            Self::Max(Some(max)) => {
                 if value.cmp(max) == Ordering::Greater {
                     *max = value
                 }
             }
 
-            (Self::Min(Some(Value::Null)), _) => {}
-            (Self::Min(min), Value::Null) => *min = Some(Value::Null),
-            (Self::Min(min @ None), value) => *min = Some(value),
-            (Self::Min(Some(min)), value) => {
+            Self::Min(min @ None) => *min = Some(value),
+            Self::Min(Some(min)) => {
                 if value.cmp(min) == Ordering::Less {
                     *min = value
                 }
             }
 
-            (Self::Sum(sum @ None), value) => *sum = Some(Value::Integer(0).checked_add(&value)?),
-            (Self::Sum(Some(sum)), value) => *sum = sum.checked_add(&value)?,
+            Self::Sum(sum @ None) => *sum = Some(Value::Integer(0).checked_add(&value)?),
+            Self::Sum(Some(sum)) => *sum = sum.checked_add(&value)?,
         }
         Ok(())
     }

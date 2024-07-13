@@ -78,29 +78,21 @@ Projection: #0
 5
 
 > SELECT MAX("bool") FROM test
-> SELECT MAX("bool") FROM test WHERE "bool" IS NOT NULL
 ---
-NULL
 TRUE
 
 > SELECT MAX("int") FROM test
-> SELECT MAX("int") FROM test WHERE "int" IS NOT NULL
 ---
-NULL
 42
 
 > SELECT MAX("float") FROM test
-> SELECT MAX("float") FROM test WHERE "float" IS NOT NULL
-> SELECT MAX("float") FROM test WHERE "float" IS NOT NAN AND "float" IS NOT NULL
+> SELECT MAX("float") FROM test WHERE "float" IS NOT NAN
 ---
-NULL
 NaN
 inf
 
 > SELECT MAX("string") FROM test
-> SELECT MAX("string") FROM test WHERE "string" IS NOT NULL
 ---
-NULL
 👋
 
 # MIN works on constant values.
@@ -128,27 +120,19 @@ Projection: #0
 0
 
 > SELECT MIN("bool") FROM test
-> SELECT MIN("bool") FROM test WHERE "bool" IS NOT NULL
 ---
-NULL
 FALSE
 
 > SELECT MIN("int") FROM test
-> SELECT MIN("int") FROM test WHERE "int" IS NOT NULL
 ---
-NULL
 -1
 
 > SELECT MIN("float") FROM test
-> SELECT MIN("float") FROM test WHERE "float" IS NOT NULL
 ---
-NULL
 0
 
 > SELECT MIN("string") FROM test
-> SELECT MIN("string") FROM test WHERE "string" IS NOT NULL
 ---
-> NULL
 > 
 
 # SUM works on constant values, but only numbers.
@@ -183,34 +167,22 @@ Projection: #0
 15
 
 !> SELECT SUM("bool") FROM test
-!> SELECT SUM("bool") FROM test WHERE "bool" IS NOT NULL
-> SELECT SUM("bool") FROM test WHERE "bool" IS NULL
 ---
-Error: invalid input: can't add NULL and TRUE
 Error: invalid input: can't add 0 and TRUE
-NULL
 
 > SELECT SUM("int") FROM test
-> SELECT SUM("int") FROM test WHERE "int" IS NOT NULL
 ---
-NULL
 44
 
 > SELECT SUM("float") FROM test
-> SELECT SUM("float") FROM test WHERE "float" IS NOT NULL
-> SELECT SUM("float") FROM test WHERE "float" IS NOT NAN AND "float" IS NOT NULL
+> SELECT SUM("float") FROM test WHERE "float" IS NOT NAN
 ---
-NULL
 NaN
 inf
 
 !> SELECT SUM("string") FROM test
-!> SELECT SUM("string") FROM test WHERE "string" IS NOT NULL
-> SELECT SUM("string") FROM test WHERE "string" IS NULL
 ---
-Error: invalid input: can't add NULL and 
 Error: invalid input: can't add 0 and 
-NULL
 
 # AVG works on constant values, but only numbers.
 [plan]> SELECT AVG(NULL), AVG(1), AVG(3.14), AVG(NAN) FROM test
@@ -243,37 +215,23 @@ Projection: #0
    └─ Scan: test
 2
 
-# TODO: the first case here should error.
-> SELECT AVG("bool") FROM test
-!> SELECT AVG("bool") FROM test WHERE "bool" IS NOT NULL
-> SELECT AVG("bool") FROM test WHERE "bool" IS NULL
+!> SELECT AVG("bool") FROM test
 ---
-NULL
 Error: invalid input: can't add 0 and TRUE
-NULL
 
 > SELECT AVG("int") FROM test
-> SELECT AVG("int") FROM test WHERE "int" IS NOT NULL
 ---
-NULL
 11
 
 > SELECT AVG("float") FROM test
-> SELECT AVG("float") FROM test WHERE "float" IS NOT NULL
-> SELECT AVG("float") FROM test WHERE "float" IS NOT NAN AND "float" IS NOT NULL
+> SELECT AVG("float") FROM test WHERE "float" IS NOT NAN
 ---
-NULL
 NaN
 inf
 
-# TODO: the first case here should error.
-> SELECT AVG("string") FROM test
-!> SELECT AVG("string") FROM test WHERE "string" IS NOT NULL
-> SELECT AVG("string") FROM test WHERE "string" IS NULL
+!> SELECT AVG("string") FROM test
 ---
-NULL
 Error: invalid input: can't add 0 and 
-NULL
 
 # Constant aggregates can be used with rows.
 [plan]> SELECT COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test
