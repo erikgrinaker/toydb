@@ -470,11 +470,70 @@ Order: o.id desc, t.id asc
 9, NULL, NULL, NULL, 👍, 1, 1, a
 
 # Order by aggregates, both when in SELECT and otherwise.
-# TODO: fix these.
-[plan]!> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
+[plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Error: invalid input: unknown function max
+Projection: #0, #1
+└─ Order: #2 desc
+   └─ Projection: test.bool, #0, #0
+      └─ Aggregate: max(int) group by bool
+         └─ Scan: test
+TRUE, 0
+FALSE, -1
+NULL, NULL
 
-[plan]!> SELECT "bool" FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
+[plan]> SELECT "bool" FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Error: invalid input: unknown function max
+Projection: #0
+└─ Order: #1 desc
+   └─ Projection: test.bool, #0
+      └─ Aggregate: max(int) group by bool
+         └─ Scan: test
+TRUE
+FALSE
+NULL
+
+[plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") - MIN("int") DESC
+---
+Projection: #0, #1
+└─ Order: #2 - #3 desc
+   └─ Projection: test.bool, #0, #0, #1
+      └─ Aggregate: max(int), min(int) group by bool
+         └─ Scan: test
+FALSE, -1
+TRUE, 0
+NULL, NULL
+
+# ORDER BY works with compound expressions using complex GROUP BY expressions
+# that are not on the SELECT clause.
+[plan]> SELECT COUNT(*) FROM test GROUP BY id % 2 ORDER BY 2 - id % 2 + 1 > 1
+---
+Projection: #0
+└─ Order: 2 - #1 + 1 > 1 asc
+   └─ Projection: #0, #1
+      └─ Aggregate: count(TRUE) group by id % 2
+         └─ Scan: test
+5
+5
+
+# ORDER BY can use (un)qualified expressions for an (un)qualified GROUP BY.
+[plan]> SELECT COUNT(*) FROM test GROUP BY "bool" ORDER BY test."bool"
+---
+Projection: #0
+└─ Order: test.bool asc
+   └─ Projection: #0, test.bool
+      └─ Aggregate: count(TRUE) group by bool
+         └─ Scan: test
+8
+1
+1
+
+[plan]> SELECT COUNT(*) FROM test GROUP BY test."bool" ORDER BY "bool"
+---
+Projection: #0
+└─ Order: bool asc
+   └─ Projection: #0, bool
+      └─ Aggregate: count(TRUE) group by test.bool
+         └─ Scan: test
+8
+1
+1

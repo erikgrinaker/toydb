@@ -148,11 +148,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
     #[allow(clippy::too_many_arguments)]
     fn build_select(
         &self,
-        mut select: Vec<(ast::Expression, Option<String>)>,
+        select: Vec<(ast::Expression, Option<String>)>,
         from: Vec<ast::From>,
         r#where: Option<ast::Expression>,
         group_by: Vec<ast::Expression>,
-        mut having: Option<ast::Expression>,
+        having: Option<ast::Expression>,
         order: Vec<(ast::Expression, ast::Order)>,
         offset: Option<ast::Expression>,
         limit: Option<ast::Expression>,
@@ -174,40 +174,27 @@ impl<'a, C: Catalog> Planner<'a, C> {
             node = Node::Filter { source: Box::new(node), predicate };
         };
 
+        // Build aggregate functions and GROUP BY clause.
+        let aggregates = Self::collect_aggregates(&select, &having, &order);
+        if !group_by.is_empty() || !aggregates.is_empty() {
+            node = self.build_aggregate(&mut scope, node, group_by, aggregates)?;
+        }
+
         // Build SELECT clause.
         let mut hidden = 0;
         if !select.is_empty() {
-            // Inject hidden SELECT columns for fields and aggregates used in ORDER BY and
-            // HAVING expressions but not present in existing SELECT output. These will be
-            // removed again by a later projection.
-            if let Some(ref mut expr) = having {
-                hidden += self.inject_hidden(expr, &mut select)?;
-            }
-
-            // Extract any aggregate functions and GROUP BY expressions and
-            // build an aggregation node for them, replacing them with Column
-            // placeholders.
-            //
-            // TODO: handle ORDER BY aggregates.
-            let aggregates = self.extract_aggregates(&scope, &mut select)?;
-            let groups = self.extract_groups(&mut select, group_by, aggregates.len())?;
-            if !aggregates.is_empty() || !groups.is_empty() {
-                node = self.build_aggregation(&mut scope, node, groups, aggregates)?;
-            }
-
-            // Build the remaining non-aggregate projection.
             let labels = select.iter().map(|(_, l)| Label::maybe_name(l.clone())).collect_vec();
-            let mut expressions = select
+            let mut expressions: Vec<_> = select
                 .into_iter()
                 .map(|(e, _)| Self::build_expression(e, &scope))
-                .collect::<Result<Vec<_>>>()?;
+                .collect::<Result<_>>()?;
             let parent_scope = scope;
             scope = parent_scope.project(&expressions, &labels)?;
 
-            // Add hidden columns for any ORDER BY fields not in the projection.
+            // Add hidden columns for HAVING and ORDER BY fields not in SELECT.
             // TODO: track hidden fields in Scope.
             let size = expressions.len();
-            for (expr, _) in &order {
+            for expr in having.iter().chain(order.iter().map(|(e, _)| e)) {
                 self.build_hidden(&mut scope, &parent_scope, &mut expressions, expr);
             }
             hidden += expressions.len() - size;
@@ -345,118 +332,124 @@ impl<'a, C: Catalog> Planner<'a, C> {
         Ok(node)
     }
 
-    /// Builds an aggregate node.
+    /// Builds an aggregate node, computing aggregate functions for a set of
+    /// GROUP BY buckets.
     ///
-    /// TODO: revisit this.
-    fn build_aggregation(
+    /// The aggregate functions have been collected from the SELECT, HAVING, and
+    /// ORDER BY clauses (all of which can contain their own aggregate
+    /// functions).
+    ///
+    /// The ast::Expression for each aggregate function and each GROUP BY
+    /// expression (except trivial column names) is stored in the Scope along
+    /// with the column index. Later nodes (i.e. SELECT, HAVING, and ORDER BY)
+    /// can look up the column index of aggregate expressions via Scope.
+    /// Similarly, they are allowed to reference GROUP BY expressions by
+    /// specifying the exact same expression.
+    ///
+    /// TODO: consider avoiding the expr cloning by taking &Expression in
+    /// various places.
+    fn build_aggregate(
         &self,
         scope: &mut Scope,
         source: Node,
-        groups: Vec<(ast::Expression, Option<String>)>,
-        aggregates: Vec<Aggregate>,
-    ) -> Result<Node> {
-        let mut group_by = Vec::new();
-        let mut expressions = Vec::new();
-        let mut labels = Vec::new();
-        for _ in &aggregates {
-            expressions.push(Expression::Constant(Value::Null));
-            labels.push(Label::None);
-        }
-        for (expr, label) in groups {
-            let expr = Self::build_expression(expr, scope)?;
-            expressions.push(expr.clone());
-            group_by.push(expr);
-            labels.push(Label::maybe_name(label));
-        }
-        let node = Node::Aggregate { source: Box::new(source), group_by, aggregates };
-        *scope = scope.project(&expressions, &labels)?;
-        Ok(node)
-    }
-
-    /// Extracts aggregate functions from an AST expression tree. This finds the aggregate
-    /// function calls, replaces them with ast::Expression::Column(i), maps the aggregate functions
-    /// to aggregates, and returns them along with their argument expressions.
-    fn extract_aggregates(
-        &self,
-        scope: &Scope,
-        exprs: &mut [(ast::Expression, Option<String>)],
-    ) -> Result<Vec<Aggregate>> {
-        let mut aggregates = Vec::new();
-        for (expr, _) in exprs {
-            expr.transform_mut(
-                &mut |e| match e {
-                    ast::Expression::Function(f, mut args)
-                        if Aggregate::is(&f) && args.len() == 1 =>
-                    {
-                        let expr = Self::build_expression(args.remove(0), scope)?;
-                        aggregates.push(match f.as_str() {
-                            "avg" => Aggregate::Average(expr),
-                            "count" => Aggregate::Count(expr),
-                            "min" => Aggregate::Min(expr),
-                            "max" => Aggregate::Max(expr),
-                            "sum" => Aggregate::Sum(expr),
-                            f => panic!("invalid aggregate function {f}"),
-                        });
-                        Ok(ast::Expression::Column(aggregates.len() - 1))
-                    }
-                    _ => Ok(e),
-                },
-                &mut Ok,
-            )?;
-        }
-        Ok(aggregates)
-    }
-
-    /// Extracts group by expressions, and replaces them with column references with the given
-    /// offset. These can be either an arbitray expression, a reference to a SELECT column, or the
-    /// same expression as a SELECT column. The following are all valid:
-    ///
-    /// SELECT released / 100 AS century, COUNT(*) FROM movies GROUP BY century
-    /// SELECT released / 100, COUNT(*) FROM movies GROUP BY released / 100
-    /// SELECT COUNT(*) FROM movies GROUP BY released / 100
-    fn extract_groups(
-        &self,
-        exprs: &mut [(ast::Expression, Option<String>)],
         group_by: Vec<ast::Expression>,
-        offset: usize,
-    ) -> Result<Vec<(ast::Expression, Option<String>)>> {
-        let mut groups = Vec::new();
-        for g in group_by {
-            // Look for references to SELECT columns with AS labels
-            if let ast::Expression::Field(None, label) = &g {
-                if let Some(i) = exprs.iter().position(|(_, l)| l.as_deref() == Some(label)) {
-                    groups.push((
-                        std::mem::replace(
-                            &mut exprs[i].0,
-                            ast::Expression::Column(offset + groups.len()),
-                        ),
-                        exprs[i].1.clone(),
-                    ));
-                    continue;
+        aggregates: Vec<&ast::Expression>,
+    ) -> Result<Node> {
+        // Construct a child scope with the group_by and aggregate AST
+        // expressions, such that downstream nodes can identify and reference
+        // them. Discard redundant expressions.
+        //
+        // TODO: reverse the order of the emitted columns: group_by then
+        // aggregates.
+        let mut child_scope = scope.project(&[], &[])?; // project to keep tables
+        let aggregates = aggregates
+            .into_iter()
+            .filter(|&expr| {
+                if child_scope.lookup_aggregate(expr).is_some() {
+                    return false;
                 }
-            }
-            // Look for expressions exactly equal to the group expression
-            if let Some(i) = exprs.iter().position(|(e, _)| e == &g) {
-                groups.push((
-                    std::mem::replace(
-                        &mut exprs[i].0,
-                        ast::Expression::Column(offset + groups.len()),
-                    ),
-                    exprs[i].1.clone(),
-                ));
-                continue;
-            }
-            // Otherwise, just use the group expression directly
-            groups.push((g, None))
+                child_scope.add_aggregate((expr).clone(), Label::None);
+                true
+            })
+            .collect_vec();
+        let group_by = group_by
+            .into_iter()
+            .filter(|expr| {
+                if child_scope.lookup_aggregate(expr).is_some() {
+                    return false; // already exists in child scope
+                }
+                let mut label = Label::None;
+                // TODO: add a Scope method to pass through columns from a parent scope.
+                if let ast::Expression::Field(table, column) = expr {
+                    if let Ok(index) = scope.lookup_column(table.as_deref(), column.as_str()) {
+                        label = scope.get_column_label(index).unwrap();
+                    }
+                }
+                child_scope.add_aggregate(expr.clone(), label);
+                true
+            })
+            .collect_vec();
+
+        // Build the node from the remaining expressions.
+        let aggregates = aggregates
+            .into_iter()
+            .map(|expr| Self::build_aggregate_function(scope, expr.clone()))
+            .collect::<Result<_>>()?;
+        let group_by = group_by
+            .into_iter()
+            .map(|expr| Self::build_expression(expr, scope))
+            .collect::<Result<_>>()?;
+
+        *scope = child_scope;
+        Ok(Node::Aggregate { source: Box::new(source), group_by, aggregates })
+    }
+
+    /// Builds an aggregate function from an AST expression.
+    fn build_aggregate_function(scope: &Scope, expr: ast::Expression) -> Result<Aggregate> {
+        let ast::Expression::Function(name, mut args) = expr else {
+            panic!("aggregate expression must be function");
+        };
+        if args.len() != 1 {
+            return errinput!("{name} takes 1 argument");
         }
-        // Make sure no group expressions contain Column references, which would be placed here
-        // during extract_aggregates().
-        for (expr, _) in &groups {
-            if Self::is_aggregate(expr) {
-                return errinput!("group expression cannot contain aggregates");
-            }
+        if args[0].contains(&|expr| Self::is_aggregate_function(expr)) {
+            return errinput!("aggregate functions can't be nested");
         }
-        Ok(groups)
+        let expr = Self::build_expression(args.remove(0), scope)?;
+        Ok(match name.as_str() {
+            "avg" => Aggregate::Average(expr),
+            "count" => Aggregate::Count(expr),
+            "min" => Aggregate::Min(expr),
+            "max" => Aggregate::Max(expr),
+            "sum" => Aggregate::Sum(expr),
+            name => return errinput!("unknown aggregate function {name}"),
+        })
+    }
+
+    /// Checks whether a given AST expression is an aggregate function.
+    fn is_aggregate_function(expr: &ast::Expression) -> bool {
+        if let ast::Expression::Function(name, _) = expr {
+            ["avg", "count", "max", "min", "sum"].contains(&name.as_str())
+        } else {
+            false
+        }
+    }
+
+    /// Collects aggregate functions from SELECT, HAVING, and ORDER BY clauses.
+    fn collect_aggregates<'c>(
+        select: &'c [(ast::Expression, Option<String>)],
+        having: &'c Option<ast::Expression>,
+        order_by: &'c [(ast::Expression, ast::Order)],
+    ) -> Vec<&'c ast::Expression> {
+        let select = select.iter().map(|(expr, _)| expr);
+        let having = having.iter();
+        let order_by = order_by.iter().map(|(expr, _)| expr);
+
+        let mut aggregates = Vec::new();
+        for expr in select.chain(having).chain(order_by) {
+            expr.collect(&|e| Self::is_aggregate_function(e), &mut aggregates)
+        }
+        aggregates
     }
 
     /// Adds hidden columns to a projection to pass through fields that are used
@@ -477,9 +470,20 @@ impl<'a, C: Catalog> Planner<'a, C> {
         projection: &mut Vec<Expression>,
         expr: &ast::Expression,
     ) {
-        expr.walk(&mut |e| {
-            // Look for field references.
-            let ast::Expression::Field(table, name) = e else {
+        expr.walk(&mut |expr| {
+            // If this is an aggregate function or GROUP BY expression that
+            // isn't already available in the child scope, pass it through.
+            if let Some(index) = parent_scope.lookup_aggregate(expr) {
+                if scope.lookup_aggregate(expr).is_none() {
+                    let label = parent_scope.get_column_label(index).unwrap();
+                    scope.add_aggregate(expr.clone(), label);
+                    projection.push(Expression::Field(index, Label::None));
+                    return true;
+                }
+            }
+
+            // Otherwise, only look for field references.
+            let ast::Expression::Field(table, name) = expr else {
                 return true;
             };
             // If the field already exists post-projection, do nothing.
@@ -492,78 +496,26 @@ impl<'a, C: Catalog> Planner<'a, C> {
             let Ok(index) = parent_scope.lookup_column(table.as_deref(), name) else {
                 return true;
             };
-            // Add a hidden column to the projection.
-            let label = Label::maybe_qualified(table.clone(), name.clone());
-            scope.add_column(label.clone());
-            projection.push(Expression::Field(index, label));
+            // Add a hidden column to the projection. Use the given label for
+            // the projection, but the qualified label for the scope.
+            scope.add_column(parent_scope.get_column_label(index).unwrap());
+            projection.push(Expression::Field(
+                index,
+                Label::maybe_qualified(table.clone(), name.clone()),
+            ));
             true
         });
-    }
-
-    /// Injects hidden expressions into SELECT expressions. This is used for ORDER BY and HAVING, in
-    /// order to apply these to fields or aggregates that are not present in the SELECT output, e.g.
-    /// to order on a column that is not selected. This is done by replacing the relevant parts of
-    /// the given expression with Column references to either existing columns or new, hidden
-    /// columns in the select expressions. Returns the number of hidden columns added.
-    fn inject_hidden(
-        &self,
-        expr: &mut ast::Expression,
-        select: &mut Vec<(ast::Expression, Option<String>)>,
-    ) -> Result<usize> {
-        // Replace any identical expressions or label references with column references.
-        //
-        // TODO: instead of trying to deduplicate here, before the optimizer has
-        // normalized expressions and such, we should just go ahead and add new
-        // columns for all fields and expressions, and have a separate optimizer
-        // that looks at duplicate expressions in a single projection and
-        // collapses them, rewriting downstream field references.
-        for (i, (sexpr, label)) in select.iter().enumerate() {
-            if expr == sexpr {
-                *expr = ast::Expression::Column(i);
-                continue;
-            }
-            if let Some(label) = label {
-                expr.transform_mut(
-                    &mut |e| match e {
-                        ast::Expression::Field(None, ref l) if l == label => {
-                            Ok(ast::Expression::Column(i))
-                        }
-                        e => Ok(e),
-                    },
-                    &mut Ok,
-                )?;
-            }
-        }
-        // Any remaining aggregate functions and field references must be extracted as hidden
-        // columns.
-        let mut hidden = 0;
-        expr.transform_mut(
-            &mut |e| match &e {
-                ast::Expression::Function(f, a) if Aggregate::is(f) => {
-                    if let ast::Expression::Column(c) = a[0] {
-                        if Self::is_aggregate(&select[c].0) {
-                            return errinput!("aggregate function cannot reference aggregate");
-                        }
-                    }
-                    select.push((e, None));
-                    hidden += 1;
-                    Ok(ast::Expression::Column(select.len() - 1))
-                }
-                ast::Expression::Field(_, _) => {
-                    select.push((e, None));
-                    hidden += 1;
-                    Ok(ast::Expression::Column(select.len() - 1))
-                }
-                _ => Ok(e),
-            },
-            &mut Ok,
-        )?;
-        Ok(hidden)
     }
 
     /// Builds an expression from an AST expression.
     pub fn build_expression(expr: ast::Expression, scope: &Scope) -> Result<Expression> {
         use Expression::*;
+
+        // Look up aggregate functions or GROUP BY expressions. These were added
+        // to the parent scope when building the Aggregate node, if any.
+        if let Some(index) = scope.lookup_aggregate(&expr) {
+            return Ok(Field(index, scope.get_column_label(index)?));
+        }
 
         // Helper for building a boxed expression.
         let build = |expr: Box<ast::Expression>| -> Result<Box<Expression>> {
@@ -578,13 +530,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Literal::Float(f) => Value::Float(f),
                 ast::Literal::String(s) => Value::String(s),
             }),
-            ast::Expression::Column(i) => Field(i, scope.get_column_label(i)?),
             ast::Expression::Field(table, name) => Field(
                 scope.lookup_column(table.as_deref(), &name)?,
                 Label::maybe_qualified(table, name),
             ),
-            // All functions are currently aggregate functions, which should be
-            // processed separately.
+            // Currently, all functions are aggregates, and processed above.
             // TODO: consider adding some basic functions for fun.
             ast::Expression::Function(name, _) => return errinput!("unknown function {name}"),
             ast::Expression::Operator(op) => match op {
@@ -625,11 +575,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
     fn evaluate_constant(expr: ast::Expression) -> Result<Value> {
         Self::build_expression(expr, &Scope::new())?.evaluate(None)
     }
-
-    /// Checks whether a given expression is an aggregate expression.
-    fn is_aggregate(expr: &ast::Expression) -> bool {
-        expr.contains(&|e| matches!(e, ast::Expression::Function(f, _) if Aggregate::is(f)))
-    }
 }
 
 /// A scope maps column/table names to input column indexes for expressions,
@@ -641,6 +586,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
 /// currently visible and what names they have. During expression planning, the
 /// scope is used to resolve column names to column indexes, which are placed in
 /// the plan and used during execution.
+///
+/// It also keeps track of output columns for aggregate functions and GROUP BY
+/// expressions in Aggregate nodes. See aggregates field.
 pub struct Scope {
     /// The currently visible columns. If empty, only constant expressions can
     /// be used (no field references).
@@ -653,6 +601,22 @@ pub struct Scope {
     /// Index of unqualified column names to column indexes. If a name points
     /// to multiple columns, lookups will fail with an ambiguous name error.
     unqualified: HashMap<String, Vec<usize>>,
+    /// Index of aggregate expressions to column indexes. This is used to track
+    /// output columns of Aggregate nodes, e.g. SUM(2 * a + b), and look them up
+    /// from expressions in downstream SELECT, HAVING, and ORDER BY columns,
+    /// e.g. SELECT SUM(2 * a + b) / COUNT(*) FROM table. When build_expression
+    /// encounters an aggregate function, it's mapped onto an aggregate column
+    /// index via this index.
+    ///
+    /// This is also used to map GROUP BY expressions to the corresponding
+    /// Aggregate node output column when evaluating downstream node expressions
+    /// in SELECT, HAVING, and ORDER BY. For trivial column references, e.g.
+    /// GROUP BY a, b, the column can be accessed and looked up as normal via
+    /// lookup_column() in downstream node expressions, but for more complex
+    /// expressions like GROUP BY a * b / 2, the group column can be accessed
+    /// using the same expression in other nodes, e.g.  GROUP BY a * b / 2 ORDER
+    /// BY a * b / 2.
+    aggregates: HashMap<ast::Expression, usize>,
 }
 
 impl Scope {
@@ -663,6 +627,7 @@ impl Scope {
             tables: HashSet::new(),
             qualified: HashMap::new(),
             unqualified: HashMap::new(),
+            aggregates: HashMap::new(),
         }
     }
 
@@ -701,26 +666,30 @@ impl Scope {
 
     /// Looks up a column index by name, if possible.
     fn lookup_column(&self, table: Option<&str>, name: &str) -> Result<usize> {
+        let fmtname = || table.map(|table| format!("{table}.{name}")).unwrap_or(name.to_string());
         if self.columns.is_empty() {
-            let field = table.map(|t| format!("{t}.{name}")).unwrap_or(name.to_string());
-            return errinput!("expression must be constant, found field {field}");
+            return errinput!("expression must be constant, found field {}", fmtname());
         }
         if let Some(table) = table {
             if !self.tables.contains(table) {
                 return errinput!("unknown table {table}");
             }
-            self.qualified
-                .get(&(table.to_string(), name.to_string()))
-                .copied()
-                .ok_or(errinput!("unknown field {table}.{name}"))
+            if let Some(index) = self.qualified.get(&(table.to_string(), name.to_string())) {
+                return Ok(*index);
+            }
         } else if let Some(indexes) = self.unqualified.get(name) {
             if indexes.len() > 1 {
                 return errinput!("ambiguous field {name}");
             }
-            Ok(indexes[0])
-        } else {
-            errinput!("unknown field {name}")
+            return Ok(indexes[0]);
         }
+        if !self.aggregates.is_empty() {
+            return errinput!(
+                "field {} must be used in an aggregate or GROUP BY expression",
+                fmtname()
+            );
+        }
+        errinput!("unknown field {}", fmtname())
     }
 
     /// Fetches a column label by index, if any.
@@ -733,6 +702,31 @@ impl Scope {
             Some(label) => Ok(label.clone()),
             None => errinput!("column index {index} not found"),
         }
+    }
+
+    /// Adds an aggregate expression to the scope, returning the column index.
+    /// This is either an aggregate function or a GROUP BY expression (i.e. not
+    /// just a simple column name). It is used to access the aggregate output or
+    /// GROUP BY column in downstream nodes like SELECT, HAVING, and ORDER BY.
+    ///
+    /// If the expression already exists, the current index is returned.
+    fn add_aggregate(&mut self, expr: ast::Expression, label: Label) -> usize {
+        if let Some(index) = self.aggregates.get(&expr) {
+            return *index;
+        }
+        let index = self.add_column(label);
+        self.aggregates.insert(expr, index);
+        index
+    }
+
+    /// Looks up an aggregate column index by aggregate function or GROUP BY
+    /// expression, if any. Trivial GROUP BY column names are accessed via
+    /// lookup_column() as normal.
+    ///
+    /// Unlike lookup_column(), this returns an option since the caller is
+    /// expected to fall back to normal expressions building.
+    fn lookup_aggregate(&self, expr: &ast::Expression) -> Option<usize> {
+        self.aggregates.get(expr).copied()
     }
 
     /// Number of columns currently in the scope.

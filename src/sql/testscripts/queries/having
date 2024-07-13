@@ -32,21 +32,37 @@ Scan: test (id > 3)
 [plan]> SELECT id FROM test HAVING "int" > 3
 ---
 Projection: #0
-└─ Filter: test.int > 3
+└─ Filter: int > 3
    └─ Projection: id, int
       └─ Scan: test
 4
 5
 
-# Having works with an aggregate function.
-# TODO: it's unnecessary do duplicate the aggregation here.
-# TODO: test without a GROUP BY clause.
+# Having works with an aggregate function, even if it's not in SELECT.
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
 Projection: #0, #1
 └─ Filter: #2 > 10
-   └─ Projection: test.group, #0, #1
-      └─ Aggregate: max(int), max(int) group by group
+   └─ Projection: test.group, #0, #0
+      └─ Aggregate: max(int) group by group
+         └─ Scan: test
+b, 42
+
+[plan]> SELECT "group" FROM test GROUP BY "group" HAVING MAX("int") > 10
+---
+Projection: #0
+└─ Filter: #1 > 10
+   └─ Projection: test.group, #0
+      └─ Aggregate: max(int) group by group
+         └─ Scan: test
+b
+
+[plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") - MIN("int") > 10
+---
+Projection: #0, #1
+└─ Filter: #2 - #3 > 10
+   └─ Projection: test.group, #0, #0, #1
+      └─ Aggregate: max(int), min(int) group by group
          └─ Scan: test
 b, 42
 
@@ -74,16 +90,46 @@ b, 3
 ---
 Projection: #0, #1
 └─ Filter: #2 / #3 > 3
-   └─ Projection: test.group, #0, #1, #2
-      └─ Aggregate: count(TRUE), max(int), count(TRUE) group by group
+   └─ Projection: test.group, #0, #1, #0
+      └─ Aggregate: count(TRUE), max(int) group by group
          └─ Scan: test
 b, 3
 
+# Having works with compound expressions using complex GROUP BY expressions
+# that are not on the SELECT clause.
+[plan]> SELECT COUNT(*) FROM test GROUP BY id % 2 HAVING 2 - id % 2 + 1 > 1
+---
+Projection: #0
+└─ Filter: 2 - #1 + 1 > 1
+   └─ Projection: #0, #1
+      └─ Aggregate: count(TRUE) group by id % 2
+         └─ Scan: test
+4
+3
+
+# Having can use (un)qualified expressions for an (un)qualified GROUP BY.
+[plan]> SELECT COUNT(*) FROM test GROUP BY "group" HAVING test."group" = 'a'
+---
+Projection: #0
+└─ Filter: test.group = a
+   └─ Projection: #0, test.group
+      └─ Aggregate: count(TRUE) group by group
+         └─ Scan: test
+3
+
+[plan]> SELECT COUNT(*) FROM test GROUP BY test."group" HAVING "group" = 'a'
+---
+Projection: #0
+└─ Filter: group = a
+   └─ Projection: #0, group
+      └─ Aggregate: count(TRUE) group by test.group
+         └─ Scan: test
+3
+
 # Having errors on nested aggregate functions.
-# TODO: fix the error message.
 !> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX(MIN("int")) > 0
 ---
-Error: invalid input: unknown function min
+Error: invalid input: aggregate functions can't be nested
 
 # Having errors on fields not in the SELECT or GROUP BY clauses.
 # TODO: improve the error message.

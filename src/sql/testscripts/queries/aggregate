@@ -17,7 +17,7 @@
 ok
 
 # COUNT(*) returns the row count.
-# TODO: revisit the plan here.
+# TODO: revisit the plan here. This can be eliminated by short-circuiting optimizer.
 [plan]> SELECT COUNT(*) FROM test
 ---
 Projection: #0
@@ -26,7 +26,7 @@ Projection: #0
 6
 
 # COUNT works on constant values.
-# TODO: revisit the plan here.
+# TODO: revisit the plan here. This can be eliminated by short-circuiting optimizer.
 [plan,header]> SELECT COUNT(NULL), COUNT(TRUE), COUNT(1), COUNT(3.14), COUNT(NAN), COUNT('')
 ---
 Projection: #0, #1, #2, #3, #4, #5
@@ -44,7 +44,7 @@ Projection: #0, #1, #2, #3
 0, 0, 0, 0
 
 # COUNT returns number of non-NULL values.
-# TODO: revisit the plan here, the last projection is unnecessary.
+# TODO: revisit the plan here. This can be eliminated by short-circuiting optimizer.
 [plan,header]> SELECT COUNT(id), COUNT("bool"), COUNT("float"), COUNT("string") FROM test
 ---
 Projection: #0, #1, #2, #3
@@ -283,14 +283,12 @@ Projection: #0, #1, #2, #3, #4
    └─ Scan: test
 6, 1, 1, 6, 1
 
-# Constant aggregates can be used with rows including values.
-# TODO: this doesn't work with SELECT *. It also doesn't work with fields.
-# It shouldn't, but the error message count be better.
+# Constant aggregates can't be used with value rows.
 [plan]!> SELECT *, COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test
 [plan]!> SELECT id, COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test
 ---
 Error: invalid input: unexpected token ,
-Error: invalid input: unknown field id
+Error: invalid input: field id must be used in an aggregate or GROUP BY expression
 
 # Aggregate can be expression, both inside and outside the aggregate.
 [plan]> SELECT SUM("int" * 10) / COUNT("int") + 7 FROM test WHERE "int" IS NOT NULL
@@ -301,7 +299,6 @@ Projection: #0 / #1 + 7
 117
 
 # Aggregate functions can't be nested.
-# TODO: improve the error message here.
 !> SELECT MIN(MAX("int")) FROM test
 ---
-Error: invalid input: unknown function max
+Error: invalid input: aggregate functions can't be nested

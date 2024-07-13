@@ -85,7 +85,9 @@ impl Plan {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
     /// Computes aggregate values for the given expressions and group_by buckets
-    /// across all rows in the source node.
+    /// across all rows in the source node. The aggregate columns are output
+    /// first, followed by the group_by columns, in the given order.
+    /// TODO: reverse the order.
     Aggregate { source: Box<Node>, aggregates: Vec<Aggregate>, group_by: Vec<Expression> },
     /// Filters source rows, by only emitting rows for which the predicate
     /// evaluates to true.
@@ -462,25 +464,6 @@ impl std::fmt::Display for Aggregate {
             Self::Min(expr) => write!(f, "min({expr})"),
             Self::Sum(expr) => write!(f, "sum({expr})"),
         }
-    }
-}
-
-impl Aggregate {
-    /// Returns the inner aggregate expression. Currently, all aggregate
-    /// functions take a single input expression.
-    pub fn into_inner(self) -> Expression {
-        match self {
-            Self::Average(expr)
-            | Self::Count(expr)
-            | Self::Max(expr)
-            | Self::Min(expr)
-            | Self::Sum(expr) => expr,
-        }
-    }
-
-    // TODO: get rid of this.
-    pub(super) fn is(name: &str) -> bool {
-        ["avg", "count", "max", "min", "sum"].contains(&name)
     }
 }
 

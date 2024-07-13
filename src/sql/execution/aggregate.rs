@@ -34,8 +34,14 @@ struct Aggregator {
 impl Aggregator {
     /// Creates a new aggregator for the given aggregates and GROUP BY buckets.
     fn new(aggregates: Vec<Aggregate>, group_by: Vec<Expression>) -> Self {
+        use Aggregate::*;
         let accumulators = aggregates.iter().map(Accumulator::new).collect();
-        let exprs = aggregates.into_iter().map(|a| a.into_inner()).collect();
+        let exprs = aggregates
+            .into_iter()
+            .map(|aggregate| match aggregate {
+                Average(expr) | Count(expr) | Max(expr) | Min(expr) | Sum(expr) => expr,
+            })
+            .collect();
         Self { buckets: BTreeMap::new(), empty: accumulators, group_by, exprs }
     }
 
@@ -101,7 +107,7 @@ impl Accumulator {
     }
 
     /// Adds a value to the accumulator.
-    /// TODO: have this take &Value.
+    /// TODO: NULL values should possibly be ignored, not yield NULL (see Postgres?).
     fn add(&mut self, value: Value) -> Result<()> {
         use std::cmp::Ordering;
         match (self, value) {

@@ -28,7 +28,7 @@ Projection: #0, #1, #2, #3, #4
 └─ Aggregate: count(id), min(id), max(id), sum(id), avg(id) group by id
    └─ Nothing
 
-# Simple GROUP BY.
+# Simple GROUP BY, including NULL group.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group"
 ---
 Projection: test.group, #0
@@ -39,39 +39,32 @@ a, 3
 b, 3
 
 [plan]> SELECT "group", COUNT(*), MIN("bool"), MAX("string"), SUM("int"), AVG("float") \
-    FROM test WHERE id != 0 GROUP BY "group"
+    FROM test GROUP BY "group"
 ---
 Projection: test.group, #0, #1, #2, #3, #4
 └─ Aggregate: count(TRUE), min(bool), max(string), sum(int), avg(float) group by group
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+NULL, 1, NULL, NULL, NULL, NULL
 a, 3, FALSE, AB, 9, NaN
 b, 3, FALSE, 👋, 41, NaN
 
-# GROUP BY works with a NULL group.
-[plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group"
----
-Projection: test.group, #0
-└─ Aggregate: count(TRUE) group by group
-   └─ Scan: test
-NULL, 1
-a, 3
-b, 3
-
 # GROUP BY works on booleans.
-[plan]> SELECT "bool", COUNT(*) FROM test WHERE id != 0 GROUP BY "bool"
+[plan]> SELECT "bool", COUNT(*) FROM test GROUP BY "bool"
 ---
 Projection: test.bool, #0
 └─ Aggregate: count(TRUE) group by bool
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+NULL, 1
 FALSE, 3
 TRUE, 3
 
 # GROUP BY works on integers.
-[plan]> SELECT "int", COUNT(*) FROM test WHERE id != 0 GROUP BY "int"
+[plan]> SELECT "int", COUNT(*) FROM test GROUP BY "int"
 ---
 Projection: test.int, #0
 └─ Aggregate: count(TRUE) group by int
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+NULL, 1
 -1, 2
 0, 1
 3, 1
@@ -79,54 +72,53 @@ Projection: test.int, #0
 42, 1
 
 # GROUP BY works with floats, including a NAN group and -0.0 and 0.0 being equal.
-[plan]> SELECT "float", COUNT(*) FROM test WHERE id != 0 GROUP BY "float"
+[plan]> SELECT "float", COUNT(*) FROM test GROUP BY "float"
 ---
 Projection: test.float, #0
 └─ Aggregate: count(TRUE) group by float
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+NULL, 1
 0, 2
 3.14, 1
 inf, 1
 NaN, 2
 
 # GROUP BY works on strings.
-[plan]> SELECT "string", COUNT(*) FROM test WHERE id != 0 GROUP BY "string"
+[plan]> SELECT "string", COUNT(*) FROM test GROUP BY "string"
 ---
 Projection: test.string, #0
 └─ Aggregate: count(TRUE) group by string
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+NULL, 1
 , 2
 AB, 1
 abc, 2
 👋, 1
 
 # GROUP BY works even if the group column isn't in the result.
-[plan]> SELECT COUNT(*) FROM test WHERE id != 0 GROUP BY "group"
+[plan]> SELECT COUNT(*) FROM test GROUP BY "group"
 ---
 Projection: #0
 └─ Aggregate: count(TRUE) group by group
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+1
 3
 3
 
 # GROUP BY works when there is no aggregate function.
-[plan]> SELECT "group" FROM test WHERE id != 0 GROUP BY "group"
+[plan]> SELECT "group" FROM test GROUP BY "group"
 ---
 Projection: test.group
 └─ Aggregate:  group by group
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+NULL
 a
 b
 
-# GROUP BY works on aliases, in which case the original table is unknown.
-[plan]> SELECT "group" AS g, COUNT(*) FROM test GROUP BY g
+# GROUP BY does not work with SELECT aliases (also the case in e.g. SQL server).
+!> SELECT "group" AS g, COUNT(*) FROM test GROUP BY g
 ---
-Projection: g, #0
-└─ Aggregate: count(TRUE) group by group
-   └─ Scan: test
-NULL, 1
-a, 3
-b, 3
+Error: invalid input: unknown field g
 
 [plan]> SELECT "group", COUNT(*) FROM test AS t GROUP BY t."group"
 ---
@@ -142,14 +134,13 @@ b, 3
 Error: invalid input: unknown table test
 
 # It errors when there is a non-group column.
-# TODO: improve the error message.
-!> SELECT "group", id FROM test WHERE id != 0 GROUP BY "group"
+!> SELECT "group", id FROM test GROUP BY "group"
 ---
-Error: invalid input: unknown field id
+Error: invalid input: field id must be used in an aggregate or GROUP BY expression
 
 # It errors on unknown tables and columns.
-!> SELECT COUNT(*) FROM test WHERE id != 0 GROUP BY unknown
-!> SELECT COUNT(*) FROM test WHERE id != 0 GROUP BY unknown.id
+!> SELECT COUNT(*) FROM test GROUP BY unknown
+!> SELECT COUNT(*) FROM test GROUP BY unknown.id
 ---
 Error: invalid input: unknown field unknown
 Error: invalid input: unknown table unknown
@@ -179,32 +170,29 @@ Projection: #1, #0
 0, 4
 1, 3
 
-# GROUP BY can use an aliased expression.
-[plan]> SELECT id % 2 AS mod, COUNT(*) FROM test GROUP BY mod
+# GROUP BY can't use an aliased expression.
+!> SELECT id % 2 AS mod, COUNT(*) FROM test GROUP BY mod
 ---
-Projection: mod, #0
-└─ Aggregate: count(TRUE) group by id % 2
-   └─ Scan: test
-0, 4
-1, 3
+Error: invalid input: unknown field mod
 
 # GROUP BY can't use aggregate functions.
 !> SELECT COUNT(*) FROM test GROUP BY MIN(id)
 ---
-Error: invalid input: group expression cannot contain aggregates
+Error: invalid input: unknown function min
 
 # GROUP BY works with multiple groups.
-[plan]> SELECT "group", "bool", COUNT(*) FROM test WHERE id != 0 GROUP BY "group", "bool"
+[plan]> SELECT "group", "bool", COUNT(*) FROM test GROUP BY "group", "bool"
 ---
 Projection: test.group, test.bool, #0
 └─ Aggregate: count(TRUE) group by group, bool
-   └─ Scan: test (NOT id = 0)
+   └─ Scan: test
+NULL, NULL, 1
 a, FALSE, 1
 a, TRUE, 2
 b, FALSE, 2
 b, TRUE, 1
 
-# GROUP BY work with joins.
+# GROUP BY works with joins.
 [plan]> SELECT t.id % 2, COUNT(*) FROM test t JOIN other o ON t.id % 2 = o.id GROUP BY t.id % 2
 ---
 Projection: #1, #0
