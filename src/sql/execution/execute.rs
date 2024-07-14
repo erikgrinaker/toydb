@@ -77,26 +77,29 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             right,
             right_field,
             right_label: _,
-            right_size,
             outer,
         } => {
+            let right_size = right.size();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
             join::hash(left, left_field, right, right_field, right_size, outer)
         }
 
         Node::IndexLookup { table, column, values, alias: _ } => {
+            let column = table.columns.into_iter().nth(column).expect("invalid column").name;
+            let table = table.name;
             source::lookup_index(txn, table, column, values)
         }
 
-        Node::KeyLookup { table, keys, alias: _ } => source::lookup_key(txn, table, keys),
+        Node::KeyLookup { table, keys, alias: _ } => source::lookup_key(txn, table.name, keys),
 
         Node::Limit { source, limit } => {
             let source = execute(*source, txn)?;
             Ok(transform::limit(source, limit))
         }
 
-        Node::NestedLoopJoin { left, left_size: _, right, right_size, predicate, outer } => {
+        Node::NestedLoopJoin { left, right, predicate, outer } => {
+            let right_size = right.size();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
             join::nested_loop(left, right, right_size, predicate, outer)

@@ -103,29 +103,21 @@ pub enum Node {
         right: Box<Node>,
         right_field: usize,
         right_label: Label,
-        right_size: usize,
         outer: bool,
     },
     /// Looks up the given values in a secondary index and emits matching rows.
     /// NULL and NaN values are considered equal, to allow IS NULL and IS NAN
     /// index lookups, as is -0.0 and 0.0.
-    IndexLookup { table: String, column: String, values: Vec<Value>, alias: Option<String> },
+    IndexLookup { table: Table, column: usize, values: Vec<Value>, alias: Option<String> },
     /// Looks up the given primary keys and emits their rows.
-    KeyLookup { table: String, keys: Vec<Value>, alias: Option<String> },
+    KeyLookup { table: Table, keys: Vec<Value>, alias: Option<String> },
     /// Only emits the first limit rows from the source, discards the rest.
     Limit { source: Box<Node>, limit: usize },
     /// Joins the left and right sources on the given predicate by buffering the
     /// right source and iterating over it for every row in the left source.
     /// When outer is true (e.g. LEFT JOIN), a left row without a right match is
     /// emitted anyway, with NULLs for the right row.
-    NestedLoopJoin {
-        left: Box<Node>,
-        left_size: usize,
-        right: Box<Node>,
-        right_size: usize,
-        predicate: Option<Expression>,
-        outer: bool,
-    },
+    NestedLoopJoin { left: Box<Node>, right: Box<Node>, predicate: Option<Expression>, outer: bool },
     /// Nothing does not emit anything.
     Nothing,
     /// Discards the first offset rows from source, emits the rest.
@@ -172,7 +164,6 @@ impl Node {
                 right,
                 right_field,
                 right_label,
-                right_size,
                 outer,
             } => Self::HashJoin {
                 left: transform(left)?,
@@ -181,20 +172,15 @@ impl Node {
                 right: transform(right)?,
                 right_field,
                 right_label,
-                right_size,
                 outer,
             },
             Self::Limit { source, limit } => Self::Limit { source: transform(source)?, limit },
-            Self::NestedLoopJoin { left, left_size, right, right_size, predicate, outer } => {
-                Self::NestedLoopJoin {
-                    left: transform(left)?,
-                    left_size,
-                    right: transform(right)?,
-                    right_size,
-                    predicate,
-                    outer,
-                }
-            }
+            Self::NestedLoopJoin { left, right, predicate, outer } => Self::NestedLoopJoin {
+                left: transform(left)?,
+                right: transform(right)?,
+                predicate,
+                outer,
+            },
             Self::Offset { source, offset } => Self::Offset { source: transform(source)?, offset },
             Self::Order { source, orders } => Self::Order { source: transform(source)?, orders },
             Self::Projection { source, labels, expressions } => {
@@ -229,21 +215,14 @@ impl Node {
                     .map(|(e, o)| e.transform(before, after).map(|e| (e, o)))
                     .collect::<Result<_>>()?,
             },
-            Self::NestedLoopJoin {
-                left,
-                left_size,
-                right,
-                right_size,
-                predicate: Some(predicate),
-                outer,
-            } => Self::NestedLoopJoin {
-                left,
-                left_size,
-                right,
-                right_size,
-                predicate: Some(predicate.transform(before, after)?),
-                outer,
-            },
+            Self::NestedLoopJoin { left, right, predicate: Some(predicate), outer } => {
+                Self::NestedLoopJoin {
+                    left,
+                    right,
+                    predicate: Some(predicate.transform(before, after)?),
+                    outer,
+                }
+            }
             Self::Projection { source, labels, expressions } => Self::Projection {
                 source,
                 labels,
@@ -272,6 +251,25 @@ impl Node {
             | Self::Offset { .. }
             | Self::Scan { filter: None, .. }) => node,
         })
+    }
+
+    /// Returns the size of the node, i.e. the column width.
+    pub fn size(&self) -> usize {
+        match &self {
+            Node::Aggregate { aggregates, group_by, .. } => aggregates.len() + group_by.len(),
+            Node::Filter { source, .. } => source.size(),
+            Node::HashJoin { left, right, .. } => left.size() + right.size(),
+            Node::IndexLookup { table, .. } => table.columns.len(),
+            Node::KeyLookup { table, .. } => table.columns.len(),
+            Node::Limit { source, .. } => source.size(),
+            Node::NestedLoopJoin { left, right, .. } => left.size() + right.size(),
+            Node::Nothing => 0,
+            Node::Offset { source, .. } => source.size(),
+            Node::Order { source, .. } => source.size(),
+            Node::Projection { expressions, .. } => expressions.len(),
+            Node::Scan { table, .. } => table.columns.len(),
+            Node::Values { rows } => rows.first().map(|row| row.len()).unwrap_or(0),
+        }
     }
 }
 
@@ -370,6 +368,8 @@ impl Node {
                 right.format(f, prefix, false, true)?;
             }
             Self::IndexLookup { table, column, alias, values } => {
+                let column = &table.columns[*column].name;
+                let table = &table.name;
                 write!(f, "IndexLookup: {table}.{column}")?;
                 if let Some(alias) = alias {
                     write!(f, " as {alias}.{column}")?;
@@ -381,7 +381,7 @@ impl Node {
                 }
             }
             Self::KeyLookup { table, alias, keys } => {
-                write!(f, "KeyLookup: {table}")?;
+                write!(f, "KeyLookup: {}", table.name)?;
                 if let Some(alias) = alias {
                     write!(f, " as {alias}")?;
                 }

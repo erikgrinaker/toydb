@@ -110,14 +110,7 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
     // Pushes down parts of a join predicate into the left or right sources
     // where possible.
     fn push_join(node: Node) -> Node {
-        let Node::NestedLoopJoin {
-            mut left,
-            left_size,
-            mut right,
-            right_size,
-            predicate: Some(predicate),
-            outer,
-        } = node
+        let Node::NestedLoopJoin { mut left, mut right, predicate: Some(predicate), outer } = node
         else {
             return node;
         };
@@ -131,8 +124,8 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
             let (mut ref_left, mut ref_right) = (false, false);
             expr.walk(&mut |e| {
                 if let Expression::Field(index, _) = e {
-                    ref_left = ref_left || *index < left_size;
-                    ref_right = ref_right || *index >= left_size;
+                    ref_left = ref_left || *index < left.size();
+                    ref_right = ref_right || *index >= left.size();
                 }
                 !(ref_left && ref_right) // exit once both are referenced
             });
@@ -193,17 +186,17 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
 
         if let Some(mut expr) = Expression::and_vec(push_right) {
             // Right fields have indexes in the joined row; shift them left.
-            expr = expr.shift_field(-(left_size as isize));
+            expr = expr.shift_field(-(left.size() as isize));
             if let Some(mut expr) = push_into(expr, &mut right) {
                 // Pushdown failed, undo the field index shift.
-                expr = expr.shift_field(left_size as isize);
+                expr = expr.shift_field(left.size() as isize);
                 predicate.push(expr)
             }
         }
 
         // Leave any remaining predicates in the join node.
         let predicate = Expression::and_vec(predicate);
-        Node::NestedLoopJoin { left, left_size, right, right_size, predicate, outer }
+        Node::NestedLoopJoin { left, right, predicate, outer }
     }
 
     /// Applies pushdown transformations to a node.
@@ -238,14 +231,13 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
         };
 
         // Extract the lookup values and expression from the cnf vector.
-        let (field, values) = cnf.remove(i).into_field_values().expect("field lookup failed");
+        let (column, values) = cnf.remove(i).into_field_values().expect("field lookup failed");
 
         // Build the primary key or secondary index lookup node.
-        if field == table.primary_key {
-            node = Node::KeyLookup { table: table.name, keys: values, alias };
+        if column == table.primary_key {
+            node = Node::KeyLookup { table, keys: values, alias };
         } else {
-            let column = table.columns.into_iter().nth(field).unwrap().name;
-            node = Node::IndexLookup { table: table.name, column, values, alias };
+            node = Node::IndexLookup { table, column, values, alias };
         }
 
         // If there's any remaining CNF expressions add a filter node for them.
@@ -264,9 +256,7 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
         // We could use a single match if we had deref patterns, but alas.
         Node::NestedLoopJoin {
             left,
-            left_size,
             right,
-            right_size,
             predicate: Some(Expression::Equal(lhs, rhs)),
             outer,
         } => match (*lhs, *rhs) {
@@ -282,7 +272,7 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
                 // The NestedLoopJoin predicate uses field indexes in the joined
                 // row, while the HashJoin uses field indexes for each table
                 // individually. Adjust the RHS field reference.
-                right_field -= left_size;
+                right_field -= left.size();
                 Node::HashJoin {
                     left,
                     left_field,
@@ -290,13 +280,12 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
                     right,
                     right_field,
                     right_label,
-                    right_size,
                     outer,
                 }
             }
             (lhs, rhs) => {
                 let predicate = Some(Expression::Equal(lhs.into(), rhs.into()));
-                Node::NestedLoopJoin { left, left_size, right, right_size, predicate, outer }
+                Node::NestedLoopJoin { left, right, predicate, outer }
             }
         },
         node => node,
@@ -318,14 +307,9 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
         Node::Scan { table, filter: Some(Constant(Boolean(true))), alias } => {
             Node::Scan { table, filter: None, alias }
         }
-        Node::NestedLoopJoin {
-            left,
-            left_size,
-            right,
-            right_size,
-            predicate: Some(Constant(Boolean(true))),
-            outer,
-        } => Node::NestedLoopJoin { left, left_size, right, right_size, predicate: None, outer },
+        Node::NestedLoopJoin { left, right, predicate: Some(Constant(Boolean(true))), outer } => {
+            Node::NestedLoopJoin { left, right, predicate: None, outer }
+        }
 
         // Short-circuit nodes that can't produce anything by replacing them
         // with a Nothing node.

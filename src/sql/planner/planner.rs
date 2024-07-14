@@ -243,7 +243,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // TODO: add a separate plan node kind for this, and also use it for
         // RIGHT JOIN projections.
         if hidden > 0 {
-            let columns = scope.len() - hidden;
+            let columns = node.size() - hidden;
             let labels = vec![Label::None; columns];
             let expressions = (0..columns).map(|i| Expression::Field(i, Label::None)).collect_vec();
             scope = scope.project(&expressions, &labels)?;
@@ -266,14 +266,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build and implicitly join additional items.
         for from in items {
-            let left_size = scope.len();
             let right = self.build_from(from, scope)?;
-            let right_size = scope.len() - left_size;
             node = Node::NestedLoopJoin {
                 left: Box::new(node),
-                left_size,
                 right: Box::new(right),
-                right_size,
                 predicate: None,
                 outer: false,
             };
@@ -306,20 +302,18 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
                 // Build the left and right nodes.
                 let left = Box::new(self.build_from(*left, &mut scope)?);
-                let left_size = scope.len();
                 let right = Box::new(self.build_from(*right, &mut scope)?);
-                let right_size = scope.len() - left_size;
+                let (left_size, right_size) = (left.size(), right.size());
 
                 // Build the join node.
                 let predicate = predicate.map(|e| Self::build_expression(e, &scope)).transpose()?;
                 let outer = r#type.is_outer();
-                let mut node =
-                    Node::NestedLoopJoin { left, left_size, right, right_size, predicate, outer };
+                let mut node = Node::NestedLoopJoin { left, right, predicate, outer };
 
                 // For right joins, build a projection to swap the columns.
                 if matches!(r#type, ast::JoinType::Right) {
-                    let labels = vec![Label::None; scope.len()];
-                    let expressions = (left_size..scope.len())
+                    let labels = vec![Label::None; left_size + right_size];
+                    let expressions = (left_size..left_size + right_size)
                         .chain(0..left_size)
                         .map(|i| Ok(Expression::Field(i, scope.get_column_label(i)?)))
                         .collect::<Result<Vec<_>>>()?;
@@ -652,7 +646,7 @@ impl Scope {
 
     /// Adds a column and label to the scope. Returns the column index.
     fn add_column(&mut self, label: Label) -> usize {
-        let index = self.len();
+        let index = self.columns.len();
         if let Label::Qualified(table, column) = &label {
             self.qualified.insert((table.clone(), column.clone()), index);
         }
@@ -726,11 +720,6 @@ impl Scope {
     /// expected to fall back to normal expressions building.
     fn lookup_aggregate(&self, expr: &ast::Expression) -> Option<usize> {
         self.aggregates.get(expr).copied()
-    }
-
-    /// Number of columns currently in the scope.
-    fn len(&self) -> usize {
-        self.columns.len()
     }
 
     /// Merges two scopes, by appending the given scope to self.
