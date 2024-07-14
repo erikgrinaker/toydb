@@ -30,14 +30,14 @@ ok
 ---
 Order: value asc
 └─ Projection: 1
-   └─ EmptyRow
+   └─ Values: blank row
 1
 
 [plan]> SELECT 1 AS value ORDER BY value DESC
 ---
 Order: value desc
 └─ Projection: 1
-   └─ EmptyRow
+   └─ Values: blank row
 1
 
 # Order by primary key.

@@ -165,7 +165,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
         } else if select.is_empty() {
             return errinput!("can't select * without a table");
         } else {
-            Node::EmptyRow
+            // For a constant SELECT, emit a single empty row to project. This
+            // allows using both a WHERE predicate and aggregate functions.
+            Node::Values { rows: vec![vec![]] }
         };
 
         // Build WHERE clause.

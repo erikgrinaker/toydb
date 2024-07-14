@@ -128,9 +128,6 @@ pub enum Node {
     },
     /// Nothing does not emit anything.
     Nothing,
-    /// Emits a single empty row. Used for SELECT queries with no FROM clause.
-    /// TODO: remove this.
-    EmptyRow,
     /// Discards the first offset rows from source, emits the rest.
     Offset { source: Box<Node>, offset: usize },
     /// Sorts the source rows by the given expression/direction pairs. Buffers
@@ -206,7 +203,6 @@ impl Node {
 
             node @ (Self::IndexLookup { .. }
             | Self::KeyLookup { .. }
-            | Self::EmptyRow
             | Self::Nothing
             | Self::Scan { .. }
             | Self::Values { .. }) => node,
@@ -273,7 +269,6 @@ impl Node {
             | Self::Limit { .. }
             | Self::NestedLoopJoin { predicate: None, .. }
             | Self::Nothing
-            | Self::EmptyRow
             | Self::Offset { .. }
             | Self::Scan { filter: None, .. }) => node,
         })
@@ -411,9 +406,6 @@ impl Node {
             Self::Nothing => {
                 write!(f, "Nothing")?;
             }
-            Self::EmptyRow => {
-                write!(f, "EmptyRow")?;
-            }
             Self::Offset { source, offset } => {
                 write!(f, "Offset: {offset}")?;
                 source.format(f, prefix, false, true)?;
@@ -437,7 +429,12 @@ impl Node {
                 }
             }
             Self::Values { rows, .. } => {
-                write!(f, "Values: {} rows", rows.len())?;
+                write!(f, "Values: ")?;
+                match rows.len() {
+                    1 if rows[0].is_empty() => write!(f, "blank row")?,
+                    1 => write!(f, "{}", rows[0].iter().map(|e| e.to_string()).join(", "))?,
+                    n => write!(f, "{n} rows")?,
+                }
             }
         };
         Ok(())

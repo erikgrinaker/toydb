@@ -26,10 +26,10 @@ Short circuit:
 Initial:
    Projection: 1, 2, 3
    └─ Filter: TRUE
-      └─ EmptyRow
+      └─ Values: blank row
 Short circuit:
    Projection: 1, 2, 3
-   └─ EmptyRow
+   └─ Values: blank row
 1, 2, 3
 
 [opt]> SELECT * FROM test JOIN ref ON TRUE
@@ -72,7 +72,7 @@ Short circuit:
 Initial:
    Projection: 1, 2, 3
    └─ Filter: FALSE
-      └─ EmptyRow
+      └─ Values: blank row
 Short circuit:
    Nothing
 
@@ -109,7 +109,7 @@ Short circuit:
 Initial:
    Projection: 1, 2, 3
    └─ Filter: NULL
-      └─ EmptyRow
+      └─ Values: blank row
 Short circuit:
    Nothing
 

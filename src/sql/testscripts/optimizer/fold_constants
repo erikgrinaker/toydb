@@ -10,10 +10,10 @@ ok
 ---
 Initial:
    Projection: 1 + 1
-   └─ EmptyRow
+   └─ Values: blank row
 Constant folding:
    Projection: 2
-   └─ EmptyRow
+   └─ Values: blank row
 2
 
 [opt]> SELECT 1+1 FROM test

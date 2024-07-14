@@ -42,13 +42,13 @@ ok
 ---
 Offset: 1
 └─ Projection: 1, 2, 3
-   └─ EmptyRow
+   └─ Values: blank row
 
 [plan]> SELECT 1, 2, 3 OFFSET 0
 ---
 Offset: 0
 └─ Projection: 1, 2, 3
-   └─ EmptyRow
+   └─ Values: blank row
 1, 2, 3
 
 # Offsets can be expressions, but only constant ones.

@@ -8,7 +8,7 @@ ok
 [plan,result,ops]> INSERT INTO name VALUES (1, 'a')
 ---
 Insert: name
-└─ Values: 1 rows
+└─ Values: 1, a
 Insert { count: 1 }
 storage set mvcc:NextVersion → 3 ["\x00" → "\x03"]
 storage set mvcc:TxnActive(2) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x02" → ""]

@@ -45,7 +45,7 @@ Nothing
 ---
 Limit: 1
 └─ Projection: 1, 2, 3
-   └─ EmptyRow
+   └─ Values: blank row
 1, 2, 3
 
 [plan]> SELECT 1, 2, 3 LIMIT 0

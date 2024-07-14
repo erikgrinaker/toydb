@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::sql::engine::Transaction;
-use crate::sql::types::{Expression, Row, Rows, Table, Value};
+use crate::sql::types::{Expression, Rows, Table, Value};
 
 /// A table scan source.
 pub(super) fn scan(
@@ -30,13 +30,6 @@ pub(super) fn lookup_index(
 /// Returns nothing. Used to short-circuit nodes that can't produce any rows.
 pub(super) fn nothing() -> Rows {
     Box::new(std::iter::empty())
-}
-
-/// Produces a single empty row. Used for queries without a FROM clause, e.g.
-/// SELECT 1+1, in order to have something to project against.
-/// TODO: remove this.
-pub(super) fn empty_row() -> Rows {
-    Box::new(std::iter::once(Ok(Row::new())))
 }
 
 /// Emits predefined constant values.
