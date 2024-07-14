@@ -60,9 +60,9 @@ pub fn execute_plan(
 /// TODO: since iterators are lazy, make this infallible if possible.
 pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
     match node {
-        Node::Aggregate { source, aggregates, group_by } => {
+        Node::Aggregate { source, group_by, aggregates } => {
             let source = execute(*source, txn)?;
-            aggregate::aggregate(source, aggregates, group_by)
+            aggregate::aggregate(source, group_by, aggregates)
         }
 
         Node::Filter { source, predicate } => {

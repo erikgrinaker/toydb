@@ -358,20 +358,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Construct a child scope with the group_by and aggregate AST
         // expressions, such that downstream nodes can identify and reference
         // them. Discard redundant expressions.
-        //
-        // TODO: reverse the order of the emitted columns: group_by then
-        // aggregates.
         let mut child_scope = scope.project(&[], &[])?; // project to keep tables
-        let aggregates = aggregates
-            .into_iter()
-            .filter(|&expr| {
-                if child_scope.lookup_aggregate(expr).is_some() {
-                    return false;
-                }
-                child_scope.add_aggregate((expr).clone(), Label::None);
-                true
-            })
-            .collect_vec();
         let group_by = group_by
             .into_iter()
             .filter(|expr| {
@@ -389,15 +376,25 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 true
             })
             .collect_vec();
-
-        // Build the node from the remaining expressions.
         let aggregates = aggregates
             .into_iter()
-            .map(|expr| Self::build_aggregate_function(scope, expr.clone()))
-            .collect::<Result<_>>()?;
+            .filter(|&expr| {
+                if child_scope.lookup_aggregate(expr).is_some() {
+                    return false;
+                }
+                child_scope.add_aggregate((expr).clone(), Label::None);
+                true
+            })
+            .collect_vec();
+
+        // Build the node from the remaining expressions.
         let group_by = group_by
             .into_iter()
             .map(|expr| Self::build_expression(expr, scope))
+            .collect::<Result<_>>()?;
+        let aggregates = aggregates
+            .into_iter()
+            .map(|expr| Self::build_aggregate_function(scope, expr.clone()))
             .collect::<Result<_>>()?;
 
         *scope = child_scope;

@@ -24,14 +24,14 @@ ok
 # Grouping with no input rows yields empty result.
 [plan]> SELECT COUNT(id), MIN(id), MAX(id), SUM(id), AVG(id) FROM test WHERE FALSE GROUP BY id
 ---
-Projection: #0, #1, #2, #3, #4
+Projection: #1, #2, #3, #4, #5
 └─ Aggregate: count(id), min(id), max(id), sum(id), avg(id) group by id
    └─ Nothing
 
 # Simple GROUP BY, including NULL group.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group"
 ---
-Projection: test.group, #0
+Projection: test.group, #1
 └─ Aggregate: count(TRUE) group by group
    └─ Scan: test
 NULL, 1
@@ -41,7 +41,7 @@ b, 3
 [plan]> SELECT "group", COUNT(*), MIN("bool"), MAX("string"), SUM("int"), AVG("float") \
     FROM test GROUP BY "group"
 ---
-Projection: test.group, #0, #1, #2, #3, #4
+Projection: test.group, #1, #2, #3, #4, #5
 └─ Aggregate: count(TRUE), min(bool), max(string), sum(int), avg(float) group by group
    └─ Scan: test
 NULL, 1, NULL, NULL, NULL, NULL
@@ -51,7 +51,7 @@ b, 3, FALSE, 👋, 41, NaN
 # GROUP BY works on booleans.
 [plan]> SELECT "bool", COUNT(*) FROM test GROUP BY "bool"
 ---
-Projection: test.bool, #0
+Projection: test.bool, #1
 └─ Aggregate: count(TRUE) group by bool
    └─ Scan: test
 NULL, 1
@@ -61,7 +61,7 @@ TRUE, 3
 # GROUP BY works on integers.
 [plan]> SELECT "int", COUNT(*) FROM test GROUP BY "int"
 ---
-Projection: test.int, #0
+Projection: test.int, #1
 └─ Aggregate: count(TRUE) group by int
    └─ Scan: test
 NULL, 1
@@ -74,7 +74,7 @@ NULL, 1
 # GROUP BY works with floats, including a NAN group and -0.0 and 0.0 being equal.
 [plan]> SELECT "float", COUNT(*) FROM test GROUP BY "float"
 ---
-Projection: test.float, #0
+Projection: test.float, #1
 └─ Aggregate: count(TRUE) group by float
    └─ Scan: test
 NULL, 1
@@ -86,7 +86,7 @@ NaN, 2
 # GROUP BY works on strings.
 [plan]> SELECT "string", COUNT(*) FROM test GROUP BY "string"
 ---
-Projection: test.string, #0
+Projection: test.string, #1
 └─ Aggregate: count(TRUE) group by string
    └─ Scan: test
 NULL, 1
@@ -98,7 +98,7 @@ abc, 2
 # GROUP BY works even if the group column isn't in the result.
 [plan]> SELECT COUNT(*) FROM test GROUP BY "group"
 ---
-Projection: #0
+Projection: #1
 └─ Aggregate: count(TRUE) group by group
    └─ Scan: test
 1
@@ -122,7 +122,7 @@ Error: invalid input: unknown field g
 
 [plan]> SELECT "group", COUNT(*) FROM test AS t GROUP BY t."group"
 ---
-Projection: group, #0
+Projection: group, #1
 └─ Aggregate: count(TRUE) group by t.group
    └─ Scan: test as t
 NULL, 1
@@ -148,14 +148,14 @@ Error: invalid input: unknown table unknown
 # GROUP BY can be arbitrary expressions.
 [plan]> SELECT COUNT(*) FROM test GROUP BY 1
 ---
-Projection: #0
+Projection: #1
 └─ Aggregate: count(TRUE) group by 1
    └─ Scan: test
 7
 
 [plan]> SELECT COUNT(*) FROM test GROUP BY id % 2
 ---
-Projection: #0
+Projection: #1
 └─ Aggregate: count(TRUE) group by id % 2
    └─ Scan: test
 4
@@ -164,7 +164,7 @@ Projection: #0
 # GROUP BY can use an expression also used in the SELECT.
 [plan]> SELECT id % 2, COUNT(*) FROM test GROUP BY id % 2
 ---
-Projection: #1, #0
+Projection: #0, #1
 └─ Aggregate: count(TRUE) group by id % 2
    └─ Scan: test
 0, 4
@@ -183,7 +183,7 @@ Error: invalid input: unknown function min
 # GROUP BY works with multiple groups.
 [plan]> SELECT "group", "bool", COUNT(*) FROM test GROUP BY "group", "bool"
 ---
-Projection: test.group, test.bool, #0
+Projection: test.group, test.bool, #2
 └─ Aggregate: count(TRUE) group by group, bool
    └─ Scan: test
 NULL, NULL, 1
@@ -195,7 +195,7 @@ b, TRUE, 1
 # GROUP BY works with joins.
 [plan]> SELECT t.id % 2, COUNT(*) FROM test t JOIN other o ON t.id % 2 = o.id GROUP BY t.id % 2
 ---
-Projection: #1, #0
+Projection: #0, #1
 └─ Aggregate: count(TRUE) group by t.id % 2
    └─ NestedLoopJoin: inner on t.id % 2 = o.id
       ├─ Scan: test as t

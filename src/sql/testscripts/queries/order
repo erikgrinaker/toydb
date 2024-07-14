@@ -474,7 +474,7 @@ Order: o.id desc, t.id asc
 ---
 Projection: #0, #1
 └─ Order: #2 desc
-   └─ Projection: test.bool, #0, #0
+   └─ Projection: test.bool, #1, #1
       └─ Aggregate: max(int) group by bool
          └─ Scan: test
 NULL, 1000
@@ -485,7 +485,7 @@ FALSE, -1
 ---
 Projection: #0
 └─ Order: #1 desc
-   └─ Projection: test.bool, #0
+   └─ Projection: test.bool, #1
       └─ Aggregate: max(int) group by bool
          └─ Scan: test
 NULL
@@ -496,7 +496,7 @@ FALSE
 ---
 Projection: #0, #1
 └─ Order: #2 - #3 desc
-   └─ Projection: test.bool, #0, #0, #1
+   └─ Projection: test.bool, #1, #1, #2
       └─ Aggregate: max(int), min(int) group by bool
          └─ Scan: test
 NULL, 1000
@@ -509,7 +509,7 @@ TRUE, 0
 ---
 Projection: #0
 └─ Order: 2 - #1 + 1 > 1 asc
-   └─ Projection: #0, #1
+   └─ Projection: #1, #0
       └─ Aggregate: count(TRUE) group by id % 2
          └─ Scan: test
 5
@@ -520,7 +520,7 @@ Projection: #0
 ---
 Projection: #0
 └─ Order: test.bool asc
-   └─ Projection: #0, test.bool
+   └─ Projection: #1, test.bool
       └─ Aggregate: count(TRUE) group by bool
          └─ Scan: test
 8
@@ -531,7 +531,7 @@ Projection: #0
 ---
 Projection: #0
 └─ Order: bool asc
-   └─ Projection: #0, bool
+   └─ Projection: #1, bool
       └─ Aggregate: count(TRUE) group by test.bool
          └─ Scan: test
 8

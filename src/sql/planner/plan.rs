@@ -85,10 +85,9 @@ impl Plan {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
     /// Computes aggregate values for the given expressions and group_by buckets
-    /// across all rows in the source node. The aggregate columns are output
-    /// first, followed by the group_by columns, in the given order.
-    /// TODO: reverse the order.
-    Aggregate { source: Box<Node>, aggregates: Vec<Aggregate>, group_by: Vec<Expression> },
+    /// across all rows in the source node. The group_by columns are emitted first,
+    /// followed by the aggregate columns, in the given order.
+    Aggregate { source: Box<Node>, group_by: Vec<Expression>, aggregates: Vec<Aggregate> },
     /// Filters source rows, by only emitting rows for which the predicate
     /// evaluates to true.
     Filter { source: Box<Node>, predicate: Expression },

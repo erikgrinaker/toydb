@@ -9,8 +9,8 @@ use std::collections::BTreeMap;
 /// group_by expressions as buckets.
 pub(super) fn aggregate(
     mut source: Rows,
-    aggregates: Vec<Aggregate>,
     group_by: Vec<Expression>,
+    aggregates: Vec<Aggregate>,
 ) -> Result<Rows> {
     let mut aggregator = Aggregator::new(aggregates, group_by);
     while let Some(row) = source.next().transpose()? {
@@ -69,15 +69,15 @@ impl Aggregator {
             return Ok(Box::new(std::iter::once(result)));
         }
 
-        // Emit the aggregate and group_by values for each bucket. We use an
+        // Emit the group_by and aggregate values for each bucket. We use an
         // intermediate vec since btree_map::IntoIter doesn't implement Clone
         // (required by Rows).
         let buckets = self.buckets.into_iter().collect_vec();
         Ok(Box::new(buckets.into_iter().map(|(bucket, accumulators)| {
-            accumulators
+            bucket
                 .into_iter()
-                .map(|acc| acc.value())
-                .chain(bucket.into_iter().map(Ok))
+                .map(Ok)
+                .chain(accumulators.into_iter().map(|acc| acc.value()))
                 .collect()
         })))
     }
