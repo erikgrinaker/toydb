@@ -52,9 +52,8 @@ b, 42
 ---
 Projection: #0
 └─ Filter: #1 > 10
-   └─ Projection: test.group, #1
-      └─ Aggregate: max(int) group by group
-         └─ Scan: test
+   └─ Aggregate: max(int) group by group
+      └─ Scan: test
 b
 
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") - MIN("int") > 10
@@ -70,9 +69,8 @@ b, 42
 [plan]> SELECT "group", MAX("int") AS m FROM test GROUP BY "group" HAVING m > 10
 ---
 Filter: m > 10
-└─ Projection: test.group, #1
-   └─ Aggregate: max(int) group by group
-      └─ Scan: test
+└─ Aggregate: max(int) group by group
+   └─ Scan: test
 b, 42
 
 # Having works with an aggregate function not in the SELECT clause.
@@ -80,9 +78,8 @@ b, 42
 ---
 Projection: #0, #1
 └─ Filter: #2 > 10
-   └─ Projection: test.group, #1, #2
-      └─ Aggregate: count(TRUE), max(int) group by group
-         └─ Scan: test
+   └─ Aggregate: count(TRUE), max(int) group by group
+      └─ Scan: test
 b, 3
 
 # Having works with compound expressions.

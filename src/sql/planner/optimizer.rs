@@ -340,6 +340,17 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
             Node::Nothing
         }
 
+        // Remove noop projections that simply pass through the source columns.
+        Node::Projection { source, expressions, .. }
+            if source.size() == expressions.len()
+                && expressions
+                    .iter()
+                    .enumerate()
+                    .all(|(i, e)| matches!(e, Expression::Field(f, _) if i == *f)) =>
+        {
+            *source
+        }
+
         node => node,
     };
 

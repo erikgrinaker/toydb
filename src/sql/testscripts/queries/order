@@ -485,9 +485,8 @@ FALSE, -1
 ---
 Projection: #0
 └─ Order: #1 desc
-   └─ Projection: test.bool, #1
-      └─ Aggregate: max(int) group by bool
-         └─ Scan: test
+   └─ Aggregate: max(int) group by bool
+      └─ Scan: test
 NULL
 TRUE
 FALSE

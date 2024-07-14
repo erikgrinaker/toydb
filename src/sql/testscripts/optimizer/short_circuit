@@ -164,6 +164,44 @@ Initial:
 Short circuit:
    Nothing
 
+# Remove projections that simply pass through source columns. Aliased
+# column names are retained.
+[opt]> SELECT id, value FROM test
+---
+Initial:
+   Projection: id, value
+   └─ Scan: test
+Short circuit:
+   Scan: test
+1, a
+2, b
+3, c
+
+[opt,header]> SELECT id AS foo, value AS bar FROM test
+---
+Initial:
+   Projection: id, value
+   └─ Scan: test
+Short circuit:
+   Scan: test
+foo, bar
+1, a
+2, b
+3, c
+
+[opt]> SELECT id, MIN(id), MAX(id) FROM test GROUP BY id
+---
+Initial:
+   Projection: test.id, #1, #2
+   └─ Aggregate: min(id), max(id) group by id
+      └─ Scan: test
+Short circuit:
+   Aggregate: min(id), max(id) group by id
+   └─ Scan: test
+1, 1, 1
+2, 2, 2
+3, 3, 3
+
 # Constant folding happens before short-circuiting.
 [opt]> SELECT * FROM test WHERE 1 != 1 OR 0 > 3 AND NOT NULL
 ---
