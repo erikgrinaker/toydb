@@ -61,7 +61,7 @@ NULL
 !> SELECT *
 !> SELECT * FROM
 ---
-Error: invalid input: can't select * without a table
+Error: invalid input: SELECT * requires a FROM clause
 Error: invalid input: unexpected end of input
 
 # Mix fields, field expressions, and constant expressions.

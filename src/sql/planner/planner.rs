@@ -148,7 +148,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     #[allow(clippy::too_many_arguments)]
     fn build_select(
         &self,
-        select: Vec<(ast::Expression, Option<String>)>,
+        mut select: Vec<(ast::Expression, Option<String>)>,
         from: Vec<ast::From>,
         r#where: Option<ast::Expression>,
         group_by: Vec<ast::Expression>,
@@ -163,7 +163,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         let mut node = if !from.is_empty() {
             self.build_from_clause(&mut scope, from)?
         } else if select.is_empty() {
-            return errinput!("can't select * without a table");
+            return errinput!("SELECT * requires a FROM clause");
         } else {
             // For a constant SELECT, emit a single empty row to project. This
             // allows using both a WHERE predicate and aggregate functions.
@@ -179,6 +179,19 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Build aggregate functions and GROUP BY clause.
         let aggregates = Self::collect_aggregates(&select, &having, &order);
         if !group_by.is_empty() || !aggregates.is_empty() {
+            // If there is a SELECT * clause, specify explicit columns. This
+            // ensures that the columns must be used in GROUP BY as well.
+            // TODO: consider improving this.
+            if select.is_empty() {
+                for index in 0..node.size() {
+                    let (table, column) = match scope.get_column_label(index)? {
+                        Label::Qualified(table, column) => (Some(table), column),
+                        Label::Unqualified(column) => (None, column),
+                        Label::None => panic!("FROM clause must produce labels"),
+                    };
+                    select.push((ast::Expression::Field(table, column), None));
+                }
+            }
             node = self.build_aggregate(&mut scope, node, group_by, aggregates)?;
         }
 
@@ -344,15 +357,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// can look up the column index of aggregate expressions via Scope.
     /// Similarly, they are allowed to reference GROUP BY expressions by
     /// specifying the exact same expression.
-    ///
-    /// TODO: consider avoiding the expr cloning by taking &Expression in
-    /// various places.
     fn build_aggregate(
         &self,
         scope: &mut Scope,
         source: Node,
         group_by: Vec<ast::Expression>,
-        aggregates: Vec<&ast::Expression>,
+        aggregates: Vec<ast::Expression>,
     ) -> Result<Node> {
         // Construct a child scope with the group_by and aggregate AST
         // expressions, such that downstream nodes can identify and reference
@@ -377,11 +387,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
             .collect_vec();
         let aggregates = aggregates
             .into_iter()
-            .filter(|&expr| {
+            .filter(|expr| {
                 if child_scope.lookup_aggregate(expr).is_some() {
                     return false;
                 }
-                child_scope.add_aggregate((expr).clone(), Label::None);
+                child_scope.add_aggregate(expr.clone(), Label::None);
                 true
             })
             .collect_vec();
@@ -393,7 +403,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             .collect::<Result<_>>()?;
         let aggregates = aggregates
             .into_iter()
-            .map(|expr| Self::build_aggregate_function(scope, expr.clone()))
+            .map(|expr| Self::build_aggregate_function(scope, expr))
             .collect::<Result<_>>()?;
 
         *scope = child_scope;
@@ -432,11 +442,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
     }
 
     /// Collects aggregate functions from SELECT, HAVING, and ORDER BY clauses.
-    fn collect_aggregates<'c>(
-        select: &'c [(ast::Expression, Option<String>)],
-        having: &'c Option<ast::Expression>,
-        order_by: &'c [(ast::Expression, ast::Order)],
-    ) -> Vec<&'c ast::Expression> {
+    fn collect_aggregates(
+        select: &[(ast::Expression, Option<String>)],
+        having: &Option<ast::Expression>,
+        order_by: &[(ast::Expression, ast::Order)],
+    ) -> Vec<ast::Expression> {
         let select = select.iter().map(|(expr, _)| expr);
         let having = having.iter();
         let order_by = order_by.iter().map(|(expr, _)| expr);

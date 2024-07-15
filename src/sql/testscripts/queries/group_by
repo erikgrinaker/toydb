@@ -190,3 +190,33 @@ Aggregate: count(TRUE) group by t.id % 2
    ├─ Scan: test as t
    └─ Scan: other as o
 1, 3
+
+# SELECT * requires all columns to be in GROUP BY.
+!> SELECT * FROM test GROUP BY id
+---
+Error: invalid input: field test.group must be used in an aggregate or GROUP BY expression
+
+[plan]> SELECT * FROM test GROUP BY id, "group", "bool", "int", "float", "string"
+---
+Aggregate:  group by id, group, bool, int, float, string
+└─ Scan: test
+0, NULL, NULL, NULL, NULL, NULL
+1, a, TRUE, -1, 3.14, 
+2, b, FALSE, 0, NaN, abc
+3, a, TRUE, 3, 0, AB
+4, b, TRUE, 42, inf, 👋
+5, a, FALSE, 7, NaN, 
+6, b, FALSE, -1, 0, abc
+
+[plan]> SELECT * FROM test GROUP BY "bool", "int", "float", "string", "group", id
+---
+Projection: test.id, test.group, test.bool, test.int, test.float, test.string
+└─ Aggregate:  group by bool, int, float, string, group, id
+   └─ Scan: test
+0, NULL, NULL, NULL, NULL, NULL
+6, b, FALSE, -1, 0, abc
+2, b, FALSE, 0, NaN, abc
+5, a, FALSE, 7, NaN, 
+1, a, TRUE, -1, 3.14, 
+3, a, TRUE, 3, 0, AB
+4, b, TRUE, 42, inf, 👋

@@ -229,13 +229,9 @@ impl Expression {
 
     /// Find and collects expressions for which the given closure returns true,
     /// adding them to c. Does not recurse into matching expressions.
-    pub fn collect<'a>(
-        &'a self,
-        visitor: &impl Fn(&Expression) -> bool,
-        c: &mut Vec<&'a Expression>,
-    ) {
+    pub fn collect(&self, visitor: &impl Fn(&Expression) -> bool, c: &mut Vec<Expression>) {
         if visitor(self) {
-            c.push(self);
+            c.push(self.clone());
             return;
         }
         use Operator::*;
