@@ -342,10 +342,12 @@ impl Node {
         // Format the node.
         match self {
             Self::Aggregate { source, aggregates, group_by } => {
-                write!(f, "Aggregate: {}", aggregates.iter().join(", "))?;
-                if !group_by.is_empty() {
-                    write!(f, " group by {}", group_by.iter().join(", "))?;
-                }
+                let aggregates = group_by
+                    .iter()
+                    .map(|group| format!("group({group})"))
+                    .chain(aggregates.iter().map(|agg| agg.to_string()))
+                    .join(", ");
+                write!(f, "Aggregate: {aggregates}")?;
                 source.format(f, prefix, false, true)?;
             }
             Self::Filter { source, predicate } => {
