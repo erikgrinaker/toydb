@@ -184,7 +184,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // TODO: consider improving this.
             if select.is_empty() {
                 for index in 0..node.size() {
-                    let (table, column) = match scope.get_column_label(index)? {
+                    let (table, column) = match scope.get_label(index) {
                         Label::Qualified(table, column) => (Some(table), column),
                         Label::Unqualified(column) => (None, column),
                         Label::None => panic!("FROM clause must produce labels"),
@@ -342,8 +342,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     let labels = vec![Label::None; left_size + right_size];
                     let expressions = (left_size..left_size + right_size)
                         .chain(0..left_size)
-                        .map(|i| Ok(Expression::Field(i, scope.get_column_label(i)?)))
-                        .collect::<Result<Vec<_>>>()?;
+                        .map(|i| Expression::Field(i, scope.get_label(i)))
+                        .collect_vec();
                     scope = scope.project(&expressions, &labels)?;
                     node = Node::Projection { source: Box::new(node), expressions, labels }
                 }
@@ -389,7 +389,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 // TODO: add a Scope method to pass through columns from a parent scope.
                 if let ast::Expression::Field(table, column) = expr {
                     if let Ok(index) = scope.lookup_column(table.as_deref(), column.as_str()) {
-                        label = scope.get_column_label(index).unwrap();
+                        label = scope.get_label(index);
                     }
                 }
                 child_scope.add_aggregate(expr.clone(), label);
@@ -492,7 +492,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // isn't already available in the child scope, pass it through.
             if let Some(index) = parent_scope.lookup_aggregate(expr) {
                 if scope.lookup_aggregate(expr).is_none() {
-                    let label = parent_scope.get_column_label(index).unwrap();
+                    let label = parent_scope.get_label(index);
                     scope.add_aggregate(expr.clone(), label);
                     projection.push(Expression::Field(index, Label::None));
                     return true;
@@ -515,7 +515,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             };
             // Add a hidden column to the projection. Use the given label for
             // the projection, but the qualified label for the scope.
-            scope.add_column(parent_scope.get_column_label(index).unwrap());
+            scope.add_column(parent_scope.get_label(index));
             projection.push(Expression::Field(
                 index,
                 Label::maybe_qualified(table.clone(), name.clone()),
@@ -531,7 +531,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Look up aggregate functions or GROUP BY expressions. These were added
         // to the parent scope when building the Aggregate node, if any.
         if let Some(index) = scope.lookup_aggregate(&expr) {
-            return Ok(Field(index, scope.get_column_label(index)?));
+            return Ok(Field(index, scope.get_label(index)));
         }
 
         // Helper for building a boxed expression.
@@ -709,16 +709,9 @@ impl Scope {
         errinput!("unknown field {}", fmtname())
     }
 
-    /// Fetches a column label by index, if any.
-    /// TODO: this can possibly be removed.
-    fn get_column_label(&self, index: usize) -> Result<Label> {
-        if self.columns.is_empty() {
-            return errinput!("expression must be constant, found column index {index}");
-        }
-        match self.columns.get(index) {
-            Some(label) => Ok(label.clone()),
-            None => errinput!("column index {index} not found"),
-        }
+    /// Fetches a column label by index, or Label::None if it doesn't exist.
+    fn get_label(&self, index: usize) -> Label {
+        self.columns.get(index).cloned().unwrap_or(Label::None)
     }
 
     /// Adds an aggregate expression to the scope, returning the column index.
