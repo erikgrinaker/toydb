@@ -230,7 +230,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build HAVING clause.
         if let Some(having) = having {
-            if !node.contains(&|n| matches!(n, Node::Aggregate { .. })) {
+            if scope.aggregates.is_empty() {
                 return errinput!("HAVING requires GROUP BY or aggregate function");
             }
             let predicate = Self::build_expression(having, &scope)?;

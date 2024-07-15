@@ -136,35 +136,6 @@ pub enum Node {
 }
 
 impl Node {
-    /// Recursively walks the expression tree depth-first, calling the given
-    /// closure until it returns false. Returns true otherwise.
-    pub fn walk(&self, visitor: &mut impl FnMut(&Self) -> bool) -> bool {
-        use Node::*;
-        if !visitor(self) {
-            return false;
-        }
-        match self {
-            HashJoin { left, right, .. } | NestedLoopJoin { left, right, .. } => {
-                left.walk(visitor) && right.walk(visitor)
-            }
-
-            Aggregate { source, .. }
-            | Filter { source, .. }
-            | Limit { source, .. }
-            | Offset { source, .. }
-            | Order { source, .. }
-            | Projection { source, .. } => source.walk(visitor),
-
-            IndexLookup { .. } | KeyLookup { .. } | Nothing | Scan { .. } | Values { .. } => true,
-        }
-    }
-
-    /// Recursively walks the node tree depth-first, calling the given closure
-    /// until it returns true. Returns false otherwise. The inverse of walk().
-    pub fn contains(&self, visitor: &impl Fn(&Self) -> bool) -> bool {
-        !self.walk(&mut |node| !visitor(node))
-    }
-
     /// Recursively transforms query nodes depth-first by applying the given
     /// closures before and after descending.
     pub fn transform<B, A>(mut self, before: &B, after: &A) -> Result<Self>
