@@ -196,7 +196,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
         }
 
         // Build SELECT clause.
-        let mut hidden = 0;
         if !select.is_empty() {
             let labels = select.iter().map(|(_, l)| Label::maybe_name(l.clone())).collect_vec();
             let mut expressions: Vec<_> = select
@@ -208,12 +207,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
             scope = parent_scope.project(&expressions, &labels)?;
 
             // Add hidden columns for HAVING and ORDER BY fields not in SELECT.
-            // TODO: track hidden fields in Scope.
-            let size = expressions.len();
             for expr in having.iter().chain(order_by.iter().map(|(e, _)| e)) {
                 self.build_hidden(&mut scope, &parent_scope, &mut expressions, expr);
             }
-            hidden += expressions.len() - size;
 
             // If the parent scope is an aggregate scope, then every projected
             // column must also be an aggregate column by definition. Record them
@@ -269,11 +265,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
         //
         // TODO: add a separate plan node kind for this, and also use it for
         // RIGHT JOIN projections.
-        if hidden > 0 {
-            let columns = node.size() - hidden;
-            let labels = vec![Label::None; columns];
-            let expressions = (0..columns).map(|i| Expression::Field(i, Label::None)).collect_vec();
-            scope = scope.project(&expressions, &labels)?;
+        let hidden = scope.remove_hidden();
+        if !hidden.is_empty() {
+            let size = node.size() - hidden.len();
+            let labels = vec![Label::None; size];
+            let expressions = (0..size).map(|i| Expression::Field(i, Label::None)).collect_vec();
             node = Node::Projection { source: Box::new(node), labels, expressions }
         }
 
@@ -490,11 +486,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
         expr.walk(&mut |expr| {
             // If this is an aggregate function or GROUP BY expression that
             // isn't already available in the child scope, pass it through.
-            if let Some(index) = parent_scope.lookup_aggregate(expr) {
+            if let Some(parent_index) = parent_scope.lookup_aggregate(expr) {
                 if scope.lookup_aggregate(expr).is_none() {
-                    let label = parent_scope.get_label(index);
-                    scope.add_aggregate(expr.clone(), label);
-                    projection.push(Expression::Field(index, Label::None));
+                    let label = parent_scope.get_label(parent_index);
+                    let index = scope.add_aggregate(expr.clone(), label);
+                    scope.hide(index);
+                    projection.push(Expression::Field(parent_index, Label::None));
                     return true;
                 }
             }
@@ -510,14 +507,15 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // If the field doesn't exist in the parent scope either, we simply
             // don't build a hidden column for it. The field evaluation will
             // error when building the downstream node (e.g. ORDER BY).
-            let Ok(index) = parent_scope.lookup_column(table.as_deref(), name) else {
+            let Ok(parent_index) = parent_scope.lookup_column(table.as_deref(), name) else {
                 return true;
             };
             // Add a hidden column to the projection. Use the given label for
             // the projection, but the qualified label for the scope.
-            scope.add_column(parent_scope.get_label(index));
+            let index = scope.add_column(parent_scope.get_label(parent_index));
+            scope.hide(index);
             projection.push(Expression::Field(
-                index,
+                parent_index,
                 Label::maybe_qualified(table.clone(), name.clone()),
             ));
             true
@@ -634,6 +632,10 @@ pub struct Scope {
     /// using the same expression in other nodes, e.g.  GROUP BY a * b / 2 ORDER
     /// BY a * b / 2.
     aggregates: HashMap<ast::Expression, usize>,
+    /// Hidden columns. These are used to pass e.g. ORDER BY and HAVING
+    /// expressions through SELECT projection nodes if the expressions aren't
+    /// already projected. They should be removed before emitting results.
+    hidden: HashSet<usize>,
 }
 
 impl Scope {
@@ -645,6 +647,7 @@ impl Scope {
             qualified: HashMap::new(),
             unqualified: HashMap::new(),
             aggregates: HashMap::new(),
+            hidden: HashSet::new(),
         }
     }
 
@@ -737,6 +740,34 @@ impl Scope {
     /// expected to fall back to normal expressions building.
     fn lookup_aggregate(&self, expr: &ast::Expression) -> Option<usize> {
         self.aggregates.get(expr).copied()
+    }
+
+    /// Marks the given column as hidden.
+    fn hide(&mut self, index: usize) {
+        if index < self.columns.len() {
+            self.hidden.insert(index);
+        }
+    }
+
+    /// Removes hidden columns from the scope, returning their indexes.
+    fn remove_hidden(&mut self) -> HashSet<usize> {
+        if self.hidden.is_empty() {
+            return HashSet::new();
+        }
+        let hidden = std::mem::take(&mut self.hidden);
+
+        let mut index = 0;
+        self.columns.retain(|_| {
+            let is_hidden = hidden.contains(&index);
+            index += 1;
+            !is_hidden
+        });
+
+        self.qualified.retain(|_, index| !hidden.contains(index));
+        self.unqualified.iter_mut().for_each(|(_, vec)| vec.retain(|i| !hidden.contains(i)));
+        self.unqualified.retain(|_, vec| !vec.is_empty());
+        self.aggregates.retain(|_, index| !hidden.contains(index));
+        hidden
     }
 
     /// Merges two scopes, by appending the given scope to self.
