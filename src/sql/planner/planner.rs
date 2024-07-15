@@ -205,8 +205,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
         };
 
         // Build HAVING clause.
-        if let Some(expr) = having {
-            let predicate = Self::build_expression(expr, &scope)?;
+        if let Some(having) = having {
+            if !node.contains(&|n| matches!(n, Node::Aggregate { .. })) {
+                return errinput!("HAVING requires GROUP BY or aggregate function");
+            }
+            let predicate = Self::build_expression(having, &scope)?;
             node = Node::Filter { source: Box::new(node), predicate };
         };
 

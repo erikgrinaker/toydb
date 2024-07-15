@@ -18,25 +18,23 @@
 ---
 ok
 
-# Having without a GROUP BY clause is valid, and behaves as if every column is
-# grouped by.
-[plan]> SELECT * FROM test HAVING id > 3
+# Having requires an aggregate function or GROUP BY clause.
+!> SELECT * FROM test HAVING id > 3
 ---
-Scan: test (id > 3)
-4, b, TRUE, 42, inf, 👋
-5, a, FALSE, 7, NaN, 
-6, b, FALSE, -1, 0, abc
+Error: invalid input: HAVING requires GROUP BY or aggregate function
 
-# Having works with a column not in the result.
-# TODO: should it?
-[plan]> SELECT id FROM test HAVING "int" > 3
+> SELECT COUNT(*) FROM test HAVING COUNT(*) > 0
 ---
-Projection: #0
-└─ Filter: int > 3
-   └─ Projection: id, int
-      └─ Scan: test
-4
-5
+7
+
+> SELECT TRUE FROM test GROUP BY id HAVING id > 0
+---
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
 
 # Having works with an aggregate function, even if it's not in SELECT.
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") > 10
