@@ -327,7 +327,7 @@ impl<'a> Parser<'a> {
             r#where: self.parse_where_clause()?,
             group_by: self.parse_group_by_clause()?,
             having: self.parse_having_clause()?,
-            order: self.parse_order_by_clause()?,
+            order_by: self.parse_order_by_clause()?,
             limit: self
                 .next_is(Keyword::Limit.into())
                 .then(|| self.parse_expression())

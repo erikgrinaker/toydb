@@ -31,8 +31,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
             Delete { table, r#where } => self.build_delete(table, r#where),
             Insert { table, columns, values } => self.build_insert(table, columns, values),
             Update { table, set, r#where } => self.build_update(table, set, r#where),
-            Select { select, from, r#where, group_by, having, order, offset, limit } => {
-                self.build_select(select, from, r#where, group_by, having, order, offset, limit)
+            Select { select, from, r#where, group_by, having, order_by, offset, limit } => {
+                self.build_select(select, from, r#where, group_by, having, order_by, offset, limit)
             }
 
             // Transaction and explain statements are handled by Session.
@@ -153,7 +153,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         r#where: Option<ast::Expression>,
         group_by: Vec<ast::Expression>,
         having: Option<ast::Expression>,
-        order: Vec<(ast::Expression, ast::Order)>,
+        order_by: Vec<(ast::Expression, ast::Order)>,
         offset: Option<ast::Expression>,
         limit: Option<ast::Expression>,
     ) -> Result<Plan> {
@@ -177,7 +177,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         };
 
         // Build aggregate functions and GROUP BY clause.
-        let aggregates = Self::collect_aggregates(&select, &having, &order);
+        let aggregates = Self::collect_aggregates(&select, &having, &order_by);
         if !group_by.is_empty() || !aggregates.is_empty() {
             // If there is a SELECT * clause, specify explicit columns. This
             // ensures that the columns must be used in GROUP BY as well.
@@ -210,7 +210,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // Add hidden columns for HAVING and ORDER BY fields not in SELECT.
             // TODO: track hidden fields in Scope.
             let size = expressions.len();
-            for expr in having.iter().chain(order.iter().map(|(e, _)| e)) {
+            for expr in having.iter().chain(order_by.iter().map(|(e, _)| e)) {
                 self.build_hidden(&mut scope, &parent_scope, &mut expressions, expr);
             }
             hidden += expressions.len() - size;
@@ -237,9 +237,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
             node = Node::Filter { source: Box::new(node), predicate };
         };
 
-        // Build ORDER clause.
-        if !order.is_empty() {
-            let orders = order
+        // Build ORDER BY clause.
+        if !order_by.is_empty() {
+            let orders = order_by
                 .into_iter()
                 .map(|(e, o)| Ok((Self::build_expression(e, &scope)?, Direction::from(o))))
                 .collect::<Result<_>>()?;

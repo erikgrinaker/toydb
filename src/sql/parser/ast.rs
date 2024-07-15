@@ -42,7 +42,7 @@ pub enum Statement {
         r#where: Option<Expression>,
         group_by: Vec<Expression>,
         having: Option<Expression>,
-        order: Vec<(Expression, Order)>,
+        order_by: Vec<(Expression, Order)>,
         offset: Option<Expression>,
         limit: Option<Expression>,
     },
