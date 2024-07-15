@@ -82,6 +82,9 @@ impl Plan {
 }
 
 /// A query plan node. These return row iterators and can be nested.
+///
+/// TODO: try to get rid of the labels. Can they be reconstructed by walking
+/// down the node tree?
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
     /// Computes aggregate values for the given expressions and group_by buckets
@@ -95,7 +98,6 @@ pub enum Node {
     /// in-memory hashmap of the right source and looking up matches for each
     /// row in the left source. When outer is true (e.g. LEFT JOIN), a left row
     /// without a right match is emitted anyway, with NULLs for the right row.
-    /// TODO: do we need the labels?
     HashJoin {
         left: Box<Node>,
         left_field: usize,

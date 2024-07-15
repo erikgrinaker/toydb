@@ -196,6 +196,16 @@ a, TRUE, 2
 b, FALSE, 2
 b, TRUE, 1
 
+# Repeated GROUP BY column works.
+[plan]> SELECT "group", "group", "group", COUNT(*) FROM test GROUP BY "group", "group"
+---
+Projection: test.group, test.group, test.group, #1
+└─ Aggregate: group(group), count(TRUE)
+   └─ Scan: test
+NULL, NULL, NULL, 1
+a, a, a, 3
+b, b, b, 3
+
 # GROUP BY works with joins.
 [plan]> SELECT t.id % 2, COUNT(*) FROM test t JOIN other o ON t.id % 2 = o.id GROUP BY t.id % 2
 ---

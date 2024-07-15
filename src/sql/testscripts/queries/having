@@ -39,11 +39,9 @@ TRUE
 # Having works with an aggregate function, even if it's not in SELECT.
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
-Remap: #0, #1 (dropped: #2)
-└─ Filter: #2 > 10
-   └─ Projection: test.group, #1, #1
-      └─ Aggregate: group(group), max(int)
-         └─ Scan: test
+Filter: #1 > 10
+└─ Aggregate: group(group), max(int)
+   └─ Scan: test
 b, 42
 
 [plan]> SELECT "group" FROM test GROUP BY "group" HAVING MAX("int") > 10
@@ -56,11 +54,10 @@ b
 
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") - MIN("int") > 10
 ---
-Remap: #0, #1 (dropped: #2, #3)
-└─ Filter: #2 - #3 > 10
-   └─ Projection: test.group, #1, #1, #2
-      └─ Aggregate: group(group), max(int), min(int)
-         └─ Scan: test
+Remap: #0, #1 (dropped: #2)
+└─ Filter: #1 - #2 > 10
+   └─ Aggregate: group(group), max(int), min(int)
+      └─ Scan: test
 b, 42
 
 # Having works with SELECT aliases.
@@ -83,11 +80,10 @@ b, 3
 # Having works with compound expressions.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") / COUNT(*) > 3
 ---
-Remap: #0, #1 (dropped: #2, #3)
-└─ Filter: #2 / #3 > 3
-   └─ Projection: test.group, #1, #2, #1
-      └─ Aggregate: group(group), count(TRUE), max(int)
-         └─ Scan: test
+Remap: #0, #1 (dropped: #2)
+└─ Filter: #2 / #1 > 3
+   └─ Aggregate: group(group), count(TRUE), max(int)
+      └─ Scan: test
 b, 3
 
 # Having works with compound expressions using complex GROUP BY expressions

@@ -228,6 +228,14 @@ Aggregate: count(1), min(1), max(1), sum(1), avg(1)
 Error: invalid input: unexpected token ,
 Error: invalid input: field id must be used in an aggregate or GROUP BY expression
 
+# Repeated aggregates work.
+[plan]> SELECT MAX("int"), MAX("int"), MAX("int") FROM test
+---
+Projection: #0, #0, #0
+└─ Aggregate: max(int)
+   └─ Scan: test
+42, 42, 42
+
 # Aggregate can be expression, both inside and outside the aggregate.
 [plan]> SELECT SUM("int" * 10) / COUNT("int") + 7 FROM test WHERE "int" IS NOT NULL
 ---

@@ -472,11 +472,9 @@ Order: o.id desc, t.id asc
 # Order by aggregates, both when in SELECT and otherwise.
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Remap: #0, #1 (dropped: #2)
-└─ Order: #2 desc
-   └─ Projection: test.bool, #1, #1
-      └─ Aggregate: group(bool), max(int)
-         └─ Scan: test
+Order: #1 desc
+└─ Aggregate: group(bool), max(int)
+   └─ Scan: test
 NULL, 1000
 TRUE, 0
 FALSE, -1
@@ -493,11 +491,10 @@ FALSE
 
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") - MIN("int") DESC
 ---
-Remap: #0, #1 (dropped: #2, #3)
-└─ Order: #2 - #3 desc
-   └─ Projection: test.bool, #1, #1, #2
-      └─ Aggregate: group(bool), max(int), min(int)
-         └─ Scan: test
+Remap: #0, #1 (dropped: #2)
+└─ Order: #1 - #2 desc
+   └─ Aggregate: group(bool), max(int), min(int)
+      └─ Scan: test
 NULL, 1000
 FALSE, -1
 TRUE, 0

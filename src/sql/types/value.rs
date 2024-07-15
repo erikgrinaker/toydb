@@ -4,6 +4,7 @@ use crate::encoding;
 use crate::errdata;
 use crate::errinput;
 use crate::error::{Error, Result};
+use crate::sql::parser::ast;
 
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
@@ -412,6 +413,15 @@ impl Label {
         match self {
             Self::Qualified(_, column) | Self::Unqualified(column) => column.to_string(),
             Self::None => "?".to_string(),
+        }
+    }
+
+    /// Converts the label into an AST field expression.
+    pub fn into_ast_field(self) -> Option<ast::Expression> {
+        match self {
+            Label::Qualified(table, column) => Some(ast::Expression::Field(Some(table), column)),
+            Label::Unqualified(column) => Some(ast::Expression::Field(None, column)),
+            Label::None => None,
         }
     }
 
