@@ -240,3 +240,8 @@ Projection: #0 / #1 + 7
 !> SELECT MIN(MAX("int")) FROM test
 ---
 Error: invalid input: aggregate functions can't be nested
+
+# Can't mix aggregate and non-aggregate expressions.
+!> SELECT MAX("int") - "int" FROM test
+---
+Error: invalid input: field int must be used in an aggregate or GROUP BY expression

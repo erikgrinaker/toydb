@@ -127,7 +127,6 @@ Projection: #0
 Error: invalid input: aggregate functions can't be nested
 
 # Having errors on fields not in the SELECT or GROUP BY clauses.
-# TODO: improve the error message.
 !> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING id > 3
 ---
-Error: invalid input: unknown field id
+Error: invalid input: field id must be used in an aggregate or GROUP BY expression

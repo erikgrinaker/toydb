@@ -161,6 +161,20 @@ Aggregate: count(TRUE) group by id % 2
 0, 4
 1, 3
 
+# Can mix GROUP BY and aggregate expressions in SELECT.
+[plan]> SELECT MAX("int") + id % 2 FROM test GROUP BY id
+---
+Projection: #1 + test.id % 2
+└─ Aggregate: max(int) group by id
+   └─ Scan: test
+NULL
+0
+0
+4
+42
+8
+-1
+
 # GROUP BY can't use an aliased expression.
 !> SELECT id % 2 AS mod, COUNT(*) FROM test GROUP BY mod
 ---

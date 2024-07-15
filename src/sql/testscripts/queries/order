@@ -536,3 +536,8 @@ Projection: #0
 8
 1
 1
+
+# ORDER BY errors on fields not in the SELECT or GROUP BY clauses.
+!> SELECT "bool", COUNT(*) FROM test GROUP BY "bool" ORDER BY id
+---
+Error: invalid input: field id must be used in an aggregate or GROUP BY expression

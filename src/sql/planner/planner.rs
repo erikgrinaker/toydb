@@ -200,6 +200,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         if !select.is_empty() {
             let labels = select.iter().map(|(_, l)| Label::maybe_name(l.clone())).collect_vec();
             let mut expressions: Vec<_> = select
+                .clone() // TODO: avoid
                 .into_iter()
                 .map(|(e, _)| Self::build_expression(e, &scope))
                 .collect::<Result<_>>()?;
@@ -213,6 +214,16 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 self.build_hidden(&mut scope, &parent_scope, &mut expressions, expr);
             }
             hidden += expressions.len() - size;
+
+            // If the parent scope is an aggregate scope, then every projected
+            // column must also be an aggregate column by definition. Record them
+            // as such. build_hidden() already does this for hidden columns.
+            // TODO: clean this up.
+            if !parent_scope.aggregates.is_empty() {
+                for (i, expr) in select.into_iter().map(|(e, _)| e).enumerate() {
+                    scope.aggregates.entry(expr).or_insert(i);
+                }
+            }
 
             node = Node::Projection { source: Box::new(node), expressions, labels };
         };
