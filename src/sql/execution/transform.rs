@@ -65,3 +65,19 @@ pub(super) fn project(source: Rows, expressions: Vec<Expression>) -> Rows {
         r.and_then(|row| expressions.iter().map(|e| e.evaluate(Some(&row))).collect())
     }))
 }
+
+/// Remaps source columns to target column indexes, or drops them if None.
+pub(super) fn remap(source: Rows, targets: Vec<Option<usize>>) -> Rows {
+    let size = targets.iter().filter_map(|v| *v).map(|i| i + 1).max().unwrap_or(0);
+    Box::new(source.map(move |r| {
+        r.map(|row| {
+            let mut out = vec![Value::Null; size];
+            for (value, target) in row.into_iter().zip(&targets) {
+                if let Some(index) = target {
+                    out[*index] = value;
+                }
+            }
+            out
+        })
+    }))
+}

@@ -128,6 +128,9 @@ pub enum Node {
     /// Projects the input rows by evaluating the given expressions.
     /// The labels are only used when displaying the plan.
     Projection { source: Box<Node>, expressions: Vec<Expression>, labels: Vec<Label> },
+    /// Remaps source columns to the given target column index, or None to drop
+    /// the column. Unspecified target columns yield Value::Null.
+    Remap { source: Box<Node>, targets: Vec<Option<usize>> },
     /// A full table scan, with an optional filter pushdown. The schema is used
     /// during plan optimization. The alias is only used for formatting.
     Scan { table: Table, filter: Option<Expression>, alias: Option<String> },
@@ -186,6 +189,7 @@ impl Node {
             Self::Projection { source, labels, expressions } => {
                 Self::Projection { source: transform(source)?, labels, expressions }
             }
+            Self::Remap { source, targets } => Self::Remap { source: transform(source)?, targets },
 
             node @ (Self::IndexLookup { .. }
             | Self::KeyLookup { .. }
@@ -249,7 +253,8 @@ impl Node {
             | Self::NestedLoopJoin { predicate: None, .. }
             | Self::Nothing
             | Self::Offset { .. }
-            | Self::Scan { filter: None, .. }) => node,
+            | Self::Scan { filter: None, .. }
+            | Self::Remap { .. }) => node,
         })
     }
 
@@ -267,6 +272,9 @@ impl Node {
             Node::Offset { source, .. } => source.size(),
             Node::Order { source, .. } => source.size(),
             Node::Projection { expressions, .. } => expressions.len(),
+            Node::Remap { targets, .. } => {
+                targets.iter().filter_map(|v| *v).map(|i| i + 1).max().unwrap_or(0)
+            }
             Node::Scan { table, .. } => table.columns.len(),
             Node::Values { rows } => rows.first().map(|row| row.len()).unwrap_or(0),
         }
@@ -419,6 +427,22 @@ impl Node {
                 write!(f, "Projection: {}", expressions.iter().join(", "))?;
                 source.format(f, prefix, false, true)?;
             }
+            Self::Remap { source, targets } => {
+                let remap = remap_sources(targets)
+                    .into_iter()
+                    .map(|from| from.map(|from| format!("#{from}")).unwrap_or("Null".to_string()))
+                    .join(", ");
+                write!(f, "Remap: {remap}")?;
+                let dropped = targets
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, v)| v.is_none().then_some(format!("#{i}")))
+                    .join(", ");
+                if !dropped.is_empty() {
+                    write!(f, " (dropped: {dropped})")?;
+                }
+                source.format(f, prefix, false, true)?;
+            }
             Self::Scan { table, alias, filter } => {
                 write!(f, "Scan: {}", table.name)?;
                 if let Some(alias) = alias {
@@ -486,4 +510,17 @@ impl From<ast::Order> for Direction {
             ast::Order::Descending => Self::Descending,
         }
     }
+}
+
+/// Inverts a Remap targets vector to a vector of source indexes, with None
+/// for columns that weren't targeted.
+pub fn remap_sources(targets: &[Option<usize>]) -> Vec<Option<usize>> {
+    let size = targets.iter().filter_map(|v| *v).map(|i| i + 1).max().unwrap_or(0);
+    let mut sources = vec![None; size];
+    for (from, to) in targets.iter().enumerate() {
+        if let Some(to) = to {
+            sources[*to] = Some(from);
+        }
+    }
+    sources
 }

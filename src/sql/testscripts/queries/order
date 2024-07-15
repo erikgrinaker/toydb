@@ -258,7 +258,7 @@ Order: float ^ 2 asc
 # only result in one hidden column.
 [plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2)
 └─ Order: bool desc
    └─ Projection: id, int, bool
       └─ Scan: test
@@ -275,7 +275,7 @@ Projection: #0, #1
 
 [plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC, "bool" ASC
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2)
 └─ Order: bool desc, bool asc
    └─ Projection: id, int, bool
       └─ Scan: test
@@ -293,7 +293,7 @@ Projection: #0, #1
 # Can order on expressions on columns not in the result.
 [plan]> SELECT id FROM test ORDER BY "float" ^ 2 - "int" ^ 2 DESC
 ---
-Projection: #0
+Remap: #0 (dropped: #1, #2)
 └─ Order: float ^ 2 - int ^ 2 desc
    └─ Projection: id, float, int
       └─ Scan: test
@@ -373,7 +373,7 @@ Order: int desc
 
 [plan]> SELECT id AS "int" FROM test ORDER BY test."int" DESC
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Order: test.int desc
    └─ Projection: id, test.int
       └─ Scan: test
@@ -472,7 +472,7 @@ Order: o.id desc, t.id asc
 # Order by aggregates, both when in SELECT and otherwise.
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2)
 └─ Order: #2 desc
    └─ Projection: test.bool, #1, #1
       └─ Aggregate: max(int) group by bool
@@ -483,7 +483,7 @@ FALSE, -1
 
 [plan]> SELECT "bool" FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Order: #1 desc
    └─ Aggregate: max(int) group by bool
       └─ Scan: test
@@ -493,7 +493,7 @@ FALSE
 
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") - MIN("int") DESC
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2, #3)
 └─ Order: #2 - #3 desc
    └─ Projection: test.bool, #1, #1, #2
       └─ Aggregate: max(int), min(int) group by bool
@@ -506,7 +506,7 @@ TRUE, 0
 # that are not on the SELECT clause.
 [plan]> SELECT COUNT(*) FROM test GROUP BY id % 2 ORDER BY 2 - id % 2 + 1 > 1
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Order: 2 - #1 + 1 > 1 asc
    └─ Projection: #1, #0
       └─ Aggregate: count(TRUE) group by id % 2
@@ -517,7 +517,7 @@ Projection: #0
 # ORDER BY can use (un)qualified expressions for an (un)qualified GROUP BY.
 [plan]> SELECT COUNT(*) FROM test GROUP BY "bool" ORDER BY test."bool"
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Order: test.bool asc
    └─ Projection: #1, test.bool
       └─ Aggregate: count(TRUE) group by bool
@@ -528,7 +528,7 @@ Projection: #0
 
 [plan]> SELECT COUNT(*) FROM test GROUP BY test."bool" ORDER BY "bool"
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Order: bool asc
    └─ Projection: #1, bool
       └─ Aggregate: count(TRUE) group by test.bool

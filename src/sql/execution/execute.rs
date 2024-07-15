@@ -122,6 +122,11 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             Ok(transform::project(source, expressions))
         }
 
+        Node::Remap { source, targets } => {
+            let source = execute(*source, txn)?;
+            Ok(transform::remap(source, targets))
+        }
+
         Node::Scan { table, filter, alias: _ } => source::scan(txn, table, filter),
 
         Node::Values { rows } => Ok(source::values(rows)),

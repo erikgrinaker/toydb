@@ -1,5 +1,6 @@
 #![allow(clippy::module_inception)]
 
+use super::plan::remap_sources;
 use super::{Aggregate, Direction, Node, Plan};
 use crate::errinput;
 use crate::error::Result;
@@ -260,17 +261,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
             node = Node::Limit { source: Box::new(node), limit }
         }
 
-        // Add a final projection that removes hidden columns, only passing
-        // through the originally requested columns.
-        //
-        // TODO: add a separate plan node kind for this, and also use it for
-        // RIGHT JOIN projections.
-        let hidden = scope.remove_hidden();
-        if !hidden.is_empty() {
-            let size = node.size() - hidden.len();
-            let labels = vec![Label::None; size];
-            let expressions = (0..size).map(|i| Expression::Field(i, Label::None)).collect_vec();
-            node = Node::Projection { source: Box::new(node), labels, expressions }
+        // Remove any hidden columns before emitting the result.
+        if let Some(targets) = scope.remap_hidden() {
+            node = Node::Remap { source: Box::new(node), targets }
         }
 
         Ok(Plan::Select { root: node, labels: scope.columns })
@@ -317,8 +310,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             // A two-way join. The left or right nodes may be chained joins.
             ast::From::Join { mut left, mut right, r#type, predicate } => {
-                // Right joins are built as a left join with an additional
-                // projection to swap the resulting columns.
+                // Right joins are built as a left join then column swap.
                 if matches!(r#type, ast::JoinType::Right) {
                     (left, right) = (right, left)
                 }
@@ -333,15 +325,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let outer = r#type.is_outer();
                 let mut node = Node::NestedLoopJoin { left, right, predicate, outer };
 
-                // For right joins, build a projection to swap the columns.
+                // For right joins, swap the columns.
                 if matches!(r#type, ast::JoinType::Right) {
-                    let labels = vec![Label::None; left_size + right_size];
-                    let expressions = (left_size..left_size + right_size)
-                        .chain(0..left_size)
-                        .map(|i| Expression::Field(i, scope.get_label(i)))
-                        .collect_vec();
-                    scope = scope.project(&expressions, &labels)?;
-                    node = Node::Projection { source: Box::new(node), expressions, labels }
+                    let size = left_size + right_size;
+                    let targets = (0..size).map(|i| Some((i + right_size) % size)).collect_vec();
+                    scope = scope.remap(&targets);
+                    node = Node::Remap { source: Box::new(node), targets }
                 }
                 node
             }
@@ -749,25 +738,42 @@ impl Scope {
         }
     }
 
-    /// Removes hidden columns from the scope, returning their indexes.
-    fn remove_hidden(&mut self) -> HashSet<usize> {
+    /// Removes hidden columns from the scope, returning their indexes or None
+    /// if no columns are hidden.
+    fn remove_hidden(&mut self) -> Option<HashSet<usize>> {
         if self.hidden.is_empty() {
-            return HashSet::new();
+            return None;
         }
         let hidden = std::mem::take(&mut self.hidden);
-
         let mut index = 0;
         self.columns.retain(|_| {
             let is_hidden = hidden.contains(&index);
             index += 1;
             !is_hidden
         });
-
         self.qualified.retain(|_, index| !hidden.contains(index));
         self.unqualified.iter_mut().for_each(|(_, vec)| vec.retain(|i| !hidden.contains(i)));
         self.unqualified.retain(|_, vec| !vec.is_empty());
         self.aggregates.retain(|_, index| !hidden.contains(index));
-        hidden
+        Some(hidden)
+    }
+
+    /// Removes hidden columns from the scope and returns the remaining column
+    /// indexes as a Remap targets vector, or None if no columns are hidden. A
+    /// Remap targets vector maps parent column indexes to child column indexes,
+    /// or None if a column should be dropped.
+    fn remap_hidden(&mut self) -> Option<Vec<Option<usize>>> {
+        let size = self.columns.len();
+        let hidden = self.remove_hidden()?;
+        let mut targets = vec![None; size];
+        let mut index = 0;
+        for (old_index, target) in targets.iter_mut().enumerate() {
+            if !hidden.contains(&old_index) {
+                *target = Some(index);
+                index += 1;
+            }
+        }
+        Some(targets)
     }
 
     /// Merges two scopes, by appending the given scope to self.
@@ -817,5 +823,32 @@ impl Scope {
             }
         }
         Ok(new)
+    }
+
+    /// Passes the given column through from a parent scope.
+    fn add_column_from(&mut self, parent: &Scope, parent_index: usize) -> usize {
+        let label = parent.get_label(parent_index);
+        let index = self.add_column(label);
+        for (expr, i) in &parent.aggregates {
+            if *i == parent_index {
+                self.aggregates.entry(expr.clone()).or_insert(index);
+            }
+        }
+        if parent.hidden.contains(&parent_index) {
+            self.hidden.insert(index);
+        }
+        index
+    }
+
+    /// Remaps the scope using the given targets.
+    fn remap(&self, targets: &[Option<usize>]) -> Self {
+        let mut new = Scope::new();
+        new.tables = self.tables.clone();
+
+        for index in remap_sources(targets).into_iter().flatten() {
+            new.add_column_from(self, index);
+        }
+
+        new
     }
 }

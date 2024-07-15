@@ -39,7 +39,7 @@ TRUE
 # Having works with an aggregate function, even if it's not in SELECT.
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2)
 └─ Filter: #2 > 10
    └─ Projection: test.group, #1, #1
       └─ Aggregate: max(int) group by group
@@ -48,7 +48,7 @@ b, 42
 
 [plan]> SELECT "group" FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Filter: #1 > 10
    └─ Aggregate: max(int) group by group
       └─ Scan: test
@@ -56,7 +56,7 @@ b
 
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") - MIN("int") > 10
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2, #3)
 └─ Filter: #2 - #3 > 10
    └─ Projection: test.group, #1, #1, #2
       └─ Aggregate: max(int), min(int) group by group
@@ -74,7 +74,7 @@ b, 42
 # Having works with an aggregate function not in the SELECT clause.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2)
 └─ Filter: #2 > 10
    └─ Aggregate: count(TRUE), max(int) group by group
       └─ Scan: test
@@ -83,7 +83,7 @@ b, 3
 # Having works with compound expressions.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") / COUNT(*) > 3
 ---
-Projection: #0, #1
+Remap: #0, #1 (dropped: #2, #3)
 └─ Filter: #2 / #3 > 3
    └─ Projection: test.group, #1, #2, #1
       └─ Aggregate: count(TRUE), max(int) group by group
@@ -94,7 +94,7 @@ b, 3
 # that are not on the SELECT clause.
 [plan]> SELECT COUNT(*) FROM test GROUP BY id % 2 HAVING 2 - id % 2 + 1 > 1
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Filter: 2 - #1 + 1 > 1
    └─ Projection: #1, #0
       └─ Aggregate: count(TRUE) group by id % 2
@@ -105,7 +105,7 @@ Projection: #0
 # Having can use (un)qualified expressions for an (un)qualified GROUP BY.
 [plan]> SELECT COUNT(*) FROM test GROUP BY "group" HAVING test."group" = 'a'
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Filter: test.group = a
    └─ Projection: #1, test.group
       └─ Aggregate: count(TRUE) group by group
@@ -114,7 +114,7 @@ Projection: #0
 
 [plan]> SELECT COUNT(*) FROM test GROUP BY test."group" HAVING "group" = 'a'
 ---
-Projection: #0
+Remap: #0 (dropped: #1)
 └─ Filter: group = a
    └─ Projection: #1, group
       └─ Aggregate: count(TRUE) group by test.group
