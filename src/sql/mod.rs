@@ -126,7 +126,7 @@ mod tests {
                 }
                 let ast = Parser::new(input).parse()?;
                 let plan = self.session.with_txn(true, |txn| Planner::new(txn).build(ast))?;
-                let Plan::Select { mut root, labels: _ } = plan else {
+                let Plan::Select(mut root) = plan else {
                     return Err("can only use opt with SELECT plans".into());
                 };
 

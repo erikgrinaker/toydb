@@ -253,7 +253,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             node = Node::Remap { source: Box::new(node), targets }
         }
 
-        Ok(Plan::Select { root: node, labels: scope.columns })
+        Ok(Plan::Select(node))
     }
 
     /// Builds a FROM clause consisting of one or more items. Each item is
@@ -537,8 +537,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
 }
 
 /// A scope maps column/table names to input column indexes, for lookups during
-/// expression construction. It also tracks output column names, aggregate and
-/// GROUP BY expressions, and hidden columns.
+/// expression construction. It also tracks aggregate and GROUP BY expressions,
+/// as well as hidden columns.
 ///
 /// Expression evaluation generally happens in the context of an input row. This
 /// row may come directly from a single table, or it may be the result of a long

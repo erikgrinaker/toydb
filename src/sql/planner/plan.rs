@@ -36,8 +36,8 @@ pub enum Plan {
     /// in source must be complete, existing rows from the table to update.
     Update { table: Table, primary_key: usize, source: Node, expressions: Vec<(usize, Expression)> },
     /// A SELECT plan. Recursively executes the query plan tree and returns the
-    /// resulting rows. Also includes the output column labels.
-    Select { root: Node, labels: Vec<Label> },
+    /// resulting rows.
+    Select(Node),
 }
 
 impl Plan {
@@ -67,7 +67,7 @@ impl Plan {
             Self::Update { table, primary_key, source, expressions } => {
                 Self::Update { table, primary_key, source: optimize(source)?, expressions }
             }
-            Self::Select { root, labels } => Self::Select { root: optimize(root)?, labels },
+            Self::Select(root) => Self::Select(optimize(root)?),
         })
     }
 }
@@ -379,7 +379,7 @@ impl std::fmt::Display for Plan {
                 write!(f, "Update: {table} ({expressions})")?;
                 source.format(f, String::new(), false, true)
             }
-            Self::Select { root, .. } => root.fmt(f),
+            Self::Select(root) => root.fmt(f),
         }
     }
 }

@@ -41,7 +41,8 @@ pub fn execute_plan(
             ExecutionResult::Insert { count }
         }
 
-        Plan::Select { root, labels } => {
+        Plan::Select(root) => {
+            let labels = (0..root.size()).map(|i| root.column_label(i)).collect();
             let iter = execute(root, txn)?;
             ExecutionResult::Select { rows: iter, labels }
         }
