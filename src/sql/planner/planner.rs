@@ -184,7 +184,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // verify that they're all used in GROUP BY as well.
             if select.is_empty() {
                 select = (0..node.size())
-                    .map(|i| (scope.get_label(i).into_ast_field().expect("no FROM label"), None))
+                    .map(|i| (node.column_label(i).into_ast_field().expect("no FROM label"), None))
                     .collect();
             }
             node = self.build_aggregate(&mut scope, node, group_by, aggregates)?;
@@ -649,11 +649,6 @@ impl Scope {
         errinput!("unknown field {}", fmtname())
     }
 
-    /// Fetches a column label by index, or Label::None if it doesn't exist.
-    fn get_label(&self, index: usize) -> Label {
-        self.columns.get(index).cloned().unwrap_or(Label::None)
-    }
-
     /// Adds an aggregate expression to the scope, returning the new column
     /// index or None if the expression already exists. This is either an
     /// aggregate function or a GROUP BY expression. It is used to look up the
@@ -669,7 +664,7 @@ impl Scope {
         if let ast::Expression::Field(table, column) = expr {
             // Ignore errors, they will be emitted when building the expression.
             if let Ok(index) = parent.lookup_column(table.as_deref(), column.as_str()) {
-                label = parent.get_label(index);
+                label = parent.columns[index].clone();
             }
         }
 
@@ -687,7 +682,7 @@ impl Scope {
     /// Adds a column that passes through a column from the parent scope,
     /// retaining its properties. If hide is true, the column is hidden.
     fn add_passthrough(&mut self, parent: &Scope, parent_index: usize, hide: bool) -> usize {
-        let label = parent.get_label(parent_index);
+        let label = parent.columns[parent_index].clone();
         let index = self.add_column(label);
         for (expr, i) in &parent.aggregates {
             if *i == parent_index {
@@ -735,7 +730,7 @@ impl Scope {
             } else if let ast::Expression::Field(table, column) = expr {
                 // Ignore errors, they will be surfaced by build_expression().
                 if let Ok(index) = self.lookup_column(table.as_deref(), column.as_str()) {
-                    label = self.get_label(index);
+                    label = self.columns[index].clone();
                 }
             }
 
