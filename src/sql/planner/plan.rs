@@ -251,25 +251,115 @@ impl Node {
         })
     }
 
-    /// Returns the size of the node, i.e. the column width.
+    /// Returns the table name of the node, if any. Only used for display purposes.
+    pub fn name(&self) -> Option<String> {
+        match self {
+            // These nodes are the ones that actually provide names.
+            Self::IndexLookup { table, alias, .. }
+            | Self::KeyLookup { table, alias, .. }
+            | Self::Scan { table, alias, .. } => match alias {
+                Some(alias) => Some(alias.clone()),
+                None => Some(table.name.clone()),
+            },
+
+            // Most nodes just pass through the name from the source.
+            Self::Aggregate { source, .. }
+            | Self::Filter { source, .. }
+            | Self::Limit { source, .. }
+            | Self::Offset { source, .. }
+            | Self::Order { source, .. }
+            | Self::Projection { source, .. }
+            | Self::Remap { source, .. } => source.name(),
+
+            // Some can't have names.
+            Self::HashJoin { .. }
+            | Self::NestedLoopJoin { .. }
+            | Self::Nothing
+            | Self::Values { .. } => None,
+        }
+    }
+
+    /// Returns a label for a column, if any. Only used for display purposes.
+    pub fn column_label(&self, index: usize) -> Label {
+        match self {
+            // Source nodes use the table/column name, calling name() to handle
+            // any aliases.
+            Self::IndexLookup { table, .. }
+            | Self::KeyLookup { table, .. }
+            | Self::Scan { table, .. } => {
+                Label::maybe_qualified(self.name(), table.columns[index].name.clone())
+            }
+
+            // Some nodes rearrange columns. Route them to the correct
+            // upstream column where appropriate.
+            Self::Aggregate { source, group_by, .. } => match group_by.get(index) {
+                Some(Expression::Field(index, _)) => source.column_label(*index),
+                Some(_) | None => Label::None,
+            },
+            Self::Projection { source, expressions, aliases } => match aliases.get(index) {
+                Some(Label::None) | None => match expressions.get(index) {
+                    // Unaliased field references route to the source.
+                    Some(Expression::Field(index, _)) => source.column_label(*index),
+                    // Unaliased expressions don't have a name.
+                    Some(_) | None => Label::None,
+                },
+                Some(alias) => alias.clone(),
+            },
+            Self::Remap { source, targets } => targets
+                .iter()
+                .position(|t| t == &Some(index))
+                .map(|i| source.column_label(i))
+                .unwrap_or(Label::None),
+
+            // Joins dispatch to the appropriate source.
+            Self::HashJoin { left, right, .. } | Self::NestedLoopJoin { left, right, .. } => {
+                if index < left.size() {
+                    left.column_label(index)
+                } else {
+                    right.column_label(index - left.size())
+                }
+            }
+
+            // Simple nodes just dispatch to the source.
+            Self::Filter { source, .. }
+            | Self::Limit { source, .. }
+            | Self::Offset { source, .. }
+            | Self::Order { source, .. } => source.column_label(index),
+
+            // And some don't have any names at all.
+            Self::Nothing | Self::Values { .. } => Label::None,
+        }
+    }
+
+    /// Returns the size of the node, i.e. the number of columns.
     pub fn size(&self) -> usize {
-        match &self {
-            Node::Aggregate { aggregates, group_by, .. } => aggregates.len() + group_by.len(),
-            Node::Filter { source, .. } => source.size(),
-            Node::HashJoin { left, right, .. } => left.size() + right.size(),
-            Node::IndexLookup { table, .. } => table.columns.len(),
-            Node::KeyLookup { table, .. } => table.columns.len(),
-            Node::Limit { source, .. } => source.size(),
-            Node::NestedLoopJoin { left, right, .. } => left.size() + right.size(),
-            Node::Nothing => 0,
-            Node::Offset { source, .. } => source.size(),
-            Node::Order { source, .. } => source.size(),
-            Node::Projection { expressions, .. } => expressions.len(),
-            Node::Remap { targets, .. } => {
+        match self {
+            // Source nodes emit all table columns.
+            Self::IndexLookup { table, .. }
+            | Self::KeyLookup { table, .. }
+            | Self::Scan { table, .. } => table.columns.len(),
+
+            // Some nodes modify the column set.
+            Self::Aggregate { aggregates, group_by, .. } => aggregates.len() + group_by.len(),
+            Self::Projection { expressions, .. } => expressions.len(),
+            Self::Remap { targets, .. } => {
                 targets.iter().filter_map(|v| *v).map(|i| i + 1).max().unwrap_or(0)
             }
-            Node::Scan { table, .. } => table.columns.len(),
-            Node::Values { rows } => rows.first().map(|row| row.len()).unwrap_or(0),
+
+            // Join nodes emit the combined columns.
+            Self::HashJoin { left, right, .. } | Self::NestedLoopJoin { left, right, .. } => {
+                left.size() + right.size()
+            }
+
+            // Simple nodes just pass through the source columns.
+            Self::Filter { source, .. }
+            | Self::Limit { source, .. }
+            | Self::Offset { source, .. }
+            | Self::Order { source, .. } => source.size(),
+
+            // And some are trivial.
+            Self::Nothing => 0,
+            Self::Values { rows } => rows.first().map(|row| row.len()).unwrap_or(0),
         }
     }
 }
