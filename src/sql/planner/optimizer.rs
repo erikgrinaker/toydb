@@ -260,28 +260,16 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
             predicate: Some(Expression::Equal(lhs, rhs)),
             outer,
         } => match (*lhs, *rhs) {
-            (
-                Expression::Field(mut left_field, mut left_label),
-                Expression::Field(mut right_field, mut right_label),
-            ) => {
+            (Expression::Field(mut left_field, _), Expression::Field(mut right_field, _)) => {
                 // The LHS field may be a field in the right table; swap them.
                 if right_field < left_field {
                     (left_field, right_field) = (right_field, left_field);
-                    (left_label, right_label) = (right_label, left_label);
                 }
                 // The NestedLoopJoin predicate uses field indexes in the joined
                 // row, while the HashJoin uses field indexes for each table
                 // individually. Adjust the RHS field reference.
                 right_field -= left.size();
-                Node::HashJoin {
-                    left,
-                    left_field,
-                    left_label,
-                    right,
-                    right_field,
-                    right_label,
-                    outer,
-                }
+                Node::HashJoin { left, left_field, right, right_field, outer }
             }
             (lhs, rhs) => {
                 let predicate = Some(Expression::Equal(lhs.into(), rhs.into()));

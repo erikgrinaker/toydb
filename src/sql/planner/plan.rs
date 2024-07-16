@@ -92,10 +92,8 @@ pub enum Node {
     HashJoin {
         left: Box<Node>,
         left_field: usize,
-        left_label: Label,
         right: Box<Node>,
         right_field: usize,
-        right_label: Label,
         outer: bool,
     },
     /// Looks up the given values in a secondary index and emits matching rows.
@@ -153,21 +151,11 @@ impl Node {
             Self::Filter { source, predicate } => {
                 Self::Filter { source: transform(source)?, predicate }
             }
-            Self::HashJoin {
-                left,
-                left_field,
-                left_label,
-                right,
-                right_field,
-                right_label,
-                outer,
-            } => Self::HashJoin {
+            Self::HashJoin { left, left_field, right, right_field, outer } => Self::HashJoin {
                 left: transform(left)?,
                 left_field,
-                left_label,
                 right: transform(right)?,
                 right_field,
-                right_label,
                 outer,
             },
             Self::Limit { source, limit } => Self::Limit { source: transform(source)?, limit },
@@ -441,22 +429,13 @@ impl Node {
                 write!(f, "Filter: {predicate}")?;
                 source.format(f, prefix, false, true)?;
             }
-            Self::HashJoin {
-                left,
-                left_field,
-                left_label,
-                right,
-                right_field,
-                right_label,
-                outer,
-                ..
-            } => {
+            Self::HashJoin { left, left_field, right, right_field, outer } => {
                 let kind = if *outer { "outer" } else { "inner" };
-                let left_label = match left_label {
+                let left_label = match left.column_label(*left_field) {
                     Label::None => format!("left #{left_field}"),
                     label => format!("{label}"),
                 };
-                let right_label = match right_label {
+                let right_label = match right.column_label(*right_field) {
                     Label::None => format!("right #{right_field}"),
                     label => format!("{label}"),
                 };

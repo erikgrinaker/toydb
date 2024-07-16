@@ -69,15 +69,7 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             Ok(transform::filter(source, predicate))
         }
 
-        Node::HashJoin {
-            left,
-            left_field,
-            left_label: _,
-            right,
-            right_field,
-            right_label: _,
-            outer,
-        } => {
+        Node::HashJoin { left, left_field, right, right_field, outer } => {
             let right_size = right.size();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
