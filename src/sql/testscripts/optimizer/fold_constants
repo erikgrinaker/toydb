@@ -104,10 +104,10 @@ Initial:
 [opt]> SELECT 2*2 + id - 3 * 2 FROM test
 ---
 Initial:
-   Projection: 2 * 2 + id - 3 * 2
+   Projection: 2 * 2 + test.id - 3 * 2
    └─ Scan: test
 Constant folding:
-   Projection: 4 + id - 6
+   Projection: 4 + test.id - 6
    └─ Scan: test
 -1
 0
@@ -117,7 +117,7 @@ Constant folding:
 [opt]> SELECT * FROM test WHERE 1+1 > 1 OR id > 1
 ---
 Initial:
-   Filter: 1 + 1 > 1 OR id > 1
+   Filter: 1 + 1 > 1 OR test.id > 1
    └─ Scan: test
 Constant folding:
    Filter: TRUE
@@ -133,33 +133,33 @@ Short circuit:
 [opt]> SELECT * FROM test WHERE 1+1 < 1 OR id > 1
 ---
 Initial:
-   Filter: 1 + 1 < 1 OR id > 1
+   Filter: 1 + 1 < 1 OR test.id > 1
    └─ Scan: test
 Constant folding:
-   Filter: id > 1
+   Filter: test.id > 1
    └─ Scan: test
 Filter pushdown:
-   Scan: test (id > 1)
+   Scan: test (test.id > 1)
 2, b
 3, c
 
 [opt]> SELECT * FROM test WHERE 1+1 > 1 AND id > 1
 ---
 Initial:
-   Filter: 1 + 1 > 1 AND id > 1
+   Filter: 1 + 1 > 1 AND test.id > 1
    └─ Scan: test
 Constant folding:
-   Filter: id > 1
+   Filter: test.id > 1
    └─ Scan: test
 Filter pushdown:
-   Scan: test (id > 1)
+   Scan: test (test.id > 1)
 2, b
 3, c
 
 [opt]> SELECT * FROM test WHERE 1+1 < 1 AND id > 1
 ---
 Initial:
-   Filter: 1 + 1 < 1 AND id > 1
+   Filter: 1 + 1 < 1 AND test.id > 1
    └─ Scan: test
 Constant folding:
    Filter: FALSE

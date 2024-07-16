@@ -40,7 +40,7 @@ TRUE
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
 Filter: #1 > 10
-└─ Aggregate: group(group), max(int)
+└─ Aggregate: group(test.group), max(test.int)
    └─ Scan: test
 b, 42
 
@@ -48,7 +48,7 @@ b, 42
 ---
 Remap: #0 (dropped: #1)
 └─ Filter: #1 > 10
-   └─ Aggregate: group(group), max(int)
+   └─ Aggregate: group(test.group), max(test.int)
       └─ Scan: test
 b
 
@@ -56,7 +56,7 @@ b
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Filter: #1 - #2 > 10
-   └─ Aggregate: group(group), max(int), min(int)
+   └─ Aggregate: group(test.group), max(test.int), min(test.int)
       └─ Scan: test
 b, 42
 
@@ -64,7 +64,7 @@ b, 42
 [plan]> SELECT "group", MAX("int") AS m FROM test GROUP BY "group" HAVING m > 10
 ---
 Filter: m > 10
-└─ Aggregate: group(group), max(int)
+└─ Aggregate: group(test.group), max(test.int)
    └─ Scan: test
 b, 42
 
@@ -73,7 +73,7 @@ b, 42
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Filter: #2 > 10
-   └─ Aggregate: group(group), count(TRUE), max(int)
+   └─ Aggregate: group(test.group), count(TRUE), max(test.int)
       └─ Scan: test
 b, 3
 
@@ -82,7 +82,7 @@ b, 3
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Filter: #2 / #1 > 3
-   └─ Aggregate: group(group), count(TRUE), max(int)
+   └─ Aggregate: group(test.group), count(TRUE), max(test.int)
       └─ Scan: test
 b, 3
 
@@ -93,7 +93,7 @@ b, 3
 Remap: #0 (dropped: #1)
 └─ Filter: 2 - #1 + 1 > 1
    └─ Projection: #1, #0
-      └─ Aggregate: group(id % 2), count(TRUE)
+      └─ Aggregate: group(test.id % 2), count(TRUE)
          └─ Scan: test
 4
 3
@@ -104,15 +104,15 @@ Remap: #0 (dropped: #1)
 Remap: #0 (dropped: #1)
 └─ Filter: test.group = a
    └─ Projection: #1, test.group
-      └─ Aggregate: group(group), count(TRUE)
+      └─ Aggregate: group(test.group), count(TRUE)
          └─ Scan: test
 3
 
 [plan]> SELECT COUNT(*) FROM test GROUP BY test."group" HAVING "group" = 'a'
 ---
 Remap: #0 (dropped: #1)
-└─ Filter: group = a
-   └─ Projection: #1, group
+└─ Filter: test.group = a
+   └─ Projection: #1, test.group
       └─ Aggregate: group(test.group), count(TRUE)
          └─ Scan: test
 3

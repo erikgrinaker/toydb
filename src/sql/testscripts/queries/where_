@@ -28,13 +28,13 @@ Nothing
 # Field predicate expressions work as expected.
 [plan]> SELECT * FROM test WHERE id > 1
 ---
-Scan: test (id > 1)
+Scan: test (test.id > 1)
 2, b
 3, c
 
 [plan]> SELECT * FROM test WHERE id > 1 AND value < 'c'
 ---
-Scan: test (id > 1 AND value < c)
+Scan: test (test.id > 1 AND test.value < c)
 2, b
 
 # Errors on non-boolean type.

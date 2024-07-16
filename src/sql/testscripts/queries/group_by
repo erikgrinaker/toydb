@@ -25,13 +25,13 @@ ok
 [plan]> SELECT COUNT(id), MIN(id), MAX(id), SUM(id), AVG(id) FROM test WHERE FALSE GROUP BY id
 ---
 Projection: #1, #2, #3, #4, #5
-└─ Aggregate: group(id), count(id), min(id), max(id), sum(id), avg(id)
+└─ Aggregate: group(test.id), count(test.id), min(test.id), max(test.id), sum(test.id), avg(test.id)
    └─ Nothing
 
 # Simple GROUP BY, including NULL group.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group"
 ---
-Aggregate: group(group), count(TRUE)
+Aggregate: group(test.group), count(TRUE)
 └─ Scan: test
 NULL, 1
 a, 3
@@ -40,7 +40,7 @@ b, 3
 [plan]> SELECT "group", COUNT(*), MIN("bool"), MAX("string"), SUM("int"), AVG("float") \
     FROM test GROUP BY "group"
 ---
-Aggregate: group(group), count(TRUE), min(bool), max(string), sum(int), avg(float)
+Aggregate: group(test.group), count(TRUE), min(test.bool), max(test.string), sum(test.int), avg(test.float)
 └─ Scan: test
 NULL, 1, NULL, NULL, NULL, NULL
 a, 3, FALSE, AB, 9, NaN
@@ -49,7 +49,7 @@ b, 3, FALSE, 👋, 41, NaN
 # GROUP BY works on booleans.
 [plan]> SELECT "bool", COUNT(*) FROM test GROUP BY "bool"
 ---
-Aggregate: group(bool), count(TRUE)
+Aggregate: group(test.bool), count(TRUE)
 └─ Scan: test
 NULL, 1
 FALSE, 3
@@ -58,7 +58,7 @@ TRUE, 3
 # GROUP BY works on integers.
 [plan]> SELECT "int", COUNT(*) FROM test GROUP BY "int"
 ---
-Aggregate: group(int), count(TRUE)
+Aggregate: group(test.int), count(TRUE)
 └─ Scan: test
 NULL, 1
 -1, 2
@@ -70,7 +70,7 @@ NULL, 1
 # GROUP BY works with floats, including a NAN group and -0.0 and 0.0 being equal.
 [plan]> SELECT "float", COUNT(*) FROM test GROUP BY "float"
 ---
-Aggregate: group(float), count(TRUE)
+Aggregate: group(test.float), count(TRUE)
 └─ Scan: test
 NULL, 1
 0, 2
@@ -81,7 +81,7 @@ NaN, 2
 # GROUP BY works on strings.
 [plan]> SELECT "string", COUNT(*) FROM test GROUP BY "string"
 ---
-Aggregate: group(string), count(TRUE)
+Aggregate: group(test.string), count(TRUE)
 └─ Scan: test
 NULL, 1
 , 2
@@ -93,7 +93,7 @@ abc, 2
 [plan]> SELECT COUNT(*) FROM test GROUP BY "group"
 ---
 Projection: #1
-└─ Aggregate: group(group), count(TRUE)
+└─ Aggregate: group(test.group), count(TRUE)
    └─ Scan: test
 1
 3
@@ -102,7 +102,7 @@ Projection: #1
 # GROUP BY works when there is no aggregate function.
 [plan]> SELECT "group" FROM test GROUP BY "group"
 ---
-Aggregate: group(group)
+Aggregate: group(test.group)
 └─ Scan: test
 NULL
 a
@@ -148,7 +148,7 @@ Projection: #1
 [plan]> SELECT COUNT(*) FROM test GROUP BY id % 2
 ---
 Projection: #1
-└─ Aggregate: group(id % 2), count(TRUE)
+└─ Aggregate: group(test.id % 2), count(TRUE)
    └─ Scan: test
 4
 3
@@ -156,7 +156,7 @@ Projection: #1
 # GROUP BY can use an expression also used in the SELECT.
 [plan]> SELECT id % 2, COUNT(*) FROM test GROUP BY id % 2
 ---
-Aggregate: group(id % 2), count(TRUE)
+Aggregate: group(test.id % 2), count(TRUE)
 └─ Scan: test
 0, 4
 1, 3
@@ -165,7 +165,7 @@ Aggregate: group(id % 2), count(TRUE)
 [plan]> SELECT MAX("int") + id % 2 FROM test GROUP BY id
 ---
 Projection: #1 + test.id % 2
-└─ Aggregate: group(id), max(int)
+└─ Aggregate: group(test.id), max(test.int)
    └─ Scan: test
 NULL
 0
@@ -188,7 +188,7 @@ Error: invalid input: unknown function min
 # GROUP BY works with multiple groups.
 [plan]> SELECT "group", "bool", COUNT(*) FROM test GROUP BY "group", "bool"
 ---
-Aggregate: group(group), group(bool), count(TRUE)
+Aggregate: group(test.group), group(test.bool), count(TRUE)
 └─ Scan: test
 NULL, NULL, 1
 a, FALSE, 1
@@ -200,7 +200,7 @@ b, TRUE, 1
 [plan]> SELECT "group", "group", "group", COUNT(*) FROM test GROUP BY "group", "group"
 ---
 Projection: test.group, test.group, test.group, #1
-└─ Aggregate: group(group), count(TRUE)
+└─ Aggregate: group(test.group), count(TRUE)
    └─ Scan: test
 NULL, NULL, NULL, 1
 a, a, a, 3
@@ -222,7 +222,7 @@ Error: invalid input: field test.group must be used in an aggregate or GROUP BY 
 
 [plan]> SELECT * FROM test GROUP BY id, "group", "bool", "int", "float", "string"
 ---
-Aggregate: group(id), group(group), group(bool), group(int), group(float), group(string)
+Aggregate: group(test.id), group(test.group), group(test.bool), group(test.int), group(test.float), group(test.string)
 └─ Scan: test
 0, NULL, NULL, NULL, NULL, NULL
 1, a, TRUE, -1, 3.14, 
@@ -235,7 +235,7 @@ Aggregate: group(id), group(group), group(bool), group(int), group(float), group
 [plan]> SELECT * FROM test GROUP BY "bool", "int", "float", "string", "group", id
 ---
 Projection: test.id, test.group, test.bool, test.int, test.float, test.string
-└─ Aggregate: group(bool), group(int), group(float), group(string), group(group), group(id)
+└─ Aggregate: group(test.bool), group(test.int), group(test.float), group(test.string), group(test.group), group(test.id)
    └─ Scan: test
 0, NULL, NULL, NULL, NULL, NULL
 6, b, FALSE, -1, 0, abc

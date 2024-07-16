@@ -34,14 +34,14 @@ Aggregate: count(NULL), count(TRUE), count(1), count(3.14), count(NaN), count()
 # COUNT works on no rows.
 [plan]> SELECT COUNT(id), COUNT("bool"), COUNT("float"), COUNT("string") FROM test WHERE false
 ---
-Aggregate: count(id), count(bool), count(float), count(string)
+Aggregate: count(test.id), count(test.bool), count(test.float), count(test.string)
 └─ Nothing
 0, 0, 0, 0
 
 # COUNT returns number of non-NULL values.
 [plan,header]> SELECT COUNT(id), COUNT("bool"), COUNT("float"), COUNT("string") FROM test
 ---
-Aggregate: count(id), count(bool), count(float), count(string)
+Aggregate: count(test.id), count(test.bool), count(test.float), count(test.string)
 └─ Scan: test
 , , , 
 6, 3, 5, 4
@@ -56,14 +56,14 @@ NULL, TRUE, 1, 3.14, NaN, foo
 # MAX works on no rows.
 [plan]> SELECT MAX(id), MAX("bool"), MAX("float"), MAX("string") FROM test WHERE false
 ---
-Aggregate: max(id), max(bool), max(float), max(string)
+Aggregate: max(test.id), max(test.bool), max(test.float), max(test.string)
 └─ Nothing
 NULL, NULL, NULL, NULL
 
 # MAX returns the max value, or NULL if any value is NULL.
 [plan]> SELECT MAX(id) FROM test
 ---
-Aggregate: max(id)
+Aggregate: max(test.id)
 └─ Scan: test
 5
 
@@ -95,14 +95,14 @@ NULL, TRUE, 1, 3.14, NaN, foo
 # MIN works on no rows.
 [plan]> SELECT MIN(id), MIN("bool"), MIN("float"), MIN("string") FROM test WHERE false
 ---
-Aggregate: min(id), min(bool), min(float), min(string)
+Aggregate: min(test.id), min(test.bool), min(test.float), min(test.string)
 └─ Nothing
 NULL, NULL, NULL, NULL
 
 # MIN returns the min value, or NULL if any value is NULL.
 [plan]> SELECT MIN(id) FROM test
 ---
-Aggregate: min(id)
+Aggregate: min(test.id)
 └─ Scan: test
 0
 
@@ -138,7 +138,7 @@ Error: invalid input: can't add 0 and foo
 # SUM works on no rows.
 [plan]> SELECT SUM(id), SUM("bool"), SUM("float"), SUM("string") FROM test WHERE false
 ---
-Aggregate: sum(id), sum(bool), sum(float), sum(string)
+Aggregate: sum(test.id), sum(test.bool), sum(test.float), sum(test.string)
 └─ Nothing
 NULL, NULL, NULL, NULL
 
@@ -146,7 +146,7 @@ NULL, NULL, NULL, NULL
 # on booleans or strings.
 [plan]> SELECT SUM(id) FROM test
 ---
-Aggregate: sum(id)
+Aggregate: sum(test.id)
 └─ Scan: test
 15
 
@@ -184,7 +184,7 @@ Error: invalid input: can't add 0 and foo
 # AVG works on no rows.
 [plan]> SELECT AVG(id), AVG("bool"), AVG("float"), AVG("string") FROM test WHERE false
 ---
-Aggregate: avg(id), avg(bool), avg(float), avg(string)
+Aggregate: avg(test.id), avg(test.bool), avg(test.float), avg(test.string)
 └─ Nothing
 NULL, NULL, NULL, NULL
 
@@ -192,7 +192,7 @@ NULL, NULL, NULL, NULL
 # on booleans or strings.
 [plan]> SELECT AVG(id) FROM test
 ---
-Aggregate: avg(id)
+Aggregate: avg(test.id)
 └─ Scan: test
 2
 
@@ -232,7 +232,7 @@ Error: invalid input: field id must be used in an aggregate or GROUP BY expressi
 [plan]> SELECT MAX("int"), MAX("int"), MAX("int") FROM test
 ---
 Projection: #0, #0, #0
-└─ Aggregate: max(int)
+└─ Aggregate: max(test.int)
    └─ Scan: test
 42, 42, 42
 
@@ -240,8 +240,8 @@ Projection: #0, #0, #0
 [plan]> SELECT SUM("int" * 10) / COUNT("int") + 7 FROM test WHERE "int" IS NOT NULL
 ---
 Projection: #0 / #1 + 7
-└─ Aggregate: sum(int * 10), count(int)
-   └─ Scan: test (NOT int IS NULL)
+└─ Aggregate: sum(test.int * 10), count(test.int)
+   └─ Scan: test (NOT test.int IS NULL)
 117
 
 # Aggregate functions can't be nested.

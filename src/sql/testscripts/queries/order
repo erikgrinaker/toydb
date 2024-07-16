@@ -43,7 +43,7 @@ Order: value desc
 # Order by primary key.
 [plan]> SELECT * FROM test ORDER BY id ASC
 ---
-Order: id asc
+Order: test.id asc
 └─ Scan: test
 0, NULL, NULL, NULL, NULL, 1
 1, TRUE, 0, 3.14, a, 1
@@ -58,7 +58,7 @@ Order: id asc
 
 [plan]> SELECT * FROM test ORDER BY id DESC
 ---
-Order: id desc
+Order: test.id desc
 └─ Scan: test
 9, NULL, NULL, NULL, 👍, 1
 8, NULL, NULL, NULL, B, 1
@@ -240,8 +240,8 @@ Order: id desc
 # Can order by expressions.
 [plan]> SELECT id, "float" FROM test ORDER BY "float" ^ 2
 ---
-Order: float ^ 2 asc
-└─ Projection: id, float
+Order: test.float ^ 2 asc
+└─ Projection: test.id, test.float
    └─ Scan: test
 0, NULL
 8, NULL
@@ -259,8 +259,8 @@ Order: float ^ 2 asc
 [plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC
 ---
 Remap: #0, #1 (dropped: #2)
-└─ Order: bool desc
-   └─ Projection: id, int, bool
+└─ Order: test.bool desc
+   └─ Projection: test.id, test.int, test.bool
       └─ Scan: test
 1, 0
 2, -1
@@ -276,8 +276,8 @@ Remap: #0, #1 (dropped: #2)
 [plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC, "bool" ASC
 ---
 Remap: #0, #1 (dropped: #2)
-└─ Order: bool desc, bool asc
-   └─ Projection: id, int, bool
+└─ Order: test.bool desc, test.bool asc
+   └─ Projection: test.id, test.int, test.bool
       └─ Scan: test
 1, 0
 2, -1
@@ -294,8 +294,8 @@ Remap: #0, #1 (dropped: #2)
 [plan]> SELECT id FROM test ORDER BY "float" ^ 2 - "int" ^ 2 DESC
 ---
 Remap: #0 (dropped: #1, #2)
-└─ Order: float ^ 2 - int ^ 2 desc
-   └─ Projection: id, float, int
+└─ Order: test.float ^ 2 - test.int ^ 2 desc
+   └─ Projection: test.id, test.float, test.int
       └─ Scan: test
 7
 5
@@ -358,7 +358,7 @@ Error: invalid input: ambiguous field foo
 [plan]> SELECT id AS "int" FROM test ORDER BY "int" DESC
 ---
 Order: int desc
-└─ Projection: id as int
+└─ Projection: test.id as int
    └─ Scan: test
 9
 8
@@ -375,7 +375,7 @@ Order: int desc
 ---
 Remap: #0 (dropped: #1)
 └─ Order: test.int desc
-   └─ Projection: id as int, test.int
+   └─ Projection: test.id as int, test.int
       └─ Scan: test
 4
 6
@@ -473,7 +473,7 @@ Order: o.id desc, t.id asc
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
 Order: #1 desc
-└─ Aggregate: group(bool), max(int)
+└─ Aggregate: group(test.bool), max(test.int)
    └─ Scan: test
 NULL, 1000
 TRUE, 0
@@ -483,7 +483,7 @@ FALSE, -1
 ---
 Remap: #0 (dropped: #1)
 └─ Order: #1 desc
-   └─ Aggregate: group(bool), max(int)
+   └─ Aggregate: group(test.bool), max(test.int)
       └─ Scan: test
 NULL
 TRUE
@@ -493,7 +493,7 @@ FALSE
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Order: #1 - #2 desc
-   └─ Aggregate: group(bool), max(int), min(int)
+   └─ Aggregate: group(test.bool), max(test.int), min(test.int)
       └─ Scan: test
 NULL, 1000
 FALSE, -1
@@ -506,7 +506,7 @@ TRUE, 0
 Remap: #0 (dropped: #1)
 └─ Order: 2 - #1 + 1 > 1 asc
    └─ Projection: #1, #0
-      └─ Aggregate: group(id % 2), count(TRUE)
+      └─ Aggregate: group(test.id % 2), count(TRUE)
          └─ Scan: test
 5
 5
@@ -517,7 +517,7 @@ Remap: #0 (dropped: #1)
 Remap: #0 (dropped: #1)
 └─ Order: test.bool asc
    └─ Projection: #1, test.bool
-      └─ Aggregate: group(bool), count(TRUE)
+      └─ Aggregate: group(test.bool), count(TRUE)
          └─ Scan: test
 8
 1
@@ -526,8 +526,8 @@ Remap: #0 (dropped: #1)
 [plan]> SELECT COUNT(*) FROM test GROUP BY test."bool" ORDER BY "bool"
 ---
 Remap: #0 (dropped: #1)
-└─ Order: bool asc
-   └─ Projection: #1, bool
+└─ Order: test.bool asc
+   └─ Projection: #1, test.bool
       └─ Aggregate: group(test.bool), count(TRUE)
          └─ Scan: test
 8

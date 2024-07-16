@@ -458,9 +458,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     return true;
                 };
                 // Add the hidden column to the projection.
-                let label = Label::maybe_qualified(table.clone(), column.clone());
                 child_scope.add_passthrough(scope, index, true);
-                hidden.push(Expression::Field(index, label));
+                hidden.push(Expression::Field(index, scope.get_label(index)));
                 true
             });
         }
@@ -490,10 +489,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Literal::Float(f) => Value::Float(f),
                 ast::Literal::String(s) => Value::String(s),
             }),
-            ast::Expression::Field(table, name) => Field(
-                scope.lookup_column(table.as_deref(), &name)?,
-                Label::maybe_qualified(table, name),
-            ),
+            ast::Expression::Field(table, name) => {
+                let index = scope.lookup_column(table.as_deref(), &name)?;
+                Field(index, scope.get_label(index))
+            }
             // Currently, all functions are aggregates, and processed above.
             // TODO: consider adding some basic functions for fun.
             ast::Expression::Function(name, _) => return errinput!("unknown function {name}"),

@@ -134,10 +134,10 @@ Short circuit:
 [opt]> SELECT * FROM test WHERE id = NULL
 ---
 Initial:
-   Filter: id = NULL
+   Filter: test.id = NULL
    └─ Scan: test
 Filter pushdown:
-   Scan: test (id = NULL)
+   Scan: test (test.id = NULL)
 Index lookup:
    KeyLookup: test (0 keys)
 Short circuit:
@@ -146,10 +146,10 @@ Short circuit:
 [opt]> SELECT * FROM ref WHERE test_id = NULL
 ---
 Initial:
-   Filter: test_id = NULL
+   Filter: ref.test_id = NULL
    └─ Scan: ref
 Filter pushdown:
-   Scan: ref (test_id = NULL)
+   Scan: ref (ref.test_id = NULL)
 Index lookup:
    IndexLookup: ref.test_id (0 values)
 Short circuit:
@@ -169,7 +169,7 @@ Short circuit:
 [opt]> SELECT id, value FROM test
 ---
 Initial:
-   Projection: id, value
+   Projection: test.id, test.value
    └─ Scan: test
 Short circuit:
    Scan: test
@@ -180,7 +180,7 @@ Short circuit:
 [opt,header]> SELECT id AS foo, value AS bar FROM test
 ---
 Initial:
-   Projection: id as foo, value as bar
+   Projection: test.id as foo, test.value as bar
    └─ Scan: test
 Short circuit:
    Scan: test
@@ -193,10 +193,10 @@ foo, bar
 ---
 Initial:
    Projection: test.id, #1, #2
-   └─ Aggregate: group(id), min(id), max(id)
+   └─ Aggregate: group(test.id), min(test.id), max(test.id)
       └─ Scan: test
 Short circuit:
-   Aggregate: group(id), min(id), max(id)
+   Aggregate: group(test.id), min(test.id), max(test.id)
    └─ Scan: test
 1, 1, 1
 2, 2, 2

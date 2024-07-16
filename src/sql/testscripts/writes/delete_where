@@ -67,7 +67,7 @@ Delete: name
 > ROLLBACK
 ---
 Delete: name
-└─ Scan: name (id > 3 OR id = 3 OR value LIKE a IS NULL)
+└─ Scan: name (name.id > 3 OR name.id = 3 OR name.value LIKE a IS NULL)
 1, a, 1
 2, b, 2
 

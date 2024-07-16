@@ -12,10 +12,10 @@ ok
 [opt]> SELECT * FROM test WHERE id = 2
 ---
 Initial:
-   Filter: id = 2
+   Filter: test.id = 2
    └─ Scan: test
 Filter pushdown:
-   Scan: test (id = 2)
+   Scan: test (test.id = 2)
 Index lookup:
    KeyLookup: test (2)
 2, b, NaN
@@ -23,10 +23,10 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE id = 1 OR id = 3
 ---
 Initial:
-   Filter: id = 1 OR id = 3
+   Filter: test.id = 1 OR test.id = 3
    └─ Scan: test
 Filter pushdown:
-   Scan: test (id = 1 OR id = 3)
+   Scan: test (test.id = 1 OR test.id = 3)
 Index lookup:
    KeyLookup: test (1, 3)
 1, a, 3.14
@@ -36,22 +36,22 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE (id = 1 OR id = 3) AND value > 'a'
 ---
 Initial:
-   Filter: id = 1 OR id = 3 AND value > a
+   Filter: test.id = 1 OR test.id = 3 AND test.value > a
    └─ Scan: test
 Filter pushdown:
-   Scan: test (id = 1 OR id = 3 AND value > a)
+   Scan: test (test.id = 1 OR test.id = 3 AND test.value > a)
 Index lookup:
-   Filter: value > a
+   Filter: test.value > a
    └─ KeyLookup: test (1, 3)
 3, c, 0
 
 [opt]> SELECT * FROM test WHERE id = 1 OR id = 3 OR value > 'a'
 ---
 Initial:
-   Filter: id = 1 OR id = 3 OR value > a
+   Filter: test.id = 1 OR test.id = 3 OR test.value > a
    └─ Scan: test
 Filter pushdown:
-   Scan: test (id = 1 OR id = 3 OR value > a)
+   Scan: test (test.id = 1 OR test.id = 3 OR test.value > a)
 1, a, 3.14
 2, b, NaN
 3, c, 0
@@ -60,10 +60,10 @@ Filter pushdown:
 [opt]> SELECT * FROM test WHERE value = 'b'
 ---
 Initial:
-   Filter: value = b
+   Filter: test.value = b
    └─ Scan: test
 Filter pushdown:
-   Scan: test (value = b)
+   Scan: test (test.value = b)
 Index lookup:
    IndexLookup: test.value (b)
 2, b, NaN
@@ -71,10 +71,10 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c'
 ---
 Initial:
-   Filter: value = a OR value = c
+   Filter: test.value = a OR test.value = c
    └─ Scan: test
 Filter pushdown:
-   Scan: test (value = a OR value = c)
+   Scan: test (test.value = a OR test.value = c)
 Index lookup:
    IndexLookup: test.value (a, c)
 1, a, 3.14
@@ -83,22 +83,22 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE (value = 'a' OR value = 'c') AND id > 1
 ---
 Initial:
-   Filter: value = a OR value = c AND id > 1
+   Filter: test.value = a OR test.value = c AND test.id > 1
    └─ Scan: test
 Filter pushdown:
-   Scan: test (value = a OR value = c AND id > 1)
+   Scan: test (test.value = a OR test.value = c AND test.id > 1)
 Index lookup:
-   Filter: id > 1
+   Filter: test.id > 1
    └─ IndexLookup: test.value (a, c)
 3, c, 0
 
 [opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c' OR id > 1
 ---
 Initial:
-   Filter: value = a OR value = c OR id > 1
+   Filter: test.value = a OR test.value = c OR test.id > 1
    └─ Scan: test
 Filter pushdown:
-   Scan: test (value = a OR value = c OR id > 1)
+   Scan: test (test.value = a OR test.value = c OR test.id > 1)
 1, a, 3.14
 2, b, NaN
 3, c, 0
@@ -108,10 +108,10 @@ Filter pushdown:
 [opt]> SELECT * FROM test WHERE value IS NULL
 ---
 Initial:
-   Filter: value IS NULL
+   Filter: test.value IS NULL
    └─ Scan: test
 Filter pushdown:
-   Scan: test (value IS NULL)
+   Scan: test (test.value IS NULL)
 Index lookup:
    IndexLookup: test.value (NULL)
 0, NULL, NULL
@@ -119,10 +119,10 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE value = NULL
 ---
 Initial:
-   Filter: value = NULL
+   Filter: test.value = NULL
    └─ Scan: test
 Filter pushdown:
-   Scan: test (value = NULL)
+   Scan: test (test.value = NULL)
 Index lookup:
    IndexLookup: test.value (0 values)
 Short circuit:
@@ -131,18 +131,18 @@ Short circuit:
 [opt]> SELECT * FROM test WHERE value != NULL
 ---
 Initial:
-   Filter: NOT value = NULL
+   Filter: NOT test.value = NULL
    └─ Scan: test
 Filter pushdown:
-   Scan: test (NOT value = NULL)
+   Scan: test (NOT test.value = NULL)
 
 [opt]> SELECT * FROM test WHERE value IS NOT NULL
 ---
 Initial:
-   Filter: NOT value IS NULL
+   Filter: NOT test.value IS NULL
    └─ Scan: test
 Filter pushdown:
-   Scan: test (NOT value IS NULL)
+   Scan: test (NOT test.value IS NULL)
 1, a, 3.14
 2, b, NaN
 3, c, 0
@@ -151,10 +151,10 @@ Filter pushdown:
 [opt]> SELECT * FROM test WHERE "float" IS NAN
 ---
 Initial:
-   Filter: float IS NAN
+   Filter: test.float IS NAN
    └─ Scan: test
 Filter pushdown:
-   Scan: test (float IS NAN)
+   Scan: test (test.float IS NAN)
 Index lookup:
    IndexLookup: test.float (NaN)
 2, b, NaN
@@ -162,10 +162,10 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE "float" = NAN
 ---
 Initial:
-   Filter: float = NaN
+   Filter: test.float = NaN
    └─ Scan: test
 Filter pushdown:
-   Scan: test (float = NaN)
+   Scan: test (test.float = NaN)
 Index lookup:
    IndexLookup: test.float (0 values)
 Short circuit:
@@ -174,13 +174,13 @@ Short circuit:
 [opt]> SELECT * FROM test WHERE "float" = -NAN
 ---
 Initial:
-   Filter: float = -NaN
+   Filter: test.float = -NaN
    └─ Scan: test
 Constant folding:
-   Filter: float = NaN
+   Filter: test.float = NaN
    └─ Scan: test
 Filter pushdown:
-   Scan: test (float = NaN)
+   Scan: test (test.float = NaN)
 Index lookup:
    IndexLookup: test.float (0 values)
 Short circuit:
@@ -191,10 +191,10 @@ Short circuit:
 [opt]> SELECT * FROM test WHERE "float" != NAN
 ---
 Initial:
-   Filter: NOT float = NaN
+   Filter: NOT test.float = NaN
    └─ Scan: test
 Filter pushdown:
-   Scan: test (NOT float = NaN)
+   Scan: test (NOT test.float = NaN)
 1, a, 3.14
 2, b, NaN
 3, c, 0
@@ -202,10 +202,10 @@ Filter pushdown:
 [opt]> SELECT * FROM test WHERE "float" IS NOT NAN
 ---
 Initial:
-   Filter: NOT float IS NAN
+   Filter: NOT test.float IS NAN
    └─ Scan: test
 Filter pushdown:
-   Scan: test (NOT float IS NAN)
+   Scan: test (NOT test.float IS NAN)
 1, a, 3.14
 3, c, 0
 
@@ -213,14 +213,14 @@ Filter pushdown:
 [opt]> SELECT * FROM test JOIN other ON other.test_id = test.id WHERE test_id = 1 OR test_id = 3
 ---
 Initial:
-   Filter: test_id = 1 OR test_id = 3
+   Filter: other.test_id = 1 OR other.test_id = 3
    └─ NestedLoopJoin: inner on other.test_id = test.id
       ├─ Scan: test
       └─ Scan: other
 Filter pushdown:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ Scan: test (test.id = 1 OR test.id = 3)
-   └─ Scan: other (test_id = 1 OR test_id = 3)
+   └─ Scan: other (other.test_id = 1 OR other.test_id = 3)
 Index lookup:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ KeyLookup: test (1, 3)
@@ -236,13 +236,13 @@ Join type:
 [opt]> SELECT * FROM test JOIN other ON other.test_id = test.id AND (test_id = 1 OR test_id = 3)
 ---
 Initial:
-   NestedLoopJoin: inner on other.test_id = test.id AND test_id = 1 OR test_id = 3
+   NestedLoopJoin: inner on other.test_id = test.id AND other.test_id = 1 OR other.test_id = 3
    ├─ Scan: test
    └─ Scan: other
 Filter pushdown:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ Scan: test (test.id = 1 OR test.id = 3)
-   └─ Scan: other (test_id = 1 OR test_id = 3)
+   └─ Scan: other (other.test_id = 1 OR other.test_id = 3)
 Index lookup:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ KeyLookup: test (1, 3)

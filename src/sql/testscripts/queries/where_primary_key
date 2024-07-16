@@ -111,7 +111,7 @@ KeyLookup: string (👍)
 # LIKE does not use an index.
 [plan]> SELECT * FROM "string" WHERE id LIKE 'a%'
 ---
-Scan: string (id LIKE a%)
+Scan: string (string.id LIKE a%)
 a
 abc
 
@@ -135,12 +135,12 @@ KeyLookup: int (-1, 0, 1, 7)
 # > or < predicates don't use an index.
 [plan]> SELECT * FROM "int" WHERE id < 1
 ---
-Scan: int (id < 1)
+Scan: int (int.id < 1)
 -1
 0
 
 [plan]> SELECT * FROM "int" WHERE id > -1
 ---
-Scan: int (id > -1)
+Scan: int (int.id > -1)
 0
 1

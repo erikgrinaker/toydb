@@ -122,7 +122,7 @@ IndexLookup: test.string ()
 # LIKE does not use an index.
 [plan]> SELECT * FROM test WHERE "string" LIKE 'a%'
 ---
-Scan: test (string LIKE a%)
+Scan: test (test.string LIKE a%)
 1, TRUE, 0, 3.14, abc
 2, FALSE, -1, -2.718, a
 
@@ -150,13 +150,13 @@ IndexLookup: test.int (-1, 0, 1, 7)
 # > or < predicates don't use an index.
 [plan]> SELECT * FROM test WHERE "int" < 1
 ---
-Scan: test (int < 1)
+Scan: test (test.int < 1)
 1, TRUE, 0, 3.14, abc
 2, FALSE, -1, -2.718, a
 
 [plan]> SELECT * FROM test WHERE "int" > -1
 ---
-Scan: test (int > -1)
+Scan: test (test.int > -1)
 1, TRUE, 0, 3.14, abc
 3, TRUE, 1, 0, ABC
 4, NULL, 1, 0, 👍
