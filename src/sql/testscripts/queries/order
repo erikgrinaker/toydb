@@ -258,7 +258,7 @@ Order: test.float ^ 2 asc
 # only result in one hidden column.
 [plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC
 ---
-Remap: #0, #1 (dropped: #2)
+Remap: test.id, test.int (dropped: test.bool)
 └─ Order: test.bool desc
    └─ Projection: test.id, test.int, test.bool
       └─ Scan: test
@@ -275,7 +275,7 @@ Remap: #0, #1 (dropped: #2)
 
 [plan]> SELECT id, "int" FROM test ORDER BY "bool" DESC, "bool" ASC
 ---
-Remap: #0, #1 (dropped: #2)
+Remap: test.id, test.int (dropped: test.bool)
 └─ Order: test.bool desc, test.bool asc
    └─ Projection: test.id, test.int, test.bool
       └─ Scan: test
@@ -293,7 +293,7 @@ Remap: #0, #1 (dropped: #2)
 # Can order on expressions on columns not in the result.
 [plan]> SELECT id FROM test ORDER BY "float" ^ 2 - "int" ^ 2 DESC
 ---
-Remap: #0 (dropped: #1, #2)
+Remap: test.id (dropped: test.float, test.int)
 └─ Order: test.float ^ 2 - test.int ^ 2 desc
    └─ Projection: test.id, test.float, test.int
       └─ Scan: test
@@ -373,7 +373,7 @@ Order: int desc
 
 [plan]> SELECT id AS "int" FROM test ORDER BY test."int" DESC
 ---
-Remap: #0 (dropped: #1)
+Remap: int (dropped: test.int)
 └─ Order: test.int desc
    └─ Projection: test.id as int, test.int
       └─ Scan: test
@@ -481,7 +481,7 @@ FALSE, -1
 
 [plan]> SELECT "bool" FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
-Remap: #0 (dropped: #1)
+Remap: test.bool (dropped: #1)
 └─ Order: #1 desc
    └─ Aggregate: test.bool, max(test.int)
       └─ Scan: test
@@ -491,7 +491,7 @@ FALSE
 
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") - MIN("int") DESC
 ---
-Remap: #0, #1 (dropped: #2)
+Remap: test.bool, #1 (dropped: #2)
 └─ Order: #1 - #2 desc
    └─ Aggregate: test.bool, max(test.int), min(test.int)
       └─ Scan: test
@@ -514,7 +514,7 @@ Remap: #0 (dropped: #1)
 # ORDER BY can use (un)qualified expressions for an (un)qualified GROUP BY.
 [plan]> SELECT COUNT(*) FROM test GROUP BY "bool" ORDER BY test."bool"
 ---
-Remap: #0 (dropped: #1)
+Remap: #0 (dropped: test.bool)
 └─ Order: test.bool asc
    └─ Projection: #1, test.bool
       └─ Aggregate: test.bool, count(TRUE)
@@ -525,7 +525,7 @@ Remap: #0 (dropped: #1)
 
 [plan]> SELECT COUNT(*) FROM test GROUP BY test."bool" ORDER BY "bool"
 ---
-Remap: #0 (dropped: #1)
+Remap: #0 (dropped: test.bool)
 └─ Order: test.bool asc
    └─ Projection: #1, test.bool
       └─ Aggregate: test.bool, count(TRUE)

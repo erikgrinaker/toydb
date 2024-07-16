@@ -221,7 +221,7 @@ Error: invalid input: unknown field movies.unknown_id
   WHERE m.studio_id = s.id \
   ORDER BY m.rating DESC, m.released ASC, m.id ASC
 ---
-Remap: #0, #1, #2, #3, #4 (dropped: #5)
+Remap: m.id, m.title, genre, studio, m.rating (dropped: m.released)
 └─ Order: m.rating desc, m.released asc, m.id asc
    └─ Projection: m.id, m.title, g.name as genre, s.name as studio, m.rating, m.released
       └─ HashJoin: inner on m.studio_id = s.id

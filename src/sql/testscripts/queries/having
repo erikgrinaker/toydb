@@ -46,7 +46,7 @@ b, 42
 
 [plan]> SELECT "group" FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
-Remap: #0 (dropped: #1)
+Remap: test.group (dropped: #1)
 └─ Filter: #1 > 10
    └─ Aggregate: test.group, max(test.int)
       └─ Scan: test
@@ -54,7 +54,7 @@ b
 
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") - MIN("int") > 10
 ---
-Remap: #0, #1 (dropped: #2)
+Remap: test.group, #1 (dropped: #2)
 └─ Filter: #1 - #2 > 10
    └─ Aggregate: test.group, max(test.int), min(test.int)
       └─ Scan: test
@@ -72,7 +72,7 @@ b, 42
 # Having works with an aggregate function not in the SELECT clause.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
-Remap: #0, #1 (dropped: #2)
+Remap: test.group, #1 (dropped: #2)
 └─ Filter: #2 > 10
    └─ Aggregate: test.group, count(TRUE), max(test.int)
       └─ Scan: test
@@ -81,7 +81,7 @@ b, 3
 # Having works with compound expressions.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") / COUNT(*) > 3
 ---
-Remap: #0, #1 (dropped: #2)
+Remap: test.group, #1 (dropped: #2)
 └─ Filter: #2 / #1 > 3
    └─ Aggregate: test.group, count(TRUE), max(test.int)
       └─ Scan: test
@@ -102,7 +102,7 @@ Remap: #0 (dropped: #1)
 # Having can use (un)qualified expressions for an (un)qualified GROUP BY.
 [plan]> SELECT COUNT(*) FROM test GROUP BY "group" HAVING test."group" = 'a'
 ---
-Remap: #0 (dropped: #1)
+Remap: #0 (dropped: test.group)
 └─ Filter: test.group = a
    └─ Projection: #1, test.group
       └─ Aggregate: test.group, count(TRUE)
@@ -111,7 +111,7 @@ Remap: #0 (dropped: #1)
 
 [plan]> SELECT COUNT(*) FROM test GROUP BY test."group" HAVING "group" = 'a'
 ---
-Remap: #0 (dropped: #1)
+Remap: #0 (dropped: test.group)
 └─ Filter: test.group = a
    └─ Projection: #1, test.group
       └─ Aggregate: test.group, count(TRUE)

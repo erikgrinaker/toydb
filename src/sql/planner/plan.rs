@@ -510,13 +510,24 @@ impl Node {
             Self::Remap { source, targets } => {
                 let remap = remap_sources(targets)
                     .into_iter()
-                    .map(|from| from.map(|from| format!("#{from}")).unwrap_or("Null".to_string()))
+                    .map(|from| {
+                        from.map(|from| match source.column_label(from) {
+                            Label::None => format!("#{from}"),
+                            label => format!("{label}"),
+                        })
+                        .unwrap_or("Null".to_string())
+                    })
                     .join(", ");
                 write!(f, "Remap: {remap}")?;
                 let dropped = targets
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, v)| v.is_none().then_some(format!("#{i}")))
+                    .filter_map(|(i, v)| {
+                        v.is_none().then_some(match source.column_label(i) {
+                            Label::None => format!("#{i}"),
+                            label => format!("{label}"),
+                        })
+                    })
                     .join(", ");
                 if !dropped.is_empty() {
                     write!(f, " (dropped: {dropped})")?;

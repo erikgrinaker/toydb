@@ -70,7 +70,7 @@ HashJoin: outer on movies.id = genres.id
 # Right join.
 [plan]> SELECT * FROM genres RIGHT JOIN movies ON movies.id = genres.id
 ---
-Remap: #7, #8, #0, #1, #2, #3, #4, #5, #6
+Remap: genres.id, genres.name, movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd
 └─ HashJoin: outer on movies.id = genres.id
    ├─ Scan: movies
    └─ Scan: genres
@@ -104,7 +104,7 @@ HashJoin: outer on movies.id = genres.id
 
 [plan]> SELECT * FROM genres RIGHT OUTER JOIN movies ON movies.id = genres.id
 ---
-Remap: #7, #8, #0, #1, #2, #3, #4, #5, #6
+Remap: genres.id, genres.name, movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd
 └─ HashJoin: outer on movies.id = genres.id
    ├─ Scan: movies
    └─ Scan: genres
@@ -131,7 +131,7 @@ HashJoin: outer on genres.id = movies.id
 
 [plan]> SELECT * FROM movies RIGHT JOIN genres ON movies.id = genres.id
 ---
-Remap: #2, #3, #4, #5, #6, #7, #8, #0, #1
+Remap: movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name
 └─ HashJoin: outer on genres.id = movies.id
    ├─ Scan: genres
    └─ Scan: movies
@@ -164,7 +164,7 @@ NestedLoopJoin: outer on genres.id > movies.id OR genres.id = movies.id
     LEFT JOIN genres ON studios.id = genres.id \
     RIGHT JOIN movies ON movies.id = studios.id
 ---
-Remap: #7, #8, #9, #10, #11, #0, #1, #2, #3, #4, #5, #6
+Remap: studios.id, studios.name, studios.country_id, genres.id, genres.name, movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd
 └─ HashJoin: outer on movies.id = studios.id
    ├─ Scan: movies
    └─ HashJoin: outer on studios.id = genres.id
