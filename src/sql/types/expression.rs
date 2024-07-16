@@ -1,6 +1,7 @@
 use super::{Label, Row, Value};
 use crate::errinput;
 use crate::error::Result;
+use crate::sql::planner::Node;
 
 use serde::{Deserialize, Serialize};
 
@@ -59,39 +60,41 @@ pub enum Expression {
     Like(Box<Expression>, Box<Expression>),
 }
 
-impl std::fmt::Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Expression {
+    /// Formats the expression, using the given Node to look up column labels.
+    pub fn format(&self, node: &Node) -> String {
+        let format = |expr: &Expression| expr.format(node);
         match self {
-            Self::Constant(value) => write!(f, "{value}"),
-            Self::Field(index, Label::None) => write!(f, "#{index}"),
-            Self::Field(_, label) => write!(f, "{label}"),
+            Self::Field(index, _) => match node.column_label(*index) {
+                Label::None => format!("#{index}"),
+                label => format!("{label}"),
+            },
+            Self::Constant(value) => format!("{value}"),
 
-            Self::And(lhs, rhs) => write!(f, "{lhs} AND {rhs}"),
-            Self::Or(lhs, rhs) => write!(f, "{lhs} OR {rhs}"),
-            Self::Not(expr) => write!(f, "NOT {expr}"),
+            Self::And(lhs, rhs) => format!("{} AND {}", format(lhs), format(rhs)),
+            Self::Or(lhs, rhs) => format!("{} OR {}", format(lhs), format(rhs)),
+            Self::Not(expr) => format!("NOT {}", format(expr)),
 
-            Self::Equal(lhs, rhs) => write!(f, "{lhs} = {rhs}"),
-            Self::GreaterThan(lhs, rhs) => write!(f, "{lhs} > {rhs}"),
-            Self::LessThan(lhs, rhs) => write!(f, "{lhs} < {rhs}"),
-            Self::IsNull(expr) => write!(f, "{expr} IS NULL"),
-            Self::IsNaN(expr) => write!(f, "{expr} IS NAN"),
+            Self::Equal(lhs, rhs) => format!("{} = {}", format(lhs), format(rhs)),
+            Self::GreaterThan(lhs, rhs) => format!("{} > {}", format(lhs), format(rhs)),
+            Self::LessThan(lhs, rhs) => format!("{} < {}", format(lhs), format(rhs)),
+            Self::IsNull(expr) => format!("{} IS NULL", format(expr)),
+            Self::IsNaN(expr) => format!("{} IS NAN", format(expr)),
 
-            Self::Add(lhs, rhs) => write!(f, "{lhs} + {rhs}"),
-            Self::Divide(lhs, rhs) => write!(f, "{lhs} / {rhs}"),
-            Self::Exponentiate(lhs, rhs) => write!(f, "{lhs} ^ {rhs}"),
-            Self::Factorial(expr) => write!(f, "{expr}!"),
-            Self::Identity(expr) => write!(f, "{expr}"),
-            Self::Modulo(lhs, rhs) => write!(f, "{lhs} % {rhs}"),
-            Self::Multiply(lhs, rhs) => write!(f, "{lhs} * {rhs}"),
-            Self::Negate(expr) => write!(f, "-{expr}"),
-            Self::Subtract(lhs, rhs) => write!(f, "{lhs} - {rhs}"),
+            Self::Add(lhs, rhs) => format!("{} + {}", format(lhs), format(rhs)),
+            Self::Divide(lhs, rhs) => format!("{} / {}", format(lhs), format(rhs)),
+            Self::Exponentiate(lhs, rhs) => format!("{} ^ {}", format(lhs), format(rhs)),
+            Self::Factorial(expr) => format!("{}!", format(expr)),
+            Self::Identity(expr) => format(expr),
+            Self::Modulo(lhs, rhs) => format!("{} % {}", format(lhs), format(rhs)),
+            Self::Multiply(lhs, rhs) => format!("{} * {}", format(lhs), format(rhs)),
+            Self::Negate(expr) => format!("-{}", format(expr)),
+            Self::Subtract(lhs, rhs) => format!("{} - {}", format(lhs), format(rhs)),
 
-            Self::Like(lhs, rhs) => write!(f, "{lhs} LIKE {rhs}"),
+            Self::Like(lhs, rhs) => format!("{} LIKE {}", format(lhs), format(rhs)),
         }
     }
-}
 
-impl Expression {
     /// Evaluates an expression, returning a value. If a row is given, Field
     /// references will look up the row value at the field index. If no row is
     /// given, any field references yield NULL.

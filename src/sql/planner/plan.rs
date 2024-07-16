@@ -73,9 +73,6 @@ impl Plan {
 }
 
 /// A query plan node. These return row iterators and can be nested.
-///
-/// TODO: try to get rid of the labels. Can they be reconstructed by walking
-/// down the node tree?
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
     /// Computes aggregate values for the given expressions and group_by buckets
@@ -373,7 +370,7 @@ impl std::fmt::Display for Plan {
             Self::Update { table, source, expressions, .. } => {
                 let expressions = expressions
                     .iter()
-                    .map(|(i, e)| format!("{}={e}", table.columns[*i].name))
+                    .map(|(i, e)| format!("{}={}", table.columns[*i].name, e.format(source)))
                     .join(", ");
                 let table = &table.name;
                 write!(f, "Update: {table} ({expressions})")?;
@@ -423,14 +420,14 @@ impl Node {
             Self::Aggregate { source, aggregates, group_by } => {
                 let aggregates = group_by
                     .iter()
-                    .map(|group| group.to_string())
-                    .chain(aggregates.iter().map(|agg| agg.to_string()))
+                    .map(|group| group.format(source))
+                    .chain(aggregates.iter().map(|agg| agg.format(source)))
                     .join(", ");
                 write!(f, "Aggregate: {aggregates}")?;
                 source.format(f, prefix, false, true)?;
             }
             Self::Filter { source, predicate } => {
-                write!(f, "Filter: {predicate}")?;
+                write!(f, "Filter: {}", predicate.format(source))?;
                 source.format(f, prefix, false, true)?;
             }
             Self::HashJoin { left, left_field, right, right_field, outer } => {
@@ -478,7 +475,7 @@ impl Node {
             Self::NestedLoopJoin { left, right, predicate, outer, .. } => {
                 write!(f, "NestedLoopJoin: {}", if *outer { "outer" } else { "inner" })?;
                 if let Some(expr) = predicate {
-                    write!(f, " on {expr}")?;
+                    write!(f, " on {}", expr.format(self))?;
                 }
                 left.format(f, prefix.clone(), false, false)?;
                 right.format(f, prefix, false, true)?;
@@ -491,7 +488,10 @@ impl Node {
                 source.format(f, prefix, false, true)?;
             }
             Self::Order { source, orders } => {
-                let orders = orders.iter().map(|(expr, dir)| format!("{expr} {dir}")).join(", ");
+                let orders = orders
+                    .iter()
+                    .map(|(expr, dir)| format!("{} {dir}", expr.format(source)))
+                    .join(", ");
                 write!(f, "Order: {orders}")?;
                 source.format(f, prefix, false, true)?;
             }
@@ -500,8 +500,8 @@ impl Node {
                     .iter()
                     .enumerate()
                     .map(|(i, expr)| match aliases.get(i) {
-                        Some(Label::None) | None => format!("{expr}"),
-                        Some(alias) => format!("{expr} as {alias}"),
+                        Some(Label::None) | None => expr.format(source),
+                        Some(alias) => format!("{} as {alias}", expr.format(source)),
                     })
                     .join(", ");
                 write!(f, "Projection: {expressions}")?;
@@ -529,14 +529,14 @@ impl Node {
                     write!(f, " as {alias}")?;
                 }
                 if let Some(expr) = filter {
-                    write!(f, " ({expr})")?;
+                    write!(f, " ({})", expr.format(self))?;
                 }
             }
             Self::Values { rows, .. } => {
                 write!(f, "Values: ")?;
                 match rows.len() {
                     1 if rows[0].is_empty() => write!(f, "blank row")?,
-                    1 => write!(f, "{}", rows[0].iter().map(|e| e.to_string()).join(", "))?,
+                    1 => write!(f, "{}", rows[0].iter().map(|e| e.format(self)).join(", "))?,
                     n => write!(f, "{n} rows")?,
                 }
             }
@@ -555,14 +555,14 @@ pub enum Aggregate {
     Sum(Expression),
 }
 
-impl std::fmt::Display for Aggregate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Aggregate {
+    fn format(&self, node: &Node) -> String {
         match self {
-            Self::Average(expr) => write!(f, "avg({expr})"),
-            Self::Count(expr) => write!(f, "count({expr})"),
-            Self::Max(expr) => write!(f, "max({expr})"),
-            Self::Min(expr) => write!(f, "min({expr})"),
-            Self::Sum(expr) => write!(f, "sum({expr})"),
+            Self::Average(expr) => format!("avg({})", expr.format(node)),
+            Self::Count(expr) => format!("count({})", expr.format(node)),
+            Self::Max(expr) => format!("max({})", expr.format(node)),
+            Self::Min(expr) => format!("min({})", expr.format(node)),
+            Self::Sum(expr) => format!("sum({})", expr.format(node)),
         }
     }
 }
