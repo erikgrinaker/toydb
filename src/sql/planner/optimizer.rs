@@ -287,6 +287,12 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
     use Expression::Constant;
     use Value::{Boolean, Null};
 
+    /// Creates a Nothing node with the columns of the original node.
+    fn nothing(node: &Node) -> Node {
+        let columns = (0..node.size()).map(|i| node.column_label(i)).collect();
+        Node::Nothing { columns }
+    }
+
     let transform = |node| match node {
         // Filter nodes that always yield true are unnecessary: remove them.
         Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
@@ -300,32 +306,34 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
         }
 
         // Short-circuit nodes that can't produce anything by replacing them
-        // with a Nothing node.
-        Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => Node::Nothing,
-        Node::IndexLookup { values, .. } if values.is_empty() => Node::Nothing,
-        Node::KeyLookup { keys, .. } if keys.is_empty() => Node::Nothing,
-        Node::Limit { limit: 0, .. } => Node::Nothing,
-        Node::NestedLoopJoin { predicate: Some(Constant(Boolean(false) | Null)), .. } => {
-            Node::Nothing
+        // with a Nothing node, retaining the columns.
+        ref node @ Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => nothing(node),
+        ref node @ Node::IndexLookup { ref values, .. } if values.is_empty() => nothing(node),
+        ref node @ Node::KeyLookup { ref keys, .. } if keys.is_empty() => nothing(node),
+        ref node @ Node::Limit { limit: 0, .. } => nothing(node),
+        ref node @ Node::NestedLoopJoin {
+            predicate: Some(Constant(Boolean(false) | Null)), ..
+        } => nothing(node),
+        ref node @ Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => {
+            nothing(node)
         }
-        Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => Node::Nothing,
-        Node::Values { rows, .. } if rows.is_empty() => Node::Nothing,
+        Node::Values { rows } if rows.is_empty() => Node::Nothing { columns: vec![] },
 
         // Short-circuit nodes that pull from a Nothing node.
         //
         // NB: does not short-circuit aggregation, since an aggregation over 0
         // rows should produce a result.
-        Node::Filter { source, .. }
-        | Node::HashJoin { left: source, .. }
-        | Node::HashJoin { right: source, .. }
-        | Node::NestedLoopJoin { left: source, .. }
-        | Node::NestedLoopJoin { right: source, .. }
-        | Node::Offset { source, .. }
-        | Node::Order { source, .. }
-        | Node::Projection { source, .. }
-            if *source == Node::Nothing =>
+        ref node @ (Node::Filter { ref source, .. }
+        | Node::HashJoin { left: ref source, .. }
+        | Node::HashJoin { right: ref source, .. }
+        | Node::NestedLoopJoin { left: ref source, .. }
+        | Node::NestedLoopJoin { right: ref source, .. }
+        | Node::Offset { ref source, .. }
+        | Node::Order { ref source, .. }
+        | Node::Projection { ref source, .. })
+            if matches!(**source, Node::Nothing { .. }) =>
         {
-            Node::Nothing
+            nothing(node)
         }
 
         // Remove noop projections that simply pass through the source columns.

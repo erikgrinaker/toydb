@@ -96,7 +96,7 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             join::nested_loop(left, right, right_size, predicate, outer)
         }
 
-        Node::Nothing => Ok(source::nothing()),
+        Node::Nothing { .. } => Ok(source::nothing()),
 
         Node::Offset { source, offset } => {
             let source = execute(*source, txn)?;

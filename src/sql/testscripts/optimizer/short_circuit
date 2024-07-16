@@ -56,8 +56,8 @@ Short circuit:
 3, c, 2, 2
 3, c, 3, 3
 
-# FALSE predicates → Nothing
-[opt]> SELECT * FROM test WHERE FALSE
+# FALSE predicates → Nothing (but retains column headers)
+[opt,header]> SELECT * FROM test WHERE FALSE
 ---
 Initial:
    Filter: FALSE
@@ -66,8 +66,9 @@ Filter pushdown:
    Scan: test (FALSE)
 Short circuit:
    Nothing
+test.id, test.value
 
-[opt]> SELECT 1, 2, 3 WHERE FALSE
+[opt,header]> SELECT 1, 2, 3 WHERE FALSE
 ---
 Initial:
    Projection: 1, 2, 3
@@ -75,8 +76,9 @@ Initial:
       └─ Values: blank row
 Short circuit:
    Nothing
+, , 
 
-[opt]> SELECT * FROM test JOIN ref ON ref.test_id = test.id AND FALSE
+[opt,header]> SELECT * FROM test JOIN ref ON ref.test_id = test.id AND FALSE
 ---
 Initial:
    NestedLoopJoin: inner on ref.test_id = test.id AND FALSE
@@ -92,9 +94,10 @@ Filter pushdown:
    └─ Scan: ref (FALSE)
 Short circuit:
    Nothing
+test.id, test.value, ref.id, ref.test_id
 
 # NULL predicates → Nothing
-[opt]> SELECT * FROM test WHERE NULL
+[opt,header]> SELECT * FROM test WHERE NULL
 ---
 Initial:
    Filter: NULL
@@ -103,8 +106,9 @@ Filter pushdown:
    Scan: test (NULL)
 Short circuit:
    Nothing
+test.id, test.value
 
-[opt]> SELECT 1, 2, 3 WHERE NULL
+[opt,header]> SELECT 1, 2, 3 WHERE NULL
 ---
 Initial:
    Projection: 1, 2, 3
@@ -112,8 +116,9 @@ Initial:
       └─ Values: blank row
 Short circuit:
    Nothing
+, , 
 
-[opt]> SELECT * FROM test JOIN ref ON ref.test_id = test.id AND NULL
+[opt,header]> SELECT * FROM test JOIN ref ON ref.test_id = test.id AND NULL
 ---
 Initial:
    NestedLoopJoin: inner on ref.test_id = test.id AND NULL
@@ -129,9 +134,10 @@ Join type:
    └─ Scan: ref (NULL)
 Short circuit:
    Nothing
+test.id, test.value, ref.id, ref.test_id
 
-# Empty key/index lookups.
-[opt]> SELECT * FROM test WHERE id = NULL
+# Empty key/index lookups → Nothing
+[opt,header]> SELECT * FROM test WHERE id = NULL
 ---
 Initial:
    Filter: test.id = NULL
@@ -142,8 +148,9 @@ Index lookup:
    KeyLookup: test (0 keys)
 Short circuit:
    Nothing
+test.id, test.value
 
-[opt]> SELECT * FROM ref WHERE test_id = NULL
+[opt,header]> SELECT * FROM ref WHERE test_id = NULL
 ---
 Initial:
    Filter: ref.test_id = NULL
@@ -154,15 +161,17 @@ Index lookup:
    IndexLookup: ref.test_id (0 values)
 Short circuit:
    Nothing
+ref.id, ref.test_id
 
 # LIMIT 0 → Nothing
-[opt]> SELECT * FROM test LIMIT 0
+[opt,header]> SELECT * FROM test LIMIT 0
 ---
 Initial:
    Limit: 0
    └─ Scan: test
 Short circuit:
    Nothing
+test.id, test.value
 
 # Remove projections that simply pass through source columns. Aliased
 # column names are retained.

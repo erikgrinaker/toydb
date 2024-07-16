@@ -109,8 +109,9 @@ pub enum Node {
     /// When outer is true (e.g. LEFT JOIN), a left row without a right match is
     /// emitted anyway, with NULLs for the right row.
     NestedLoopJoin { left: Box<Node>, right: Box<Node>, predicate: Option<Expression>, outer: bool },
-    /// Nothing does not emit anything.
-    Nothing,
+    /// Nothing does not emit anything, but retains the column names of any
+    /// replaced nodes for results and plan expression display.
+    Nothing { columns: Vec<Label> },
     /// Discards the first offset rows from source, emits the rest.
     Offset { source: Box<Node>, offset: usize },
     /// Sorts the source rows by the given expression/direction pairs. Buffers
@@ -174,7 +175,7 @@ impl Node {
 
             node @ (Self::IndexLookup { .. }
             | Self::KeyLookup { .. }
-            | Self::Nothing
+            | Self::Nothing { .. }
             | Self::Scan { .. }
             | Self::Values { .. }) => node,
         };
@@ -232,7 +233,7 @@ impl Node {
             | Self::KeyLookup { .. }
             | Self::Limit { .. }
             | Self::NestedLoopJoin { predicate: None, .. }
-            | Self::Nothing
+            | Self::Nothing { .. }
             | Self::Offset { .. }
             | Self::Scan { filter: None, .. }
             | Self::Remap { .. }) => node,
@@ -262,7 +263,7 @@ impl Node {
             // Some can't have names.
             Self::HashJoin { .. }
             | Self::NestedLoopJoin { .. }
-            | Self::Nothing
+            | Self::Nothing { .. }
             | Self::Values { .. } => None,
         }
     }
@@ -314,8 +315,11 @@ impl Node {
             | Self::Offset { source, .. }
             | Self::Order { source, .. } => source.column_label(index),
 
+            // Nothing nodes contain the original columns of replaced nodes.
+            Self::Nothing { columns } => columns.get(index).cloned().unwrap_or(Label::None),
+
             // And some don't have any names at all.
-            Self::Nothing | Self::Values { .. } => Label::None,
+            Self::Values { .. } => Label::None,
         }
     }
 
@@ -346,7 +350,7 @@ impl Node {
             | Self::Order { source, .. } => source.size(),
 
             // And some are trivial.
-            Self::Nothing => 0,
+            Self::Nothing { columns } => columns.len(),
             Self::Values { rows } => rows.first().map(|row| row.len()).unwrap_or(0),
         }
     }
@@ -479,7 +483,7 @@ impl Node {
                 left.format(f, prefix.clone(), false, false)?;
                 right.format(f, prefix, false, true)?;
             }
-            Self::Nothing => {
+            Self::Nothing { .. } => {
                 write!(f, "Nothing")?;
             }
             Self::Offset { source, offset } => {

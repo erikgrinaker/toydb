@@ -200,3 +200,9 @@ NULL, b
 2, 2
 3, 1
 3, 2
+
+# A select with no rows optimized to a Nothing node still emits headers.
+[plan,header]> SELECT * FROM test WHERE FALSE
+---
+Nothing
+test.id, test.bool, test.float, test.int, test.string
