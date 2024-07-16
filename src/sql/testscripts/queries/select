@@ -119,7 +119,7 @@ Error: invalid input: unknown table test
 # The AS keyword is optional.
 [header,plan]> SELECT 1 AS one, test."int" value FROM test
 ---
-Projection: 1, test.int
+Projection: 1 as one, test.int as value
 └─ Scan: test
 one, value
 1, 7

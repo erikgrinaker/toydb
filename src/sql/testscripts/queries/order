@@ -29,14 +29,14 @@ ok
 [plan]> SELECT 1 AS value ORDER BY value ASC
 ---
 Order: value asc
-└─ Projection: 1
+└─ Projection: 1 as value
    └─ Values: blank row
 1
 
 [plan]> SELECT 1 AS value ORDER BY value DESC
 ---
 Order: value desc
-└─ Projection: 1
+└─ Projection: 1 as value
    └─ Values: blank row
 1
 
@@ -358,7 +358,7 @@ Error: invalid input: ambiguous field foo
 [plan]> SELECT id AS "int" FROM test ORDER BY "int" DESC
 ---
 Order: int desc
-└─ Projection: id
+└─ Projection: id as int
    └─ Scan: test
 9
 8
@@ -375,7 +375,7 @@ Order: int desc
 ---
 Remap: #0 (dropped: #1)
 └─ Order: test.int desc
-   └─ Projection: id, test.int
+   └─ Projection: id as int, test.int
       └─ Scan: test
 4
 6

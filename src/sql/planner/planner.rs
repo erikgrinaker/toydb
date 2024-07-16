@@ -209,7 +209,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             expressions.extend(hidden);
 
             scope = child_scope;
-            node = Node::Projection { source: Box::new(node), expressions, labels };
+            node = Node::Projection { source: Box::new(node), expressions, aliases: labels };
         };
 
         // Build HAVING clause.

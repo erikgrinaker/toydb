@@ -118,9 +118,9 @@ pub enum Node {
     /// Sorts the source rows by the given expression/direction pairs. Buffers
     /// the entire row set in memory.
     Order { source: Box<Node>, orders: Vec<(Expression, Direction)> },
-    /// Projects the input rows by evaluating the given expressions.
-    /// The labels are only used when displaying the plan.
-    Projection { source: Box<Node>, expressions: Vec<Expression>, labels: Vec<Label> },
+    /// Projects the input rows by evaluating the given expressions. Aliases are
+    /// only used when displaying the plan.
+    Projection { source: Box<Node>, expressions: Vec<Expression>, aliases: Vec<Label> },
     /// Remaps source columns to the given target column index, or None to drop
     /// the column. Unspecified target columns yield Value::Null.
     Remap { source: Box<Node>, targets: Vec<Option<usize>> },
@@ -179,8 +179,8 @@ impl Node {
             },
             Self::Offset { source, offset } => Self::Offset { source: transform(source)?, offset },
             Self::Order { source, orders } => Self::Order { source: transform(source)?, orders },
-            Self::Projection { source, labels, expressions } => {
-                Self::Projection { source: transform(source)?, labels, expressions }
+            Self::Projection { source, expressions, aliases } => {
+                Self::Projection { source: transform(source)?, expressions, aliases }
             }
             Self::Remap { source, targets } => Self::Remap { source: transform(source)?, targets },
 
@@ -220,13 +220,13 @@ impl Node {
                     outer,
                 }
             }
-            Self::Projection { source, labels, expressions } => Self::Projection {
+            Self::Projection { source, expressions, aliases } => Self::Projection {
                 source,
-                labels,
                 expressions: expressions
                     .into_iter()
                     .map(|e| e.transform(before, after))
                     .collect::<Result<_>>()?,
+                aliases,
             },
             Self::Scan { table, alias, filter: Some(filter) } => {
                 Self::Scan { table, alias, filter: Some(filter.transform(before, after)?) }
@@ -422,8 +422,16 @@ impl Node {
                 write!(f, "Order: {orders}")?;
                 source.format(f, prefix, false, true)?;
             }
-            Self::Projection { source, expressions, .. } => {
-                write!(f, "Projection: {}", expressions.iter().join(", "))?;
+            Self::Projection { source, expressions, aliases } => {
+                let expressions = expressions
+                    .iter()
+                    .enumerate()
+                    .map(|(i, expr)| match aliases.get(i) {
+                        Some(Label::None) | None => format!("{expr}"),
+                        Some(alias) => format!("{expr} as {alias}"),
+                    })
+                    .join(", ");
+                write!(f, "Projection: {expressions}")?;
                 source.format(f, prefix, false, true)?;
             }
             Self::Remap { source, targets } => {

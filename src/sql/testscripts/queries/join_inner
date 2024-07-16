@@ -223,7 +223,7 @@ Error: invalid input: unknown field movies.unknown_id
 ---
 Remap: #0, #1, #2, #3, #4 (dropped: #5)
 └─ Order: m.rating desc, m.released asc, m.id asc
-   └─ Projection: m.id, m.title, g.name, s.name, m.rating, m.released
+   └─ Projection: m.id, m.title, g.name as genre, s.name as studio, m.rating, m.released
       └─ HashJoin: inner on m.studio_id = s.id
          ├─ HashJoin: inner on m.genre_id = g.id
          │  ├─ Scan: movies as m

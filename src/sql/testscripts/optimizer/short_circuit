@@ -180,7 +180,7 @@ Short circuit:
 [opt,header]> SELECT id AS foo, value AS bar FROM test
 ---
 Initial:
-   Projection: id, value
+   Projection: id as foo, value as bar
    └─ Scan: test
 Short circuit:
    Scan: test

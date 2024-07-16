@@ -116,7 +116,7 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             transform::order(source, orders)
         }
 
-        Node::Projection { source, expressions, labels: _ } => {
+        Node::Projection { source, expressions, aliases: _ } => {
             let source = execute(*source, txn)?;
             Ok(transform::project(source, expressions))
         }
