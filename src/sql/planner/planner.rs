@@ -446,7 +446,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 }
 
                 // Look for field references that don't exist post-projection.
-                // Otherwise, only look for field references.
                 let ast::Expression::Field(table, column) = expr else {
                     return true;
                 };
