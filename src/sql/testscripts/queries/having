@@ -64,8 +64,9 @@ b, 42
 [plan]> SELECT "group", MAX("int") AS m FROM test GROUP BY "group" HAVING m > 10
 ---
 Filter: m > 10
-└─ Aggregate: group(test.group), max(test.int)
-   └─ Scan: test
+└─ Projection: test.group, #1 as m
+   └─ Aggregate: group(test.group), max(test.int)
+      └─ Scan: test
 b, 42
 
 # Having works with an aggregate function not in the SELECT clause.

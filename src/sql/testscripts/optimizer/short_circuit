@@ -182,8 +182,6 @@ Short circuit:
 Initial:
    Projection: test.id as foo, test.value as bar
    └─ Scan: test
-Short circuit:
-   Scan: test
 foo, bar
 1, a
 2, b

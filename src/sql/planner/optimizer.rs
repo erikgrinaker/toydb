@@ -1,6 +1,6 @@
 use super::Node;
 use crate::error::Result;
-use crate::sql::types::{Expression, Value};
+use crate::sql::types::{Expression, Label, Value};
 
 use std::collections::HashMap;
 
@@ -329,8 +329,9 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
         }
 
         // Remove noop projections that simply pass through the source columns.
-        Node::Projection { source, expressions, .. }
+        Node::Projection { source, expressions, aliases }
             if source.size() == expressions.len()
+                && aliases.iter().all(|a| a == &Label::None)
                 && expressions
                     .iter()
                     .enumerate()
