@@ -15,9 +15,8 @@ use serde::{Deserialize, Serialize};
 pub enum Expression {
     /// A constant value.
     Constant(Value),
-    /// A field reference (row index) with optional label. The label is only
-    /// used for display purposes.
-    Field(usize, Label),
+    /// A field reference (row index).
+    Field(usize),
 
     /// Logical AND of two booleans: a AND b.
     And(Box<Expression>, Box<Expression>),
@@ -65,7 +64,7 @@ impl Expression {
     pub fn format(&self, node: &Node) -> String {
         let format = |expr: &Expression| expr.format(node);
         match self {
-            Self::Field(index, _) => match node.column_label(*index) {
+            Self::Field(index) => match node.column_label(*index) {
                 Label::None => format!("#{index}"),
                 label => format!("{label}"),
             },
@@ -106,7 +105,7 @@ impl Expression {
 
             // Field references look up a row value. The planner must make sure
             // the field reference is valid.
-            Self::Field(i, _) => row.map(|row| row[*i].clone()).unwrap_or(Null),
+            Self::Field(i) => row.map(|row| row[*i].clone()).unwrap_or(Null),
 
             // Logical AND. Inputs must be boolean or NULL. NULLs generally
             // yield NULL, except the special case NULL AND false == false.
@@ -243,7 +242,7 @@ impl Expression {
                 | Self::Negate(expr)
                 | Self::Not(expr) => expr.walk(visitor),
 
-                Self::Constant(_) | Self::Field(_, _) => true,
+                Self::Constant(_) | Self::Field(_) => true,
             }
     }
 
@@ -289,7 +288,7 @@ impl Expression {
             Self::Negate(expr) => Self::Negate(transform(expr)?),
             Self::Not(expr) => Self::Not(transform(expr)?),
 
-            expr @ (Self::Constant(_) | Self::Field(_, _)) => expr,
+            expr @ (Self::Constant(_) | Self::Field(_)) => expr,
         };
         self = after(self)?;
         Ok(self)
@@ -371,12 +370,12 @@ impl Expression {
             // use index lookups. NULL and NaN won't return any matches, but we
             // handle this in into_field_values().
             Equal(lhs, rhs) => match (lhs.as_ref(), rhs.as_ref()) {
-                (Field(f, _), Constant(_)) | (Constant(_), Field(f, _)) => Some(*f),
+                (Field(f), Constant(_)) | (Constant(_), Field(f)) => Some(*f),
                 _ => None,
             },
             // IS NULL and IS NAN can use index lookups, since we index these.
             IsNull(expr) | IsNaN(expr) => match expr.as_ref() {
-                Field(f, _) => Some(*f),
+                Field(f) => Some(*f),
                 _ => None,
             },
             // For OR branches, check if all branches are lookups on the same
@@ -397,20 +396,20 @@ impl Expression {
                 // NULL and NAN index lookups are for IS NULL and IS NAN.
                 // Equality comparisons with = shouldn't yield any results, so
                 // just return an empty value set for these.
-                (Field(f, _), Constant(v)) | (Constant(v), Field(f, _)) if v.is_undefined() => {
+                (Field(f), Constant(v)) | (Constant(v), Field(f)) if v.is_undefined() => {
                     Some((f, Vec::new()))
                 }
-                (Field(f, _), Constant(v)) | (Constant(v), Field(f, _)) => Some((f, vec![v])),
+                (Field(f), Constant(v)) | (Constant(v), Field(f)) => Some((f, vec![v])),
                 _ => None,
             },
             // IS NULL index lookups should look up NULL.
             IsNull(expr) => match *expr {
-                Field(f, _) => Some((f, vec![Value::Null])),
+                Field(f) => Some((f, vec![Value::Null])),
                 _ => None,
             },
             // IS NAN index lookups should look up NAN.
             IsNaN(expr) => match *expr {
-                Field(f, _) => Some((f, vec![Value::Float(f64::NAN)])),
+                Field(f) => Some((f, vec![Value::Float(f64::NAN)])),
                 _ => None,
             },
             Or(lhs, rhs) => match (lhs.into_field_values(), rhs.into_field_values()) {
@@ -424,9 +423,9 @@ impl Expression {
     }
 
     /// Replaces field references with the given field.
-    pub fn replace_field(self, from: usize, to: usize, label: &Label) -> Self {
+    pub fn replace_field(self, from: usize, to: usize) -> Self {
         let transform = |expr| match expr {
-            Expression::Field(i, _) if i == from => Expression::Field(to, label.clone()),
+            Expression::Field(i) if i == from => Expression::Field(to),
             expr => expr,
         };
         self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible
@@ -435,7 +434,7 @@ impl Expression {
     /// Shifts any field indexes by the given amount.
     pub fn shift_field(self, diff: isize) -> Self {
         let transform = |expr| match expr {
-            Expression::Field(i, label) => Expression::Field((i as isize + diff) as usize, label),
+            Expression::Field(i) => Expression::Field((i as isize + diff) as usize),
             expr => expr,
         };
         self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible

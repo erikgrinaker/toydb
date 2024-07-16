@@ -279,13 +279,13 @@ impl Node {
             // Some nodes rearrange columns. Route them to the correct
             // upstream column where appropriate.
             Self::Aggregate { source, group_by, .. } => match group_by.get(index) {
-                Some(Expression::Field(index, _)) => source.column_label(*index),
+                Some(Expression::Field(index)) => source.column_label(*index),
                 Some(_) | None => Label::None,
             },
             Self::Projection { source, expressions, aliases } => match aliases.get(index) {
                 Some(Label::None) | None => match expressions.get(index) {
                     // Unaliased field references route to the source.
-                    Some(Expression::Field(index, _)) => source.column_label(*index),
+                    Some(Expression::Field(index)) => source.column_label(*index),
                     // Unaliased expressions don't have a name.
                     Some(_) | None => Label::None,
                 },

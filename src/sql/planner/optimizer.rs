@@ -24,8 +24,8 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
 
     // Transforms expressions.
     let transform = |expr: Expression| {
-        // If the expression is constant, evaulate it.
-        if !expr.contains(&|e| matches!(e, Expression::Field(_, _))) {
+        // If the expression is constant, evaluate it.
+        if !expr.contains(&|e| matches!(e, Expression::Field(_))) {
             return expr.evaluate(None).map(Expression::Constant);
         }
         // If the expression is a logical operator, and one of the sides is
@@ -123,7 +123,7 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         for expr in cnf {
             let (mut ref_left, mut ref_right) = (false, false);
             expr.walk(&mut |e| {
-                if let Expression::Field(index, _) = e {
+                if let Expression::Field(index) = e {
                     ref_left = ref_left || *index < left.size();
                     ref_right = ref_right || *index >= left.size();
                 }
@@ -160,19 +160,18 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         for expr in &predicate {
             // Find equijoins.
             let Expression::Equal(lhs, rhs) = expr else { continue };
-            let Expression::Field(l, lname) = lhs.as_ref() else { continue };
-            let Expression::Field(r, rname) = rhs.as_ref() else { continue };
+            let Expression::Field(l) = lhs.as_ref() else { continue };
+            let Expression::Field(r) = rhs.as_ref() else { continue };
 
             // The lhs may be a reference to the right source; swap them.
-            let (l, lname, r, rname) =
-                if l > r { (r, rname, l, lname) } else { (l, lname, r, rname) };
+            let (l, r) = if l > r { (r, l) } else { (l, r) };
 
             // Check if either side is a field lookup, and copy it over.
             if let Some(expr) = left_lookups.get(l).map(|i| push_left[*i].clone()) {
-                push_right.push(expr.replace_field(*l, *r, rname));
+                push_right.push(expr.replace_field(*l, *r));
             }
             if let Some(expr) = right_lookups.get(r).map(|i| push_right[*i].clone()) {
-                push_left.push(expr.replace_field(*r, *l, lname));
+                push_left.push(expr.replace_field(*r, *l));
             }
         }
 
@@ -260,7 +259,7 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
             predicate: Some(Expression::Equal(lhs, rhs)),
             outer,
         } => match (*lhs, *rhs) {
-            (Expression::Field(mut left_field, _), Expression::Field(mut right_field, _)) => {
+            (Expression::Field(mut left_field), Expression::Field(mut right_field)) => {
                 // The LHS field may be a field in the right table; swap them.
                 if right_field < left_field {
                     (left_field, right_field) = (right_field, left_field);
@@ -343,7 +342,7 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
                 && expressions
                     .iter()
                     .enumerate()
-                    .all(|(i, e)| matches!(e, Expression::Field(f, _) if i == *f)) =>
+                    .all(|(i, e)| matches!(e, Expression::Field(f) if i == *f)) =>
         {
             *source
         }

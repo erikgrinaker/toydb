@@ -440,7 +440,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 if let Some(index) = scope.lookup_aggregate(expr) {
                     if child_scope.lookup_aggregate(expr).is_none() {
                         child_scope.add_passthrough(scope, index, true);
-                        hidden.push(Expression::Field(index, scope.get_label(index)));
+                        hidden.push(Expression::Field(index));
                         return true;
                     }
                 }
@@ -459,7 +459,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 };
                 // Add the hidden column to the projection.
                 child_scope.add_passthrough(scope, index, true);
-                hidden.push(Expression::Field(index, scope.get_label(index)));
+                hidden.push(Expression::Field(index));
                 true
             });
         }
@@ -473,7 +473,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Look up aggregate functions or GROUP BY expressions. These were added
         // to the parent scope when building the Aggregate node, if any.
         if let Some(index) = scope.lookup_aggregate(&expr) {
-            return Ok(Field(index, scope.get_label(index)));
+            return Ok(Field(index));
         }
 
         // Helper for building a boxed expression.
@@ -490,8 +490,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Literal::String(s) => Value::String(s),
             }),
             ast::Expression::Field(table, name) => {
-                let index = scope.lookup_column(table.as_deref(), &name)?;
-                Field(index, scope.get_label(index))
+                Field(scope.lookup_column(table.as_deref(), &name)?)
             }
             // Currently, all functions are aggregates, and processed above.
             // TODO: consider adding some basic functions for fun.
