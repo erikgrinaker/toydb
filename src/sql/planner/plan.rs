@@ -34,16 +34,7 @@ pub enum Plan {
     /// to update. The given column/expression pairs specify the row updates to
     /// be made, and will be evaluated using the old row entry from source. Rows
     /// in source must be complete, existing rows from the table to update.
-    ///
-    /// TODO: the expressions string is only used when displaying the plan, i.e.
-    /// "column = expr". Consider getting rid of it, or combining it with other
-    /// label/column handling elsewhere.
-    Update {
-        table: String,
-        primary_key: usize,
-        source: Node,
-        expressions: Vec<(usize, String, Expression)>,
-    },
+    Update { table: Table, primary_key: usize, source: Node, expressions: Vec<(usize, Expression)> },
     /// A SELECT plan. Recursively executes the query plan tree and returns the
     /// resulting rows. Also includes the output column labels.
     Select { root: Node, labels: Vec<Label> },
@@ -298,7 +289,11 @@ impl std::fmt::Display for Plan {
                 source.format(f, String::new(), false, true)
             }
             Self::Update { table, source, expressions, .. } => {
-                let expressions = expressions.iter().map(|(_, l, e)| format!("{l}={e}")).join(",");
+                let expressions = expressions
+                    .iter()
+                    .map(|(i, e)| format!("{}={e}", table.columns[*i].name))
+                    .join(", ");
+                let table = &table.name;
                 write!(f, "Update: {table} ({expressions})")?;
                 source.format(f, String::new(), false, true)
             }

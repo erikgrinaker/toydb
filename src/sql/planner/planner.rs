@@ -135,10 +135,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     None => return errinput!("column {column} has no default value"),
                 },
             };
-            expressions.push((index, column, expr));
+            expressions.push((index, expr));
         }
         Ok(Plan::Update {
-            table: table.name.clone(),
+            table: table.clone(),
             primary_key: table.primary_key,
             source: Node::Scan { table, alias: None, filter },
             expressions,

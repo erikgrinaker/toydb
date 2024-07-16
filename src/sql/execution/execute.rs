@@ -48,8 +48,7 @@ pub fn execute_plan(
 
         Plan::Update { table, primary_key, source, expressions } => {
             let source = execute(source, txn)?;
-            let expressions = expressions.into_iter().map(|(i, _, expr)| (i, expr)).collect();
-            let count = write::update(txn, table, primary_key, source, expressions)?;
+            let count = write::update(txn, table.name, primary_key, source, expressions)?;
             ExecutionResult::Update { count }
         }
     })
