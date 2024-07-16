@@ -40,7 +40,7 @@ TRUE
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
 Filter: #1 > 10
-└─ Aggregate: group(test.group), max(test.int)
+└─ Aggregate: test.group, max(test.int)
    └─ Scan: test
 b, 42
 
@@ -48,7 +48,7 @@ b, 42
 ---
 Remap: #0 (dropped: #1)
 └─ Filter: #1 > 10
-   └─ Aggregate: group(test.group), max(test.int)
+   └─ Aggregate: test.group, max(test.int)
       └─ Scan: test
 b
 
@@ -56,7 +56,7 @@ b
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Filter: #1 - #2 > 10
-   └─ Aggregate: group(test.group), max(test.int), min(test.int)
+   └─ Aggregate: test.group, max(test.int), min(test.int)
       └─ Scan: test
 b, 42
 
@@ -65,7 +65,7 @@ b, 42
 ---
 Filter: m > 10
 └─ Projection: test.group, #1 as m
-   └─ Aggregate: group(test.group), max(test.int)
+   └─ Aggregate: test.group, max(test.int)
       └─ Scan: test
 b, 42
 
@@ -74,7 +74,7 @@ b, 42
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Filter: #2 > 10
-   └─ Aggregate: group(test.group), count(TRUE), max(test.int)
+   └─ Aggregate: test.group, count(TRUE), max(test.int)
       └─ Scan: test
 b, 3
 
@@ -83,7 +83,7 @@ b, 3
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Filter: #2 / #1 > 3
-   └─ Aggregate: group(test.group), count(TRUE), max(test.int)
+   └─ Aggregate: test.group, count(TRUE), max(test.int)
       └─ Scan: test
 b, 3
 
@@ -94,7 +94,7 @@ b, 3
 Remap: #0 (dropped: #1)
 └─ Filter: 2 - #1 + 1 > 1
    └─ Projection: #1, #0
-      └─ Aggregate: group(test.id % 2), count(TRUE)
+      └─ Aggregate: test.id % 2, count(TRUE)
          └─ Scan: test
 4
 3
@@ -105,7 +105,7 @@ Remap: #0 (dropped: #1)
 Remap: #0 (dropped: #1)
 └─ Filter: test.group = a
    └─ Projection: #1, test.group
-      └─ Aggregate: group(test.group), count(TRUE)
+      └─ Aggregate: test.group, count(TRUE)
          └─ Scan: test
 3
 
@@ -114,7 +114,7 @@ Remap: #0 (dropped: #1)
 Remap: #0 (dropped: #1)
 └─ Filter: test.group = a
    └─ Projection: #1, test.group
-      └─ Aggregate: group(test.group), count(TRUE)
+      └─ Aggregate: test.group, count(TRUE)
          └─ Scan: test
 3
 

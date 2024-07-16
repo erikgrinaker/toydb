@@ -473,7 +473,7 @@ Order: o.id desc, t.id asc
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC
 ---
 Order: #1 desc
-└─ Aggregate: group(test.bool), max(test.int)
+└─ Aggregate: test.bool, max(test.int)
    └─ Scan: test
 NULL, 1000
 TRUE, 0
@@ -483,7 +483,7 @@ FALSE, -1
 ---
 Remap: #0 (dropped: #1)
 └─ Order: #1 desc
-   └─ Aggregate: group(test.bool), max(test.int)
+   └─ Aggregate: test.bool, max(test.int)
       └─ Scan: test
 NULL
 TRUE
@@ -493,7 +493,7 @@ FALSE
 ---
 Remap: #0, #1 (dropped: #2)
 └─ Order: #1 - #2 desc
-   └─ Aggregate: group(test.bool), max(test.int), min(test.int)
+   └─ Aggregate: test.bool, max(test.int), min(test.int)
       └─ Scan: test
 NULL, 1000
 FALSE, -1
@@ -506,7 +506,7 @@ TRUE, 0
 Remap: #0 (dropped: #1)
 └─ Order: 2 - #1 + 1 > 1 asc
    └─ Projection: #1, #0
-      └─ Aggregate: group(test.id % 2), count(TRUE)
+      └─ Aggregate: test.id % 2, count(TRUE)
          └─ Scan: test
 5
 5
@@ -517,7 +517,7 @@ Remap: #0 (dropped: #1)
 Remap: #0 (dropped: #1)
 └─ Order: test.bool asc
    └─ Projection: #1, test.bool
-      └─ Aggregate: group(test.bool), count(TRUE)
+      └─ Aggregate: test.bool, count(TRUE)
          └─ Scan: test
 8
 1
@@ -528,7 +528,7 @@ Remap: #0 (dropped: #1)
 Remap: #0 (dropped: #1)
 └─ Order: test.bool asc
    └─ Projection: #1, test.bool
-      └─ Aggregate: group(test.bool), count(TRUE)
+      └─ Aggregate: test.bool, count(TRUE)
          └─ Scan: test
 8
 1

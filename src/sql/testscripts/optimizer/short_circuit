@@ -191,10 +191,10 @@ foo, bar
 ---
 Initial:
    Projection: test.id, #1, #2
-   └─ Aggregate: group(test.id), min(test.id), max(test.id)
+   └─ Aggregate: test.id, min(test.id), max(test.id)
       └─ Scan: test
 Short circuit:
-   Aggregate: group(test.id), min(test.id), max(test.id)
+   Aggregate: test.id, min(test.id), max(test.id)
    └─ Scan: test
 1, 1, 1
 2, 2, 2

@@ -419,7 +419,7 @@ impl Node {
             Self::Aggregate { source, aggregates, group_by } => {
                 let aggregates = group_by
                     .iter()
-                    .map(|group| format!("group({group})"))
+                    .map(|group| group.to_string())
                     .chain(aggregates.iter().map(|agg| agg.to_string()))
                     .join(", ");
                 write!(f, "Aggregate: {aggregates}")?;
