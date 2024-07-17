@@ -237,35 +237,8 @@ impl Node {
         })
     }
 
-    /// Returns the table name of the node, if any. Only used for display purposes.
-    pub fn name(&self) -> Option<String> {
-        match self {
-            // These nodes are the ones that actually provide names.
-            Self::IndexLookup { table, alias, .. }
-            | Self::KeyLookup { table, alias, .. }
-            | Self::Scan { table, alias, .. } => match alias {
-                Some(alias) => Some(alias.clone()),
-                None => Some(table.name.clone()),
-            },
-
-            // Most nodes just pass through the name from the source.
-            Self::Aggregate { source, .. }
-            | Self::Filter { source, .. }
-            | Self::Limit { source, .. }
-            | Self::Offset { source, .. }
-            | Self::Order { source, .. }
-            | Self::Projection { source, .. }
-            | Self::Remap { source, .. } => source.name(),
-
-            // Some can't have names.
-            Self::HashJoin { .. }
-            | Self::NestedLoopJoin { .. }
-            | Self::Nothing { .. }
-            | Self::Values { .. } => None,
-        }
-    }
-
-    /// Returns a label for a column, if any. Only used for display purposes.
+    /// Returns a label for a column, if any. Only used as query result headers
+    /// and for display purposes, not to look up expression columns (see Scope).
     pub fn column_label(&self, index: usize) -> Label {
         match self {
             // Source nodes use the table/column name.
