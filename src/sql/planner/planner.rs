@@ -492,9 +492,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
             ast::Expression::Column(table, name) => {
                 Column(scope.lookup_column(table.as_deref(), &name)?)
             }
-            // Currently, all functions are aggregates, and processed above.
-            // TODO: consider adding some basic functions for fun.
-            ast::Expression::Function(name, _) => return errinput!("unknown function {name}"),
+            ast::Expression::Function(name, mut args) => match (name.as_str(), args.len()) {
+                // NB: aggregate functions are processed above.
+                ("sqrt", 1) => SquareRoot(build(Box::new(args.remove(0)))?),
+                (name, n) => return errinput!("unknown function {name} with {n} arguments"),
+            },
             ast::Expression::Operator(op) => match op {
                 ast::Operator::And(lhs, rhs) => And(build(lhs)?, build(rhs)?),
                 ast::Operator::Not(expr) => Not(build(expr)?),

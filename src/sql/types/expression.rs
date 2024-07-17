@@ -52,6 +52,8 @@ pub enum Expression {
     Multiply(Box<Expression>, Box<Expression>),
     /// Negates the given number: -a.
     Negate(Box<Expression>),
+    /// Takes the square root of a number: √a.
+    SquareRoot(Box<Expression>),
     /// Subtracts two numbers: a - b.
     Subtract(Box<Expression>, Box<Expression>),
 
@@ -88,6 +90,7 @@ impl Expression {
             Self::Modulo(lhs, rhs) => format!("{} % {}", format(lhs), format(rhs)),
             Self::Multiply(lhs, rhs) => format!("{} * {}", format(lhs), format(rhs)),
             Self::Negate(expr) => format!("-{}", format(expr)),
+            Self::SquareRoot(expr) => format!("sqrt({})", format(expr)),
             Self::Subtract(lhs, rhs) => format!("{} - {}", format(lhs), format(rhs)),
 
             Self::Like(lhs, rhs) => format!("{} LIKE {}", format(lhs), format(rhs)),
@@ -202,6 +205,12 @@ impl Expression {
                 Null => Null,
                 value => return errinput!("can't negate {value}"),
             },
+            Self::SquareRoot(expr) => match expr.evaluate(row)? {
+                Integer(i) if i >= 0 => Float((i as f64).sqrt()),
+                Float(f) => Float(f.sqrt()),
+                Null => Null,
+                value => return errinput!("can't take square root of {value}"),
+            },
             Self::Subtract(lhs, rhs) => lhs.evaluate(row)?.checked_sub(&rhs.evaluate(row)?)?,
 
             // LIKE pattern matching, using _ and % as single- and
@@ -242,7 +251,8 @@ impl Expression {
                 | Self::IsNaN(expr)
                 | Self::IsNull(expr)
                 | Self::Negate(expr)
-                | Self::Not(expr) => expr.walk(visitor),
+                | Self::Not(expr)
+                | Self::SquareRoot(expr) => expr.walk(visitor),
 
                 Self::Constant(_) | Self::Column(_) => true,
             }
@@ -281,6 +291,7 @@ impl Expression {
             Self::Modulo(lhs, rhs) => Self::Modulo(transform(lhs)?, transform(rhs)?),
             Self::Multiply(lhs, rhs) => Self::Multiply(transform(lhs)?, transform(rhs)?),
             Self::Or(lhs, rhs) => Self::Or(transform(lhs)?, transform(rhs)?),
+            Self::SquareRoot(expr) => Self::SquareRoot(transform(expr)?),
             Self::Subtract(lhs, rhs) => Self::Subtract(transform(lhs)?, transform(rhs)?),
 
             Self::Factorial(expr) => Self::Factorial(transform(expr)?),

@@ -183,7 +183,7 @@ Error: invalid input: unknown column mod
 # GROUP BY can't use aggregate functions.
 !> SELECT COUNT(*) FROM test GROUP BY MIN(id)
 ---
-Error: invalid input: unknown function min
+Error: invalid input: unknown function min with 1 arguments
 
 # GROUP BY works with multiple groups.
 [plan]> SELECT "group", "bool", COUNT(*) FROM test GROUP BY "group", "bool"

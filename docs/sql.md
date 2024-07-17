@@ -157,6 +157,10 @@ The operator precedence (order of operations) is as follows:
 
 Precedence can be overridden by wrapping an expression in parentheses, e.g. `(1 + 2) * 3`.
 
+### Functions
+
+* `sqrt(expr)`: returns the square root of a numerical argument.
+
 ### Aggregate functions
 
 Aggregate function aggregate an expression across all rows, optionally grouped into buckets given by `GROUP BY`, and results can be filtered via `HAVING`.

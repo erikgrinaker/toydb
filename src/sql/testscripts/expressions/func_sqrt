@@ -1,0 +1,52 @@
+# Tests sqrt().
+
+# Integers work, and return floats.
+[expr]> sqrt(2)
+[expr]> sqrt(100)
+---
+Float(1.4142135623730951) ← SquareRoot(Constant(Integer(2)))
+Float(10.0) ← SquareRoot(Constant(Integer(100)))
+
+# Negative integers error, but 0 is valid.
+!> sqrt(-1)
+> sqrt(0)
+---
+Error: invalid input: can't take square root of -1
+Float(0.0)
+
+# Floats work.
+> sqrt(3.14)
+> sqrt(100.0)
+---
+Float(1.772004514666935)
+Float(10.0)
+
+# Negative floats work, but return NAN.
+> sqrt(-1.0)
+---
+Float(NaN)
+
+# Test various special float values.
+> sqrt(-0.0)
+> sqrt(0.0)
+> sqrt(NAN)
+> sqrt(INFINITY)
+> sqrt(-INFINITY)
+---
+Float(-0.0)
+Float(0.0)
+Float(NaN)
+Float(inf)
+Float(NaN)
+
+# NULL is passed through.
+> sqrt(NULL)
+---
+Null
+
+# Strings and booleans error.
+!> sqrt(TRUE)
+!> sqrt('foo')
+---
+Error: invalid input: can't take square root of TRUE
+Error: invalid input: can't take square root of foo
