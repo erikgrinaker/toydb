@@ -17,7 +17,7 @@ crossbeam = { version = "0.8.4", features = ["crossbeam-channel"] }
 dyn-clone = "1.0.17"
 fs4 = "0.8.2"
 hdrhistogram = "7.5.4"
-itertools = "0.12.1"
+itertools = "0.13.0"
 log = "0.4.21"
 petname = "2.0.2"
 rand = "0.8.5"
