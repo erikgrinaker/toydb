@@ -1,7 +1,7 @@
-use crate::error::{Error, Result};
+use crate::errinput;
+use crate::error::Result;
 use crate::sql::engine::Transaction;
 use crate::sql::types::{Expression, Rows, Table};
-use crate::{errdata, errinput};
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -14,8 +14,7 @@ pub(super) fn delete(
     source: Rows,
 ) -> Result<u64> {
     let ids = source
-        // TODO: consider moving this out to a helper.
-        .map(|r| r.and_then(|row| row.into_iter().nth(primary_key).ok_or(errdata!("short row"))))
+        .map(|r| r.map(|row| row.into_iter().nth(primary_key).expect("short row")))
         .collect::<Result<Vec<_>>>()?;
     let count = ids.len() as u64;
     txn.delete(&table, &ids)?;
@@ -90,7 +89,7 @@ pub(super) fn update(
         for (column, expr) in &expressions {
             new[*column] = expr.evaluate(Some(&row))?;
         }
-        let id = row.into_iter().nth(primary_key).ok_or::<Error>(errdata!("short row"))?;
+        let id = row.into_iter().nth(primary_key).expect("short row");
         updates.insert(id, new);
     }
     let count = updates.len() as u64;

@@ -278,8 +278,6 @@ pub mod test {
     /// An engine that wraps two others and mirrors operations across them,
     /// panicking if they produce different results. Engine implementations
     /// should not have any observable differences in behavior.
-    ///
-    /// TODO: use this in more tests, e.g. SQL tests.
     pub struct Mirror<A: Engine, B: Engine> {
         pub a: A,
         pub b: B,

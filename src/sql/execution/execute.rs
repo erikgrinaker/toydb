@@ -56,73 +56,71 @@ pub fn execute_plan(
 }
 
 /// Recursively executes a query plan node, returning a row iterator.
-///
-/// TODO: since iterators are lazy, make this infallible if possible.
 pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
-    match node {
+    Ok(match node {
         Node::Aggregate { source, group_by, aggregates } => {
             let source = execute(*source, txn)?;
-            aggregate::aggregate(source, group_by, aggregates)
+            aggregate::aggregate(source, group_by, aggregates)?
         }
 
         Node::Filter { source, predicate } => {
             let source = execute(*source, txn)?;
-            Ok(transform::filter(source, predicate))
+            transform::filter(source, predicate)
         }
 
         Node::HashJoin { left, left_column, right, right_column, outer } => {
             let right_size = right.size();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
-            join::hash(left, left_column, right, right_column, right_size, outer)
+            join::hash(left, left_column, right, right_column, right_size, outer)?
         }
 
         Node::IndexLookup { table, column, values, alias: _ } => {
             let column = table.columns.into_iter().nth(column).expect("invalid column").name;
             let table = table.name;
-            source::lookup_index(txn, table, column, values)
+            source::lookup_index(txn, table, column, values)?
         }
 
-        Node::KeyLookup { table, keys, alias: _ } => source::lookup_key(txn, table.name, keys),
+        Node::KeyLookup { table, keys, alias: _ } => source::lookup_key(txn, table.name, keys)?,
 
         Node::Limit { source, limit } => {
             let source = execute(*source, txn)?;
-            Ok(transform::limit(source, limit))
+            transform::limit(source, limit)
         }
 
         Node::NestedLoopJoin { left, right, predicate, outer } => {
             let right_size = right.size();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
-            join::nested_loop(left, right, right_size, predicate, outer)
+            join::nested_loop(left, right, right_size, predicate, outer)?
         }
 
-        Node::Nothing { .. } => Ok(source::nothing()),
+        Node::Nothing { .. } => source::nothing(),
 
         Node::Offset { source, offset } => {
             let source = execute(*source, txn)?;
-            Ok(transform::offset(source, offset))
+            transform::offset(source, offset)
         }
 
         Node::Order { source, orders } => {
             let source = execute(*source, txn)?;
-            transform::order(source, orders)
+            transform::order(source, orders)?
         }
 
         Node::Projection { source, expressions, aliases: _ } => {
             let source = execute(*source, txn)?;
-            Ok(transform::project(source, expressions))
+            transform::project(source, expressions)
         }
 
         Node::Remap { source, targets } => {
             let source = execute(*source, txn)?;
-            Ok(transform::remap(source, targets))
+            transform::remap(source, targets)
         }
 
-        Node::Scan { table, filter, alias: _ } => source::scan(txn, table, filter),
+        Node::Scan { table, filter, alias: _ } => source::scan(txn, table, filter)?,
 
-        Node::Values { rows } => Ok(source::values(rows)),
-    }
+        Node::Values { rows } => source::values(rows),
+    })
 }
 
 /// A plan execution result.

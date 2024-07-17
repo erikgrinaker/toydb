@@ -361,8 +361,6 @@ impl<'a> From<&'a Value> for Cow<'a, Value> {
 pub type Row = Vec<Value>;
 
 /// A row iterator.
-///
-/// TODO: try to avoid boxing here.
 pub type Rows = Box<dyn RowIterator>;
 
 /// A row iterator trait, which requires it to be clonable and object-safe. It
