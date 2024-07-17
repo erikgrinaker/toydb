@@ -122,9 +122,9 @@ impl Iterator for NestedLoopIterator {
 /// TODO: add more tests for the multiple match case.
 pub(super) fn hash(
     left: Rows,
-    left_field: usize,
+    left_column: usize,
     right: Rows,
-    right_field: usize,
+    right_column: usize,
     right_size: usize,
     outer: bool,
 ) -> Result<Rows> {
@@ -132,7 +132,7 @@ pub(super) fn hash(
     let mut rows = right;
     let mut right: HashMap<Value, Vec<Row>> = HashMap::new();
     while let Some(row) = rows.next().transpose()? {
-        let id = row[right_field].clone();
+        let id = row[right_column].clone();
         right.entry(id).or_default().push(row);
     }
 
@@ -146,7 +146,7 @@ pub(super) fn hash(
             return Box::new(std::iter::once(result));
         };
         // Join the left row with any matching right rows.
-        match right.get(&row[left_field]) {
+        match right.get(&row[left_column]) {
             Some(matches) => Box::new(
                 std::iter::once(row)
                     .cartesian_product(matches.clone())

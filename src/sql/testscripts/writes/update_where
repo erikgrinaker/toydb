@@ -105,4 +105,4 @@ Error: invalid input: unexpected end of input
 # Missing column errors.
 !> UPDATE name SET value = 'foo' WHERE missing = 'foo'
 ---
-Error: invalid input: unknown field missing
+Error: invalid input: unknown column missing

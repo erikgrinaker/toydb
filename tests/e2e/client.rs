@@ -225,7 +225,7 @@ fn execute() -> Result<()> {
     );
     assert_eq!(
         c.execute("DELETE FROM genres WHERE x = 1"),
-        Err(Error::InvalidInput("unknown field x".into()))
+        Err(Error::InvalidInput("unknown column x".into()))
     );
 
     Ok(())

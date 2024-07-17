@@ -349,10 +349,10 @@ Remap: test.id (dropped: test.float, test.int)
 4, 1000000
 5, 1000000
 
-# Errors if the field is ambiguous.
+# Errors if the column is ambiguous.
 !> SELECT id, "int" ^ 2 AS foo, "int" AS foo FROM test ORDER BY foo ASC
 ---
-Error: invalid input: ambiguous field foo
+Error: invalid input: ambiguous column foo
 
 # Prefers alias over table column if ambiguous, but not if fully qualified.
 [plan]> SELECT id AS "int" FROM test ORDER BY "int" DESC
@@ -394,8 +394,8 @@ Remap: int (dropped: test.int)
 !> SELECT * FROM test ORDER BY unknown.id
 !> SELECT * FROM test AS t ORDER BY test."int"
 ---
-Error: invalid input: unknown field unknown
-Error: invalid input: unknown field test.unknown
+Error: invalid input: unknown column unknown
+Error: invalid input: unknown column test.unknown
 Error: invalid input: unknown table unknown
 Error: invalid input: unknown table test
 
@@ -409,12 +409,12 @@ Error: invalid input: unexpected token unknown
 ---
 Error: invalid input: unexpected end of input
 
-# Errors on ambiguous fields.
+# Errors on ambiguous columns.
 !> SELECT * FROM test, other ORDER BY id DESC
 ---
-Error: invalid input: ambiguous field id
+Error: invalid input: ambiguous column id
 
-# Works with qualified fields, even when aliased.
+# Works with qualified columns, even when aliased.
 [plan]> SELECT * FROM test, other ORDER BY other.id DESC
 ---
 Order: other.id desc
@@ -534,7 +534,7 @@ Remap: #0 (dropped: test.bool)
 1
 1
 
-# ORDER BY errors on fields not in the SELECT or GROUP BY clauses.
+# ORDER BY errors on columns not in the SELECT or GROUP BY clauses.
 !> SELECT "bool", COUNT(*) FROM test GROUP BY "bool" ORDER BY id
 ---
-Error: invalid input: field id must be used in an aggregate or GROUP BY expression
+Error: invalid input: column id must be used in an aggregate or GROUP BY expression

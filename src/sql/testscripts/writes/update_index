@@ -45,7 +45,7 @@ storage delete mvcc:TxnWrite(3, sql:Index(index.string, "foo")) ["\x03\x00\x00\x
 storage delete mvcc:TxnWrite(3, sql:Row(index, 1)) ["\x03\x00\x00\x00\x00\x00\x00\x00\x03\x02index\x00\xff\x00\xff\x02\x80\x00\xff\x00\xff\x00\xff\x00\xff\x00\xff\x00\xff\x01\x00\x00"]
 storage delete mvcc:TxnActive(3) ["\x01\x00\x00\x00\x00\x00\x00\x00\x03"]
 
-# A single-field update only updates the relevant index.
+# A single-column update only updates the relevant index.
 [ops]> UPDATE "index" SET "bool" = TRUE
 ---
 storage set mvcc:NextVersion → 5 ["\x00" → "\x05"]

@@ -62,7 +62,7 @@ Limit: 2
 
 !> SELECT * FROM test LIMIT id
 ---
-Error: invalid input: expression must be constant, found field id
+Error: invalid input: expression must be constant, found column id
 
 # Negative and NULL limits error.
 !> SELECT * FROM test LIMIT -1

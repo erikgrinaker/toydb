@@ -405,11 +405,11 @@ impl Label {
 }
 
 impl From<Label> for ast::Expression {
-    /// Builds an ast::Expression::Field for a label. Can't be None.
+    /// Builds an ast::Expression::Column for a label. Can't be None.
     fn from(label: Label) -> Self {
         match label {
-            Label::Qualified(table, column) => ast::Expression::Field(Some(table), column),
-            Label::Unqualified(column) => ast::Expression::Field(None, column),
+            Label::Qualified(table, column) => ast::Expression::Column(Some(table), column),
+            Label::Unqualified(column) => ast::Expression::Column(None, column),
             Label::None => panic!("can't convert None label to AST expression"), // shouldn't happen
         }
     }

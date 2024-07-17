@@ -510,7 +510,7 @@ impl<'a> Parser<'a> {
     /// Parses an expression atom. This is either:
     ///
     /// * A literal value.
-    /// * A field name.
+    /// * A column name.
     /// * A function call.
     /// * A parenthesized expression.
     fn parse_expression_atom(&mut self) -> Result<ast::Expression> {
@@ -544,11 +544,11 @@ impl<'a> Parser<'a> {
                 ast::Expression::Function(name, args)
             }
 
-            // Field name, either qualified as table.field or unqualified.
+            // Column name, either qualified as table.column or unqualified.
             Token::Ident(table) if self.next_is(Token::Period) => {
-                ast::Expression::Field(Some(table), self.next_ident()?)
+                ast::Expression::Column(Some(table), self.next_ident()?)
             }
-            Token::Ident(field) => ast::Expression::Field(None, field),
+            Token::Ident(column) => ast::Expression::Column(None, column),
 
             // Parenthesized expression.
             Token::OpenParen => {

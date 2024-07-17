@@ -184,17 +184,17 @@ impl TryFrom<StatementResult> for Row {
     }
 }
 
-/// Extracts the value of the first field in the first row.
+/// Extracts the value of the first column in the first row.
 impl TryFrom<StatementResult> for Value {
     type Error = Error;
 
     fn try_from(result: StatementResult) -> Result<Self> {
         let row: Row = result.try_into()?;
-        row.into_iter().next().ok_or(errdata!("no fields returned"))
+        row.into_iter().next().ok_or(errdata!("no columns returned"))
     }
 }
 
-/// Extracts the first boolean value of the first field in the first row.
+/// Extracts the first boolean value of the first column in the first row.
 impl TryFrom<StatementResult> for bool {
     type Error = Error;
 
@@ -204,7 +204,7 @@ impl TryFrom<StatementResult> for bool {
     }
 }
 
-/// Extracts the first f64 value of the first field in the first row.
+/// Extracts the first f64 value of the first column in the first row.
 impl TryFrom<StatementResult> for f64 {
     type Error = Error;
 
@@ -214,7 +214,7 @@ impl TryFrom<StatementResult> for f64 {
     }
 }
 
-/// Extracts the first i64 value of the first field in the first row.
+/// Extracts the first i64 value of the first column in the first row.
 impl TryFrom<StatementResult> for i64 {
     type Error = Error;
 
@@ -224,7 +224,7 @@ impl TryFrom<StatementResult> for i64 {
     }
 }
 
-/// Extracts the first string value of the first field in the first row.
+/// Extracts the first string value of the first column in the first row.
 impl TryFrom<StatementResult> for String {
     type Error = Error;
 

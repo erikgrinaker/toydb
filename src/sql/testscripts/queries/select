@@ -1,6 +1,6 @@
 # Tests the SELECT part of queries.
 
-# Create a basic test table, and a secondary table for join field lookups.
+# Create a basic test table, and a secondary table for join column lookups.
 > CREATE TABLE test ( \
     id INT PRIMARY KEY, \
     "bool" BOOLEAN, \
@@ -37,7 +37,7 @@ NULL, TRUE, 5, 6.28, Hi 👋
 ---
 Error: invalid input: unexpected end of input
 Error: invalid input: unexpected end of input
-Error: invalid input: expression must be constant, found field foo
+Error: invalid input: expression must be constant, found column foo
 
 # Select from a table.
 [plan,header]> SELECT * FROM test
@@ -64,7 +64,7 @@ NULL
 Error: invalid input: SELECT * requires a FROM clause
 Error: invalid input: unexpected end of input
 
-# Mix fields, field expressions, and constant expressions.
+# Mix columns, column expressions, and constant expressions.
 [plan,header]> SELECT id, 7-4, "float"^2 FROM test
 ---
 Projection: test.id, 3, test.float ^ 2
@@ -109,8 +109,8 @@ t.id, t.bool
 !> SELECT test.id FROM test AS t
 ---
 Error: invalid input: table unknown does not exist
-Error: invalid input: unknown field unknown
-Error: invalid input: unknown field test.unknown
+Error: invalid input: unknown column unknown
+Error: invalid input: unknown column test.unknown
 Error: invalid input: unexpected token .
 Error: invalid input: unknown table unknown
 Error: invalid input: unknown table test
@@ -136,8 +136,8 @@ integer, hi 👋
 !> SELECT 1 AS one, one + 1
 !> SELECT id AS alias, alias + 1 FROM test
 ---
-Error: invalid input: expression must be constant, found field one
-Error: invalid input: unknown field alias
+Error: invalid input: expression must be constant, found column one
+Error: invalid input: unknown column alias
 
 # Aliases can have the same name as table columns, but won't shadow them.
 [header]> SELECT 'foo' AS id, id, id + 3 FROM test
@@ -167,12 +167,12 @@ Error: invalid input: unexpected token .
 Error: invalid input: unexpected end of input
 Error: invalid input: unexpected token AS
 
-# Ambiguous fields error.
+# Ambiguous columns error.
 !> SELECT id FROM test, other
 ---
-Error: invalid input: ambiguous field id
+Error: invalid input: ambiguous column id
 
-# Unambiguous fields don't, resulting in a cross join.
+# Unambiguous columns don't, resulting in a cross join.
 > SELECT "bool", value FROM test, other
 ---
 TRUE, a
@@ -182,7 +182,7 @@ FALSE, b
 NULL, a
 NULL, b
 
-# Qualified fields work, also when aliased.
+# Qualified columns work, also when aliased.
 > SELECT test.id, other.id FROM test, other
 ---
 1, 1

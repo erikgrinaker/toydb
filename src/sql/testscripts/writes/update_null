@@ -21,4 +21,4 @@ ok
 !> UPDATE name SET non_null = NULL
 ---
 Error: invalid input: invalid primary key NULL
-Error: invalid input: unknown field non_null
+Error: invalid input: unknown column non_null

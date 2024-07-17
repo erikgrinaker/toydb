@@ -479,7 +479,7 @@ ast::Statement::Select{
 
 The parser will interpret the SQL _syntax_, determining the type of query and its parameters,
 returning an error for any invalid syntax. However, it has no idea if the table `people`
-actually exists, or if the field `birthyear` is an integer - that is the job of the planner.
+actually exists, or if the column `birthyear` is an integer - that is the job of the planner.
 
 Notably, the parser also parses expressions, such as `1 + 2 * 3`. This is non-trivial due to
 precedence rules, i.e. `2 * 3` should be evaluated first, but not if there are parentheses

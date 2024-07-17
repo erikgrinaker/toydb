@@ -64,7 +64,7 @@ mvcc:Version(sql:Row(name, 4), 3) → 4,"d" ["\x04\x02name\x00\xff\x00\xff\x02\x
 
 !> INSERT INTO name VALUES (id + 2, 'abc')
 ---
-Error: invalid input: expression must be constant, found field id
+Error: invalid input: expression must be constant, found column id
 
 # INSERTs with too many columns errors. Fewer are tested by insert_default.
 !> INSERT INTO name VALUES (6, 'e', NULL)

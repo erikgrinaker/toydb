@@ -111,7 +111,7 @@ b
 # GROUP BY does not work with SELECT aliases (also the case in e.g. SQL server).
 !> SELECT "group" AS g, COUNT(*) FROM test GROUP BY g
 ---
-Error: invalid input: unknown field g
+Error: invalid input: unknown column g
 
 [plan]> SELECT "group", COUNT(*) FROM test AS t GROUP BY t."group"
 ---
@@ -128,13 +128,13 @@ Error: invalid input: unknown table test
 # It errors when there is a non-group column.
 !> SELECT "group", id FROM test GROUP BY "group"
 ---
-Error: invalid input: field id must be used in an aggregate or GROUP BY expression
+Error: invalid input: column id must be used in an aggregate or GROUP BY expression
 
 # It errors on unknown tables and columns.
 !> SELECT COUNT(*) FROM test GROUP BY unknown
 !> SELECT COUNT(*) FROM test GROUP BY unknown.id
 ---
-Error: invalid input: unknown field unknown
+Error: invalid input: unknown column unknown
 Error: invalid input: unknown table unknown
 
 # GROUP BY can be arbitrary expressions.
@@ -178,7 +178,7 @@ NULL
 # GROUP BY can't use an aliased expression.
 !> SELECT id % 2 AS mod, COUNT(*) FROM test GROUP BY mod
 ---
-Error: invalid input: unknown field mod
+Error: invalid input: unknown column mod
 
 # GROUP BY can't use aggregate functions.
 !> SELECT COUNT(*) FROM test GROUP BY MIN(id)
@@ -218,7 +218,7 @@ Aggregate: t.id % 2, count(TRUE)
 # SELECT * requires all columns to be in GROUP BY.
 !> SELECT * FROM test GROUP BY id
 ---
-Error: invalid input: field test.group must be used in an aggregate or GROUP BY expression
+Error: invalid input: column test.group must be used in an aggregate or GROUP BY expression
 
 [plan]> SELECT * FROM test GROUP BY id, "group", "bool", "int", "float", "string"
 ---

@@ -82,15 +82,15 @@ pub enum Node {
     /// Filters source rows, by only emitting rows for which the predicate
     /// evaluates to true.
     Filter { source: Box<Node>, predicate: Expression },
-    /// Joins the left and right sources on the given fields by building an
+    /// Joins the left and right sources on the given columns by building an
     /// in-memory hashmap of the right source and looking up matches for each
     /// row in the left source. When outer is true (e.g. LEFT JOIN), a left row
     /// without a right match is emitted anyway, with NULLs for the right row.
     HashJoin {
         left: Box<Node>,
-        left_field: usize,
+        left_column: usize,
         right: Box<Node>,
-        right_field: usize,
+        right_column: usize,
         outer: bool,
     },
     /// Looks up the given values in a secondary index and emits matching rows.
@@ -149,11 +149,11 @@ impl Node {
             Self::Filter { source, predicate } => {
                 Self::Filter { source: transform(source)?, predicate }
             }
-            Self::HashJoin { left, left_field, right, right_field, outer } => Self::HashJoin {
+            Self::HashJoin { left, left_column, right, right_column, outer } => Self::HashJoin {
                 left: transform(left)?,
-                left_field,
+                left_column,
                 right: transform(right)?,
-                right_field,
+                right_column,
                 outer,
             },
             Self::Limit { source, limit } => Self::Limit { source: transform(source)?, limit },
@@ -252,13 +252,13 @@ impl Node {
             // Some nodes rearrange columns. Route them to the correct
             // upstream column where appropriate.
             Self::Aggregate { source, group_by, .. } => match group_by.get(index) {
-                Some(Expression::Field(index)) => source.column_label(*index),
+                Some(Expression::Column(index)) => source.column_label(*index),
                 Some(_) | None => Label::None,
             },
             Self::Projection { source, expressions, aliases } => match aliases.get(index) {
                 Some(Label::None) | None => match expressions.get(index) {
-                    // Unaliased field references route to the source.
-                    Some(Expression::Field(index)) => source.column_label(*index),
+                    // Unaliased column references route to the source.
+                    Some(Expression::Column(index)) => source.column_label(*index),
                     // Unaliased expressions don't have a name.
                     Some(_) | None => Label::None,
                 },
@@ -403,14 +403,14 @@ impl Node {
                 write!(f, "Filter: {}", predicate.format(source))?;
                 source.format(f, prefix, false, true)?;
             }
-            Self::HashJoin { left, left_field, right, right_field, outer } => {
+            Self::HashJoin { left, left_column, right, right_column, outer } => {
                 let kind = if *outer { "outer" } else { "inner" };
-                let left_label = match left.column_label(*left_field) {
-                    Label::None => format!("left #{left_field}"),
+                let left_label = match left.column_label(*left_column) {
+                    Label::None => format!("left #{left_column}"),
                     label => format!("{label}"),
                 };
-                let right_label = match right.column_label(*right_field) {
-                    Label::None => format!("right #{right_field}"),
+                let right_label = match right.column_label(*right_column) {
+                    Label::None => format!("right #{right_column}"),
                     label => format!("{label}"),
                 };
                 write!(f, "HashJoin: {kind} on {left_label} = {right_label}")?;

@@ -414,7 +414,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         aggregates
     }
 
-    /// Builds hidden columns for a projection to pass through fields that are
+    /// Builds hidden columns for a projection to pass through columns that are
     /// used by downstream nodes. Consider e.g.:
     ///
     /// SELECT id FROM table ORDER BY value
@@ -440,13 +440,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 if let Some(index) = scope.lookup_aggregate(expr) {
                     if child_scope.lookup_aggregate(expr).is_none() {
                         child_scope.add_passthrough(scope, index, true);
-                        hidden.push(Expression::Field(index));
+                        hidden.push(Expression::Column(index));
                         return true;
                     }
                 }
 
-                // Look for field references that don't exist post-projection.
-                let ast::Expression::Field(table, column) = expr else {
+                // Look for column references that don't exist post-projection.
+                let ast::Expression::Column(table, column) = expr else {
                     return true;
                 };
                 if child_scope.lookup_column(table.as_deref(), column).is_ok() {
@@ -459,7 +459,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 };
                 // Add the hidden column to the projection.
                 child_scope.add_passthrough(scope, index, true);
-                hidden.push(Expression::Field(index));
+                hidden.push(Expression::Column(index));
                 true
             });
         }
@@ -473,7 +473,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Look up aggregate functions or GROUP BY expressions. These were added
         // to the parent scope when building the Aggregate node, if any.
         if let Some(index) = scope.lookup_aggregate(&expr) {
-            return Ok(Field(index));
+            return Ok(Column(index));
         }
 
         // Helper for building a boxed expression.
@@ -489,8 +489,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Literal::Float(f) => Value::Float(f),
                 ast::Literal::String(s) => Value::String(s),
             }),
-            ast::Expression::Field(table, name) => {
-                Field(scope.lookup_column(table.as_deref(), &name)?)
+            ast::Expression::Column(table, name) => {
+                Column(scope.lookup_column(table.as_deref(), &name)?)
             }
             // Currently, all functions are aggregates, and processed above.
             // TODO: consider adding some basic functions for fun.
@@ -547,7 +547,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 /// the plan and used during execution.
 pub struct Scope {
     /// The currently visible columns. If empty, only constant expressions can
-    /// be used (no field references).
+    /// be used (no column references).
     columns: Vec<Label>,
     /// Index of currently visible tables, by query name (e.g. may be aliased).
     tables: HashSet<String>,
@@ -625,7 +625,7 @@ impl Scope {
     fn lookup_column(&self, table: Option<&str>, name: &str) -> Result<usize> {
         let fmtname = || table.map(|table| format!("{table}.{name}")).unwrap_or(name.to_string());
         if self.columns.is_empty() {
-            return errinput!("expression must be constant, found field {}", fmtname());
+            return errinput!("expression must be constant, found column {}", fmtname());
         }
         if let Some(table) = table {
             if !self.tables.contains(table) {
@@ -636,17 +636,17 @@ impl Scope {
             }
         } else if let Some(indexes) = self.unqualified.get(name) {
             if indexes.len() > 1 {
-                return errinput!("ambiguous field {name}");
+                return errinput!("ambiguous column {name}");
             }
             return Ok(indexes[0]);
         }
         if !self.aggregates.is_empty() {
             return errinput!(
-                "field {} must be used in an aggregate or GROUP BY expression",
+                "column {} must be used in an aggregate or GROUP BY expression",
                 fmtname()
             );
         }
-        errinput!("unknown field {}", fmtname())
+        errinput!("unknown column {}", fmtname())
     }
 
     /// Adds an aggregate expression to the scope, returning the new column
@@ -661,7 +661,7 @@ impl Scope {
         // If this is a simple column reference (i.e. GROUP BY foo), pass
         // through the column label from the parent scope for lookups.
         let mut label = Label::None;
-        if let ast::Expression::Field(table, column) = expr {
+        if let ast::Expression::Column(table, column) = expr {
             // Ignore errors, they will be emitted when building the expression.
             if let Ok(index) = parent.lookup_column(table.as_deref(), column.as_str()) {
                 label = parent.columns[index].clone();
@@ -715,10 +715,10 @@ impl Scope {
     }
 
     /// Projects the scope via the given expressions and aliases, creating a new
-    /// child scope with one column per expression. These may be a simple field
+    /// child scope with one column per expression. These may be a simple column
     /// reference (e.g. "SELECT a, b FROM table"), which passes through the
     /// corresponding column from the original scope and retains its qualified
-    /// and unqualified names. Otherwise, for non-trivial field references, a
+    /// and unqualified names. Otherwise, for non-trivial column references, a
     /// new column is created for the expression. Explicit aliases may be given.
     fn project(&self, expressions: &[(ast::Expression, Option<String>)]) -> Self {
         let mut child = self.spawn();
@@ -727,7 +727,7 @@ impl Scope {
             let mut label = Label::None;
             if let Some(alias) = alias {
                 label = Label::Unqualified(alias.clone());
-            } else if let ast::Expression::Field(table, column) = expr {
+            } else if let ast::Expression::Column(table, column) = expr {
                 // Ignore errors, they will be surfaced by build_expression().
                 if let Ok(index) = self.lookup_column(table.as_deref(), column.as_str()) {
                     label = self.columns[index].clone();

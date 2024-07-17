@@ -51,7 +51,7 @@ Error: invalid input: unexpected end of input
 !> UPDATE name SET foo = 'bar'
 ---
 Error: invalid input: table foo does not exist
-Error: invalid input: unknown field foo
+Error: invalid input: unknown column foo
 
 # Specifying the same column multiple times errors.
 !> UPDATE name SET value = 'e', value = 'f'

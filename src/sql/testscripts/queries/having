@@ -123,7 +123,7 @@ Remap: #0 (dropped: test.group)
 ---
 Error: invalid input: aggregate functions can't be nested
 
-# Having errors on fields not in the SELECT or GROUP BY clauses.
+# Having errors on columns not in the SELECT or GROUP BY clauses.
 !> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING id > 3
 ---
-Error: invalid input: field id must be used in an aggregate or GROUP BY expression
+Error: invalid input: column id must be used in an aggregate or GROUP BY expression

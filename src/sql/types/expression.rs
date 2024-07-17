@@ -6,7 +6,7 @@ use crate::sql::planner::Node;
 use serde::{Deserialize, Serialize};
 
 /// An expression, made up of nested values and operators. Values can either be
-/// constants or row field references.
+/// constants or row column references.
 ///
 /// Since this is a recursive data structure, we have to box each child
 /// expression, which incurs a heap allocation. There are clever ways to get
@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 pub enum Expression {
     /// A constant value.
     Constant(Value),
-    /// A field reference (row index).
-    Field(usize),
+    /// A column reference. Used as row index when evaluating expressions.
+    Column(usize),
 
     /// Logical AND of two booleans: a AND b.
     And(Box<Expression>, Box<Expression>),
@@ -64,7 +64,7 @@ impl Expression {
     pub fn format(&self, node: &Node) -> String {
         let format = |expr: &Expression| expr.format(node);
         match self {
-            Self::Field(index) => match node.column_label(*index) {
+            Self::Column(index) => match node.column_label(*index) {
                 Label::None => format!("#{index}"),
                 label => format!("{label}"),
             },
@@ -94,18 +94,19 @@ impl Expression {
         }
     }
 
-    /// Evaluates an expression, returning a value. If a row is given, Field
-    /// references will look up the row value at the field index. If no row is
-    /// given, any field references yield NULL.
+    /// Evaluates an expression, returning a value. If a row is given, Column
+    /// references will look up the row value at the column index. If no row is
+    /// given, any column references yield NULL.
     pub fn evaluate(&self, row: Option<&Row>) -> Result<Value> {
         use Value::*;
         Ok(match self {
             // Constant values return itself.
             Self::Constant(value) => value.clone(),
 
-            // Field references look up a row value. The planner must make sure
-            // the field reference is valid.
-            Self::Field(i) => row.map(|row| row[*i].clone()).unwrap_or(Null),
+            // Column references look up a row value. The planner must make sure
+            // the column reference is valid.
+            // TODO: error instead.
+            Self::Column(i) => row.map(|row| row[*i].clone()).unwrap_or(Null),
 
             // Logical AND. Inputs must be boolean or NULL. NULLs generally
             // yield NULL, except the special case NULL AND false == false.
@@ -242,7 +243,7 @@ impl Expression {
                 | Self::Negate(expr)
                 | Self::Not(expr) => expr.walk(visitor),
 
-                Self::Constant(_) | Self::Field(_) => true,
+                Self::Constant(_) | Self::Column(_) => true,
             }
     }
 
@@ -288,7 +289,7 @@ impl Expression {
             Self::Negate(expr) => Self::Negate(transform(expr)?),
             Self::Not(expr) => Self::Not(transform(expr)?),
 
-            expr @ (Self::Constant(_) | Self::Field(_)) => expr,
+            expr @ (Self::Constant(_) | Self::Column(_)) => expr,
         };
         self = after(self)?;
         Ok(self)
@@ -361,26 +362,27 @@ impl Expression {
         Some(expr)
     }
 
-    /// Checks if an expression is a single field lookup (i.e. a disjunction of
-    /// = or IS NULL/NAN referencing a single field), returning the field index.
-    pub fn is_field_lookup(&self) -> Option<usize> {
+    /// Checks if an expression is a single column lookup (i.e. a disjunction of
+    /// = or IS NULL/NAN referencing a single column), returning the column
+    /// index.
+    pub fn is_column_lookup(&self) -> Option<usize> {
         use Expression::*;
         match &self {
-            // Equality comparisons with = between field and constant value can
+            // Equality comparisons with = between column and constant value can
             // use index lookups. NULL and NaN won't return any matches, but we
-            // handle this in into_field_values().
+            // handle this in into_column_values().
             Equal(lhs, rhs) => match (lhs.as_ref(), rhs.as_ref()) {
-                (Field(f), Constant(_)) | (Constant(_), Field(f)) => Some(*f),
+                (Column(f), Constant(_)) | (Constant(_), Column(f)) => Some(*f),
                 _ => None,
             },
             // IS NULL and IS NAN can use index lookups, since we index these.
             IsNull(expr) | IsNaN(expr) => match expr.as_ref() {
-                Field(f) => Some(*f),
+                Column(f) => Some(*f),
                 _ => None,
             },
             // For OR branches, check if all branches are lookups on the same
-            // field, i.e. foo = 1 OR foo = 2 OR foo = 3.
-            Or(lhs, rhs) => match (lhs.is_field_lookup(), rhs.is_field_lookup()) {
+            // column, i.e. foo = 1 OR foo = 2 OR foo = 3.
+            Or(lhs, rhs) => match (lhs.is_column_lookup(), rhs.is_column_lookup()) {
                 (Some(l), Some(r)) if l == r => Some(l),
                 _ => None,
             },
@@ -388,31 +390,31 @@ impl Expression {
         }
     }
 
-    /// Converts the expression into a set of single-field lookup values if possible.
-    pub fn into_field_values(self) -> Option<(usize, Vec<Value>)> {
+    /// Converts the expression into a set of single-column lookup values if possible.
+    pub fn into_column_values(self) -> Option<(usize, Vec<Value>)> {
         use Expression::*;
         match self {
             Equal(lhs, rhs) => match (*lhs, *rhs) {
                 // NULL and NAN index lookups are for IS NULL and IS NAN.
                 // Equality comparisons with = shouldn't yield any results, so
                 // just return an empty value set for these.
-                (Field(f), Constant(v)) | (Constant(v), Field(f)) if v.is_undefined() => {
+                (Column(f), Constant(v)) | (Constant(v), Column(f)) if v.is_undefined() => {
                     Some((f, Vec::new()))
                 }
-                (Field(f), Constant(v)) | (Constant(v), Field(f)) => Some((f, vec![v])),
+                (Column(f), Constant(v)) | (Constant(v), Column(f)) => Some((f, vec![v])),
                 _ => None,
             },
             // IS NULL index lookups should look up NULL.
             IsNull(expr) => match *expr {
-                Field(f) => Some((f, vec![Value::Null])),
+                Column(f) => Some((f, vec![Value::Null])),
                 _ => None,
             },
             // IS NAN index lookups should look up NAN.
             IsNaN(expr) => match *expr {
-                Field(f) => Some((f, vec![Value::Float(f64::NAN)])),
+                Column(f) => Some((f, vec![Value::Float(f64::NAN)])),
                 _ => None,
             },
-            Or(lhs, rhs) => match (lhs.into_field_values(), rhs.into_field_values()) {
+            Or(lhs, rhs) => match (lhs.into_column_values(), rhs.into_column_values()) {
                 (Some((l, lvec)), Some((r, rvec))) if l == r => {
                     Some((l, lvec.into_iter().chain(rvec).collect()))
                 }
@@ -422,19 +424,19 @@ impl Expression {
         }
     }
 
-    /// Replaces field references with the given field.
-    pub fn replace_field(self, from: usize, to: usize) -> Self {
+    /// Replaces column references with the given column.
+    pub fn replace_column(self, from: usize, to: usize) -> Self {
         let transform = |expr| match expr {
-            Expression::Field(i) if i == from => Expression::Field(to),
+            Expression::Column(i) if i == from => Expression::Column(to),
             expr => expr,
         };
         self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible
     }
 
-    /// Shifts any field indexes by the given amount.
-    pub fn shift_field(self, diff: isize) -> Self {
+    /// Shifts any column indexes by the given amount.
+    pub fn shift_column(self, diff: isize) -> Self {
         let transform = |expr| match expr {
-            Expression::Field(i) => Expression::Field((i as isize + diff) as usize),
+            Expression::Column(i) => Expression::Column((i as isize + diff) as usize),
             expr => expr,
         };
         self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible

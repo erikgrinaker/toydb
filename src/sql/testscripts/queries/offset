@@ -61,7 +61,7 @@ Offset: 1
 
 !> SELECT * FROM test OFFSET id
 ---
-Error: invalid input: expression must be constant, found field id
+Error: invalid input: expression must be constant, found column id
 
 # Negative and NULL offset error.
 !> SELECT * FROM test OFFSET -1

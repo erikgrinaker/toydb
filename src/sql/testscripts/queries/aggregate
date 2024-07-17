@@ -226,7 +226,7 @@ Aggregate: count(1), min(1), max(1), sum(1), avg(1)
 [plan]!> SELECT id, COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test
 ---
 Error: invalid input: unexpected token ,
-Error: invalid input: field id must be used in an aggregate or GROUP BY expression
+Error: invalid input: column id must be used in an aggregate or GROUP BY expression
 
 # Repeated aggregates work.
 [plan]> SELECT MAX("int"), MAX("int"), MAX("int") FROM test
@@ -252,4 +252,4 @@ Error: invalid input: aggregate functions can't be nested
 # Can't mix aggregate and non-aggregate expressions.
 !> SELECT MAX("int") - "int" FROM test
 ---
-Error: invalid input: field int must be used in an aggregate or GROUP BY expression
+Error: invalid input: column int must be used in an aggregate or GROUP BY expression

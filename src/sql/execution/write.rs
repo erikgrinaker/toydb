@@ -6,7 +6,7 @@ use crate::{errdata, errinput};
 use std::collections::{BTreeMap, HashMap};
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE) using the
-/// primary_key field index. Returns the number of rows deleted.
+/// primary_key column index. Returns the number of rows deleted.
 pub(super) fn delete(
     txn: &impl Transaction,
     table: String,
@@ -51,8 +51,8 @@ pub(super) fn insert(
             }
         }
 
-        // Fill in the row with default values for missing fields, and map
-        // source fields to table fields.
+        // Fill in the row with default values for missing columns, and map
+        // source columns to table columns.
         let mut row = Vec::with_capacity(table.columns.len());
         for (cidx, column) in table.columns.iter().enumerate() {
             if column_map.is_none() && cidx < values.len() {
@@ -87,8 +87,8 @@ pub(super) fn update(
     let mut updates = BTreeMap::new();
     while let Some(row) = source.next().transpose()? {
         let mut new = row.clone();
-        for (field, expr) in &expressions {
-            new[*field] = expr.evaluate(Some(&row))?;
+        for (column, expr) in &expressions {
+            new[*column] = expr.evaluate(Some(&row))?;
         }
         let id = row.into_iter().nth(primary_key).ok_or::<Error>(errdata!("short row"))?;
         updates.insert(id, new);

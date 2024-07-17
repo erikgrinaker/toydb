@@ -104,4 +104,4 @@ String("Try \\n newlines and \\t tabs")
 # a constant expression.
 !> "Hi!"
 ---
-Error: invalid input: expression must be constant, found field Hi!
+Error: invalid input: expression must be constant, found column Hi!

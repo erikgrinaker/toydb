@@ -57,7 +57,7 @@ The `-` prefix operator can be used to take negative numbers.
 
 ### Expressions
 
-Expressions can be used wherever a value is expected, e.g. as `SELECT` fields and `INSERT` values. They are made up of constants, a column references, an operator invocations, and a function calls.
+Expressions can be used wherever a value is expected, e.g. as `SELECT` columns nd `INSERT` values. They are made up of constants, a column references, an operator invocations, and a function calls.
 
 Column references can either be unqualified, e.g. `name`, or prefixed with the relation identifier separated by `.`, e.g. `person.name`. Unqualified identifiers must be unambiguous.
 
@@ -290,7 +290,7 @@ If column names are given, an identical number of values must be given. If no co
 
 * ***`column_name`***: a column to insert into in the given table. Errors if it does not exist.
 
-* ***`expression`***: an expression to insert into the corresponding column. Must be a constant expression, i.e. it cannot refer to table fields.
+* ***`expression`***: an expression to insert into the corresponding column. Must be a constant expression, i.e. it cannot refer to table columns.
 
 #### Example
 
@@ -337,9 +337,9 @@ RIGHT [ OUTER ] JOIN
 
 Fetches rows or expressions, either from table ***`table_name`*** (if given) or generated.
 
-* ***`expression`***: [expression](#expressions) to fetch (can be a simple field name).
+* ***`expression`***: [expression](#expressions) to fetch (can be a simple column name).
 
-* ***`output_name`***: output column [identifier](#identifier), defaults to field name (if single field) otherwise nothing (displayed as `?`).
+* ***`output_name`***: output column [identifier](#identifier), defaults to column name (if single column) otherwise nothing (displayed as `?`).
 
 * ***`table_name`***: table to fetch rows from.
 
@@ -347,11 +347,11 @@ Fetches rows or expressions, either from table ***`table_name`*** (if given) or 
 
 * ***`predicate`***: only return rows for which this [expression](#expressions) evaluates to `TRUE`.
 
-* ***`group_expr`***: an expression to group aggregates by. Non-aggregate `SELECT` expressions must either reference a field given in `group_expr`, be idential with a `group_expr`, or have an `output_name` that is referenced by a `group_expr` field.
+* ***`group_expr`***: an expression to group aggregates by. Non-aggregate `SELECT` expressions must either reference a column given in `group_expr`, be idential with a `group_expr`, or have an `output_name` that is referenced by a `group_expr` column.
 
 * ***`having_expr`***: only return aggregate results for which this [expression](#expressions) evaluates to `TRUE`.
 
-* ***`order_expr`***: order rows by this expression (can be a simple field name).
+* ***`order_expr`***: order rows by this expression (can be a simple column name).
 
 * ***`count`***: maximum number of rows to return. Must be a constant integer expression.
 

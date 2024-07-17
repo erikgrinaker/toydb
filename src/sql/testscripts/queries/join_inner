@@ -210,7 +210,7 @@ Error: invalid input: expected token ON, found WHERE
 !> SELECT * FROM movies INNER JOIN genres on movies.unknown_id = genres.id
 ---
 Error: invalid input: table unknown does not exist
-Error: invalid input: unknown field movies.unknown_id
+Error: invalid input: unknown column movies.unknown_id
 
 # Try a multi-way join with multiple joins of the same table. This will result
 # in expected duplicates due to the cross join. The query finds all movies

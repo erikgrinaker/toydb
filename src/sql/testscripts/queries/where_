@@ -53,11 +53,11 @@ Error: invalid input: filter returned , expected boolean
 Error: invalid input: unexpected end of input
 Error: invalid input: unexpected token ,
 
-# Errors on unknown tables and fields.
+# Errors on unknown tables and columns.
 !> SELECT * FROM test WHERE unknown > 0
 !> SELECT * FROM test WHERE unknown.id > 0
 ---
-Error: invalid input: unknown field unknown
+Error: invalid input: unknown column unknown
 Error: invalid input: unknown table unknown
 
 # Qualified names are valid.
@@ -69,27 +69,27 @@ Error: invalid input: unknown table unknown
 !> SELECT value AS v FROM test WHERE v = 'b'
 !> SELECT 1 + 1 AS two WHERE two = 2
 ---
-Error: invalid input: unknown field v
-Error: invalid input: expression must be constant, found field two
+Error: invalid input: unknown column v
+Error: invalid input: expression must be constant, found column two
 
 # Table aliases are visible.
 > SELECT * FROM test AS t WHERE t.id = 2
 ---
 2, b
 
-# Ambiguous fields error.
+# Ambiguous columns error.
 !> SELECT * FROM test, other WHERE id > 1
 ---
-Error: invalid input: ambiguous field id
+Error: invalid input: ambiguous column id
 
-# Unambiguous fields work.
+# Unambiguous columns work.
 > SELECT * FROM test, other WHERE value = 'b'
 ---
 2, b, 1, FALSE
 2, b, 2, TRUE
 
 
-# Qualified fields work, also when aliased.
+# Qualified columns work, also when aliased.
 > SELECT * FROM test, other WHERE test.id = 2 AND other.id = 2
 ---
 2, b, 2, TRUE

@@ -70,11 +70,11 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             Ok(transform::filter(source, predicate))
         }
 
-        Node::HashJoin { left, left_field, right, right_field, outer } => {
+        Node::HashJoin { left, left_column, right, right_column, outer } => {
             let right_size = right.size();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
-            join::hash(left, left_field, right, right_field, right_size, outer)
+            join::hash(left, left_column, right, right_column, right_size, outer)
         }
 
         Node::IndexLookup { table, column, values, alias: _ } => {

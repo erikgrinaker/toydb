@@ -25,7 +25,7 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
     // Transforms expressions.
     let transform = |expr: Expression| {
         // If the expression is constant, evaluate it.
-        if !expr.contains(&|e| matches!(e, Expression::Field(_))) {
+        if !expr.contains(&|e| matches!(e, Expression::Column(_))) {
             return expr.evaluate(None).map(Expression::Constant);
         }
         // If the expression is a logical operator, and one of the sides is
@@ -55,7 +55,7 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
 
     // Transform expressions after descending, both to perform the logical
     // short-circuiting on child expressions that have already been folded, and
-    // to reduce the quadratic cost when an expression contains a field.
+    // to reduce the quadratic cost when an expression contains a column.
     node.transform(&|n| n.transform_expressions(&Ok, &transform), &Ok)
 }
 
@@ -123,7 +123,7 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         for expr in cnf {
             let (mut ref_left, mut ref_right) = (false, false);
             expr.walk(&mut |e| {
-                if let Expression::Field(index) = e {
+                if let Expression::Column(index) = e {
                     ref_left = ref_left || *index < left.size();
                     ref_right = ref_right || *index >= left.size();
                 }
@@ -146,32 +146,32 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         // commonly happens when joining a foreign key (which is indexed) on a
         // primary key, and we want to make use of the foreign key index, e.g.:
         // SELECT m.name, g.name FROM movies m JOIN genres g ON m.genre_id = g.id AND g.id = 7;
-        let left_lookups: HashMap<usize, usize> = push_left // field → push_left index
+        let left_lookups: HashMap<usize, usize> = push_left // column → push_left index
             .iter()
             .enumerate()
-            .filter_map(|(i, expr)| expr.is_field_lookup().map(|field| (field, i)))
+            .filter_map(|(i, expr)| expr.is_column_lookup().map(|column| (column, i)))
             .collect();
-        let right_lookups: HashMap<usize, usize> = push_right // field → push_right index
+        let right_lookups: HashMap<usize, usize> = push_right // column → push_right index
             .iter()
             .enumerate()
-            .filter_map(|(i, expr)| expr.is_field_lookup().map(|field| (field, i)))
+            .filter_map(|(i, expr)| expr.is_column_lookup().map(|column| (column, i)))
             .collect();
 
         for expr in &predicate {
             // Find equijoins.
             let Expression::Equal(lhs, rhs) = expr else { continue };
-            let Expression::Field(l) = lhs.as_ref() else { continue };
-            let Expression::Field(r) = rhs.as_ref() else { continue };
+            let Expression::Column(l) = lhs.as_ref() else { continue };
+            let Expression::Column(r) = rhs.as_ref() else { continue };
 
             // The lhs may be a reference to the right source; swap them.
             let (l, r) = if l > r { (r, l) } else { (l, r) };
 
-            // Check if either side is a field lookup, and copy it over.
+            // Check if either side is a column lookup, and copy it over.
             if let Some(expr) = left_lookups.get(l).map(|i| push_left[*i].clone()) {
-                push_right.push(expr.replace_field(*l, *r));
+                push_right.push(expr.replace_column(*l, *r));
             }
             if let Some(expr) = right_lookups.get(r).map(|i| push_right[*i].clone()) {
-                push_left.push(expr.replace_field(*r, *l));
+                push_left.push(expr.replace_column(*r, *l));
             }
         }
 
@@ -184,11 +184,11 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         }
 
         if let Some(mut expr) = Expression::and_vec(push_right) {
-            // Right fields have indexes in the joined row; shift them left.
-            expr = expr.shift_field(-(left.size() as isize));
+            // Right columns have indexes in the joined row; shift them left.
+            expr = expr.shift_column(-(left.size() as isize));
             if let Some(mut expr) = push_into(expr, &mut right) {
-                // Pushdown failed, undo the field index shift.
-                expr = expr.shift_field(left.size() as isize);
+                // Pushdown failed, undo the column index shift.
+                expr = expr.shift_column(left.size() as isize);
                 predicate.push(expr)
             }
         }
@@ -222,7 +222,7 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
         // Find the first expression that's either a primary key or secondary
         // index lookup. We could be more clever here, but this is fine.
         let Some(i) = cnf.iter().enumerate().find_map(|(i, e)| {
-            e.is_field_lookup()
+            e.is_column_lookup()
                 .filter(|f| *f == table.primary_key || table.columns[*f].index)
                 .and(Some(i))
         }) else {
@@ -230,7 +230,7 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
         };
 
         // Extract the lookup values and expression from the cnf vector.
-        let (column, values) = cnf.remove(i).into_field_values().expect("field lookup failed");
+        let (column, values) = cnf.remove(i).into_column_values().expect("column lookup failed");
 
         // Build the primary key or secondary index lookup node.
         if column == table.primary_key {
@@ -249,7 +249,7 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
     node.transform(&Ok, &|n| Ok(transform(n)))
 }
 
-/// Uses a hash join instead of a nested loop join for single-field equijoins.
+/// Uses a hash join instead of a nested loop join for single-column equijoins.
 pub(super) fn join_type(node: Node) -> Result<Node> {
     let transform = |node| match node {
         // We could use a single match if we had deref patterns, but alas.
@@ -259,16 +259,16 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
             predicate: Some(Expression::Equal(lhs, rhs)),
             outer,
         } => match (*lhs, *rhs) {
-            (Expression::Field(mut left_field), Expression::Field(mut right_field)) => {
-                // The LHS field may be a field in the right table; swap them.
-                if right_field < left_field {
-                    (left_field, right_field) = (right_field, left_field);
+            (Expression::Column(mut left_column), Expression::Column(mut right_column)) => {
+                // The LHS column may be a column in the right table; swap them.
+                if right_column < left_column {
+                    (left_column, right_column) = (right_column, left_column);
                 }
-                // The NestedLoopJoin predicate uses field indexes in the joined
-                // row, while the HashJoin uses field indexes for each table
-                // individually. Adjust the RHS field reference.
-                right_field -= left.size();
-                Node::HashJoin { left, left_field, right, right_field, outer }
+                // The NestedLoopJoin predicate uses column indexes in the
+                // joined row, while the HashJoin uses column indexes for each
+                // table individually. Adjust the RHS column reference.
+                right_column -= left.size();
+                Node::HashJoin { left, left_column, right, right_column, outer }
             }
             (lhs, rhs) => {
                 let predicate = Some(Expression::Equal(lhs.into(), rhs.into()));
@@ -342,7 +342,7 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
                 && expressions
                     .iter()
                     .enumerate()
-                    .all(|(i, e)| matches!(e, Expression::Field(f) if i == *f)) =>
+                    .all(|(i, e)| matches!(e, Expression::Column(f) if i == *f)) =>
         {
             *source
         }
