@@ -118,8 +118,6 @@ impl Iterator for NestedLoopIterator {
 /// matching rows in the hash table. If outer is true, and there is no match
 /// in the right source for a row in the left source, a row with NULL values
 /// for the right source is emitted instead.
-///
-/// TODO: add more tests for the multiple match case.
 pub(super) fn hash(
     left: Rows,
     left_column: usize,
@@ -132,8 +130,11 @@ pub(super) fn hash(
     let mut rows = right;
     let mut right: HashMap<Value, Vec<Row>> = HashMap::new();
     while let Some(row) = rows.next().transpose()? {
-        let id = row[right_column].clone();
-        right.entry(id).or_default().push(row);
+        let value = row[right_column].clone();
+        if value.is_undefined() {
+            continue; // NULL and NAN equality is always false
+        }
+        right.entry(value).or_default().push(row);
     }
 
     // Set up an iterator for an empty right row in the outer case.

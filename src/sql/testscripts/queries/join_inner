@@ -212,36 +212,112 @@ Error: invalid input: expected token ON, found WHERE
 Error: invalid input: table unknown does not exist
 Error: invalid input: unknown column movies.unknown_id
 
-# Try a multi-way join with multiple joins of the same table. This will result
-# in expected duplicates due to the cross join. The query finds all movies
+# Hash joins with multiple matches work, on either side of the join.
+[plan]> SELECT movies.title, genres.name FROM movies JOIN genres ON movies.genre_id = genres.id
+---
+Projection: movies.title, genres.name
+└─ HashJoin: inner on movies.genre_id = genres.id
+   ├─ Scan: movies
+   └─ Scan: genres
+Stalker, Science Fiction
+Sicario, Action
+Primer, Science Fiction
+Heat, Action
+The Fountain, Science Fiction
+Solaris, Science Fiction
+Gravity, Science Fiction
+Blindspotting, Comedy
+Birdman, Comedy
+Inception, Science Fiction
+
+[plan]> SELECT movies.title, genres.name FROM genres JOIN movies ON genres.id = movies.genre_id
+---
+Projection: movies.title, genres.name
+└─ HashJoin: inner on genres.id = movies.genre_id
+   ├─ Scan: genres
+   └─ Scan: movies
+Stalker, Science Fiction
+Primer, Science Fiction
+The Fountain, Science Fiction
+Solaris, Science Fiction
+Gravity, Science Fiction
+Inception, Science Fiction
+Sicario, Action
+Heat, Action
+Blindspotting, Comedy
+Birdman, Comedy
+
+# Also try multi-match self hash joins joins on ultrahd, where both sides have
+# multiple matches. Note that NULL matches are ignored.
+[plan]> SELECT a.title, b.title FROM movies a JOIN movies b ON a.ultrahd = b.ultrahd
+---
+Projection: a.title, b.title
+└─ HashJoin: inner on a.ultrahd = b.ultrahd
+   ├─ Scan: movies as a
+   └─ Scan: movies as b
+Sicario, Sicario
+Sicario, Heat
+Sicario, Gravity
+Sicario, Blindspotting
+Sicario, Birdman
+Sicario, Inception
+Heat, Sicario
+Heat, Heat
+Heat, Gravity
+Heat, Blindspotting
+Heat, Birdman
+Heat, Inception
+The Fountain, The Fountain
+Gravity, Sicario
+Gravity, Heat
+Gravity, Gravity
+Gravity, Blindspotting
+Gravity, Birdman
+Gravity, Inception
+Blindspotting, Sicario
+Blindspotting, Heat
+Blindspotting, Gravity
+Blindspotting, Blindspotting
+Blindspotting, Birdman
+Blindspotting, Inception
+Birdman, Sicario
+Birdman, Heat
+Birdman, Gravity
+Birdman, Blindspotting
+Birdman, Birdman
+Birdman, Inception
+Inception, Sicario
+Inception, Heat
+Inception, Gravity
+Inception, Blindspotting
+Inception, Birdman
+Inception, Inception
+
+# Try a complex multi-way join with multiple joins of the same table. Uses GROUP
+# BY to discard duplicates from the cross join. The query finds all movies
 # belonging to a studio that's released at least one movies rated 8 or higher.
 [plan]> SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating \
   FROM movies m JOIN genres g ON m.genre_id = g.id, \
     studios s JOIN movies good ON good.studio_id = s.id AND good.rating >= 8 \
   WHERE m.studio_id = s.id \
+  GROUP BY m.id, m.title, g.name, s.name, m.rating, m.released \
   ORDER BY m.rating DESC, m.released ASC, m.id ASC
 ---
 Remap: m.id, m.title, genre, studio, m.rating (dropped: m.released)
 └─ Order: m.rating desc, m.released asc, m.id asc
    └─ Projection: m.id, m.title, g.name as genre, s.name as studio, m.rating, m.released
-      └─ HashJoin: inner on m.studio_id = s.id
-         ├─ HashJoin: inner on m.genre_id = g.id
-         │  ├─ Scan: movies as m
-         │  └─ Scan: genres as g
-         └─ HashJoin: inner on s.id = good.studio_id
-            ├─ Scan: studios as s
-            └─ Scan: movies as good (good.rating > 8 OR good.rating = 8)
-10, Inception, Science Fiction, Warner Bros, 8.8
+      └─ Aggregate: m.id, m.title, g.name, s.name, m.rating, m.released
+         └─ HashJoin: inner on m.studio_id = s.id
+            ├─ HashJoin: inner on m.genre_id = g.id
+            │  ├─ Scan: movies as m
+            │  └─ Scan: genres as g
+            └─ HashJoin: inner on s.id = good.studio_id
+               ├─ Scan: studios as s
+               └─ Scan: movies as good (good.rating > 8 OR good.rating = 8)
 10, Inception, Science Fiction, Warner Bros, 8.8
 1, Stalker, Science Fiction, Mosfilm, 8.2
-1, Stalker, Science Fiction, Mosfilm, 8.2
-4, Heat, Action, Warner Bros, 8.2
 4, Heat, Action, Warner Bros, 8.2
 6, Solaris, Science Fiction, Mosfilm, 8.1
-6, Solaris, Science Fiction, Mosfilm, 8.1
-7, Gravity, Science Fiction, Warner Bros, 7.7
 7, Gravity, Science Fiction, Warner Bros, 7.7
 9, Birdman, Comedy, Warner Bros, 7.7
-9, Birdman, Comedy, Warner Bros, 7.7
-5, The Fountain, Science Fiction, Warner Bros, 7.2
 5, The Fountain, Science Fiction, Warner Bros, 7.2
