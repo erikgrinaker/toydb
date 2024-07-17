@@ -92,6 +92,12 @@ pub mod test {
         pub engine: E,
     }
 
+    impl<E: Engine> Runner<E> {
+        pub fn new(engine: E) -> Self {
+            Self { engine }
+        }
+    }
+
     impl<E: Engine> goldenscript::Runner for Runner<E> {
         fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
             let mut output = String::new();
@@ -99,7 +105,7 @@ pub mod test {
                 // delete KEY
                 "delete" => {
                     let mut args = command.consume_args();
-                    let key = Self::decode_binary(&args.next_pos().ok_or("key not given")?.value);
+                    let key = decode_binary(&args.next_pos().ok_or("key not given")?.value);
                     args.reject_rest()?;
                     self.engine.delete(&key)?;
                 }
@@ -107,7 +113,7 @@ pub mod test {
                 // get KEY
                 "get" => {
                     let mut args = command.consume_args();
-                    let key = Self::decode_binary(&args.next_pos().ok_or("key not given")?.value);
+                    let key = decode_binary(&args.next_pos().ok_or("key not given")?.value);
                     args.reject_rest()?;
                     let value = self.engine.get(&key)?;
                     writeln!(output, "{}", format::Raw::key_maybe_value(&key, value.as_deref()))?;
@@ -117,9 +123,8 @@ pub mod test {
                 "scan" => {
                     let mut args = command.consume_args();
                     let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
-                    let range = Self::parse_key_range(
-                        args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."),
-                    )?;
+                    let range =
+                        parse_key_range(args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."))?;
                     args.reject_rest()?;
                     let items: Vec<_> = if reverse {
                         self.engine.scan(range).rev().collect::<Result<_>>()?
@@ -134,8 +139,7 @@ pub mod test {
                 // scan_prefix PREFIX
                 "scan_prefix" => {
                     let mut args = command.consume_args();
-                    let prefix =
-                        Self::decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
+                    let prefix = decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
                     args.reject_rest()?;
                     let mut scan = self.engine.scan_prefix(&prefix);
                     while let Some((key, value)) = scan.next().transpose()? {
@@ -147,8 +151,8 @@ pub mod test {
                 "set" => {
                     let mut args = command.consume_args();
                     let kv = args.next_key().ok_or("key=value not given")?.clone();
-                    let key = Self::decode_binary(&kv.key.unwrap());
-                    let value = Self::decode_binary(&kv.value);
+                    let key = decode_binary(&kv.key.unwrap());
+                    let value = decode_binary(&kv.value);
                     args.reject_rest()?;
                     self.engine.set(&key, value)?;
                 }
@@ -165,52 +169,46 @@ pub mod test {
         }
     }
 
-    impl<E: Engine> Runner<E> {
-        pub fn new(engine: E) -> Self {
-            Self { engine }
+    /// Decodes a raw byte vector from a Unicode string. Code points in the
+    /// range U+0080 to U+00FF are converted back to bytes 0x80 to 0xff.
+    /// This allows using e.g. \xff in the input string literal, and getting
+    /// back a 0xff byte in the byte vector. Otherwise, char(0xff) yields
+    /// the UTF-8 bytes 0xc3bf, which is the U+00FF code point as UTF-8.
+    /// These characters are effectively represented as ISO-8859-1 rather
+    /// than UTF-8, but it allows precise use of the entire u8 value range.
+    pub fn decode_binary(s: &str) -> Vec<u8> {
+        let mut buf = [0; 4];
+        let mut bytes = Vec::new();
+        for c in s.chars() {
+            // u32 is the Unicode code point, not the UTF-8 encoding.
+            match c as u32 {
+                b @ 0x80..=0xff => bytes.push(b as u8),
+                _ => bytes.extend(c.encode_utf8(&mut buf).as_bytes()),
+            }
         }
+        bytes
+    }
 
-        /// Decodes a raw byte vector from a Unicode string. Code points in the
-        /// range U+0080 to U+00FF are converted back to bytes 0x80 to 0xff.
-        /// This allows using e.g. \xff in the input string literal, and getting
-        /// back a 0xff byte in the byte vector. Otherwise, char(0xff) yields
-        /// the UTF-8 bytes 0xc3bf, which is the U+00FF code point as UTF-8.
-        /// These characters are effectively represented as ISO-8859-1 rather
-        /// than UTF-8, but it allows precise use of the entire u8 value range.
-        pub fn decode_binary(s: &str) -> Vec<u8> {
-            let mut buf = [0; 4];
-            let mut bytes = Vec::new();
-            for c in s.chars() {
-                // u32 is the Unicode code point, not the UTF-8 encoding.
-                match c as u32 {
-                    b @ 0x80..=0xff => bytes.push(b as u8),
-                    _ => bytes.extend(c.encode_utf8(&mut buf).as_bytes()),
-                }
-            }
-            bytes
+    /// Parses an binary key range, using Rust range syntax.
+    pub fn parse_key_range(
+        s: &str,
+    ) -> StdResult<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn StdError>> {
+        use std::ops::Bound;
+        let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
+        let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
+        let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
+        if let Some(start) = groups.get(1) {
+            bound.0 = Bound::Included(decode_binary(start.as_str()));
         }
-
-        /// Parses an binary key range, using Rust range syntax.
-        fn parse_key_range(
-            s: &str,
-        ) -> StdResult<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn StdError>> {
-            use std::ops::Bound;
-            let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
-            let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
-            let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
-            if let Some(start) = groups.get(1) {
-                bound.0 = Bound::Included(Self::decode_binary(start.as_str()));
+        if let Some(end) = groups.get(3) {
+            let end = decode_binary(end.as_str());
+            if groups.get(2).is_some() {
+                bound.1 = Bound::Included(end)
+            } else {
+                bound.1 = Bound::Excluded(end)
             }
-            if let Some(end) = groups.get(3) {
-                let end = Self::decode_binary(end.as_str());
-                if groups.get(2).is_some() {
-                    bound.1 = Bound::Included(end)
-                } else {
-                    bound.1 = Bound::Excluded(end)
-                }
-            }
-            Ok(bound)
         }
+        Ok(bound)
     }
 
     /// Wraps another engine and emits write events to the given channel.

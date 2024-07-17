@@ -754,11 +754,11 @@ impl<'a, E: Engine> Iterator for VersionIterator<'a, E> {
 pub mod tests {
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
-    use crate::storage::engine::test::{Emit, Mirror, Operation};
+    use crate::storage::engine::test::{decode_binary, parse_key_range, Emit, Mirror, Operation};
     use crate::storage::{BitCask, Memory};
+
     use crossbeam::channel::Receiver;
     use itertools::Itertools as _;
-    use regex::Regex;
     use std::collections::HashMap;
     use std::fmt::Write as _;
     use std::{error::Error, result::Result};
@@ -836,7 +836,7 @@ pub mod tests {
                     let txn = self.get_txn(&command.prefix)?;
                     let mut args = command.consume_args();
                     for arg in args.rest_pos() {
-                        let key = Self::decode_binary(&arg.value);
+                        let key = decode_binary(&arg.value);
                         txn.delete(&key)?;
                     }
                     args.reject_rest()?;
@@ -859,7 +859,7 @@ pub mod tests {
                     let txn = self.get_txn(&command.prefix)?;
                     let mut args = command.consume_args();
                     for arg in args.rest_pos() {
-                        let key = Self::decode_binary(&arg.value);
+                        let key = decode_binary(&arg.value);
                         let value = txn.get(&key)?;
                         let fmtkv = format::Raw::key_maybe_value(&key, value.as_deref());
                         writeln!(output, "{fmtkv}")?;
@@ -872,7 +872,7 @@ pub mod tests {
                     Self::no_txn(command)?;
                     let mut args = command.consume_args();
                     for arg in args.rest_pos() {
-                        let key = Self::decode_binary(&arg.value);
+                        let key = decode_binary(&arg.value);
                         let value = self.mvcc.get_unversioned(&key)?;
                         let fmtkv = format::Raw::key_maybe_value(&key, value.as_deref());
                         writeln!(output, "{fmtkv}")?;
@@ -895,8 +895,8 @@ pub mod tests {
                         }
                     }
                     for kv in args.rest_key() {
-                        let key = Self::decode_binary(kv.key.as_ref().unwrap());
-                        let value = Self::decode_binary(&kv.value);
+                        let key = decode_binary(kv.key.as_ref().unwrap());
+                        let value = decode_binary(&kv.value);
                         if value.is_empty() {
                             txn.delete(&key)?;
                         } else {
@@ -930,9 +930,8 @@ pub mod tests {
                 "scan" => {
                     let txn = self.get_txn(&command.prefix)?;
                     let mut args = command.consume_args();
-                    let range = Self::parse_key_range(
-                        args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."),
-                    )?;
+                    let range =
+                        parse_key_range(args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."))?;
                     args.reject_rest()?;
 
                     let kvs: Vec<_> = txn.scan(range).collect::<crate::error::Result<_>>()?;
@@ -945,8 +944,7 @@ pub mod tests {
                 "scan_prefix" => {
                     let txn = self.get_txn(&command.prefix)?;
                     let mut args = command.consume_args();
-                    let prefix =
-                        Self::decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
+                    let prefix = decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
                     args.reject_rest()?;
 
                     let kvs: Vec<_> =
@@ -961,8 +959,8 @@ pub mod tests {
                     let txn = self.get_txn(&command.prefix)?;
                     let mut args = command.consume_args();
                     for kv in args.rest_key() {
-                        let key = Self::decode_binary(kv.key.as_ref().unwrap());
-                        let value = Self::decode_binary(&kv.value);
+                        let key = decode_binary(kv.key.as_ref().unwrap());
+                        let value = decode_binary(&kv.value);
                         txn.set(&key, value)?;
                     }
                     args.reject_rest()?;
@@ -973,8 +971,8 @@ pub mod tests {
                     Self::no_txn(command)?;
                     let mut args = command.consume_args();
                     for kv in args.rest_key() {
-                        let key = Self::decode_binary(kv.key.as_ref().unwrap());
-                        let value = Self::decode_binary(&kv.value);
+                        let key = decode_binary(kv.key.as_ref().unwrap());
+                        let value = decode_binary(&kv.value);
                         self.mvcc.set_unversioned(&key, value)?;
                     }
                     args.reject_rest()?;
@@ -1052,47 +1050,6 @@ pub mod tests {
             let engine = Emit::new(Mirror::new(bitcask, memory), op_tx);
             let mvcc = MVCC::new(engine);
             Self { mvcc, op_rx, txns: HashMap::new(), tempdir }
-        }
-
-        /// Decodes a raw byte vector from a Unicode string. Code points in the
-        /// range U+0080 to U+00FF are converted back to bytes 0x80 to 0xff.
-        /// This allows using e.g. \xff in the input string literal, and getting
-        /// back a 0xff byte in the byte vector. Otherwise, char(0xff) yields
-        /// the UTF-8 bytes 0xc3bf, which is the U+00FF code point as UTF-8.
-        /// These characters are effectively represented as ISO-8859-1 rather
-        /// than UTF-8, but it allows precise use of the entire u8 value range.
-        ///
-        /// TODO: share this and the below with engine::test::Runner.
-        pub fn decode_binary(s: &str) -> Vec<u8> {
-            let mut buf = [0; 4];
-            let mut bytes = Vec::new();
-            for c in s.chars() {
-                // u32 is the Unicode code point, not the UTF-8 encoding.
-                match c as u32 {
-                    b @ 0x80..=0xff => bytes.push(b as u8),
-                    _ => bytes.extend(c.encode_utf8(&mut buf).as_bytes()),
-                }
-            }
-            bytes
-        }
-
-        /// Parses an binary key range, using Rust range syntax.
-        fn parse_key_range(s: &str) -> Result<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn Error>> {
-            let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
-            let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
-            let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
-            if let Some(start) = groups.get(1) {
-                bound.0 = Bound::Included(Self::decode_binary(start.as_str()));
-            }
-            if let Some(end) = groups.get(3) {
-                let end = Self::decode_binary(end.as_str());
-                if groups.get(2).is_some() {
-                    bound.1 = Bound::Included(end)
-                } else {
-                    bound.1 = Bound::Excluded(end)
-                }
-            }
-            Ok(bound)
         }
 
         /// Fetches the named transaction from a command prefix.
