@@ -94,19 +94,20 @@ impl Expression {
         }
     }
 
-    /// Evaluates an expression, returning a value. If a row is given, Column
-    /// references will look up the row value at the column index. If no row is
-    /// given, any column references yield NULL.
+    /// Evaluates an expression, returning a value. Column references look up
+    /// values in the given row. If None, any Column references will panic.
     pub fn evaluate(&self, row: Option<&Row>) -> Result<Value> {
         use Value::*;
         Ok(match self {
             // Constant values return itself.
             Self::Constant(value) => value.clone(),
 
-            // Column references look up a row value. The planner must make sure
-            // the column reference is valid.
-            // TODO: error instead.
-            Self::Column(i) => row.map(|row| row[*i].clone()).unwrap_or(Null),
+            // Column references look up a row value. The planner ensures that
+            // only constant expressions are evaluated without a row.
+            Self::Column(index) => match row {
+                Some(row) => row[*index].clone(),
+                None => panic!("can't reference column {index} with constant evaluation"),
+            },
 
             // Logical AND. Inputs must be boolean or NULL. NULLs generally
             // yield NULL, except the special case NULL AND false == false.
