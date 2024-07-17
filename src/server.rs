@@ -8,7 +8,7 @@ use crate::storage;
 
 use crossbeam::channel::{Receiver, Sender};
 use log::{debug, error, info};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Write as _;
 use std::net::{TcpListener, TcpStream, ToSocketAddrs};

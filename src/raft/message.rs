@@ -3,7 +3,7 @@ use crate::encoding;
 use crate::error::Result;
 use crate::storage;
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// A message envelope specifying the sender and receiver.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

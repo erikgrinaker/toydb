@@ -1,4 +1,4 @@
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// toyDB errors.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

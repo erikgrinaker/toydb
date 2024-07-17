@@ -7,7 +7,6 @@ use toydb::sql::engine::StatementResult;
 use toydb::sql::types::{Column, DataType, Label, Table, Value};
 use toydb::storage::{engine, mvcc};
 
-use pretty_assertions::assert_eq;
 use serial_test::serial;
 
 #[test]

@@ -6,7 +6,7 @@
 
 #![warn(clippy::all)]
 
-use serde_derive::Deserialize;
+use serde::Deserialize;
 use std::collections::HashMap;
 use toydb::errinput;
 use toydb::error::Result;
