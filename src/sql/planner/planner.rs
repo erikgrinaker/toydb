@@ -197,19 +197,19 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             // Build the SELECT column expressions and aliases.
             let mut expressions = Vec::with_capacity(select.len());
-            let mut labels = Vec::with_capacity(select.len());
+            let mut aliases = Vec::with_capacity(select.len());
             for (expr, alias) in select {
                 expressions.push(Self::build_expression(expr, &scope)?);
-                labels.push(Label::from(alias));
+                aliases.push(Label::from(alias));
             }
 
             // Add hidden columns for HAVING and ORDER BY columns not in SELECT.
             let hidden = self.build_select_hidden(&scope, &mut child_scope, &having, &order_by);
-            labels.extend(std::iter::repeat(Label::None).take(hidden.len()));
+            aliases.extend(std::iter::repeat(Label::None).take(hidden.len()));
             expressions.extend(hidden);
 
             scope = child_scope;
-            node = Node::Projection { source: Box::new(node), expressions, aliases: labels };
+            node = Node::Projection { source: Box::new(node), expressions, aliases };
         };
 
         // Build HAVING clause.
