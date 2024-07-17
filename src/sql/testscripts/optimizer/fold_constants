@@ -100,8 +100,8 @@ Initial:
 3, c
 
 # Constant folding folds the constant parts of a variable expression.
-# TODO: this should fold 4 - 6, needs to reorder commutative operations.
-[opt]> SELECT 2*2 + id - 3 * 2 FROM test
+# TODO: this should fold 4 - 6, but it needs to reorder operations.
+[opt]> SELECT 2 * 2 + id - 3 * 2 FROM test
 ---
 Initial:
    Projection: 2 * 2 + test.id - 3 * 2

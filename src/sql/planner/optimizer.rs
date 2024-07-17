@@ -23,14 +23,21 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
     use Value::*;
 
     // Transforms expressions.
-    let transform = |expr: Expression| {
+    let transform = |mut expr: Expression| {
         // If the expression is constant, evaluate it.
+        //
+        // This is a very simple approach, which doesn't handle more complex
+        // cases such as 1 + a - 2 (which would require rearranging the
+        // expression as 1 - 2 + a to evaluate the 1 - 2 branch).
+        //
+        // TODO: consider doing something better.
         if !expr.contains(&|e| matches!(e, Expression::Column(_))) {
             return expr.evaluate(None).map(Expression::Constant);
         }
+
         // If the expression is a logical operator, and one of the sides is
         // known, we may be able to short-circuit it.
-        Ok(match expr {
+        expr = match expr {
             And(lhs, rhs) => match (*lhs, *rhs) {
                 // If either side of an AND is false, the AND is false.
                 (Constant(Boolean(false)), _) | (_, Constant(Boolean(false))) => {
@@ -50,7 +57,8 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
                 (lhs, rhs) => Or(lhs.into(), rhs.into()),
             },
             expr => expr,
-        })
+        };
+        Ok(expr)
     };
 
     // Transform expressions after descending, both to perform the logical
