@@ -98,6 +98,8 @@ pub enum Order {
 /// Expressions. Can be nested.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Expression {
+    /// All columns, i.e. *.
+    All,
     /// A column reference, optionally qualified with a table name.
     Column(Option<String>, String),
     /// A literal value.
@@ -217,7 +219,7 @@ impl Expression {
 
             Self::Function(_, exprs) => exprs.iter().any(|expr| expr.walk(visitor)),
 
-            Self::Literal(_) | Self::Column(_, _) => true,
+            Self::All | Self::Column(_, _) | Self::Literal(_) => true,
         }
     }
 
@@ -264,7 +266,7 @@ impl Expression {
 
             Self::Function(_, exprs) => exprs.iter().for_each(|expr| expr.collect(visitor, c)),
 
-            Self::Literal(_) | Self::Column(_, _) => {}
+            Self::All | Self::Column(_, _) | Self::Literal(_) => {}
         }
     }
 }

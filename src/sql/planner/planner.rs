@@ -163,13 +163,32 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Build FROM clause.
         let mut node = if !from.is_empty() {
             self.build_from_clause(&mut scope, from)?
-        } else if select.is_empty() {
-            return errinput!("SELECT * requires a FROM clause");
         } else {
             // For a constant SELECT, emit a single empty row to project with.
             // This allows using aggregate functions and WHERE as normal.
             Node::Values { rows: vec![vec![]] }
         };
+
+        // Expand out SELECT * to all FROM columns if there are multiple SELECT
+        // expressions or a GROUP BY clause (to ensure all columns are in GROUP
+        // BY). For simplicity, expressions only supports scalar values, so we
+        // special-case the * tuple here.
+        if select.contains(&(ast::Expression::All, None)) {
+            if node.size() == 0 {
+                return errinput!("SELECT * requires a FROM clause");
+            }
+            if select.len() > 1 || !group_by.is_empty() {
+                select = select
+                    .into_iter()
+                    .flat_map(|(expr, alias)| match expr {
+                        ast::Expression::All => itertools::Either::Left(
+                            (0..node.size()).map(|i| (node.column_label(i).into(), None)),
+                        ),
+                        expr => itertools::Either::Right(std::iter::once((expr, alias))),
+                    })
+                    .collect();
+            }
+        }
 
         // Build WHERE clause.
         if let Some(expr) = r#where {
@@ -180,18 +199,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // Build aggregate functions and GROUP BY clause.
         let aggregates = Self::collect_aggregates(&select, &having, &order_by);
         if !group_by.is_empty() || !aggregates.is_empty() {
-            // For SELECT * with aggregates, expand as explicit columns to
-            // verify that they're all used in GROUP BY as well.
-            if select.is_empty() {
-                select = (0..node.size())
-                    .map(|i| (ast::Expression::from(node.column_label(i)), None))
-                    .collect();
-            }
             node = self.build_aggregate(&mut scope, node, group_by, aggregates)?;
         }
 
-        // Build SELECT clause.
-        if !select.is_empty() {
+        // Build SELECT clause. We can omit this for a trivial SELECT *.
+        if select.as_slice() != [(ast::Expression::All, None)] {
             // Prepare the post-projection scope.
             let mut child_scope = scope.project(&select);
 
@@ -210,7 +222,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             scope = child_scope;
             node = Node::Projection { source: Box::new(node), expressions, aliases };
-        };
+        }
 
         // Build HAVING clause.
         if let Some(having) = having {
@@ -379,7 +391,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
         if args[0].contains(&|expr| Self::is_aggregate_function(expr)) {
             return errinput!("aggregate functions can't be nested");
         }
-        let expr = Self::build_expression(args.remove(0), scope)?;
+        // Special-case COUNT(*) since expressions don't support tuples.
+        let expr = if name.as_str() == "count" && args[0] == ast::Expression::All {
+            Expression::Constant(Value::Boolean(true))
+        } else {
+            Self::build_expression(args.remove(0), scope)?
+        };
         Ok(match name.as_str() {
             "avg" => Aggregate::Average(expr),
             "count" => Aggregate::Count(expr),
@@ -482,6 +499,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
         };
 
         Ok(match expr {
+            // For simplicity, expression evaluation only supports scalar
+            // values, not compound types like tuples. Support for * is
+            // therefore special-cased in SELECT and COUNT(*).
+            ast::Expression::All => return errinput!("unsupported use of *"),
             ast::Expression::Literal(l) => Constant(match l {
                 ast::Literal::Null => Value::Null,
                 ast::Literal::Boolean(b) => Value::Boolean(b),

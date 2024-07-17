@@ -344,14 +344,14 @@ impl<'a> Parser<'a> {
         if !self.next_is(Keyword::Select.into()) {
             return Ok(Vec::new());
         }
-        if self.next_is(Token::Asterisk) {
-            return Ok(Vec::new());
-        }
         let mut select = Vec::new();
         loop {
             let expr = self.parse_expression()?;
             let mut label = None;
             if self.next_is(Keyword::As.into()) || matches!(self.peek()?, Some(Token::Ident(_))) {
+                if expr == ast::Expression::All {
+                    return errinput!("can't alias *");
+                }
                 label = Some(self.next_ident()?);
             }
             select.push((expr, label));
@@ -515,6 +515,9 @@ impl<'a> Parser<'a> {
     /// * A parenthesized expression.
     fn parse_expression_atom(&mut self) -> Result<ast::Expression> {
         Ok(match self.next()? {
+            // All columns.
+            Token::Asterisk => ast::Expression::All,
+
             // Literal value.
             Token::Number(n) if n.chars().all(|c| c.is_ascii_digit()) => {
                 ast::Literal::Integer(n.parse()?).into()
@@ -534,12 +537,7 @@ impl<'a> Parser<'a> {
                     if !args.is_empty() {
                         self.expect(Token::Comma)?;
                     }
-                    if name == "count" && self.next_is(Token::Asterisk) {
-                        // TODO: ugly hack to handle COUNT(*).
-                        args.push(ast::Expression::Literal(ast::Literal::Boolean(true)));
-                    } else {
-                        args.push(self.parse_expression()?);
-                    }
+                    args.push(self.parse_expression()?);
                 }
                 ast::Expression::Function(name, args)
             }
