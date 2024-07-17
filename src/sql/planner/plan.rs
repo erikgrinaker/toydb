@@ -268,13 +268,13 @@ impl Node {
     /// Returns a label for a column, if any. Only used for display purposes.
     pub fn column_label(&self, index: usize) -> Label {
         match self {
-            // Source nodes use the table/column name, calling name() to handle
-            // any aliases.
-            Self::IndexLookup { table, .. }
-            | Self::KeyLookup { table, .. }
-            | Self::Scan { table, .. } => {
-                Label::maybe_qualified(self.name(), table.columns[index].name.clone())
-            }
+            // Source nodes use the table/column name.
+            Self::IndexLookup { table, alias, .. }
+            | Self::KeyLookup { table, alias, .. }
+            | Self::Scan { table, alias, .. } => Label::Qualified(
+                alias.as_ref().unwrap_or(&table.name).clone(),
+                table.columns[index].name.clone(),
+            ),
 
             // Some nodes rearrange columns. Route them to the correct
             // upstream column where appropriate.

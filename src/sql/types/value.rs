@@ -373,14 +373,14 @@ dyn_clone::clone_trait_object!(RowIterator);
 
 impl<I: Iterator<Item = Result<Row>> + DynClone> RowIterator for I {}
 
-/// A column label, used in result sets and query plans.
+/// A column label, used in query results and plans.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Label {
     /// No label.
     None,
     /// An unqualified column name.
     Unqualified(String),
-    /// A fully qualified column name.
+    /// A fully qualified table/column name.
     Qualified(String, String),
 }
 
@@ -395,43 +395,28 @@ impl std::fmt::Display for Label {
 }
 
 impl Label {
-    /// Creates an unqualified label for a Some.
-    pub fn maybe_name(name: Option<String>) -> Self {
-        name.map(Self::Unqualified).unwrap_or(Self::None)
-    }
-
-    /// Creates a qualified label if table is given, otherwise unqualified.
-    pub fn maybe_qualified(table: Option<String>, column: String) -> Self {
-        match table {
-            Some(table) => Self::Qualified(table, column),
-            None => Self::Unqualified(column),
-        }
-    }
-
     /// Formats the label as a short column header.
-    pub fn as_header(&self) -> String {
+    pub fn as_header(&self) -> &str {
         match self {
-            Self::Qualified(_, column) | Self::Unqualified(column) => column.to_string(),
-            Self::None => "?".to_string(),
+            Self::Qualified(_, column) | Self::Unqualified(column) => column.as_str(),
+            Self::None => "?",
         }
     }
+}
 
-    /// Converts the label into an AST field expression.
-    pub fn into_ast_field(self) -> Option<ast::Expression> {
-        match self {
-            Label::Qualified(table, column) => Some(ast::Expression::Field(Some(table), column)),
-            Label::Unqualified(column) => Some(ast::Expression::Field(None, column)),
-            Label::None => None,
+impl From<Label> for ast::Expression {
+    /// Builds an ast::Expression::Field for a label. Can't be None.
+    fn from(label: Label) -> Self {
+        match label {
+            Label::Qualified(table, column) => ast::Expression::Field(Some(table), column),
+            Label::Unqualified(column) => ast::Expression::Field(None, column),
+            Label::None => panic!("can't convert None label to AST expression"), // shouldn't happen
         }
     }
+}
 
-    /// Returns true if the label is None.
-    pub fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-
-    /// Returns true if the label is not None.
-    pub fn is_some(&self) -> bool {
-        !self.is_none()
+impl From<Option<String>> for Label {
+    fn from(name: Option<String>) -> Self {
+        name.map(Label::Unqualified).unwrap_or(Label::None)
     }
 }

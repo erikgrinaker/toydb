@@ -184,7 +184,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // verify that they're all used in GROUP BY as well.
             if select.is_empty() {
                 select = (0..node.size())
-                    .map(|i| (node.column_label(i).into_ast_field().expect("no FROM label"), None))
+                    .map(|i| (ast::Expression::from(node.column_label(i)), None))
                     .collect();
             }
             node = self.build_aggregate(&mut scope, node, group_by, aggregates)?;
@@ -200,7 +200,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             let mut labels = Vec::with_capacity(select.len());
             for (expr, alias) in select {
                 expressions.push(Self::build_expression(expr, &scope)?);
-                labels.push(Label::maybe_name(alias));
+                labels.push(Label::from(alias));
             }
 
             // Add hidden columns for HAVING and ORDER BY columns not in SELECT.
