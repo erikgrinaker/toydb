@@ -158,11 +158,31 @@ storage delete mvcc:TxnActive(26) ["\x01\x00\x00\x00\x00\x00\x00\x00\x1a"]
 !> UPDATE self SET id = 4 WHERE id = 1
 !> UPDATE self SET id = 4 WHERE id = 2
 ---
-Error: invalid input: row referenced by self.self_id for self.id=2
-Error: invalid input: row referenced by self.self_id for self.id=3
+Error: invalid input: primary key referenced by self.id=2
+Error: invalid input: primary key referenced by self.id=3
 
 # Not even when only this row points to itself.
 > UPDATE self SET self_id = NULL WHERE id > 1
 !> UPDATE self SET id = 4 WHERE id = 1
 ---
 Error: invalid input: reference 1 not in table self
+
+# Updates can't violate foreign key references in intermediate states even if
+# the final state retains foreign key integrity. Postgres can't either.
+> SELECT * FROM "int"
+---
+-1
+0
+1
+
+> INSERT INTO name (id, "int") VALUES (2, -1), (3, 0), (4, 1)
+> SELECT * FROM name
+---
+1, NULL, NULL, NULL, NULL
+2, NULL, -1, NULL, NULL
+3, NULL, 0, NULL, NULL
+4, NULL, 1, NULL, NULL
+
+!> UPDATE "int" SET id = -id
+---
+Error: invalid input: primary key referenced by name.id=2

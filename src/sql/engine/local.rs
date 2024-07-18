@@ -190,9 +190,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                 }
                 if let Some(source_id) = source_ids.into_iter().next() {
                     return errinput!(
-                        "row referenced by {}.{} for {}.{}={source_id}",
-                        source.name,
-                        column.name,
+                        "primary key referenced by {}.{}={source_id}",
                         source.name,
                         source.columns[source.primary_key].name
                     );

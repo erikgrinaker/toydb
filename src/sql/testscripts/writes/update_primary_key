@@ -136,9 +136,9 @@ Error: invalid input: primary key ABC already exists
 Error: invalid input: primary key Hi! 👋 already exists
 Error: invalid input: invalid primary key NULL
 
-# UPDATE can modify multiple primary keys whose intermediate keys conflict,
-# as long as the final set doesn't conflict.
-# TODO: fix this
+# Primary key updates error if intermediate row updates violate primary key
+# uniqueness, even if the final state wouldn't violate the constraints. This is
+# also true with Postgres.
 > SELECT * FROM "int"
 ---
 0
@@ -148,26 +148,9 @@ Error: invalid input: invalid primary key NULL
 ---
 Error: invalid input: primary key 1 already exists
 
-# UPDATE can modify multiple primary keys that have foreign key references
-# as long as the final set of primary keys still satisfy the references.
-# We test this by swapping primary keys 0 <-> 1 in a single UPDATE.
-# TODO: this shouldn't error.
-> CREATE TABLE ref (id INT PRIMARY KEY, int_id INTEGER REFERENCES "int")
-> INSERT INTO ref VALUES (0, 0), (1, 1)
----
-ok
-
-!> UPDATE "int" SET id = 1 - id
+# The updates happen in primary key order, so the reverse update does work.
+> UPDATE "int" SET id = id - 1
 > SELECT * FROM "int"
 ---
-Error: invalid input: row referenced by ref.int_id for ref.id=0
+-1
 0
-1
-
-# If the UPDATE leaves a foreign key dangling, it should error.
-!> UPDATE "int" SET id = id - 1
-> SELECT * FROM "int"
----
-Error: invalid input: row referenced by ref.int_id for ref.id=0
-0
-1

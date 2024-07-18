@@ -260,3 +260,15 @@ storage delete mvcc:TxnActive(23) ["\x01\x00\x00\x00\x00\x00\x00\x00\x17"]
 ---
 1, NULL, NULL, inf, case
 2, NULL, NULL, -inf, CaSe
+
+# An UPDATE errors if intermediate states violate the uniqueness constraints,
+# even if the final state wouldn't. This is the same in Postgres.
+> UPDATE "unique" SET "bool" = id = 2
+> SELECT * FROM "unique"
+---
+1, FALSE, NULL, inf, case
+2, TRUE, NULL, -inf, CaSe
+
+!> UPDATE "unique" SET "bool" = NOT "bool"
+---
+Error: invalid input: value TRUE already in unique column bool
