@@ -1,2 +1,52 @@
-# TODO: test expression evaluation, in particular that it uses values from the
-# old row not the new.
+# Tests UPDATE expression evaluation.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value INT, quantity INT NOT NULL)
+> INSERT INTO test VALUES (0, NULL, 0), (1, 1, 0), (2, 2, 0)
+---
+ok
+
+# UPDATE can evaluate constant expressions.
+> UPDATE test SET value = 2 * 2 + 3
+> SELECT * FROM test
+---
+0, 7, 0
+1, 7, 0
+2, 7, 0
+
+# UPDATE can evaluate variable expressions.
+> UPDATE test SET value = id + 10 - quantity
+> SELECT * FROM test
+---
+0, 10, 0
+1, 11, 0
+2, 12, 0
+
+# UPDATE evaluation uses the old values.
+> UPDATE test SET value = id + 1, quantity = value
+> SELECT * FROM test
+---
+0, 1, 10
+1, 2, 11
+2, 3, 12
+
+# This is also true with primary key updates.
+# TODO: fix this
+!> UPDATE test SET id = id + 1, value = id, quantity = value
+> SELECT * FROM test
+---
+Error: invalid input: primary key 1 already exists
+0, 1, 10
+1, 2, 11
+2, 3, 12
+
+# UPDATE expressions respect constraints.
+> UPDATE test SET value = NULL WHERE id = 1
+> SELECT * FROM test
+---
+0, 1, 10
+1, NULL, 11
+2, 3, 12
+
+!> UPDATE test SET quantity = value
+---
+Error: invalid input: NULL value not allowed for column quantity

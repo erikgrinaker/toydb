@@ -135,3 +135,15 @@ Error: invalid input: primary key abc already exists
 Error: invalid input: primary key ABC already exists
 Error: invalid input: primary key Hi! 👋 already exists
 Error: invalid input: invalid primary key NULL
+
+# UPDATE can modify multiple primary keys whose intermediate keys conflict,
+# as long as the final set doesn't conflict.
+# TODO: fix this
+> SELECT * FROM "int"
+---
+0
+1
+
+!> UPDATE "int" SET id = id + 1
+---
+Error: invalid input: primary key 1 already exists
