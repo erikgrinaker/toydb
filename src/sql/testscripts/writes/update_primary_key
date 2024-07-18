@@ -147,3 +147,27 @@ Error: invalid input: invalid primary key NULL
 !> UPDATE "int" SET id = id + 1
 ---
 Error: invalid input: primary key 1 already exists
+
+# UPDATE can modify multiple primary keys that have foreign key references
+# as long as the final set of primary keys still satisfy the references.
+# We test this by swapping primary keys 0 <-> 1 in a single UPDATE.
+# TODO: this shouldn't error.
+> CREATE TABLE ref (id INT PRIMARY KEY, int_id INTEGER REFERENCES "int")
+> INSERT INTO ref VALUES (0, 0), (1, 1)
+---
+ok
+
+!> UPDATE "int" SET id = 1 - id
+> SELECT * FROM "int"
+---
+Error: invalid input: row referenced by ref.int_id for ref.id=0
+0
+1
+
+# If the UPDATE leaves a foreign key dangling, it should error.
+!> UPDATE "int" SET id = id - 1
+> SELECT * FROM "int"
+---
+Error: invalid input: row referenced by ref.int_id for ref.id=0
+0
+1
