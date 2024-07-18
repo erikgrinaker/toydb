@@ -233,7 +233,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
         let table = self.must_get_table(table)?;
         for mut row in rows {
             // Normalize the row.
-            row = row.into_iter().map(|v| v.normalize()).collect();
+            row.iter_mut().for_each(|v| v.normalize());
 
             // Insert the row.
             table.validate_row(&row, false, self)?;
@@ -284,8 +284,8 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 
         for (mut id, mut row) in rows {
             // Normalize the ID and row.
-            id = id.normalize();
-            row = row.into_iter().map(|v| v.normalize()).collect();
+            id.normalize();
+            row.iter_mut().for_each(|v| v.normalize());
 
             // If the primary key changes, we simply do a delete and insert.
             // This simplifies constraint validation.

@@ -243,20 +243,19 @@ impl Value {
         }
     }
 
-    /// Normalizes a value. Currently normalizes -0.0 and -NAN to 0.0 and NAN
-    /// respectively, which is the canonical value used e.g. in primary key and
-    /// index lookups.
-    pub fn normalize(self) -> Self {
-        match self.normalize_ref() {
-            Cow::Borrowed(_) => self, // no change
-            Cow::Owned(v) => v,
+    /// Normalizes a value in place. Currently normalizes -0.0 and -NAN to 0.0
+    /// and NAN respectively, which is the canonical value used e.g. in primary
+    /// key and index lookups.
+    pub fn normalize(&mut self) {
+        if let Cow::Owned(normalized) = self.normalize_ref() {
+            *self = normalized;
         }
     }
 
     /// Normalizes a borrowed value. Currently normalizes -0.0 and -NAN to 0.0
     /// and NAN respectively, which is the canonical value used e.g. in primary
-    /// key and index lookups. Returns a Cow to avoid allocating in the common
-    /// case where the value doesn't change.
+    /// key and index lookups. Returns a Cow::Owned when changed, to avoid
+    /// allocating in the common case where the value doesn't change.
     pub fn normalize_ref(&self) -> Cow<'_, Self> {
         if let Self::Float(f) = self {
             if f.is_sign_negative() && (f.is_nan() || *f == -0.0) {
