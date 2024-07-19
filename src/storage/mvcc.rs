@@ -644,8 +644,11 @@ type UserValue = Vec<u8>;
 
 impl<E: Engine> ScanIterator<E> {
     /// The number of live keys to pull from the engine at a time.
-    /// TODO: add tests that either exceed or vary this.
-    const BUFFER_SIZE: usize = 100;
+    #[cfg(not(test))]
+    const BUFFER_SIZE: usize = 1000;
+    /// Pull only 2 keys in tests, to exercise this more often.
+    #[cfg(test)]
+    const BUFFER_SIZE: usize = 2;
 
     /// Creates a new scan iterator.
     fn new(
