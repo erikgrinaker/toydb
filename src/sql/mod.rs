@@ -9,7 +9,6 @@ mod tests {
     use crate::encoding::format::{self, Formatter as _};
     use crate::sql::engine::{Engine, Local, StatementResult};
     use crate::sql::planner::{Planner, Scope};
-    use crate::sql::types::Value;
     use crate::storage::engine::test::{Emit, Mirror, Operation};
     use crate::storage::{self, Engine as _};
     use crossbeam::channel::Receiver;
@@ -47,7 +46,7 @@ mod tests {
     }
 
     fn test_goldenscript_expr(path: &std::path::Path) {
-        goldenscript::run(&mut ExpressionRunner::new(), path).expect("goldenscript failed")
+        goldenscript::run(&mut ExpressionRunner, path).expect("goldenscript failed")
     }
 
     /// A SQL test runner.
@@ -201,18 +200,9 @@ mod tests {
 
     /// A test runner for expressions specifically. Evaluates expressions to
     /// values, and can optionally emit the expression tree.
-    struct ExpressionRunner {
-        engine: Local<storage::Memory>,
-    }
+    struct ExpressionRunner;
 
     type Catalog<'a> = <Local<storage::Memory> as Engine<'a>>::Transaction;
-
-    impl ExpressionRunner {
-        fn new() -> Self {
-            let engine = Local::new(storage::Memory::new());
-            Self { engine }
-        }
-    }
 
     impl goldenscript::Runner for ExpressionRunner {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
@@ -223,17 +213,28 @@ mod tests {
             let input = &command.name;
             let mut tags = command.tags.clone();
 
+            // Parse and build the expression.
+            let ast = Parser::new(input).parse_expression()?;
+            let mut expr = Planner::<Catalog>::build_expression(ast, &Scope::new())?;
+
+            // If requested, convert the expression to conjunctive normal form.
+            if tags.remove("cnf") {
+                expr = expr.into_cnf();
+                tags.insert("expr".to_string()); // imply expr
+            }
+
             // Evaluate the expression.
             let mut output = String::new();
-            let mut session = self.engine.session();
-            let value: Value = session.execute(&format!("SELECT {input}"))?.try_into()?;
+            let value = expr.evaluate(None)?;
             write!(output, "{value:?}")?;
 
-            // If requested, parse and dump the expression.
+            // If requested, dump the parsed expression.
             if tags.remove("expr") {
-                let ast = Parser::new(input).parse_expression()?;
-                let expr = Planner::<Catalog>::build_expression(ast, &Scope::new())?;
-                write!(output, " ← {expr:?}")?;
+                let mut s = format!("{expr:?}");
+                if s.len() > 80 {
+                    s = format!("{expr:#?}");
+                }
+                write!(output, " ← {s}")?;
             }
 
             // Reject unknown tags.

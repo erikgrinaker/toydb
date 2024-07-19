@@ -7,7 +7,27 @@
 ---
 Integer(1) ← Subtract(Constant(Integer(2)), Constant(Integer(1)))
 Integer(-1) ← Subtract(Constant(Integer(2)), Constant(Integer(3)))
-Integer(2) ← Subtract(Subtract(Constant(Integer(1)), Negate(Constant(Integer(3)))), Constant(Integer(2)))
+Integer(2) ← Subtract(
+    Subtract(
+        Constant(
+            Integer(
+                1,
+            ),
+        ),
+        Negate(
+            Constant(
+                Integer(
+                    3,
+                ),
+            ),
+        ),
+    ),
+    Constant(
+        Integer(
+            2,
+        ),
+    ),
+)
 
 # Simple float subtraction.
 [expr]> 3.1 - 2.71

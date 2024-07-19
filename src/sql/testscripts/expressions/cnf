@@ -1,0 +1,185 @@
+# Tests conversion of logical expressions into canonical normal form.
+
+# Noop for non-boolean expressions.
+[cnf]> 1 + 2
+---
+Integer(3) ← Add(Constant(Integer(1)), Constant(Integer(2)))
+
+# Applies De Morgan's laws.
+[cnf]> NOT (TRUE AND FALSE)
+---
+Boolean(true) ← Or(Not(Constant(Boolean(true))), Not(Constant(Boolean(false))))
+
+[cnf]> NOT (TRUE OR FALSE)
+---
+Boolean(false) ← And(Not(Constant(Boolean(true))), Not(Constant(Boolean(false))))
+
+# NOTs are pushed into the expression.
+[cnf]> NOT (TRUE AND TRUE AND TRUE OR TRUE)
+---
+Boolean(false) ← And(
+    Or(
+        Or(
+            Not(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+            Not(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+        ),
+        Not(
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+        ),
+    ),
+    Not(
+        Constant(
+            Boolean(
+                true,
+            ),
+        ),
+    ),
+)
+
+# ORs are converted to ANDs by the distributive law.
+[cnf]> (TRUE AND FALSE) OR (FALSE AND TRUE)
+---
+Boolean(false) ← And(
+    And(
+        Or(
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        ),
+        Or(
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+        ),
+    ),
+    And(
+        Or(
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+        ),
+        Or(
+            Constant(
+                Boolean(
+                    false,
+                ),
+            ),
+            Constant(
+                Boolean(
+                    true,
+                ),
+            ),
+        ),
+    ),
+)
+
+# This is also true when combined with De Morgan's laws.
+[cnf]> NOT ((TRUE OR FALSE) AND (TRUE OR FALSE))
+---
+Boolean(false) ← And(
+    And(
+        Or(
+            Not(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+            Not(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+        ),
+        Or(
+            Not(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+            Not(
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+            ),
+        ),
+    ),
+    And(
+        Or(
+            Not(
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+            ),
+            Not(
+                Constant(
+                    Boolean(
+                        true,
+                    ),
+                ),
+            ),
+        ),
+        Or(
+            Not(
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+            ),
+            Not(
+                Constant(
+                    Boolean(
+                        false,
+                    ),
+                ),
+            ),
+        ),
+    ),
+)

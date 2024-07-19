@@ -1,5 +1,4 @@
 # Tests the index_lookup optimizer.
-# TODO: test the expression handling better, e.g. CNF.
 
 > CREATE TABLE test (id INT PRIMARY KEY, value STRING INDEX, "float" FLOAT INDEX)
 > INSERT INTO test VALUES (0, NULL), (1, 'a', 3.14), (2, 'b', NAN), (3, 'c', 0.0)

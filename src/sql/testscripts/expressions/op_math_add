@@ -7,7 +7,27 @@
 ---
 Integer(3) ← Add(Constant(Integer(1)), Constant(Integer(2)))
 Integer(-2) ← Add(Constant(Integer(1)), Negate(Constant(Integer(3))))
-Integer(2) ← Add(Add(Constant(Integer(1)), Negate(Constant(Integer(2)))), Constant(Integer(3)))
+Integer(2) ← Add(
+    Add(
+        Constant(
+            Integer(
+                1,
+            ),
+        ),
+        Negate(
+            Constant(
+                Integer(
+                    2,
+                ),
+            ),
+        ),
+    ),
+    Constant(
+        Integer(
+            3,
+        ),
+    ),
+)
 
 # Simple float addition.
 [expr]> 3.1 + 2.71

@@ -30,7 +30,23 @@ Error: invalid input: can't take factorial of NaN
 [expr]> 2!!!!!!
 ---
 Integer(720) ← Factorial(Factorial(Constant(Integer(3))))
-Integer(2) ← Factorial(Factorial(Factorial(Factorial(Factorial(Factorial(Constant(Integer(2))))))))
+Integer(2) ← Factorial(
+    Factorial(
+        Factorial(
+            Factorial(
+                Factorial(
+                    Factorial(
+                        Constant(
+                            Integer(
+                                2,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    ),
+)
 
 # Overflow.
 [expr]!> 3!!!
