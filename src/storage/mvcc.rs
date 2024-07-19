@@ -675,14 +675,17 @@ impl<E: Engine> ScanIterator<E> {
                 Some(Err(err)) => return Err(err.clone()),
                 Some(Ok(_)) | None => {}
             }
-            // If the key is live (not a tombstone), buffer it.
+            // Decode the value, and skip deleted keys (tombstones).
             let Some(value) = bincode::deserialize(&value)? else { continue };
             self.buffer.push_back((key, value));
             // If we filled the buffer, save the remaining range (if any) and
-            // return. peek() has already buffered next(), so pull it.
+            // return. peek() has already buffered next(), so pull it. We have
+            // to re-encode it as a raw engine key though, since we only have
+            // access to the decoded MVCC key.
             if self.buffer.len() == Self::BUFFER_SIZE {
-                if let Some((next, _, _)) = iter.next().transpose()? {
-                    self.remainder = Some((Bound::Included(next), range_end));
+                if let Some((next, version, _)) = iter.next().transpose()? {
+                    let range_start = Bound::Included(Key::Version(next.into(), version).encode());
+                    self.remainder = Some((range_start, range_end));
                 }
                 return Ok(());
             }
