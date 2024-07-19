@@ -599,7 +599,7 @@ impl<E: Engine> Transaction<E> {
         let mut prefix = KeyPrefix::Version(prefix.into()).encode();
         prefix.truncate(prefix.len() - 2);
         let range = encoding::prefix_range(&prefix);
-        ScanIterator::<E>::new(self.engine.clone(), self.state().clone(), range)
+        ScanIterator::new(self.engine.clone(), self.state().clone(), range)
     }
 }
 
@@ -612,15 +612,16 @@ impl<E: Engine> Transaction<E> {
 ///
 /// This does not implement DoubleEndedIterator (reverse scans), since the SQL
 /// layer doesn't currently need it.
+#[allow(clippy::type_complexity)]
 pub struct ScanIterator<E: Engine> {
     /// The engine.
     engine: Arc<Mutex<E>>,
     /// The transaction state.
     txn: TransactionState,
     /// A buffer of live and visible key/value pairs to emit.
-    buffer: VecDeque<(UserKey, UserValue)>,
+    buffer: VecDeque<(Vec<u8>, Vec<u8>)>,
     /// The remaining range after the buffer.
-    remainder: Option<(Bound<RawKey>, Bound<RawKey>)>,
+    remainder: Option<(Bound<Vec<u8>>, Bound<Vec<u8>>)>,
 }
 
 /// Implement Clone manually. Deriving it requires Engine: Clone.
@@ -635,13 +636,6 @@ impl<E: Engine> Clone for ScanIterator<E> {
     }
 }
 
-// Helper types to distinguish raw engine key/values from encoded user
-// key/values (which are encoded inside mvcc::Key). Mostly to appease Clippy's
-// type complexity lint, but TODO: consider using elsewhere.
-type RawKey = Vec<u8>;
-type UserKey = Vec<u8>;
-type UserValue = Vec<u8>;
-
 impl<E: Engine> ScanIterator<E> {
     /// The number of live keys to pull from the engine at a time.
     #[cfg(not(test))]
@@ -654,7 +648,7 @@ impl<E: Engine> ScanIterator<E> {
     fn new(
         engine: Arc<Mutex<E>>,
         txn: TransactionState,
-        range: (Bound<RawKey>, Bound<RawKey>),
+        range: (Bound<Vec<u8>>, Bound<Vec<u8>>),
     ) -> Self {
         let buffer = VecDeque::with_capacity(Self::BUFFER_SIZE);
         Self { engine, txn, buffer, remainder: Some(range) }
@@ -682,11 +676,11 @@ impl<E: Engine> ScanIterator<E> {
             let Some(value) = bincode::deserialize(&value)? else { continue };
             self.buffer.push_back((key, value));
             // If we filled the buffer, save the remaining range (if any) and
-            // return. peek() has already buffered next(), so pull it. We have
-            // to re-encode it as a raw engine key though, since we only have
-            // access to the decoded MVCC key.
+            // return. peek() has already buffered next(), so pull it.
             if self.buffer.len() == Self::BUFFER_SIZE {
                 if let Some((next, version, _)) = iter.next().transpose()? {
+                    // We have to re-encode it as a raw engine key, since we
+                    // only have access to the decoded MVCC user key.
                     let range_start = Bound::Included(Key::Version(next.into(), version).encode());
                     self.remainder = Some((range_start, range_end));
                 }
@@ -698,7 +692,7 @@ impl<E: Engine> ScanIterator<E> {
 }
 
 impl<E: Engine> Iterator for ScanIterator<E> {
-    type Item = Result<(UserKey, UserValue)>;
+    type Item = Result<(Vec<u8>, Vec<u8>)>;
     fn next(&mut self) -> Option<Self::Item> {
         if self.buffer.is_empty() {
             if let Err(error) = self.fill_buffer() {
@@ -725,7 +719,8 @@ impl<'a, I: engine::ScanIterator> VersionIterator<'a, I> {
     }
 
     // Fallible next(). Returns the next visible key/version/value tuple.
-    fn try_next(&mut self) -> Result<Option<(UserKey, Version, UserValue)>> {
+    #[allow(clippy::type_complexity)]
+    fn try_next(&mut self) -> Result<Option<(Vec<u8>, Version, Vec<u8>)>> {
         while let Some((key, value)) = self.inner.next().transpose()? {
             let Key::Version(key, version) = Key::decode(&key)? else {
                 return errdata!("expected Key::Version got {key:?}");
@@ -740,7 +735,7 @@ impl<'a, I: engine::ScanIterator> VersionIterator<'a, I> {
 }
 
 impl<'a, I: engine::ScanIterator> Iterator for VersionIterator<'a, I> {
-    type Item = Result<(UserKey, Version, UserValue)>;
+    type Item = Result<(Vec<u8>, Version, Vec<u8>)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
     }
