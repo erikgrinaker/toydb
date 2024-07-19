@@ -608,7 +608,7 @@ impl<E: Engine> Transaction<E> {
 /// The (single-threaded) engine is protected by a mutex, and holding the mutex
 /// for the duration of the iteration can cause deadlocks (e.g. when the local
 /// SQL engine pulls from two tables concurrently during a join). Instead, we
-/// pull and buffer 100 rows at a time, and release the mutex in between.
+/// pull and buffer a batch of rows at a time, and release the mutex in between.
 ///
 /// This does not implement DoubleEndedIterator (reverse scans), since the SQL
 /// layer doesn't currently need it.
