@@ -139,7 +139,7 @@
 //! forever, both out of laziness and also because it allows unlimited time
 //! travel queries (it's a feature, not a bug!).
 
-use super::engine::Engine;
+use super::engine::{self, Engine};
 use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::{Error, Result};
 use crate::{errdata, errinput};
@@ -667,7 +667,7 @@ impl<E: Engine> ScanIterator<E> {
         let range_end = range.1.clone();
 
         let mut engine = self.engine.lock()?;
-        let mut iter = VersionIterator::<E>::new(&self.txn, engine.scan(range)).peekable();
+        let mut iter = VersionIterator::new(&self.txn, engine.scan(range)).peekable();
         while let Some((key, _, value)) = iter.next().transpose()? {
             // If the next key equals this one, we're not at the latest version.
             match iter.peek() {
@@ -705,45 +705,35 @@ impl<E: Engine> Iterator for ScanIterator<E> {
 
 /// An iterator that decodes raw engine key/value pairs into MVCC key/value
 /// versions, and skips invisible versions. Helper for ScanIterator.
-struct VersionIterator<'a, E: Engine + 'a> {
+struct VersionIterator<'a, I: engine::ScanIterator> {
     /// The transaction the scan is running in.
     txn: &'a TransactionState,
     /// The inner engine scan iterator.
-    inner: E::ScanIterator<'a>,
+    inner: I,
 }
 
-impl<'a, E: Engine + 'a> VersionIterator<'a, E> {
+impl<'a, I: engine::ScanIterator> VersionIterator<'a, I> {
     /// Creates a new MVCC version iterator for the given engine iterator.
-    fn new(txn: &'a TransactionState, inner: E::ScanIterator<'a>) -> Self {
+    fn new(txn: &'a TransactionState, inner: I) -> Self {
         Self { txn, inner }
     }
 
-    /// Decodes a raw engine key into an MVCC key and version, returning None if
-    /// the version is not visible.
-    fn decode_visible(&self, key: &[u8]) -> Result<Option<(UserKey, Version)>> {
-        let (key, version) = match Key::decode(key)? {
-            Key::Version(key, version) => (key.into_owned(), version),
-            key => return errdata!("expected Key::Version got {key:?}"),
-        };
-        if self.txn.is_visible(version) {
-            Ok(Some((key, version)))
-        } else {
-            Ok(None)
-        }
-    }
-
-    // Fallible next(), emitting the next item, or None if exhausted.
+    // Fallible next(). Returns the next visible key/version/value tuple.
     fn try_next(&mut self) -> Result<Option<(UserKey, Version, UserValue)>> {
         while let Some((key, value)) = self.inner.next().transpose()? {
-            if let Some((key, version)) = self.decode_visible(&key)? {
-                return Ok(Some((key, version, value)));
+            let Key::Version(key, version) = Key::decode(&key)? else {
+                return errdata!("expected Key::Version got {key:?}");
+            };
+            if !self.txn.is_visible(version) {
+                continue;
             }
+            return Ok(Some((key.into_owned(), version, value)));
         }
         Ok(None)
     }
 }
 
-impl<'a, E: Engine> Iterator for VersionIterator<'a, E> {
+impl<'a, I: engine::ScanIterator> Iterator for VersionIterator<'a, I> {
     type Item = Result<(UserKey, Version, UserValue)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()
