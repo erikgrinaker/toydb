@@ -1,0 +1,196 @@
+# Tests filter pushdown.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a'), (2, 'b'), (3, 'c')
+---
+ok
+
+# Pushes WHERE filters into Scan nodes.
+[opt]> SELECT * FROM test WHERE value = 'b'
+---
+Initial:
+   Filter: test.value = b
+   └─ Scan: test
+Filter pushdown:
+   Scan: test (test.value = b)
+2, b
+
+# HAVING filters are not pushed past aggregate nodes, even when possible. The
+# optimizer could do this if it was smarter.
+[opt]> SELECT id, value FROM test GROUP BY id, value HAVING value = 'b'
+---
+Initial:
+   Filter: test.value = b
+   └─ Projection: test.id, test.value
+      └─ Aggregate: test.id, test.value
+         └─ Scan: test
+Short circuit:
+   Filter: test.value = b
+   └─ Aggregate: test.id, test.value
+      └─ Scan: test
+2, b
+
+# Pushes down independent predicates from JOIN nodes.
+[opt]> SELECT * FROM test a JOIN test b ON a.value = 'a' AND b.value = 'b'
+---
+Initial:
+   NestedLoopJoin: inner on a.value = a AND b.value = b
+   ├─ Scan: test as a
+   └─ Scan: test as b
+Filter pushdown:
+   NestedLoopJoin: inner
+   ├─ Scan: test as a (a.value = a)
+   └─ Scan: test as b (b.value = b)
+1, a, 2, b
+
+# Pushes down independent predicates from JOIN nodes, even when there
+# are also dependent predicates.
+[opt]> SELECT * FROM test a JOIN test b ON a.id = b.id AND a.value = 'a' AND b.value = 'b'
+---
+Initial:
+   NestedLoopJoin: inner on a.id = b.id AND a.value = a AND b.value = b
+   ├─ Scan: test as a
+   └─ Scan: test as b
+Filter pushdown:
+   NestedLoopJoin: inner on a.id = b.id
+   ├─ Scan: test as a (a.value = a)
+   └─ Scan: test as b (b.value = b)
+Join type:
+   HashJoin: inner on a.id = b.id
+   ├─ Scan: test as a (a.value = a)
+   └─ Scan: test as b (b.value = b)
+
+# Does not push down JOIN node OR predicates.
+[opt]> SELECT * FROM test a JOIN test b ON a.value = 'a' OR b.value = 'b'
+---
+Initial:
+   NestedLoopJoin: inner on a.value = a OR b.value = b
+   ├─ Scan: test as a
+   └─ Scan: test as b
+1, a, 1, a
+1, a, 2, b
+1, a, 3, c
+2, b, 2, b
+3, c, 2, b
+
+# Pushes WHERE predicates down into and past JOIN nodes.
+[opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE a.value = 'a' AND b.value = 'b'
+---
+Initial:
+   Filter: a.value = a AND b.value = b
+   └─ NestedLoopJoin: inner on a.id = b.id
+      ├─ Scan: test as a
+      └─ Scan: test as b
+Filter pushdown:
+   NestedLoopJoin: inner on a.id = b.id
+   ├─ Scan: test as a (a.value = a)
+   └─ Scan: test as b (b.value = b)
+Join type:
+   HashJoin: inner on a.id = b.id
+   ├─ Scan: test as a (a.value = a)
+   └─ Scan: test as b (b.value = b)
+
+# Pushes down the parts of predicates that can be pushed.
+[opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE a.value = 'a' AND b.value = 'b' AND (a.id > 0 OR b.id > 0)
+---
+Initial:
+   Filter: a.value = a AND b.value = b AND a.id > 0 OR b.id > 0
+   └─ NestedLoopJoin: inner on a.id = b.id
+      ├─ Scan: test as a
+      └─ Scan: test as b
+Filter pushdown:
+   NestedLoopJoin: inner on a.id > 0 OR b.id > 0 AND a.id = b.id
+   ├─ Scan: test as a (a.value = a)
+   └─ Scan: test as b (b.value = b)
+
+# Equijoin pushdowns can transfer lookups from one relation to the other to make
+# use of indexes.
+[opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE (a.id = 1 OR a.id = 2)
+---
+Initial:
+   Filter: a.id = 1 OR a.id = 2
+   └─ NestedLoopJoin: inner on a.id = b.id
+      ├─ Scan: test as a
+      └─ Scan: test as b
+Filter pushdown:
+   NestedLoopJoin: inner on a.id = b.id
+   ├─ Scan: test as a (a.id = 1 OR a.id = 2)
+   └─ Scan: test as b (b.id = 1 OR b.id = 2)
+Index lookup:
+   NestedLoopJoin: inner on a.id = b.id
+   ├─ KeyLookup: test as a (1, 2)
+   └─ KeyLookup: test as b (1, 2)
+Join type:
+   HashJoin: inner on a.id = b.id
+   ├─ KeyLookup: test as a (1, 2)
+   └─ KeyLookup: test as b (1, 2)
+1, a, 1, a
+2, b, 2, b
+
+[opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE (b.id = 1 OR b.id = 2)
+---
+Initial:
+   Filter: b.id = 1 OR b.id = 2
+   └─ NestedLoopJoin: inner on a.id = b.id
+      ├─ Scan: test as a
+      └─ Scan: test as b
+Filter pushdown:
+   NestedLoopJoin: inner on a.id = b.id
+   ├─ Scan: test as a (a.id = 1 OR a.id = 2)
+   └─ Scan: test as b (b.id = 1 OR b.id = 2)
+Index lookup:
+   NestedLoopJoin: inner on a.id = b.id
+   ├─ KeyLookup: test as a (1, 2)
+   └─ KeyLookup: test as b (1, 2)
+Join type:
+   HashJoin: inner on a.id = b.id
+   ├─ KeyLookup: test as a (1, 2)
+   └─ KeyLookup: test as b (1, 2)
+1, a, 1, a
+2, b, 2, b
+
+# Pushdowns can propagate through multiple JOIN nodes.
+[opt]> SELECT * FROM \
+    test a JOIN test b ON a.id = b.id JOIN test c ON b.id = c.id JOIN test d ON c.id = d.id \
+    WHERE a.id > 0 AND b.id = 2 AND c.id < 3 AND (d.id = 2 OR d.id = 3)
+---
+Initial:
+   Filter: a.id > 0 AND b.id = 2 AND c.id < 3 AND d.id = 2 OR d.id = 3
+   └─ NestedLoopJoin: inner on c.id = d.id
+      ├─ NestedLoopJoin: inner on b.id = c.id
+      │  ├─ NestedLoopJoin: inner on a.id = b.id
+      │  │  ├─ Scan: test as a
+      │  │  └─ Scan: test as b
+      │  └─ Scan: test as c
+      └─ Scan: test as d
+Filter pushdown:
+   NestedLoopJoin: inner on c.id = d.id
+   ├─ NestedLoopJoin: inner on b.id = c.id
+   │  ├─ NestedLoopJoin: inner on a.id = b.id
+   │  │  ├─ Scan: test as a (a.id > 0 AND a.id = 2 OR a.id = 3)
+   │  │  └─ Scan: test as b (b.id = 2 AND b.id = 2 OR b.id = 3)
+   │  └─ Scan: test as c (c.id < 3 AND c.id = 2 OR c.id = 3 AND c.id = 2)
+   └─ Scan: test as d (d.id = 2 OR d.id = 3)
+Index lookup:
+   NestedLoopJoin: inner on c.id = d.id
+   ├─ NestedLoopJoin: inner on b.id = c.id
+   │  ├─ NestedLoopJoin: inner on a.id = b.id
+   │  │  ├─ Filter: a.id > 0
+   │  │  │  └─ KeyLookup: test as a (2, 3)
+   │  │  └─ Filter: b.id = 2 OR b.id = 3
+   │  │     └─ KeyLookup: test as b (2)
+   │  └─ Filter: c.id < 3 AND c.id = 2
+   │     └─ KeyLookup: test as c (2, 3)
+   └─ KeyLookup: test as d (2, 3)
+Join type:
+   HashJoin: inner on c.id = d.id
+   ├─ HashJoin: inner on b.id = c.id
+   │  ├─ HashJoin: inner on a.id = b.id
+   │  │  ├─ Filter: a.id > 0
+   │  │  │  └─ KeyLookup: test as a (2, 3)
+   │  │  └─ Filter: b.id = 2 OR b.id = 3
+   │  │     └─ KeyLookup: test as b (2)
+   │  └─ Filter: c.id < 3 AND c.id = 2
+   │     └─ KeyLookup: test as c (2, 3)
+   └─ KeyLookup: test as d (2, 3)
+2, b, 2, b, 2, b, 2, b
