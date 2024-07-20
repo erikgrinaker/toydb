@@ -51,7 +51,7 @@ Initial:
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id AND a.value >= b.value
 ---
 Initial:
-   NestedLoopJoin: inner on a.id = b.id AND a.value > b.value OR a.value = b.value
+   NestedLoopJoin: inner on a.id = b.id AND (a.value > b.value OR a.value = b.value)
    ├─ Scan: test as a
    └─ Scan: test as b
 1, a, 1, a

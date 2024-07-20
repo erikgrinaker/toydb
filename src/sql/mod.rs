@@ -234,11 +234,7 @@ mod tests {
 
             // If requested, dump the parsed expression.
             if tags.remove("expr") {
-                let mut s = format!("{expr:?}");
-                if s.len() > 80 {
-                    s = format!("{expr:#?}");
-                }
-                write!(output, " ← {s}")?;
+                write!(output, " ← {}", expr.format(&Node::Nothing { columns: vec![] }))?;
             }
 
             // Reject unknown tags.

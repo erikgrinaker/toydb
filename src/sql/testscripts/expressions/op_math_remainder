@@ -8,16 +8,16 @@
 [expr]> -5 % 3
 [expr]> 5 % -3
 ---
-Integer(2) ← Remainder(Constant(Integer(5)), Constant(Integer(3)))
-Integer(-2) ← Remainder(Negate(Constant(Integer(5))), Constant(Integer(3)))
-Integer(2) ← Remainder(Constant(Integer(5)), Negate(Constant(Integer(3))))
+Integer(2) ← 5 % 3
+Integer(-2) ← -5 % 3
+Integer(2) ← 5 % -3
 
 # Floats.
 [expr]> 6.28 % 2.2
 [expr]> 6.28 % -2.2
 ---
-Float(1.88) ← Remainder(Constant(Float(6.28)), Constant(Float(2.2)))
-Float(1.88) ← Remainder(Constant(Float(6.28)), Negate(Constant(Float(2.2))))
+Float(1.88) ← 6.28 % 2.2
+Float(1.88) ← 6.28 % -2.2
 
 # Mixed.
 > 3.15 % 2

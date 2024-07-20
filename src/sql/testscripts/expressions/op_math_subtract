@@ -5,36 +5,16 @@
 [expr]> 2 - 3
 [expr]> 1 - -3 - 2
 ---
-Integer(1) ← Subtract(Constant(Integer(2)), Constant(Integer(1)))
-Integer(-1) ← Subtract(Constant(Integer(2)), Constant(Integer(3)))
-Integer(2) ← Subtract(
-    Subtract(
-        Constant(
-            Integer(
-                1,
-            ),
-        ),
-        Negate(
-            Constant(
-                Integer(
-                    3,
-                ),
-            ),
-        ),
-    ),
-    Constant(
-        Integer(
-            2,
-        ),
-    ),
-)
+Integer(1) ← 2 - 1
+Integer(-1) ← 2 - 3
+Integer(2) ← 1 - -3 - 2
 
 # Simple float subtraction.
 [expr]> 3.1 - 2.71
 [expr]> 3.1 - -2.71
 ---
-Float(0.3900000000000001) ← Subtract(Constant(Float(3.1)), Constant(Float(2.71)))
-Float(5.8100000000000005) ← Subtract(Constant(Float(3.1)), Negate(Constant(Float(2.71))))
+Float(0.3900000000000001) ← 3.1 - 2.71
+Float(5.8100000000000005) ← 3.1 - -2.71
 
 # Combined int/float subtraction yields floats.
 > 3.72 - 1

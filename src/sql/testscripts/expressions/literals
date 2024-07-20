@@ -44,10 +44,10 @@ Float(3.0)
 [expr]> -3.14
 [expr]> +3.14
 ---
-Integer(-3) ← Negate(Constant(Integer(3)))
-Integer(3) ← Identity(Constant(Integer(3)))
-Float(-3.14) ← Negate(Constant(Float(3.14)))
-Float(3.14) ← Identity(Constant(Float(3.14)))
+Integer(-3) ← -3
+Integer(3) ← 3
+Float(-3.14) ← -3.14
+Float(3.14) ← 3.14
 
 # Floats with exponents.
 3.14e3

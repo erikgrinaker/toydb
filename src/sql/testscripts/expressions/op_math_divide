@@ -5,16 +5,16 @@
 [expr]> 8 / 3
 [expr]> 8 / -3
 ---
-Integer(3) ← Divide(Constant(Integer(9)), Constant(Integer(3)))
-Integer(2) ← Divide(Constant(Integer(8)), Constant(Integer(3)))
-Integer(-2) ← Divide(Constant(Integer(8)), Negate(Constant(Integer(3))))
+Integer(3) ← 9 / 3
+Integer(2) ← 8 / 3
+Integer(-2) ← 8 / -3
 
 # Floats.
 [expr]> 4.16 / 3.2
 [expr]> 4.16 / -3.2
 ---
-Float(1.3) ← Divide(Constant(Float(4.16)), Constant(Float(3.2)))
-Float(-1.3) ← Divide(Constant(Float(4.16)), Negate(Constant(Float(3.2))))
+Float(1.3) ← 4.16 / 3.2
+Float(-1.3) ← 4.16 / -3.2
 
 # Mixed always yields floats.
 > 3 / 1.2

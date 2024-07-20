@@ -35,10 +35,10 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE (id = 1 OR id = 3) AND value > 'a'
 ---
 Initial:
-   Filter: test.id = 1 OR test.id = 3 AND test.value > a
+   Filter: (test.id = 1 OR test.id = 3) AND test.value > a
    └─ Scan: test
 Filter pushdown:
-   Scan: test (test.id = 1 OR test.id = 3 AND test.value > a)
+   Scan: test ((test.id = 1 OR test.id = 3) AND test.value > a)
 Index lookup:
    Filter: test.value > a
    └─ KeyLookup: test (1, 3)
@@ -82,10 +82,10 @@ Index lookup:
 [opt]> SELECT * FROM test WHERE (value = 'a' OR value = 'c') AND id > 1
 ---
 Initial:
-   Filter: test.value = a OR test.value = c AND test.id > 1
+   Filter: (test.value = a OR test.value = c) AND test.id > 1
    └─ Scan: test
 Filter pushdown:
-   Scan: test (test.value = a OR test.value = c AND test.id > 1)
+   Scan: test ((test.value = a OR test.value = c) AND test.id > 1)
 Index lookup:
    Filter: test.id > 1
    └─ IndexLookup: test.value (a, c)
@@ -235,7 +235,7 @@ Join type:
 [opt]> SELECT * FROM test JOIN other ON other.test_id = test.id AND (test_id = 1 OR test_id = 3)
 ---
 Initial:
-   NestedLoopJoin: inner on other.test_id = test.id AND other.test_id = 1 OR other.test_id = 3
+   NestedLoopJoin: inner on other.test_id = test.id AND (other.test_id = 1 OR other.test_id = 3)
    ├─ Scan: test
    └─ Scan: other
 Filter pushdown:

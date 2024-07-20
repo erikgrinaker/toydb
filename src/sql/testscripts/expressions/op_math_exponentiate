@@ -6,17 +6,17 @@
 [expr]> 0 ^ 2
 [expr]> 9 ^ -3
 ---
-Integer(8) ← Exponentiate(Constant(Integer(2)), Constant(Integer(3)))
-Integer(1) ← Exponentiate(Constant(Integer(2)), Constant(Integer(0)))
-Integer(0) ← Exponentiate(Constant(Integer(0)), Constant(Integer(2)))
-Float(0.0013717421124828531) ← Exponentiate(Constant(Integer(9)), Negate(Constant(Integer(3))))
+Integer(8) ← 2 ^ 3
+Integer(1) ← 2 ^ 0
+Integer(0) ← 0 ^ 2
+Float(0.0013717421124828531) ← 9 ^ -3
 
 # Floats.
 [expr]> 6.25 ^ 0.5
 [expr]> 6.25 ^ 3.14
 ---
-Float(2.5) ← Exponentiate(Constant(Float(6.25)), Constant(Float(0.5)))
-Float(315.5464179407336) ← Exponentiate(Constant(Float(6.25)), Constant(Float(3.14)))
+Float(2.5) ← 6.25 ^ 0.5
+Float(315.5464179407336) ← 6.25 ^ 3.14
 
 # Mixed.
 > 6.25 ^ 2

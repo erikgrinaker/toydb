@@ -4,15 +4,15 @@
 [expr]> 2 * 3
 [expr]> 2 * -3
 ---
-Integer(6) ← Multiply(Constant(Integer(2)), Constant(Integer(3)))
-Integer(-6) ← Multiply(Constant(Integer(2)), Negate(Constant(Integer(3))))
+Integer(6) ← 2 * 3
+Integer(-6) ← 2 * -3
 
 # Float.
 [expr]> 3.14 * 2.71
 [expr]> 3.14 * -2.71
 ---
-Float(8.5094) ← Multiply(Constant(Float(3.14)), Constant(Float(2.71)))
-Float(-8.5094) ← Multiply(Constant(Float(3.14)), Negate(Constant(Float(2.71))))
+Float(8.5094) ← 3.14 * 2.71
+Float(-8.5094) ← 3.14 * -2.71
 
 # Mixed.
 > 3.14 * 2

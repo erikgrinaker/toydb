@@ -4,8 +4,8 @@
 [expr]> sqrt(2)
 [expr]> sqrt(100)
 ---
-Float(1.4142135623730951) ← SquareRoot(Constant(Integer(2)))
-Float(10.0) ← SquareRoot(Constant(Integer(100)))
+Float(1.4142135623730951) ← sqrt(2)
+Float(10.0) ← sqrt(100)
 
 # Negative integers error, but 0 is valid.
 !> sqrt(-1)

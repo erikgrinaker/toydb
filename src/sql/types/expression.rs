@@ -62,7 +62,34 @@ pub enum Expression {
 impl Expression {
     /// Formats the expression, using the given Node to look up column labels.
     pub fn format(&self, node: &Node) -> String {
-        let format = |expr: &Expression| expr.format(node);
+        // Precedence levels, for grouping. Matches the parser precedence.
+        fn precedence(expr: &Expression) -> u8 {
+            use Expression::*;
+            match expr {
+                Column(_) | Constant(_) | SquareRoot(_) => 11,
+                Identity(_) | Negate(_) => 10,
+                Factorial(_) => 9,
+                Exponentiate(_, _) => 8,
+                Multiply(_, _) | Divide(_, _) | Remainder(_, _) => 7,
+                Add(_, _) | Subtract(_, _) => 6,
+                GreaterThan(_, _) | LessThan(_, _) => 5,
+                Equal(_, _) | Like(_, _) | Is(_, _) => 4,
+                Not(_) => 3,
+                And(_, _) => 2,
+                Or(_, _) => 1,
+            }
+        }
+
+        // Helper to format a boxed expression.
+        let format = |expr: &Expression| {
+            let group = precedence(expr) < precedence(self);
+            let mut s = expr.format(node);
+            if group {
+                s = format!("({s})");
+            }
+            s
+        };
+
         match self {
             Self::Column(index) => match node.column_label(*index) {
                 Label::None => format!("#{index}"),

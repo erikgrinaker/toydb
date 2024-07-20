@@ -94,12 +94,12 @@ Join type:
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE a.value = 'a' AND b.value = 'b' AND (a.id > 0 OR b.id > 0)
 ---
 Initial:
-   Filter: a.value = a AND b.value = b AND a.id > 0 OR b.id > 0
+   Filter: a.value = a AND b.value = b AND (a.id > 0 OR b.id > 0)
    └─ NestedLoopJoin: inner on a.id = b.id
       ├─ Scan: test as a
       └─ Scan: test as b
 Filter pushdown:
-   NestedLoopJoin: inner on a.id > 0 OR b.id > 0 AND a.id = b.id
+   NestedLoopJoin: inner on (a.id > 0 OR b.id > 0) AND a.id = b.id
    ├─ Scan: test as a (a.value = a)
    └─ Scan: test as b (b.value = b)
 
@@ -155,7 +155,7 @@ Join type:
     WHERE a.id > 0 AND b.id = 2 AND c.id < 3 AND (d.id = 2 OR d.id = 3)
 ---
 Initial:
-   Filter: a.id > 0 AND b.id = 2 AND c.id < 3 AND d.id = 2 OR d.id = 3
+   Filter: a.id > 0 AND b.id = 2 AND c.id < 3 AND (d.id = 2 OR d.id = 3)
    └─ NestedLoopJoin: inner on c.id = d.id
       ├─ NestedLoopJoin: inner on b.id = c.id
       │  ├─ NestedLoopJoin: inner on a.id = b.id
@@ -167,9 +167,9 @@ Filter pushdown:
    NestedLoopJoin: inner on c.id = d.id
    ├─ NestedLoopJoin: inner on b.id = c.id
    │  ├─ NestedLoopJoin: inner on a.id = b.id
-   │  │  ├─ Scan: test as a (a.id > 0 AND a.id = 2 OR a.id = 3)
-   │  │  └─ Scan: test as b (b.id = 2 AND b.id = 2 OR b.id = 3)
-   │  └─ Scan: test as c (c.id < 3 AND c.id = 2 OR c.id = 3 AND c.id = 2)
+   │  │  ├─ Scan: test as a (a.id > 0 AND (a.id = 2 OR a.id = 3))
+   │  │  └─ Scan: test as b (b.id = 2 AND (b.id = 2 OR b.id = 3))
+   │  └─ Scan: test as c (c.id < 3 AND (c.id = 2 OR c.id = 3) AND c.id = 2)
    └─ Scan: test as d (d.id = 2 OR d.id = 3)
 Index lookup:
    NestedLoopJoin: inner on c.id = d.id
