@@ -13,7 +13,7 @@ use crate::sql::types::DataType;
 /// does not know e.g. whether a given table or column exists, or which kind of
 /// join to use -- that is the job of the planner.
 pub struct Parser<'a> {
-    lexer: std::iter::Peekable<Lexer<'a>>,
+    pub lexer: std::iter::Peekable<Lexer<'a>>,
 }
 
 impl<'a> Parser<'a> {
@@ -494,7 +494,7 @@ impl<'a> Parser<'a> {
         } else {
             self.parse_expression_atom()?
         };
-        // Apply any postfix operators.
+        // Apply any postfix operators for the left-hand atom.
         while let Some(postfix) = self.parse_postfix_operator(min_precedence)? {
             lhs = postfix.build(lhs)
         }
@@ -502,7 +502,12 @@ impl<'a> Parser<'a> {
         while let Some(infix) = self.parse_infix_operator(min_precedence)? {
             let at_precedence = infix.precedence() + infix.associativity();
             let rhs = self.parse_expression_at(at_precedence)?;
-            lhs = infix.build(lhs, rhs)
+            lhs = infix.build(lhs, rhs);
+        }
+        // Apply any postfix operators after the binary operator. Consider e.g.
+        // 1 + NULL IS NULL.
+        while let Some(postfix) = self.parse_postfix_operator(min_precedence)? {
+            lhs = postfix.build(lhs)
         }
         Ok(lhs)
     }
@@ -658,7 +663,7 @@ impl PrefixOperator {
     fn precedence(&self) -> Precedence {
         match self {
             Self::Not => 3,
-            _ => 10,
+            Self::Minus | Self::Plus => 10,
         }
     }
 
@@ -700,12 +705,15 @@ enum InfixOperator {
 
 impl InfixOperator {
     /// The operator precedence.
+    ///
+    /// Mostly follows Postgres, except IS and LIKE having same precedence as =.
+    /// This is similar to SQLite and MySQL.
     fn precedence(&self) -> Precedence {
         match self {
             Self::Or => 1,
             Self::And => 2,
             // Self::Not => 3
-            Self::Equal | Self::NotEqual | Self::Like => 4,
+            Self::Equal | Self::NotEqual | Self::Like => 4, // and Self::Is
             Self::GreaterThan
             | Self::GreaterThanOrEqual
             | Self::LessThan
@@ -757,9 +765,12 @@ enum PostfixOperator {
 }
 
 impl PostfixOperator {
-    // The operator precedence. Postfix operators are below most prefix operators.
+    // The operator precedence.
     fn precedence(&self) -> Precedence {
-        9
+        match self {
+            Self::IsNaN | Self::IsNotNaN | Self::IsNotNull | Self::IsNull => 4,
+            Self::Factorial => 9,
+        }
     }
 
     /// Builds an AST expression for the operator.

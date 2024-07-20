@@ -1,13 +1,13 @@
 # Tests operator precedence. Test each precedence level against the operators
-# immediately below it, in order. The levels are:
+# beside and immediately below it, in order. The levels are:
 #
 # 10: prefix +, -
-# 9: postfix !, IS NULL, IS NOT NULL, IS NAN, IS NOT NAN
+# 9: postfix !
 # 8: ^ (left-associative)
 # 7: *, /, %
 # 6: +, -
 # 5: >, >=, <, <=
-# 4: =, !=, LIKE
+# 4: =, !=, LIKE, IS
 # 3: NOT
 # 2: AND
 # 1: OR
@@ -43,35 +43,6 @@ Integer(-9)
 ---
 Integer(64)
 Integer(40320)
-
-# IS NAN.
-!> 2.0 ^ NAN IS NAN
-> (2.0 ^ NAN) IS NAN
----
-Error: invalid input: can't exponentiate 2 and TRUE
-Boolean(true)
-
-# IS NOT NAN.
-!> 2.0 ^ NAN IS NOT NAN
-> (2.0 ^ NAN) IS NOT NAN
----
-Error: invalid input: can't exponentiate 2 and FALSE
-Boolean(false)
-
-
-# IS NULL.
-!> 2 ^ NULL IS NULL
-> (2 ^ NULL) IS NULL
----
-Error: invalid input: can't exponentiate 2 and TRUE
-Boolean(true)
-
-# IS NOT NULL.
-!> 2 ^ NULL IS NOT NULL
-> (2 ^ NULL) IS NOT NULL
----
-Error: invalid input: can't exponentiate 2 and FALSE
-Boolean(false)
 
 # ^, which is also left-associative.
 > 2 ^ 3 ^ 2
@@ -210,6 +181,8 @@ Error: invalid input: can't subtract 2 and TRUE
 !> 5 > (3 != TRUE)
 !> 5 > 3 LIKE 'abc'
 !> 5 > (3 LIKE 'abc')
+> 5 > 3 IS NULL
+!> 5 > (3 IS NULL)
 ---
 Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
@@ -225,6 +198,8 @@ Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE TRUE and abc
 Error: invalid input: can't LIKE 3 and abc
+Boolean(false)
+Error: invalid input: can't compare 5 and FALSE
 
 # >=
 > 5 >= 3 < TRUE
@@ -241,6 +216,8 @@ Error: invalid input: can't LIKE 3 and abc
 !> 5 >= (3 != TRUE)
 !> 5 >= 3 LIKE 'abc'
 !> 5 >= (3 LIKE 'abc')
+> 5 >= 3 IS NULL
+!> 5 >= (3 IS NULL)
 ---
 Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
@@ -256,6 +233,8 @@ Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE TRUE and abc
 Error: invalid input: can't LIKE 3 and abc
+Boolean(false)
+Error: invalid input: can't compare 5 and FALSE
 
 # <
 > 5 < 3 < TRUE
@@ -272,6 +251,8 @@ Error: invalid input: can't LIKE 3 and abc
 !> 5 < (3 != TRUE)
 !> 5 < 3 LIKE 'abc'
 !> 5 < (3 LIKE 'abc')
+> 5 < 3 IS NULL
+!> 5 < (3 IS NULL)
 ---
 Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
@@ -287,6 +268,8 @@ Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE FALSE and abc
 Error: invalid input: can't LIKE 3 and abc
+Boolean(false)
+Error: invalid input: can't compare 5 and FALSE
 
 # <=
 > 5 <= 3 < TRUE
@@ -303,6 +286,8 @@ Error: invalid input: can't LIKE 3 and abc
 !> 5 <= (3 != TRUE)
 !> 5 <= 3 LIKE 'abc'
 !> 5 <= (3 LIKE 'abc')
+> 5 <= 3 IS NULL
+!> 5 <= (3 IS NULL)
 ---
 Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
@@ -318,43 +303,85 @@ Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE FALSE and abc
 Error: invalid input: can't LIKE 3 and abc
+Boolean(false)
+Error: invalid input: can't compare 5 and FALSE
 
 # =
 > 1 = 1 != FALSE
 !> 1 = (1 != FALSE)
 !> 1 = 1 LIKE 'abc'
 !> 1 = (1 LIKE 'abc')
-> 1 = 1 AND TRUE
-!> 1 = (1 AND TRUE)
+> 1 = NULL IS NULL
+!> 1 = (NULL IS NULL)
+> NOT 1 = 1
+!> (NOT 1) = 1
 ---
 Boolean(true)
 Error: invalid input: can't compare 1 and FALSE
 Error: invalid input: can't LIKE TRUE and abc
 Error: invalid input: can't LIKE 1 and abc
 Boolean(true)
-Error: invalid input: can't and 1 and TRUE
+Error: invalid input: can't compare 1 and TRUE
+Boolean(false)
+Error: invalid input: can't negate 1
 
 # !=
 > 1 != 1 != FALSE
 !> 1 != (1 != FALSE)
 !> 1 != 1 LIKE 'abc'
 !> 1 != (1 LIKE 'abc')
-> 1 != 1 AND TRUE
-!> 1 != (1 AND TRUE)
+> 1 != NULL IS NULL
+!> 1 != (NULL IS NULL)
+> NOT 1 != 1
+!> (NOT 1) != 1
 ---
 Boolean(false)
 Error: invalid input: can't compare 1 and FALSE
 Error: invalid input: can't LIKE FALSE and abc
 Error: invalid input: can't LIKE 1 and abc
-Boolean(false)
-Error: invalid input: can't and 1 and TRUE
+Boolean(true)
+Error: invalid input: can't compare 1 and TRUE
+Boolean(true)
+Error: invalid input: can't negate 1
 
 # LIKE
+> 'abc' LIKE NULL IS NULL
+!> 'abc' LIKE (NULL IS NULL)
 > NOT 'abc' LIKE 'abc'
 !> (NOT 'abc') LIKE 'abc'
 ---
+Boolean(true)
+Error: invalid input: can't LIKE abc and TRUE
 Boolean(false)
 Error: invalid input: can't negate abc
+
+# IS NULL
+> NOT NULL IS NULL
+> (NOT NULL) IS NULL
+---
+Boolean(false)
+Boolean(true)
+
+# IS NOT NULL
+> NOT NULL IS NOT NULL
+> (NOT NULL) IS NOT NULL
+---
+Boolean(true)
+Boolean(false)
+
+# IS NAN
+> NOT NAN IS NAN
+!> (NOT NAN) IS NAN
+---
+Boolean(false)
+Error: invalid input: can't negate NaN
+
+# IS NOT NAN
+> NOT NAN IS NOT NAN
+!> (NOT NAN) IS NOT NAN
+---
+Boolean(true)
+Error: invalid input: can't negate NaN
 
 # NOT.
 > NOT TRUE AND FALSE

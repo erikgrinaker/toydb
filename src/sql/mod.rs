@@ -214,7 +214,11 @@ mod tests {
             let mut tags = command.tags.clone();
 
             // Parse and build the expression.
-            let ast = Parser::new(input).parse_expression()?;
+            let mut parser = Parser::new(input);
+            let ast = parser.parse_expression()?;
+            if let Some(next) = parser.lexer.next().transpose()? {
+                return Err(format!("unconsumed token {next}").into());
+            }
             let mut expr = Planner::<Catalog>::build_expression(ast, &Scope::new())?;
 
             // If requested, convert the expression to conjunctive normal form.
