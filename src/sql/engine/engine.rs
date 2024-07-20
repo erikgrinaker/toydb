@@ -85,6 +85,6 @@ pub trait Catalog {
 
     /// Fetches a table schema, or errors if it does not exist.
     fn must_get_table(&self, table: &str) -> Result<Table> {
-        self.get_table(table)?.ok_or(errinput!("table {table} does not exist"))
+        self.get_table(table)?.ok_or_else(|| errinput!("table {table} does not exist"))
     }
 }

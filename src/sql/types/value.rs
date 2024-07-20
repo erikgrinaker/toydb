@@ -130,9 +130,10 @@ impl Value {
     pub fn checked_add(&self, other: &Self) -> Result<Self> {
         use Value::*;
         Ok(match (self, other) {
-            (Integer(lhs), Integer(rhs)) => {
-                Integer(lhs.checked_add(*rhs).ok_or::<Error>(errinput!("integer overflow"))?)
-            }
+            (Integer(lhs), Integer(rhs)) => match lhs.checked_add(*rhs) {
+                Some(i) => Integer(i),
+                None => return errinput!("integer overflow"),
+            },
             (Integer(lhs), Float(rhs)) => Float(*lhs as f64 + rhs),
             (Float(lhs), Integer(rhs)) => Float(lhs + *rhs as f64),
             (Float(lhs), Float(rhs)) => Float(lhs + rhs),
@@ -162,8 +163,11 @@ impl Value {
         use Value::*;
         Ok(match (self, other) {
             (Integer(lhs), Integer(rhs)) if *rhs >= 0 => {
-                let rhs: u32 = (*rhs).try_into().or(errinput!("integer overflow"))?;
-                Integer(lhs.checked_pow(rhs).ok_or::<Error>(errinput!("integer overflow"))?)
+                let rhs = (*rhs).try_into().or_else(|_| errinput!("integer overflow"))?;
+                match lhs.checked_pow(rhs) {
+                    Some(i) => Integer(i),
+                    None => return errinput!("integer overflow"),
+                }
             }
             (Integer(lhs), Integer(rhs)) => Float((*lhs as f64).powf(*rhs as f64)),
             (Integer(lhs), Float(rhs)) => Float((*lhs as f64).powf(*rhs)),
@@ -179,9 +183,10 @@ impl Value {
     pub fn checked_mul(&self, other: &Self) -> Result<Self> {
         use Value::*;
         Ok(match (self, other) {
-            (Integer(lhs), Integer(rhs)) => {
-                Integer(lhs.checked_mul(*rhs).ok_or::<Error>(errinput!("integer overflow"))?)
-            }
+            (Integer(lhs), Integer(rhs)) => match lhs.checked_mul(*rhs) {
+                Some(i) => Integer(i),
+                None => return errinput!("integer overflow"),
+            },
             (Integer(lhs), Float(rhs)) => Float(*lhs as f64 * rhs),
             (Float(lhs), Integer(rhs)) => Float(lhs * *rhs as f64),
             (Float(lhs), Float(rhs)) => Float(lhs * rhs),
@@ -214,9 +219,10 @@ impl Value {
     pub fn checked_sub(&self, other: &Self) -> Result<Self> {
         use Value::*;
         Ok(match (self, other) {
-            (Integer(lhs), Integer(rhs)) => {
-                Integer(lhs.checked_sub(*rhs).ok_or::<Error>(errinput!("integer overflow"))?)
-            }
+            (Integer(lhs), Integer(rhs)) => match lhs.checked_sub(*rhs) {
+                Some(i) => Integer(i),
+                None => return errinput!("integer overflow"),
+            },
             (Integer(lhs), Float(rhs)) => Float(*lhs as f64 - rhs),
             (Float(lhs), Integer(rhs)) => Float(lhs - *rhs as f64),
             (Float(lhs), Float(rhs)) => Float(lhs - rhs),

@@ -11,7 +11,7 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{error::ReadlineError, Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 use toydb::errinput;
-use toydb::error::{Error, Result};
+use toydb::error::Result;
 use toydb::sql::engine::StatementResult;
 use toydb::sql::parser::{Lexer, Token};
 use toydb::Client;
@@ -80,7 +80,9 @@ impl ToySQL {
     /// Handles a REPL command (prefixed by !, e.g. !help)
     fn execute_command(&mut self, input: &str) -> Result<()> {
         let mut input = input.split_ascii_whitespace();
-        let command = input.next().ok_or::<Error>(errinput!("expected command"))?;
+        let Some(command) = input.next() else {
+            return errinput!("expected command");
+        };
 
         let getargs = |n| {
             let args: Vec<&str> = input.collect();
