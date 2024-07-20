@@ -70,8 +70,8 @@ Error: invalid input: invalid datatype STRING for INTEGER column int
 ---
 NaN
 NaN
-0
-0
+0.0
+0.0
 
 # Strings.
 > UPDATE datatypes SET "string" = NULL
@@ -81,7 +81,7 @@ NaN
 > UPDATE datatypes SET "string" = 'Hi! 👋'
 > SELECT * FROM datatypes
 ---
-1, TRUE, -9223372036854775807, 0, Hi! 👋
+1, TRUE, -9223372036854775807, 0.0, Hi! 👋
 
 !> UPDATE datatypes SET "string" = false
 !> UPDATE datatypes SET "string" = 3

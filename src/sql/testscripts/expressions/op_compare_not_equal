@@ -13,8 +13,8 @@ Null ← NOT 1 = NULL
 [expr]> 3.0 != 3
 [expr]> 0.0 != -0.0
 ---
-Boolean(false) ← NOT 3 = 3
-Boolean(false) ← NOT 0 = -0
+Boolean(false) ← NOT 3.0 = 3
+Boolean(false) ← NOT 0.0 = -0.0
 
 [expr]> NAN != NAN
 [expr]> INFINITY != INFINITY

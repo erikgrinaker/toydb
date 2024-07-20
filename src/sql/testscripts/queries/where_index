@@ -23,7 +23,7 @@ ok
 ---
 IndexLookup: test.bool (TRUE)
 1, TRUE, 0, 3.14, abc
-3, TRUE, 1, 0, ABC
+3, TRUE, 1, 0.0, ABC
 
 [plan]> SELECT * FROM test WHERE "bool" = FALSE
 ---
@@ -44,8 +44,8 @@ IndexLookup: test.int (0)
 [plan]> SELECT * FROM test WHERE "int" = 1
 ---
 IndexLookup: test.int (1)
-3, TRUE, 1, 0, ABC
-4, NULL, 1, 0, 👍
+3, TRUE, 1, 0.0, ABC
+4, NULL, 1, 0.0, 👍
 
 [plan]> SELECT * FROM test WHERE "int" = 7
 ---
@@ -60,15 +60,15 @@ IndexLookup: test.float (-2.718)
 
 [plan]> SELECT * FROM test WHERE "float" = -0.0
 ---
-IndexLookup: test.float (-0)
-3, TRUE, 1, 0, ABC
-4, NULL, 1, 0, 👍
+IndexLookup: test.float (-0.0)
+3, TRUE, 1, 0.0, ABC
+4, NULL, 1, 0.0, 👍
 
 [plan]> SELECT * FROM test WHERE "float" = 0.0
 ---
-IndexLookup: test.float (0)
-3, TRUE, 1, 0, ABC
-4, NULL, 1, 0, 👍
+IndexLookup: test.float (0.0)
+3, TRUE, 1, 0.0, ABC
+4, NULL, 1, 0.0, 👍
 
 [plan]> SELECT * FROM test WHERE "float" = 3.14
 ---
@@ -112,7 +112,7 @@ IndexLookup: test.string (å)
 [plan]> SELECT * FROM test WHERE "string" = '👍'
 ---
 IndexLookup: test.string (👍)
-4, NULL, 1, 0, 👍
+4, NULL, 1, 0.0, 👍
 
 [plan]> SELECT * FROM test WHERE "string" = ''
 ---
@@ -144,8 +144,8 @@ Nothing
 IndexLookup: test.int (-1, 0, 1, 7)
 1, TRUE, 0, 3.14, abc
 2, FALSE, -1, -2.718, a
-3, TRUE, 1, 0, ABC
-4, NULL, 1, 0, 👍
+3, TRUE, 1, 0.0, ABC
+4, NULL, 1, 0.0, 👍
 
 # > or < predicates don't use an index.
 [plan]> SELECT * FROM test WHERE "int" < 1
@@ -158,5 +158,5 @@ Scan: test (test.int < 1)
 ---
 Scan: test (test.int > -1)
 1, TRUE, 0, 3.14, abc
-3, TRUE, 1, 0, ABC
-4, NULL, 1, 0, 👍
+3, TRUE, 1, 0.0, ABC
+4, NULL, 1, 0.0, 👍

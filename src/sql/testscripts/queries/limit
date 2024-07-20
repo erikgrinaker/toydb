@@ -77,7 +77,7 @@ Error: invalid input: invalid limit NULL
 !> SELECT * FROM test LIMIT '1'
 ---
 Error: invalid input: invalid limit FALSE
-Error: invalid input: invalid limit 1
+Error: invalid input: invalid limit 1.0
 Error: invalid input: invalid limit 1
 
 # Multiple limits error.

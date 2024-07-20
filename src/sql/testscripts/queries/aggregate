@@ -116,7 +116,7 @@ FALSE
 
 > SELECT MIN("float") FROM test
 ---
-0
+0.0
 
 > SELECT MIN("string") FROM test
 ---

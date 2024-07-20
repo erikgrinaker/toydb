@@ -43,7 +43,7 @@ Scan: test (test.id > 1 AND test.value < c)
 !> SELECT * FROM test WHERE ''
 ---
 Error: invalid input: filter returned 1, expected boolean
-Error: invalid input: filter returned 1, expected boolean
+Error: invalid input: filter returned 1.0, expected boolean
 Error: invalid input: filter returned , expected boolean
 
 # Errors on bare WHERE clause or multiple predicates.

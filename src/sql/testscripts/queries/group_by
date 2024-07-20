@@ -73,7 +73,7 @@ NULL, 1
 Aggregate: test.float, count(TRUE)
 └─ Scan: test
 NULL, 1
-0, 2
+0.0, 2
 3.14, 1
 inf, 1
 NaN, 2
@@ -227,10 +227,10 @@ Aggregate: test.id, test.group, test.bool, test.int, test.float, test.string
 0, NULL, NULL, NULL, NULL, NULL
 1, a, TRUE, -1, 3.14, 
 2, b, FALSE, 0, NaN, abc
-3, a, TRUE, 3, 0, AB
+3, a, TRUE, 3, 0.0, AB
 4, b, TRUE, 42, inf, 👋
 5, a, FALSE, 7, NaN, 
-6, b, FALSE, -1, 0, abc
+6, b, FALSE, -1, 0.0, abc
 
 [plan]> SELECT * FROM test GROUP BY "bool", "int", "float", "string", "group", id
 ---
@@ -238,9 +238,9 @@ Projection: test.id, test.group, test.bool, test.int, test.float, test.string
 └─ Aggregate: test.bool, test.int, test.float, test.string, test.group, test.id
    └─ Scan: test
 0, NULL, NULL, NULL, NULL, NULL
-6, b, FALSE, -1, 0, abc
+6, b, FALSE, -1, 0.0, abc
 2, b, FALSE, 0, NaN, abc
 5, a, FALSE, 7, NaN, 
 1, a, TRUE, -1, 3.14, 
-3, a, TRUE, 3, 0, AB
+3, a, TRUE, 3, 0.0, AB
 4, b, TRUE, 42, inf, 👋

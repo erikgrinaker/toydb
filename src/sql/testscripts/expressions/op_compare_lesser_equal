@@ -14,7 +14,7 @@ Boolean(true) ← -1 < 0 OR -1 = 0
 [expr]> INFINITY <= INFINITY
 [expr]> NAN <= NAN
 ---
-Boolean(true) ← 0 < -0 OR 0 = -0
+Boolean(true) ← 0.0 < -0.0 OR 0.0 = -0.0
 Boolean(true) ← inf < inf OR inf = inf
 Boolean(false) ← NaN < NaN OR NaN = NaN
 

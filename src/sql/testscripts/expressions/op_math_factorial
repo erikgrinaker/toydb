@@ -12,7 +12,7 @@ Integer(6) ← 3!
 !> 'a'!
 ---
 Error: invalid input: can't take factorial of 3.14
-Error: invalid input: can't take factorial of 3
+Error: invalid input: can't take factorial of 3.0
 Error: invalid input: can't take factorial of TRUE
 Error: invalid input: can't take factorial of a
 

@@ -53,13 +53,13 @@ KeyLookup: float (-2.718)
 
 [plan]> SELECT * FROM "float" WHERE id = -0.0
 ---
-KeyLookup: float (-0)
-0
+KeyLookup: float (-0.0)
+0.0
 
 [plan]> SELECT * FROM "float" WHERE id = 0.0
 ---
-KeyLookup: float (0)
-0
+KeyLookup: float (0.0)
+0.0
 
 [plan]> SELECT * FROM "float" WHERE id = 3.14
 ---

@@ -76,7 +76,7 @@ Error: invalid input: invalid offset NULL
 !> SELECT * FROM test OFFSET '1'
 ---
 Error: invalid input: invalid offset FALSE
-Error: invalid input: invalid offset 1
+Error: invalid input: invalid offset 1.0
 Error: invalid input: invalid offset 1
 
 # Multiple offsets error.
