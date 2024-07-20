@@ -621,18 +621,21 @@ impl<'a> Parser<'a> {
         if let Some(Token::Keyword(Keyword::Is)) = self.peek()? {
             // We can't consume tokens unless the precedence is satisfied, so we
             // assume IS NULL (they all have the same precedence).
-            if PostfixOperator::IsNull.precedence() < min_precedence {
+            if PostfixOperator::Is(ast::Literal::Null).precedence() < min_precedence {
                 return Ok(None);
             }
             self.expect(Keyword::Is.into())?;
             let not = self.next_is(Keyword::Not.into());
-            return Ok(match self.next()? {
-                Token::Keyword(Keyword::NaN) if not => Some(PostfixOperator::IsNotNaN),
-                Token::Keyword(Keyword::NaN) => Some(PostfixOperator::IsNaN),
-                Token::Keyword(Keyword::Null) if not => Some(PostfixOperator::IsNotNull),
-                Token::Keyword(Keyword::Null) => Some(PostfixOperator::IsNull),
+            let value = match self.next()? {
+                Token::Keyword(Keyword::NaN) => ast::Literal::Float(f64::NAN),
+                Token::Keyword(Keyword::Null) => ast::Literal::Null,
                 token => return errinput!("unexpected token {token}"),
-            });
+            };
+            let operator = match not {
+                false => PostfixOperator::Is(value),
+                true => PostfixOperator::IsNot(value),
+            };
+            return Ok(Some(operator));
         }
 
         self.next_if_map(|token| {
@@ -674,7 +677,7 @@ impl PrefixOperator {
     }
 
     /// Builds an AST expression for the operator.
-    fn build(&self, rhs: ast::Expression) -> ast::Expression {
+    fn build(self, rhs: ast::Expression) -> ast::Expression {
         let rhs = Box::new(rhs);
         match self {
             Self::Plus => ast::Operator::Identity(rhs).into(),
@@ -733,7 +736,7 @@ impl InfixOperator {
     }
 
     /// Builds an AST expression for the infix operator.
-    fn build(&self, lhs: ast::Expression, rhs: ast::Expression) -> ast::Expression {
+    fn build(self, lhs: ast::Expression, rhs: ast::Expression) -> ast::Expression {
         let (lhs, rhs) = (Box::new(lhs), Box::new(rhs));
         match self {
             Self::Add => ast::Operator::Add(lhs, rhs).into(),
@@ -758,30 +761,26 @@ impl InfixOperator {
 /// Postfix operators.
 enum PostfixOperator {
     Factorial,
-    IsNaN,
-    IsNotNaN,
-    IsNotNull,
-    IsNull,
+    Is(ast::Literal),
+    IsNot(ast::Literal),
 }
 
 impl PostfixOperator {
     // The operator precedence.
     fn precedence(&self) -> Precedence {
         match self {
-            Self::IsNaN | Self::IsNotNaN | Self::IsNotNull | Self::IsNull => 4,
+            Self::Is(_) | Self::IsNot(_) => 4,
             Self::Factorial => 9,
         }
     }
 
     /// Builds an AST expression for the operator.
-    fn build(&self, lhs: ast::Expression) -> ast::Expression {
+    fn build(self, lhs: ast::Expression) -> ast::Expression {
         let lhs = Box::new(lhs);
         match self {
             Self::Factorial => ast::Operator::Factorial(lhs).into(),
-            Self::IsNaN => ast::Operator::IsNaN(lhs).into(),
-            Self::IsNotNaN => ast::Operator::Not(ast::Operator::IsNaN(lhs).into()).into(),
-            Self::IsNotNull => ast::Operator::Not(ast::Operator::IsNull(lhs).into()).into(),
-            Self::IsNull => ast::Operator::IsNull(lhs).into(),
+            Self::Is(v) => ast::Operator::Is(lhs, v).into(),
+            Self::IsNot(v) => ast::Operator::Not(ast::Operator::Is(lhs, v).into()).into(),
         }
     }
 }

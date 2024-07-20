@@ -31,10 +31,8 @@ pub enum Expression {
     GreaterThan(Box<Expression>, Box<Expression>),
     /// < comparison of two values: a < b.
     LessThan(Box<Expression>, Box<Expression>),
-    /// Returns true if the value is null.
-    IsNull(Box<Expression>),
-    /// Returns true if the value is a f64 NaN.
-    IsNaN(Box<Expression>),
+    /// Checks for the given value: IS NULL or IS NAN.
+    Is(Box<Expression>, Value),
 
     /// Adds two numbers: a + b.
     Add(Box<Expression>, Box<Expression>),
@@ -79,8 +77,9 @@ impl Expression {
             Self::Equal(lhs, rhs) => format!("{} = {}", format(lhs), format(rhs)),
             Self::GreaterThan(lhs, rhs) => format!("{} > {}", format(lhs), format(rhs)),
             Self::LessThan(lhs, rhs) => format!("{} < {}", format(lhs), format(rhs)),
-            Self::IsNull(expr) => format!("{} IS NULL", format(expr)),
-            Self::IsNaN(expr) => format!("{} IS NAN", format(expr)),
+            Self::Is(expr, Value::Null) => format!("{} IS NULL", format(expr)),
+            Self::Is(expr, Value::Float(f)) if f.is_nan() => format!("{} IS NAN", format(expr)),
+            Self::Is(_, v) => panic!("unexpected IS value {v}"),
 
             Self::Add(lhs, rhs) => format!("{} + {}", format(lhs), format(rhs)),
             Self::Divide(lhs, rhs) => format!("{} / {}", format(lhs), format(rhs)),
@@ -175,12 +174,13 @@ impl Expression {
                 (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
-            Self::IsNull(expr) => Boolean(expr.evaluate(row)? == Null),
-            Self::IsNaN(expr) => match expr.evaluate(row)? {
+            Self::Is(expr, Null) => Boolean(expr.evaluate(row)? == Null),
+            Self::Is(expr, Float(f)) if f.is_nan() => match expr.evaluate(row)? {
                 Float(f) => Boolean(f.is_nan()),
                 Null => Null,
                 v => return errinput!("IS NAN can't be used with {}", v.datatype().unwrap()),
             },
+            Self::Is(_, v) => return errinput!("invalid IS value {v}"),
 
             // Mathematical operations. Inputs must be numbers, but integers and
             // floats are interchangeable (float when mixed). NULLs yield NULL.
@@ -248,8 +248,7 @@ impl Expression {
 
                 Self::Factorial(expr)
                 | Self::Identity(expr)
-                | Self::IsNaN(expr)
-                | Self::IsNull(expr)
+                | Self::Is(expr, _)
                 | Self::Negate(expr)
                 | Self::Not(expr)
                 | Self::SquareRoot(expr) => expr.walk(visitor),
@@ -296,8 +295,7 @@ impl Expression {
 
             Self::Factorial(expr) => Self::Factorial(transform(expr)?),
             Self::Identity(expr) => Self::Identity(transform(expr)?),
-            Self::IsNaN(expr) => Self::IsNaN(transform(expr)?),
-            Self::IsNull(expr) => Self::IsNull(transform(expr)?),
+            Self::Is(expr, value) => Self::Is(transform(expr)?, value),
             Self::Negate(expr) => Self::Negate(transform(expr)?),
             Self::Not(expr) => Self::Not(transform(expr)?),
 
@@ -387,8 +385,8 @@ impl Expression {
                 (Column(f), Constant(_)) | (Constant(_), Column(f)) => Some(*f),
                 _ => None,
             },
-            // IS NULL and IS NAN can use index lookups, since we index these.
-            IsNull(expr) | IsNaN(expr) => match expr.as_ref() {
+            // IS NULL and IS NAN can use index lookups.
+            Is(expr, _) => match expr.as_ref() {
                 Column(f) => Some(*f),
                 _ => None,
             },
@@ -416,14 +414,9 @@ impl Expression {
                 (Column(f), Constant(v)) | (Constant(v), Column(f)) => Some((f, vec![v])),
                 _ => None,
             },
-            // IS NULL index lookups should look up NULL.
-            IsNull(expr) => match *expr {
-                Column(f) => Some((f, vec![Value::Null])),
-                _ => None,
-            },
-            // IS NAN index lookups should look up NAN.
-            IsNaN(expr) => match *expr {
-                Column(f) => Some((f, vec![Value::Float(f64::NAN)])),
+            // IS NULL and IS NAN can use index lookups.
+            Is(expr, value) => match *expr {
+                Column(f) => Some((f, vec![value])),
                 _ => None,
             },
             Or(lhs, rhs) => match (lhs.into_column_values(), rhs.into_column_values()) {

@@ -529,8 +529,15 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     GreaterThan(build(lhs.clone())?, build(rhs.clone())?).into(),
                     Equal(build(lhs)?, build(rhs)?).into(),
                 ),
-                ast::Operator::IsNaN(expr) => IsNaN(build(expr)?),
-                ast::Operator::IsNull(expr) => IsNull(build(expr)?),
+                ast::Operator::Is(expr, literal) => {
+                    let expr = build(expr)?;
+                    let value = match literal {
+                        ast::Literal::Null => Value::Null,
+                        ast::Literal::Float(f) if f.is_nan() => Value::Float(f),
+                        value => panic!("invalid IS value {value:?}"), // enforced by parser
+                    };
+                    Is(expr, value)
+                }
                 ast::Operator::LessThan(lhs, rhs) => LessThan(build(lhs)?, build(rhs)?),
                 ast::Operator::LessThanOrEqual(lhs, rhs) => Or(
                     LessThan(build(lhs.clone())?, build(rhs.clone())?).into(),
