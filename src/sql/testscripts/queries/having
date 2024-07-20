@@ -42,7 +42,7 @@ TRUE
 Filter: #1 > 10
 └─ Aggregate: test.group, max(test.int)
    └─ Scan: test
-b, 42
+'b', 42
 
 [plan]> SELECT "group" FROM test GROUP BY "group" HAVING MAX("int") > 10
 ---
@@ -50,7 +50,7 @@ Remap: test.group (dropped: #1)
 └─ Filter: #1 > 10
    └─ Aggregate: test.group, max(test.int)
       └─ Scan: test
-b
+'b'
 
 [plan]> SELECT "group", MAX("int") FROM test GROUP BY "group" HAVING MAX("int") - MIN("int") > 10
 ---
@@ -58,7 +58,7 @@ Remap: test.group, #1 (dropped: #2)
 └─ Filter: #1 - #2 > 10
    └─ Aggregate: test.group, max(test.int), min(test.int)
       └─ Scan: test
-b, 42
+'b', 42
 
 # Having works with SELECT aliases.
 [plan]> SELECT "group", MAX("int") AS m FROM test GROUP BY "group" HAVING m > 10
@@ -67,7 +67,7 @@ Filter: m > 10
 └─ Projection: test.group, #1 as m
    └─ Aggregate: test.group, max(test.int)
       └─ Scan: test
-b, 42
+'b', 42
 
 # Having works with an aggregate function not in the SELECT clause.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") > 10
@@ -76,7 +76,7 @@ Remap: test.group, #1 (dropped: #2)
 └─ Filter: #2 > 10
    └─ Aggregate: test.group, count(TRUE), max(test.int)
       └─ Scan: test
-b, 3
+'b', 3
 
 # Having works with compound expressions.
 [plan]> SELECT "group", COUNT(*) FROM test GROUP BY "group" HAVING MAX("int") / COUNT(*) > 3
@@ -85,7 +85,7 @@ Remap: test.group, #1 (dropped: #2)
 └─ Filter: #2 / #1 > 3
    └─ Aggregate: test.group, count(TRUE), max(test.int)
       └─ Scan: test
-b, 3
+'b', 3
 
 # Having works with compound expressions using complex GROUP BY expressions
 # that are not on the SELECT clause.
@@ -103,7 +103,7 @@ Remap: #0 (dropped: #1)
 [plan]> SELECT COUNT(*) FROM test GROUP BY "group" HAVING test."group" = 'a'
 ---
 Remap: #0 (dropped: test.group)
-└─ Filter: test.group = a
+└─ Filter: test.group = 'a'
    └─ Projection: #1, test.group
       └─ Aggregate: test.group, count(TRUE)
          └─ Scan: test
@@ -112,7 +112,7 @@ Remap: #0 (dropped: test.group)
 [plan]> SELECT COUNT(*) FROM test GROUP BY test."group" HAVING "group" = 'a'
 ---
 Remap: #0 (dropped: test.group)
-└─ Filter: test.group = a
+└─ Filter: test.group = 'a'
    └─ Projection: #1, test.group
       └─ Aggregate: test.group, count(TRUE)
          └─ Scan: test

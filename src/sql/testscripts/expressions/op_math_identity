@@ -26,4 +26,4 @@ Integer(1) ← 1
 !> +'a'
 ---
 Error: invalid input: can't take the identity of TRUE
-Error: invalid input: can't take the identity of a
+Error: invalid input: can't take the identity of 'a'

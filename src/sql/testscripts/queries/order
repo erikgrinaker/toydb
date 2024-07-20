@@ -46,29 +46,29 @@ Order: value desc
 Order: test.id asc
 └─ Scan: test
 0, NULL, NULL, NULL, NULL, 1
-1, TRUE, 0, 3.14, a, 1
-2, FALSE, -1, -2.718, ab, 1
-3, NULL, 1, 0.0, aaa, 1
-4, NULL, 1000, 0.0, A, 1
-5, NULL, -1000, inf, , 1
-6, NULL, 7, -inf, åa, 1
-7, NULL, -9, NaN, Åa, 1
-8, NULL, NULL, NULL, B, 1
-9, NULL, NULL, NULL, 👍, 1
+1, TRUE, 0, 3.14, 'a', 1
+2, FALSE, -1, -2.718, 'ab', 1
+3, NULL, 1, 0.0, 'aaa', 1
+4, NULL, 1000, 0.0, 'A', 1
+5, NULL, -1000, inf, '', 1
+6, NULL, 7, -inf, 'åa', 1
+7, NULL, -9, NaN, 'Åa', 1
+8, NULL, NULL, NULL, 'B', 1
+9, NULL, NULL, NULL, '👍', 1
 
 [plan]> SELECT * FROM test ORDER BY id DESC
 ---
 Order: test.id desc
 └─ Scan: test
-9, NULL, NULL, NULL, 👍, 1
-8, NULL, NULL, NULL, B, 1
-7, NULL, -9, NaN, Åa, 1
-6, NULL, 7, -inf, åa, 1
-5, NULL, -1000, inf, , 1
-4, NULL, 1000, 0.0, A, 1
-3, NULL, 1, 0.0, aaa, 1
-2, FALSE, -1, -2.718, ab, 1
-1, TRUE, 0, 3.14, a, 1
+9, NULL, NULL, NULL, '👍', 1
+8, NULL, NULL, NULL, 'B', 1
+7, NULL, -9, NaN, 'Åa', 1
+6, NULL, 7, -inf, 'åa', 1
+5, NULL, -1000, inf, '', 1
+4, NULL, 1000, 0.0, 'A', 1
+3, NULL, 1, 0.0, 'aaa', 1
+2, FALSE, -1, -2.718, 'ab', 1
+1, TRUE, 0, 3.14, 'a', 1
 0, NULL, NULL, NULL, NULL, 1
 
 # Booleans.
@@ -156,27 +156,27 @@ Order: test.id desc
 > SELECT id, "string" FROM test ORDER BY "string" ASC
 ---
 0, NULL
-5, 
-4, A
-8, B
-1, a
-3, aaa
-2, ab
-7, Åa
-6, åa
-9, 👍
+5, ''
+4, 'A'
+8, 'B'
+1, 'a'
+3, 'aaa'
+2, 'ab'
+7, 'Åa'
+6, 'åa'
+9, '👍'
 
 > SELECT id, "string" FROM test ORDER BY "string" DESC
 ---
-9, 👍
-6, åa
-7, Åa
-2, ab
-3, aaa
-1, a
-8, B
-4, A
-5, 
+9, '👍'
+6, 'åa'
+7, 'Åa'
+2, 'ab'
+3, 'aaa'
+1, 'a'
+8, 'B'
+4, 'A'
+5, ''
 0, NULL
 
 # When all values are equal, they are stably ordered by the primary key in
@@ -212,30 +212,30 @@ Order: test.id desc
 > SELECT id, static, "bool", "int", "string" FROM test \
   ORDER BY static ASC, "bool" DESC, "int" ASC, "string" DESC
 ---
-1, 1, TRUE, 0, a
-2, 1, FALSE, -1, ab
-9, 1, NULL, NULL, 👍
-8, 1, NULL, NULL, B
+1, 1, TRUE, 0, 'a'
+2, 1, FALSE, -1, 'ab'
+9, 1, NULL, NULL, '👍'
+8, 1, NULL, NULL, 'B'
 0, 1, NULL, NULL, NULL
-5, 1, NULL, -1000, 
-7, 1, NULL, -9, Åa
-3, 1, NULL, 1, aaa
-6, 1, NULL, 7, åa
-4, 1, NULL, 1000, A
+5, 1, NULL, -1000, ''
+7, 1, NULL, -9, 'Åa'
+3, 1, NULL, 1, 'aaa'
+6, 1, NULL, 7, 'åa'
+4, 1, NULL, 1000, 'A'
 
 > SELECT id, static, "bool", "int", "string" FROM test \
   ORDER BY static DESC, "bool" ASC, "int" DESC, "string" ASC
 ---
-4, 1, NULL, 1000, A
-6, 1, NULL, 7, åa
-3, 1, NULL, 1, aaa
-7, 1, NULL, -9, Åa
-5, 1, NULL, -1000, 
+4, 1, NULL, 1000, 'A'
+6, 1, NULL, 7, 'åa'
+3, 1, NULL, 1, 'aaa'
+7, 1, NULL, -9, 'Åa'
+5, 1, NULL, -1000, ''
 0, 1, NULL, NULL, NULL
-8, 1, NULL, NULL, B
-9, 1, NULL, NULL, 👍
-2, 1, FALSE, -1, ab
-1, 1, TRUE, 0, a
+8, 1, NULL, NULL, 'B'
+9, 1, NULL, NULL, '👍'
+2, 1, FALSE, -1, 'ab'
+1, 1, TRUE, 0, 'a'
 
 # Can order by expressions.
 [plan]> SELECT id, "float" FROM test ORDER BY "float" ^ 2
@@ -421,26 +421,26 @@ Order: other.id desc
 └─ NestedLoopJoin: inner
    ├─ Scan: test
    └─ Scan: other
-0, NULL, NULL, NULL, NULL, 1, 2, b
-1, TRUE, 0, 3.14, a, 1, 2, b
-2, FALSE, -1, -2.718, ab, 1, 2, b
-3, NULL, 1, 0.0, aaa, 1, 2, b
-4, NULL, 1000, 0.0, A, 1, 2, b
-5, NULL, -1000, inf, , 1, 2, b
-6, NULL, 7, -inf, åa, 1, 2, b
-7, NULL, -9, NaN, Åa, 1, 2, b
-8, NULL, NULL, NULL, B, 1, 2, b
-9, NULL, NULL, NULL, 👍, 1, 2, b
-0, NULL, NULL, NULL, NULL, 1, 1, a
-1, TRUE, 0, 3.14, a, 1, 1, a
-2, FALSE, -1, -2.718, ab, 1, 1, a
-3, NULL, 1, 0.0, aaa, 1, 1, a
-4, NULL, 1000, 0.0, A, 1, 1, a
-5, NULL, -1000, inf, , 1, 1, a
-6, NULL, 7, -inf, åa, 1, 1, a
-7, NULL, -9, NaN, Åa, 1, 1, a
-8, NULL, NULL, NULL, B, 1, 1, a
-9, NULL, NULL, NULL, 👍, 1, 1, a
+0, NULL, NULL, NULL, NULL, 1, 2, 'b'
+1, TRUE, 0, 3.14, 'a', 1, 2, 'b'
+2, FALSE, -1, -2.718, 'ab', 1, 2, 'b'
+3, NULL, 1, 0.0, 'aaa', 1, 2, 'b'
+4, NULL, 1000, 0.0, 'A', 1, 2, 'b'
+5, NULL, -1000, inf, '', 1, 2, 'b'
+6, NULL, 7, -inf, 'åa', 1, 2, 'b'
+7, NULL, -9, NaN, 'Åa', 1, 2, 'b'
+8, NULL, NULL, NULL, 'B', 1, 2, 'b'
+9, NULL, NULL, NULL, '👍', 1, 2, 'b'
+0, NULL, NULL, NULL, NULL, 1, 1, 'a'
+1, TRUE, 0, 3.14, 'a', 1, 1, 'a'
+2, FALSE, -1, -2.718, 'ab', 1, 1, 'a'
+3, NULL, 1, 0.0, 'aaa', 1, 1, 'a'
+4, NULL, 1000, 0.0, 'A', 1, 1, 'a'
+5, NULL, -1000, inf, '', 1, 1, 'a'
+6, NULL, 7, -inf, 'åa', 1, 1, 'a'
+7, NULL, -9, NaN, 'Åa', 1, 1, 'a'
+8, NULL, NULL, NULL, 'B', 1, 1, 'a'
+9, NULL, NULL, NULL, '👍', 1, 1, 'a'
 
 [plan]> SELECT * FROM test t, other o ORDER BY o.id DESC, t.id ASC
 ---
@@ -448,26 +448,26 @@ Order: o.id desc, t.id asc
 └─ NestedLoopJoin: inner
    ├─ Scan: test as t
    └─ Scan: other as o
-0, NULL, NULL, NULL, NULL, 1, 2, b
-1, TRUE, 0, 3.14, a, 1, 2, b
-2, FALSE, -1, -2.718, ab, 1, 2, b
-3, NULL, 1, 0.0, aaa, 1, 2, b
-4, NULL, 1000, 0.0, A, 1, 2, b
-5, NULL, -1000, inf, , 1, 2, b
-6, NULL, 7, -inf, åa, 1, 2, b
-7, NULL, -9, NaN, Åa, 1, 2, b
-8, NULL, NULL, NULL, B, 1, 2, b
-9, NULL, NULL, NULL, 👍, 1, 2, b
-0, NULL, NULL, NULL, NULL, 1, 1, a
-1, TRUE, 0, 3.14, a, 1, 1, a
-2, FALSE, -1, -2.718, ab, 1, 1, a
-3, NULL, 1, 0.0, aaa, 1, 1, a
-4, NULL, 1000, 0.0, A, 1, 1, a
-5, NULL, -1000, inf, , 1, 1, a
-6, NULL, 7, -inf, åa, 1, 1, a
-7, NULL, -9, NaN, Åa, 1, 1, a
-8, NULL, NULL, NULL, B, 1, 1, a
-9, NULL, NULL, NULL, 👍, 1, 1, a
+0, NULL, NULL, NULL, NULL, 1, 2, 'b'
+1, TRUE, 0, 3.14, 'a', 1, 2, 'b'
+2, FALSE, -1, -2.718, 'ab', 1, 2, 'b'
+3, NULL, 1, 0.0, 'aaa', 1, 2, 'b'
+4, NULL, 1000, 0.0, 'A', 1, 2, 'b'
+5, NULL, -1000, inf, '', 1, 2, 'b'
+6, NULL, 7, -inf, 'åa', 1, 2, 'b'
+7, NULL, -9, NaN, 'Åa', 1, 2, 'b'
+8, NULL, NULL, NULL, 'B', 1, 2, 'b'
+9, NULL, NULL, NULL, '👍', 1, 2, 'b'
+0, NULL, NULL, NULL, NULL, 1, 1, 'a'
+1, TRUE, 0, 3.14, 'a', 1, 1, 'a'
+2, FALSE, -1, -2.718, 'ab', 1, 1, 'a'
+3, NULL, 1, 0.0, 'aaa', 1, 1, 'a'
+4, NULL, 1000, 0.0, 'A', 1, 1, 'a'
+5, NULL, -1000, inf, '', 1, 1, 'a'
+6, NULL, 7, -inf, 'åa', 1, 1, 'a'
+7, NULL, -9, NaN, 'Åa', 1, 1, 'a'
+8, NULL, NULL, NULL, 'B', 1, 1, 'a'
+9, NULL, NULL, NULL, '👍', 1, 1, 'a'
 
 # Order by aggregates, both when in SELECT and otherwise.
 [plan]> SELECT "bool", MAX("int") FROM test GROUP BY "bool" ORDER BY MAX("int") DESC

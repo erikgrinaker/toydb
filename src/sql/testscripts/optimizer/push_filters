@@ -9,99 +9,99 @@ ok
 [opt]> SELECT * FROM test WHERE value = 'b'
 ---
 Initial:
-   Filter: test.value = b
+   Filter: test.value = 'b'
    └─ Scan: test
 Filter pushdown:
-   Scan: test (test.value = b)
-2, b
+   Scan: test (test.value = 'b')
+2, 'b'
 
 # HAVING filters are not pushed past aggregate nodes, even when possible. The
 # optimizer could do this if it was smarter.
 [opt]> SELECT id, value FROM test GROUP BY id, value HAVING value = 'b'
 ---
 Initial:
-   Filter: test.value = b
+   Filter: test.value = 'b'
    └─ Projection: test.id, test.value
       └─ Aggregate: test.id, test.value
          └─ Scan: test
 Short circuit:
-   Filter: test.value = b
+   Filter: test.value = 'b'
    └─ Aggregate: test.id, test.value
       └─ Scan: test
-2, b
+2, 'b'
 
 # Pushes down independent predicates from JOIN nodes.
 [opt]> SELECT * FROM test a JOIN test b ON a.value = 'a' AND b.value = 'b'
 ---
 Initial:
-   NestedLoopJoin: inner on a.value = a AND b.value = b
+   NestedLoopJoin: inner on a.value = 'a' AND b.value = 'b'
    ├─ Scan: test as a
    └─ Scan: test as b
 Filter pushdown:
    NestedLoopJoin: inner
-   ├─ Scan: test as a (a.value = a)
-   └─ Scan: test as b (b.value = b)
-1, a, 2, b
+   ├─ Scan: test as a (a.value = 'a')
+   └─ Scan: test as b (b.value = 'b')
+1, 'a', 2, 'b'
 
 # Pushes down independent predicates from JOIN nodes, even when there
 # are also dependent predicates.
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id AND a.value = 'a' AND b.value = 'b'
 ---
 Initial:
-   NestedLoopJoin: inner on a.id = b.id AND a.value = a AND b.value = b
+   NestedLoopJoin: inner on a.id = b.id AND a.value = 'a' AND b.value = 'b'
    ├─ Scan: test as a
    └─ Scan: test as b
 Filter pushdown:
    NestedLoopJoin: inner on a.id = b.id
-   ├─ Scan: test as a (a.value = a)
-   └─ Scan: test as b (b.value = b)
+   ├─ Scan: test as a (a.value = 'a')
+   └─ Scan: test as b (b.value = 'b')
 Join type:
    HashJoin: inner on a.id = b.id
-   ├─ Scan: test as a (a.value = a)
-   └─ Scan: test as b (b.value = b)
+   ├─ Scan: test as a (a.value = 'a')
+   └─ Scan: test as b (b.value = 'b')
 
 # Does not push down JOIN node OR predicates.
 [opt]> SELECT * FROM test a JOIN test b ON a.value = 'a' OR b.value = 'b'
 ---
 Initial:
-   NestedLoopJoin: inner on a.value = a OR b.value = b
+   NestedLoopJoin: inner on a.value = 'a' OR b.value = 'b'
    ├─ Scan: test as a
    └─ Scan: test as b
-1, a, 1, a
-1, a, 2, b
-1, a, 3, c
-2, b, 2, b
-3, c, 2, b
+1, 'a', 1, 'a'
+1, 'a', 2, 'b'
+1, 'a', 3, 'c'
+2, 'b', 2, 'b'
+3, 'c', 2, 'b'
 
 # Pushes WHERE predicates down into and past JOIN nodes.
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE a.value = 'a' AND b.value = 'b'
 ---
 Initial:
-   Filter: a.value = a AND b.value = b
+   Filter: a.value = 'a' AND b.value = 'b'
    └─ NestedLoopJoin: inner on a.id = b.id
       ├─ Scan: test as a
       └─ Scan: test as b
 Filter pushdown:
    NestedLoopJoin: inner on a.id = b.id
-   ├─ Scan: test as a (a.value = a)
-   └─ Scan: test as b (b.value = b)
+   ├─ Scan: test as a (a.value = 'a')
+   └─ Scan: test as b (b.value = 'b')
 Join type:
    HashJoin: inner on a.id = b.id
-   ├─ Scan: test as a (a.value = a)
-   └─ Scan: test as b (b.value = b)
+   ├─ Scan: test as a (a.value = 'a')
+   └─ Scan: test as b (b.value = 'b')
 
 # Pushes down the parts of predicates that can be pushed.
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE a.value = 'a' AND b.value = 'b' AND (a.id > 0 OR b.id > 0)
 ---
 Initial:
-   Filter: a.value = a AND b.value = b AND (a.id > 0 OR b.id > 0)
+   Filter: a.value = 'a' AND b.value = 'b' AND (a.id > 0 OR b.id > 0)
    └─ NestedLoopJoin: inner on a.id = b.id
       ├─ Scan: test as a
       └─ Scan: test as b
 Filter pushdown:
    NestedLoopJoin: inner on (a.id > 0 OR b.id > 0) AND a.id = b.id
-   ├─ Scan: test as a (a.value = a)
-   └─ Scan: test as b (b.value = b)
+   ├─ Scan: test as a (a.value = 'a')
+   └─ Scan: test as b (b.value = 'b')
 
 # Equijoin pushdowns can transfer lookups from one relation to the other to make
 # use of indexes.
@@ -124,8 +124,8 @@ Join type:
    HashJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
-1, a, 1, a
-2, b, 2, b
+1, 'a', 1, 'a'
+2, 'b', 2, 'b'
 
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id WHERE (b.id = 1 OR b.id = 2)
 ---
@@ -146,8 +146,8 @@ Join type:
    HashJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
-1, a, 1, a
-2, b, 2, b
+1, 'a', 1, 'a'
+2, 'b', 2, 'b'
 
 # Pushdowns can propagate through multiple JOIN nodes.
 [opt]> SELECT * FROM \
@@ -193,4 +193,4 @@ Join type:
    │  └─ Filter: c.id < 3 AND c.id = 2
    │     └─ KeyLookup: test as c (2, 3)
    └─ KeyLookup: test as d (2, 3)
-2, b, 2, b, 2, b, 2, b
+2, 'b', 2, 'b', 2, 'b', 2, 'b'

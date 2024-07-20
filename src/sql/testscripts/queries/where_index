@@ -22,30 +22,30 @@ ok
 [plan]> SELECT * FROM test WHERE "bool" = TRUE
 ---
 IndexLookup: test.bool (TRUE)
-1, TRUE, 0, 3.14, abc
-3, TRUE, 1, 0.0, ABC
+1, TRUE, 0, 3.14, 'abc'
+3, TRUE, 1, 0.0, 'ABC'
 
 [plan]> SELECT * FROM test WHERE "bool" = FALSE
 ---
 IndexLookup: test.bool (FALSE)
-2, FALSE, -1, -2.718, a
+2, FALSE, -1, -2.718, 'a'
 
 # Integer lookups, including multiple matches and missing values.
 [plan]> SELECT * FROM test WHERE "int" = -1
 ---
 IndexLookup: test.int (-1)
-2, FALSE, -1, -2.718, a
+2, FALSE, -1, -2.718, 'a'
 
 [plan]> SELECT * FROM test WHERE "int" = 0
 ---
 IndexLookup: test.int (0)
-1, TRUE, 0, 3.14, abc
+1, TRUE, 0, 3.14, 'abc'
 
 [plan]> SELECT * FROM test WHERE "int" = 1
 ---
 IndexLookup: test.int (1)
-3, TRUE, 1, 0.0, ABC
-4, NULL, 1, 0.0, 👍
+3, TRUE, 1, 0.0, 'ABC'
+4, NULL, 1, 0.0, '👍'
 
 [plan]> SELECT * FROM test WHERE "int" = 7
 ---
@@ -56,29 +56,29 @@ IndexLookup: test.int (7)
 [plan]> SELECT * FROM test WHERE "float" = -2.718
 ---
 IndexLookup: test.float (-2.718)
-2, FALSE, -1, -2.718, a
+2, FALSE, -1, -2.718, 'a'
 
 [plan]> SELECT * FROM test WHERE "float" = -0.0
 ---
 IndexLookup: test.float (-0.0)
-3, TRUE, 1, 0.0, ABC
-4, NULL, 1, 0.0, 👍
+3, TRUE, 1, 0.0, 'ABC'
+4, NULL, 1, 0.0, '👍'
 
 [plan]> SELECT * FROM test WHERE "float" = 0.0
 ---
 IndexLookup: test.float (0.0)
-3, TRUE, 1, 0.0, ABC
-4, NULL, 1, 0.0, 👍
+3, TRUE, 1, 0.0, 'ABC'
+4, NULL, 1, 0.0, '👍'
 
 [plan]> SELECT * FROM test WHERE "float" = 3.14
 ---
 IndexLookup: test.float (3.14)
-1, TRUE, 0, 3.14, abc
+1, TRUE, 0, 3.14, 'abc'
 
 [plan]> SELECT * FROM test WHERE "float" = INFINITY
 ---
 IndexLookup: test.float (inf)
-5, NULL, NULL, inf, å
+5, NULL, NULL, inf, 'å'
 
 [plan]> SELECT * FROM test WHERE "float" = NAN
 ---
@@ -91,48 +91,48 @@ Nothing
 [plan]> SELECT * FROM test WHERE "float" IS NAN
 ---
 IndexLookup: test.float (NaN)
-6, NULL, NULL, NaN, 
+6, NULL, NULL, NaN, ''
 
 # Strings. Should be case-insensitive.
 [plan]> SELECT * FROM test WHERE "string" = 'abc'
 ---
-IndexLookup: test.string (abc)
-1, TRUE, 0, 3.14, abc
+IndexLookup: test.string ('abc')
+1, TRUE, 0, 3.14, 'abc'
 
 [plan]> SELECT * FROM test WHERE "string" = 'a'
 ---
-IndexLookup: test.string (a)
-2, FALSE, -1, -2.718, a
+IndexLookup: test.string ('a')
+2, FALSE, -1, -2.718, 'a'
 
 [plan]> SELECT * FROM test WHERE "string" = 'å'
 ---
-IndexLookup: test.string (å)
-5, NULL, NULL, inf, å
+IndexLookup: test.string ('å')
+5, NULL, NULL, inf, 'å'
 
 [plan]> SELECT * FROM test WHERE "string" = '👍'
 ---
-IndexLookup: test.string (👍)
-4, NULL, 1, 0.0, 👍
+IndexLookup: test.string ('👍')
+4, NULL, 1, 0.0, '👍'
 
 [plan]> SELECT * FROM test WHERE "string" = ''
 ---
-IndexLookup: test.string ()
-6, NULL, NULL, NaN, 
+IndexLookup: test.string ('')
+6, NULL, NULL, NaN, ''
 
 # LIKE does not use an index.
 [plan]> SELECT * FROM test WHERE "string" LIKE 'a%'
 ---
-Scan: test (test.string LIKE a%)
-1, TRUE, 0, 3.14, abc
-2, FALSE, -1, -2.718, a
+Scan: test (test.string LIKE 'a%')
+1, TRUE, 0, 3.14, 'abc'
+2, FALSE, -1, -2.718, 'a'
 
 # IS NULL lookups should use an index. = NULL should give no matches.
 [plan]> SELECT * FROM test WHERE "int" IS NULL
 ---
 IndexLookup: test.int (NULL)
 0, NULL, NULL, NULL, NULL
-5, NULL, NULL, inf, å
-6, NULL, NULL, NaN, 
+5, NULL, NULL, inf, 'å'
+6, NULL, NULL, NaN, ''
 
 [plan]> SELECT * FROM test WHERE "int" = NULL
 ---
@@ -142,21 +142,21 @@ Nothing
 [plan]> SELECT * FROM test WHERE "int" = -1 OR "int" = 0 OR "int" = 1 OR "int" = 7
 ---
 IndexLookup: test.int (-1, 0, 1, 7)
-1, TRUE, 0, 3.14, abc
-2, FALSE, -1, -2.718, a
-3, TRUE, 1, 0.0, ABC
-4, NULL, 1, 0.0, 👍
+1, TRUE, 0, 3.14, 'abc'
+2, FALSE, -1, -2.718, 'a'
+3, TRUE, 1, 0.0, 'ABC'
+4, NULL, 1, 0.0, '👍'
 
 # > or < predicates don't use an index.
 [plan]> SELECT * FROM test WHERE "int" < 1
 ---
 Scan: test (test.int < 1)
-1, TRUE, 0, 3.14, abc
-2, FALSE, -1, -2.718, a
+1, TRUE, 0, 3.14, 'abc'
+2, FALSE, -1, -2.718, 'a'
 
 [plan]> SELECT * FROM test WHERE "int" > -1
 ---
 Scan: test (test.int > -1)
-1, TRUE, 0, 3.14, abc
-3, TRUE, 1, 0.0, ABC
-4, NULL, 1, 0.0, 👍
+1, TRUE, 0, 3.14, 'abc'
+3, TRUE, 1, 0.0, 'ABC'
+4, NULL, 1, 0.0, '👍'

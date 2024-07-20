@@ -117,9 +117,9 @@ Boolean(false)
 !> 'abc' LIKE TRUE
 !> TRUE LIKE 'abc'
 ---
-Error: invalid input: can't LIKE abc and 1
-Error: invalid input: can't LIKE 1 and abc
-Error: invalid input: can't LIKE abc and 3.14
-Error: invalid input: can't LIKE 3.14 and abc
-Error: invalid input: can't LIKE abc and TRUE
-Error: invalid input: can't LIKE TRUE and abc
+Error: invalid input: can't LIKE 'abc' and 1
+Error: invalid input: can't LIKE 1 and 'abc'
+Error: invalid input: can't LIKE 'abc' and 3.14
+Error: invalid input: can't LIKE 3.14 and 'abc'
+Error: invalid input: can't LIKE 'abc' and TRUE
+Error: invalid input: can't LIKE TRUE and 'abc'

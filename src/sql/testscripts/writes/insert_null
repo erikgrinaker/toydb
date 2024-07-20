@@ -16,7 +16,7 @@ ok
 
 > SELECT * FROM name
 ---
-1, NULL, foo
+1, NULL, 'foo'
 
 # INSERT with NULL into non-NULL columns errors.
 !> INSERT INTO name VALUES (NULL, 'foo', 'bar')
@@ -32,5 +32,5 @@ ok
 
 > SELECT * FROM name
 ---
-1, NULL, foo
-2, NULL, foo
+1, NULL, 'foo'
+2, NULL, 'foo'

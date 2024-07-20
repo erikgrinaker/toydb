@@ -67,4 +67,4 @@ Float(-inf)
 !> 'a' - 'b'
 ---
 Error: invalid input: can't subtract TRUE and FALSE
-Error: invalid input: can't subtract a and b
+Error: invalid input: can't subtract 'a' and 'b'

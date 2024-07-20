@@ -85,35 +85,35 @@ KeyLookup: float (NaN)
 
 [plan]> SELECT * FROM "string" WHERE id = ''
 ---
-> KeyLookup: string ()
-> 
+KeyLookup: string ('')
+''
 
 [plan]> SELECT * FROM "string" WHERE id = 'a'
 ---
-KeyLookup: string (a)
-a
+KeyLookup: string ('a')
+'a'
 
 [plan]> SELECT * FROM "string" WHERE id = 'å'
 ---
-KeyLookup: string (å)
-å
+KeyLookup: string ('å')
+'å'
 
 [plan]> SELECT * FROM "string" WHERE id = 'abc'
 ---
-KeyLookup: string (abc)
-abc
+KeyLookup: string ('abc')
+'abc'
 
 [plan]> SELECT * FROM "string" WHERE id = '👍'
 ---
-KeyLookup: string (👍)
-👍
+KeyLookup: string ('👍')
+'👍'
 
 # LIKE does not use an index.
 [plan]> SELECT * FROM "string" WHERE id LIKE 'a%'
 ---
-Scan: string (string.id LIKE a%)
-a
-abc
+Scan: string (string.id LIKE 'a%')
+'a'
+'abc'
 
 # NULL lookups should be legal but give no matches.
 [plan]> SELECT * FROM "int" WHERE id = NULL

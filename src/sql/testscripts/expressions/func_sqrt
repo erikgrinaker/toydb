@@ -49,4 +49,4 @@ Null
 !> sqrt('foo')
 ---
 Error: invalid input: can't take square root of TRUE
-Error: invalid input: can't take square root of foo
+Error: invalid input: can't take square root of 'foo'

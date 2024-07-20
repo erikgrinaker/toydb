@@ -96,11 +96,11 @@ Error: invalid input: invalid primary key NULL
 > INSERT INTO "string" VALUES ('Hi! 👋')
 > SELECT * FROM "string";
 ---
-> 
->   
-> ABC
-> Hi! 👋
-> abc
+''
+'  '
+'ABC'
+'Hi! 👋'
+'abc'
 
 !> INSERT INTO "string" VALUES ('')
 !> INSERT INTO "string" VALUES ('  ')
@@ -109,9 +109,9 @@ Error: invalid input: invalid primary key NULL
 !> INSERT INTO "string" VALUES ('Hi! 👋')
 !> INSERT INTO "string" VALUES (NULL)
 ---
-Error: invalid input: primary key  already exists
-Error: invalid input: primary key    already exists
-Error: invalid input: primary key abc already exists
-Error: invalid input: primary key ABC already exists
-Error: invalid input: primary key Hi! 👋 already exists
+Error: invalid input: primary key '' already exists
+Error: invalid input: primary key '  ' already exists
+Error: invalid input: primary key 'abc' already exists
+Error: invalid input: primary key 'ABC' already exists
+Error: invalid input: primary key 'Hi! 👋' already exists
 Error: invalid input: invalid primary key NULL

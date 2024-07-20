@@ -196,8 +196,8 @@ Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
 Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
-Error: invalid input: can't LIKE TRUE and abc
-Error: invalid input: can't LIKE 3 and abc
+Error: invalid input: can't LIKE TRUE and 'abc'
+Error: invalid input: can't LIKE 3 and 'abc'
 Boolean(false)
 Error: invalid input: can't compare 5 and FALSE
 
@@ -231,8 +231,8 @@ Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
 Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
-Error: invalid input: can't LIKE TRUE and abc
-Error: invalid input: can't LIKE 3 and abc
+Error: invalid input: can't LIKE TRUE and 'abc'
+Error: invalid input: can't LIKE 3 and 'abc'
 Boolean(false)
 Error: invalid input: can't compare 5 and FALSE
 
@@ -266,8 +266,8 @@ Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
 Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
-Error: invalid input: can't LIKE FALSE and abc
-Error: invalid input: can't LIKE 3 and abc
+Error: invalid input: can't LIKE FALSE and 'abc'
+Error: invalid input: can't LIKE 3 and 'abc'
 Boolean(false)
 Error: invalid input: can't compare 5 and FALSE
 
@@ -301,8 +301,8 @@ Boolean(false)
 Error: invalid input: can't compare 3 and TRUE
 Boolean(true)
 Error: invalid input: can't compare 3 and TRUE
-Error: invalid input: can't LIKE FALSE and abc
-Error: invalid input: can't LIKE 3 and abc
+Error: invalid input: can't LIKE FALSE and 'abc'
+Error: invalid input: can't LIKE 3 and 'abc'
 Boolean(false)
 Error: invalid input: can't compare 5 and FALSE
 
@@ -318,8 +318,8 @@ Error: invalid input: can't compare 5 and FALSE
 ---
 Boolean(true)
 Error: invalid input: can't compare 1 and FALSE
-Error: invalid input: can't LIKE TRUE and abc
-Error: invalid input: can't LIKE 1 and abc
+Error: invalid input: can't LIKE TRUE and 'abc'
+Error: invalid input: can't LIKE 1 and 'abc'
 Boolean(true)
 Error: invalid input: can't compare 1 and TRUE
 Boolean(false)
@@ -337,8 +337,8 @@ Error: invalid input: can't negate 1
 ---
 Boolean(false)
 Error: invalid input: can't compare 1 and FALSE
-Error: invalid input: can't LIKE FALSE and abc
-Error: invalid input: can't LIKE 1 and abc
+Error: invalid input: can't LIKE FALSE and 'abc'
+Error: invalid input: can't LIKE 1 and 'abc'
 Boolean(true)
 Error: invalid input: can't compare 1 and TRUE
 Boolean(true)
@@ -351,9 +351,9 @@ Error: invalid input: can't negate 1
 !> (NOT 'abc') LIKE 'abc'
 ---
 Boolean(true)
-Error: invalid input: can't LIKE abc and TRUE
+Error: invalid input: can't LIKE 'abc' and TRUE
 Boolean(false)
-Error: invalid input: can't negate abc
+Error: invalid input: can't negate 'abc'
 
 # IS NULL
 > NOT NULL IS NULL

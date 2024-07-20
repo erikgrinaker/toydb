@@ -16,7 +16,7 @@ ok
 > UPDATE defaults SET "null" = DEFAULT, "boolean" = DEFAULT, "float" = DEFAULT, "integer" = DEFAULT, "string" = DEFAULT
 > SELECT * FROM defaults
 ---
-1, TRUE, NULL, TRUE, 3.14, 7, foo
+1, TRUE, NULL, TRUE, 3.14, 7, 'foo'
 
 # Errors on columns with no default.
 !> UPDATE defaults SET required = DEFAULT

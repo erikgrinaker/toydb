@@ -288,7 +288,7 @@ impl std::fmt::Display for Value {
             Self::Boolean(false) => f.write_str("FALSE"),
             Self::Integer(integer) => integer.fmt(f),
             Self::Float(float) => write!(f, "{float:?}"),
-            Self::String(string) => string.fmt(f),
+            Self::String(string) => write!(f, "'{}'", string.escape_debug()),
         }
     }
 }

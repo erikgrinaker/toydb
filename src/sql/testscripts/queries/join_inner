@@ -57,16 +57,16 @@ HashJoin: inner on movies.genre_id = genres.id
 ├─ Scan: movies
 └─ Scan: genres
 movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name
-1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
-3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
-4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
-6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
-10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 1, 'Science Fiction'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 2, 'Action'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 1, 'Science Fiction'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 2, 'Action'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 1, 'Science Fiction'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 1, 'Science Fiction'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 1, 'Science Fiction'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 3, 'Comedy'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 3, 'Comedy'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 1, 'Science Fiction'
 
 # Implicit inner join.
 [plan,header]> SELECT * FROM movies JOIN genres ON movies.genre_id = genres.id
@@ -75,16 +75,16 @@ HashJoin: inner on movies.genre_id = genres.id
 ├─ Scan: movies
 └─ Scan: genres
 movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name
-1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
-3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
-4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
-6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
-10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 1, 'Science Fiction'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 2, 'Action'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 1, 'Science Fiction'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 2, 'Action'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 1, 'Science Fiction'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 1, 'Science Fiction'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 1, 'Science Fiction'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 3, 'Comedy'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 3, 'Comedy'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 1, 'Science Fiction'
 
 # Implicit inner join with cross join and WHERE.
 [plan,header]> SELECT * FROM movies, genres WHERE movies.genre_id = genres.id
@@ -93,16 +93,16 @@ HashJoin: inner on movies.genre_id = genres.id
 ├─ Scan: movies
 └─ Scan: genres
 movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name
-1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
-3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
-4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
-6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
-10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 1, 'Science Fiction'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 2, 'Action'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 1, 'Science Fiction'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 2, 'Action'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 1, 'Science Fiction'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 1, 'Science Fiction'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 1, 'Science Fiction'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 3, 'Comedy'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 3, 'Comedy'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 1, 'Science Fiction'
 
 # Three-way inner join.
 [plan,header]> SELECT * FROM movies \
@@ -115,16 +115,16 @@ HashJoin: inner on movies.studio_id = studios.id
 │  └─ Scan: genres
 └─ Scan: studios
 movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd, genres.id, genres.name, studios.id, studios.name, studios.country_id
-1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 1, Mosfilm, ru
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 2, Lionsgate, us
-3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 3, StudioCanal, fr
-4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 4, Warner Bros, us
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 4, Warner Bros, us
-6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 1, Mosfilm, ru
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 2, Lionsgate, us
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
-10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 4, Warner Bros, us
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 1, 'Science Fiction', 1, 'Mosfilm', 'ru'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 2, 'Action', 2, 'Lionsgate', 'us'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 1, 'Science Fiction', 3, 'StudioCanal', 'fr'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 2, 'Action', 4, 'Warner Bros', 'us'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 1, 'Science Fiction', 4, 'Warner Bros', 'us'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 1, 'Science Fiction', 1, 'Mosfilm', 'ru'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 1, 'Science Fiction', 4, 'Warner Bros', 'us'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 3, 'Comedy', 2, 'Lionsgate', 'us'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 3, 'Comedy', 4, 'Warner Bros', 'us'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 1, 'Science Fiction', 4, 'Warner Bros', 'us'
 
 # Inner join on TRUE and FALSE.
 [plan]> SELECT * FROM movies INNER JOIN genres ON TRUE
@@ -132,36 +132,36 @@ movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, mov
 NestedLoopJoin: inner
 ├─ Scan: movies
 └─ Scan: genres
-1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
-1, Stalker, 1, 1, 1979, 8.2, NULL, 2, Action
-1, Stalker, 1, 1, 1979, 8.2, NULL, 3, Comedy
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 1, Science Fiction
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 3, Comedy
-3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction
-3, Primer, 3, 1, 2004, 6.9, NULL, 2, Action
-3, Primer, 3, 1, 2004, 6.9, NULL, 3, Comedy
-4, Heat, 4, 2, 1995, 8.2, TRUE, 1, Science Fiction
-4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action
-4, Heat, 4, 2, 1995, 8.2, TRUE, 3, Comedy
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 2, Action
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 3, Comedy
-6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction
-6, Solaris, 1, 1, 1972, 8.1, NULL, 2, Action
-6, Solaris, 1, 1, 1972, 8.1, NULL, 3, Comedy
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 2, Action
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 3, Comedy
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 1, Science Fiction
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 2, Action
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 1, Science Fiction
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 2, Action
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy
-10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction
-10, Inception, 4, 1, 2010, 8.8, TRUE, 2, Action
-10, Inception, 4, 1, 2010, 8.8, TRUE, 3, Comedy
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 1, 'Science Fiction'
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 2, 'Action'
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 3, 'Comedy'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 1, 'Science Fiction'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 2, 'Action'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 3, 'Comedy'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 1, 'Science Fiction'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 2, 'Action'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 3, 'Comedy'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 1, 'Science Fiction'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 2, 'Action'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 3, 'Comedy'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 1, 'Science Fiction'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 2, 'Action'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 3, 'Comedy'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 1, 'Science Fiction'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 2, 'Action'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 3, 'Comedy'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 1, 'Science Fiction'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 2, 'Action'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 3, 'Comedy'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 1, 'Science Fiction'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 2, 'Action'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 3, 'Comedy'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 1, 'Science Fiction'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 2, 'Action'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 3, 'Comedy'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 1, 'Science Fiction'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 2, 'Action'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 3, 'Comedy'
 
 [plan]> SELECT * FROM movies INNER JOIN genres ON FALSE
 ---
@@ -173,8 +173,8 @@ Nothing
 NestedLoopJoin: inner on movies.genre_id = genres.id AND movies.id = genres.id
 ├─ Scan: movies
 └─ Scan: genres
-1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 1, 'Science Fiction'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 2, 'Action'
 
 # Aliased inner join.
 [plan]> SELECT * FROM movies m INNER JOIN genres g ON m.genre_id = g.id INNER JOIN studios AS s ON m.studio_id = s.id
@@ -184,16 +184,16 @@ HashJoin: inner on m.studio_id = s.id
 │  ├─ Scan: movies as m
 │  └─ Scan: genres as g
 └─ Scan: studios as s
-1, Stalker, 1, 1, 1979, 8.2, NULL, 1, Science Fiction, 1, Mosfilm, ru
-2, Sicario, 2, 2, 2015, 7.6, TRUE, 2, Action, 2, Lionsgate, us
-3, Primer, 3, 1, 2004, 6.9, NULL, 1, Science Fiction, 3, StudioCanal, fr
-4, Heat, 4, 2, 1995, 8.2, TRUE, 2, Action, 4, Warner Bros, us
-5, The Fountain, 4, 1, 2006, 7.2, FALSE, 1, Science Fiction, 4, Warner Bros, us
-6, Solaris, 1, 1, 1972, 8.1, NULL, 1, Science Fiction, 1, Mosfilm, ru
-7, Gravity, 4, 1, 2013, 7.7, TRUE, 1, Science Fiction, 4, Warner Bros, us
-8, Blindspotting, 2, 3, 2018, 7.4, TRUE, 3, Comedy, 2, Lionsgate, us
-9, Birdman, 4, 3, 2014, 7.7, TRUE, 3, Comedy, 4, Warner Bros, us
-10, Inception, 4, 1, 2010, 8.8, TRUE, 1, Science Fiction, 4, Warner Bros, us
+1, 'Stalker', 1, 1, 1979, 8.2, NULL, 1, 'Science Fiction', 1, 'Mosfilm', 'ru'
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE, 2, 'Action', 2, 'Lionsgate', 'us'
+3, 'Primer', 3, 1, 2004, 6.9, NULL, 1, 'Science Fiction', 3, 'StudioCanal', 'fr'
+4, 'Heat', 4, 2, 1995, 8.2, TRUE, 2, 'Action', 4, 'Warner Bros', 'us'
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE, 1, 'Science Fiction', 4, 'Warner Bros', 'us'
+6, 'Solaris', 1, 1, 1972, 8.1, NULL, 1, 'Science Fiction', 1, 'Mosfilm', 'ru'
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE, 1, 'Science Fiction', 4, 'Warner Bros', 'us'
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE, 3, 'Comedy', 2, 'Lionsgate', 'us'
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE, 3, 'Comedy', 4, 'Warner Bros', 'us'
+10, 'Inception', 4, 1, 2010, 8.8, TRUE, 1, 'Science Fiction', 4, 'Warner Bros', 'us'
 
 # Inner join with missing ON errors.
 !> SELECT * FROM movies INNER JOIN genres
@@ -219,16 +219,16 @@ Projection: movies.title, genres.name
 └─ HashJoin: inner on movies.genre_id = genres.id
    ├─ Scan: movies
    └─ Scan: genres
-Stalker, Science Fiction
-Sicario, Action
-Primer, Science Fiction
-Heat, Action
-The Fountain, Science Fiction
-Solaris, Science Fiction
-Gravity, Science Fiction
-Blindspotting, Comedy
-Birdman, Comedy
-Inception, Science Fiction
+'Stalker', 'Science Fiction'
+'Sicario', 'Action'
+'Primer', 'Science Fiction'
+'Heat', 'Action'
+'The Fountain', 'Science Fiction'
+'Solaris', 'Science Fiction'
+'Gravity', 'Science Fiction'
+'Blindspotting', 'Comedy'
+'Birdman', 'Comedy'
+'Inception', 'Science Fiction'
 
 [plan]> SELECT movies.title, genres.name FROM genres JOIN movies ON genres.id = movies.genre_id
 ---
@@ -236,16 +236,16 @@ Projection: movies.title, genres.name
 └─ HashJoin: inner on genres.id = movies.genre_id
    ├─ Scan: genres
    └─ Scan: movies
-Stalker, Science Fiction
-Primer, Science Fiction
-The Fountain, Science Fiction
-Solaris, Science Fiction
-Gravity, Science Fiction
-Inception, Science Fiction
-Sicario, Action
-Heat, Action
-Blindspotting, Comedy
-Birdman, Comedy
+'Stalker', 'Science Fiction'
+'Primer', 'Science Fiction'
+'The Fountain', 'Science Fiction'
+'Solaris', 'Science Fiction'
+'Gravity', 'Science Fiction'
+'Inception', 'Science Fiction'
+'Sicario', 'Action'
+'Heat', 'Action'
+'Blindspotting', 'Comedy'
+'Birdman', 'Comedy'
 
 # Also try multi-match self hash joins joins on ultrahd, where both sides have
 # multiple matches. Note that NULL matches are ignored.
@@ -255,43 +255,43 @@ Projection: a.title, b.title
 └─ HashJoin: inner on a.ultrahd = b.ultrahd
    ├─ Scan: movies as a
    └─ Scan: movies as b
-Sicario, Sicario
-Sicario, Heat
-Sicario, Gravity
-Sicario, Blindspotting
-Sicario, Birdman
-Sicario, Inception
-Heat, Sicario
-Heat, Heat
-Heat, Gravity
-Heat, Blindspotting
-Heat, Birdman
-Heat, Inception
-The Fountain, The Fountain
-Gravity, Sicario
-Gravity, Heat
-Gravity, Gravity
-Gravity, Blindspotting
-Gravity, Birdman
-Gravity, Inception
-Blindspotting, Sicario
-Blindspotting, Heat
-Blindspotting, Gravity
-Blindspotting, Blindspotting
-Blindspotting, Birdman
-Blindspotting, Inception
-Birdman, Sicario
-Birdman, Heat
-Birdman, Gravity
-Birdman, Blindspotting
-Birdman, Birdman
-Birdman, Inception
-Inception, Sicario
-Inception, Heat
-Inception, Gravity
-Inception, Blindspotting
-Inception, Birdman
-Inception, Inception
+'Sicario', 'Sicario'
+'Sicario', 'Heat'
+'Sicario', 'Gravity'
+'Sicario', 'Blindspotting'
+'Sicario', 'Birdman'
+'Sicario', 'Inception'
+'Heat', 'Sicario'
+'Heat', 'Heat'
+'Heat', 'Gravity'
+'Heat', 'Blindspotting'
+'Heat', 'Birdman'
+'Heat', 'Inception'
+'The Fountain', 'The Fountain'
+'Gravity', 'Sicario'
+'Gravity', 'Heat'
+'Gravity', 'Gravity'
+'Gravity', 'Blindspotting'
+'Gravity', 'Birdman'
+'Gravity', 'Inception'
+'Blindspotting', 'Sicario'
+'Blindspotting', 'Heat'
+'Blindspotting', 'Gravity'
+'Blindspotting', 'Blindspotting'
+'Blindspotting', 'Birdman'
+'Blindspotting', 'Inception'
+'Birdman', 'Sicario'
+'Birdman', 'Heat'
+'Birdman', 'Gravity'
+'Birdman', 'Blindspotting'
+'Birdman', 'Birdman'
+'Birdman', 'Inception'
+'Inception', 'Sicario'
+'Inception', 'Heat'
+'Inception', 'Gravity'
+'Inception', 'Blindspotting'
+'Inception', 'Birdman'
+'Inception', 'Inception'
 
 # Try a complex multi-way join with multiple joins of the same table. Uses GROUP
 # BY to discard duplicates from the cross join. The query finds all movies
@@ -314,10 +314,10 @@ Remap: m.id, m.title, genre, studio, m.rating (dropped: m.released)
             └─ HashJoin: inner on s.id = good.studio_id
                ├─ Scan: studios as s
                └─ Scan: movies as good (good.rating > 8 OR good.rating = 8)
-10, Inception, Science Fiction, Warner Bros, 8.8
-1, Stalker, Science Fiction, Mosfilm, 8.2
-4, Heat, Action, Warner Bros, 8.2
-6, Solaris, Science Fiction, Mosfilm, 8.1
-7, Gravity, Science Fiction, Warner Bros, 7.7
-9, Birdman, Comedy, Warner Bros, 7.7
-5, The Fountain, Science Fiction, Warner Bros, 7.2
+10, 'Inception', 'Science Fiction', 'Warner Bros', 8.8
+1, 'Stalker', 'Science Fiction', 'Mosfilm', 8.2
+4, 'Heat', 'Action', 'Warner Bros', 8.2
+6, 'Solaris', 'Science Fiction', 'Mosfilm', 8.1
+7, 'Gravity', 'Science Fiction', 'Warner Bros', 7.7
+9, 'Birdman', 'Comedy', 'Warner Bros', 7.7
+5, 'The Fountain', 'Science Fiction', 'Warner Bros', 7.2

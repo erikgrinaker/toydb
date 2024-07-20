@@ -14,7 +14,7 @@ Integer(6) ← 3!
 Error: invalid input: can't take factorial of 3.14
 Error: invalid input: can't take factorial of 3.0
 Error: invalid input: can't take factorial of TRUE
-Error: invalid input: can't take factorial of a
+Error: invalid input: can't take factorial of 'a'
 
 # NULL yields null, infinity and NaN error.
 > NULL!

@@ -26,9 +26,9 @@ Projection: 1
 
 [plan]> SELECT NULL, NOT FALSE, 2^2+1, 3.14*2, 'Hi 👋'
 ---
-Projection: NULL, TRUE, 5, 6.28, Hi 👋
+Projection: NULL, TRUE, 5, 6.28, 'Hi 👋'
 └─ Values: blank row
-NULL, TRUE, 5, 6.28, Hi 👋
+NULL, TRUE, 5, 6.28, 'Hi 👋'
 
 # Bare select errors, as does trailing comma and identifier without a table.
 !> SELECT
@@ -44,8 +44,8 @@ Error: invalid input: expression must be constant, found column foo
 ---
 Scan: test
 test.id, test.bool, test.float, test.int, test.string
-1, TRUE, 3.14, 7, foo
-2, FALSE, 2.718, 1, 👍
+1, TRUE, 3.14, 7, 'foo'
+2, FALSE, 2.718, 1, '👍'
 3, NULL, NULL, NULL, NULL
 
 [plan,header]> SELECT "bool" FROM test
@@ -84,8 +84,8 @@ Error: invalid input: unsupported use of *
 Projection: test.id, test.bool, test.float, test.int, test.string, test.id, test.bool, test.float, test.int, test.string, test.id, test.bool, test.float, test.int, test.string
 └─ Scan: test
 test.id, test.bool, test.float, test.int, test.string, test.id, test.bool, test.float, test.int, test.string, test.id, test.bool, test.float, test.int, test.string
-1, TRUE, 3.14, 7, foo, 1, TRUE, 3.14, 7, foo, 1, TRUE, 3.14, 7, foo
-2, FALSE, 2.718, 1, 👍, 2, FALSE, 2.718, 1, 👍, 2, FALSE, 2.718, 1, 👍
+1, TRUE, 3.14, 7, 'foo', 1, TRUE, 3.14, 7, 'foo', 1, TRUE, 3.14, 7, 'foo'
+2, FALSE, 2.718, 1, '👍', 2, FALSE, 2.718, 1, '👍', 2, FALSE, 2.718, 1, '👍'
 3, NULL, NULL, NULL, NULL, 3, NULL, NULL, NULL, NULL, 3, NULL, NULL, NULL, NULL
 
 # Mix *, columns, column expressions, and constant expressions.
@@ -94,8 +94,8 @@ test.id, test.bool, test.float, test.int, test.string, test.id, test.bool, test.
 Projection: test.id, 3, test.id, test.bool, test.float, test.int, test.string, test.float ^ 2
 └─ Scan: test
 test.id, , test.id, test.bool, test.float, test.int, test.string, 
-1, 3, 1, TRUE, 3.14, 7, foo, 9.8596
-2, 3, 2, FALSE, 2.718, 1, 👍, 7.387524
+1, 3, 1, TRUE, 3.14, 7, 'foo', 9.8596
+2, 3, 2, FALSE, 2.718, 1, '👍', 7.387524
 3, 3, 3, NULL, NULL, NULL, NULL, NULL
 
 # Column names may be qualified or unqualified.
@@ -167,9 +167,9 @@ Error: invalid input: unknown column alias
 [header]> SELECT 'foo' AS id, id, id + 3 FROM test
 ---
 id, test.id, 
-foo, 1, 4
-foo, 2, 5
-foo, 3, 6
+'foo', 1, 4
+'foo', 2, 5
+'foo', 3, 6
 
 # Multiple aliases can have the same name.
 [header]> SELECT 1 AS id, id, "float" AS id FROM test
@@ -199,12 +199,12 @@ Error: invalid input: ambiguous column id
 # Unambiguous columns don't, resulting in a cross join.
 > SELECT "bool", value FROM test, other
 ---
-TRUE, a
-TRUE, b
-FALSE, a
-FALSE, b
-NULL, a
-NULL, b
+TRUE, 'a'
+TRUE, 'b'
+FALSE, 'a'
+FALSE, 'b'
+NULL, 'a'
+NULL, 'b'
 
 # Qualified columns work, also when aliased.
 > SELECT test.id, other.id FROM test, other

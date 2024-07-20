@@ -132,5 +132,5 @@ Null
 !> '' < 1
 ---
 Error: invalid input: can't compare TRUE and 1
-Error: invalid input: can't compare TRUE and 
-Error: invalid input: can't compare  and 1
+Error: invalid input: can't compare TRUE and ''
+Error: invalid input: can't compare '' and 1

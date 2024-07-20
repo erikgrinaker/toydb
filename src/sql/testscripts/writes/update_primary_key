@@ -113,14 +113,14 @@ Error: invalid input: invalid primary key NULL
 > UPDATE "string" SET id = 'Hi! 👋'
 > SELECT * FROM "string"
 ---
-Hi! 👋
+'Hi! 👋'
 
 > INSERT INTO "string" VALUES ('')
 > UPDATE "string" SET id = 'foo' WHERE id = ''
 > SELECT * FROM "string"
 ---
-Hi! 👋
-foo
+'Hi! 👋'
+'foo'
 
 !> UPDATE "string" SET id = ''
 !> UPDATE "string" SET id = '  '
@@ -129,11 +129,11 @@ foo
 !> UPDATE "string" SET id = 'Hi! 👋'
 !> UPDATE "string" SET id = NULL
 ---
-Error: invalid input: primary key  already exists
-Error: invalid input: primary key    already exists
-Error: invalid input: primary key abc already exists
-Error: invalid input: primary key ABC already exists
-Error: invalid input: primary key Hi! 👋 already exists
+Error: invalid input: primary key '' already exists
+Error: invalid input: primary key '  ' already exists
+Error: invalid input: primary key 'abc' already exists
+Error: invalid input: primary key 'ABC' already exists
+Error: invalid input: primary key 'Hi! 👋' already exists
 Error: invalid input: invalid primary key NULL
 
 # Primary key updates error if intermediate row updates violate primary key

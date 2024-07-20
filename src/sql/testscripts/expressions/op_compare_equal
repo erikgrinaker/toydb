@@ -80,4 +80,4 @@ Null
 !> 'true' = true
 ---
 Error: invalid input: can't compare TRUE and 1
-Error: invalid input: can't compare true and TRUE
+Error: invalid input: can't compare 'true' and TRUE

@@ -71,4 +71,4 @@ Float(NaN)
 !> 'a' * 'b'
 ---
 Error: invalid input: can't multiply TRUE and FALSE
-Error: invalid input: can't multiply a and b
+Error: invalid input: can't multiply 'a' and 'b'

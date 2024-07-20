@@ -15,4 +15,4 @@ Null
 ---
 Error: invalid input: can't negate 1
 Error: invalid input: can't negate 3.14
-Error: invalid input: can't negate true
+Error: invalid input: can't negate 'true'

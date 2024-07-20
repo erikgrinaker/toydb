@@ -10,24 +10,24 @@ ok
 ---
 Limit: 4
 └─ Scan: test
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 > SELECT * FROM test LIMIT 3
 ---
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 > SELECT * FROM test LIMIT 2
 ---
-1, a
-2, b
+1, 'a'
+2, 'b'
 
 > SELECT * FROM test LIMIT 1
 ---
-1, a
+1, 'a'
 
 [plan]> SELECT * FROM test LIMIT 0
 ---
@@ -36,9 +36,9 @@ Nothing
 # A max i64 limit works.
 > SELECT * FROM test LIMIT 9223372036854775807
 ---
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 # Limits can also be used with constant values.
 [plan]> SELECT 1, 2, 3 LIMIT 1
@@ -57,8 +57,8 @@ Nothing
 ---
 Limit: 2
 └─ Scan: test
-1, a
-2, b
+1, 'a'
+2, 'b'
 
 !> SELECT * FROM test LIMIT id
 ---
@@ -78,7 +78,7 @@ Error: invalid input: invalid limit NULL
 ---
 Error: invalid input: invalid limit FALSE
 Error: invalid input: invalid limit 1.0
-Error: invalid input: invalid limit 1
+Error: invalid input: invalid limit '1'
 
 # Multiple limits error.
 !> SELECT * FROM test LIMIT 1 2

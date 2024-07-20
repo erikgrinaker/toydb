@@ -68,4 +68,4 @@ Float(NaN)
 !> 'a' % 'b'
 ---
 Error: invalid input: can't take remainder of TRUE and FALSE
-Error: invalid input: can't take remainder of a and b
+Error: invalid input: can't take remainder of 'a' and 'b'

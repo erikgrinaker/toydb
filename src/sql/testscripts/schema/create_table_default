@@ -15,7 +15,7 @@ CREATE TABLE datatypes (
   "bool" BOOLEAN DEFAULT TRUE,
   "float" FLOAT DEFAULT 3.14,
   "int" INTEGER DEFAULT 7,
-  "string" STRING DEFAULT foo
+  "string" STRING DEFAULT 'foo'
 )
 
 # Default datatypes must match column. This includes float/integer types.

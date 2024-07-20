@@ -41,6 +41,6 @@ Error: invalid input: can't and 1 and 1
 Error: invalid input: can't and 3.14 and TRUE
 Error: invalid input: can't and TRUE and 3.14
 Error: invalid input: can't and 3.14 and 3.14
-Error: invalid input: can't and true and TRUE
-Error: invalid input: can't and TRUE and true
-Error: invalid input: can't and true and true
+Error: invalid input: can't and 'true' and TRUE
+Error: invalid input: can't and TRUE and 'true'
+Error: invalid input: can't and 'true' and 'true'

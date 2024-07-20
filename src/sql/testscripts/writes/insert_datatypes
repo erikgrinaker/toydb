@@ -115,10 +115,10 @@ ok
 > SELECT * FROM datatypes
 > ROLLBACK
 ---
-1, NULL, NULL, NULL, 
-2, NULL, NULL, NULL,   
-3, NULL, NULL, NULL, abc
-4, NULL, NULL, NULL, Hi! 👋
+1, NULL, NULL, NULL, ''
+2, NULL, NULL, NULL, '  '
+3, NULL, NULL, NULL, 'abc'
+4, NULL, NULL, NULL, 'Hi! 👋'
 5, NULL, NULL, NULL, NULL
 
 !> INSERT INTO datatypes (id, "string") VALUES (0, false)

@@ -28,4 +28,4 @@ Integer(1) ← ----1
 !> -'a'
 ---
 Error: invalid input: can't negate TRUE
-Error: invalid input: can't negate a
+Error: invalid input: can't negate 'a'

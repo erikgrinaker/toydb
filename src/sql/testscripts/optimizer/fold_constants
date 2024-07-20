@@ -46,15 +46,15 @@ Short circuit:
    NestedLoopJoin: inner
    ├─ Scan: test as a
    └─ Scan: test as b
-1, a, 1, a
-1, a, 2, b
-1, a, 3, c
-2, b, 1, a
-2, b, 2, b
-2, b, 3, c
-3, c, 1, a
-3, c, 2, b
-3, c, 3, c
+1, 'a', 1, 'a'
+1, 'a', 2, 'b'
+1, 'a', 3, 'c'
+2, 'b', 1, 'a'
+2, 'b', 2, 'b'
+2, 'b', 3, 'c'
+3, 'c', 1, 'a'
+3, 'c', 2, 'b'
+3, 'c', 3, 'c'
 
 [opt]> SELECT * FROM test WHERE 1+1 > 1
 ---
@@ -68,9 +68,9 @@ Filter pushdown:
    Scan: test (TRUE)
 Short circuit:
    Scan: test
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 [opt]> SELECT * FROM test ORDER BY 1+1
 ---
@@ -80,24 +80,24 @@ Initial:
 Constant folding:
    Order: 2 asc
    └─ Scan: test
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 [opt]> SELECT * FROM test LIMIT 1+1
 ---
 Initial:
    Limit: 2
    └─ Scan: test
-1, a
-2, b
+1, 'a'
+2, 'b'
 
 [opt]> SELECT * FROM test OFFSET 1+1
 ---
 Initial:
    Offset: 2
    └─ Scan: test
-3, c
+3, 'c'
 
 # Constant folding folds the constant parts of a variable expression.
 # TODO: this should fold 4 - 6, but it needs to reorder operations.
@@ -126,9 +126,9 @@ Filter pushdown:
    Scan: test (TRUE)
 Short circuit:
    Scan: test
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 [opt]> SELECT * FROM test WHERE 1+1 < 1 OR id > 1
 ---
@@ -140,8 +140,8 @@ Constant folding:
    └─ Scan: test
 Filter pushdown:
    Scan: test (test.id > 1)
-2, b
-3, c
+2, 'b'
+3, 'c'
 
 [opt]> SELECT * FROM test WHERE 1+1 > 1 AND id > 1
 ---
@@ -153,8 +153,8 @@ Constant folding:
    └─ Scan: test
 Filter pushdown:
    Scan: test (test.id > 1)
-2, b
-3, c
+2, 'b'
+3, 'c'
 
 [opt]> SELECT * FROM test WHERE 1+1 < 1 AND id > 1
 ---

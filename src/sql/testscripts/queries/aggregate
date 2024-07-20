@@ -26,7 +26,7 @@ Aggregate: count(TRUE)
 # COUNT works on constant values.
 [plan,header]> SELECT COUNT(NULL), COUNT(TRUE), COUNT(1), COUNT(3.14), COUNT(NAN), COUNT('')
 ---
-Aggregate: count(NULL), count(TRUE), count(1), count(3.14), count(NaN), count()
+Aggregate: count(NULL), count(TRUE), count(1), count(3.14), count(NaN), count('')
 └─ Values: blank row
 , , , , , 
 0, 1, 1, 1, 1, 1
@@ -49,9 +49,9 @@ Aggregate: count(test.id), count(test.bool), count(test.float), count(test.strin
 # MAX works on constant values.
 [plan]> SELECT MAX(NULL), MAX(TRUE), MAX(1), MAX(3.14), MAX(NAN), MAX('foo') FROM test
 ---
-Aggregate: max(NULL), max(TRUE), max(1), max(3.14), max(NaN), max(foo)
+Aggregate: max(NULL), max(TRUE), max(1), max(3.14), max(NaN), max('foo')
 └─ Scan: test
-NULL, TRUE, 1, 3.14, NaN, foo
+NULL, TRUE, 1, 3.14, NaN, 'foo'
 
 # MAX works on no rows.
 [plan]> SELECT MAX(id), MAX("bool"), MAX("float"), MAX("string") FROM test WHERE false
@@ -83,14 +83,14 @@ inf
 
 > SELECT MAX("string") FROM test
 ---
-👋
+'👋'
 
 # MIN works on constant values.
 [plan]> SELECT MIN(NULL), MIN(TRUE), MIN(1), MIN(3.14), MIN(NAN), MIN('foo') FROM test
 ---
-Aggregate: min(NULL), min(TRUE), min(1), min(3.14), min(NaN), min(foo)
+Aggregate: min(NULL), min(TRUE), min(1), min(3.14), min(NaN), min('foo')
 └─ Scan: test
-NULL, TRUE, 1, 3.14, NaN, foo
+NULL, TRUE, 1, 3.14, NaN, 'foo'
 
 # MIN works on no rows.
 [plan]> SELECT MIN(id), MIN("bool"), MIN("float"), MIN("string") FROM test WHERE false
@@ -120,7 +120,7 @@ FALSE
 
 > SELECT MIN("string") FROM test
 ---
-> 
+''
 
 # SUM works on constant values, but only numbers.
 [plan]> SELECT SUM(NULL), SUM(1), SUM(3.14), SUM(NAN) FROM test
@@ -133,7 +133,7 @@ NULL, 6, 18.84, NaN
 !> SELECT SUM('foo')
 ---
 Error: invalid input: can't add 0 and TRUE
-Error: invalid input: can't add 0 and foo
+Error: invalid input: can't add 0 and 'foo'
 
 # SUM works on no rows.
 [plan]> SELECT SUM(id), SUM("bool"), SUM("float"), SUM("string") FROM test WHERE false
@@ -166,7 +166,7 @@ inf
 
 !> SELECT SUM("string") FROM test
 ---
-Error: invalid input: can't add 0 and 
+Error: invalid input: can't add 0 and ''
 
 # AVG works on constant values, but only numbers.
 [plan]> SELECT AVG(NULL), AVG(1), AVG(3.14), AVG(NAN) FROM test
@@ -179,7 +179,7 @@ NULL, 1, 3.14, NaN
 !> SELECT AVG('foo')
 ---
 Error: invalid input: can't add 0 and TRUE
-Error: invalid input: can't add 0 and foo
+Error: invalid input: can't add 0 and 'foo'
 
 # AVG works on no rows.
 [plan]> SELECT AVG(id), AVG("bool"), AVG("float"), AVG("string") FROM test WHERE false
@@ -212,7 +212,7 @@ inf
 
 !> SELECT AVG("string") FROM test
 ---
-Error: invalid input: can't add 0 and 
+Error: invalid input: can't add 0 and ''
 
 # Constant aggregates can be used with rows.
 [plan]> SELECT COUNT(1), MIN(1), MAX(1), SUM(1), AVG(1) FROM test

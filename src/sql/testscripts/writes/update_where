@@ -12,20 +12,20 @@ ok
 > SELECT * FROM name
 > ROLLBACK
 ---
-Update: name (value=foo)
+Update: name (value='foo')
 └─ Scan: name
-1, foo, 1
-2, foo, 2
-3, foo, NULL
+1, 'foo', 1
+2, 'foo', 2
+3, 'foo', NULL
 
 [plan]> UPDATE name SET value = 'foo' WHERE FALSE
 > SELECT * FROM name
 ---
-Update: name (value=foo)
+Update: name (value='foo')
 └─ Nothing
-1, a, 1
-2, b, 2
-3, c, NULL
+1, 'a', 1
+2, 'b', 2
+3, 'c', NULL
 
 # Updating by primary key lookup.
 > BEGIN
@@ -33,11 +33,11 @@ Update: name (value=foo)
 > SELECT * FROM name
 > ROLLBACK
 ---
-Update: name (value=foo)
+Update: name (value='foo')
 └─ KeyLookup: name (1, 3)
-1, foo, 1
-2, b, 2
-3, foo, NULL
+1, 'foo', 1
+2, 'b', 2
+3, 'foo', NULL
 
 # Updating by index lookup.
 > BEGIN
@@ -45,11 +45,11 @@ Update: name (value=foo)
 > SELECT * FROM name
 > ROLLBACK
 ---
-Update: name (value=foo)
+Update: name (value='foo')
 └─ IndexLookup: name.index (2)
-1, a, 1
-2, foo, 2
-3, c, NULL
+1, 'a', 1
+2, 'foo', 2
+3, 'c', NULL
 
 # Including IS NULL.
 > BEGIN
@@ -57,11 +57,11 @@ Update: name (value=foo)
 > SELECT * FROM name
 > ROLLBACK
 ---
-Update: name (value=foo)
+Update: name (value='foo')
 └─ IndexLookup: name.index (NULL)
-1, a, 1
-2, b, 2
-3, foo, NULL
+1, 'a', 1
+2, 'b', 2
+3, 'foo', NULL
 
 # Updating by arbitrary predicate over full scan.
 > BEGIN
@@ -69,11 +69,11 @@ Update: name (value=foo)
 > SELECT * FROM name
 > ROLLBACK
 ---
-Update: name (value=foo)
-└─ Scan: name (name.id > 3 OR name.id = 3 OR name.value LIKE a IS NULL)
-1, a, 1
-2, b, 2
-3, foo, NULL
+Update: name (value='foo')
+└─ Scan: name (name.id > 3 OR name.id = 3 OR name.value LIKE 'a' IS NULL)
+1, 'a', 1
+2, 'b', 2
+3, 'foo', NULL
 
 # Non-boolean predicates error, except NULL which is equivalent to FALSE.
 !> UPDATE name SET value = 'foo' WHERE 0
@@ -87,15 +87,15 @@ Error: invalid input: filter returned 0, expected boolean
 Error: invalid input: filter returned 1, expected boolean
 Error: invalid input: filter returned 3.14, expected boolean
 Error: invalid input: filter returned NaN, expected boolean
-Error: invalid input: filter returned , expected boolean
+Error: invalid input: filter returned '', expected boolean
 Error: invalid input: unexpected end of string literal
 
 > UPDATE name SET value = 'foo' WHERE NULL
 > SELECT * FROM name
 ---
-1, a, 1
-2, b, 2
-3, c, NULL
+1, 'a', 1
+2, 'b', 2
+3, 'c', NULL
 
 # Bare WHERE errors.
 !> UPDATE name SET value = 'foo' WHERE

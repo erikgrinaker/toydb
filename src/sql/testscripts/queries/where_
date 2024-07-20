@@ -12,9 +12,9 @@ ok
 [plan]> SELECT * FROM test WHERE TRUE
 ---
 Scan: test
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 [plan]> SELECT * FROM test WHERE FALSE
 ---
@@ -29,13 +29,13 @@ Nothing
 [plan]> SELECT * FROM test WHERE id > 1
 ---
 Scan: test (test.id > 1)
-2, b
-3, c
+2, 'b'
+3, 'c'
 
 [plan]> SELECT * FROM test WHERE id > 1 AND value < 'c'
 ---
-Scan: test (test.id > 1 AND test.value < c)
-2, b
+Scan: test (test.id > 1 AND test.value < 'c')
+2, 'b'
 
 # Errors on non-boolean type.
 !> SELECT * FROM test WHERE 1
@@ -44,7 +44,7 @@ Scan: test (test.id > 1 AND test.value < c)
 ---
 Error: invalid input: filter returned 1, expected boolean
 Error: invalid input: filter returned 1.0, expected boolean
-Error: invalid input: filter returned , expected boolean
+Error: invalid input: filter returned '', expected boolean
 
 # Errors on bare WHERE clause or multiple predicates.
 !> SELECT * FROM test WHERE
@@ -63,7 +63,7 @@ Error: invalid input: unknown table unknown
 # Qualified names are valid.
 > SELECT * FROM test WHERE test.value = 'b'
 ---
-2, b
+2, 'b'
 
 # Expression and column aliases aren't visible.
 !> SELECT value AS v FROM test WHERE v = 'b'
@@ -75,7 +75,7 @@ Error: invalid input: expression must be constant, found column two
 # Table aliases are visible.
 > SELECT * FROM test AS t WHERE t.id = 2
 ---
-2, b
+2, 'b'
 
 # Ambiguous columns error.
 !> SELECT * FROM test, other WHERE id > 1
@@ -85,18 +85,18 @@ Error: invalid input: ambiguous column id
 # Unambiguous columns work.
 > SELECT * FROM test, other WHERE value = 'b'
 ---
-2, b, 1, FALSE
-2, b, 2, TRUE
+2, 'b', 1, FALSE
+2, 'b', 2, TRUE
 
 
 # Qualified columns work, also when aliased.
 > SELECT * FROM test, other WHERE test.id = 2 AND other.id = 2
 ---
-2, b, 2, TRUE
+2, 'b', 2, TRUE
 
 > SELECT * FROM test t, other o WHERE t.id = 2 AND o.id = 2
 ---
-2, b, 2, TRUE
+2, 'b', 2, TRUE
 
 # WHERE can be combined with joins, even when aliased.
 [plan]> SELECT * FROM test JOIN other ON test.id = other.id WHERE test.id > 1
@@ -104,11 +104,11 @@ Error: invalid input: ambiguous column id
 HashJoin: inner on test.id = other.id
 ├─ Scan: test (test.id > 1)
 └─ Scan: other
-2, b, 2, TRUE
+2, 'b', 2, TRUE
 
 [plan]> SELECT * FROM test t JOIN other o ON t.id = o.id WHERE t.id > 1
 ---
 HashJoin: inner on t.id = o.id
 ├─ Scan: test as t (t.id > 1)
 └─ Scan: other as o
-2, b, 2, TRUE
+2, 'b', 2, TRUE

@@ -94,4 +94,4 @@ Float(NaN)
 !> 'a' / 'b'
 ---
 Error: invalid input: can't divide TRUE and FALSE
-Error: invalid input: can't divide a and b
+Error: invalid input: can't divide 'a' and 'b'

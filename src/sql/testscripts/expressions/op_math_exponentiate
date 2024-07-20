@@ -69,4 +69,4 @@ Float(NaN)
 !> 'a' ^ 'b'
 ---
 Error: invalid input: can't exponentiate TRUE and FALSE
-Error: invalid input: can't exponentiate a and b
+Error: invalid input: can't exponentiate 'a' and 'b'

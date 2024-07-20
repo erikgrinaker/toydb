@@ -21,9 +21,9 @@ Delete: name
 Delete: name
 └─ Nothing
 0, NULL, NULL
-1, a, 1
-2, b, 2
-3, c, 3
+1, 'a', 1
+2, 'b', 2
+3, 'c', 3
 
 # Deleting by primary key lookup works.
 > BEGIN
@@ -34,7 +34,7 @@ Delete: name
 Delete: name
 └─ KeyLookup: name (1, 3)
 0, NULL, NULL
-2, b, 2
+2, 'b', 2
 
 # Deleting by secondary index lookup works.
 > BEGIN
@@ -45,8 +45,8 @@ Delete: name
 Delete: name
 └─ IndexLookup: name.index (3)
 0, NULL, NULL
-1, a, 1
-2, b, 2
+1, 'a', 1
+2, 'b', 2
 
 # Including IS NULL predicates.
 > BEGIN
@@ -56,9 +56,9 @@ Delete: name
 ---
 Delete: name
 └─ IndexLookup: name.index (NULL)
-1, a, 1
-2, b, 2
-3, c, 3
+1, 'a', 1
+2, 'b', 2
+3, 'c', 3
 
 # Deleting by arbitrary predicate works.
 > BEGIN
@@ -67,9 +67,9 @@ Delete: name
 > ROLLBACK
 ---
 Delete: name
-└─ Scan: name (name.id > 3 OR name.id = 3 OR name.value LIKE a IS NULL)
-1, a, 1
-2, b, 2
+└─ Scan: name (name.id > 3 OR name.id = 3 OR name.value LIKE 'a' IS NULL)
+1, 'a', 1
+2, 'b', 2
 
 # Other types error, except NULL which is equivalent to false.
 !> DELETE FROM name WHERE 0
@@ -83,16 +83,16 @@ Error: invalid input: filter returned 0, expected boolean
 Error: invalid input: filter returned 1, expected boolean
 Error: invalid input: filter returned 3.14, expected boolean
 Error: invalid input: filter returned NaN, expected boolean
-Error: invalid input: filter returned , expected boolean
-Error: invalid input: filter returned true, expected boolean
+Error: invalid input: filter returned '', expected boolean
+Error: invalid input: filter returned 'true', expected boolean
 
 > DELETE FROM name WHERE NULL
 > SELECT * FROM name
 ---
 0, NULL, NULL
-1, a, 1
-2, b, 2
-3, c, 3
+1, 'a', 1
+2, 'b', 2
+3, 'c', 3
 
 # Bare WHERE errors.
 !> DELETE FROM name WHERE

@@ -81,7 +81,7 @@ NaN
 > UPDATE datatypes SET "string" = 'Hi! 👋'
 > SELECT * FROM datatypes
 ---
-1, TRUE, -9223372036854775807, 0.0, Hi! 👋
+1, TRUE, -9223372036854775807, 0.0, 'Hi! 👋'
 
 !> UPDATE datatypes SET "string" = false
 !> UPDATE datatypes SET "string" = 3

@@ -17,7 +17,7 @@ Filter pushdown:
    Scan: test (test.id = 2)
 Index lookup:
    KeyLookup: test (2)
-2, b, NaN
+2, 'b', NaN
 
 [opt]> SELECT * FROM test WHERE id = 1 OR id = 3
 ---
@@ -28,79 +28,79 @@ Filter pushdown:
    Scan: test (test.id = 1 OR test.id = 3)
 Index lookup:
    KeyLookup: test (1, 3)
-1, a, 3.14
-3, c, 0.0
+1, 'a', 3.14
+3, 'c', 0.0
 
 # Can combine lookups with other predicates, but only AND.
 [opt]> SELECT * FROM test WHERE (id = 1 OR id = 3) AND value > 'a'
 ---
 Initial:
-   Filter: (test.id = 1 OR test.id = 3) AND test.value > a
+   Filter: (test.id = 1 OR test.id = 3) AND test.value > 'a'
    └─ Scan: test
 Filter pushdown:
-   Scan: test ((test.id = 1 OR test.id = 3) AND test.value > a)
+   Scan: test ((test.id = 1 OR test.id = 3) AND test.value > 'a')
 Index lookup:
-   Filter: test.value > a
+   Filter: test.value > 'a'
    └─ KeyLookup: test (1, 3)
-3, c, 0.0
+3, 'c', 0.0
 
 [opt]> SELECT * FROM test WHERE id = 1 OR id = 3 OR value > 'a'
 ---
 Initial:
-   Filter: test.id = 1 OR test.id = 3 OR test.value > a
+   Filter: test.id = 1 OR test.id = 3 OR test.value > 'a'
    └─ Scan: test
 Filter pushdown:
-   Scan: test (test.id = 1 OR test.id = 3 OR test.value > a)
-1, a, 3.14
-2, b, NaN
-3, c, 0.0
+   Scan: test (test.id = 1 OR test.id = 3 OR test.value > 'a')
+1, 'a', 3.14
+2, 'b', NaN
+3, 'c', 0.0
 
 # Same story with secondary indexes.
 [opt]> SELECT * FROM test WHERE value = 'b'
 ---
 Initial:
-   Filter: test.value = b
+   Filter: test.value = 'b'
    └─ Scan: test
 Filter pushdown:
-   Scan: test (test.value = b)
+   Scan: test (test.value = 'b')
 Index lookup:
-   IndexLookup: test.value (b)
-2, b, NaN
+   IndexLookup: test.value ('b')
+2, 'b', NaN
 
 [opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c'
 ---
 Initial:
-   Filter: test.value = a OR test.value = c
+   Filter: test.value = 'a' OR test.value = 'c'
    └─ Scan: test
 Filter pushdown:
-   Scan: test (test.value = a OR test.value = c)
+   Scan: test (test.value = 'a' OR test.value = 'c')
 Index lookup:
-   IndexLookup: test.value (a, c)
-1, a, 3.14
-3, c, 0.0
+   IndexLookup: test.value ('a', 'c')
+1, 'a', 3.14
+3, 'c', 0.0
 
 [opt]> SELECT * FROM test WHERE (value = 'a' OR value = 'c') AND id > 1
 ---
 Initial:
-   Filter: (test.value = a OR test.value = c) AND test.id > 1
+   Filter: (test.value = 'a' OR test.value = 'c') AND test.id > 1
    └─ Scan: test
 Filter pushdown:
-   Scan: test ((test.value = a OR test.value = c) AND test.id > 1)
+   Scan: test ((test.value = 'a' OR test.value = 'c') AND test.id > 1)
 Index lookup:
    Filter: test.id > 1
-   └─ IndexLookup: test.value (a, c)
-3, c, 0.0
+   └─ IndexLookup: test.value ('a', 'c')
+3, 'c', 0.0
 
 [opt]> SELECT * FROM test WHERE value = 'a' OR value = 'c' OR id > 1
 ---
 Initial:
-   Filter: test.value = a OR test.value = c OR test.id > 1
+   Filter: test.value = 'a' OR test.value = 'c' OR test.id > 1
    └─ Scan: test
 Filter pushdown:
-   Scan: test (test.value = a OR test.value = c OR test.id > 1)
-1, a, 3.14
-2, b, NaN
-3, c, 0.0
+   Scan: test (test.value = 'a' OR test.value = 'c' OR test.id > 1)
+1, 'a', 3.14
+2, 'b', NaN
+3, 'c', 0.0
 
 # NULL lookups should match for IS NULL, but not for = NULL. IS NOT NULL
 # incurs a table scan.
@@ -142,9 +142,9 @@ Initial:
    └─ Scan: test
 Filter pushdown:
    Scan: test (NOT test.value IS NULL)
-1, a, 3.14
-2, b, NaN
-3, c, 0.0
+1, 'a', 3.14
+2, 'b', NaN
+3, 'c', 0.0
 
 # NAN lookups should be treated similarly to NULLs.
 [opt]> SELECT * FROM test WHERE "float" IS NAN
@@ -156,7 +156,7 @@ Filter pushdown:
    Scan: test (test.float IS NAN)
 Index lookup:
    IndexLookup: test.float (NaN)
-2, b, NaN
+2, 'b', NaN
 
 [opt]> SELECT * FROM test WHERE "float" = NAN
 ---
@@ -194,9 +194,9 @@ Initial:
    └─ Scan: test
 Filter pushdown:
    Scan: test (NOT test.float = NaN)
-1, a, 3.14
-2, b, NaN
-3, c, 0.0
+1, 'a', 3.14
+2, 'b', NaN
+3, 'c', 0.0
 
 [opt]> SELECT * FROM test WHERE "float" IS NOT NAN
 ---
@@ -205,8 +205,8 @@ Initial:
    └─ Scan: test
 Filter pushdown:
    Scan: test (NOT test.float IS NAN)
-1, a, 3.14
-3, c, 0.0
+1, 'a', 3.14
+3, 'c', 0.0
 
 # Inner joins on foreign keys with index lookups are transferred across.
 [opt]> SELECT * FROM test JOIN other ON other.test_id = test.id WHERE test_id = 1 OR test_id = 3
@@ -228,8 +228,8 @@ Join type:
    HashJoin: inner on test.id = other.test_id
    ├─ KeyLookup: test (1, 3)
    └─ IndexLookup: other.test_id (1, 3)
-1, a, 3.14, 1, 1
-3, c, 0.0, 3, 3
+1, 'a', 3.14, 1, 1
+3, 'c', 0.0, 3, 3
 
 # It's the same if the index lookups are given in the join predicate.
 [opt]> SELECT * FROM test JOIN other ON other.test_id = test.id AND (test_id = 1 OR test_id = 3)
@@ -250,8 +250,8 @@ Join type:
    HashJoin: inner on test.id = other.test_id
    ├─ KeyLookup: test (1, 3)
    └─ IndexLookup: other.test_id (1, 3)
-1, a, 3.14, 1, 1
-3, c, 0.0, 3, 3
+1, 'a', 3.14, 1, 1
+3, 'c', 0.0, 3, 3
 
 # It also works with three tables.
 [opt]> SELECT * FROM test \
@@ -282,4 +282,4 @@ Join type:
    │  ├─ KeyLookup: test (2)
    │  └─ IndexLookup: other.test_id as a.test_id (2)
    └─ IndexLookup: other.test_id as b.test_id (1, 3)
-2, b, NaN, 2, 2, 3, 3
+2, 'b', NaN, 2, 2, 3, 3

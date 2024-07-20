@@ -67,4 +67,4 @@ Float(inf)
 !> 'a' + 'b'
 ---
 Error: invalid input: can't add TRUE and FALSE
-Error: invalid input: can't add a and b
+Error: invalid input: can't add 'a' and 'b'

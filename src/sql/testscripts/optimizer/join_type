@@ -16,9 +16,9 @@ Join type:
    HashJoin: inner on a.id = b.id
    ├─ Scan: test as a
    └─ Scan: test as b
-1, a, 1, a
-2, b, 2, b
-3, c, 3, c
+1, 'a', 1, 'a'
+2, 'b', 2, 'b'
+3, 'c', 3, 'c'
 
 # This also works for non-primary key columns.
 [opt]> SELECT * FROM test a JOIN test b ON a.value = b.value
@@ -31,9 +31,9 @@ Join type:
    HashJoin: inner on a.value = b.value
    ├─ Scan: test as a
    └─ Scan: test as b
-1, a, 1, a
-2, b, 2, b
-3, c, 3, c
+1, 'a', 1, 'a'
+2, 'b', 2, 'b'
+3, 'c', 3, 'c'
 
 # However, it does not work with both.
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id AND a.value = b.value 
@@ -42,9 +42,9 @@ Initial:
    NestedLoopJoin: inner on a.id = b.id AND a.value = b.value
    ├─ Scan: test as a
    └─ Scan: test as b
-1, a, 1, a
-2, b, 2, b
-3, c, 3, c
+1, 'a', 1, 'a'
+2, 'b', 2, 'b'
+3, 'c', 3, 'c'
 
 # It does not work with other predicates either. A smarter optimizer could
 # move the rest of the predicate into a new filter node.
@@ -54,23 +54,23 @@ Initial:
    NestedLoopJoin: inner on a.id = b.id AND (a.value > b.value OR a.value = b.value)
    ├─ Scan: test as a
    └─ Scan: test as b
-1, a, 1, a
-2, b, 2, b
-3, c, 3, c
+1, 'a', 1, 'a'
+2, 'b', 2, 'b'
+3, 'c', 3, 'c'
 
 # However, the filter pushdown optimizer can save the day by pushing down
 # independent predicates into the scans.
 [opt]> SELECT * FROM test a JOIN test b ON a.id = b.id AND a.value = 'b' AND b.value = 'c'
 ---
 Initial:
-   NestedLoopJoin: inner on a.id = b.id AND a.value = b AND b.value = c
+   NestedLoopJoin: inner on a.id = b.id AND a.value = 'b' AND b.value = 'c'
    ├─ Scan: test as a
    └─ Scan: test as b
 Filter pushdown:
    NestedLoopJoin: inner on a.id = b.id
-   ├─ Scan: test as a (a.value = b)
-   └─ Scan: test as b (b.value = c)
+   ├─ Scan: test as a (a.value = 'b')
+   └─ Scan: test as b (b.value = 'c')
 Join type:
    HashJoin: inner on a.id = b.id
-   ├─ Scan: test as a (a.value = b)
-   └─ Scan: test as b (b.value = c)
+   ├─ Scan: test as a (a.value = 'b')
+   └─ Scan: test as b (b.value = 'c')

@@ -14,7 +14,7 @@ ok
 > UPDATE name SET "null" = NULL
 > SELECT * FROM name
 ---
-1, NULL, bar
+1, NULL, 'bar'
 
 # UPDATE with NULL in non-NULL column errors.
 !> UPDATE name SET id = NULL

@@ -34,8 +34,8 @@ Projection: #1, #2, #3, #4, #5
 Aggregate: test.group, count(TRUE)
 └─ Scan: test
 NULL, 1
-a, 3
-b, 3
+'a', 3
+'b', 3
 
 [plan]> SELECT "group", COUNT(*), MIN("bool"), MAX("string"), SUM("int"), AVG("float") \
     FROM test GROUP BY "group"
@@ -43,8 +43,8 @@ b, 3
 Aggregate: test.group, count(TRUE), min(test.bool), max(test.string), sum(test.int), avg(test.float)
 └─ Scan: test
 NULL, 1, NULL, NULL, NULL, NULL
-a, 3, FALSE, AB, 9, NaN
-b, 3, FALSE, 👋, 41, NaN
+'a', 3, FALSE, 'AB', 9, NaN
+'b', 3, FALSE, '👋', 41, NaN
 
 # GROUP BY works on booleans.
 [plan]> SELECT "bool", COUNT(*) FROM test GROUP BY "bool"
@@ -84,10 +84,10 @@ NaN, 2
 Aggregate: test.string, count(TRUE)
 └─ Scan: test
 NULL, 1
-, 2
-AB, 1
-abc, 2
-👋, 1
+'', 2
+'AB', 1
+'abc', 2
+'👋', 1
 
 # GROUP BY works even if the group column isn't in the result.
 [plan]> SELECT COUNT(*) FROM test GROUP BY "group"
@@ -105,8 +105,8 @@ Projection: #1
 Aggregate: test.group
 └─ Scan: test
 NULL
-a
-b
+'a'
+'b'
 
 # GROUP BY does not work with SELECT aliases (also the case in e.g. SQL server).
 !> SELECT "group" AS g, COUNT(*) FROM test GROUP BY g
@@ -118,8 +118,8 @@ Error: invalid input: unknown column g
 Aggregate: t.group, count(TRUE)
 └─ Scan: test as t
 NULL, 1
-a, 3
-b, 3
+'a', 3
+'b', 3
 
 !> SELECT "group", COUNT(*) FROM test AS t GROUP BY test."group"
 ---
@@ -191,10 +191,10 @@ Error: invalid input: unknown function min with 1 arguments
 Aggregate: test.group, test.bool, count(TRUE)
 └─ Scan: test
 NULL, NULL, 1
-a, FALSE, 1
-a, TRUE, 2
-b, FALSE, 2
-b, TRUE, 1
+'a', FALSE, 1
+'a', TRUE, 2
+'b', FALSE, 2
+'b', TRUE, 1
 
 # Repeated GROUP BY column works.
 [plan]> SELECT "group", "group", "group", COUNT(*) FROM test GROUP BY "group", "group"
@@ -203,8 +203,8 @@ Projection: test.group, test.group, test.group, #1
 └─ Aggregate: test.group, count(TRUE)
    └─ Scan: test
 NULL, NULL, NULL, 1
-a, a, a, 3
-b, b, b, 3
+'a', 'a', 'a', 3
+'b', 'b', 'b', 3
 
 # GROUP BY works with joins.
 [plan]> SELECT t.id % 2, COUNT(*) FROM test t JOIN other o ON t.id % 2 = o.id GROUP BY t.id % 2
@@ -225,12 +225,12 @@ Error: invalid input: column test.group must be used in an aggregate or GROUP BY
 Aggregate: test.id, test.group, test.bool, test.int, test.float, test.string
 └─ Scan: test
 0, NULL, NULL, NULL, NULL, NULL
-1, a, TRUE, -1, 3.14, 
-2, b, FALSE, 0, NaN, abc
-3, a, TRUE, 3, 0.0, AB
-4, b, TRUE, 42, inf, 👋
-5, a, FALSE, 7, NaN, 
-6, b, FALSE, -1, 0.0, abc
+1, 'a', TRUE, -1, 3.14, ''
+2, 'b', FALSE, 0, NaN, 'abc'
+3, 'a', TRUE, 3, 0.0, 'AB'
+4, 'b', TRUE, 42, inf, '👋'
+5, 'a', FALSE, 7, NaN, ''
+6, 'b', FALSE, -1, 0.0, 'abc'
 
 [plan]> SELECT * FROM test GROUP BY "bool", "int", "float", "string", "group", id
 ---
@@ -238,9 +238,9 @@ Projection: test.id, test.group, test.bool, test.int, test.float, test.string
 └─ Aggregate: test.bool, test.int, test.float, test.string, test.group, test.id
    └─ Scan: test
 0, NULL, NULL, NULL, NULL, NULL
-6, b, FALSE, -1, 0.0, abc
-2, b, FALSE, 0, NaN, abc
-5, a, FALSE, 7, NaN, 
-1, a, TRUE, -1, 3.14, 
-3, a, TRUE, 3, 0.0, AB
-4, b, TRUE, 42, inf, 👋
+6, 'b', FALSE, -1, 0.0, 'abc'
+2, 'b', FALSE, 0, NaN, 'abc'
+5, 'a', FALSE, 7, NaN, ''
+1, 'a', TRUE, -1, 3.14, ''
+3, 'a', TRUE, 3, 0.0, 'AB'
+4, 'b', TRUE, 42, inf, '👋'

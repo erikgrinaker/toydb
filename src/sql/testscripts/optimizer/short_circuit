@@ -17,9 +17,9 @@ Filter pushdown:
    Scan: test (TRUE)
 Short circuit:
    Scan: test
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 [opt]> SELECT 1, 2, 3 WHERE TRUE
 ---
@@ -46,15 +46,15 @@ Short circuit:
    NestedLoopJoin: inner
    ├─ Scan: test
    └─ Scan: ref
-1, a, 1, 1
-1, a, 2, 2
-1, a, 3, 3
-2, b, 1, 1
-2, b, 2, 2
-2, b, 3, 3
-3, c, 1, 1
-3, c, 2, 2
-3, c, 3, 3
+1, 'a', 1, 1
+1, 'a', 2, 2
+1, 'a', 3, 3
+2, 'b', 1, 1
+2, 'b', 2, 2
+2, 'b', 3, 3
+3, 'c', 1, 1
+3, 'c', 2, 2
+3, 'c', 3, 3
 
 # FALSE predicates → Nothing (but retains column headers)
 [opt,header]> SELECT * FROM test WHERE FALSE
@@ -182,9 +182,9 @@ Initial:
    └─ Scan: test
 Short circuit:
    Scan: test
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 [opt,header]> SELECT id AS foo, value AS bar FROM test
 ---
@@ -192,9 +192,9 @@ Initial:
    Projection: test.id as foo, test.value as bar
    └─ Scan: test
 foo, bar
-1, a
-2, b
-3, c
+1, 'a'
+2, 'b'
+3, 'c'
 
 [opt]> SELECT id, MIN(id), MAX(id) FROM test GROUP BY id
 ---

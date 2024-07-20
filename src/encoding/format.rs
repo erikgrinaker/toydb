@@ -150,15 +150,8 @@ impl<I: Formatter> Formatter for MVCC<I> {
 pub struct SQL;
 
 impl SQL {
-    fn literal(value: &sql::types::Value) -> String {
-        match value {
-            sql::types::Value::String(s) => format!("{s:?}"), // quoted string
-            value => value.to_string(),
-        }
-    }
-
     fn values(values: impl IntoIterator<Item = sql::types::Value>) -> String {
-        values.into_iter().map(|v| Self::literal(&v)).join(",")
+        values.into_iter().join(",")
     }
 
     fn schema(table: sql::types::Table) -> String {
@@ -178,10 +171,10 @@ impl Formatter for SQL {
         match key {
             sql::engine::Key::Table(name) => format!("sql:Table({name})"),
             sql::engine::Key::Index(table, column, value) => {
-                format!("sql:Index({table}.{column}, {})", Self::literal(&value))
+                format!("sql:Index({table}.{column}, {value})")
             }
             sql::engine::Key::Row(table, id) => {
-                format!("sql:Row({table}, {})", Self::literal(&id))
+                format!("sql:Row({table}, {id})")
             }
         }
     }
