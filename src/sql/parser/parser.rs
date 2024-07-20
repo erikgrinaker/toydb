@@ -654,9 +654,12 @@ enum PrefixOperator {
 }
 
 impl PrefixOperator {
-    /// The operator precedence. Prefix operators have the highest precedence.
+    /// The operator precedence.
     fn precedence(&self) -> Precedence {
-        9
+        match self {
+            Self::Not => 3,
+            _ => 10,
+        }
     }
 
     // The operator associativity. Prefix operators are right-associative by
@@ -701,14 +704,15 @@ impl InfixOperator {
         match self {
             Self::Or => 1,
             Self::And => 2,
-            Self::Equal | Self::NotEqual | Self::Like => 3,
+            // Self::Not => 3
+            Self::Equal | Self::NotEqual | Self::Like => 4,
             Self::GreaterThan
             | Self::GreaterThanOrEqual
             | Self::LessThan
-            | Self::LessThanOrEqual => 4,
-            Self::Add | Self::Subtract => 5,
-            Self::Multiply | Self::Divide | Self::Remainder => 6,
-            Self::Exponentiate => 7,
+            | Self::LessThanOrEqual => 5,
+            Self::Add | Self::Subtract => 6,
+            Self::Multiply | Self::Divide | Self::Remainder => 7,
+            Self::Exponentiate => 8,
         }
     }
 
@@ -753,9 +757,9 @@ enum PostfixOperator {
 }
 
 impl PostfixOperator {
-    // The operator precedence. Postfix operators are below prefix operators.
+    // The operator precedence. Postfix operators are below most prefix operators.
     fn precedence(&self) -> Precedence {
-        8
+        9
     }
 
     /// Builds an AST expression for the operator.

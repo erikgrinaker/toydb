@@ -1,13 +1,14 @@
 # Tests operator precedence. Test each precedence level against the operators
 # immediately below it, in order. The levels are:
 #
-# 9: prefix +, -, NOT
-# 8: postfix !, IS NULL, IS NOT NULL, IS NAN, IS NOT NAN
-# 7: ^ (left-associative)
-# 6: *, /, %
-# 5: +, -
-# 4: >, >=, <, <=
-# 3: =, !=, LIKE
+# 10: prefix +, -
+# 9: postfix !, IS NULL, IS NOT NULL, IS NAN, IS NOT NAN
+# 8: ^ (left-associative)
+# 7: *, /, %
+# 6: +, -
+# 5: >, >=, <, <=
+# 4: =, !=, LIKE
+# 3: NOT
 # 2: AND
 # 1: OR
 #
@@ -35,17 +36,6 @@ Integer(120)
 ---
 Integer(9)
 Integer(-9)
-
-# NOT.
-> NOT NULL IS NULL
-> NOT (NULL IS NULL)
-!> NOT NAN IS NAN
-> NOT (NAN IS NAN)
----
-Boolean(true)
-Boolean(false)
-Error: invalid input: can't negate NaN
-Boolean(false)
 
 # Postfix !.
 > 2 ^ 3!
@@ -360,24 +350,27 @@ Boolean(false)
 Error: invalid input: can't and 1 and TRUE
 
 # LIKE
-> 'abc' LIKE 'abc' = TRUE
-!> 'abc' LIKE ('abc' = TRUE)
-> 'abc' LIKE 'abc' != TRUE
-!> 'abc' LIKE ('abc' != TRUE)
-> 'abc' LIKE 'abc' AND TRUE
-!> 'abc' LIKE ('abc' AND TRUE)
+> NOT 'abc' LIKE 'abc'
+!> (NOT 'abc') LIKE 'abc'
 ---
-Boolean(true)
-Error: invalid input: can't compare abc and TRUE
 Boolean(false)
-Error: invalid input: can't compare abc and TRUE
+Error: invalid input: can't negate abc
+
+# NOT.
+> NOT TRUE AND FALSE
+> NOT (TRUE AND FALSE)
+---
+Boolean(false)
 Boolean(true)
-Error: invalid input: can't and abc and TRUE
 
 # AND
 > FALSE AND TRUE OR TRUE
 > FALSE AND (TRUE OR TRUE)
+> TRUE OR TRUE AND FALSE
+> (TRUE OR TRUE) AND FALSE
 ---
+Boolean(true)
+Boolean(false)
 Boolean(true)
 Boolean(false)
 
