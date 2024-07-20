@@ -597,7 +597,7 @@ impl<'a> Parser<'a> {
                 Token::LessThanOrEqual => InfixOperator::LessThanOrEqual,
                 Token::Minus => InfixOperator::Subtract,
                 Token::NotEqual => InfixOperator::NotEqual,
-                Token::Percent => InfixOperator::Modulo,
+                Token::Percent => InfixOperator::Remainder,
                 Token::Plus => InfixOperator::Add,
                 Token::Slash => InfixOperator::Divide,
                 _ => return None,
@@ -688,10 +688,10 @@ enum InfixOperator {
     LessThan,
     LessThanOrEqual,
     Like,
-    Modulo,
     Multiply,
     NotEqual,
     Or,
+    Remainder,
     Subtract,
 }
 
@@ -707,7 +707,7 @@ impl InfixOperator {
             | Self::LessThan
             | Self::LessThanOrEqual => 4,
             Self::Add | Self::Subtract => 5,
-            Self::Multiply | Self::Divide | Self::Modulo => 6,
+            Self::Multiply | Self::Divide | Self::Remainder => 6,
             Self::Exponentiate => 7,
         }
     }
@@ -734,10 +734,10 @@ impl InfixOperator {
             Self::LessThan => ast::Operator::LessThan(lhs, rhs).into(),
             Self::LessThanOrEqual => ast::Operator::LessThanOrEqual(lhs, rhs).into(),
             Self::Like => ast::Operator::Like(lhs, rhs).into(),
-            Self::Modulo => ast::Operator::Modulo(lhs, rhs).into(),
             Self::Multiply => ast::Operator::Multiply(lhs, rhs).into(),
             Self::NotEqual => ast::Operator::NotEqual(lhs, rhs).into(),
             Self::Or => ast::Operator::Or(lhs, rhs).into(),
+            Self::Remainder => ast::Operator::Remainder(lhs, rhs).into(),
             Self::Subtract => ast::Operator::Subtract(lhs, rhs).into(),
         }
     }

@@ -192,10 +192,13 @@ impl Value {
     }
 
     /// Finds the remainder of two values. Errors when invalid.
+    ///
+    /// NB: uses the remainder, not modulo, like Postgres. For negative values,
+    /// the result has the sign of the dividend, rather than always returning a
+    /// positive value (modulo).
     pub fn checked_rem(&self, other: &Self) -> Result<Self> {
         use Value::*;
         Ok(match (self, other) {
-            // Uses remainder semantics, like Postgres.
             (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
             (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),
             (Integer(lhs), Float(rhs)) => Float(*lhs as f64 % rhs),
@@ -203,7 +206,7 @@ impl Value {
             (Float(lhs), Float(rhs)) => Float(lhs % rhs),
             (Integer(_) | Float(_) | Null, Null) => Null,
             (Null, Integer(_) | Float(_)) => Null,
-            (lhs, rhs) => return errinput!("can't take modulo of {lhs} and {rhs}"),
+            (lhs, rhs) => return errinput!("can't take remainder of {lhs} and {rhs}"),
         })
     }
 

@@ -544,7 +544,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 ast::Operator::Exponentiate(lhs, rhs) => Exponentiate(build(lhs)?, build(rhs)?),
                 ast::Operator::Factorial(expr) => Factorial(build(expr)?),
                 ast::Operator::Identity(expr) => Identity(build(expr)?),
-                ast::Operator::Modulo(lhs, rhs) => Modulo(build(lhs)?, build(rhs)?),
+                ast::Operator::Remainder(lhs, rhs) => Remainder(build(lhs)?, build(rhs)?),
                 ast::Operator::Multiply(lhs, rhs) => Multiply(build(lhs)?, build(rhs)?),
                 ast::Operator::Negate(expr) => Negate(build(expr)?),
                 ast::Operator::Subtract(lhs, rhs) => Subtract(build(lhs)?, build(rhs)?),

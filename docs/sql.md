@@ -125,7 +125,7 @@ Binary operators:
 * `*`: multiplication, e.g. `3 * 2` yields `6`.
 * `/`: division, e.g. `6 / 2` yields `3`.
 * `^`: exponentiation, e.g. `2 ^ 4` yields `16`.
-* `%`: modulo or remainder, e.g. `8 % 3` yields `2`. The result has the sign of the divisor.
+* `%`: remainder, e.g. `8 % 3` yields `2`. Unlike modulo, the result has the sign of the dividend.
 
 Unary operators:
 

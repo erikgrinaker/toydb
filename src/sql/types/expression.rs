@@ -46,12 +46,12 @@ pub enum Expression {
     Factorial(Box<Expression>),
     /// The identify function, which simply returns the same number.
     Identity(Box<Expression>),
-    /// The remainder after dividing two numbers: a % b.
-    Modulo(Box<Expression>, Box<Expression>),
     /// Multiplies two numbers: a * b.
     Multiply(Box<Expression>, Box<Expression>),
     /// Negates the given number: -a.
     Negate(Box<Expression>),
+    /// The remainder after dividing two numbers: a % b.
+    Remainder(Box<Expression>, Box<Expression>),
     /// Takes the square root of a number: √a.
     SquareRoot(Box<Expression>),
     /// Subtracts two numbers: a - b.
@@ -87,9 +87,9 @@ impl Expression {
             Self::Exponentiate(lhs, rhs) => format!("{} ^ {}", format(lhs), format(rhs)),
             Self::Factorial(expr) => format!("{}!", format(expr)),
             Self::Identity(expr) => format(expr),
-            Self::Modulo(lhs, rhs) => format!("{} % {}", format(lhs), format(rhs)),
             Self::Multiply(lhs, rhs) => format!("{} * {}", format(lhs), format(rhs)),
             Self::Negate(expr) => format!("-{}", format(expr)),
+            Self::Remainder(lhs, rhs) => format!("{} % {}", format(lhs), format(rhs)),
             Self::SquareRoot(expr) => format!("sqrt({})", format(expr)),
             Self::Subtract(lhs, rhs) => format!("{} - {}", format(lhs), format(rhs)),
 
@@ -197,7 +197,6 @@ impl Expression {
                 v @ (Integer(_) | Float(_) | Null) => v,
                 expr => return errinput!("can't take the identity of {expr}"),
             },
-            Self::Modulo(lhs, rhs) => lhs.evaluate(row)?.checked_rem(&rhs.evaluate(row)?)?,
             Self::Multiply(lhs, rhs) => lhs.evaluate(row)?.checked_mul(&rhs.evaluate(row)?)?,
             Self::Negate(expr) => match expr.evaluate(row)? {
                 Integer(i) => Integer(-i),
@@ -205,6 +204,7 @@ impl Expression {
                 Null => Null,
                 value => return errinput!("can't negate {value}"),
             },
+            Self::Remainder(lhs, rhs) => lhs.evaluate(row)?.checked_rem(&rhs.evaluate(row)?)?,
             Self::SquareRoot(expr) => match expr.evaluate(row)? {
                 Integer(i) if i >= 0 => Float((i as f64).sqrt()),
                 Float(f) => Float(f.sqrt()),
@@ -241,9 +241,9 @@ impl Expression {
                 | Self::GreaterThan(lhs, rhs)
                 | Self::LessThan(lhs, rhs)
                 | Self::Like(lhs, rhs)
-                | Self::Modulo(lhs, rhs)
                 | Self::Multiply(lhs, rhs)
                 | Self::Or(lhs, rhs)
+                | Self::Remainder(lhs, rhs)
                 | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
 
                 Self::Factorial(expr)
@@ -288,9 +288,9 @@ impl Expression {
             Self::GreaterThan(lhs, rhs) => Self::GreaterThan(transform(lhs)?, transform(rhs)?),
             Self::LessThan(lhs, rhs) => Self::LessThan(transform(lhs)?, transform(rhs)?),
             Self::Like(lhs, rhs) => Self::Like(transform(lhs)?, transform(rhs)?),
-            Self::Modulo(lhs, rhs) => Self::Modulo(transform(lhs)?, transform(rhs)?),
             Self::Multiply(lhs, rhs) => Self::Multiply(transform(lhs)?, transform(rhs)?),
             Self::Or(lhs, rhs) => Self::Or(transform(lhs)?, transform(rhs)?),
+            Self::Remainder(lhs, rhs) => Self::Remainder(transform(lhs)?, transform(rhs)?),
             Self::SquareRoot(expr) => Self::SquareRoot(transform(expr)?),
             Self::Subtract(lhs, rhs) => Self::Subtract(transform(lhs)?, transform(rhs)?),
 

@@ -177,9 +177,9 @@ pub enum Operator {
     Exponentiate(Box<Expression>, Box<Expression>),
     Factorial(Box<Expression>),
     Identity(Box<Expression>),
-    Modulo(Box<Expression>, Box<Expression>),
     Multiply(Box<Expression>, Box<Expression>),
     Negate(Box<Expression>),
+    Remainder(Box<Expression>, Box<Expression>),
     Subtract(Box<Expression>, Box<Expression>),
 
     Like(Box<Expression>, Box<Expression>),
@@ -204,10 +204,10 @@ impl Expression {
             | Self::Operator(LessThan(lhs, rhs))
             | Self::Operator(LessThanOrEqual(lhs, rhs))
             | Self::Operator(Like(lhs, rhs))
-            | Self::Operator(Modulo(lhs, rhs))
             | Self::Operator(Multiply(lhs, rhs))
             | Self::Operator(NotEqual(lhs, rhs))
             | Self::Operator(Or(lhs, rhs))
+            | Self::Operator(Remainder(lhs, rhs))
             | Self::Operator(Subtract(lhs, rhs)) => lhs.walk(visitor) && rhs.walk(visitor),
 
             Self::Operator(Factorial(expr))
@@ -248,10 +248,10 @@ impl Expression {
             | Self::Operator(LessThan(lhs, rhs))
             | Self::Operator(LessThanOrEqual(lhs, rhs))
             | Self::Operator(Like(lhs, rhs))
-            | Self::Operator(Modulo(lhs, rhs))
             | Self::Operator(Multiply(lhs, rhs))
             | Self::Operator(NotEqual(lhs, rhs))
             | Self::Operator(Or(lhs, rhs))
+            | Self::Operator(Remainder(lhs, rhs))
             | Self::Operator(Subtract(lhs, rhs)) => {
                 lhs.collect(visitor, c);
                 rhs.collect(visitor, c);

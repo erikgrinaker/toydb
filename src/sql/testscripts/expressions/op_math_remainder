@@ -1,20 +1,23 @@
 # Tests the % remainder operator.
+#
+# Note that remainder is not the same as modulo: the former has the sign of the
+# dividend, while the latter always has a positive value.
 
 # Integers.
 [expr]> 5 % 3
 [expr]> -5 % 3
 [expr]> 5 % -3
 ---
-Integer(2) ← Modulo(Constant(Integer(5)), Constant(Integer(3)))
-Integer(-2) ← Modulo(Negate(Constant(Integer(5))), Constant(Integer(3)))
-Integer(2) ← Modulo(Constant(Integer(5)), Negate(Constant(Integer(3))))
+Integer(2) ← Remainder(Constant(Integer(5)), Constant(Integer(3)))
+Integer(-2) ← Remainder(Negate(Constant(Integer(5))), Constant(Integer(3)))
+Integer(2) ← Remainder(Constant(Integer(5)), Negate(Constant(Integer(3))))
 
 # Floats.
 [expr]> 6.28 % 2.2
 [expr]> 6.28 % -2.2
 ---
-Float(1.88) ← Modulo(Constant(Float(6.28)), Constant(Float(2.2)))
-Float(1.88) ← Modulo(Constant(Float(6.28)), Negate(Constant(Float(2.2))))
+Float(1.88) ← Remainder(Constant(Float(6.28)), Constant(Float(2.2)))
+Float(1.88) ← Remainder(Constant(Float(6.28)), Negate(Constant(Float(2.2))))
 
 # Mixed.
 > 3.15 % 2
@@ -64,5 +67,5 @@ Float(NaN)
 !> TRUE % FALSE
 !> 'a' % 'b'
 ---
-Error: invalid input: can't take modulo of TRUE and FALSE
-Error: invalid input: can't take modulo of a and b
+Error: invalid input: can't take remainder of TRUE and FALSE
+Error: invalid input: can't take remainder of a and b
