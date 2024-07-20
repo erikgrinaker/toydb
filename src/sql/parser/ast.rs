@@ -2,42 +2,41 @@ use crate::sql::types::DataType;
 
 use std::collections::BTreeMap;
 
-/// The statement AST is the root node of the AST tree, which describes the
-/// syntactic structure of a SQL query. It is passed to the planner, which
-/// validates its contents and converts it into an execution plan.
+/// The statement is the root node of the Abstract Syntax Tree, and describes
+/// the syntactic structure of a SQL query. It is built from a raw SQL string by
+/// the parser, and passed on to the planner which validates it and builds an
+/// execution plan from it.
 #[derive(Debug)]
 pub enum Statement {
-    Begin {
-        read_only: bool,
-        as_of: Option<u64>,
-    },
+    /// Begin a new transaction.
+    Begin { read_only: bool, as_of: Option<u64> },
+    /// Commit a transaction.
     Commit,
+    /// Roll back a transaction.
     Rollback,
+    /// Explain a statement.
     Explain(Box<Statement>),
-    CreateTable {
-        name: String,
-        columns: Vec<Column>,
-    },
-    DropTable {
-        name: String,
-        if_exists: bool,
-    },
-    Delete {
-        table: String,
-        r#where: Option<Expression>,
-    },
+    /// Create a new table.
+    CreateTable { name: String, columns: Vec<Column> },
+    /// Drop a table.
+    DropTable { name: String, if_exists: bool },
+    /// Delete matching rows.
+    Delete { table: String, r#where: Option<Expression> },
+    /// Insert new rows into a table.
     Insert {
         table: String,
-        columns: Option<Vec<String>>,
-        values: Vec<Vec<Expression>>,
+        columns: Option<Vec<String>>, // columns given in values, using default for rest
+        values: Vec<Vec<Expression>>, // rows to insert
     },
+    /// Update rows in a table.
     Update {
         table: String,
-        set: BTreeMap<String, Option<Expression>>, // None for DEFAULT value
+        set: BTreeMap<String, Option<Expression>>, // column → value, None for default value
         r#where: Option<Expression>,
     },
+    /// Select matching rows.
     Select {
-        select: Vec<(Expression, Option<String>)>,
+        select: Vec<(Expression, Option<String>)>, // optional column aliases
         from: Vec<From>,
         r#where: Option<Expression>,
         group_by: Vec<Expression>,
@@ -48,10 +47,12 @@ pub enum Statement {
     },
 }
 
-/// A FROM item: a table or join.
+/// A FROM item.
 #[derive(Debug)]
 pub enum From {
+    /// A table.
     Table { name: String, alias: Option<String> },
+    /// A join of two or more tables (may be nested).
     Join { left: Box<From>, right: Box<From>, r#type: JoinType, predicate: Option<Expression> },
 }
 
@@ -78,8 +79,8 @@ pub enum JoinType {
 }
 
 impl JoinType {
-    // If true, the join is an outer join -- rows with no join match are emitted
-    // with a NULL match.
+    // If true, the join is an outer join, where rows with no join matches are
+    // emitted with a NULL match.
     pub fn is_outer(&self) -> bool {
         match self {
             Self::Left | Self::Right => true,
@@ -88,7 +89,7 @@ impl JoinType {
     }
 }
 
-/// Sort orders.
+/// ORDER BY direction.
 #[derive(Debug)]
 pub enum Order {
     Ascending,
@@ -110,7 +111,7 @@ pub enum Expression {
     Operator(Operator),
 }
 
-/// Expression literals.
+/// Expression literal values.
 #[derive(Clone, Debug)]
 pub enum Literal {
     Null,
@@ -120,19 +121,19 @@ pub enum Literal {
     String(String),
 }
 
-/// To allow Expressions and Literals in e.g. hashmap lookups, implement simple
+/// To allow using Expressions and Literals in e.g. hashmaps, implement simple
 /// equality and hash for all types, including Null and f64::NAN. This is not
 /// used for expression evaluation (handled by sql::types::Expression), where
-/// these values should not be considered equal, only in lookups.
+/// these values should not be considered equal to themselves, only in lookups.
 impl std::cmp::PartialEq for Literal {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Boolean(l), Self::Boolean(r)) => l == r,
             (Self::Integer(l), Self::Integer(r)) => l == r,
-            // Consider e.g. NaN equal to NaN for comparison purposes.
+            // Implies NaN == NaN but -NaN != NaN. Similarly with +/-0.0.
             (Self::Float(l), Self::Float(r)) => l.to_bits() == r.to_bits(),
             (Self::String(l), Self::String(r)) => l == r,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+            (l, r) => core::mem::discriminant(l) == core::mem::discriminant(r),
         }
     }
 }
@@ -159,29 +160,29 @@ impl std::hash::Hash for Literal {
 /// around this, but we keep it simple.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Operator {
-    And(Box<Expression>, Box<Expression>),
-    Not(Box<Expression>),
-    Or(Box<Expression>, Box<Expression>),
+    And(Box<Expression>, Box<Expression>), // a AND b
+    Not(Box<Expression>),                  // NOT a
+    Or(Box<Expression>, Box<Expression>),  // a OR b
 
-    Equal(Box<Expression>, Box<Expression>),
-    GreaterThan(Box<Expression>, Box<Expression>),
-    GreaterThanOrEqual(Box<Expression>, Box<Expression>),
-    Is(Box<Expression>, Literal), // NULL or f64 NAN
-    LessThan(Box<Expression>, Box<Expression>),
-    LessThanOrEqual(Box<Expression>, Box<Expression>),
-    NotEqual(Box<Expression>, Box<Expression>),
+    Equal(Box<Expression>, Box<Expression>),       // a = b
+    GreaterThan(Box<Expression>, Box<Expression>), // a > b
+    GreaterThanOrEqual(Box<Expression>, Box<Expression>), // a != b
+    Is(Box<Expression>, Literal),                  // IS NULL or IS NAN
+    LessThan(Box<Expression>, Box<Expression>),    // a < b
+    LessThanOrEqual(Box<Expression>, Box<Expression>), // a <= b
+    NotEqual(Box<Expression>, Box<Expression>),    // a != b
 
-    Add(Box<Expression>, Box<Expression>),
-    Divide(Box<Expression>, Box<Expression>),
-    Exponentiate(Box<Expression>, Box<Expression>),
-    Factorial(Box<Expression>),
-    Identity(Box<Expression>),
-    Multiply(Box<Expression>, Box<Expression>),
-    Negate(Box<Expression>),
-    Remainder(Box<Expression>, Box<Expression>),
-    Subtract(Box<Expression>, Box<Expression>),
+    Add(Box<Expression>, Box<Expression>),          // a + b
+    Divide(Box<Expression>, Box<Expression>),       // a / b
+    Exponentiate(Box<Expression>, Box<Expression>), // a ^ b
+    Factorial(Box<Expression>),                     // a!
+    Identity(Box<Expression>),                      // +a
+    Multiply(Box<Expression>, Box<Expression>),     // a * b
+    Negate(Box<Expression>),                        // -a
+    Remainder(Box<Expression>, Box<Expression>),    // a % b
+    Subtract(Box<Expression>, Box<Expression>),     // a - b
 
-    Like(Box<Expression>, Box<Expression>),
+    Like(Box<Expression>, Box<Expression>), // a LIKE b
 }
 
 impl Expression {

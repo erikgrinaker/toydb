@@ -2,9 +2,9 @@ use crate::errinput;
 use crate::error::Result;
 
 /// The lexer (lexical analyzer) preprocesses raw SQL strings into a sequence of
-/// lexical tokens (e.g. keyword, number, string, etc) that are passed onto the
-/// SQL parser. In doing so, it strips away basic syntactic noise such as
-/// whitespace, case, and quotes, and performs initial validation of symbols.
+/// lexical tokens (e.g. keyword, number, string, etc), which are passed on to
+/// the SQL parser. In doing so, it strips away basic syntactic noise such as
+/// whitespace, case, and quotes, and performs initial symbol validation.
 pub struct Lexer<'a> {
     chars: std::iter::Peekable<std::str::Chars<'a>>,
 }
@@ -16,8 +16,8 @@ pub struct Lexer<'a> {
 /// fine for our purposes here.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    /// A number, with digits, decimal points, and/or exponents. Leading signs
-    /// (e.g. -) are separate tokens.
+    /// A numeric string, with digits, decimal points, and/or exponents. Leading
+    /// signs (e.g. -) are separate tokens.
     Number(String),
     /// A Unicode string, with quotes stripped and escape sequences resolved.
     String(String),
@@ -156,7 +156,7 @@ pub enum Keyword {
 }
 
 impl TryFrom<&str> for Keyword {
-    // The error just indicates this isn't a keyword, so use a cheap string.
+    // Use a cheap static string, since this just indicates it's not a keyword.
     type Error = &'static str;
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
@@ -351,8 +351,9 @@ impl<'a> Lexer<'a> {
 
     /// Scans the next token, if any.
     fn scan(&mut self) -> Result<Option<Token>> {
-        // Ignore whitespace. The first character tells us the token type.
+        // Ignore whitespace.
         self.skip_whitespace();
+        // The first character tells us the token type.
         match self.chars.peek() {
             Some('\'') => self.scan_string(),
             Some('"') => self.scan_ident_quoted(),
@@ -378,8 +379,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Scans the next quoted identifier, if any. Case is preserved, keywords
-    /// are ignored.
+    /// Scans the next quoted identifier, if any. Case is preserved.
     fn scan_ident_quoted(&mut self) -> Result<Option<Token>> {
         if !self.next_is('"') {
             return Ok(None);
@@ -405,8 +405,8 @@ impl<'a> Lexer<'a> {
             number.push(c)
         }
         // Scan the fractional part, if any.
-        if let Some(sep) = self.next_if(|c| c == '.') {
-            number.push(sep);
+        if self.next_is('.') {
+            number.push('.');
             while let Some(dec) = self.next_if(|c| c.is_ascii_digit()) {
                 number.push(dec)
             }
@@ -424,7 +424,7 @@ impl<'a> Lexer<'a> {
         Some(Token::Number(number))
     }
 
-    /// Scans the next string literal, if any.
+    /// Scans the next quoted string literal, if any.
     fn scan_string(&mut self) -> Result<Option<Token>> {
         if !self.next_is('\'') {
             return Ok(None);
@@ -485,9 +485,6 @@ impl<'a> Lexer<'a> {
 /// Returns true if the entire given string is a single valid identifier.
 pub fn is_ident(ident: &str) -> bool {
     let mut lexer = Lexer::new(ident);
-    let token = lexer.next();
-    if lexer.next().is_some() {
-        return false; // multiple tokens, so not an identifier
-    }
-    matches!(token, Some(Ok(Token::Ident(_))))
+    let Some(Ok(Token::Ident(_))) = lexer.next() else { return false };
+    lexer.next().is_none() // if further tokens, it's not a lone identifier
 }

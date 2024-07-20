@@ -1,29 +1,28 @@
 #![allow(clippy::module_inception)]
 
-use super::ast;
-use super::{Keyword, Lexer, Token};
+use super::{ast, Keyword, Lexer, Token};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::DataType;
 
 /// The SQL parser takes tokens from the lexer and parses the SQL syntax into an
-/// AST (Abstract Syntax Tree). This nested structure represents the semantic
-/// components of a SQL query (e.g. the SELECT and FROM clauses, values,
-/// arithmetic expressions, etc.), but only makes sure it is well-formed. It
-/// does not know e.g. whether a given table or column exists, or which kind of
-/// join to use -- that is the job of the planner.
+/// Abstract Syntax Tree (AST). This nested structure represents the syntactic
+/// structure of a SQL query (e.g. the SELECT and FROM clauses, values,
+/// arithmetic expressions, etc.). However, it only ensures the syntax is
+/// well-formed, and does not know whether e.g. a given table or column exists
+/// or which kind of join to use -- that is the job of the planner.
 pub struct Parser<'a> {
     pub lexer: std::iter::Peekable<Lexer<'a>>,
 }
 
 impl<'a> Parser<'a> {
-    /// Creates a new parser for the given SQL string.
+    /// Creates a new parser for the given raw SQL string.
     pub fn new(statement: &str) -> Parser {
         Parser { lexer: Lexer::new(statement).peekable() }
     }
 
-    /// Parses the input string into an AST statement. We expect to parse the
-    /// whole string as a single statement, ending with an optional semicolon.
+    /// Parses the input string into an AST statement. The whole string must be
+    /// parsed as a single statement, ending with an optional semicolon.
     pub fn parse(&mut self) -> Result<ast::Statement> {
         let statement = self.parse_statement()?;
         self.next_is(Token::Semicolon);
@@ -33,7 +32,7 @@ impl<'a> Parser<'a> {
         Ok(statement)
     }
 
-    /// Fetches the next lexer token, or throws an error if none is found.
+    /// Fetches the next lexer token, or errors if none is found.
     fn next(&mut self) -> Result<Token> {
         self.lexer.next().transpose()?.ok_or_else(|| errinput!("unexpected end of input"))
     }
@@ -54,20 +53,20 @@ impl<'a> Parser<'a> {
 
     /// Passes the next lexer token through the closure, consuming it if the
     /// closure returns Some.
-    fn next_if_map<T>(&mut self, f: impl Fn(&Token) -> Option<T>) -> Result<Option<T>> {
-        let out = self.peek()?.and_then(f);
+    fn next_if_map<T>(&mut self, f: impl Fn(&Token) -> Option<T>) -> Option<T> {
+        let out = self.peek().unwrap_or(None).map(f)?;
         if out.is_some() {
-            self.next()?;
+            self.next().ok();
         }
-        Ok(out)
+        out
     }
 
     /// Grabs the next keyword if there is one.
     fn next_if_keyword(&mut self) -> Option<Keyword> {
-        match self.next_if(|t| matches!(t, Token::Keyword(_))) {
-            Some(Token::Keyword(keyword)) => Some(keyword),
-            Some(_) | None => None,
-        }
+        self.next_if_map(|token| match token {
+            Token::Keyword(keyword) => Some(*keyword),
+            _ => None,
+        })
     }
 
     /// Consumes the next lexer token if it is the given token, returning true.
@@ -97,22 +96,24 @@ impl<'a> Parser<'a> {
 
     /// Parses a SQL statement.
     fn parse_statement(&mut self) -> Result<ast::Statement> {
-        match self.peek()? {
-            Some(Token::Keyword(Keyword::Begin)) => self.parse_begin(),
-            Some(Token::Keyword(Keyword::Commit)) => self.parse_commit(),
-            Some(Token::Keyword(Keyword::Rollback)) => self.parse_rollback(),
-            Some(Token::Keyword(Keyword::Explain)) => self.parse_explain(),
+        let Some(token) = self.peek()? else {
+            return errinput!("unexpected end of input");
+        };
+        match token {
+            Token::Keyword(Keyword::Begin) => self.parse_begin(),
+            Token::Keyword(Keyword::Commit) => self.parse_commit(),
+            Token::Keyword(Keyword::Rollback) => self.parse_rollback(),
+            Token::Keyword(Keyword::Explain) => self.parse_explain(),
 
-            Some(Token::Keyword(Keyword::Create)) => self.parse_create_table(),
-            Some(Token::Keyword(Keyword::Drop)) => self.parse_drop_table(),
+            Token::Keyword(Keyword::Create) => self.parse_create_table(),
+            Token::Keyword(Keyword::Drop) => self.parse_drop_table(),
 
-            Some(Token::Keyword(Keyword::Delete)) => self.parse_delete(),
-            Some(Token::Keyword(Keyword::Insert)) => self.parse_insert(),
-            Some(Token::Keyword(Keyword::Select)) => self.parse_select(),
-            Some(Token::Keyword(Keyword::Update)) => self.parse_update(),
+            Token::Keyword(Keyword::Delete) => self.parse_delete(),
+            Token::Keyword(Keyword::Insert) => self.parse_insert(),
+            Token::Keyword(Keyword::Select) => self.parse_select(),
+            Token::Keyword(Keyword::Update) => self.parse_update(),
 
-            Some(token) => errinput!("unexpected token {token}"),
-            None => errinput!("unexpected end of input"),
+            token => errinput!("unexpected token {token}"),
         }
     }
 
@@ -296,17 +297,13 @@ impl<'a> Parser<'a> {
         self.expect(Keyword::Update.into())?;
         let table = self.next_ident()?;
         self.expect(Keyword::Set.into())?;
-
         let mut set = std::collections::BTreeMap::new();
         loop {
             let column = self.next_ident()?;
             self.expect(Token::Equal)?;
-            let expr = if self.next_is(Keyword::Default.into()) {
-                None
-            } else {
-                Some(self.parse_expression()?)
-            };
-
+            let expr = (!self.next_is(Keyword::Default.into()))
+                .then(|| self.parse_expression())
+                .transpose()?;
             if set.contains_key(&column) {
                 return errinput!("column {column} set multiple times");
             }
@@ -315,7 +312,6 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-
         Ok(ast::Statement::Update { table, set, r#where: self.parse_where_clause()? })
     }
 
@@ -400,25 +396,28 @@ impl<'a> Parser<'a> {
 
     // Parses a FROM JOIN type, if present.
     fn parse_from_join(&mut self) -> Result<Option<ast::JoinType>> {
+        if self.next_is(Keyword::Join.into()) {
+            return Ok(Some(ast::JoinType::Inner));
+        }
         if self.next_is(Keyword::Cross.into()) {
             self.expect(Keyword::Join.into())?;
-            Ok(Some(ast::JoinType::Cross))
-        } else if self.next_is(Keyword::Inner.into()) {
-            self.expect(Keyword::Join.into())?;
-            Ok(Some(ast::JoinType::Inner))
-        } else if self.next_is(Keyword::Join.into()) {
-            Ok(Some(ast::JoinType::Inner))
-        } else if self.next_is(Keyword::Left.into()) {
-            self.skip(Keyword::Outer.into());
-            self.expect(Keyword::Join.into())?;
-            Ok(Some(ast::JoinType::Left))
-        } else if self.next_is(Keyword::Right.into()) {
-            self.skip(Keyword::Outer.into());
-            self.expect(Keyword::Join.into())?;
-            Ok(Some(ast::JoinType::Right))
-        } else {
-            Ok(None)
+            return Ok(Some(ast::JoinType::Cross));
         }
+        if self.next_is(Keyword::Inner.into()) {
+            self.expect(Keyword::Join.into())?;
+            return Ok(Some(ast::JoinType::Inner));
+        }
+        if self.next_is(Keyword::Left.into()) {
+            self.skip(Keyword::Outer.into());
+            self.expect(Keyword::Join.into())?;
+            return Ok(Some(ast::JoinType::Left));
+        }
+        if self.next_is(Keyword::Right.into()) {
+            self.skip(Keyword::Outer.into());
+            self.expect(Keyword::Join.into())?;
+            return Ok(Some(ast::JoinType::Right));
+        }
+        Ok(None)
     }
 
     /// Parses a WHERE clause, if present.
@@ -462,13 +461,13 @@ impl<'a> Parser<'a> {
         self.expect(Keyword::By.into())?;
         loop {
             let expr = self.parse_expression()?;
-            let order = if self.next_is(Keyword::Asc.into()) {
-                ast::Order::Ascending
-            } else if self.next_is(Keyword::Desc.into()) {
-                ast::Order::Descending
-            } else {
-                ast::Order::Ascending
-            };
+            let order = self
+                .next_if_map(|token| match token {
+                    Token::Keyword(Keyword::Asc) => Some(ast::Order::Ascending),
+                    Token::Keyword(Keyword::Desc) => Some(ast::Order::Descending),
+                    _ => None,
+                })
+                .unwrap_or(ast::Order::Ascending);
             order_by.push((expr, order));
             if !self.next_is(Token::Comma) {
                 break;
@@ -479,6 +478,7 @@ impl<'a> Parser<'a> {
 
     /// Parses an expression consisting of at least one atom operated on by any
     /// number of operators, using the precedence climbing algorithm.
+    ///
     /// TODO: write a description of the algorithm.
     pub fn parse_expression(&mut self) -> Result<ast::Expression> {
         self.parse_expression_at(0)
@@ -488,7 +488,7 @@ impl<'a> Parser<'a> {
     fn parse_expression_at(&mut self, min_precedence: Precedence) -> Result<ast::Expression> {
         // If there is a prefix operator, parse it and its right-hand operand.
         // Otherwise, parse the left-hand atom.
-        let mut lhs = if let Some(prefix) = self.parse_prefix_operator(min_precedence)? {
+        let mut lhs = if let Some(prefix) = self.parse_prefix_operator(min_precedence) {
             let at_precedence = prefix.precedence() + prefix.associativity();
             prefix.build(self.parse_expression_at(at_precedence)?)
         } else {
@@ -499,7 +499,7 @@ impl<'a> Parser<'a> {
             lhs = postfix.build(lhs)
         }
         // Apply any binary infix operators, parsing the right-hand operand.
-        while let Some(infix) = self.parse_infix_operator(min_precedence)? {
+        while let Some(infix) = self.parse_infix_operator(min_precedence) {
             let at_precedence = infix.precedence() + infix.associativity();
             let rhs = self.parse_expression_at(at_precedence)?;
             lhs = infix.build(lhs, rhs);
@@ -564,12 +564,9 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parses a prefix operator, if there is one and it's precedence is at
-    /// least min_precedence.
-    fn parse_prefix_operator(
-        &mut self,
-        min_precedence: Precedence,
-    ) -> Result<Option<PrefixOperator>> {
+    /// Parses a prefix operator, if there is one and its precedence is at least
+    /// min_precedence.
+    fn parse_prefix_operator(&mut self, min_precedence: Precedence) -> Option<PrefixOperator> {
         self.next_if_map(|token| {
             let operator = match token {
                 Token::Keyword(Keyword::Not) => PrefixOperator::Not,
@@ -581,12 +578,9 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parses an infix operator, if there is one and it's precedence is at
-    /// least min_precedence.
-    fn parse_infix_operator(
-        &mut self,
-        min_precedence: Precedence,
-    ) -> Result<Option<InfixOperator>> {
+    /// Parses an infix operator, if there is one and its precedence is at least
+    /// min_precedence.
+    fn parse_infix_operator(&mut self, min_precedence: Precedence) -> Option<InfixOperator> {
         self.next_if_map(|token| {
             let operator = match token {
                 Token::Asterisk => InfixOperator::Multiply,
@@ -611,7 +605,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parses a postfix operator, if there is one and it's precedence is at
+    /// Parses a postfix operator, if there is one and its precedence is at
     /// least min_precedence.
     fn parse_postfix_operator(
         &mut self,
@@ -638,13 +632,13 @@ impl<'a> Parser<'a> {
             return Ok(Some(operator));
         }
 
-        self.next_if_map(|token| {
+        Ok(self.next_if_map(|token| {
             let operator = match token {
                 Token::Exclamation => PostfixOperator::Factorial,
                 _ => return None,
             };
             Some(operator).filter(|op| op.precedence() >= min_precedence)
-        })
+        }))
     }
 }
 
@@ -656,9 +650,9 @@ const RIGHT_ASSOCIATIVE: Precedence = 0;
 
 /// Prefix operators.
 enum PrefixOperator {
-    Minus,
-    Not,
-    Plus,
+    Minus, // -a
+    Not,   // NOT a
+    Plus,  // +a
 }
 
 impl PrefixOperator {
@@ -689,21 +683,21 @@ impl PrefixOperator {
 
 /// Infix operators.
 enum InfixOperator {
-    Add,
-    And,
-    Divide,
-    Equal,
-    Exponentiate,
-    GreaterThan,
-    GreaterThanOrEqual,
-    LessThan,
-    LessThanOrEqual,
-    Like,
-    Multiply,
-    NotEqual,
-    Or,
-    Remainder,
-    Subtract,
+    Add,                // a + b
+    And,                // a AND b
+    Divide,             // a / b
+    Equal,              // a = b
+    Exponentiate,       // a ^ b
+    GreaterThan,        // a > b
+    GreaterThanOrEqual, // a >= b
+    LessThan,           // a < b
+    LessThanOrEqual,    // a <= b
+    Like,               // a LIKE b
+    Multiply,           // a * b
+    NotEqual,           // a != b
+    Or,                 // a OR b
+    Remainder,          // a % b
+    Subtract,           // a - b
 }
 
 impl InfixOperator {
@@ -760,9 +754,9 @@ impl InfixOperator {
 
 /// Postfix operators.
 enum PostfixOperator {
-    Factorial,
-    Is(ast::Literal),
-    IsNot(ast::Literal),
+    Factorial,           // a!
+    Is(ast::Literal),    // a IS NULL | NAN
+    IsNot(ast::Literal), // a IS NOT NULL | NAN
 }
 
 impl PostfixOperator {
