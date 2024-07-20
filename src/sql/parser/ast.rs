@@ -146,7 +146,7 @@ impl std::hash::Hash for Literal {
             Self::Null => {}
             Self::Boolean(v) => v.hash(state),
             Self::Integer(v) => v.hash(state),
-            Self::Float(v) => v.to_be_bytes().hash(state),
+            Self::Float(v) => v.to_bits().hash(state),
             Self::String(v) => v.hash(state),
         }
     }

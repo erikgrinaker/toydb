@@ -13,6 +13,6 @@ Null
 !> NOT 3.14
 !> NOT 'true'
 ---
-Error: invalid input: can't negate 1
-Error: invalid input: can't negate 3.14
-Error: invalid input: can't negate 'true'
+Error: invalid input: can't NOT 1
+Error: invalid input: can't NOT 3.14
+Error: invalid input: can't NOT 'true'

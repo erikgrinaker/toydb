@@ -11,7 +11,7 @@ Float(10.0) ← sqrt(100)
 !> sqrt(-1)
 > sqrt(0)
 ---
-Error: invalid input: can't take square root of -1
+Error: invalid input: can't take negative square root
 Float(0.0)
 
 # Floats work.

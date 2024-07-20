@@ -7,7 +7,7 @@ use crate::sql::engine::{Catalog, Transaction};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-/// A table schema, which specifies the data structure and constraints.
+/// A table schema, which specifies its data structure and constraints.
 ///
 /// Tables can't change after they are created. There is no ALTER TABLE nor
 /// CREATE/DROP INDEX -- only CREATE TABLE and DROP TABLE.
@@ -37,11 +37,12 @@ pub struct Column {
     /// value. Must match the column datatype. Nullable columns require a
     /// default (often Null), and Null is only a valid default when nullable.
     pub default: Option<Value>,
-    /// Whether the column should only allow unique values. Must be true for a
-    /// primary key column.
+    /// Whether the column should only allow unique values (ignoring NULLs).
+    /// Must be true for a primary key column.
     pub unique: bool,
-    /// Whether the column should have a secondary index. Never set for primary
-    /// keys, which have an implicit primary index.
+    /// Whether the column should have a secondary index. Must be false for
+    /// primary keys, which are the implicit primary index. Must be true for
+    /// unique or reference columns.
     pub index: bool,
     /// If set, this column is a foreign key reference to the given table's
     /// primary key. Must be of the same type as the target primary key.
@@ -82,7 +83,8 @@ impl std::fmt::Display for Table {
 }
 
 impl Table {
-    /// Validates the table schema.
+    /// Validates the table schema, using the catalog to validate foreign key
+    /// references.
     pub fn validate(&self, catalog: &impl Catalog) -> Result<()> {
         if self.name.is_empty() {
             return errinput!("table name can't be empty");
@@ -98,7 +100,7 @@ impl Table {
             if column.name.is_empty() {
                 return errinput!("column name can't be empty");
             }
-            let cname = &column.name; // for formatting convenience
+            let (cname, ctype) = (&column.name, &column.datatype); // for formatting convenience
 
             // Validate primary key.
             let is_primary_key = i == self.primary_key;
@@ -115,20 +117,17 @@ impl Table {
             }
 
             // Validate default value.
-            match &column.default {
-                Some(Value::Null) if !column.nullable => {
-                    return errinput!("invalid NULL default for non-nullable column {cname}")
-                }
-                Some(Value::Null) => {}
-                Some(value) if value.datatype().as_ref() != Some(&column.datatype) => {
-                    let (ctype, vtype) = (&column.datatype, value.datatype().unwrap());
-                    return errinput!("invalid datatype {vtype} for {ctype} column {cname}",);
-                }
-                Some(_) => {}
+            match column.default.as_ref().map(|v| v.datatype()) {
                 None if column.nullable => {
                     return errinput!("nullable column {cname} must have a default value")
                 }
-                None => {}
+                Some(None) if !column.nullable => {
+                    return errinput!("invalid NULL default for non-nullable column {cname}")
+                }
+                Some(Some(vtype)) if vtype != column.datatype => {
+                    return errinput!("invalid default type {vtype} for {ctype} column {cname}");
+                }
+                Some(_) | None => {}
             }
 
             // Validate unique index.
@@ -141,29 +140,30 @@ impl Table {
                 if !column.index && !is_primary_key {
                     return errinput!("reference column {cname} must have a secondary index");
                 }
-                let target_type = if reference == &self.name {
+                let reftype = if reference == &self.name {
                     self.columns[self.primary_key].datatype
                 } else if let Some(target) = catalog.get_table(reference)? {
                     target.columns[target.primary_key].datatype
                 } else {
                     return errinput!("unknown table {reference} referenced by column {cname}");
                 };
-                if column.datatype != target_type {
-                    return errinput!(
-                        "can't reference {target_type} primary key of {reference} from {} column {cname}",
-                        column.datatype,
-                    );
+                if column.datatype != reftype {
+                    return errinput!("can't reference {reftype} primary key of {reference} from {ctype} column {cname}");
                 }
             }
         }
         Ok(())
     }
 
-    /// Validates a row, including uniqueness constraints and references.
+    /// Validates a row, including uniqueness and reference checks using the
+    /// given transaction.
     ///
     /// If update is true, the row replaces an existing entry with the same
     /// primary key. Otherwise, it is an insert. Primary key changes are
     /// implemented as a delete+insert.
+    ///
+    /// Validating uniqueness and references individually for each row is not
+    /// performant, but it's fine for our purposes.
     pub fn validate_row(&self, row: &[Value], update: bool, txn: &impl Transaction) -> Result<()> {
         if row.len() != self.columns.len() {
             return errinput!("invalid row size for table {}", self.name);

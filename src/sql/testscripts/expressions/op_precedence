@@ -323,7 +323,7 @@ Error: invalid input: can't LIKE 1 and 'abc'
 Boolean(true)
 Error: invalid input: can't compare 1 and TRUE
 Boolean(false)
-Error: invalid input: can't negate 1
+Error: invalid input: can't NOT 1
 
 # !=
 > 1 != 1 != FALSE
@@ -342,7 +342,7 @@ Error: invalid input: can't LIKE 1 and 'abc'
 Boolean(true)
 Error: invalid input: can't compare 1 and TRUE
 Boolean(true)
-Error: invalid input: can't negate 1
+Error: invalid input: can't NOT 1
 
 # LIKE
 > 'abc' LIKE NULL IS NULL
@@ -353,7 +353,7 @@ Error: invalid input: can't negate 1
 Boolean(true)
 Error: invalid input: can't LIKE 'abc' and TRUE
 Boolean(false)
-Error: invalid input: can't negate 'abc'
+Error: invalid input: can't NOT 'abc'
 
 # IS NULL
 > NOT NULL IS NULL
@@ -374,14 +374,14 @@ Boolean(false)
 !> (NOT NAN) IS NAN
 ---
 Boolean(false)
-Error: invalid input: can't negate NaN
+Error: invalid input: can't NOT NaN
 
 # IS NOT NAN
 > NOT NAN IS NOT NAN
 !> (NOT NAN) IS NOT NAN
 ---
 Boolean(true)
-Error: invalid input: can't negate NaN
+Error: invalid input: can't NOT NaN
 
 # NOT.
 > NOT TRUE AND FALSE

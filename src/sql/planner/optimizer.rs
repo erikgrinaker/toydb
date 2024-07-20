@@ -229,16 +229,16 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
 
         // Find the first expression that's either a primary key or secondary
         // index lookup. We could be more clever here, but this is fine.
-        let Some(i) = cnf.iter().enumerate().find_map(|(i, e)| {
+        let Some((i, column)) = cnf.iter().enumerate().find_map(|(i, e)| {
             e.is_column_lookup()
-                .filter(|f| *f == table.primary_key || table.columns[*f].index)
-                .and(Some(i))
+                .filter(|c| *c == table.primary_key || table.columns[*c].index)
+                .map(|c| (i, c))
         }) else {
             return Node::Scan { table, alias, filter: Some(filter) };
         };
 
         // Extract the lookup values and expression from the cnf vector.
-        let (column, values) = cnf.remove(i).into_column_values().expect("column lookup failed");
+        let values = cnf.remove(i).into_column_values(column);
 
         // Build the primary key or secondary index lookup node.
         if column == table.primary_key {

@@ -5,12 +5,13 @@ use crate::sql::planner::Node;
 
 use serde::{Deserialize, Serialize};
 
-/// An expression, made up of nested values and operators. Values can either be
-/// constants or row column references.
+/// An expression, made up of nested operations and values. Values are either
+/// constants or dynamic column references. Evaluates to a final value during
+/// query execution, using row values for column references.
 ///
 /// Since this is a recursive data structure, we have to box each child
-/// expression, which incurs a heap allocation. There are clever ways to get
-/// around this, but we keep it simple.
+/// expression, which incurs a heap allocation per expression node. There are
+/// clever ways to avoid this, but we keep it simple.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Expression {
     /// A constant value.
@@ -27,9 +28,9 @@ pub enum Expression {
 
     /// Equality comparison of two values: a = b.
     Equal(Box<Expression>, Box<Expression>),
-    /// > comparison of two values: a > b.
+    /// Greater than comparison of two values: a > b.
     GreaterThan(Box<Expression>, Box<Expression>),
-    /// < comparison of two values: a < b.
+    /// Less than comparison of two values: a < b.
     LessThan(Box<Expression>, Box<Expression>),
     /// Checks for the given value: IS NULL or IS NAN.
     Is(Box<Expression>, Value),
@@ -42,7 +43,7 @@ pub enum Expression {
     Exponentiate(Box<Expression>, Box<Expression>),
     /// Takes the factorial of a number: 4! = 4*3*2*1.
     Factorial(Box<Expression>),
-    /// The identify function, which simply returns the same number.
+    /// The identify function, which simply returns the same number: +a.
     Identity(Box<Expression>),
     /// Multiplies two numbers: a * b.
     Multiply(Box<Expression>, Box<Expression>),
@@ -60,11 +61,13 @@ pub enum Expression {
 }
 
 impl Expression {
-    /// Formats the expression, using the given Node to look up column labels.
+    /// Formats the expression, using the given plan node to look up labels for
+    /// numeric column references.
     pub fn format(&self, node: &Node) -> String {
+        use Expression::*;
+
         // Precedence levels, for grouping. Matches the parser precedence.
         fn precedence(expr: &Expression) -> u8 {
-            use Expression::*;
             match expr {
                 Column(_) | Constant(_) | SquareRoot(_) => 11,
                 Identity(_) | Negate(_) => 10,
@@ -80,46 +83,45 @@ impl Expression {
             }
         }
 
-        // Helper to format a boxed expression.
+        // Helper to format a boxed expression, grouping it with () if needed.
         let format = |expr: &Expression| {
-            let group = precedence(expr) < precedence(self);
-            let mut s = expr.format(node);
-            if group {
-                s = format!("({s})");
+            let mut string = expr.format(node);
+            if precedence(expr) < precedence(self) {
+                string = format!("({string})");
             }
-            s
+            string
         };
 
         match self {
-            Self::Column(index) => match node.column_label(*index) {
+            Constant(value) => format!("{value}"),
+            Column(index) => match node.column_label(*index) {
                 Label::None => format!("#{index}"),
                 label => format!("{label}"),
             },
-            Self::Constant(value) => format!("{value}"),
 
-            Self::And(lhs, rhs) => format!("{} AND {}", format(lhs), format(rhs)),
-            Self::Or(lhs, rhs) => format!("{} OR {}", format(lhs), format(rhs)),
-            Self::Not(expr) => format!("NOT {}", format(expr)),
+            And(lhs, rhs) => format!("{} AND {}", format(lhs), format(rhs)),
+            Or(lhs, rhs) => format!("{} OR {}", format(lhs), format(rhs)),
+            Not(expr) => format!("NOT {}", format(expr)),
 
-            Self::Equal(lhs, rhs) => format!("{} = {}", format(lhs), format(rhs)),
-            Self::GreaterThan(lhs, rhs) => format!("{} > {}", format(lhs), format(rhs)),
-            Self::LessThan(lhs, rhs) => format!("{} < {}", format(lhs), format(rhs)),
-            Self::Is(expr, Value::Null) => format!("{} IS NULL", format(expr)),
-            Self::Is(expr, Value::Float(f)) if f.is_nan() => format!("{} IS NAN", format(expr)),
-            Self::Is(_, v) => panic!("unexpected IS value {v}"),
+            Equal(lhs, rhs) => format!("{} = {}", format(lhs), format(rhs)),
+            GreaterThan(lhs, rhs) => format!("{} > {}", format(lhs), format(rhs)),
+            LessThan(lhs, rhs) => format!("{} < {}", format(lhs), format(rhs)),
+            Is(expr, Value::Null) => format!("{} IS NULL", format(expr)),
+            Is(expr, Value::Float(f)) if f.is_nan() => format!("{} IS NAN", format(expr)),
+            Is(_, v) => panic!("unexpected IS value {v}"),
 
-            Self::Add(lhs, rhs) => format!("{} + {}", format(lhs), format(rhs)),
-            Self::Divide(lhs, rhs) => format!("{} / {}", format(lhs), format(rhs)),
-            Self::Exponentiate(lhs, rhs) => format!("{} ^ {}", format(lhs), format(rhs)),
-            Self::Factorial(expr) => format!("{}!", format(expr)),
-            Self::Identity(expr) => format(expr),
-            Self::Multiply(lhs, rhs) => format!("{} * {}", format(lhs), format(rhs)),
-            Self::Negate(expr) => format!("-{}", format(expr)),
-            Self::Remainder(lhs, rhs) => format!("{} % {}", format(lhs), format(rhs)),
-            Self::SquareRoot(expr) => format!("sqrt({})", format(expr)),
-            Self::Subtract(lhs, rhs) => format!("{} - {}", format(lhs), format(rhs)),
+            Add(lhs, rhs) => format!("{} + {}", format(lhs), format(rhs)),
+            Divide(lhs, rhs) => format!("{} / {}", format(lhs), format(rhs)),
+            Exponentiate(lhs, rhs) => format!("{} ^ {}", format(lhs), format(rhs)),
+            Factorial(expr) => format!("{}!", format(expr)),
+            Identity(expr) => format(expr),
+            Multiply(lhs, rhs) => format!("{} * {}", format(lhs), format(rhs)),
+            Negate(expr) => format!("-{}", format(expr)),
+            Remainder(lhs, rhs) => format!("{} % {}", format(lhs), format(rhs)),
+            SquareRoot(expr) => format!("sqrt({})", format(expr)),
+            Subtract(lhs, rhs) => format!("{} - {}", format(lhs), format(rhs)),
 
-            Self::Like(lhs, rhs) => format!("{} LIKE {}", format(lhs), format(rhs)),
+            Like(lhs, rhs) => format!("{} LIKE {}", format(lhs), format(rhs)),
         }
     }
 
@@ -128,13 +130,13 @@ impl Expression {
     pub fn evaluate(&self, row: Option<&Row>) -> Result<Value> {
         use Value::*;
         Ok(match self {
-            // Constant values return itself.
+            // Constant values return themselves.
             Self::Constant(value) => value.clone(),
 
             // Column references look up a row value. The planner ensures that
             // only constant expressions are evaluated without a row.
             Self::Column(index) => match row {
-                Some(row) => row[*index].clone(),
+                Some(row) => row.get(*index).expect("short row").clone(),
                 None => panic!("can't reference column {index} with constant evaluation"),
             },
 
@@ -144,7 +146,7 @@ impl Expression {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs && rhs),
                 (Boolean(b), Null) | (Null, Boolean(b)) if !b => Boolean(false),
                 (Boolean(_), Null) | (Null, Boolean(_)) | (Null, Null) => Null,
-                (lhs, rhs) => return errinput!("can't and {lhs} and {rhs}"),
+                (lhs, rhs) => return errinput!("can't AND {lhs} and {rhs}"),
             },
 
             // Logical OR. Inputs must be boolean or NULL. NULLs generally
@@ -153,21 +155,21 @@ impl Expression {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs || rhs),
                 (Boolean(b), Null) | (Null, Boolean(b)) if b => Boolean(true),
                 (Boolean(_), Null) | (Null, Boolean(_)) | (Null, Null) => Null,
-                (lhs, rhs) => return errinput!("can't or {lhs} and {rhs}"),
+                (lhs, rhs) => return errinput!("can't OR {lhs} and {rhs}"),
             },
 
             // Logical NOT. Input must be boolean or NULL.
             Self::Not(expr) => match expr.evaluate(row)? {
                 Boolean(b) => Boolean(!b),
                 Null => Null,
-                value => return errinput!("can't negate {value}"),
+                value => return errinput!("can't NOT {value}"),
             },
 
             // Comparisons. Must be of same type, except floats and integers
             // which are interchangeable. NULLs yield NULL, NaNs yield NaN.
             //
             // Does not dispatch to Value.cmp() because sorting and comparisons
-            // are different for f64 NaN and -0 values.
+            // are different for f64 NaN and -0.0 values.
             #[allow(clippy::float_cmp)]
             Self::Equal(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs == rhs),
@@ -179,6 +181,7 @@ impl Expression {
                 (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
+
             Self::GreaterThan(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs > rhs),
@@ -190,6 +193,7 @@ impl Expression {
                 (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
+
             Self::LessThan(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 #[allow(clippy::bool_comparison)]
                 (Boolean(lhs), Boolean(rhs)) => Boolean(lhs < rhs),
@@ -201,16 +205,18 @@ impl Expression {
                 (Null, _) | (_, Null) => Null,
                 (lhs, rhs) => return errinput!("can't compare {lhs} and {rhs}"),
             },
+
             Self::Is(expr, Null) => Boolean(expr.evaluate(row)? == Null),
             Self::Is(expr, Float(f)) if f.is_nan() => match expr.evaluate(row)? {
                 Float(f) => Boolean(f.is_nan()),
                 Null => Null,
                 v => return errinput!("IS NAN can't be used with {}", v.datatype().unwrap()),
             },
-            Self::Is(_, v) => return errinput!("invalid IS value {v}"),
+            Self::Is(_, v) => panic!("invalid IS value {v}"), // enforced by parser
 
             // Mathematical operations. Inputs must be numbers, but integers and
             // floats are interchangeable (float when mixed). NULLs yield NULL.
+            // Errors on integer overflow, while floats yield infinity or NaN.
             Self::Add(lhs, rhs) => lhs.evaluate(row)?.checked_add(&rhs.evaluate(row)?)?,
             Self::Divide(lhs, rhs) => lhs.evaluate(row)?.checked_div(&rhs.evaluate(row)?)?,
             Self::Exponentiate(lhs, rhs) => lhs.evaluate(row)?.checked_pow(&rhs.evaluate(row)?)?,
@@ -233,7 +239,8 @@ impl Expression {
             },
             Self::Remainder(lhs, rhs) => lhs.evaluate(row)?.checked_rem(&rhs.evaluate(row)?)?,
             Self::SquareRoot(expr) => match expr.evaluate(row)? {
-                Integer(i) if i >= 0 => Float((i as f64).sqrt()),
+                Integer(i) if i < 0 => return errinput!("can't take negative square root"),
+                Integer(i) => Float((i as f64).sqrt()),
                 Float(f) => Float(f.sqrt()),
                 Null => Null,
                 value => return errinput!("can't take square root of {value}"),
@@ -245,6 +252,8 @@ impl Expression {
             // NULL. There's no support for escaping an _ and %.
             Self::Like(lhs, rhs) => match (lhs.evaluate(row)?, rhs.evaluate(row)?) {
                 (String(lhs), String(rhs)) => {
+                    // We could precompile the pattern if it's constant, instead
+                    // of recompiling it for every row, but this is fine.
                     let pattern =
                         format!("^{}$", regex::escape(&rhs).replace('%', ".*").replace('_', "."));
                     Boolean(regex::Regex::new(&pattern)?.is_match(&lhs))
@@ -258,30 +267,32 @@ impl Expression {
     /// Recursively walks the expression tree depth-first, calling the given
     /// closure until it returns false. Returns true otherwise.
     pub fn walk(&self, visitor: &mut impl FnMut(&Expression) -> bool) -> bool {
-        visitor(self)
-            && match self {
-                Self::Add(lhs, rhs)
-                | Self::And(lhs, rhs)
-                | Self::Divide(lhs, rhs)
-                | Self::Equal(lhs, rhs)
-                | Self::Exponentiate(lhs, rhs)
-                | Self::GreaterThan(lhs, rhs)
-                | Self::LessThan(lhs, rhs)
-                | Self::Like(lhs, rhs)
-                | Self::Multiply(lhs, rhs)
-                | Self::Or(lhs, rhs)
-                | Self::Remainder(lhs, rhs)
-                | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
+        if !visitor(self) {
+            return false;
+        }
+        match self {
+            Self::Add(lhs, rhs)
+            | Self::And(lhs, rhs)
+            | Self::Divide(lhs, rhs)
+            | Self::Equal(lhs, rhs)
+            | Self::Exponentiate(lhs, rhs)
+            | Self::GreaterThan(lhs, rhs)
+            | Self::LessThan(lhs, rhs)
+            | Self::Like(lhs, rhs)
+            | Self::Multiply(lhs, rhs)
+            | Self::Or(lhs, rhs)
+            | Self::Remainder(lhs, rhs)
+            | Self::Subtract(lhs, rhs) => lhs.walk(visitor) && rhs.walk(visitor),
 
-                Self::Factorial(expr)
-                | Self::Identity(expr)
-                | Self::Is(expr, _)
-                | Self::Negate(expr)
-                | Self::Not(expr)
-                | Self::SquareRoot(expr) => expr.walk(visitor),
+            Self::Factorial(expr)
+            | Self::Identity(expr)
+            | Self::Is(expr, _)
+            | Self::Negate(expr)
+            | Self::Not(expr)
+            | Self::SquareRoot(expr) => expr.walk(visitor),
 
-                Self::Constant(_) | Self::Column(_) => true,
-            }
+            Self::Constant(_) | Self::Column(_) => true,
+        }
     }
 
     /// Recursively walks the expression tree depth-first, calling the given
@@ -291,40 +302,40 @@ impl Expression {
         !self.walk(&mut |e| !visitor(e))
     }
 
-    /// Transforms the expression tree by recursively applying the given
-    /// closures depth-first to each node before/after descending.
-    pub fn transform<B, A>(mut self, before: &B, after: &A) -> Result<Self>
-    where
-        B: Fn(Self) -> Result<Self>,
-        A: Fn(Self) -> Result<Self>,
-    {
+    /// Transforms the expression by recursively applying the given closures
+    /// depth-first to each node before/after descending.
+    pub fn transform(
+        mut self,
+        before: &impl Fn(Self) -> Result<Self>,
+        after: &impl Fn(Self) -> Result<Self>,
+    ) -> Result<Self> {
         // Helper for transforming boxed expressions.
-        let transform = |mut expr: Box<Expression>| -> Result<Box<Expression>> {
+        let xform = |mut expr: Box<Expression>| -> Result<Box<Expression>> {
             *expr = expr.transform(before, after)?;
             Ok(expr)
         };
 
         self = before(self)?;
         self = match self {
-            Self::Add(lhs, rhs) => Self::Add(transform(lhs)?, transform(rhs)?),
-            Self::And(lhs, rhs) => Self::And(transform(lhs)?, transform(rhs)?),
-            Self::Divide(lhs, rhs) => Self::Divide(transform(lhs)?, transform(rhs)?),
-            Self::Equal(lhs, rhs) => Self::Equal(transform(lhs)?, transform(rhs)?),
-            Self::Exponentiate(lhs, rhs) => Self::Exponentiate(transform(lhs)?, transform(rhs)?),
-            Self::GreaterThan(lhs, rhs) => Self::GreaterThan(transform(lhs)?, transform(rhs)?),
-            Self::LessThan(lhs, rhs) => Self::LessThan(transform(lhs)?, transform(rhs)?),
-            Self::Like(lhs, rhs) => Self::Like(transform(lhs)?, transform(rhs)?),
-            Self::Multiply(lhs, rhs) => Self::Multiply(transform(lhs)?, transform(rhs)?),
-            Self::Or(lhs, rhs) => Self::Or(transform(lhs)?, transform(rhs)?),
-            Self::Remainder(lhs, rhs) => Self::Remainder(transform(lhs)?, transform(rhs)?),
-            Self::SquareRoot(expr) => Self::SquareRoot(transform(expr)?),
-            Self::Subtract(lhs, rhs) => Self::Subtract(transform(lhs)?, transform(rhs)?),
+            Self::Add(lhs, rhs) => Self::Add(xform(lhs)?, xform(rhs)?),
+            Self::And(lhs, rhs) => Self::And(xform(lhs)?, xform(rhs)?),
+            Self::Divide(lhs, rhs) => Self::Divide(xform(lhs)?, xform(rhs)?),
+            Self::Equal(lhs, rhs) => Self::Equal(xform(lhs)?, xform(rhs)?),
+            Self::Exponentiate(lhs, rhs) => Self::Exponentiate(xform(lhs)?, xform(rhs)?),
+            Self::GreaterThan(lhs, rhs) => Self::GreaterThan(xform(lhs)?, xform(rhs)?),
+            Self::LessThan(lhs, rhs) => Self::LessThan(xform(lhs)?, xform(rhs)?),
+            Self::Like(lhs, rhs) => Self::Like(xform(lhs)?, xform(rhs)?),
+            Self::Multiply(lhs, rhs) => Self::Multiply(xform(lhs)?, xform(rhs)?),
+            Self::Or(lhs, rhs) => Self::Or(xform(lhs)?, xform(rhs)?),
+            Self::Remainder(lhs, rhs) => Self::Remainder(xform(lhs)?, xform(rhs)?),
+            Self::SquareRoot(expr) => Self::SquareRoot(xform(expr)?),
+            Self::Subtract(lhs, rhs) => Self::Subtract(xform(lhs)?, xform(rhs)?),
 
-            Self::Factorial(expr) => Self::Factorial(transform(expr)?),
-            Self::Identity(expr) => Self::Identity(transform(expr)?),
-            Self::Is(expr, value) => Self::Is(transform(expr)?, value),
-            Self::Negate(expr) => Self::Negate(transform(expr)?),
-            Self::Not(expr) => Self::Not(transform(expr)?),
+            Self::Factorial(expr) => Self::Factorial(xform(expr)?),
+            Self::Identity(expr) => Self::Identity(xform(expr)?),
+            Self::Is(expr, value) => Self::Is(xform(expr)?, value),
+            Self::Negate(expr) => Self::Negate(xform(expr)?),
+            Self::Not(expr) => Self::Not(xform(expr)?),
 
             expr @ (Self::Constant(_) | Self::Column(_)) => expr,
         };
@@ -337,7 +348,7 @@ impl Expression {
     /// to negation normal form and then applying De Morgan's distributive law.
     pub fn into_cnf(self) -> Self {
         use Expression::*;
-        let transform = |expr| {
+        let xform = |expr| {
             // We can't use a single match, since it needs deref patterns.
             let Or(lhs, rhs) = expr else { return expr };
             match (*lhs, *rhs) {
@@ -349,7 +360,7 @@ impl Expression {
                 (lhs, rhs) => Or(lhs.into(), rhs.into()),
             }
         };
-        self.into_nnf().transform(&|e| Ok(transform(e)), &Ok).unwrap() // never fails
+        self.into_nnf().transform(&|e| Ok(xform(e)), &Ok).unwrap() // infallible
     }
 
     /// Converts the expression into negation normal form. This pushes NOT
@@ -358,7 +369,7 @@ impl Expression {
     /// applying other logical normalizations.
     pub fn into_nnf(self) -> Self {
         use Expression::*;
-        let transform = |expr| {
+        let xform = |expr| {
             let Not(inner) = expr else { return expr };
             match *inner {
                 // NOT (x AND y) → (NOT x) OR (NOT y)
@@ -371,7 +382,7 @@ impl Expression {
                 expr => Not(expr.into()),
             }
         };
-        self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // never fails
+        self.transform(&|e| Ok(xform(e)), &Ok).unwrap() // never fails
     }
 
     /// Converts the expression into conjunctive normal form as a vector of
@@ -381,7 +392,7 @@ impl Expression {
         let mut stack = vec![self.into_cnf()];
         while let Some(expr) = stack.pop() {
             if let Self::And(lhs, rhs) = expr {
-                stack.extend([*rhs, *lhs]); // put LHS last to process next
+                stack.extend([*rhs, *lhs]); // push lhs last to pop it first
             } else {
                 cnf.push(expr);
             }
@@ -400,25 +411,23 @@ impl Expression {
     }
 
     /// Checks if an expression is a single column lookup (i.e. a disjunction of
-    /// = or IS NULL/NAN referencing a single column), returning the column
-    /// index.
+    /// = or IS NULL/NAN for a single column), returning the column index.
     pub fn is_column_lookup(&self) -> Option<usize> {
         use Expression::*;
         match &self {
-            // Equality comparisons with = between column and constant value can
-            // use index lookups. NULL and NaN won't return any matches, but we
-            // handle this in into_column_values().
+            // Column/constant equality can use index lookups. NULL and NaN are
+            // handled in into_column_values().
             Equal(lhs, rhs) => match (lhs.as_ref(), rhs.as_ref()) {
-                (Column(f), Constant(_)) | (Constant(_), Column(f)) => Some(*f),
+                (Column(c), Constant(_)) | (Constant(_), Column(c)) => Some(*c),
                 _ => None,
             },
             // IS NULL and IS NAN can use index lookups.
             Is(expr, _) => match expr.as_ref() {
-                Column(f) => Some(*f),
+                Column(c) => Some(*c),
                 _ => None,
             },
-            // For OR branches, check if all branches are lookups on the same
-            // column, i.e. foo = 1 OR foo = 2 OR foo = 3.
+            // All OR branches must be lookups on the same column:
+            // id = 1 OR id = 2 OR id = 3.
             Or(lhs, rhs) => match (lhs.is_column_lookup(), rhs.is_column_lookup()) {
                 (Some(l), Some(r)) if l == r => Some(l),
                 _ => None,
@@ -427,51 +436,58 @@ impl Expression {
         }
     }
 
-    /// Converts the expression into a set of single-column lookup values if possible.
-    pub fn into_column_values(self) -> Option<(usize, Vec<Value>)> {
+    /// Extracts column lookup values for the given column. Panics if the
+    /// expression isn't a lookup of the given column, i.e. is_column_lookup()
+    /// must return true for the expression.
+    pub fn into_column_values(self, index: usize) -> Vec<Value> {
         use Expression::*;
         match self {
             Equal(lhs, rhs) => match (*lhs, *rhs) {
-                // NULL and NAN index lookups are for IS NULL and IS NAN.
-                // Equality comparisons with = shouldn't yield any results, so
-                // just return an empty value set for these.
-                (Column(f), Constant(v)) | (Constant(v), Column(f)) if v.is_undefined() => {
-                    Some((f, Vec::new()))
+                (Column(column), Constant(value)) | (Constant(value), Column(column)) => {
+                    assert_eq!(column, index, "unexpected column");
+                    // NULL and NAN index lookups are for IS NULL and IS NAN.
+                    // Equality shouldn't match anything, return empty vec.
+                    if value.is_undefined() {
+                        Vec::new()
+                    } else {
+                        vec![value]
+                    }
                 }
-                (Column(f), Constant(v)) | (Constant(v), Column(f)) => Some((f, vec![v])),
-                _ => None,
+                (lhs, rhs) => panic!("unexpected expression {:?}", Equal(lhs.into(), rhs.into())),
             },
             // IS NULL and IS NAN can use index lookups.
             Is(expr, value) => match *expr {
-                Column(f) => Some((f, vec![value])),
-                _ => None,
-            },
-            Or(lhs, rhs) => match (lhs.into_column_values(), rhs.into_column_values()) {
-                (Some((l, lvec)), Some((r, rvec))) if l == r => {
-                    Some((l, lvec.into_iter().chain(rvec).collect()))
+                Column(column) => {
+                    assert_eq!(column, index, "unexpected column");
+                    vec![value]
                 }
-                _ => None,
+                expr => panic!("unexpected expression {expr:?}"),
             },
-            _ => None,
+            Or(lhs, rhs) => {
+                let mut values = lhs.into_column_values(index);
+                values.extend(rhs.into_column_values(index));
+                values
+            }
+            expr => panic!("unexpected expression {expr:?}"),
         }
     }
 
     /// Replaces column references with the given column.
     pub fn replace_column(self, from: usize, to: usize) -> Self {
-        let transform = |expr| match expr {
+        let xform = |expr| match expr {
             Expression::Column(i) if i == from => Expression::Column(to),
             expr => expr,
         };
-        self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible
+        self.transform(&|e| Ok(xform(e)), &Ok).unwrap() // infallible
     }
 
-    /// Shifts any column indexes by the given amount.
+    /// Shifts column references by the given amount.
     pub fn shift_column(self, diff: isize) -> Self {
-        let transform = |expr| match expr {
+        let xform = |expr| match expr {
             Expression::Column(i) => Expression::Column((i as isize + diff) as usize),
             expr => expr,
         };
-        self.transform(&|e| Ok(transform(e)), &Ok).unwrap() // infallible
+        self.transform(&|e| Ok(xform(e)), &Ok).unwrap() // infallible
     }
 }
 

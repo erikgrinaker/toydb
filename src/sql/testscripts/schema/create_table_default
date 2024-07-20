@@ -23,9 +23,9 @@ CREATE TABLE datatypes (
 !> CREATE TABLE name (id INT PRIMARY KEY, value INTEGER DEFAULT 3.14)
 !> CREATE TABLE name (id INT PRIMARY KEY, value FLOAT DEFAULT 7)
 ---
-Error: invalid input: invalid datatype INTEGER for STRING column value
-Error: invalid input: invalid datatype FLOAT for INTEGER column value
-Error: invalid input: invalid datatype INTEGER for FLOAT column value
+Error: invalid input: invalid default type INTEGER for STRING column value
+Error: invalid input: invalid default type FLOAT for INTEGER column value
+Error: invalid input: invalid default type INTEGER for FLOAT column value
 
 # Default values can be expressions.
 > CREATE TABLE expr (id INT PRIMARY KEY, value INT DEFAULT 7 + 3 * 2)

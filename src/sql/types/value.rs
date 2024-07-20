@@ -1,42 +1,20 @@
-use std::borrow::Cow;
-
 use crate::encoding;
-use crate::errdata;
-use crate::errinput;
 use crate::error::{Error, Result};
 use crate::sql::parser::ast;
+use crate::{errdata, errinput};
 
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
-/// A primitive data type.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Serialize, Deserialize)]
-pub enum DataType {
-    /// A boolean: true or false.
-    Boolean,
-    /// A 64-bit signed integer.
-    Integer,
-    /// A 64-bit floating point number.
-    Float,
-    /// A UTF-8 encoded string.
-    String,
-}
-
-impl std::fmt::Display for DataType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Boolean => "BOOLEAN",
-            Self::Integer => "INTEGER",
-            Self::Float => "FLOAT",
-            Self::String => "STRING",
-        })
-    }
-}
-
-/// A primitive value.
+/// A primitive SQL value.
 ///
-/// Unlike SQL and IEEE 754 floating point, Null and NaN are considered equal
-/// and comparable in code. This is necessary to allow sorting and processing of
+/// For simplicity, only a handful of representative scalar types are supported,
+/// no compound types or more compact variants.
+///
+/// In SQL, neither Null nor floating point NaN are considered equal to
+/// themselves (they are unknown values). However, in code, we consider them
+/// equal and comparable. This is necessary to allow sorting and processing of
 /// these values (e.g. in index lookups, aggregation buckets, etc.). SQL
 /// expression evaluation have special handling of these values to produce the
 /// desired NULL != NULL and NAN != NAN semantics in SQL queries.
@@ -67,9 +45,9 @@ impl std::cmp::PartialEq for Value {
         match (self, other) {
             (Self::Boolean(l), Self::Boolean(r)) => l == r,
             (Self::Integer(l), Self::Integer(r)) => l == r,
-            (Self::Float(l), Self::Float(r)) => l.is_nan() && r.is_nan() || l == r,
+            (Self::Float(l), Self::Float(r)) => l == r || l.is_nan() && r.is_nan(),
             (Self::String(l), Self::String(r)) => l == r,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+            (l, r) => core::mem::discriminant(l) == core::mem::discriminant(r),
         }
     }
 }
@@ -84,7 +62,7 @@ impl std::hash::Hash for Value {
             Self::Null => {}
             Self::Boolean(v) => v.hash(state),
             Self::Integer(v) => v.hash(state),
-            Self::Float(v) => v.to_be_bytes().hash(state),
+            Self::Float(v) => v.to_bits().hash(state),
             Self::String(v) => v.hash(state),
         }
     }
@@ -94,27 +72,26 @@ impl std::hash::Hash for Value {
 // order across all types, even though mixed types will rarely/never come up.
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::Ordering;
-        #[allow(unreachable_patterns)]
+        use std::cmp::Ordering::*;
+        use Value::*;
         match (self, other) {
-            (Self::Null, Self::Null) => Ordering::Equal,
-            (Self::Boolean(a), Self::Boolean(b)) => a.cmp(b),
-            (Self::Integer(a), Self::Integer(b)) => a.cmp(b),
-            (Self::Integer(a), Self::Float(b)) => (*a as f64).total_cmp(b),
-            (Self::Float(a), Self::Integer(b)) => a.total_cmp(&(*b as f64)),
-            (Self::Float(a), Self::Float(b)) => a.total_cmp(b),
-            (Self::String(a), Self::String(b)) => a.cmp(b),
+            (Null, Null) => Equal,
+            (Boolean(a), Boolean(b)) => a.cmp(b),
+            (Integer(a), Integer(b)) => a.cmp(b),
+            (Integer(a), Float(b)) => (*a as f64).total_cmp(b),
+            (Float(a), Integer(b)) => a.total_cmp(&(*b as f64)),
+            (Float(a), Float(b)) => a.total_cmp(b),
+            (String(a), String(b)) => a.cmp(b),
 
-            (Self::Null, _) => Ordering::Less,
-            (_, Self::Null) => Ordering::Greater,
-            (Self::Boolean(_), _) => Ordering::Less,
-            (_, Self::Boolean(_)) => Ordering::Greater,
-            (Self::Float(_), _) => Ordering::Less,
-            (_, Self::Float(_)) => Ordering::Greater,
-            (Self::Integer(_), _) => Ordering::Less,
-            (_, Self::Integer(_)) => Ordering::Greater,
-            (Self::String(_), _) => Ordering::Less,
-            (_, Self::String(_)) => Ordering::Greater,
+            (Null, _) => Less,
+            (_, Null) => Greater,
+            (Boolean(_), _) => Less,
+            (_, Boolean(_)) => Greater,
+            (Float(_), _) => Less,
+            (_, Float(_)) => Greater,
+            (Integer(_), _) => Less,
+            (_, Integer(_)) => Greater,
+            // String is ordered last.
         }
     }
 }
@@ -158,6 +135,23 @@ impl Value {
         })
     }
 
+    /// Multiplies two values. Errors when invalid.
+    pub fn checked_mul(&self, other: &Self) -> Result<Self> {
+        use Value::*;
+        Ok(match (self, other) {
+            (Integer(lhs), Integer(rhs)) => match lhs.checked_mul(*rhs) {
+                Some(i) => Integer(i),
+                None => return errinput!("integer overflow"),
+            },
+            (Integer(lhs), Float(rhs)) => Float(*lhs as f64 * rhs),
+            (Float(lhs), Integer(rhs)) => Float(lhs * *rhs as f64),
+            (Float(lhs), Float(rhs)) => Float(lhs * rhs),
+            (Null, Integer(_) | Float(_) | Null) => Null,
+            (Integer(_) | Float(_), Null) => Null,
+            (lhs, rhs) => return errinput!("can't multiply {lhs} and {rhs}"),
+        })
+    }
+
     /// Exponentiates two values. Errors when invalid.
     pub fn checked_pow(&self, other: &Self) -> Result<Self> {
         use Value::*;
@@ -176,23 +170,6 @@ impl Value {
             (Integer(_) | Float(_), Null) => Null,
             (Null, Integer(_) | Float(_) | Null) => Null,
             (lhs, rhs) => return errinput!("can't exponentiate {lhs} and {rhs}"),
-        })
-    }
-
-    /// Multiplies two values. Errors when invalid.
-    pub fn checked_mul(&self, other: &Self) -> Result<Self> {
-        use Value::*;
-        Ok(match (self, other) {
-            (Integer(lhs), Integer(rhs)) => match lhs.checked_mul(*rhs) {
-                Some(i) => Integer(i),
-                None => return errinput!("integer overflow"),
-            },
-            (Integer(lhs), Float(rhs)) => Float(*lhs as f64 * rhs),
-            (Float(lhs), Integer(rhs)) => Float(lhs * *rhs as f64),
-            (Float(lhs), Float(rhs)) => Float(lhs * rhs),
-            (Null, Integer(_) | Float(_) | Null) => Null,
-            (Integer(_) | Float(_), Null) => Null,
-            (lhs, rhs) => return errinput!("can't multiply {lhs} and {rhs}"),
         })
     }
 
@@ -245,11 +222,7 @@ impl Value {
 
     /// Returns true if the value is undefined (NULL or NaN).
     pub fn is_undefined(&self) -> bool {
-        match self {
-            Self::Null => true,
-            Self::Float(f) if f.is_nan() => true,
-            _ => false,
-        }
+        *self == Self::Null || matches!(self, Self::Float(f) if f.is_nan())
     }
 
     /// Normalizes a value in place. Currently normalizes -0.0 and -NAN to 0.0
@@ -267,7 +240,7 @@ impl Value {
     /// allocating in the common case where the value doesn't change.
     pub fn normalize_ref(&self) -> Cow<'_, Self> {
         if let Self::Float(f) = self {
-            if f.is_sign_negative() && (f.is_nan() || *f == -0.0) {
+            if (f.is_nan() || *f == -0.0) && f.is_sign_negative() {
                 return Cow::Owned(Self::Float(-f));
             }
         }
@@ -365,19 +338,43 @@ impl<'a> From<&'a Value> for Cow<'a, Value> {
     }
 }
 
+/// A primitive data type.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Serialize, Deserialize)]
+pub enum DataType {
+    /// A boolean: true or false.
+    Boolean,
+    /// A 64-bit signed integer.
+    Integer,
+    /// A 64-bit floating point number.
+    Float,
+    /// A UTF-8 encoded string.
+    String,
+}
+
+impl std::fmt::Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Boolean => write!(f, "BOOLEAN"),
+            Self::Integer => write!(f, "INTEGER"),
+            Self::Float => write!(f, "FLOAT"),
+            Self::String => write!(f, "STRING"),
+        }
+    }
+}
+
 /// A row of values.
 pub type Row = Vec<Value>;
 
 /// A row iterator.
 pub type Rows = Box<dyn RowIterator>;
 
-/// A row iterator trait, which requires it to be clonable and object-safe. It
-/// has a blanket implementation for all iterators.
+/// A row iterator trait, which requires the iterator to be both clonable and
+/// object-safe. Cloning is needed to be able to reset an iterator back to an
+/// initial state, e.g. during nested loop joins. It has a blanket
+/// implementation for all matching iterators.
 pub trait RowIterator: Iterator<Item = Result<Row>> + DynClone {}
-
-dyn_clone::clone_trait_object!(RowIterator);
-
 impl<I: Iterator<Item = Result<Row>> + DynClone> RowIterator for I {}
+dyn_clone::clone_trait_object!(RowIterator);
 
 /// A column label, used in query results and plans.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
