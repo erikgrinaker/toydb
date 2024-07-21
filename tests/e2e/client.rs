@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use super::{assert_row, assert_rows, dataset, TestCluster};
 
 use toydb::error::{Error, Result};
@@ -240,8 +242,16 @@ fn execute_txn() -> Result<()> {
     assert_eq!(c.txn(), None);
 
     // Committing a change in a txn should work
-    assert_eq!(c.execute("BEGIN")?, StatementResult::Begin { version: 2, read_only: false });
-    assert_eq!(c.txn(), Some((2, false)));
+    assert_eq!(
+        c.execute("BEGIN")?,
+        StatementResult::Begin {
+            state: mvcc::TransactionState { version: 2, read_only: false, active: BTreeSet::new() }
+        }
+    );
+    assert_eq!(
+        c.txn(),
+        Some(&mvcc::TransactionState { version: 2, read_only: false, active: BTreeSet::new() })
+    );
     c.execute("INSERT INTO genres VALUES (4, 'Drama')")?;
     assert_eq!(c.execute("COMMIT")?, StatementResult::Commit { version: 2 });
     assert_eq!(c.txn(), None);
@@ -252,8 +262,16 @@ fn execute_txn() -> Result<()> {
     assert_eq!(c.txn(), None);
 
     // Rolling back a change in a txn should also work
-    assert_eq!(c.execute("BEGIN")?, StatementResult::Begin { version: 3, read_only: false });
-    assert_eq!(c.txn(), Some((3, false)));
+    assert_eq!(
+        c.execute("BEGIN")?,
+        StatementResult::Begin {
+            state: mvcc::TransactionState { version: 3, read_only: false, active: BTreeSet::new() }
+        }
+    );
+    assert_eq!(
+        c.txn(),
+        Some(&mvcc::TransactionState { version: 3, read_only: false, active: BTreeSet::new() })
+    );
     c.execute("INSERT INTO genres VALUES (5, 'Musical')")?;
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 5")?,
@@ -266,9 +284,14 @@ fn execute_txn() -> Result<()> {
     // Starting a read-only txn should block writes
     assert_eq!(
         c.execute("BEGIN READ ONLY")?,
-        StatementResult::Begin { version: 4, read_only: true }
+        StatementResult::Begin {
+            state: mvcc::TransactionState { version: 4, read_only: true, active: BTreeSet::new() }
+        }
     );
-    assert_eq!(c.txn(), Some((4, true)));
+    assert_eq!(
+        c.txn(),
+        Some(&mvcc::TransactionState { version: 4, read_only: true, active: BTreeSet::new() })
+    );
     assert_row(
         c.execute("SELECT * FROM genres WHERE id = 4")?,
         vec![Value::Integer(4), Value::String("Drama".into())],
@@ -284,9 +307,14 @@ fn execute_txn() -> Result<()> {
     // block writes
     assert_eq!(
         c.execute("BEGIN READ ONLY AS OF SYSTEM TIME 2")?,
-        StatementResult::Begin { version: 2, read_only: true },
+        StatementResult::Begin {
+            state: mvcc::TransactionState { version: 2, read_only: true, active: BTreeSet::new() }
+        },
     );
-    assert_eq!(c.txn(), Some((2, true)));
+    assert_eq!(
+        c.txn(),
+        Some(&mvcc::TransactionState { version: 2, read_only: true, active: BTreeSet::new() })
+    );
     assert_rows(
         c.execute("SELECT * FROM genres")?,
         vec![
@@ -299,13 +327,21 @@ fn execute_txn() -> Result<()> {
     assert_eq!(c.execute("COMMIT")?, StatementResult::Commit { version: 2 });
 
     // A txn should still be usable after an error occurs
-    assert_eq!(c.execute("BEGIN")?, StatementResult::Begin { version: 4, read_only: false });
+    assert_eq!(
+        c.execute("BEGIN")?,
+        StatementResult::Begin {
+            state: mvcc::TransactionState { version: 4, read_only: false, active: BTreeSet::new() }
+        },
+    );
     c.execute("INSERT INTO genres VALUES (5, 'Horror')")?;
     assert_eq!(
         c.execute("INSERT INTO genres VALUES (5, 'Musical')"),
         Err(Error::InvalidInput("primary key 5 already exists".into()))
     );
-    assert_eq!(c.txn(), Some((4, false)));
+    assert_eq!(
+        c.txn(),
+        Some(&mvcc::TransactionState { version: 4, read_only: false, active: BTreeSet::new() })
+    );
     c.execute("INSERT INTO genres VALUES (6, 'Western')")?;
     assert_eq!(c.execute("COMMIT")?, StatementResult::Commit { version: 4 });
     assert_rows(
@@ -331,8 +367,22 @@ fn execute_txn_concurrent() -> Result<()> {
     let mut b = tc.connect_any()?;
 
     // Concurrent updates should throw a serialization failure on conflict.
-    assert_eq!(a.execute("BEGIN")?, StatementResult::Begin { version: 2, read_only: false });
-    assert_eq!(b.execute("BEGIN")?, StatementResult::Begin { version: 3, read_only: false });
+    assert_eq!(
+        a.execute("BEGIN")?,
+        StatementResult::Begin {
+            state: mvcc::TransactionState { version: 2, read_only: false, active: BTreeSet::new() }
+        },
+    );
+    assert_eq!(
+        b.execute("BEGIN")?,
+        StatementResult::Begin {
+            state: mvcc::TransactionState {
+                version: 3,
+                read_only: false,
+                active: BTreeSet::from([2])
+            }
+        },
+    );
 
     assert_row(
         a.execute("SELECT * FROM genres WHERE id = 1")?,

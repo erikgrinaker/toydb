@@ -32,27 +32,21 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
         // Parse and execute the statement. Transaction control is done here,
         // other statements are executed by the SQL engine.
         Ok(match Parser::new(statement).parse()? {
-            ast::Statement::Begin { .. } if self.txn.is_some() => {
-                return errinput!("already in a transaction")
-            }
-            ast::Statement::Begin { read_only: false, as_of: Some(_) } => {
-                return errinput!("can't start read-write transaction in a given version")
-            }
-            ast::Statement::Begin { read_only: false, as_of: None } => {
-                let txn = self.engine.begin()?;
-                let version = txn.version();
+            ast::Statement::Begin { read_only, as_of } => {
+                if self.txn.is_some() {
+                    return errinput!("already in a transaction");
+                }
+                let txn = match (read_only, as_of) {
+                    (false, None) => self.engine.begin()?,
+                    (true, None) => self.engine.begin_read_only()?,
+                    (true, Some(as_of)) => self.engine.begin_as_of(as_of)?,
+                    (false, Some(_)) => {
+                        return errinput!("can't start read-write transaction in a given version")
+                    }
+                };
+                let state = txn.state().clone();
                 self.txn = Some(txn);
-                StatementResult::Begin { version, read_only: false }
-            }
-            ast::Statement::Begin { read_only: true, as_of: None } => {
-                let txn = self.engine.begin_read_only()?;
-                let version = txn.version();
-                self.txn = Some(txn);
-                StatementResult::Begin { version, read_only: true }
-            }
-            ast::Statement::Begin { read_only: true, as_of: Some(version) } => {
-                self.txn = Some(self.engine.begin_as_of(version)?);
-                StatementResult::Begin { version, read_only: true }
+                StatementResult::Begin { state }
             }
             ast::Statement::Commit => {
                 let Some(txn) = self.txn.take() else {
@@ -131,7 +125,7 @@ impl<'a, E: Engine<'a>> Drop for Session<'a, E> {
 /// A session statement result. Sent across the wire to SQL clients.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum StatementResult {
-    Begin { version: mvcc::Version, read_only: bool },
+    Begin { state: mvcc::TransactionState },
     Commit { version: mvcc::Version },
     Rollback { version: mvcc::Version },
     Explain(Plan),

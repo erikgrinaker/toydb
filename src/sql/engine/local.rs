@@ -145,12 +145,8 @@ impl<E: storage::Engine> Transaction<E> {
 }
 
 impl<E: storage::Engine> super::Transaction for Transaction<E> {
-    fn version(&self) -> u64 {
-        self.txn.version()
-    }
-
-    fn read_only(&self) -> bool {
-        self.txn.read_only()
+    fn state(&self) -> &mvcc::TransactionState {
+        self.txn.state()
     }
 
     fn commit(self) -> Result<()> {

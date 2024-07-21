@@ -184,9 +184,9 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
     /// Runs a query and displays the results
     fn execute_query(&mut self, query: &str) -> Result<()> {
         match self.client.execute(query)? {
-            StatementResult::Begin { version, read_only } => match read_only {
-                false => println!("Began transaction at new version {}", version),
-                true => println!("Began read-only transaction at version {}", version),
+            StatementResult::Begin { state } => match state.read_only {
+                false => println!("Began transaction at new version {}", state.version),
+                true => println!("Began read-only transaction at version {}", state.version),
             },
             StatementResult::Commit { version: id } => println!("Committed transaction {}", id),
             StatementResult::Rollback { version: id } => println!("Rolled back transaction {}", id),
@@ -214,8 +214,8 @@ Storage:   {keys} keys, {logical_size} MB logical, {nodes}x {disk_size} MB disk,
     /// Prompts the user for input
     fn prompt(&mut self) -> Result<Option<String>> {
         let prompt = match self.client.txn() {
-            Some((version, false)) => format!("toydb:{}> ", version),
-            Some((version, true)) => format!("toydb@{}> ", version),
+            Some(txn) if txn.read_only => format!("toydb@{}> ", txn.version),
+            Some(txn) => format!("toydb:{}> ", txn.version),
             None => "toydb> ".into(),
         };
         match self.editor.readline(&prompt) {

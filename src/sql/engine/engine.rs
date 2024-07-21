@@ -38,10 +38,16 @@ pub trait Engine<'a>: Sized {
 /// cost. With the Raft engine, each call results in a Raft roundtrip, and we'd
 /// rather not have to do that for every single row that's modified.
 pub trait Transaction {
+    /// The transaction's internal MVCC state.
+    fn state(&self) -> &mvcc::TransactionState;
     /// The transaction's MVCC version. Unique for read/write transactions.
-    fn version(&self) -> mvcc::Version;
+    fn version(&self) -> mvcc::Version {
+        self.state().version
+    }
     /// Whether the transaction is read-only.
-    fn read_only(&self) -> bool;
+    fn read_only(&self) -> bool {
+        self.state().read_only
+    }
 
     /// Commits the transaction.
     fn commit(self) -> Result<()>;

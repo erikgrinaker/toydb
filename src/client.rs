@@ -6,6 +6,7 @@ use crate::error::{Error, Result};
 use crate::server::{Request, Response, Status};
 use crate::sql::engine::StatementResult;
 use crate::sql::types::Table;
+use crate::storage::mvcc;
 
 use rand::Rng;
 
@@ -13,7 +14,7 @@ use rand::Rng;
 pub struct Client {
     reader: std::io::BufReader<std::net::TcpStream>,
     writer: std::io::BufWriter<std::net::TcpStream>,
-    txn: Option<(u64, bool)>,
+    txn: Option<mvcc::TransactionState>,
 }
 
 impl Client {
@@ -39,9 +40,7 @@ impl Client {
             response => return errdata!("unexpected response {response:?}"),
         };
         match &resultset {
-            StatementResult::Begin { version, read_only } => {
-                self.txn = Some((*version, *read_only))
-            }
+            StatementResult::Begin { state } => self.txn = Some(state.clone()),
             StatementResult::Commit { .. } => self.txn = None,
             StatementResult::Rollback { .. } => self.txn = None,
             _ => {}
@@ -73,9 +72,9 @@ impl Client {
         }
     }
 
-    /// Returns the version and read-only state of the txn
-    pub fn txn(&self) -> Option<(u64, bool)> {
-        self.txn
+    /// Returns the transaction state.
+    pub fn txn(&self) -> Option<&mvcc::TransactionState> {
+        self.txn.as_ref()
     }
 
     /// Runs the given closure, automatically retrying serialization and abort

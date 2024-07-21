@@ -127,12 +127,8 @@ impl<'a> Transaction<'a> {
 }
 
 impl<'a> super::Transaction for Transaction<'a> {
-    fn version(&self) -> mvcc::Version {
-        self.state.version
-    }
-
-    fn read_only(&self) -> bool {
-        self.state.read_only
+    fn state(&self) -> &mvcc::TransactionState {
+        &self.state
     }
 
     fn commit(self) -> Result<()> {
