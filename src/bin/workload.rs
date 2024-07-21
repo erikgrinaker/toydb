@@ -79,7 +79,7 @@ impl Runner {
     /// Runs the specified workload.
     fn run<W: Workload>(self, workload: W) -> Result<()> {
         let mut rng = rand::rngs::StdRng::seed_from_u64(self.seed);
-        let mut client = Client::new(&self.hosts[0])?;
+        let mut client = Client::connect(&self.hosts[0])?;
 
         // Set up a histogram recording txn latencies as nanoseconds. The
         // buckets range from 0.001s to 10s.
@@ -103,7 +103,7 @@ impl Runner {
             let (done_tx, done_rx) = crossbeam::channel::bounded::<()>(0);
 
             for addr in self.hosts.iter().cycle().take(self.concurrency) {
-                let mut client = Client::new(addr)?;
+                let mut client = Client::connect(addr)?;
                 let mut recorder = hist.recorder();
                 let work_rx = work_rx.clone();
                 let done_tx = done_tx.clone();

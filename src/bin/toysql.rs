@@ -58,7 +58,7 @@ impl ToySQL {
     /// Creates a new ToySQL REPL for the given server host and port
     fn new(host: &str, port: u16) -> Result<Self> {
         Ok(Self {
-            client: Client::new((host, port))?,
+            client: Client::connect((host, port))?,
             editor: Editor::new()?,
             history_path: std::env::var_os("HOME")
                 .map(|home| std::path::Path::new(&home).join(".toysql.history")),

@@ -88,7 +88,7 @@ pub struct Log {
     /// The underlying storage engine. Uses a trait object instead of generics,
     /// to allow runtime selection of the engine and avoid propagating the
     /// generic type parameters throughout Raft.
-    pub(super) engine: Box<dyn storage::Engine>,
+    pub engine: Box<dyn storage::Engine>,
     /// The current term.
     term: Term,
     /// Our leader vote in the current term, if any.

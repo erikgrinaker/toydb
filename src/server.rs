@@ -1,5 +1,5 @@
 use crate::encoding::{self, Value as _};
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::raft;
 use crate::sql;
 use crate::sql::engine::{Catalog as _, Engine as _, StatementResult};
@@ -22,14 +22,14 @@ const RAFT_PEER_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_
 
 /// A toyDB server. Routes messages to/from an inner Raft node.
 ///
-/// - Listens for inbound Raft connections via TCP and passes messages to the
-///   local Raft node.
+/// * Listens for inbound SQL connections from clients via TCP and passes
+///   requests to the local Raft node.
 ///
-/// - Connects to Raft peers via TCP and sends outbound messages from the
-///   local Raft node.
+/// * Listens for inbound Raft connections from other toyDB nodes via TCP and
+///   passes messages to the local Raft node.
 ///
-/// - Listens for inbound SQL connections via TCP and passes requests to
-///   the local Raft node.
+/// * Connects to other toyDB nodes via TCP and sends outbound Raft messages
+///   from the local Raft node.
 pub struct Server {
     /// The inner Raft node.
     node: raft::Node,
@@ -48,18 +48,15 @@ impl Server {
         raft_state: Box<dyn raft::State>,
     ) -> Result<Self> {
         let (node_tx, node_rx) = crossbeam::channel::unbounded();
-        Ok(Self {
-            node: raft::Node::new(
-                id,
-                peers.keys().copied().collect(),
-                raft_log,
-                raft_state,
-                node_tx,
-                raft::Options::default(),
-            )?,
-            peers,
-            node_rx,
-        })
+        let node = raft::Node::new(
+            id,
+            peers.keys().copied().collect(),
+            raft_log,
+            raft_state,
+            node_tx,
+            raft::Options::default(),
+        )?;
+        Ok(Self { node, peers, node_rx })
     }
 
     /// Serves Raft and SQL requests indefinitely. Consumes the server.
@@ -80,9 +77,8 @@ impl Server {
             // Serve inbound Raft connections.
             s.spawn(move || Self::raft_accept(raft_listener, raft_step_tx));
 
-            // Establish outbound Raft connections.
+            // Establish outbound Raft connections to peers.
             let mut raft_peers_tx = HashMap::new();
-
             for (id, addr) in self.peers.into_iter() {
                 let (raft_peer_tx, raft_peer_rx) =
                     crossbeam::channel::bounded(RAFT_PEER_CHANNEL_CAPACITY);
@@ -114,7 +110,7 @@ impl Server {
     fn raft_accept(listener: TcpListener, raft_step_tx: Sender<raft::Envelope>) {
         std::thread::scope(|s| loop {
             let (socket, peer) = match listener.accept() {
-                Ok(sp) => sp,
+                Ok((socket, peer)) => (socket, peer),
                 Err(err) => {
                     error!("Raft peer accept failed: {err}");
                     continue;
@@ -154,9 +150,7 @@ impl Server {
                 }
             };
             while let Ok(message) = raft_node_rx.recv() {
-                if let Err(err) = message
-                    .encode_into(&mut socket)
-                    .and_then(|()| socket.flush().map_err(Error::from))
+                if let Err(err) = message.encode_into(&mut socket).and_then(|_| Ok(socket.flush()?))
                 {
                     error!("Failed sending to Raft peer {addr}: {err}");
                     break;
@@ -168,17 +162,17 @@ impl Server {
 
     /// Routes Raft messages:
     ///
-    /// - node_rx: outbound messages from the local Raft node. Routed to peers
+    /// * node_rx: outbound messages from the local Raft node. Routed to peers
     ///   via TCP, or to local clients via a response channel.
     ///
-    /// - request_rx: inbound requests from local SQL clients. Stepped into
+    /// * request_rx: inbound requests from local SQL clients. Stepped into
     ///   the local Raft node as ClientRequest messages. Responses are returned
     ///   via the provided response channel.
     ///
-    /// - peers_rx: inbound messages from remote Raft peers. Stepped into the
+    /// * peers_rx: inbound messages from remote Raft peers. Stepped into the
     ///   local Raft node.
     ///
-    /// - peers_tx: outbound per-peer channels sent via TCP connections.
+    /// * peers_tx: outbound per-peer channels sent via TCP connections.
     ///   Messages from the local node's node_rx are sent here.
     ///
     /// Panics on any errors, since the Raft node can't recover from failed
@@ -252,7 +246,7 @@ impl Server {
     fn sql_accept(id: raft::NodeID, listener: TcpListener, sql_engine: sql::engine::Raft) {
         std::thread::scope(|s| loop {
             let (socket, peer) = match listener.accept() {
-                Ok(sp) => sp,
+                Ok((socket, peer)) => (socket, peer),
                 Err(err) => {
                     error!("Client accept failed: {err}");
                     continue;
@@ -269,7 +263,7 @@ impl Server {
         })
     }
 
-    /// Processes a client SQL session, by executing SQL statements against the
+    /// Processes a client SQL session, executing SQL statements against the
     /// Raft node.
     fn sql_session(
         id: raft::NodeID,

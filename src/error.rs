@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Error {
     /// The operation was aborted and must be retried. This typically happens
-    /// with e.g. Raft leader changes.
+    /// with e.g. Raft leader changes. This is used instead of implementing
+    /// complex retry logic and replay protection in Raft.
     Abort,
     /// Invalid data, typically decoding errors or unexpected internal values.
     InvalidData(String),
@@ -35,23 +36,23 @@ impl std::fmt::Display for Error {
 }
 
 impl Error {
-    /// Returns whether the error is considered deterministic. State machine
-    /// application needs to know whether a command failure is deterministic on
-    /// the input command -- if it is, the command can be considered applied and
-    /// the error returned to the client, but otherwise the state machine must
-    /// panic to prevent replica divergence.
+    /// Returns whether the error is considered deterministic. Raft state
+    /// machine application needs to know whether a command failure is
+    /// deterministic on the input command -- if it is, the command can be
+    /// considered applied and the error returned to the client, but otherwise
+    /// the state machine must panic to prevent replica divergence.
     pub fn is_deterministic(&self) -> bool {
         match self {
             // Aborts don't happen during application, only leader changes. But
-            // we consider them non-deterministic in case a abort should happen
+            // we consider them non-deterministic in case an abort should happen
             // unexpectedly below Raft.
             Error::Abort => false,
             // Possible data corruption local to this node.
             Error::InvalidData(_) => false,
-            // Input errors are (likely) deterministic. We could employ command
-            // checksums to be sure.
+            // Input errors are (likely) deterministic. They might not be in
+            // case data was corrupted in flight, but we ignore this case.
             Error::InvalidInput(_) => true,
-            // IO errors are typically node-local.
+            // IO errors are typically local to the node (e.g. faulty disk).
             Error::IO(_) => false,
             // Write commands in read-only transactions are deterministic.
             Error::ReadOnly => true,
@@ -61,19 +62,19 @@ impl Error {
     }
 }
 
-/// Constructs an Error::InvalidData via format!() and into().
+/// Constructs an Error::InvalidData for the given format string.
 #[macro_export]
 macro_rules! errdata {
     ($($args:tt)*) => { $crate::error::Error::InvalidData(format!($($args)*)).into() };
 }
 
-/// Constructs an Error::InvalidInput via format!() and into().
+/// Constructs an Error::InvalidInput for the given format string.
 #[macro_export]
 macro_rules! errinput {
     ($($args:tt)*) => { $crate::error::Error::InvalidInput(format!($($args)*)).into() };
 }
 
-/// Result returning Error.
+/// A toyDB Result returning Error.
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl<T> From<Error> for Result<T> {
@@ -132,7 +133,7 @@ impl<T> From<crossbeam::channel::TrySendError<T>> for Error {
 
 impl From<hdrhistogram::CreationError> for Error {
     fn from(err: hdrhistogram::CreationError) -> Self {
-        panic!("{err}")
+        panic!("{err}") // faulty code
     }
 }
 
@@ -150,13 +151,13 @@ impl From<log::ParseLevelError> for Error {
 
 impl From<log::SetLoggerError> for Error {
     fn from(err: log::SetLoggerError) -> Self {
-        panic!("{err}")
+        panic!("{err}") // faulty code
     }
 }
 
 impl From<regex::Error> for Error {
     fn from(err: regex::Error) -> Self {
-        panic!("{err}")
+        panic!("{err}") // faulty code
     }
 }
 

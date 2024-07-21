@@ -153,7 +153,7 @@ impl TestCluster {
     /// Connects to the given cluster node.
     pub fn connect(&self, id: NodeID) -> Result<Client> {
         self.assert_id(id);
-        Client::new(self.node_address_sql(id))
+        Client::connect(self.node_address_sql(id))
     }
 
     /// Connects to a random cluster node.
