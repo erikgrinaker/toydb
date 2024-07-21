@@ -1,23 +1,27 @@
-# The node ID, peer ID/address map (empty for single node), and log level.
+# The node ID (must be unique in the cluster), and map of peer IDs and Raft
+# addresses (empty for single node).
 id: 1
 peers: {}
+
+# Addresses to listen for SQL and Raft connections on.
+listen_sql: localhost:9605
+listen_raft: localhost:9705
+
+# The log level. Valid values are DEBUG, INFO, WARN, and ERROR.
 log_level: INFO
 
-# Network addresses to bind the SQL and Raft servers to.
-listen_sql: 0.0.0.0:9605
-listen_raft: 0.0.0.0:9705
-
-# Node data directory, and the garbage fraction threshold at which to trigger
-# database compaction when opening the database (Bitcask only).
+# Node data directory. The Raft log is stored in the file "raft", and the SQL
+# database in "sql".
 data_dir: data
-compact_threshold: 0.2
 
-# Raft log storage engine
-# - bitcask (default): an append-only log-structured store.
-# - memory: an in-memory store using the Rust standard library's BTreeMap.
+# Storage engine to use for the Raft log and SQL database.
+#
+# * bitcask (default): an append-only log-structured store.
+# * memory: an in-memory store using the Rust standard library's BTreeMap.
 storage_raft: bitcask
-
-# SQL key-value storage engine
-# - bitcask (default): an append-only log-structured store.
-# - memory: an in-memory store using the Rust standard library's BTreeMap.
 storage_sql: bitcask
+
+# The minimum garbage fraction and bytes to trigger Bitcask log compaction on
+# node startup.
+compact_threshold: 0.2
+compact_min_bytes: 1000000
