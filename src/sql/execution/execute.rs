@@ -1,8 +1,4 @@
-use super::aggregate;
-use super::join;
-use super::source;
-use super::transform;
-use super::write;
+use super::{aggregate, join, source, transform, write};
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::planner::{Node, Plan};
@@ -56,6 +52,29 @@ pub fn execute_plan(
 }
 
 /// Recursively executes a query plan node, returning a row iterator.
+///
+/// Rows stream through the plan node tree from the branches to the root. Nodes
+/// recursively pull input rows upwards from their child node(s), process them,
+/// and hand the resulting rows off to their parent node.
+///
+/// Below is an example of an (unoptimized) query plan:
+///
+/// SELECT title, released, genres.name AS genre
+/// FROM movies INNER JOIN genres ON movies.genre_id = genres.id
+/// WHERE released >= 2000 ORDER BY released
+///
+/// Order: movies.released desc
+/// └─ Projection: movies.title, movies.released, genres.name as genre
+///    └─ Filter: movies.released >= 2000
+///       └─ NestedLoopJoin: inner on movies.genre_id = genres.id
+///          ├─ Scan: movies
+///          └─ Scan: genres
+///
+/// Rows flow from the tree leaves to the root. The Scan nodes read and emit
+/// table rows from storage. They are passed to the NestedLoopJoin node which
+/// joins the rows from the two tables, then the Filter node discards old
+/// movies, the Projection node picks out the requested columns, and the Order
+/// node sorts them before emitting the rows to the client.
 pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
     Ok(match node {
         Node::Aggregate { source, group_by, aggregates } => {

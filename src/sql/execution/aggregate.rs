@@ -6,13 +6,14 @@ use itertools::Itertools as _;
 use std::collections::BTreeMap;
 
 /// Aggregates row values from the source according to the aggregates, using the
-/// group_by expressions as buckets.
-pub(super) fn aggregate(
+/// group_by expressions as buckets. Emits rows with group_by buckets then
+/// aggregates in the given order.
+pub fn aggregate(
     mut source: Rows,
     group_by: Vec<Expression>,
     aggregates: Vec<Aggregate>,
 ) -> Result<Rows> {
-    let mut aggregator = Aggregator::new(aggregates, group_by);
+    let mut aggregator = Aggregator::new(group_by, aggregates);
     while let Some(row) = source.next().transpose()? {
         aggregator.add(row)?;
     }
@@ -23,39 +24,38 @@ pub(super) fn aggregate(
 struct Aggregator {
     /// Bucketed accumulators (by group_by values).
     buckets: BTreeMap<Vec<Value>, Vec<Accumulator>>,
-    /// The set of empty accumulators.
+    /// The set of empty accumulators. Used to create new buckets.
     empty: Vec<Accumulator>,
-    /// Expressions to accumulate. Indexes map to accumulators.
-    exprs: Vec<Expression>,
     /// Group by expressions. Indexes map to bucket values.
     group_by: Vec<Expression>,
+    /// Expressions to accumulate. Indexes map to accumulators.
+    expressions: Vec<Expression>,
 }
 
 impl Aggregator {
-    /// Creates a new aggregator for the given aggregates and GROUP BY buckets.
-    fn new(aggregates: Vec<Aggregate>, group_by: Vec<Expression>) -> Self {
+    /// Creates a new aggregator for the given GROUP BY buckets and aggregates.
+    fn new(group_by: Vec<Expression>, aggregates: Vec<Aggregate>) -> Self {
         use Aggregate::*;
         let accumulators = aggregates.iter().map(Accumulator::new).collect();
-        let exprs = aggregates
+        let expressions = aggregates
             .into_iter()
             .map(|aggregate| match aggregate {
                 Average(expr) | Count(expr) | Max(expr) | Min(expr) | Sum(expr) => expr,
             })
             .collect();
-        Self { buckets: BTreeMap::new(), empty: accumulators, group_by, exprs }
+        Self { buckets: BTreeMap::new(), empty: accumulators, group_by, expressions }
     }
 
     /// Adds a row to the aggregator.
     fn add(&mut self, row: Row) -> Result<()> {
         // Compute the bucket value.
         let bucket: Vec<Value> =
-            self.group_by.iter().map(|expr| expr.evaluate(Some(&row))).collect::<Result<_>>()?;
+            self.group_by.iter().map(|expr| expr.evaluate(Some(&row))).try_collect()?;
 
         // Compute and accumulate the input values.
         let accumulators = self.buckets.entry(bucket).or_insert_with(|| self.empty.clone());
-        for (accumulator, expr) in accumulators.iter_mut().zip(&self.exprs) {
-            let value = expr.evaluate(Some(&row))?;
-            accumulator.add(value)?;
+        for (accumulator, expr) in accumulators.iter_mut().zip(&self.expressions) {
+            accumulator.add(expr.evaluate(Some(&row))?)?;
         }
         Ok(())
     }
@@ -108,35 +108,19 @@ impl Accumulator {
 
     /// Adds a value to the accumulator.
     fn add(&mut self, value: Value) -> Result<()> {
-        use std::cmp::Ordering;
-
-        // NULL values are ignored in aggregates.
+        // Aggregates ignore NULL values.
         if value == Value::Null {
             return Ok(());
         }
-
         match self {
-            Self::Average { sum, count } => {
-                *sum = sum.checked_add(&value)?;
-                *count += 1;
-            }
-
-            Self::Count(c) => *c += 1,
-
+            Self::Average { sum, count } => (*sum, *count) = (sum.checked_add(&value)?, *count + 1),
+            Self::Count(count) => *count += 1,
             Self::Max(max @ None) => *max = Some(value),
-            Self::Max(Some(max)) => {
-                if value.cmp(max) == Ordering::Greater {
-                    *max = value
-                }
-            }
-
+            Self::Max(Some(max)) if value > *max => *max = value,
+            Self::Max(Some(_)) => {}
             Self::Min(min @ None) => *min = Some(value),
-            Self::Min(Some(min)) => {
-                if value.cmp(min) == Ordering::Less {
-                    *min = value
-                }
-            }
-
+            Self::Min(Some(min)) if value < *min => *min = value,
+            Self::Min(Some(_)) => {}
             Self::Sum(sum @ None) => *sum = Some(Value::Integer(0).checked_add(&value)?),
             Self::Sum(Some(sum)) => *sum = sum.checked_add(&value)?,
         }
@@ -148,9 +132,9 @@ impl Accumulator {
         Ok(match self {
             Self::Average { count: 0, sum: _ } => Value::Null,
             Self::Average { count, sum } => sum.checked_div(&Value::Integer(count))?,
-            Self::Count(c) => c.into(),
+            Self::Count(count) => count.into(),
+            Self::Max(Some(value)) | Self::Min(Some(value)) | Self::Sum(Some(value)) => value,
             Self::Max(None) | Self::Min(None) | Self::Sum(None) => Value::Null,
-            Self::Max(Some(v)) | Self::Min(Some(v)) | Self::Sum(Some(v)) => v,
         })
     }
 }

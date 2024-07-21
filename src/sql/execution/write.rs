@@ -1,21 +1,21 @@
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Transaction;
-use crate::sql::types::{Expression, Rows, Table};
+use crate::sql::types::{Expression, Rows, Table, Value};
 
+use itertools::Itertools as _;
 use std::collections::{BTreeMap, HashMap};
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE) using the
 /// primary_key column index. Returns the number of rows deleted.
-pub(super) fn delete(
+pub fn delete(
     txn: &impl Transaction,
     table: String,
     primary_key: usize,
     source: Rows,
 ) -> Result<u64> {
-    let ids = source
-        .map(|r| r.map(|row| row.into_iter().nth(primary_key).expect("short row")))
-        .collect::<Result<Vec<_>>>()?;
+    let ids: Vec<Value> =
+        source.map_ok(|row| row.into_iter().nth(primary_key).expect("short row")).try_collect()?;
     let count = ids.len() as u64;
     txn.delete(&table, &ids)?;
     Ok(count)
@@ -27,7 +27,7 @@ pub(super) fn delete(
 /// columns in source. Otherwise, every column in source is the corresponding
 /// column in table, but the source may not have all columns in table (there may
 /// be a missing tail).
-pub(super) fn insert(
+pub fn insert(
     txn: &impl Transaction,
     table: Table,
     column_map: Option<HashMap<usize, usize>>,
@@ -40,7 +40,6 @@ pub(super) fn insert(
             rows.push(values);
             continue;
         }
-
         if values.len() > table.columns.len() {
             return errinput!("too many values for table {}", table.name);
         }
@@ -50,16 +49,15 @@ pub(super) fn insert(
             }
         }
 
-        // Fill in the row with default values for missing columns, and map
-        // source columns to table columns.
+        // Map source columns to table columns, and fill in default values.
         let mut row = Vec::with_capacity(table.columns.len());
-        for (cidx, column) in table.columns.iter().enumerate() {
-            if column_map.is_none() && cidx < values.len() {
+        for (i, column) in table.columns.iter().enumerate() {
+            if column_map.is_none() && i < values.len() {
                 // Pass through the source column to the table column.
-                row.push(values[cidx].clone())
-            } else if let Some(vidx) = column_map.as_ref().and_then(|c| c.get(&cidx)).copied() {
+                row.push(values[i].clone())
+            } else if let Some(vi) = column_map.as_ref().and_then(|c| c.get(&i)).copied() {
                 // Map the source column to the table column.
-                row.push(values[vidx].clone())
+                row.push(values[vi].clone())
             } else if let Some(default) = &column.default {
                 // Column not given in source, use the default.
                 row.push(default.clone())
@@ -76,7 +74,7 @@ pub(super) fn insert(
 
 /// Updates rows passed in from the source (i.e. UPDATE). Returns the number of
 /// rows updated.
-pub(super) fn update(
+pub fn update(
     txn: &impl Transaction,
     table: String,
     primary_key: usize,
@@ -85,12 +83,12 @@ pub(super) fn update(
 ) -> Result<u64> {
     let mut updates = BTreeMap::new();
     while let Some(row) = source.next().transpose()? {
-        let mut new = row.clone();
+        let mut update = row.clone();
         for (column, expr) in &expressions {
-            new[*column] = expr.evaluate(Some(&row))?;
+            update[*column] = expr.evaluate(Some(&row))?;
         }
         let id = row.into_iter().nth(primary_key).expect("short row");
-        updates.insert(id, new);
+        updates.insert(id, update);
     }
     let count = updates.len() as u64;
     txn.update(&table, updates)?;

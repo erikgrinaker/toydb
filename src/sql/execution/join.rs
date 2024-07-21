@@ -1,4 +1,4 @@
-use crate::errdata;
+use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Value};
 
@@ -11,7 +11,7 @@ use std::iter::Peekable;
 /// there are no matches in the right source for a row in the left source, a
 /// joined row with NULL values for the right source is returned (typically used
 /// for a LEFT JOIN).
-pub(super) fn nested_loop(
+pub fn nested_loop(
     left: Rows,
     right: Rows,
     right_size: usize,
@@ -57,7 +57,7 @@ impl NestedLoopIterator {
         Ok(Self { left, right, right_init, right_size, right_match: false, predicate, outer })
     }
 
-    // Returns the next joined row, if any, with error handling.
+    // Returns the next joined row, if any.
     fn try_next(&mut self) -> Result<Option<Row>> {
         // While there is a valid left row, look for a right-hand match to return.
         while let Some(Ok(left_row)) = self.left.peek() {
@@ -70,7 +70,7 @@ impl NestedLoopIterator {
                     Some(predicate) => match predicate.evaluate(Some(&row))? {
                         Value::Boolean(true) => true,
                         Value::Boolean(false) | Value::Null => false,
-                        v => return errdata!("join predicate returned {v}, expected boolean"),
+                        v => return errinput!("join predicate returned {v}, expected boolean"),
                     },
                     None => true,
                 };
@@ -118,7 +118,7 @@ impl Iterator for NestedLoopIterator {
 /// matching rows in the hash table. If outer is true, and there is no match
 /// in the right source for a row in the left source, a row with NULL values
 /// for the right source is emitted instead.
-pub(super) fn hash(
+pub fn hash(
     left: Rows,
     left_column: usize,
     right: Rows,
@@ -141,7 +141,7 @@ pub(super) fn hash(
     let empty = std::iter::repeat(Value::Null).take(right_size);
 
     // Set up the join iterator.
-    Ok(Box::new(left.flat_map(move |result| -> Rows {
+    let join = left.flat_map(move |result| -> Rows {
         // Pass through errors.
         let Ok(row) = result else {
             return Box::new(std::iter::once(result));
@@ -159,5 +159,6 @@ pub(super) fn hash(
             }
             None => Box::new(std::iter::empty()),
         }
-    })))
+    });
+    Ok(Box::new(join))
 }
