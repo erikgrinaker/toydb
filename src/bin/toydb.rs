@@ -120,10 +120,7 @@ impl Command {
                 )?;
                 Box::new(sql::engine::Raft::new_state(engine)?)
             }
-            "memory" => {
-                let engine = storage::Memory::new();
-                Box::new(sql::engine::Raft::new_state(engine)?)
-            }
+            "memory" => Box::new(sql::engine::Raft::new_state(storage::Memory::new())?),
             name => return errinput!("invalid SQL storage engine {name}"),
         };
 

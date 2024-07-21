@@ -1,5 +1,5 @@
 //! toydump is a debug tool that prints a toyDB BitCask database in
-//! human-readable form. It can print both the SQL database, and the Raft log
+//! human-readable form. It can print both the SQL database and the Raft log
 //! (via --raft). It only outputs live BitCask data, not garbage entries.
 
 #![warn(clippy::all)]

@@ -1,17 +1,20 @@
-//! Runs toyDB workload benchmarks. For example, a read-only
-//! workload can be run as:
+//! Runs toyDB workload benchmarks. By default, it assumes a running 5-node
+//! cluster as launched via cluster/run.sh, but this can be modified via -H.
+//! For example, a read-only workload can be run as:
 //!
-//! cargo run --bin workload --
-//!     --hosts localhost:9605,localhost:9604,localhost:9603
-//!     --concurrency 16 --count 100000
-//!     read --rows 1000 --size 65536 --batch 10
+//! cargo run --release --bin workload -- read
 //!
 //! See --help for a list of available workloads and arguments.
 
 #![warn(clippy::all)]
 
+use hdrhistogram::Histogram;
+use toydb::error::Result;
+use toydb::sql::types::{Row, Rows};
+use toydb::{Client, StatementResult};
+
 use clap::Parser;
-use itertools::Itertools;
+use itertools::Itertools as _;
 use petname::Generator as _;
 use rand::distributions::Distribution as _;
 use rand::rngs::StdRng;
@@ -19,16 +22,16 @@ use rand::SeedableRng as _;
 use std::collections::HashSet;
 use std::io::Write as _;
 use std::time::Duration;
-use toydb::error::Result;
-use toydb::sql::types::{Row, Rows};
-use toydb::{Client, StatementResult};
 
-fn main() -> Result<()> {
+fn main() {
     let Command { runner, subcommand } = Command::parse();
-    match subcommand {
+    let result = match subcommand {
         Subcommand::Read(read) => runner.run(read),
         Subcommand::Write(write) => runner.run(write),
         Subcommand::Bank(bank) => runner.run(bank),
+    };
+    if let Err(error) = result {
+        eprintln!("Error: {error}")
     }
 }
 
@@ -78,13 +81,12 @@ struct Runner {
 impl Runner {
     /// Runs the specified workload.
     fn run<W: Workload>(self, workload: W) -> Result<()> {
-        let mut rng = rand::rngs::StdRng::seed_from_u64(self.seed);
+        let mut rng = StdRng::seed_from_u64(self.seed);
         let mut client = Client::connect(&self.hosts[0])?;
 
         // Set up a histogram recording txn latencies as nanoseconds. The
         // buckets range from 0.001s to 10s.
-        let mut hist =
-            hdrhistogram::Histogram::<u32>::new_with_bounds(1_000, 10_000_000_000, 3)?.into_sync();
+        let mut hist = Histogram::<u32>::new_with_bounds(1_000, 10_000_000_000, 3)?.into_sync();
 
         // Prepare the dataset.
         print!("Preparing initial dataset... ");
@@ -177,7 +179,7 @@ impl Runner {
 }
 
 /// A workload.
-trait Workload: std::fmt::Display + 'static {
+trait Workload: std::fmt::Display {
     /// A work item.
     type Item: Send;
 
