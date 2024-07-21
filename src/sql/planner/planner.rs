@@ -113,7 +113,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             .map(|exprs| {
                 exprs.into_iter().map(|expr| Self::build_expression(expr, &scope)).collect()
             })
-            .collect::<Result<_>>()?;
+            .try_collect()?;
         Ok(Plan::Insert { table, column_map, source: Node::Values { rows } })
     }
 
@@ -369,14 +369,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
         aggregates.retain(|expr| child_scope.add_aggregate(expr, scope).is_some());
 
         // Build the node from the remaining unique expressions.
-        let group_by = group_by
-            .into_iter()
-            .map(|expr| Self::build_expression(expr, scope))
-            .collect::<Result<_>>()?;
+        let group_by =
+            group_by.into_iter().map(|expr| Self::build_expression(expr, scope)).try_collect()?;
         let aggregates = aggregates
             .into_iter()
             .map(|expr| Self::build_aggregate_function(expr, scope))
-            .collect::<Result<_>>()?;
+            .try_collect()?;
 
         *scope = child_scope;
         Ok(Node::Aggregate { source: Box::new(source), group_by, aggregates })

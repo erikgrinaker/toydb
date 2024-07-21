@@ -63,6 +63,8 @@
 //!     and returns it to `Session::execute`. It in turns returns it to
 //!     `Server::sql_session`, which encodes it and sends it across the wire
 //!     to `toySQL`, which displays them to the user.
+//!
+//! TODO: expand this into a "Life of a SQL statement" document.
 
 pub mod engine;
 pub mod execution;
@@ -165,7 +167,7 @@ mod tests {
                         tables
                             .into_iter()
                             .map(|t| self.session.with_txn(true, |txn| txn.must_get_table(&t)))
-                            .collect::<Result<_, _>>()?
+                            .try_collect()?
                     };
                     return Ok(schemas.into_iter().map(|s| s.to_string()).join("\n"));
                 }

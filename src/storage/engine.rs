@@ -80,6 +80,7 @@ pub mod test {
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
     use crossbeam::channel::Sender;
+    use itertools::Itertools as _;
     use regex::Regex;
     use std::error::Error as StdError;
     use std::fmt::Write as _;
@@ -127,9 +128,9 @@ pub mod test {
                         parse_key_range(args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."))?;
                     args.reject_rest()?;
                     let items: Vec<_> = if reverse {
-                        self.engine.scan(range).rev().collect::<Result<_>>()?
+                        self.engine.scan(range).rev().try_collect()?
                     } else {
-                        self.engine.scan(range).collect::<Result<_>>()?
+                        self.engine.scan(range).try_collect()?
                     };
                     for (key, value) in items {
                         writeln!(output, "{}", format::Raw::key_value(&key, &value))?;

@@ -144,6 +144,7 @@ use crate::encoding::{self, bincode, keycode, Key as _, Value as _};
 use crate::error::{Error, Result};
 use crate::{errdata, errinput};
 
+use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{BTreeSet, VecDeque};
@@ -471,10 +472,10 @@ impl<E: Engine> Transaction<E> {
             return Ok(());
         }
         let mut engine = self.engine.lock()?;
-        let remove = engine
+        let remove: Vec<_> = engine
             .scan_prefix(&KeyPrefix::TxnWrite(self.st.version).encode())
-            .map(|r| r.map(|(k, _)| k))
-            .collect::<Result<Vec<_>>>()?;
+            .map_ok(|(k, _)| k)
+            .try_collect()?;
         for key in remove {
             engine.delete(&key)?
         }
@@ -749,7 +750,6 @@ pub mod tests {
     use crate::storage::{BitCask, Memory};
 
     use crossbeam::channel::Receiver;
-    use itertools::Itertools as _;
     use std::collections::HashMap;
     use std::fmt::Write as _;
     use std::{error::Error, result::Result};

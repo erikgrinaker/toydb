@@ -314,7 +314,7 @@ impl Node {
                 expressions = expressions
                     .into_iter()
                     .map(|expr| expr.transform(before, after))
-                    .collect::<Result<_>>()?;
+                    .try_collect()?;
                 Self::Projection { source, expressions, aliases }
             }
             Self::Scan { table, alias, filter: Some(filter) } => {
@@ -325,7 +325,7 @@ impl Node {
                 rows = rows
                     .into_iter()
                     .map(|row| row.into_iter().map(|expr| expr.transform(before, after)).collect())
-                    .collect::<Result<_>>()?;
+                    .try_collect()?;
                 Self::Values { rows }
             }
 

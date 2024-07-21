@@ -343,6 +343,7 @@ mod tests {
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
     use crossbeam::channel::Receiver;
+    use itertools::Itertools as _;
     use regex::Regex;
     use std::fmt::Write as _;
     use std::{error::Error, result::Result};
@@ -413,7 +414,7 @@ mod tests {
                 "get" => {
                     let mut args = command.consume_args();
                     let indexes: Vec<Index> =
-                        args.rest_pos().iter().map(|a| a.parse()).collect::<Result<_, _>>()?;
+                        args.rest_pos().iter().map(|a| a.parse()).try_collect()?;
                     args.reject_rest()?;
                     for index in indexes {
                         let entry = self
@@ -443,7 +444,7 @@ mod tests {
                         .rest_pos()
                         .iter()
                         .map(|a| Self::parse_index_term(&a.value))
-                        .collect::<Result<_, _>>()?;
+                        .try_collect()?;
                     args.reject_rest()?;
                     for (index, term) in indexes {
                         let has = self.log.has(index, term)?;

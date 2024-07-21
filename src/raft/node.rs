@@ -1114,7 +1114,7 @@ impl RawNode<Leader> {
                 .log
                 .scan(progress.next_index..)
                 .take(self.opts.max_append_entries)
-                .collect::<Result<_>>()?,
+                .try_collect()?,
             true => Vec::new(),
         };
 
