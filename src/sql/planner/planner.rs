@@ -1,7 +1,6 @@
 #![allow(clippy::module_inception)]
 
-use super::plan::remap_sources;
-use super::{Aggregate, Direction, Node, Plan};
+use super::plan::{remap_sources, Aggregate, Node, Plan};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Catalog;
@@ -11,8 +10,8 @@ use crate::sql::types::{Column, Expression, Label, Table, Value};
 use itertools::Itertools as _;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-/// A statement plan builder. Takes a statement AST from the parser and builds
-/// an execution plan for it, using the catalog for schema information.
+/// The planner builds an execution plan from a parsed Abstract Syntax Tree,
+/// using the catalog for schema information.
 pub struct Planner<'a, C: Catalog> {
     catalog: &'a C,
 }
@@ -45,6 +44,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
     /// Builds a CREATE TABLE plan.
     fn build_create_table(&self, name: String, columns: Vec<ast::Column>) -> Result<Plan> {
+        // Most schema validation happens during execution via Table.validate().
+        // However, the AST specifies the primary key as a column field, while
+        // the schema stores it as a column index, so we have to map that here.
         let Some(primary_key) = columns.iter().position(|c| c.primary_key) else {
             return errinput!("no primary key for table {name}");
         };
@@ -77,7 +79,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     fn build_delete(&self, table: String, r#where: Option<ast::Expression>) -> Result<Plan> {
         let table = self.catalog.must_get_table(&table)?;
         let scope = Scope::from_table(&table)?;
-        let filter = r#where.map(|e| Self::build_expression(e, &scope)).transpose()?;
+        let filter = r#where.map(|expr| Self::build_expression(expr, &scope)).transpose()?;
         Ok(Plan::Delete {
             table: table.name.clone(),
             primary_key: table.primary_key,
@@ -124,7 +126,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     ) -> Result<Plan> {
         let table = self.catalog.must_get_table(&table)?;
         let scope = Scope::from_table(&table)?;
-        let filter = r#where.map(|e| Self::build_expression(e, &scope)).transpose()?;
+        let filter = r#where.map(|expr| Self::build_expression(expr, &scope)).transpose()?;
         let mut expressions = Vec::with_capacity(set.len());
         for (column, expr) in set {
             let index = scope.lookup_column(None, &column)?;
@@ -154,7 +156,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         r#where: Option<ast::Expression>,
         group_by: Vec<ast::Expression>,
         having: Option<ast::Expression>,
-        order_by: Vec<(ast::Expression, ast::Order)>,
+        order_by: Vec<(ast::Expression, ast::Direction)>,
         offset: Option<ast::Expression>,
         limit: Option<ast::Expression>,
     ) -> Result<Plan> {
@@ -162,7 +164,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build FROM clause.
         let mut node = if !from.is_empty() {
-            self.build_from_clause(&mut scope, from)?
+            self.build_from_clause(from, &mut scope)?
         } else {
             // For a constant SELECT, emit a single empty row to project with.
             // This allows using aggregate functions and WHERE as normal.
@@ -174,7 +176,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         // BY). For simplicity, expressions only supports scalar values, so we
         // special-case the * tuple here.
         if select.contains(&(ast::Expression::All, None)) {
-            if node.size() == 0 {
+            if node.columns() == 0 {
                 return errinput!("SELECT * requires a FROM clause");
             }
             if select.len() > 1 || !group_by.is_empty() {
@@ -182,7 +184,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     .into_iter()
                     .flat_map(|(expr, alias)| match expr {
                         ast::Expression::All => itertools::Either::Left(
-                            (0..node.size()).map(|i| (node.column_label(i).into(), None)),
+                            (0..node.columns()).map(|i| (node.column_label(i).into(), None)),
                         ),
                         expr => itertools::Either::Right(std::iter::once((expr, alias))),
                     })
@@ -191,15 +193,15 @@ impl<'a, C: Catalog> Planner<'a, C> {
         }
 
         // Build WHERE clause.
-        if let Some(expr) = r#where {
-            let predicate = Self::build_expression(expr, &scope)?;
+        if let Some(r#where) = r#where {
+            let predicate = Self::build_expression(r#where, &scope)?;
             node = Node::Filter { source: Box::new(node), predicate };
-        };
+        }
 
         // Build aggregate functions and GROUP BY clause.
         let aggregates = Self::collect_aggregates(&select, &having, &order_by);
         if !group_by.is_empty() || !aggregates.is_empty() {
-            node = self.build_aggregate(&mut scope, node, group_by, aggregates)?;
+            node = self.build_aggregate(node, group_by, aggregates, &mut scope)?;
         }
 
         // Build SELECT clause. We can omit this for a trivial SELECT *.
@@ -216,7 +218,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             }
 
             // Add hidden columns for HAVING and ORDER BY columns not in SELECT.
-            let hidden = self.build_select_hidden(&scope, &mut child_scope, &having, &order_by);
+            let hidden = self.build_select_hidden(&having, &order_by, &scope, &mut child_scope);
             aliases.extend(std::iter::repeat(Label::None).take(hidden.len()));
             expressions.extend(hidden);
 
@@ -231,32 +233,32 @@ impl<'a, C: Catalog> Planner<'a, C> {
             }
             let predicate = Self::build_expression(having, &scope)?;
             node = Node::Filter { source: Box::new(node), predicate };
-        };
+        }
 
         // Build ORDER BY clause.
         if !order_by.is_empty() {
-            let orders = order_by
+            let key = order_by
                 .into_iter()
-                .map(|(e, o)| Ok((Self::build_expression(e, &scope)?, Direction::from(o))))
+                .map(|(expr, dir)| Ok((Self::build_expression(expr, &scope)?, dir.into())))
                 .collect::<Result<_>>()?;
-            node = Node::Order { source: Box::new(node), orders };
+            node = Node::Order { source: Box::new(node), key };
         }
 
         // Build OFFSET clause.
-        if let Some(expr) = offset {
-            let offset = match Self::evaluate_constant(expr)? {
-                Value::Integer(offset) if offset >= 0 => Ok(offset as usize),
-                value => errinput!("invalid offset {value}"),
-            }?;
+        if let Some(offset) = offset {
+            let offset = match Self::evaluate_constant(offset)? {
+                Value::Integer(offset) if offset >= 0 => offset as usize,
+                offset => return errinput!("invalid offset {offset}"),
+            };
             node = Node::Offset { source: Box::new(node), offset }
         }
 
         // Build LIMIT clause.
-        if let Some(expr) = limit {
-            let limit = match Self::evaluate_constant(expr)? {
-                Value::Integer(limit) if limit >= 0 => Ok(limit as usize),
-                value => errinput!("invalid limit {value}"),
-            }?;
+        if let Some(limit) = limit {
+            let limit = match Self::evaluate_constant(limit)? {
+                Value::Integer(limit) if limit >= 0 => limit as usize,
+                limit => return errinput!("invalid limit {limit}"),
+            };
             node = Node::Limit { source: Box::new(node), limit }
         }
 
@@ -271,7 +273,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// Builds a FROM clause consisting of one or more items. Each item is
     /// either a table or a join of two or more tables. All items are implicitly
     /// joined, e.g. "SELECT * FROM a, b" is an implicit full join of a and b.
-    fn build_from_clause(&self, scope: &mut Scope, from: Vec<ast::From>) -> Result<Node> {
+    fn build_from_clause(&self, from: Vec<ast::From>, scope: &mut Scope) -> Result<Node> {
         // Build the first FROM item. A FROM clause must have at least one.
         let mut items = from.into_iter();
         let mut node = match items.next() {
@@ -303,21 +305,21 @@ impl<'a, C: Catalog> Planner<'a, C> {
             // A full table scan.
             ast::From::Table { name, alias } => {
                 let table = self.catalog.must_get_table(&name)?;
-                scope.add_table(alias.as_ref().unwrap_or(&name), &table)?;
+                scope.add_table(&table, alias.as_deref())?;
                 Node::Scan { table, alias, filter: None }
             }
 
             // A two-way join. The left or right nodes may be chained joins.
             ast::From::Join { mut left, mut right, r#type, predicate } => {
                 // Right joins are built as a left join then column swap.
-                if matches!(r#type, ast::JoinType::Right) {
+                if r#type == ast::JoinType::Right {
                     (left, right) = (right, left)
                 }
 
                 // Build the left and right nodes.
                 let left = Box::new(self.build_from(*left, &mut scope)?);
                 let right = Box::new(self.build_from(*right, &mut scope)?);
-                let (left_size, right_size) = (left.size(), right.size());
+                let (left_size, right_size) = (left.columns(), right.columns());
 
                 // Build the join node.
                 let predicate = predicate.map(|e| Self::build_expression(e, &scope)).transpose()?;
@@ -325,7 +327,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 let mut node = Node::NestedLoopJoin { left, right, predicate, outer };
 
                 // For right joins, swap the columns.
-                if matches!(r#type, ast::JoinType::Right) {
+                if r#type == ast::JoinType::Right {
                     let size = left_size + right_size;
                     let targets = (0..size).map(|i| Some((i + right_size) % size)).collect_vec();
                     scope = scope.remap(&targets);
@@ -355,10 +357,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// division, and HAVING can look up b % 10 to compute the predicate.
     fn build_aggregate(
         &self,
-        scope: &mut Scope,
         source: Node,
         mut group_by: Vec<ast::Expression>,
         mut aggregates: Vec<ast::Expression>,
+        scope: &mut Scope,
     ) -> Result<Node> {
         // Construct a child scope with the group_by and aggregate AST
         // expressions, for lookups. Discard duplicate expressions.
@@ -373,7 +375,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
             .collect::<Result<_>>()?;
         let aggregates = aggregates
             .into_iter()
-            .map(|expr| Self::build_aggregate_function(scope, expr))
+            .map(|expr| Self::build_aggregate_function(expr, scope))
             .collect::<Result<_>>()?;
 
         *scope = child_scope;
@@ -381,7 +383,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
     }
 
     /// Builds an aggregate function from an AST expression.
-    fn build_aggregate_function(scope: &Scope, expr: ast::Expression) -> Result<Aggregate> {
+    fn build_aggregate_function(expr: ast::Expression, scope: &Scope) -> Result<Aggregate> {
         let ast::Expression::Function(name, mut args) = expr else {
             panic!("aggregate expression must be function");
         };
@@ -392,10 +394,9 @@ impl<'a, C: Catalog> Planner<'a, C> {
             return errinput!("aggregate functions can't be nested");
         }
         // Special-case COUNT(*) since expressions don't support tuples.
-        let expr = if name.as_str() == "count" && args[0] == ast::Expression::All {
-            Expression::Constant(Value::Boolean(true))
-        } else {
-            Self::build_expression(args.remove(0), scope)?
+        let expr = match (name.as_str(), args.remove(0)) {
+            ("count", ast::Expression::All) => Expression::Constant(Value::Boolean(true)),
+            (_, arg) => Self::build_expression(arg, scope)?,
         };
         Ok(match name.as_str() {
             "avg" => Aggregate::Average(expr),
@@ -419,14 +420,14 @@ impl<'a, C: Catalog> Planner<'a, C> {
     fn collect_aggregates(
         select: &[(ast::Expression, Option<String>)],
         having: &Option<ast::Expression>,
-        order_by: &[(ast::Expression, ast::Order)],
+        order_by: &[(ast::Expression, ast::Direction)],
     ) -> Vec<ast::Expression> {
         let select = select.iter().map(|(expr, _)| expr);
         let having = having.iter();
         let order_by = order_by.iter().map(|(expr, _)| expr);
         let mut aggregates = Vec::new();
         for expr in select.chain(having).chain(order_by) {
-            expr.collect(&|e| Self::is_aggregate_function(e), &mut aggregates)
+            expr.collect(&|expr| Self::is_aggregate_function(expr), &mut aggregates)
         }
         aggregates
     }
@@ -441,19 +442,20 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// isn't available to the ORDER BY node. We add a hidden "value" column to
     /// the projection to satisfy the ORDER BY.
     ///
-    /// Hidden columns are stripped before returning the result to the client.
+    /// Hidden columns are tracked in the scope and stripped before the result
+    /// is returned to the client.
     fn build_select_hidden(
         &self,
+        having: &Option<ast::Expression>,
+        order_by: &[(ast::Expression, ast::Direction)],
         scope: &Scope,
         child_scope: &mut Scope,
-        having: &Option<ast::Expression>,
-        order_by: &[(ast::Expression, ast::Order)],
     ) -> Vec<Expression> {
         let mut hidden = Vec::new();
         for expr in having.iter().chain(order_by.iter().map(|(expr, _)| expr)) {
             expr.walk(&mut |expr| {
                 // If this is an aggregate or GROUP BY expression that isn't
-                // already available in the child scope, pass it through.
+                // already available in the child scope, add a hidden column.
                 if let Some(index) = scope.lookup_aggregate(expr) {
                     if child_scope.lookup_aggregate(expr).is_none() {
                         child_scope.add_passthrough(scope, index, true);
@@ -462,19 +464,19 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     }
                 }
 
-                // Look for column references that don't exist post-projection.
+                // Look for column references that don't exist post-projection,
+                // but that do exist in the parent, and add hidden columns.
                 let ast::Expression::Column(table, column) = expr else {
                     return true;
                 };
                 if child_scope.lookup_column(table.as_deref(), column).is_ok() {
                     return true;
                 }
-                // If the parent lookup fails too, ignore the error. It will be
-                // surfaced during expression building.
                 let Ok(index) = scope.lookup_column(table.as_deref(), column) else {
+                    // If the parent lookup fails too (i.e. unknown column),
+                    // ignore the error. It will be surfaced during building.
                     return true;
                 };
-                // Add the hidden column to the projection.
                 child_scope.add_passthrough(scope, index, true);
                 hidden.push(Expression::Column(index));
                 true
@@ -483,12 +485,13 @@ impl<'a, C: Catalog> Planner<'a, C> {
         hidden
     }
 
-    /// Builds an expression from an AST expression.
+    /// Builds an expression from an AST expression, looking up columns and
+    /// aggregate expressions in the scope.
     pub fn build_expression(expr: ast::Expression, scope: &Scope) -> Result<Expression> {
         use Expression::*;
 
         // Look up aggregate functions or GROUP BY expressions. These were added
-        // to the parent scope when building the Aggregate node, if any.
+        // to the scope when building the Aggregate node, if any.
         if let Some(index) = scope.lookup_aggregate(&expr) {
             return Ok(Column(index));
         }
@@ -559,7 +562,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         })
     }
 
-    /// Builds and evaluates a constant AST expression.
+    /// Builds and evaluates a constant AST expression. Errors on column refs.
     fn evaluate_constant(expr: ast::Expression) -> Result<Value> {
         Self::build_expression(expr, &Scope::new())?.evaluate(None)
     }
@@ -614,7 +617,7 @@ impl Scope {
     /// Creates a scope from a table, using the table's original name.
     fn from_table(table: &Table) -> Result<Self> {
         let mut scope = Self::new();
-        scope.add_table(&table.name, table)?;
+        scope.add_table(table, None)?;
         Ok(scope)
     }
 
@@ -627,18 +630,20 @@ impl Scope {
 
     /// Adds a table to the scope. The label is either the table's original name
     /// or an alias, and must be unique. All table columns are added, in order.
-    fn add_table(&mut self, label: &str, table: &Table) -> Result<()> {
-        if self.tables.contains(label) {
-            return errinput!("duplicate table name {label}");
+    fn add_table(&mut self, table: &Table, alias: Option<&str>) -> Result<()> {
+        let name = alias.unwrap_or(&table.name);
+        if self.tables.contains(name) {
+            return errinput!("duplicate table name {name}");
         }
         for column in &table.columns {
-            self.add_column(Label::Qualified(label.to_string(), column.name.clone()));
+            self.add_column(Label::Qualified(name.to_string(), column.name.clone()));
         }
-        self.tables.insert(label.to_string());
+        self.tables.insert(name.to_string());
         Ok(())
     }
 
-    /// Adds a column and label to the scope. Returns the column index.
+    /// Appends a column with the given label to the scope. Returns the column
+    /// index.
     fn add_column(&mut self, label: Label) -> usize {
         let index = self.columns.len();
         if let Label::Qualified(table, column) = &label {
@@ -681,13 +686,12 @@ impl Scope {
 
     /// Adds an aggregate expression to the scope, returning the new column
     /// index or None if the expression already exists. This is either an
-    /// aggregate function or a GROUP BY expression. It is used to look up the
+    /// aggregate function or a GROUP BY expression, used to look up the
     /// aggregate output column from e.g. SELECT, HAVING, and ORDER BY.
     fn add_aggregate(&mut self, expr: &ast::Expression, parent: &Scope) -> Option<usize> {
         if self.aggregates.contains_key(expr) {
             return None;
         }
-
         // If this is a simple column reference (i.e. GROUP BY foo), pass
         // through the column label from the parent scope for lookups.
         let mut label = Label::None;
@@ -697,7 +701,6 @@ impl Scope {
                 label = parent.columns[index].clone();
             }
         }
-
         let index = self.add_column(label);
         self.aggregates.insert(expr.clone(), index);
         Some(index)
@@ -712,8 +715,7 @@ impl Scope {
     /// Adds a column that passes through a column from the parent scope,
     /// retaining its properties. If hide is true, the column is hidden.
     fn add_passthrough(&mut self, parent: &Scope, parent_index: usize, hide: bool) -> usize {
-        let label = parent.columns[parent_index].clone();
-        let index = self.add_column(label);
+        let index = self.add_column(parent.columns[parent_index].clone());
         for (expr, i) in &parent.aggregates {
             if *i == parent_index {
                 self.aggregates.entry(expr.clone()).or_insert(index);
@@ -758,16 +760,15 @@ impl Scope {
             if let Some(alias) = alias {
                 label = Label::Unqualified(alias.clone());
             } else if let ast::Expression::Column(table, column) = expr {
-                // Ignore errors, they will be surfaced by build_expression().
+                // Ignore errors, they will be surfaced in build_expression().
                 if let Ok(index) = self.lookup_column(table.as_deref(), column.as_str()) {
                     label = self.columns[index].clone();
                 }
             }
-
             let index = child.add_column(label);
-
             // If this is an aggregate query, then all projected expressions
-            // must also be aggregates by definition.
+            // must also be aggregates by definition (an aggregate node can only
+            // emit aggregate functions or GROUP BY expressions).
             if !self.aggregates.is_empty() {
                 child.aggregates.entry(expr.clone()).or_insert(index);
             }

@@ -42,7 +42,7 @@ pub fn execute_plan(
         }
 
         Plan::Select(root) => {
-            let labels = (0..root.size()).map(|i| root.column_label(i)).collect();
+            let labels = (0..root.columns()).map(|i| root.column_label(i)).collect();
             let iter = execute(root, txn)?;
             ExecutionResult::Select { rows: iter, labels }
         }
@@ -69,7 +69,7 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
         }
 
         Node::HashJoin { left, left_column, right, right_column, outer } => {
-            let right_size = right.size();
+            let right_size = right.columns();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
             join::hash(left, left_column, right, right_column, right_size, outer)?
@@ -89,7 +89,7 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
         }
 
         Node::NestedLoopJoin { left, right, predicate, outer } => {
-            let right_size = right.size();
+            let right_size = right.columns();
             let left = execute(*left, txn)?;
             let right = execute(*right, txn)?;
             join::nested_loop(left, right, right_size, predicate, outer)?
@@ -102,7 +102,7 @@ pub fn execute(node: Node, txn: &impl Transaction) -> Result<Rows> {
             transform::offset(source, offset)
         }
 
-        Node::Order { source, orders } => {
+        Node::Order { source, key: orders } => {
             let source = execute(*source, txn)?;
             transform::order(source, orders)?
         }

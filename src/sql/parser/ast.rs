@@ -41,7 +41,7 @@ pub enum Statement {
         r#where: Option<Expression>,
         group_by: Vec<Expression>,
         having: Option<Expression>,
-        order_by: Vec<(Expression, Order)>,
+        order_by: Vec<(Expression, Direction)>,
         offset: Option<Expression>,
         limit: Option<Expression>,
     },
@@ -91,7 +91,7 @@ impl JoinType {
 
 /// ORDER BY direction.
 #[derive(Debug)]
-pub enum Order {
+pub enum Direction {
     Ascending,
     Descending,
 }

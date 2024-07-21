@@ -453,7 +453,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses an ORDER BY clause, if present.
-    fn parse_order_by_clause(&mut self) -> Result<Vec<(ast::Expression, ast::Order)>> {
+    fn parse_order_by_clause(&mut self) -> Result<Vec<(ast::Expression, ast::Direction)>> {
         if !self.next_is(Keyword::Order.into()) {
             return Ok(Vec::new());
         }
@@ -463,11 +463,11 @@ impl<'a> Parser<'a> {
             let expr = self.parse_expression()?;
             let order = self
                 .next_if_map(|token| match token {
-                    Token::Keyword(Keyword::Asc) => Some(ast::Order::Ascending),
-                    Token::Keyword(Keyword::Desc) => Some(ast::Order::Descending),
+                    Token::Keyword(Keyword::Asc) => Some(ast::Direction::Ascending),
+                    Token::Keyword(Keyword::Desc) => Some(ast::Direction::Descending),
                     _ => None,
                 })
-                .unwrap_or(ast::Order::Ascending);
+                .unwrap_or(ast::Direction::Ascending);
             order_by.push((expr, order));
             if !self.next_is(Token::Comma) {
                 break;

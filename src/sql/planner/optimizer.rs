@@ -4,7 +4,8 @@ use crate::sql::types::{Expression, Label, Value};
 
 use std::collections::HashMap;
 
-/// A plan optimizer, which takes a root node and recursively transforms it.
+/// A plan optimizer, which recursively transforms a plan node to make plan
+/// execution more efficient where possible.
 pub type Optimizer = fn(Node) -> Result<Node>;
 
 /// The set of optimizers, and the order in which they are applied.
@@ -18,12 +19,14 @@ pub static OPTIMIZERS: &[(&str, Optimizer)] = &[
 
 /// Folds constant (sub)expressions by pre-evaluating them, instead of
 /// re-evaluating then for every row during execution.
-pub(super) fn fold_constants(node: Node) -> Result<Node> {
+pub fn fold_constants(node: Node) -> Result<Node> {
     use Expression::*;
     use Value::*;
 
-    // Transforms expressions.
-    let transform = |mut expr: Expression| {
+    // Transform expressions. Called after descending, to perform logical
+    // short-circuiting on child expressions that have already been folded, and
+    // to reduce the quadratic cost when an expression contains a column.
+    let xform = |mut expr: Expression| {
         // If the expression is constant, evaluate it.
         //
         // This is a very simple approach, which doesn't handle more complex
@@ -31,8 +34,8 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
         // expression as 1 - 2 + a to evaluate the 1 - 2 branch).
         //
         // TODO: consider doing something better.
-        if !expr.contains(&|e| matches!(e, Expression::Column(_))) {
-            return expr.evaluate(None).map(Expression::Constant);
+        if !expr.contains(&|expr| matches!(expr, Column(_))) {
+            return expr.evaluate(None).map(Constant);
         }
 
         // If the expression is a logical operator, and one of the sides is
@@ -61,15 +64,13 @@ pub(super) fn fold_constants(node: Node) -> Result<Node> {
         Ok(expr)
     };
 
-    // Transform expressions after descending, both to perform the logical
-    // short-circuiting on child expressions that have already been folded, and
-    // to reduce the quadratic cost when an expression contains a column.
-    node.transform(&|n| n.transform_expressions(&Ok, &transform), &Ok)
+    node.transform(&|node| node.transform_expressions(&Ok, &xform), &Ok)
 }
 
 /// Pushes filter predicates down into child nodes where possible. In
-/// particular, this can allow filtering during storage scans (below Raft).
-pub(super) fn push_filters(node: Node) -> Result<Node> {
+/// particular, this can allow filtering during storage scans (below Raft),
+/// instead of reading and transmitting all rows then filtering.
+pub fn push_filters(node: Node) -> Result<Node> {
     /// Pushes an expression into a node if possible. Otherwise, returns the the
     /// unpushed expression.
     fn push_into(expr: Expression, target: &mut Node) -> Option<Expression> {
@@ -112,7 +113,7 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         // replace this filter node with the source node, Node.transform() will
         // skip the source node since it now takes the place of the original
         // filter node. Transform the source manually.
-        transform(*source)
+        xform(*source)
     }
 
     // Pushes down parts of a join predicate into the left or right sources
@@ -130,10 +131,10 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         let (mut push_left, mut push_right, mut predicate) = (Vec::new(), Vec::new(), Vec::new());
         for expr in cnf {
             let (mut ref_left, mut ref_right) = (false, false);
-            expr.walk(&mut |e| {
-                if let Expression::Column(index) = e {
-                    ref_left = ref_left || *index < left.size();
-                    ref_right = ref_right || *index >= left.size();
+            expr.walk(&mut |expr| {
+                if let Expression::Column(index) = expr {
+                    ref_left = ref_left || *index < left.columns();
+                    ref_right = ref_right || *index >= left.columns();
                 }
                 !(ref_left && ref_right) // exit once both are referenced
             });
@@ -153,6 +154,7 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         // the constant lookups to the other side, to allow index lookups. This
         // commonly happens when joining a foreign key (which is indexed) on a
         // primary key, and we want to make use of the foreign key index, e.g.:
+        //
         // SELECT m.name, g.name FROM movies m JOIN genres g ON m.genre_id = g.id AND g.id = 7;
         let left_lookups: HashMap<usize, usize> = push_left // column → push_left index
             .iter()
@@ -168,18 +170,20 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
         for expr in &predicate {
             // Find equijoins.
             let Expression::Equal(lhs, rhs) = expr else { continue };
-            let Expression::Column(l) = lhs.as_ref() else { continue };
-            let Expression::Column(r) = rhs.as_ref() else { continue };
+            let Expression::Column(mut l) = **lhs else { continue };
+            let Expression::Column(mut r) = **rhs else { continue };
 
             // The lhs may be a reference to the right source; swap them.
-            let (l, r) = if l > r { (r, l) } else { (l, r) };
+            if l > r {
+                (l, r) = (r, l)
+            }
 
             // Check if either side is a column lookup, and copy it over.
-            if let Some(expr) = left_lookups.get(l).map(|i| push_left[*i].clone()) {
-                push_right.push(expr.replace_column(*l, *r));
+            if let Some(expr) = left_lookups.get(&l).map(|i| push_left[*i].clone()) {
+                push_right.push(expr.replace_column(l, r));
             }
-            if let Some(expr) = right_lookups.get(r).map(|i| push_right[*i].clone()) {
-                push_left.push(expr.replace_column(*r, *l));
+            if let Some(expr) = right_lookups.get(&r).map(|i| push_right[*i].clone()) {
+                push_left.push(expr.replace_column(r, l));
             }
         }
 
@@ -193,10 +197,10 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
 
         if let Some(mut expr) = Expression::and_vec(push_right) {
             // Right columns have indexes in the joined row; shift them left.
-            expr = expr.shift_column(-(left.size() as isize));
+            expr = expr.shift_column(-(left.columns() as isize));
             if let Some(mut expr) = push_into(expr, &mut right) {
                 // Pushdown failed, undo the column index shift.
-                expr = expr.shift_column(left.size() as isize);
+                expr = expr.shift_column(left.columns() as isize);
                 predicate.push(expr)
             }
         }
@@ -207,18 +211,16 @@ pub(super) fn push_filters(node: Node) -> Result<Node> {
     }
 
     /// Applies pushdown transformations to a node.
-    fn transform(mut node: Node) -> Node {
-        node = push_filter(node);
-        node = push_join(node);
-        node
+    fn xform(node: Node) -> Node {
+        push_join(push_filter(node))
     }
 
     // Push down before descending, so we can keep recursively pushing down.
-    node.transform(&|n| Ok(transform(n)), &Ok)
+    node.transform(&|node| Ok(xform(node)), &Ok)
 }
 
 /// Uses an index or primary key lookup for a filter when possible.
-pub(super) fn index_lookup(node: Node) -> Result<Node> {
+pub fn index_lookup(node: Node) -> Result<Node> {
     let transform = |mut node| {
         // Only handle scan filters. filter_pushdown() must have pushed filters
         // into scan nodes first.
@@ -229,10 +231,10 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
 
         // Find the first expression that's either a primary key or secondary
         // index lookup. We could be more clever here, but this is fine.
-        let Some((i, column)) = cnf.iter().enumerate().find_map(|(i, e)| {
-            e.is_column_lookup()
+        let Some((i, column)) = cnf.iter().enumerate().find_map(|(i, expr)| {
+            expr.is_column_lookup()
                 .filter(|c| *c == table.primary_key || table.columns[*c].index)
-                .map(|c| (i, c))
+                .map(|column| (i, column))
         }) else {
             return Node::Scan { table, alias, filter: Some(filter) };
         };
@@ -247,7 +249,7 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
             node = Node::IndexLookup { table, column, values, alias };
         }
 
-        // If there's any remaining CNF expressions add a filter node for them.
+        // If there's any remaining CNF expressions, add a filter node for them.
         if let Some(predicate) = Expression::and_vec(cnf) {
             node = Node::Filter { source: Box::new(node), predicate };
         }
@@ -258,9 +260,8 @@ pub(super) fn index_lookup(node: Node) -> Result<Node> {
 }
 
 /// Uses a hash join instead of a nested loop join for single-column equijoins.
-pub(super) fn join_type(node: Node) -> Result<Node> {
-    let transform = |node| match node {
-        // We could use a single match if we had deref patterns, but alas.
+pub fn join_type(node: Node) -> Result<Node> {
+    let xform = |node| match node {
         Node::NestedLoopJoin {
             left,
             right,
@@ -273,9 +274,9 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
                     (left_column, right_column) = (right_column, left_column);
                 }
                 // The NestedLoopJoin predicate uses column indexes in the
-                // joined row, while the HashJoin uses column indexes for each
-                // table individually. Adjust the RHS column reference.
-                right_column -= left.size();
+                // joined row, while the HashJoin uses column indexes in each
+                // individual table. Adjust the RHS column reference.
+                right_column -= left.columns();
                 Node::HashJoin { left, left_column, right, right_column, outer }
             }
             (lhs, rhs) => {
@@ -285,22 +286,22 @@ pub(super) fn join_type(node: Node) -> Result<Node> {
         },
         node => node,
     };
-    node.transform(&|n| Ok(transform(n)), &Ok)
+    node.transform(&|node| Ok(xform(node)), &Ok)
 }
 
 /// Short-circuits useless nodes and expressions, by removing them and/or
 /// replacing them with Nothing nodes that yield no rows.
-pub(super) fn short_circuit(node: Node) -> Result<Node> {
-    use Expression::Constant;
-    use Value::{Boolean, Null};
+pub fn short_circuit(node: Node) -> Result<Node> {
+    use Expression::*;
+    use Value::*;
 
     /// Creates a Nothing node with the columns of the original node.
     fn nothing(node: &Node) -> Node {
-        let columns = (0..node.size()).map(|i| node.column_label(i)).collect();
+        let columns = (0..node.columns()).map(|i| node.column_label(i)).collect();
         Node::Nothing { columns }
     }
 
-    let transform = |node| match node {
+    let xform = |node| match node {
         // Filter nodes that always yield true are unnecessary: remove them.
         Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
 
@@ -324,7 +325,7 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
         ref node @ Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => {
             nothing(node)
         }
-        Node::Values { rows } if rows.is_empty() => Node::Nothing { columns: vec![] },
+        ref node @ Node::Values { ref rows } if rows.is_empty() => nothing(node),
 
         // Short-circuit nodes that pull from a Nothing node.
         //
@@ -345,12 +346,12 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
 
         // Remove noop projections that simply pass through the source columns.
         Node::Projection { source, expressions, aliases }
-            if source.size() == expressions.len()
-                && aliases.iter().all(|a| a == &Label::None)
+            if source.columns() == expressions.len()
+                && aliases.iter().all(|alias| *alias == Label::None)
                 && expressions
                     .iter()
                     .enumerate()
-                    .all(|(i, e)| matches!(e, Expression::Column(f) if i == *f)) =>
+                    .all(|(i, expr)| matches!(expr, Expression::Column(c) if i == *c)) =>
         {
             *source
         }
@@ -359,5 +360,5 @@ pub(super) fn short_circuit(node: Node) -> Result<Node> {
     };
 
     // Transform after descending, to pull Nothing nodes upwards.
-    node.transform(&Ok, &|n| Ok(transform(n)))
+    node.transform(&Ok, &|node| Ok(xform(node)))
 }
