@@ -74,6 +74,15 @@ pub struct Status {
     pub garbage_disk_size: u64,
 }
 
+impl Status {
+    pub fn garbage_percent(&self) -> f64 {
+        if self.total_disk_size == 0 {
+            return 0.0;
+        }
+        self.garbage_disk_size as f64 / self.total_disk_size as f64 * 100.0
+    }
+}
+
 /// Test helpers for engines.
 #[cfg(test)]
 pub mod test {

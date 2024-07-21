@@ -80,7 +80,7 @@ impl BitCask {
             log::info!(
                 "Compacting {} to remove {:.0}% garbage ({} MB out of {} MB)",
                 s.log.path.display(),
-                status.garbage_disk_size as f64 / status.total_disk_size as f64 * 100.0,
+                status.garbage_percent(),
                 status.garbage_disk_size / 1024 / 1024,
                 status.total_disk_size / 1024 / 1024
             );
