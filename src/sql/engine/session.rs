@@ -8,6 +8,7 @@ use crate::sql::types::{Label, Row, Rows, Value};
 use crate::storage::mvcc;
 use crate::{errdata, errinput};
 
+use itertools::Itertools as _;
 use log::error;
 use serde::{Deserialize, Serialize};
 
@@ -28,28 +29,30 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
 
     /// Executes a client statement.
     pub fn execute(&mut self, statement: &str) -> Result<StatementResult> {
-        match Parser::new(statement).parse()? {
+        // Parse and execute the statement. Transaction control is done here,
+        // other statements are executed by the SQL engine.
+        Ok(match Parser::new(statement).parse()? {
             ast::Statement::Begin { .. } if self.txn.is_some() => {
-                errinput!("already in a transaction")
+                return errinput!("already in a transaction")
             }
             ast::Statement::Begin { read_only: false, as_of: Some(_) } => {
-                errinput!("can't start read-write transaction in a given version")
+                return errinput!("can't start read-write transaction in a given version")
             }
             ast::Statement::Begin { read_only: false, as_of: None } => {
                 let txn = self.engine.begin()?;
                 let version = txn.version();
                 self.txn = Some(txn);
-                Ok(StatementResult::Begin { version, read_only: false })
+                StatementResult::Begin { version, read_only: false }
             }
             ast::Statement::Begin { read_only: true, as_of: None } => {
                 let txn = self.engine.begin_read_only()?;
                 let version = txn.version();
                 self.txn = Some(txn);
-                Ok(StatementResult::Begin { version, read_only: true })
+                StatementResult::Begin { version, read_only: true }
             }
             ast::Statement::Begin { read_only: true, as_of: Some(version) } => {
                 self.txn = Some(self.engine.begin_as_of(version)?);
-                Ok(StatementResult::Begin { version, read_only: true })
+                StatementResult::Begin { version, read_only: true }
             }
             ast::Statement::Commit => {
                 let Some(txn) = self.txn.take() else {
@@ -57,7 +60,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
                 };
                 let version = txn.version();
                 txn.commit()?;
-                Ok(StatementResult::Commit { version })
+                StatementResult::Commit { version }
             }
             ast::Statement::Rollback => {
                 let Some(txn) = self.txn.take() else {
@@ -65,18 +68,18 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
                 };
                 let version = txn.version();
                 txn.rollback()?;
-                Ok(StatementResult::Rollback { version })
+                StatementResult::Rollback { version }
             }
             ast::Statement::Explain(statement) => self.with_txn(true, |txn| {
                 Ok(StatementResult::Explain(Plan::build(*statement, txn)?.optimize()?))
-            }),
+            })?,
             statement => {
                 let read_only = matches!(statement, ast::Statement::Select { .. });
                 self.with_txn(read_only, |txn| {
                     Plan::build(statement, txn)?.optimize()?.execute(txn)?.try_into()
-                })
+                })?
             }
-        }
+        })
     }
 
     /// Runs a closure in the session's explicit transaction, if there is one,
@@ -154,9 +157,9 @@ impl TryFrom<ExecutionResult> for StatementResult {
             ExecutionResult::Delete { count } => Self::Delete { count },
             ExecutionResult::Insert { count } => Self::Insert { count },
             ExecutionResult::Update { count } => Self::Update { count },
-            ExecutionResult::Select { rows, labels } => {
+            ExecutionResult::Select { rows, columns } => {
                 // We buffer the entire set of rows, for simplicity.
-                Self::Select { columns: labels, rows: rows.collect::<Result<_>>()? }
+                Self::Select { columns, rows: rows.try_collect()? }
             }
         })
     }
@@ -180,7 +183,7 @@ impl TryFrom<StatementResult> for Row {
 
     fn try_from(result: StatementResult) -> Result<Self> {
         let mut rows: Rows = result.try_into()?;
-        rows.next().transpose()?.ok_or(errdata!("no rows returned"))
+        rows.next().transpose()?.ok_or_else(|| errdata!("no rows returned"))
     }
 }
 
@@ -190,7 +193,7 @@ impl TryFrom<StatementResult> for Value {
 
     fn try_from(result: StatementResult) -> Result<Self> {
         let row: Row = result.try_into()?;
-        row.into_iter().next().ok_or(errdata!("no columns returned"))
+        row.into_iter().next().ok_or_else(|| errdata!("no columns returned"))
     }
 }
 
@@ -199,8 +202,7 @@ impl TryFrom<StatementResult> for bool {
     type Error = Error;
 
     fn try_from(result: StatementResult) -> Result<Self> {
-        let value: Value = result.try_into()?;
-        value.try_into()
+        Value::try_from(result)?.try_into()
     }
 }
 
@@ -209,8 +211,7 @@ impl TryFrom<StatementResult> for f64 {
     type Error = Error;
 
     fn try_from(result: StatementResult) -> Result<Self> {
-        let value: Value = result.try_into()?;
-        value.try_into()
+        Value::try_from(result)?.try_into()
     }
 }
 
@@ -219,8 +220,7 @@ impl TryFrom<StatementResult> for i64 {
     type Error = Error;
 
     fn try_from(result: StatementResult) -> Result<Self> {
-        let value: Value = result.try_into()?;
-        value.try_into()
+        Value::try_from(result)?.try_into()
     }
 }
 
@@ -229,7 +229,6 @@ impl TryFrom<StatementResult> for String {
     type Error = Error;
 
     fn try_from(result: StatementResult) -> Result<Self> {
-        let value: Value = result.try_into()?;
-        value.try_into()
+        Value::try_from(result)?.try_into()
     }
 }

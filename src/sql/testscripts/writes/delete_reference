@@ -24,8 +24,8 @@ ok
 !> DELETE FROM ref
 !> DELETE FROM ref WHERE id = 1
 ---
-Error: invalid input: primary key referenced by name.id=1
-Error: invalid input: primary key referenced by name.id=1
+Error: invalid input: row referenced by name.id=1
+Error: invalid input: row referenced by name.id=1
 
 > SELECT * FROM ref
 ---
@@ -97,7 +97,7 @@ ok
 # Deleting a referenced row errors.
 !> DELETE FROM self WHERE id = 2
 ---
-Error: invalid input: primary key referenced by self.id=3
+Error: invalid input: row referenced by self.id=3
 
 # Deleting an unreferenced row works.
 > DELETE FROM self WHERE id = 4

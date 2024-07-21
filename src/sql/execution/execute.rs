@@ -42,9 +42,9 @@ pub fn execute_plan(
         }
 
         Plan::Select(root) => {
-            let labels = (0..root.columns()).map(|i| root.column_label(i)).collect();
-            let iter = execute(root, txn)?;
-            ExecutionResult::Select { rows: iter, labels }
+            let columns = (0..root.columns()).map(|i| root.column_label(i)).collect();
+            let rows = execute(root, txn)?;
+            ExecutionResult::Select { rows, columns }
         }
 
         Plan::Update { table, primary_key, source, expressions } => {
@@ -130,5 +130,5 @@ pub enum ExecutionResult {
     Delete { count: u64 },
     Insert { count: u64 },
     Update { count: u64 },
-    Select { rows: Rows, labels: Vec<Label> },
+    Select { rows: Rows, columns: Vec<Label> },
 }

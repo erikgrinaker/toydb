@@ -158,8 +158,8 @@ storage delete mvcc:TxnActive(26) ["\x01\x00\x00\x00\x00\x00\x00\x00\x1a"]
 !> UPDATE self SET id = 4 WHERE id = 1
 !> UPDATE self SET id = 4 WHERE id = 2
 ---
-Error: invalid input: primary key referenced by self.id=2
-Error: invalid input: primary key referenced by self.id=3
+Error: invalid input: row referenced by self.id=2
+Error: invalid input: row referenced by self.id=3
 
 # Not even when only this row points to itself.
 > UPDATE self SET self_id = NULL WHERE id > 1
@@ -185,4 +185,4 @@ Error: invalid input: reference 1 not in table self
 
 !> UPDATE "int" SET id = -id
 ---
-Error: invalid input: primary key referenced by name.id=2
+Error: invalid input: row referenced by name.id=2

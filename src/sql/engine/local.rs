@@ -5,16 +5,16 @@ use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::{self, mvcc};
 
+use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A SQL engine using local storage. This provides the main SQL storage logic,
-/// including with the Raft SQL engine which dispatches to this engine for
-/// node-local SQL storage.
+/// and the Raft SQL engine just dispatches to this for node-local SQL storage.
 pub struct Local<E: storage::Engine + 'static> {
     /// The local MVCC storage engine.
-    pub(crate) mvcc: mvcc::MVCC<E>,
+    pub mvcc: mvcc::MVCC<E>,
 }
 
 impl<E: storage::Engine> Local<E> {
@@ -26,12 +26,12 @@ impl<E: storage::Engine> Local<E> {
     /// Resumes a transaction from the given state. This is usually encapsulated
     /// in `mvcc::Transaction`, but the Raft-based engine can't retain the MVCC
     /// transaction between each request since it may be executed across
-    /// multiple leader nodes, so it instead keeps the state in the session.
+    /// different leader nodes, so it instead keeps the state in the session.
     pub fn resume(&self, state: mvcc::TransactionState) -> Result<Transaction<E>> {
         Ok(Transaction::new(self.mvcc.resume(state)?))
     }
 
-    /// Fetches an unversioned key, or None if it doesn't exist.
+    /// Gets an unversioned key, or None if it doesn't exist.
     pub fn get_unversioned(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.mvcc.get_unversioned(key)
     }
@@ -70,7 +70,7 @@ impl<E: storage::Engine> Transaction<E> {
     }
 
     /// Returns the transaction's internal state.
-    pub(super) fn state(&self) -> &mvcc::TransactionState {
+    pub fn state(&self) -> &mvcc::TransactionState {
         self.txn.state()
     }
 
@@ -163,7 +163,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 
     fn delete(&self, table: &str, ids: &[Value]) -> Result<()> {
         let table = self.must_get_table(table)?;
-        let indexes: Vec<_> = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
+        let indexes = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect_vec();
 
         // Check for foreign key references to the deleted rows.
         for (source, refs) in self.table_references(&table.name)? {
@@ -188,25 +188,20 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                         source_ids.remove(id);
                     }
                 }
-                if let Some(source_id) = source_ids.into_iter().next() {
-                    return errinput!(
-                        "primary key referenced by {}.{}={source_id}",
-                        source.name,
-                        source.columns[source.primary_key].name
-                    );
+                // Error if the delete would violate referential integrity.
+                if let Some(source_id) = source_ids.first() {
+                    let table = source.name;
+                    let column = &source.columns[source.primary_key].name;
+                    return errinput!("row referenced by {table}.{column}={source_id}");
                 }
             }
         }
 
+        // Delete the rows.
         for id in ids {
-            // Normalize the ID.
-            //
-            // NB: We don't need to normalize in the above loop, because we're
-            // calling methods that themselves perform normalization.
             let id = id.normalize_ref();
 
-            // Remove the primary key from any index entries. There must be an
-            // index entry for each row.
+            // Update any index entries.
             if !indexes.is_empty() {
                 if let Some(row) = self.get_row(&table.name, &id)? {
                     for (i, column) in indexes.iter().copied() {
@@ -217,7 +212,6 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                 }
             }
 
-            // Delete the row.
             self.txn.delete(&Key::Row((&table.name).into(), id).encode())?;
         }
         Ok(())
@@ -249,37 +243,37 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
     }
 
     fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<BTreeSet<Value>> {
-        debug_assert!(self.has_index(table, column)?, "index lookup without index");
-        let mut pks = BTreeSet::new();
-        for v in values {
-            pks.extend(self.get_index(table, column, &v.normalize_ref())?)
-        }
-        Ok(pks)
+        debug_assert!(self.has_index(table, column)?, "no index on {table}.{column}");
+        values
+            .iter()
+            .map(|v| self.get_index(table, column, &v.normalize_ref()))
+            .flatten_ok()
+            .collect()
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
-        Ok(Box::new(
-            self.txn
-                .scan_prefix(&KeyPrefix::Row(table.into()).encode())
-                .map(|r| r.and_then(|(_, v)| Row::decode(&v)))
-                .filter_map(move |r| match r {
-                    Ok(row) => match &filter {
-                        Some(filter) => match filter.evaluate(Some(&row)) {
-                            Ok(Value::Boolean(b)) if b => Some(Ok(row)),
-                            Ok(Value::Boolean(_)) | Ok(Value::Null) => None,
-                            Ok(v) => Some(errinput!("filter returned {v}, expected boolean")),
-                            Err(err) => Some(Err(err)),
-                        },
-                        None => Some(Ok(row)),
-                    },
-                    err => Some(err),
-                }),
-        ))
+        // TODO: this could be simpler if process_results() implemented Clone.
+        let rows = self
+            .txn
+            .scan_prefix(&KeyPrefix::Row(table.into()).encode())
+            .map(|result| result.and_then(|(_, value)| Row::decode(&value)));
+        let Some(filter) = filter else {
+            return Ok(Box::new(rows));
+        };
+        let rows = rows.filter_map(move |result| {
+            result
+                .and_then(|row| match filter.evaluate(Some(&row))? {
+                    Value::Boolean(true) => Ok(Some(row)),
+                    Value::Boolean(false) | Value::Null => Ok(None),
+                    value => errinput!("filter returned {value}, expected boolean"),
+                })
+                .transpose()
+        });
+        Ok(Box::new(rows))
     }
 
     fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()> {
         let table = self.must_get_table(table)?;
-
         for (mut id, mut row) in rows {
             // Normalize the ID and row.
             id.normalize();
@@ -298,8 +292,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             table.validate_row(&row, true, self)?;
 
             // Update indexes, knowing that the primary key has not changed.
-            let indexes: Vec<_> =
-                table.columns.iter().enumerate().filter(|(_, c)| c.index).collect();
+            let indexes = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect_vec();
             if !indexes.is_empty() {
                 let old = self.get(&table.name, &[id.clone()])?.remove(0);
                 for (i, column) in indexes {
@@ -362,29 +355,21 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         // scanning, so we buffer all keys in a vector. We could also do this in
         // batches, although we'd want to do the batching above Raft to avoid
         // blocking Raft processing for the duration of the drop.
-        let keys: Vec<Vec<u8>> = self
-            .txn
-            .scan_prefix(&KeyPrefix::Row((&table.name).into()).encode())
-            .map(|r| r.map(|(key, _)| key))
-            .collect::<Result<_>>()?;
+        let prefix = &KeyPrefix::Row((&table.name).into()).encode();
+        let keys: Vec<Vec<u8>> =
+            self.txn.scan_prefix(prefix).map_ok(|(key, _)| key).try_collect()?;
         for key in keys {
             self.txn.delete(&key)?;
         }
 
         // Delete any secondary indexes.
         for column in table.columns.iter().filter(|c| c.index) {
-            let keys: Vec<_> = self
-                .txn
-                .scan_prefix(
-                    &KeyPrefix::Index((&table.name).into(), (&column.name).into()).encode(),
-                )
-                .map(|r| r.map(|(key, _)| key))
-                .collect::<Result<_>>()?;
+            let prefix = &KeyPrefix::Index((&table.name).into(), (&column.name).into()).encode();
+            let keys: Vec<_> = self.txn.scan_prefix(prefix).map_ok(|(key, _)| key).try_collect()?;
             for key in keys {
                 self.txn.delete(&key)?;
             }
         }
-
         Ok(true)
     }
 

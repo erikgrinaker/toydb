@@ -12,28 +12,24 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A Raft-based SQL engine. This dispatches to the `Local` engine for local
-/// processing and storage on each node, but plumbs read/write commands through
+/// storage and processing on each node, but plumbs read/write commands through
 /// Raft for distributed consensus.
 ///
 /// The `Raft` engine itself is simply a Raft client which sends `raft::Request`
 /// requests to the local Raft node for processing. These requests are received
 /// and processed by the Raft engine's `State` state machine running below Raft
 /// on each node, which forwards the commands to a `Local` SQL engine which
-/// actually executes them using a `storage::Engine` for local storage. I.e.:
+/// actually executes them using a `storage::Engine` for local storage.
 ///
-/// 1. `sql::engine::Session`: plans and executes a SQL statement.
-/// 2. `sql::engine::Raft`: sends row CRUD commands as `raft::Request`.
-/// 3. `raft::Node`: performs Raft distributed consensus.
-/// 4. `sql::engine::raft::State`: receives CRUD commands.
-/// 5. `sql::engine::Local`: executes CRUD commands on each node.
-/// 6. `storage::Engine`: reads/writes data on disk.
+/// For more details on how SQL statements flow through the engine, see the
+/// `sql` module documentation.
 pub struct Raft {
     /// Sends requests to the local Raft node, along with a response channel.
     tx: Sender<(raft::Request, Sender<Result<raft::Response>>)>,
 }
 
 impl Raft {
-    /// The unversioned key used to store the applied index. Just use a string
+    /// The unversioned key used to store the applied index. Just uses a string
     /// for simplicity.
     pub const APPLIED_INDEX_KEY: &'static [u8] = b"applied_index";
 
@@ -57,18 +53,18 @@ impl Raft {
     }
 
     /// Writes through Raft, deserializing the response into the return type.
-    fn write<V: DeserializeOwned>(&self, mutation: Write) -> Result<V> {
-        match self.execute(raft::Request::Write(mutation.encode()))? {
-            raft::Response::Write(response) => Ok(bincode::deserialize(&response)?),
-            resp => errdata!("unexpected Raft write response {resp:?}"),
+    fn write<V: DeserializeOwned>(&self, write: Write) -> Result<V> {
+        match self.execute(raft::Request::Write(write.encode()))? {
+            raft::Response::Write(response) => bincode::deserialize(&response),
+            response => errdata!("unexpected Raft write response {response:?}"),
         }
     }
 
     /// Reads from Raft, deserializing the response into the return type.
-    fn read<V: DeserializeOwned>(&self, query: Read) -> Result<V> {
-        match self.execute(raft::Request::Read(query.encode()))? {
-            raft::Response::Read(response) => Ok(bincode::deserialize(&response)?),
-            resp => errdata!("unexpected Raft read response {resp:?}"),
+    fn read<V: DeserializeOwned>(&self, read: Read) -> Result<V> {
+        match self.execute(raft::Request::Read(read.encode()))? {
+            raft::Response::Read(response) => bincode::deserialize(&response),
+            response => errdata!("unexpected Raft read response {response:?}"),
         }
     }
 
@@ -76,7 +72,7 @@ impl Raft {
     pub fn status(&self) -> Result<Status> {
         let raft = match self.execute(raft::Request::Status)? {
             raft::Response::Status(status) => status,
-            resp => return errdata!("unexpected Raft status response {resp:?}"),
+            response => return errdata!("unexpected Raft status response {response:?}"),
         };
         let mvcc = self.read(Read::Status)?;
         Ok(Status { raft, mvcc })
@@ -120,7 +116,7 @@ impl<'a> Transaction<'a> {
         assert!(as_of.is_none() || read_only, "can't use as_of without read_only");
         // Read-only transactions don't need to persist anything, they just need
         // to grab the current transaction state, so submit them as reads to
-        // avoid a replication roundtrip (which would also require fsyncs).
+        // avoid a replication roundtrip.
         let state = if read_only || as_of.is_some() {
             engine.read(Read::BeginReadOnly { as_of })?
         } else {
@@ -183,7 +179,7 @@ impl<'a> super::Transaction for Transaction<'a> {
     }
 
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows> {
-        let scan: Vec<_> = self.engine.read(Read::Scan {
+        let scan: Vec<Row> = self.engine.read(Read::Scan {
             txn: (&self.state).into(),
             table: table.into(),
             filter,
@@ -226,7 +222,7 @@ impl<'a> Catalog for Transaction<'a> {
 /// instead simply delivering them as one large chunk. This means that e.g. a
 /// full table scan will pull the entire table into memory, serialize it, and
 /// send it across the network as one message. The simplest way to address this
-/// would likely be to send batches of e.g. 1000 rows at a time.
+/// would likely be to send row batches, but this is fine for our purposes.
 pub struct State<E: storage::Engine + 'static> {
     /// The local SQL engine.
     local: super::Local<E>,
@@ -330,9 +326,10 @@ impl<E: storage::Engine> raft::State for State<E> {
                 self.local
                     .resume(txn.into_owned())?
                     .scan(&table, filter)?
-                    .collect::<Result<Vec<_>>>()?
+                    .collect::<Result<Vec<Row>>>()?
                     .encode()
             }
+
             Read::GetTable { txn, table } => {
                 self.local.resume(txn.into_owned())?.get_table(&table)?.encode()
             }

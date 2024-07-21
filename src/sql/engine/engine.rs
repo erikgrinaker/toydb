@@ -54,20 +54,19 @@ pub trait Transaction {
     fn get(&self, table: &str, ids: &[Value]) -> Result<Vec<Row>>;
     /// Inserts new table rows.
     fn insert(&self, table: &str, rows: Vec<Row>) -> Result<()>;
-    /// Looks up a set of primary keys by index values. Uses a BTreeSet for test
-    /// determinism.
+    /// Looks up a set of primary keys by index values. BTreeSet for testing.
     fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<BTreeSet<Value>>;
     /// Scans a table's rows, optionally applying the given filter.
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
-    /// Updates table rows by primary key. Uses a BTreeMap for test determinism.
+    /// Updates table rows by primary key. Uses BTreeMap for testing.
     fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()>;
 }
 
-/// The catalog stores table schema information. It is required for
-/// Engine::Transaction, and thus fully transactional. For simplicity, it only
-/// supports very simple operations: creating and dropping tables. There are no
-/// ALTER TABLE schema changes, nor CREATE INDEX -- everything has to be
-/// specified when the table is initially created.
+/// The catalog stores table schema information. It must be implemented for
+/// Engine::Transaction, and is thus fully transactional. For simplicity, it
+/// only supports creating and dropping tables. There are no ALTER TABLE schema
+/// changes, nor CREATE INDEX -- everything has to be specified when the table
+/// is initially created.
 ///
 /// This type is separate from Transaction, even though Engine::Transaction
 /// requires transactions to implement it. This allows better control of when
