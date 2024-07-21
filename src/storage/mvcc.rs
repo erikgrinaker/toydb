@@ -140,7 +140,7 @@
 //! travel queries (it's a feature, not a bug!).
 
 use super::engine::{self, Engine};
-use crate::encoding::{self, bincode, Key as _, Value as _};
+use crate::encoding::{self, bincode, keycode, Key as _, Value as _};
 use crate::error::{Error, Result};
 use crate::{errdata, errinput};
 
@@ -598,7 +598,7 @@ impl<E: Engine> Transaction<E> {
         // the KeyCode byte slice terminator 0x0000 at the end.
         let mut prefix = KeyPrefix::Version(prefix.into()).encode();
         prefix.truncate(prefix.len() - 2);
-        let range = encoding::prefix_range(&prefix);
+        let range = keycode::prefix_range(&prefix);
         ScanIterator::new(self.engine.clone(), self.state().clone(), range)
     }
 }

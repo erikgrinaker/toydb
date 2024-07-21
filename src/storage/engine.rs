@@ -1,4 +1,4 @@
-use crate::encoding;
+use crate::encoding::keycode;
 use crate::error::Result;
 
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ pub trait Engine: Send {
     where
         Self: Sized, // omit in trait objects, for object safety
     {
-        self.scan(encoding::prefix_range(prefix))
+        self.scan(keycode::prefix_range(prefix))
     }
 
     /// Sets a value for a key, replacing the existing value if any.
