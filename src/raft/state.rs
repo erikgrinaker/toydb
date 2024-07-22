@@ -55,6 +55,7 @@ pub trait State: Send {
 pub mod test {
     use super::*;
     use crate::encoding::{self, Value as _};
+
     use crossbeam::channel::Sender;
     use itertools::Itertools as _;
     use serde::{Deserialize, Serialize};

@@ -338,16 +338,18 @@ impl<'a> std::iter::Iterator for Iterator<'a> {
     }
 }
 
+/// Most Raft tests are Goldenscripts under src/raft/testscripts.
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
+    use crate::storage::engine::test as testengine;
+
     use crossbeam::channel::Receiver;
     use itertools::Itertools as _;
     use regex::Regex;
     use std::fmt::Write as _;
     use std::{error::Error, result::Result};
-    use storage::engine::test::{self as testengine, Operation};
     use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/raft/testscripts/log.
@@ -362,222 +364,7 @@ mod tests {
         log: Log,
         op_rx: Receiver<testengine::Operation>,
         #[allow(dead_code)]
-        tempdir: tempfile::TempDir, // deleted when dropped
-    }
-
-    impl goldenscript::Runner for TestRunner {
-        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
-            let mut output = String::new();
-            match command.name.as_str() {
-                // append [COMMAND]
-                "append" => {
-                    let mut args = command.consume_args();
-                    let command = args.next_pos().map(|a| a.value.as_bytes().to_vec());
-                    args.reject_rest()?;
-                    let index = self.log.append(command)?;
-                    let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!(
-                        "append → {}\n",
-                        format::Raft::<format::Raw>::entry(&entry)
-                    ));
-                }
-
-                // commit INDEX
-                "commit" => {
-                    let mut args = command.consume_args();
-                    let index = args.next_pos().ok_or("index not given")?.parse()?;
-                    args.reject_rest()?;
-                    let index = self.log.commit(index)?;
-                    let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!(
-                        "commit → {}\n",
-                        format::Raft::<format::Raw>::entry(&entry)
-                    ));
-                }
-
-                // dump
-                "dump" => {
-                    command.consume_args().reject_rest()?;
-                    let range = (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded);
-                    let mut scan = self.log.engine.scan_dyn(range);
-                    while let Some((key, value)) = scan.next().transpose()? {
-                        writeln!(
-                            output,
-                            "{} [{}]",
-                            format::Raft::<format::Raw>::key_value(&key, &value),
-                            format::Raw::key_value(&key, &value)
-                        )?;
-                    }
-                }
-
-                // get INDEX...
-                "get" => {
-                    let mut args = command.consume_args();
-                    let indexes: Vec<Index> =
-                        args.rest_pos().iter().map(|a| a.parse()).try_collect()?;
-                    args.reject_rest()?;
-                    for index in indexes {
-                        let entry = self
-                            .log
-                            .get(index)?
-                            .as_ref()
-                            .map(format::Raft::<format::Raw>::entry)
-                            .unwrap_or("None".to_string());
-                        output.push_str(&format!("{entry}\n"));
-                    }
-                }
-
-                // get_term
-                "get_term" => {
-                    command.consume_args().reject_rest()?;
-                    let (term, vote) = self.log.get_term();
-                    output.push_str(&format!(
-                        "term={term} vote={}\n",
-                        vote.map(|v| v.to_string()).unwrap_or("None".to_string())
-                    ));
-                }
-
-                // has INDEX@TERM...
-                "has" => {
-                    let mut args = command.consume_args();
-                    let indexes: Vec<(Index, Term)> = args
-                        .rest_pos()
-                        .iter()
-                        .map(|a| Self::parse_index_term(&a.value))
-                        .try_collect()?;
-                    args.reject_rest()?;
-                    for (index, term) in indexes {
-                        let has = self.log.has(index, term)?;
-                        output.push_str(&format!("{has}\n"));
-                    }
-                }
-
-                // reload
-                "reload" => {
-                    command.consume_args().reject_rest()?;
-                    // To get owned access to the inner engine, temporarily
-                    // replace it with an empty memory engine.
-                    let engine =
-                        std::mem::replace(&mut self.log.engine, Box::new(storage::Memory::new()));
-                    self.log = Log::new(engine)?;
-                }
-
-                // scan [RANGE]
-                "scan" => {
-                    let mut args = command.consume_args();
-                    let range = Self::parse_index_range(
-                        args.next_pos().map_or("..", |a| a.value.as_str()),
-                    )?;
-                    args.reject_rest()?;
-                    let mut scan = self.log.scan(range);
-                    while let Some(entry) = scan.next().transpose()? {
-                        output
-                            .push_str(&format!("{}\n", format::Raft::<format::Raw>::entry(&entry)));
-                    }
-                }
-
-                // scan_apply APPLIED_INDEX
-                "scan_apply" => {
-                    let mut args = command.consume_args();
-                    let applied_index =
-                        args.next_pos().ok_or("applied index not given")?.parse()?;
-                    args.reject_rest()?;
-                    let mut scan = self.log.scan_apply(applied_index);
-                    while let Some(entry) = scan.next().transpose()? {
-                        output
-                            .push_str(&format!("{}\n", format::Raft::<format::Raw>::entry(&entry)));
-                    }
-                }
-
-                // set_term TERM [VOTE]
-                "set_term" => {
-                    let mut args = command.consume_args();
-                    let term = args.next_pos().ok_or("term not given")?.parse()?;
-                    let vote = args.next_pos().map(|a| a.parse()).transpose()?;
-                    args.reject_rest()?;
-                    self.log.set_term(term, vote)?;
-                }
-
-                // splice [INDEX@TERM=COMMAND...]
-                "splice" => {
-                    let mut args = command.consume_args();
-                    let mut entries = Vec::new();
-                    for arg in args.rest_key() {
-                        let (index, term) = Self::parse_index_term(arg.key.as_deref().unwrap())?;
-                        let command = match arg.value.as_str() {
-                            "" => None,
-                            value => Some(value.as_bytes().to_vec()),
-                        };
-                        entries.push(Entry { index, term, command });
-                    }
-                    args.reject_rest()?;
-                    let index = self.log.splice(entries)?;
-                    let entry = self.log.get(index)?.expect("entry not found");
-                    output.push_str(&format!(
-                        "splice → {}\n",
-                        format::Raft::<format::Raw>::entry(&entry)
-                    ));
-                }
-
-                // status [engine=BOOL]
-                "status" => {
-                    let mut args = command.consume_args();
-                    let engine = args.lookup_parse("engine")?.unwrap_or(false);
-                    args.reject_rest()?;
-                    let (term, vote) = self.log.get_term();
-                    let (last_index, last_term) = self.log.get_last_index();
-                    let (commit_index, commit_term) = self.log.get_commit_index();
-                    output.push_str(&format!(
-                        "term={term} last={last_index}@{last_term} commit={commit_index}@{commit_term} vote={}",
-                        vote.map(|id| id.to_string()).unwrap_or("None".to_string())
-                    ));
-                    if engine {
-                        output.push_str(&format!(" engine={:#?}", self.log.status()?));
-                    }
-                    output.push('\n');
-                }
-
-                name => return Err(format!("unknown command {name}").into()),
-            }
-            Ok(output)
-        }
-
-        /// If requested via [ops] tag, output engine operations for the command.
-        fn end_command(
-            &mut self,
-            command: &goldenscript::Command,
-        ) -> Result<String, Box<dyn Error>> {
-            // Parse tags.
-            let mut show_ops = false;
-            for tag in &command.tags {
-                match tag.as_str() {
-                    "ops" => show_ops = true,
-                    tag => return Err(format!("invalid tag {tag}").into()),
-                }
-            }
-
-            // Process engine operations, either output or drain.
-            let mut output = String::new();
-            while let Ok(op) = self.op_rx.try_recv() {
-                match op {
-                    _ if !show_ops => {}
-                    Operation::Delete { key } => writeln!(
-                        output,
-                        "engine delete {} [{}]",
-                        format::Raft::<format::Raw>::key(&key),
-                        format::Raw::key(&key)
-                    )?,
-                    Operation::Flush => writeln!(output, "engine flush")?,
-                    Operation::Set { key, value } => writeln!(
-                        output,
-                        "engine set {} [{}]",
-                        format::Raft::<format::Raw>::key_value(&key, &value),
-                        format::Raw::key_value(&key, &value)
-                    )?,
-                }
-            }
-            Ok(output)
-        }
+        tempdir: tempfile::TempDir,
     }
 
     impl TestRunner {
@@ -590,7 +377,7 @@ mod tests {
                 storage::BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
             let memory = storage::Memory::new();
             let engine = testengine::Emit::new(testengine::Mirror::new(bitcask, memory), op_tx);
-            let log = Log::new(Box::new(engine)).expect("log init failed");
+            let log = Log::new(Box::new(engine)).expect("log failed");
             Self { log, op_rx, tempdir }
         }
 
@@ -621,6 +408,206 @@ mod tests {
                 }
             }
             Ok(bound)
+        }
+    }
+
+    impl goldenscript::Runner for TestRunner {
+        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+            let mut output = String::new();
+            let mut tags = command.tags.clone();
+
+            match command.name.as_str() {
+                // append [COMMAND]
+                "append" => {
+                    let mut args = command.consume_args();
+                    let command = args.next_pos().map(|a| a.value.as_bytes().to_vec());
+                    args.reject_rest()?;
+                    let index = self.log.append(command)?;
+                    let entry = self.log.get(index)?.expect("entry not found");
+                    let fmtentry = format::Raft::<format::Raw>::entry(&entry);
+                    writeln!(output, "append → {fmtentry}")?;
+                }
+
+                // commit INDEX
+                "commit" => {
+                    let mut args = command.consume_args();
+                    let index = args.next_pos().ok_or("index not given")?.parse()?;
+                    args.reject_rest()?;
+                    let index = self.log.commit(index)?;
+                    let entry = self.log.get(index)?.expect("entry not found");
+                    let fmtentry = format::Raft::<format::Raw>::entry(&entry);
+                    writeln!(output, "commit → {fmtentry}")?;
+                }
+
+                // dump
+                "dump" => {
+                    command.consume_args().reject_rest()?;
+                    let range = (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded);
+                    let mut scan = self.log.engine.scan_dyn(range);
+                    while let Some((key, value)) = scan.next().transpose()? {
+                        let fmtkv = format::Raft::<format::Raw>::key_value(&key, &value);
+                        let rawkv = format::Raw::key_value(&key, &value);
+                        writeln!(output, "{fmtkv} [{rawkv}]")?;
+                    }
+                }
+
+                // get INDEX...
+                "get" => {
+                    let mut args = command.consume_args();
+                    let indexes: Vec<Index> =
+                        args.rest_pos().iter().map(|a| a.parse()).try_collect()?;
+                    args.reject_rest()?;
+                    for index in indexes {
+                        let entry = self.log.get(index)?;
+                        let fmtentry = entry
+                            .as_ref()
+                            .map(format::Raft::<format::Raw>::entry)
+                            .unwrap_or("None".to_string());
+                        writeln!(output, "{fmtentry}")?;
+                    }
+                }
+
+                // get_term
+                "get_term" => {
+                    command.consume_args().reject_rest()?;
+                    let (term, vote) = self.log.get_term();
+                    let vote = vote.map(|v| v.to_string()).unwrap_or("None".to_string());
+                    writeln!(output, "term={term} vote={vote}")?;
+                }
+
+                // has INDEX@TERM...
+                "has" => {
+                    let mut args = command.consume_args();
+                    let indexes: Vec<(Index, Term)> = args
+                        .rest_pos()
+                        .iter()
+                        .map(|a| Self::parse_index_term(&a.value))
+                        .try_collect()?;
+                    args.reject_rest()?;
+                    for (index, term) in indexes {
+                        let has = self.log.has(index, term)?;
+                        writeln!(output, "{has}")?;
+                    }
+                }
+
+                // reload
+                "reload" => {
+                    command.consume_args().reject_rest()?;
+                    // To get owned access to the inner engine, temporarily
+                    // replace it with an empty memory engine.
+                    let engine =
+                        std::mem::replace(&mut self.log.engine, Box::new(storage::Memory::new()));
+                    self.log = Log::new(engine)?;
+                }
+
+                // scan [RANGE]
+                "scan" => {
+                    let mut args = command.consume_args();
+                    let range = Self::parse_index_range(
+                        args.next_pos().map_or("..", |a| a.value.as_str()),
+                    )?;
+                    args.reject_rest()?;
+                    let mut scan = self.log.scan(range);
+                    while let Some(entry) = scan.next().transpose()? {
+                        let fmtentry = format::Raft::<format::Raw>::entry(&entry);
+                        writeln!(output, "{fmtentry}")?;
+                    }
+                }
+
+                // scan_apply APPLIED_INDEX
+                "scan_apply" => {
+                    let mut args = command.consume_args();
+                    let applied_index =
+                        args.next_pos().ok_or("applied index not given")?.parse()?;
+                    args.reject_rest()?;
+                    let mut scan = self.log.scan_apply(applied_index);
+                    while let Some(entry) = scan.next().transpose()? {
+                        let fmtentry = format::Raft::<format::Raw>::entry(&entry);
+                        writeln!(output, "{fmtentry}")?;
+                    }
+                }
+
+                // set_term TERM [VOTE]
+                "set_term" => {
+                    let mut args = command.consume_args();
+                    let term = args.next_pos().ok_or("term not given")?.parse()?;
+                    let vote = args.next_pos().map(|a| a.parse()).transpose()?;
+                    args.reject_rest()?;
+                    self.log.set_term(term, vote)?;
+                }
+
+                // splice [INDEX@TERM=COMMAND...]
+                "splice" => {
+                    let mut args = command.consume_args();
+                    let mut entries = Vec::new();
+                    for arg in args.rest_key() {
+                        let (index, term) = Self::parse_index_term(arg.key.as_deref().unwrap())?;
+                        let command = match arg.value.as_str() {
+                            "" => None,
+                            value => Some(value.as_bytes().to_vec()),
+                        };
+                        entries.push(Entry { index, term, command });
+                    }
+                    args.reject_rest()?;
+                    let index = self.log.splice(entries)?;
+                    let entry = self.log.get(index)?.expect("entry not found");
+                    let fmtentry = format::Raft::<format::Raw>::entry(&entry);
+                    writeln!(output, "splice → {fmtentry}")?;
+                }
+
+                // status [engine=BOOL]
+                "status" => {
+                    let mut args = command.consume_args();
+                    let engine = args.lookup_parse("engine")?.unwrap_or(false);
+                    args.reject_rest()?;
+                    let (term, vote) = self.log.get_term();
+                    let (last_index, last_term) = self.log.get_last_index();
+                    let (commit_index, commit_term) = self.log.get_commit_index();
+                    let vote = vote.map(|id| id.to_string()).unwrap_or("None".to_string());
+                    write!(
+                        output,
+                        "term={term} last={last_index}@{last_term} commit={commit_index}@{commit_term} vote={vote}",
+                    )?;
+                    if engine {
+                        write!(output, " engine={:#?}", self.log.status()?)?;
+                    }
+                    writeln!(output)?;
+                }
+
+                name => return Err(format!("unknown command {name}").into()),
+            }
+
+            // If requested, output engine operations.
+            if tags.remove("ops") {
+                while let Ok(op) = self.op_rx.try_recv() {
+                    match op {
+                        testengine::Operation::Delete { key } => {
+                            let fmtkey = format::Raft::<format::Raw>::key(&key);
+                            let rawkey = format::Raw::key(&key);
+                            writeln!(output, "engine delete {fmtkey} [{rawkey}]")?
+                        }
+                        testengine::Operation::Flush => writeln!(output, "engine flush")?,
+                        testengine::Operation::Set { key, value } => {
+                            let fmtkv = format::Raft::<format::Raw>::key_value(&key, &value);
+                            let rawkv = format::Raw::key_value(&key, &value);
+                            writeln!(output, "engine set {fmtkv} [{rawkv}]")?
+                        }
+                    }
+                }
+            }
+
+            if let Some(tag) = tags.iter().next() {
+                return Err(format!("unknown tag {tag}").into());
+            }
+
+            Ok(output)
+        }
+
+        /// If requested via [ops] tag, output engine operations for the command.
+        fn end_command(&mut self, _: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+            // Drain any remaining engine operations.
+            while self.op_rx.try_recv().is_ok() {}
+            Ok(String::new())
         }
     }
 }

@@ -1152,6 +1152,7 @@ impl RawNode<Leader> {
     }
 }
 
+/// Most Raft tests are Goldenscripts under src/raft/testscripts.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1160,6 +1161,7 @@ mod tests {
     use crate::raft::Entry;
     use crate::storage;
     use crate::storage::engine::test as testengine;
+
     use crossbeam::channel::Receiver;
     use std::borrow::Borrow;
     use std::error::Error;
@@ -1791,13 +1793,13 @@ mod tests {
             // If requested, heartbeat the current leader (with the highest
             // term) and re-stabilize the nodes.
             if heartbeat {
-                if let Some(leader) = self
+                let leader = self
                     .nodes
                     .values()
                     .sorted_by_key(|n| n.term())
                     .rev()
-                    .find(|n| matches!(n, Node::Leader(_)))
-                {
+                    .find(|n| matches!(n, Node::Leader(_)));
+                if let Some(leader) = leader {
                     self.heartbeat(&[leader.id()], output)?;
                     self.stabilize(ids, false, output)?;
                 }
@@ -1832,21 +1834,18 @@ mod tests {
                 let applied_index = node.get_applied_index();
                 write!(
                     output,
-                    "{} last={last_index}@{last_term} commit={commit_index}@{commit_term} applied={applied_index}",
-                    Self::format_node_role(node)
+                    "{node} last={last_index}@{last_term} commit={commit_index}@{commit_term} applied={applied_index}",
+                    node = Self::format_node_role(node)
                 )?;
                 if let Node::Leader(leader) = node {
-                    write!(
-                        output,
-                        " progress={{{}}}",
-                        leader
-                            .role
-                            .progress
-                            .iter()
-                            .sorted_by_key(|(id, _)| *id)
-                            .map(|(id, pr)| format!("{id}:{}→{}", pr.match_index, pr.next_index))
-                            .join(" ")
-                    )?
+                    let progress = leader
+                        .role
+                        .progress
+                        .iter()
+                        .sorted_by_key(|(id, _)| *id)
+                        .map(|(id, pr)| format!("{id}:{}→{}", pr.match_index, pr.next_index))
+                        .join(" ");
+                    write!(output, " progress={{{progress}}}")?
                 }
                 output.push('\n');
             }
@@ -2029,7 +2028,7 @@ mod tests {
                 Some(raw) => KVCommand::decode(raw).expect("invalid command").to_string(),
                 None => "None".to_string(),
             };
-            format!("{}@{} {command}", entry.index, entry.term)
+            format!("{index}@{term} {command}", index = entry.index, term = entry.term)
         }
 
         /// Formats a message.
@@ -2084,7 +2083,7 @@ mod tests {
                             Ok(Response::Read(v)) => format!("read 0x{}", hex::encode(v)),
                             Ok(Response::Write(v)) => format!("write 0x{}", hex::encode(v)),
                             Ok(Response::Status(v)) => format!("status {v:?}"),
-                            Err(e) => format!("Error::{e:#?}"),
+                            Err(error) => format!("Error::{error:#?}"),
                         }
                     )
                 }
@@ -2093,7 +2092,7 @@ mod tests {
 
         /// Formats a node identifier.
         fn format_node(node: &Node) -> String {
-            format!("n{}@{}", node.id(), node.term())
+            format!("n{id}@{term}", id = node.id(), term = node.term())
         }
 
         /// Formats a node identifier with role.
@@ -2106,7 +2105,7 @@ mod tests {
                 }
                 Node::Leader(_) => "leader".to_string(),
             };
-            format!("{} {role}", Self::format_node(node))
+            format!("{node} {role}", node = Self::format_node(node))
         }
 
         /// Formats a request.
@@ -2124,7 +2123,7 @@ mod tests {
                     KVResponse::decode(r).unwrap().to_string()
                 }
                 Ok(Response::Status(status)) => format!("{status:#?}"),
-                Err(e) => format!("Error::{e:?} ({e})"),
+                Err(error) => format!("Error::{error:?} ({error})"),
             }
         }
 
