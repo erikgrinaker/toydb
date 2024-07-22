@@ -742,6 +742,7 @@ impl<'a, I: engine::ScanIterator> Iterator for VersionIterator<'a, I> {
     }
 }
 
+/// Most storage tests are Goldenscripts under src/storage/testscripts.
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -826,6 +827,8 @@ pub mod tests {
     impl goldenscript::Runner for MVCCRunner {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
+            let mut tags = command.tags.clone();
+
             match command.name.as_str() {
                 // txn: begin [readonly] [as_of=VERSION]
                 "begin" => {
@@ -961,7 +964,7 @@ pub mod tests {
                         parse_key_range(args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."))?;
                     args.reject_rest()?;
 
-                    let kvs: Vec<_> = txn.scan(range).collect::<crate::error::Result<_>>()?;
+                    let kvs: Vec<_> = txn.scan(range).try_collect()?;
                     for (key, value) in kvs {
                         writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
                     }
@@ -974,8 +977,7 @@ pub mod tests {
                     let prefix = decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
                     args.reject_rest()?;
 
-                    let kvs: Vec<_> =
-                        txn.scan_prefix(&prefix).collect::<crate::error::Result<_>>()?;
+                    let kvs: Vec<_> = txn.scan_prefix(&prefix).try_collect()?;
                     for (key, value) in kvs {
                         writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
                     }
@@ -1020,49 +1022,41 @@ pub mod tests {
                 }
 
                 // status
-                "status" => {
-                    let status = self.mvcc.status()?;
-                    writeln!(output, "{status:#?}")?;
-                }
+                "status" => writeln!(output, "{:#?}", self.mvcc.status()?)?,
 
                 name => return Err(format!("invalid command {name}").into()),
             }
+
+            // If requested, output engine operations.
+            if tags.remove("ops") {
+                while let Ok(op) = self.op_rx.try_recv() {
+                    match op {
+                        Operation::Delete { key } => {
+                            let fmtkey = format::MVCC::<format::Raw>::key(&key);
+                            let rawkey = format::Raw::key(&key);
+                            writeln!(output, "engine delete {fmtkey} [{rawkey}]")?
+                        }
+                        Operation::Flush => writeln!(output, "engine flush")?,
+                        Operation::Set { key, value } => {
+                            let fmtkv = format::MVCC::<format::Raw>::key_value(&key, &value);
+                            let rawkv = format::Raw::key_value(&key, &value);
+                            writeln!(output, "engine set {fmtkv} [{rawkv}]")?
+                        }
+                    }
+                }
+            }
+
+            if let Some(tag) = tags.iter().next() {
+                return Err(format!("unknown tag {tag}").into());
+            }
+
             Ok(output)
         }
 
-        /// If requested via [ops] tag, output engine operations for the command.
-        fn end_command(
-            &mut self,
-            command: &goldenscript::Command,
-        ) -> Result<String, Box<dyn Error>> {
-            // Parse tags.
-            let mut show_ops = false;
-            for tag in &command.tags {
-                match tag.as_str() {
-                    "ops" => show_ops = true,
-                    tag => return Err(format!("invalid tag {tag}").into()),
-                }
-            }
-
-            // Process engine operations, either output or drain.
-            let mut output = String::new();
-            while let Ok(op) = self.op_rx.try_recv() {
-                match op {
-                    _ if !show_ops => {}
-                    Operation::Delete { key } => {
-                        let fmtkey = format::MVCC::<format::Raw>::key(&key);
-                        let rawkey = format::Raw::key(&key);
-                        writeln!(output, "engine delete {fmtkey} [{rawkey}]")?
-                    }
-                    Operation::Flush => writeln!(output, "engine flush")?,
-                    Operation::Set { key, value } => {
-                        let fmtkv = format::MVCC::<format::Raw>::key_value(&key, &value);
-                        let rawkv = format::Raw::key_value(&key, &value);
-                        writeln!(output, "engine set {fmtkv} [{rawkv}]")?
-                    }
-                }
-            }
-            Ok(output)
+        // Drain unhandled engine operations.
+        fn end_command(&mut self, _: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+            while self.op_rx.try_recv().is_ok() {}
+            Ok(String::new())
         }
     }
 }

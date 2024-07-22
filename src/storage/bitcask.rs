@@ -360,14 +360,15 @@ impl Log {
     }
 }
 
+/// Most storage tests are Goldenscripts under src/storage/testscripts.
 #[cfg(test)]
 mod tests {
     use super::super::engine::test::Runner;
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
-    use std::error::Error as StdError;
+
     use std::fmt::Write as _;
-    use std::result::Result as StdResult;
+    use std::{error::Error as StdError, result::Result as StdResult};
     use test_case::test_case;
     use test_each_file::test_each_path;
 

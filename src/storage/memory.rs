@@ -83,10 +83,12 @@ impl<'a> DoubleEndedIterator for ScanIterator<'a> {
     }
 }
 
+/// Most storage tests are Goldenscripts under src/storage/testscripts.
 #[cfg(test)]
 mod tests {
     use super::super::engine::test::Runner;
     use super::*;
+
     use test_each_file::test_each_path;
 
     // Run common goldenscript tests in src/storage/testscripts/engine.

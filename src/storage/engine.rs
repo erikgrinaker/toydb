@@ -88,12 +88,12 @@ impl Status {
 pub mod test {
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
+
     use crossbeam::channel::Sender;
     use itertools::Itertools as _;
     use regex::Regex;
-    use std::error::Error as StdError;
     use std::fmt::Write as _;
-    use std::result::Result as StdResult;
+    use std::{error::Error as StdError, result::Result as StdResult};
 
     /// Goldenscript runner for engines. All engines use a common set of
     /// goldenscripts in src/storage/testscripts/engine, as well as their own
@@ -142,7 +142,8 @@ pub mod test {
                         self.engine.scan(range).try_collect()?
                     };
                     for (key, value) in items {
-                        writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
+                        let fmtkv = format::Raw::key_value(&key, &value);
+                        writeln!(output, "{fmtkv}")?;
                     }
                 }
 
@@ -153,7 +154,8 @@ pub mod test {
                     args.reject_rest()?;
                     let mut scan = self.engine.scan_prefix(&prefix);
                     while let Some((key, value)) = scan.next().transpose()? {
-                        writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
+                        let fmtkv = format::Raw::key_value(&key, &value);
+                        writeln!(output, "{fmtkv}")?;
                     }
                 }
 
