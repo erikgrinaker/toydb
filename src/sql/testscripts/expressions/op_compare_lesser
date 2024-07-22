@@ -6,10 +6,10 @@
 > TRUE < TRUE
 > FALSE < FALSE
 ---
-Boolean(true)
-Boolean(false)
-Boolean(false)
-Boolean(false)
+TRUE
+FALSE
+FALSE
+FALSE
 
 # Integers.
 > 3 < 2
@@ -18,11 +18,11 @@ Boolean(false)
 > -1 < 0
 > 0 < -1
 ---
-Boolean(false)
-Boolean(false)
-Boolean(true)
-Boolean(true)
-Boolean(false)
+FALSE
+FALSE
+TRUE
+TRUE
+FALSE
 
 # Floats.
 > 3.14 < 3.13
@@ -30,10 +30,10 @@ Boolean(false)
 > 3.14 < 3.15
 > -0.0 < 0.0
 ---
-Boolean(false)
-Boolean(false)
-Boolean(true)
-Boolean(false)
+FALSE
+FALSE
+TRUE
+FALSE
 
 # Float special values.
 > 1e300 < INFINITY
@@ -44,13 +44,13 @@ Boolean(false)
 > INFINITY < NAN
 > 0.0 < NAN
 ---
-Boolean(true)
-Boolean(false)
-Boolean(true)
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(false)
+TRUE
+FALSE
+TRUE
+FALSE
+FALSE
+FALSE
+FALSE
 
 # Mixed integer/float values.
 > 3 < 2.9
@@ -58,10 +58,10 @@ Boolean(false)
 > 3 < 3.1
 > -0.0 < 0
 ---
-Boolean(false)
-Boolean(false)
-Boolean(true)
-Boolean(false)
+FALSE
+FALSE
+TRUE
+FALSE
 
 # Strings.
 > 'abc' < 'abc'
@@ -69,19 +69,19 @@ Boolean(false)
 > 'ab' < 'abc'
 > 'abc' < 'b'
 ---
-Boolean(false)
-Boolean(true)
-Boolean(true)
-Boolean(true)
+FALSE
+TRUE
+TRUE
+TRUE
 
 # Empty strings.
 > '' < ''
 > '' < 'a'
 > 'a' < ''
 ---
-Boolean(false)
-Boolean(true)
-Boolean(false)
+FALSE
+TRUE
+FALSE
 
 # String case comparisons.
 > 'B' < 'a'
@@ -89,19 +89,19 @@ Boolean(false)
 > 'B' < 'A'
 > 'B' < 'Z'
 ---
-Boolean(true)
-Boolean(true)
-Boolean(false)
-Boolean(true)
+TRUE
+TRUE
+FALSE
+TRUE
 
 # Unicode strings.
 > '😀' < '🙁' 
 > '😀' < '😀' 
 > '🙁' < '😀' 
 ---
-Boolean(true)
-Boolean(false)
-Boolean(false)
+TRUE
+FALSE
+FALSE
 
 # NULLs.
 > TRUE < NULL
@@ -115,16 +115,16 @@ Boolean(false)
 > NULL < NULL
 > NULL < NAN
 ---
-Null
-Null
-Null
-Null
-Null
-Null
-Null
-Null
-Null
-Null
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
 
 # Type conflicts.
 !> TRUE < 1

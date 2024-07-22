@@ -4,22 +4,22 @@
 [expr]> 2 * 3
 [expr]> 2 * -3
 ---
-Integer(6) ← 2 * 3
-Integer(-6) ← 2 * -3
+6 ← Multiply(Constant(Integer(2)), Constant(Integer(3)))
+-6 ← Multiply(Constant(Integer(2)), Negate(Constant(Integer(3))))
 
 # Float.
 [expr]> 3.14 * 2.71
 [expr]> 3.14 * -2.71
 ---
-Float(8.5094) ← 3.14 * 2.71
-Float(-8.5094) ← 3.14 * -2.71
+8.5094 ← Multiply(Constant(Float(3.14)), Constant(Float(2.71)))
+-8.5094 ← Multiply(Constant(Float(3.14)), Negate(Constant(Float(2.71))))
 
 # Mixed.
 > 3.14 * 2
 > -2 * 3.14
 ---
-Float(6.28)
-Float(-6.28)
+6.28
+-6.28
 
 # Integer and float overflow, underflow, and precision loss.
 !> 9223372036854775807 * 2
@@ -29,8 +29,8 @@ Float(-6.28)
 ---
 Error: invalid input: integer overflow
 Error: invalid input: integer overflow
-Float(inf)
-Float(1.8446744073709552e19)
+inf
+1.8446744073709552e19
 
 
 # NULLs always yield NULL.
@@ -38,9 +38,9 @@ Float(1.8446744073709552e19)
 > NULL * 3.14
 > NULL * NULL
 ---
-Null
-Null
-Null
+NULL
+NULL
+NULL
 
 # Infinity.
 > 2 * INFINITY
@@ -49,11 +49,11 @@ Null
 > INFINITY * INFINITY
 > INFINITY * -INFINITY
 ---
-Float(inf)
-Float(-inf)
-Float(-inf)
-Float(inf)
-Float(-inf)
+inf
+-inf
+-inf
+inf
+-inf
 
 # NaN.
 > 2 * NAN
@@ -61,10 +61,10 @@ Float(-inf)
 > INFINITY * NAN
 > NAN * NAN
 ---
-Float(NaN)
-Float(NaN)
-Float(NaN)
-Float(NaN)
+NaN
+NaN
+NaN
+NaN
 
 # Bools and strings.
 !> TRUE * FALSE

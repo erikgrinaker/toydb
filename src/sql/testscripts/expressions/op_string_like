@@ -6,10 +6,10 @@
 > 'abcde' LIKE '%cde'
 > 'abcde' LIKE '%'
 ---
-Boolean(true)
-Boolean(true)
-Boolean(true)
-Boolean(true)
+TRUE
+TRUE
+TRUE
+TRUE
 
 # Multi-character mismatches.
 > 'abcde' LIKE 'a%f'
@@ -17,10 +17,10 @@ Boolean(true)
 > 'abcde' LIKE 'b%'
 > 'abcde' LIKE '%d'
 ---
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(false)
+FALSE
+FALSE
+FALSE
+FALSE
 
 # Multi-character wildcards match 0 characters.
 > 'abcde' LIKE 'abc%de'
@@ -28,28 +28,28 @@ Boolean(false)
 > 'abcde' LIKE 'abcde%'
 > '' LIKE '%'
 ---
-Boolean(true)
-Boolean(true)
-Boolean(true)
-Boolean(true)
+TRUE
+TRUE
+TRUE
+TRUE
 
 # Single-character matches.
 > 'abcde' LIKE 'ab_de'
 > 'abcde' LIKE '_bcde'
 > 'abcde' LIKE 'abcd_'
 ---
-Boolean(true)
-Boolean(true)
-Boolean(true)
+TRUE
+TRUE
+TRUE
 
 # Single-character mismatches.
 > 'abcde' LIKE 'ab_e'
 > 'abcde' LIKE 'abc_'
 > 'abcde' LIKE '_bcd'
 ---
-Boolean(false)
-Boolean(false)
-Boolean(false)
+FALSE
+FALSE
+FALSE
 
 # Single-character wildcards require at least one match.
 > 'abcde' LIKE 'abc_de'
@@ -57,26 +57,26 @@ Boolean(false)
 > 'abcde' LIKE 'abcde_'
 > '' LIKE '_'
 ---
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(false)
+FALSE
+FALSE
+FALSE
+FALSE
 
 # Exact matches. Submatches are not sufficient.
 > 'abcde' LIKE 'abcde'
 > 'abcde' LIKE 'abc'
 > 'abcde' LIKE 'abcdef'
 ---
-Boolean(true)
-Boolean(false)
-Boolean(false)
+TRUE
+FALSE
+FALSE
 
 # Patterns are case-sensitive.
 > 'abcde' LIKE 'ABCDE'
 > 'abcde' LIKE 'A%'
 ---
-Boolean(false)
-Boolean(false)
+FALSE
+FALSE
 
 # Wildcards can be mixed and used multiple times, and % can match nothing.
 > 'abcde' LIKE 'a%c%e'
@@ -85,11 +85,11 @@ Boolean(false)
 > 'abcde' LIKE 'a___e'
 > 'abcdefghijklmno' LIKE 'a_c%f%i_kl%m_o'
 ---
-Boolean(true)
-Boolean(true)
-Boolean(true)
-Boolean(true)
-Boolean(true)
+TRUE
+TRUE
+TRUE
+TRUE
+TRUE
 
 # NULLs.
 > NULL LIKE '%'
@@ -97,17 +97,17 @@ Boolean(true)
 > 'abc' LIKE NULL
 > NULL LIKE NULL
 ---
-Null
-Null
-Null
-Null
+NULL
+NULL
+NULL
+NULL
 
 # * and ? are not valid patterns.
 > 'abcde' LIKE 'a*e'
 > 'abcde' LIKE 'ab?de'
 ---
-Boolean(false)
-Boolean(false)
+FALSE
+FALSE
 
 # Fails with non-strings.
 !> 'abc' LIKE 1

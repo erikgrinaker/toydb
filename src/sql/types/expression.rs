@@ -125,6 +125,11 @@ impl Expression {
         }
     }
 
+    /// Formats a constant expression. Errors on column references.
+    pub fn format_constant(&self) -> String {
+        self.format(&Node::Nothing { columns: Vec::new() })
+    }
+
     /// Evaluates an expression, returning a value. Column references look up
     /// values in the given row. If None, any Column references will panic.
     pub fn evaluate(&self, row: Option<&Row>) -> Result<Value> {

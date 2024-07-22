@@ -4,9 +4,9 @@
 > NAN IS NAN
 > NULL IS NAN
 ---
-Boolean(false)
-Boolean(true)
-Null
+FALSE
+TRUE
+NULL
 
 !> FALSE IS NAN
 !> 0 IS NAN

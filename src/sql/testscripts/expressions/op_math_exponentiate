@@ -6,24 +6,24 @@
 [expr]> 0 ^ 2
 [expr]> 9 ^ -3
 ---
-Integer(8) ← 2 ^ 3
-Integer(1) ← 2 ^ 0
-Integer(0) ← 0 ^ 2
-Float(0.0013717421124828531) ← 9 ^ -3
+8 ← Exponentiate(Constant(Integer(2)), Constant(Integer(3)))
+1 ← Exponentiate(Constant(Integer(2)), Constant(Integer(0)))
+0 ← Exponentiate(Constant(Integer(0)), Constant(Integer(2)))
+0.0013717421124828531 ← Exponentiate(Constant(Integer(9)), Negate(Constant(Integer(3))))
 
 # Floats.
 [expr]> 6.25 ^ 0.5
 [expr]> 6.25 ^ 3.14
 ---
-Float(2.5) ← 6.25 ^ 0.5
-Float(315.5464179407336) ← 6.25 ^ 3.14
+2.5 ← Exponentiate(Constant(Float(6.25)), Constant(Float(0.5)))
+315.5464179407336 ← Exponentiate(Constant(Float(6.25)), Constant(Float(3.14)))
 
 # Mixed.
 > 6.25 ^ 2
 > 9 ^ 0.5
 ---
-Float(39.0625)
-Float(3.0)
+39.0625
+3.0
 
 # Overflow and underflow.
 !> 2 ^ 10000000000
@@ -32,7 +32,7 @@ Float(3.0)
 ---
 Error: invalid input: integer overflow
 Error: invalid input: integer overflow
-Float(inf)
+inf
 
 # Nulls.
 > 1 ^ NULL
@@ -41,11 +41,11 @@ Float(inf)
 > NULL ^ 3.14
 > NULL ^ NULL
 ---
-Null
-Null
-Null
-Null
-Null
+NULL
+NULL
+NULL
+NULL
+NULL
 
 # Infinity and NaN.
 > 2 ^ INFINITY
@@ -56,13 +56,13 @@ Null
 > NAN ^ 2
 > NAN ^ NAN
 ---
-Float(inf)
-Float(inf)
-Float(inf)
-Float(0.0)
-Float(NaN)
-Float(NaN)
-Float(NaN)
+inf
+inf
+inf
+0.0
+NaN
+NaN
+NaN
 
 # Bools and strings.
 !> TRUE ^ FALSE

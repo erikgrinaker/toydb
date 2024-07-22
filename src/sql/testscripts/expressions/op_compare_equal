@@ -5,32 +5,32 @@
 > TRUE = FALSE
 > FALSE = TRUE
 ---
-Boolean(true)
-Boolean(false)
-Boolean(false)
+TRUE
+FALSE
+FALSE
 
 # Integers.
 > 1 = 1
 > 1 = 2
 ---
-Boolean(true)
-Boolean(false)
+TRUE
+FALSE
 
 # Floats.
 > 3.14 = 3.14
 > 3.14 = 2.718
 ---
-Boolean(true)
-Boolean(false)
+TRUE
+FALSE
 
 # Float special values.
 > 0.0 = -0.0
 > INFINITY = INFINITY
 > NAN = NAN
 ---
-Boolean(true)
-Boolean(true)
-Boolean(false)
+TRUE
+TRUE
+FALSE
 
 # Mixed integers and floats.
 > 3.0 = 3
@@ -38,10 +38,10 @@ Boolean(false)
 > 3 = 3.01
 > -0.0 = 0
 ---
-Boolean(true)
-Boolean(false)
-Boolean(false)
-Boolean(true)
+TRUE
+FALSE
+FALSE
+TRUE
 
 # Strings.
 > 'abc' = 'abc'
@@ -51,12 +51,12 @@ Boolean(true)
 > '😀' = '😀'
 > '😀' = '🙁'
 ---
-Boolean(true)
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(true)
-Boolean(false)
+TRUE
+FALSE
+FALSE
+FALSE
+TRUE
+FALSE
 
 # NULLs.
 > 1 = NULL
@@ -67,13 +67,13 @@ Boolean(false)
 > NAN = NULL
 > INFINITY = NULL
 ---
-Null
-Null
-Null
-Null
-Null
-Null
-Null
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
 
 # Type mismatches.
 !> true = 1

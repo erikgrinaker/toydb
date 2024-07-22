@@ -6,22 +6,22 @@
 [expr]> 0 >= 0
 [expr]> 0 >= -1
 ---
-Boolean(false) ← 0 > 1 OR 0 = 1
-Boolean(true) ← 0 > 0 OR 0 = 0
-Boolean(true) ← 0 > -1 OR 0 = -1
+FALSE ← Or(GreaterThan(Constant(Integer(0)), Constant(Integer(1))), Equal(Constant(Integer(0)), Constant(Integer(1))))
+TRUE ← Or(GreaterThan(Constant(Integer(0)), Constant(Integer(0))), Equal(Constant(Integer(0)), Constant(Integer(0))))
+TRUE ← Or(GreaterThan(Constant(Integer(0)), Negate(Constant(Integer(1)))), Equal(Constant(Integer(0)), Negate(Constant(Integer(1)))))
 
 [expr]> -0.0 >= 0.0
 [expr]> INFINITY >= INFINITY
 [expr]> NAN >= NAN
 ---
-Boolean(true) ← -0.0 > 0.0 OR -0.0 = 0.0
-Boolean(true) ← inf > inf OR inf = inf
-Boolean(false) ← NaN > NaN OR NaN = NaN
+TRUE ← Or(GreaterThan(Negate(Constant(Float(0.0))), Constant(Float(0.0))), Equal(Negate(Constant(Float(0.0))), Constant(Float(0.0))))
+TRUE ← Or(GreaterThan(Constant(Float(inf)), Constant(Float(inf))), Equal(Constant(Float(inf)), Constant(Float(inf))))
+FALSE ← Or(GreaterThan(Constant(Float(NaN)), Constant(Float(NaN))), Equal(Constant(Float(NaN)), Constant(Float(NaN))))
 
 [expr]> NULL >= 1
 [expr]> NULL >= NAN
 [expr]> NULL >= NULL
 ---
-Null ← NULL > 1 OR NULL = 1
-Null ← NULL > NaN OR NULL = NaN
-Null ← NULL > NULL OR NULL = NULL
+NULL ← Or(GreaterThan(Constant(Null), Constant(Integer(1))), Equal(Constant(Null), Constant(Integer(1))))
+NULL ← Or(GreaterThan(Constant(Null), Constant(Float(NaN))), Equal(Constant(Null), Constant(Float(NaN))))
+NULL ← Or(GreaterThan(Constant(Null), Constant(Null)), Equal(Constant(Null), Constant(Null)))

@@ -23,26 +23,26 @@
 > 2 + 3!
 > (2 + 3)!
 ---
-Integer(5)
-Integer(9)
-Integer(1)
-Integer(-3)
-Integer(8)
-Integer(120)
+5
+9
+1
+-3
+8
+120
 
 # Prefix -.
 > -3 ^ 2
 > -(3 ^ 2)
 ---
-Integer(9)
-Integer(-9)
+9
+-9
 
 # Postfix !.
 > 2 ^ 3!
 > (2 ^ 3)!
 ---
-Integer(64)
-Integer(40320)
+64
+40320
 
 # ^, which is also left-associative.
 > 2 ^ 3 ^ 2
@@ -54,14 +54,14 @@ Integer(40320)
 > 2 ^ 5 % 2
 > 2 ^ (5 % 2)
 ---
-Integer(512)
-Integer(64)
-Integer(32)
-Integer(4096)
-Integer(8)
-Integer(4)
-Integer(0)
-Integer(2)
+512
+64
+32
+4096
+8
+4
+0
+2
 
 # *
 > 3 * 4 / 2
@@ -73,14 +73,14 @@ Integer(2)
 > 1 - 2 * 3
 > (1 - 2) * 3
 ---
-Integer(6)
-Integer(6)
-Integer(0)
-Integer(3)
-Integer(7)
-Integer(9)
-Integer(-5)
-Integer(-3)
+6
+6
+0
+3
+7
+9
+-5
+-3
 
 # /
 > 4 / 2 * 3
@@ -92,14 +92,14 @@ Integer(-3)
 > 4 - 2 / 2
 > (4 - 2) / 2
 ---
-Integer(6)
-Integer(0)
-Integer(2)
-Integer(8)
-Integer(4)
-Integer(3)
-Integer(3)
-Integer(1)
+6
+0
+2
+8
+4
+3
+3
+1
 
 # %
 > 4 % 3 * 3
@@ -111,14 +111,14 @@ Integer(1)
 > 8 - 5 % 3
 > (8 - 5) % 3
 ---
-Integer(3)
-Integer(4)
-Integer(1)
-Integer(0)
-Integer(3)
-Integer(0)
-Integer(6)
-Integer(0)
+3
+4
+1
+0
+3
+0
+6
+0
 
 # +
 > 1 + 2 - 3
@@ -132,15 +132,15 @@ Integer(0)
 > 1 + 2 <= 2
 !> 1 + (2 <= 2)
 ---
-Integer(0)
-Integer(0)
-Boolean(true)
+0
+0
+TRUE
 Error: invalid input: can't add 1 and FALSE
-Boolean(true)
+TRUE
 Error: invalid input: can't add 1 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't add 1 and FALSE
-Boolean(false)
+FALSE
 Error: invalid input: can't add 1 and TRUE
 
 # -
@@ -155,15 +155,15 @@ Error: invalid input: can't add 1 and TRUE
 > 2 - 1 <= 2
 !> 2 - (1 <= 2)
 ---
-Integer(2)
-Integer(0)
-Boolean(false)
+2
+0
+FALSE
 Error: invalid input: can't subtract 2 and FALSE
-Boolean(false)
+FALSE
 Error: invalid input: can't subtract 2 and FALSE
-Boolean(true)
+TRUE
 Error: invalid input: can't subtract 2 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't subtract 2 and TRUE
 
 # >
@@ -184,21 +184,21 @@ Error: invalid input: can't subtract 2 and TRUE
 > 5 > 3 IS NULL
 !> 5 > (3 IS NULL)
 ---
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE TRUE and 'abc'
 Error: invalid input: can't LIKE 3 and 'abc'
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 5 and FALSE
 
 # >=
@@ -219,21 +219,21 @@ Error: invalid input: can't compare 5 and FALSE
 > 5 >= 3 IS NULL
 !> 5 >= (3 IS NULL)
 ---
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE TRUE and 'abc'
 Error: invalid input: can't LIKE 3 and 'abc'
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 5 and FALSE
 
 # <
@@ -254,21 +254,21 @@ Error: invalid input: can't compare 5 and FALSE
 > 5 < 3 IS NULL
 !> 5 < (3 IS NULL)
 ---
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE FALSE and 'abc'
 Error: invalid input: can't LIKE 3 and 'abc'
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 5 and FALSE
 
 # <=
@@ -289,21 +289,21 @@ Error: invalid input: can't compare 5 and FALSE
 > 5 <= 3 IS NULL
 !> 5 <= (3 IS NULL)
 ---
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 3 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 3 and TRUE
 Error: invalid input: can't LIKE FALSE and 'abc'
 Error: invalid input: can't LIKE 3 and 'abc'
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 5 and FALSE
 
 # =
@@ -316,13 +316,13 @@ Error: invalid input: can't compare 5 and FALSE
 > NOT 1 = 1
 !> (NOT 1) = 1
 ---
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 1 and FALSE
 Error: invalid input: can't LIKE TRUE and 'abc'
 Error: invalid input: can't LIKE 1 and 'abc'
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 1 and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't NOT 1
 
 # !=
@@ -335,13 +335,13 @@ Error: invalid input: can't NOT 1
 > NOT 1 != 1
 !> (NOT 1) != 1
 ---
-Boolean(false)
+FALSE
 Error: invalid input: can't compare 1 and FALSE
 Error: invalid input: can't LIKE FALSE and 'abc'
 Error: invalid input: can't LIKE 1 and 'abc'
-Boolean(true)
+TRUE
 Error: invalid input: can't compare 1 and TRUE
-Boolean(true)
+TRUE
 Error: invalid input: can't NOT 1
 
 # LIKE
@@ -350,45 +350,45 @@ Error: invalid input: can't NOT 1
 > NOT 'abc' LIKE 'abc'
 !> (NOT 'abc') LIKE 'abc'
 ---
-Boolean(true)
+TRUE
 Error: invalid input: can't LIKE 'abc' and TRUE
-Boolean(false)
+FALSE
 Error: invalid input: can't NOT 'abc'
 
 # IS NULL
 > NOT NULL IS NULL
 > (NOT NULL) IS NULL
 ---
-Boolean(false)
-Boolean(true)
+FALSE
+TRUE
 
 # IS NOT NULL
 > NOT NULL IS NOT NULL
 > (NOT NULL) IS NOT NULL
 ---
-Boolean(true)
-Boolean(false)
+TRUE
+FALSE
 
 # IS NAN
 > NOT NAN IS NAN
 !> (NOT NAN) IS NAN
 ---
-Boolean(false)
+FALSE
 Error: invalid input: can't NOT NaN
 
 # IS NOT NAN
 > NOT NAN IS NOT NAN
 !> (NOT NAN) IS NOT NAN
 ---
-Boolean(true)
+TRUE
 Error: invalid input: can't NOT NaN
 
 # NOT.
 > NOT TRUE AND FALSE
 > NOT (TRUE AND FALSE)
 ---
-Boolean(false)
-Boolean(true)
+FALSE
+TRUE
 
 # AND
 > FALSE AND TRUE OR TRUE
@@ -396,9 +396,9 @@ Boolean(true)
 > TRUE OR TRUE AND FALSE
 > (TRUE OR TRUE) AND FALSE
 ---
-Boolean(true)
-Boolean(false)
-Boolean(true)
-Boolean(false)
+TRUE
+FALSE
+TRUE
+FALSE
 
 # OR has the lowest precedence, so nothing to test.

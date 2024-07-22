@@ -4,9 +4,9 @@
 > NOT FALSE
 > NOT NULL
 ---
-Boolean(false)
-Boolean(true)
-Null
+FALSE
+TRUE
+NULL
 
 # Non-booleans.
 !> NOT 1

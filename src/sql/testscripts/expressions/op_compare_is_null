@@ -8,10 +8,10 @@
 > NAN IS NULL
 > NULL IS NULL
 ---
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(false)
-Boolean(true)
+FALSE
+FALSE
+FALSE
+FALSE
+FALSE
+FALSE
+TRUE

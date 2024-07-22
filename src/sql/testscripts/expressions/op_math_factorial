@@ -3,7 +3,7 @@
 # Integer works.
 [expr]> 3!
 ---
-Integer(6) ← 3!
+6 ← Factorial(Constant(Integer(3)))
 
 # But float, bool, and string fails.
 !> 3.14!
@@ -21,7 +21,7 @@ Error: invalid input: can't take factorial of 'a'
 !> INFINITY!
 !> NAN!
 ---
-Null
+NULL
 Error: invalid input: can't take factorial of inf
 Error: invalid input: can't take factorial of NaN
 
@@ -29,8 +29,8 @@ Error: invalid input: can't take factorial of NaN
 [expr]> 3!!
 [expr]> 2!!!!!!
 ---
-Integer(720) ← 3!!
-Integer(2) ← 2!!!!!!
+720 ← Factorial(Factorial(Constant(Integer(3))))
+2 ← Factorial(Factorial(Factorial(Factorial(Factorial(Factorial(Constant(Integer(2))))))))
 
 # Overflow.
 [expr]!> 3!!!

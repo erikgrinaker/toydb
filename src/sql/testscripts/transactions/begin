@@ -9,9 +9,9 @@ ok
 # record for itself.
 c1:[result,ops]> BEGIN
 ---
-c1: v3 read-write active={}
-c1: storage set mvcc:NextVersion → 4 ["\x00" → "\x04"]
-c1: storage set mvcc:TxnActive(3) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x03" → ""]
+c1: set mvcc:NextVersion → 4 ["\x00" → "\x04"]
+c1: set mvcc:TxnActive(3) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x03" → ""]
+c1: Begin { state: TransactionState { version: 3, read_only: false, active: {} } }
 
 # Starting another transaction for c1 errors.
 c1:!> BEGIN
@@ -24,10 +24,10 @@ c1: Error: invalid input: already in a transaction
 # its active set. The active snapshot is persisted to storage.
 c2:[result,ops]> BEGIN
 ---
-c2: v4 read-write active={3}
-c2: storage set mvcc:NextVersion → 5 ["\x00" → "\x05"]
-c2: storage set mvcc:TxnActiveSnapshot(4) → {3} ["\x02\x00\x00\x00\x00\x00\x00\x00\x04" → "\x01\x03"]
-c2: storage set mvcc:TxnActive(4) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x04" → ""]
+c2: set mvcc:NextVersion → 5 ["\x00" → "\x05"]
+c2: set mvcc:TxnActiveSnapshot(4) → {3} ["\x02\x00\x00\x00\x00\x00\x00\x00\x04" → "\x01\x03"]
+c2: set mvcc:TxnActive(4) → "" ["\x01\x00\x00\x00\x00\x00\x00\x00\x04" → ""]
+c2: Begin { state: TransactionState { version: 4, read_only: false, active: {3} } }
 
 # A read-only transaction doesn't allocate a new version, and doesn't perform
 # any storage engine writes. It does capture an active set though, and it can't
@@ -36,7 +36,7 @@ c3:[result,ops]> BEGIN READ ONLY
 c3:!> INSERT INTO test VALUES (0, '')
 c3:> ROLLBACK
 ---
-c3: v5 read-only active={3,4}
+c3: Begin { state: TransactionState { version: 5, read_only: true, active: {3, 4} } }
 c3: Error: invalid input: primary key 0 already exists
 
 # c1 writes a value and commits.
@@ -51,7 +51,7 @@ c3:[result,ops]> BEGIN READ ONLY AS OF SYSTEM TIME 1
 c3:!> SELECT * FROM test
 c3:> ROLLBACK
 ---
-c3: v1 read-only active={}
+c3: Begin { state: TransactionState { version: 1, read_only: true, active: {} } }
 c3: Error: invalid input: table test does not exist
 
 # It sees the table at version 2, but no rows. The row is visible
@@ -61,13 +61,13 @@ c3:[result,ops]> BEGIN READ ONLY AS OF SYSTEM TIME 2
 c3:> SELECT * FROM test
 c3:> ROLLBACK
 ---
-c3: v2 read-only active={}
+c3: Begin { state: TransactionState { version: 2, read_only: true, active: {} } }
 
 c3:[result,ops]> BEGIN READ ONLY AS OF SYSTEM TIME 3
 c3:> SELECT * FROM test
 c3:> ROLLBACK
 ---
-c3: v3 read-only active={}
+c3: Begin { state: TransactionState { version: 3, read_only: true, active: {} } }
 c3: 0, ''
 
 # At version 4, we inherit c2's active set which excludes c1, and still can't
@@ -76,5 +76,5 @@ c3:[result,ops]> BEGIN READ ONLY AS OF SYSTEM TIME 4
 c3:> SELECT * FROM test
 c3:> ROLLBACK
 ---
-c3: v4 read-only active={3}
+c3: Begin { state: TransactionState { version: 4, read_only: true, active: {3} } }
 c3: 0, ''

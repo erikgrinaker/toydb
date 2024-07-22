@@ -3,28 +3,28 @@
 # Noop for non-boolean expressions.
 [cnf]> 1 + 2
 ---
-Integer(3) ← 1 + 2
+3 ← 1 + 2
 
 # Applies De Morgan's laws.
 [cnf]> NOT (TRUE AND FALSE)
 ---
-Boolean(true) ← NOT TRUE OR NOT FALSE
+TRUE ← NOT TRUE OR NOT FALSE
 
 [cnf]> NOT (TRUE OR FALSE)
 ---
-Boolean(false) ← NOT TRUE AND NOT FALSE
+FALSE ← NOT TRUE AND NOT FALSE
 
 # NOTs are pushed into the expression.
 [cnf]> NOT (TRUE AND TRUE AND TRUE OR TRUE)
 ---
-Boolean(false) ← (NOT TRUE OR NOT TRUE OR NOT TRUE) AND NOT TRUE
+FALSE ← (NOT TRUE OR NOT TRUE OR NOT TRUE) AND NOT TRUE
 
 # ORs are converted to ANDs by the distributive law.
 [cnf]> (TRUE AND FALSE) OR (FALSE AND TRUE)
 ---
-Boolean(false) ← (TRUE OR FALSE) AND (TRUE OR TRUE) AND (FALSE OR FALSE) AND (FALSE OR TRUE)
+FALSE ← (TRUE OR FALSE) AND (TRUE OR TRUE) AND (FALSE OR FALSE) AND (FALSE OR TRUE)
 
 # This is also true when combined with De Morgan's laws.
 [cnf]> NOT ((TRUE OR FALSE) AND (TRUE OR FALSE))
 ---
-Boolean(false) ← (NOT TRUE OR NOT TRUE) AND (NOT TRUE OR NOT FALSE) AND (NOT FALSE OR NOT TRUE) AND (NOT FALSE OR NOT FALSE)
+FALSE ← (NOT TRUE OR NOT TRUE) AND (NOT TRUE OR NOT FALSE) AND (NOT FALSE OR NOT TRUE) AND (NOT FALSE OR NOT FALSE)

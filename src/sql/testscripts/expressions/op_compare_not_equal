@@ -6,20 +6,20 @@
 [expr]> 1 != 3
 [expr]> 1 != NULL
 ---
-Boolean(false) ← NOT 1 = 1
-Boolean(true) ← NOT 1 = 3
-Null ← NOT 1 = NULL
+FALSE ← Not(Equal(Constant(Integer(1)), Constant(Integer(1))))
+TRUE ← Not(Equal(Constant(Integer(1)), Constant(Integer(3))))
+NULL ← Not(Equal(Constant(Integer(1)), Constant(Null)))
 
 [expr]> 3.0 != 3
 [expr]> 0.0 != -0.0
 ---
-Boolean(false) ← NOT 3.0 = 3
-Boolean(false) ← NOT 0.0 = -0.0
+FALSE ← Not(Equal(Constant(Float(3.0)), Constant(Integer(3))))
+FALSE ← Not(Equal(Constant(Float(0.0)), Negate(Constant(Float(0.0)))))
 
 [expr]> NAN != NAN
 [expr]> INFINITY != INFINITY
 [expr]> NULL != NULL
 ---
-Boolean(true) ← NOT NaN = NaN
-Boolean(false) ← NOT inf = inf
-Null ← NOT NULL = NULL
+TRUE ← Not(Equal(Constant(Float(NaN)), Constant(Float(NaN))))
+FALSE ← Not(Equal(Constant(Float(inf)), Constant(Float(inf))))
+NULL ← Not(Equal(Constant(Null), Constant(Null)))

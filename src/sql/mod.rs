@@ -72,15 +72,16 @@ pub mod parser;
 pub mod planner;
 pub mod types;
 
+/// SQL tests are implemented as goldenscripts under src/sql/testscripts.
 #[cfg(test)]
 mod tests {
     use super::engine::{Catalog as _, Session};
     use super::parser::Parser;
-    use super::planner::{Node, Plan, OPTIMIZERS};
+    use super::planner::{Plan, OPTIMIZERS};
     use crate::encoding::format::{self, Formatter as _};
     use crate::sql::engine::{Engine, Local, StatementResult};
     use crate::sql::planner::{Planner, Scope};
-    use crate::storage::engine::test::{self, Emit, Mirror, Operation};
+    use crate::storage::engine::test as testengine;
     use crate::storage::{self, Engine as _};
 
     use crossbeam::channel::Receiver;
@@ -92,24 +93,25 @@ mod tests {
     use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/sql/testscripts.
-    test_each_path! { in "src/sql/testscripts/optimizer" as optimizer => test_goldenscript }
+    test_each_path! { in "src/sql/testscripts/expressions" as expressions => test_goldenscript_expr }
+    test_each_path! { in "src/sql/testscripts/optimizers" as optimizers => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/queries" as queries => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/schema" as schema => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/transactions" as transactions => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/writes" as writes => test_goldenscript }
-    test_each_path! { in "src/sql/testscripts/expressions" as expressions => test_goldenscript_expr }
 
     /// Runs SQL goldenscripts.
     fn test_goldenscript(path: &std::path::Path) {
-        // Since the runner's Session can't reference an Engine in the same
-        // struct, borrow the engine. Use both a BitCask and a Memory engine,
-        // and mirror operations across them. Emit engine operations to op_rx.
+        // The runner's Session can't borrow from an Engine in the same struct,
+        // so pass an engine reference. Use both BitCask and Memory engines and
+        // mirror operations across them. Emit engine operations to op_rx.
         let (op_tx, op_rx) = crossbeam::channel::unbounded();
         let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
         let bitcask =
             storage::BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
         let memory = storage::Memory::new();
-        let engine = Local::new(Emit::new(Mirror::new(bitcask, memory), op_tx));
+        let engine =
+            Local::new(testengine::Emit::new(testengine::Mirror::new(bitcask, memory), op_tx));
         let mut runner = SQLRunner::new(&engine, op_rx);
 
         goldenscript::run(&mut runner, path).expect("goldenscript failed")
@@ -124,13 +126,14 @@ mod tests {
     struct SQLRunner<'a> {
         engine: &'a TestEngine,
         sessions: HashMap<String, Session<'a, TestEngine>>,
-        op_rx: Receiver<Operation>,
+        op_rx: Receiver<testengine::Operation>,
     }
 
-    type TestEngine = Local<test::Emit<test::Mirror<storage::BitCask, storage::Memory>>>;
+    type TestEngine =
+        Local<testengine::Emit<testengine::Mirror<storage::BitCask, storage::Memory>>>;
 
     impl<'a> SQLRunner<'a> {
-        fn new(engine: &'a TestEngine, op_rx: Receiver<Operation>) -> Self {
+        fn new(engine: &'a TestEngine, op_rx: Receiver<testengine::Operation>) -> Self {
             Self { engine, sessions: HashMap::new(), op_rx }
         }
     }
@@ -139,7 +142,7 @@ mod tests {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
 
-            // Obtain a session for the command prefix.
+            // Obtain a session based on the command prefix ("" if none).
             let prefix = command.prefix.clone().unwrap_or_default();
             let session = self.sessions.entry(prefix).or_insert_with(|| self.engine.session());
 
@@ -151,12 +154,9 @@ mod tests {
                     let mut engine = self.engine.mvcc.engine.lock().expect("mutex failed");
                     let mut iter = engine.scan(..);
                     while let Some((key, value)) = iter.next().transpose()? {
-                        writeln!(
-                            output,
-                            "{} [{}]",
-                            format::MVCC::<format::SQL>::key_value(&key, &value),
-                            format::Raw::key_value(&key, &value)
-                        )?;
+                        let fmtkv = format::MVCC::<format::SQL>::key_value(&key, &value);
+                        let rawkv = format::Raw::key_value(&key, &value);
+                        writeln!(output, "{fmtkv} [{rawkv}]",)?;
                     }
                     return Ok(output);
                 }
@@ -175,56 +175,71 @@ mod tests {
                             .map(|t| session.with_txn(true, |txn| txn.must_get_table(&t)))
                             .try_collect()?
                     };
-                    return Ok(schemas.into_iter().map(|s| s.to_string()).join("\n"));
+                    return Ok(schemas.into_iter().join("\n"));
                 }
 
                 // Otherwise, fall through to SQL execution.
                 _ => {}
             }
 
-            // The entire command is the statement to execute. There are no args.
+            // The entire command is the SQL statement. There are no args.
             if !command.args.is_empty() {
-                return Err("expressions should be given as a command with no args".into());
+                return Err("SQL statements should be given as a command with no args".into());
             }
             let input = &command.name;
             let mut tags = command.tags.clone();
 
-            // Execute the statement.
-            let result = session.execute(input)?;
+            // Output the plan if requested.
+            if tags.remove("plan") {
+                let ast = Parser::new(input).parse()?;
+                let plan =
+                    session.with_txn(true, |txn| Planner::new(txn).build(ast)?.optimize())?;
+                writeln!(output, "{plan}")?;
+            }
 
-            // Output optimizations if requested.
+            // Output plan optimizations if requested.
             if tags.remove("opt") {
                 if tags.contains("plan") {
-                    return Err("no point using both plan and opt".into());
+                    return Err("using both plan and opt is redundant".into());
                 }
                 let ast = Parser::new(input).parse()?;
                 let plan = session.with_txn(true, |txn| Planner::new(txn).build(ast))?;
                 let Plan::Select(mut root) = plan else {
                     return Err("can only use opt with SELECT plans".into());
                 };
-
-                let fmtplan = |name, node: &Node| format!("{name}:\n{node}").replace('\n', "\n   ");
-                writeln!(output, "{}", fmtplan("Initial", &root))?;
+                writeln!(output, "{}", format!("Initial:\n{root}").replace('\n', "\n   "))?;
                 for (name, optimizer) in OPTIMIZERS {
-                    let old = root.clone();
+                    let prev = root.clone();
                     root = optimizer(root)?;
-                    if root != old {
-                        writeln!(output, "{}", fmtplan(name, &root))?;
+                    if root != prev {
+                        writeln!(output, "{}", format!("{name}:\n{root}").replace('\n', "\n   "))?;
                     }
                 }
             }
 
-            // Output the plan if requested.
-            if tags.remove("plan") {
-                let query = format!("EXPLAIN {input}");
-                let StatementResult::Explain(plan) = session.execute(&query)? else {
-                    return Err("unexpected explain response".into());
-                };
-                writeln!(output, "{plan}")?;
+            // Execute the statement.
+            let result = session.execute(input)?;
+
+            // Output engine ops if requested.
+            if tags.remove("ops") {
+                while let Ok(op) = self.op_rx.try_recv() {
+                    match op {
+                        testengine::Operation::Delete { key } => {
+                            let fmtkey = format::MVCC::<format::SQL>::key(&key);
+                            let rawkey = format::Raw::key(&key);
+                            writeln!(output, "delete {fmtkey} [{rawkey}]")?;
+                        }
+                        testengine::Operation::Flush => writeln!(output, "flush")?,
+                        testengine::Operation::Set { key, value } => {
+                            let fmtkv = format::MVCC::<format::SQL>::key_value(&key, &value);
+                            let rawkv = format::Raw::key_value(&key, &value);
+                            writeln!(output, "set {fmtkv} [{rawkv}]")?;
+                        }
+                    }
+                }
             }
 
             // Output the result if requested. SELECT results are always output.
-            let show_result = tags.remove("result");
             match result {
                 StatementResult::Select { columns, rows } => {
                     if tags.remove("header") {
@@ -234,35 +249,8 @@ mod tests {
                         writeln!(output, "{}", row.into_iter().join(", "))?;
                     }
                 }
-                StatementResult::Begin { state } if show_result => {
-                    let version = state.version;
-                    let kind = if state.read_only { "read-only" } else { "read-write" };
-                    let active = state.active.iter().join(",");
-                    writeln!(output, "v{version} {kind} active={{{active}}}")?;
-                }
-                result if show_result => writeln!(output, "{result:?}")?,
+                result if tags.remove("result") => writeln!(output, "{result:?}")?,
                 _ => {}
-            }
-
-            // Output engine ops if requested.
-            if tags.remove("ops") {
-                while let Ok(op) = self.op_rx.try_recv() {
-                    match op {
-                        Operation::Delete { key } => writeln!(
-                            output,
-                            "storage delete {} [{}]",
-                            format::MVCC::<format::SQL>::key(&key),
-                            format::Raw::key(&key),
-                        )?,
-                        Operation::Flush => writeln!(output, "storage flush")?,
-                        Operation::Set { key, value } => writeln!(
-                            output,
-                            "storage set {} [{}]",
-                            format::MVCC::<format::SQL>::key_value(&key, &value),
-                            format::Raw::key_value(&key, &value),
-                        )?,
-                    }
-                }
             }
 
             // Reject unknown tags.
@@ -280,14 +268,16 @@ mod tests {
         }
     }
 
-    /// A test runner for expressions specifically. Evaluates expressions to
-    /// values, and can optionally emit the expression tree.
+    /// A test runner for expressions. Evaluates expressions to values, and
+    /// optionally emits the expression tree.
     struct ExpressionRunner;
 
     type Catalog<'a> = <Local<storage::Memory> as Engine<'a>>::Transaction;
 
     impl goldenscript::Runner for ExpressionRunner {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+            let mut output = String::new();
+
             // The entire command is the expression to evaluate. There are no args.
             if !command.args.is_empty() {
                 return Err("expressions should be given as a command with no args".into());
@@ -301,30 +291,31 @@ mod tests {
             if let Some(next) = parser.lexer.next().transpose()? {
                 return Err(format!("unconsumed token {next}").into());
             }
-            let mut expr = Planner::<Catalog>::build_expression(ast, &Scope::new())?;
-
-            // If requested, convert the expression to conjunctive normal form.
-            if tags.remove("cnf") {
-                expr = expr.into_cnf();
-                tags.insert("expr".to_string()); // imply expr
-            }
+            let expr = Planner::<Catalog>::build_expression(ast, &Scope::new())?;
 
             // Evaluate the expression.
-            let mut output = String::new();
             let value = expr.evaluate(None)?;
-            write!(output, "{value:?}")?;
+            write!(output, "{value}")?;
 
-            // If requested, dump the parsed expression.
-            if tags.remove("expr") {
-                write!(output, " ← {}", expr.format(&Node::Nothing { columns: vec![] }))?;
+            // If requested, convert the expression to conjunctive normal form
+            // and dump it. Assert that it produces the same result.
+            if tags.remove("cnf") {
+                let cnf = expr.clone().into_cnf();
+                assert_eq!(value, cnf.evaluate(None)?, "CNF result differs");
+                write!(output, " ← {}", cnf.format_constant())?;
             }
+
+            // If requested, debug-dump the parsed expression.
+            if tags.remove("expr") {
+                write!(output, " ← {:?}", expr)?;
+            }
+            writeln!(output)?;
 
             // Reject unknown tags.
             if let Some(tag) = tags.iter().next() {
                 return Err(format!("unknown tag {tag}").into());
             }
 
-            writeln!(output)?;
             Ok(output)
         }
     }

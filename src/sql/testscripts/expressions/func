@@ -4,13 +4,13 @@
 > sqrt(1)
 > SQRT(1)
 ---
-Float(1.0)
-Float(1.0)
+1.0
+1.0
 
 # A space is allowed around the arguments.
 > sqrt ( 1 )
 ---
-Float(1.0)
+1.0
 
 # Wrong number of arguments errors.
 !> sqrt()

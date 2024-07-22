@@ -6,10 +6,10 @@
 > FALSE OR TRUE
 > FALSE OR FALSE
 ---
-Boolean(true)
-Boolean(true)
-Boolean(true)
-Boolean(false)
+TRUE
+TRUE
+TRUE
+FALSE
 
 # Trinary logic.
 > TRUE OR NULL
@@ -18,11 +18,11 @@ Boolean(false)
 > NULL OR FALSE
 > NULL OR NULL
 ---
-Boolean(true)
-Boolean(true)
-Null
-Null
-Null
+TRUE
+TRUE
+NULL
+NULL
+NULL
 
 # Non-booleans.
 !> 1 OR TRUE

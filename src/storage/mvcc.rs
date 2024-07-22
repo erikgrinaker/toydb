@@ -787,6 +787,42 @@ pub mod tests {
 
     type TestEngine = Emit<Mirror<BitCask, Memory>>;
 
+    impl MVCCRunner {
+        fn new() -> Self {
+            // Use both a BitCask and a Memory engine, and mirror operations
+            // across them. Emit engine operations to op_rx.
+            let (op_tx, op_rx) = crossbeam::channel::unbounded();
+            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
+            let bitcask = BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
+            let memory = Memory::new();
+            let engine = Emit::new(Mirror::new(bitcask, memory), op_tx);
+            let mvcc = MVCC::new(engine);
+            Self { mvcc, op_rx, txns: HashMap::new(), tempdir }
+        }
+
+        /// Fetches the named transaction from a command prefix.
+        fn get_txn(
+            &mut self,
+            prefix: &Option<String>,
+        ) -> Result<&'_ mut Transaction<TestEngine>, Box<dyn Error>> {
+            let name = Self::txn_name(prefix)?;
+            self.txns.get_mut(name).ok_or(format!("unknown txn {name}").into())
+        }
+
+        /// Fetches the txn name from a command prefix, or errors.
+        fn txn_name(prefix: &Option<String>) -> Result<&str, Box<dyn Error>> {
+            prefix.as_deref().ok_or("no txn name".into())
+        }
+
+        /// Errors if a txn prefix is given.
+        fn no_txn(command: &goldenscript::Command) -> Result<(), Box<dyn Error>> {
+            if let Some(name) = &command.prefix {
+                return Err(format!("can't run {} with txn {name}", command.name).into());
+            }
+            Ok(())
+        }
+    }
+
     impl goldenscript::Runner for MVCCRunner {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
@@ -1027,42 +1063,6 @@ pub mod tests {
                 }
             }
             Ok(output)
-        }
-    }
-
-    impl MVCCRunner {
-        fn new() -> Self {
-            // Use both a BitCask and a Memory engine, and mirror operations
-            // across them. Emit engine operations to op_rx.
-            let (op_tx, op_rx) = crossbeam::channel::unbounded();
-            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
-            let bitcask = BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
-            let memory = Memory::new();
-            let engine = Emit::new(Mirror::new(bitcask, memory), op_tx);
-            let mvcc = MVCC::new(engine);
-            Self { mvcc, op_rx, txns: HashMap::new(), tempdir }
-        }
-
-        /// Fetches the named transaction from a command prefix.
-        fn get_txn(
-            &mut self,
-            prefix: &Option<String>,
-        ) -> Result<&'_ mut Transaction<TestEngine>, Box<dyn Error>> {
-            let name = Self::txn_name(prefix)?;
-            self.txns.get_mut(name).ok_or(format!("unknown txn {name}").into())
-        }
-
-        /// Fetches the txn name from a command prefix, or errors.
-        fn txn_name(prefix: &Option<String>) -> Result<&str, Box<dyn Error>> {
-            prefix.as_deref().ok_or("no txn name".into())
-        }
-
-        /// Errors if a txn prefix is given.
-        fn no_txn(command: &goldenscript::Command) -> Result<(), Box<dyn Error>> {
-            if let Some(name) = &command.prefix {
-                return Err(format!("can't run {} with txn {name}", command.name).into());
-            }
-            Ok(())
         }
     }
 }

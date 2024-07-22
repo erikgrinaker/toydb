@@ -8,32 +8,32 @@
 [expr]> -5 % 3
 [expr]> 5 % -3
 ---
-Integer(2) ← 5 % 3
-Integer(-2) ← -5 % 3
-Integer(2) ← 5 % -3
+2 ← Remainder(Constant(Integer(5)), Constant(Integer(3)))
+-2 ← Remainder(Negate(Constant(Integer(5))), Constant(Integer(3)))
+2 ← Remainder(Constant(Integer(5)), Negate(Constant(Integer(3))))
 
 # Floats.
 [expr]> 6.28 % 2.2
 [expr]> 6.28 % -2.2
 ---
-Float(1.88) ← 6.28 % 2.2
-Float(1.88) ← 6.28 % -2.2
+1.88 ← Remainder(Constant(Float(6.28)), Constant(Float(2.2)))
+1.88 ← Remainder(Constant(Float(6.28)), Negate(Constant(Float(2.2))))
 
 # Mixed.
 > 3.15 % 2
 > 6 % 3.15
 > 3.15 % -2
 ---
-Float(1.15)
-Float(2.85)
-Float(1.15)
+1.15
+2.85
+1.15
 
 # Division by zero.
 !> 7 % 0
 > 6.28 % 0.0
 ---
 Error: invalid input: can't divide by zero
-Float(NaN)
+NaN
 
 # NULLs.
 > 1 % NULL
@@ -41,10 +41,10 @@ Float(NaN)
 > 3.14 % NULL
 > NULL % NULL
 ---
-Null
-Null
-Null
-Null
+NULL
+NULL
+NULL
+NULL
 
 # Infinity and NaN.
 > INFINITY % 7
@@ -55,13 +55,13 @@ Null
 > NAN % 7
 > NAN % NAN
 ---
-Float(NaN)
-Float(7.0)
-Float(7.0)
-Float(NaN)
-Float(NaN)
-Float(NaN)
-Float(NaN)
+NaN
+7.0
+7.0
+NaN
+NaN
+NaN
+NaN
 
 # Bools and strings.
 !> TRUE % FALSE
