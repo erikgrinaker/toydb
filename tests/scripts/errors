@@ -1,0 +1,41 @@
+# Tests various error handling.
+
+cluster nodes=5
+---
+ok
+
+# A transaction can continue and commit after encountering an error.
+> BEGIN
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a')
+!> INSERT INTO test VALUES (NULL, 'b')
+> INSERT INTO test VALUES (2, 'b')
+> COMMIT
+---
+Error: invalid input: invalid primary key NULL
+
+> SELECT * FROM test
+---
+1, 'a'
+2, 'b'
+
+# Closing/disconnecting a client rolls back an open transaction.
+c1:> BEGIN
+c1:> INSERT INTO test VALUES (3, 'c')
+---
+ok
+
+c2:!> INSERT INTO test VALUES (3, 'c')
+---
+c2: Error: serialization failure, retry transaction
+
+c1:> close
+---
+ok
+
+c2:> INSERT INTO test VALUES (3, 'c')
+c2:> SELECT * FROM test
+---
+c2: 1, 'a'
+c2: 2, 'b'
+c2: 3, 'c'

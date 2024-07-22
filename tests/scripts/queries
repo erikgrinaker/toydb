@@ -1,0 +1,104 @@
+# Tests some basic queries. This is more thorougly tested in the SQL tests, this
+# just tries a few basic things.
+
+cluster nodes=5
+---
+ok
+
+# Add a movie dataset.
+> CREATE TABLE countries (id STRING PRIMARY KEY, name STRING NOT NULL)
+> INSERT INTO countries VALUES ('fr', 'France'), ('ru', 'Russia'), ('us', 'United States of America')
+> CREATE TABLE genres (id INTEGER PRIMARY KEY, name STRING NOT NULL)
+> INSERT INTO genres VALUES (1, 'Science Fiction'), (2, 'Action'), (3, 'Comedy')
+> CREATE TABLE studios (id INTEGER PRIMARY KEY, name STRING NOT NULL, country_id STRING REFERENCES countries)
+> INSERT INTO studios VALUES (1, 'Mosfilm', 'ru'), (2, 'Lionsgate', 'us'), (3, 'StudioCanal', 'fr'), (4, 'Warner Bros', 'us')
+> CREATE TABLE movies ( \
+    id INTEGER PRIMARY KEY, \
+    title STRING NOT NULL, \
+    studio_id INTEGER NOT NULL REFERENCES studios, \
+    genre_id INTEGER NOT NULL REFERENCES genres, \
+    released INTEGER NOT NULL, \
+    rating FLOAT, \
+    ultrahd BOOLEAN \
+)
+> INSERT INTO movies VALUES \
+    (1, 'Stalker', 1, 1, 1979, 8.2, NULL), \
+    (2, 'Sicario', 2, 2, 2015, 7.6, TRUE), \
+    (3, 'Primer', 3, 1, 2004, 6.9, NULL), \
+    (4, 'Heat', 4, 2, 1995, 8.2, TRUE), \
+    (5, 'The Fountain', 4, 1, 2006, 7.2, FALSE), \
+    (6, 'Solaris', 1, 1, 1972, 8.1, NULL), \
+    (7, 'Gravity', 4, 1, 2013, 7.7, TRUE), \
+    (8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE), \
+    (9, 'Birdman', 4, 3, 2014, 7.7, TRUE), \
+    (10, 'Inception', 4, 1, 2010, 8.8, TRUE)
+---
+ok
+
+# Full table scan and point queries. With/without column headers.
+[header]> SELECT * FROM movies
+---
+movies.id, movies.title, movies.studio_id, movies.genre_id, movies.released, movies.rating, movies.ultrahd
+1, 'Stalker', 1, 1, 1979, 8.2, NULL
+2, 'Sicario', 2, 2, 2015, 7.6, TRUE
+3, 'Primer', 3, 1, 2004, 6.9, NULL
+4, 'Heat', 4, 2, 1995, 8.2, TRUE
+5, 'The Fountain', 4, 1, 2006, 7.2, FALSE
+6, 'Solaris', 1, 1, 1972, 8.1, NULL
+7, 'Gravity', 4, 1, 2013, 7.7, TRUE
+8, 'Blindspotting', 2, 3, 2018, 7.4, TRUE
+9, 'Birdman', 4, 3, 2014, 7.7, TRUE
+10, 'Inception', 4, 1, 2010, 8.8, TRUE
+
+> SELECT * FROM genres WHERE id = 2
+---
+2, 'Action'
+
+# Aggregate query.
+[header]> SELECT s.name AS studio, COUNT(*) AS movies, AVG(m.rating) AS rating \
+    FROM movies m JOIN studios s ON m.studio_id = s.id \
+    GROUP BY s.name ORDER BY rating DESC
+---
+studio, movies, rating
+'Mosfilm', 2, 8.149999999999999
+'Warner Bros', 5, 7.919999999999999
+'Lionsgate', 2, 7.5
+'StudioCanal', 1, 6.9
+
+# Try a complex multi-way join with multiple joins of the same table. Uses GROUP
+# BY to discard duplicates from the cross join. The query finds all movies
+# belonging to a studio that's released at least one movies rated 8 or higher.
+> SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating \
+  FROM movies m JOIN genres g ON m.genre_id = g.id, \
+    studios s JOIN movies good ON good.studio_id = s.id AND good.rating >= 8 \
+  WHERE m.studio_id = s.id \
+  GROUP BY m.id, m.title, g.name, s.name, m.rating, m.released \
+  ORDER BY m.rating DESC, m.released ASC, m.id ASC
+---
+10, 'Inception', 'Science Fiction', 'Warner Bros', 8.8
+1, 'Stalker', 'Science Fiction', 'Mosfilm', 8.2
+4, 'Heat', 'Action', 'Warner Bros', 8.2
+6, 'Solaris', 'Science Fiction', 'Mosfilm', 8.1
+7, 'Gravity', 'Science Fiction', 'Warner Bros', 7.7
+9, 'Birdman', 'Comedy', 'Warner Bros', 7.7
+5, 'The Fountain', 'Science Fiction', 'Warner Bros', 7.2
+
+# Explain that query.
+> EXPLAIN SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating \
+  FROM movies m JOIN genres g ON m.genre_id = g.id, \
+    studios s JOIN movies good ON good.studio_id = s.id AND good.rating >= 8 \
+  WHERE m.studio_id = s.id \
+  GROUP BY m.id, m.title, g.name, s.name, m.rating, m.released \
+  ORDER BY m.rating DESC, m.released ASC, m.id ASC
+---
+Remap: m.id, m.title, genre, studio, m.rating (dropped: m.released)
+└─ Order: m.rating desc, m.released asc, m.id asc
+   └─ Projection: m.id, m.title, g.name as genre, s.name as studio, m.rating, m.released
+      └─ Aggregate: m.id, m.title, g.name, s.name, m.rating, m.released
+         └─ HashJoin: inner on m.studio_id = s.id
+            ├─ HashJoin: inner on m.genre_id = g.id
+            │  ├─ Scan: movies as m
+            │  └─ Scan: genres as g
+            └─ HashJoin: inner on s.id = good.studio_id
+               ├─ Scan: studios as s
+               └─ Scan: movies as good (good.rating > 8 OR good.rating = 8)

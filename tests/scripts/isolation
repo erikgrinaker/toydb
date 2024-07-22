@@ -1,0 +1,98 @@
+# Tests transaction isolation.
+#
+# Transactions are tested more thoroughly in the MVCC tests, this just does some
+# basic SQL-level testing.
+#
+# Sets up a sequence of transactions that each perform a write, and checks
+# what they can see.
+#
+# c1: past, committed before c4 began
+# c2: past, commits after c4 began
+# c3: past, uncommitted
+# c4: test transaction
+# c5: future, committed
+# c6: future, uncommitted
+# c7: future, AS OF version 4
+
+cluster nodes=5
+---
+ok
+
+# c1: past, committed before c4 began
+c1:> BEGIN
+c1:> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+c1:> INSERT INTO test VALUES (1, 'a')
+c1:> COMMIT
+---
+ok
+
+# c2: past, commits after c4 began
+c2:> BEGIN
+c2:> INSERT INTO test VALUES (2, 'b')
+---
+ok
+
+# c3: past, uncommitted
+c3:> BEGIN
+c3:> INSERT INTO test VALUES (3, 'c')
+---
+ok
+
+# c4: test transaction
+c4:[result]> BEGIN
+c4:> INSERT INTO test VALUES (4, 'd')
+---
+c4: Begin(TransactionState { version: 4, read_only: false, active: {2, 3} })
+
+# Commit c2.
+c2:> COMMIT
+---
+ok
+
+# c5: future, committed
+c5:> BEGIN
+c5:> INSERT INTO test VALUES (5, 'e')
+c5:> COMMIT
+---
+ok
+
+# c6: future, uncommitted
+c6:> BEGIN
+c6:> INSERT INTO test VALUES (6, 'f')
+---
+ok
+
+# When c4 scans, it should only see the write of c1 and itself.
+c4:> SELECT * FROM test
+---
+c4: 1, 'a'
+c4: 4, 'd'
+
+# An AS OF transaction in version 4 should not see c4's uncomitted write.
+c7:> BEGIN READ ONLY AS OF SYSTEM TIME 4
+c7:> SELECT * FROM test
+c7:> ROLLBACK
+---
+c7: 1, 'a'
+
+# c4 can commit.
+c4:> COMMIT
+---
+ok
+
+# An implicit transaction should see c1, c2, c4, c5:
+> SELECT * FROM test
+---
+1, 'a'
+2, 'b'
+4, 'd'
+5, 'e'
+
+# An AS OF transaction in version 4 should not see c4's write even after it
+# has committed, such that it's consistent with the previous AS OF 4. The
+# snapshot is taken out at the start of the version.
+c7:> BEGIN READ ONLY AS OF SYSTEM TIME 4
+c7:> SELECT * FROM test
+c7:> ROLLBACK
+---
+c7: 1, 'a'

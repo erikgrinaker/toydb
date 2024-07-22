@@ -1,6 +1,6 @@
-# A phantom read is when t1 reads entries matching some predicate, but a
-# modification by t2 changes which entries match the predicate such that a later
-# read by t1 returns them. Snapshot isolation prevents this.
+# A phantom read is when c1 reads entries matching some predicate, but a
+# modification by c2 changes which entries match the predicate such that a later
+# read by c1 returns them. Snapshot isolation prevents this.
 
 > CREATE TABLE test (id INT PRIMARY KEY, value STRING)
 > INSERT INTO test VALUES (1, 'a'), (2, 'b'), (3, 'c')
