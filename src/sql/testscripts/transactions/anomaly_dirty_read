@@ -1,0 +1,16 @@
+# A dirty read is when c2 can read an uncommitted value set by c1. Snapshot
+# isolation prevents this.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+---
+ok
+
+c1:> BEGIN
+c1:> INSERT INTO test VALUES (1, 'a')
+---
+ok
+
+c2:> BEGIN
+c2:> SELECT * FROM test WHERE id = 1
+---
+ok

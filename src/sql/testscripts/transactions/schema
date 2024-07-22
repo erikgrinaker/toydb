@@ -1,0 +1,46 @@
+# Tests that schema changes are transactional.
+
+c1:> BEGIN
+c1:[ops]> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+c1:> SELECT * FROM test
+---
+c1: storage set mvcc:TxnWrite(1, sql:Table(test)) → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xfftest\x00\xff\x00\xff\x00\x00" → ""]
+c1: storage set mvcc:Version(sql:Table(test), 1) → CREATE TABLE test ( id INTEGER PRIMARY KEY, value STRING DEFAULT NULL ) ["\x04\x00\xfftest\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01" → "\x01\x1d\x04test\x00\x02\x02id\x01\x00\x00\x01\x00\x00\x05value\x03\x01\x01\x00\x00\x00\x00"]
+
+# A concurrent transaction can't see the uncommitted table.
+c2:!> SELECT * FROM test
+---
+c2: Error: invalid input: table test does not exist
+
+# Rolling back the transaction removes the table.
+c1:[ops]> ROLLBACK
+---
+c1: storage delete mvcc:Version(sql:Table(test), 1) ["\x04\x00\xfftest\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"]
+c1: storage delete mvcc:TxnWrite(1, sql:Table(test)) ["\x03\x00\x00\x00\x00\x00\x00\x00\x01\x00\xfftest\x00\xff\x00\xff\x00\x00"]
+c1: storage delete mvcc:TxnActive(1) ["\x01\x00\x00\x00\x00\x00\x00\x00\x01"]
+
+c1:!> SELECT * FROM test
+c2:!> SELECT * FROM test
+---
+c1: Error: invalid input: table test does not exist
+c2: Error: invalid input: table test does not exist
+
+# Committing a transaction does reveal the table.
+c1:> BEGIN
+c1:[ops]> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+---
+c1: storage set mvcc:TxnWrite(2, sql:Table(test)) → "" ["\x03\x00\x00\x00\x00\x00\x00\x00\x02\x00\xfftest\x00\xff\x00\xff\x00\x00" → ""]
+c1: storage set mvcc:Version(sql:Table(test), 2) → CREATE TABLE test ( id INTEGER PRIMARY KEY, value STRING DEFAULT NULL ) ["\x04\x00\xfftest\x00\xff\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02" → "\x01\x1d\x04test\x00\x02\x02id\x01\x00\x00\x01\x00\x00\x05value\x03\x01\x01\x00\x00\x00\x00"]
+
+c2:!> SELECT * FROM test
+---
+c2: Error: invalid input: table test does not exist
+
+c1:[ops]> COMMIT
+---
+c1: storage delete mvcc:TxnWrite(2, sql:Table(test)) ["\x03\x00\x00\x00\x00\x00\x00\x00\x02\x00\xfftest\x00\xff\x00\xff\x00\x00"]
+c1: storage delete mvcc:TxnActive(2) ["\x01\x00\x00\x00\x00\x00\x00\x00\x02"]
+
+c2:> SELECT * FROM test
+---
+ok

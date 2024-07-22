@@ -1,0 +1,35 @@
+# Write skew is when c1 reads a and writes it to b while c2 reads b and writes
+# it to a. Snapshot isolation does not prevent this, which is expected, so we
+# assert the anomalous behavior. Fixing this would require implementing
+# serializable snapshot isolation.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a'), (2, 'b')
+---
+ok
+
+c1:> BEGIN
+c2:> BEGIN
+---
+ok
+
+c1:> SELECT * FROM test WHERE id = 1
+c2:> SELECT * FROM test WHERE id = 2
+---
+c1: 1, 'a'
+c2: 2, 'b'
+
+c1:> UPDATE test SET value = 'a' WHERE id = 2
+c2:> UPDATE test SET value = 'b' WHERE id = 1
+---
+ok
+
+c1:> COMMIT
+c2:> COMMIT
+---
+ok
+
+> SELECT * FROM test
+---
+1, 'b'
+2, 'a'

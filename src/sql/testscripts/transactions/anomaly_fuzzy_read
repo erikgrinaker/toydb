@@ -1,0 +1,26 @@
+# A fuzzy (or unrepeatable) read is when c2 sees a value change after c1
+# updates it. Snapshot isolation prevents this.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a')
+---
+ok
+
+c1:> BEGIN
+c2:> BEGIN
+---
+ok
+
+c2:> SELECT * FROM test WHERE id = 1
+---
+c2: 1, 'a'
+
+c1:> UPDATE test SET value = 'b' WHERE id = 1
+c1:> COMMIT
+c1:> SELECT * FROM test
+---
+c1: 1, 'b'
+
+c2:> SELECT * FROM test WHERE id = 1
+---
+c2: 1, 'a'

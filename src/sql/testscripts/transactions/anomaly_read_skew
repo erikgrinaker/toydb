@@ -1,0 +1,26 @@
+# Read skew is when c1 reads a and b, but c2 modifies b in between the
+# reads. Snapshot isolation prevents this.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+> INSERT INTO test VALUES (1, 'a'), (2, 'b')
+---
+ok
+
+c1:> BEGIN
+c2:> BEGIN
+---
+ok
+
+c1:> SELECT * FROM test WHERE id = 1
+---
+c1: 1, 'a'
+
+c2:> UPDATE test SET value = 'b' WHERE id = 1
+c2:> UPDATE test SET value = 'a' WHERE id = 2
+c2:> COMMIT
+---
+ok
+
+c1:> SELECT * FROM test WHERE id = 2
+---
+c1: 2, 'b'

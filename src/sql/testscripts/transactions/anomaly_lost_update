@@ -1,0 +1,26 @@
+# A lost update is when c1 and c2 both read a value and update it, where
+# c2's update replaces c1. Snapshot isolation prevents this.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+---
+ok
+
+
+c1:> BEGIN
+c1:> SELECT * FROM test WHERE id = 1
+---
+ok
+
+c2:> BEGIN
+c2:> SELECT * FROM test WHERE id = 1
+---
+ok
+
+c1:> INSERT INTO test VALUES (1, 'a')
+c1:> COMMIT
+---
+ok
+
+c2:!> INSERT INTO test VALUES (1, 'a')
+---
+c2: Error: serialization failure, retry transaction

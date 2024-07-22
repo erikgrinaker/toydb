@@ -74,34 +74,36 @@ pub mod types;
 
 #[cfg(test)]
 mod tests {
+    use super::engine::{Catalog as _, Session};
+    use super::parser::Parser;
+    use super::planner::{Node, Plan, OPTIMIZERS};
     use crate::encoding::format::{self, Formatter as _};
     use crate::sql::engine::{Engine, Local, StatementResult};
     use crate::sql::planner::{Planner, Scope};
-    use crate::storage::engine::test::{Emit, Mirror, Operation};
+    use crate::storage::engine::test::{self, Emit, Mirror, Operation};
     use crate::storage::{self, Engine as _};
+
     use crossbeam::channel::Receiver;
     use itertools::Itertools as _;
+    use std::collections::HashMap;
     use std::error::Error;
     use std::fmt::Write as _;
     use std::result::Result;
     use test_each_file::test_each_path;
 
-    use super::engine::{Catalog as _, Session};
-    use super::parser::Parser;
-    use super::planner::{Node, Plan, OPTIMIZERS};
-
     // Run goldenscript tests in src/sql/testscripts.
     test_each_path! { in "src/sql/testscripts/optimizer" as optimizer => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/queries" as queries => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/schema" as schema => test_goldenscript }
+    test_each_path! { in "src/sql/testscripts/transactions" as transactions => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/writes" as writes => test_goldenscript }
     test_each_path! { in "src/sql/testscripts/expressions" as expressions => test_goldenscript_expr }
 
+    /// Runs SQL goldenscripts.
     fn test_goldenscript(path: &std::path::Path) {
-        // Since the runner's Session can't reference an Engine stored in the
-        // same struct, we borrow the engine. Use both a BitCask and a Memory
-        // engine, and mirror operations across them. Emit engine operations to
-        // op_rx.
+        // Since the runner's Session can't reference an Engine in the same
+        // struct, borrow the engine. Use both a BitCask and a Memory engine,
+        // and mirror operations across them. Emit engine operations to op_rx.
         let (op_tx, op_rx) = crossbeam::channel::unbounded();
         let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
         let bitcask =
@@ -113,29 +115,33 @@ mod tests {
         goldenscript::run(&mut runner, path).expect("goldenscript failed")
     }
 
+    /// Runs expression goldenscripts.
     fn test_goldenscript_expr(path: &std::path::Path) {
         goldenscript::run(&mut ExpressionRunner, path).expect("goldenscript failed")
     }
 
-    /// A SQL test runner.
+    /// The SQL test runner.
     struct SQLRunner<'a> {
         engine: &'a TestEngine,
-        session: Session<'a, TestEngine>,
+        sessions: HashMap<String, Session<'a, TestEngine>>,
         op_rx: Receiver<Operation>,
     }
 
-    type TestEngine = Local<Emit<Mirror<storage::BitCask, storage::Memory>>>;
+    type TestEngine = Local<test::Emit<test::Mirror<storage::BitCask, storage::Memory>>>;
 
     impl<'a> SQLRunner<'a> {
         fn new(engine: &'a TestEngine, op_rx: Receiver<Operation>) -> Self {
-            let session = engine.session();
-            Self { engine, session, op_rx }
+            Self { engine, sessions: HashMap::new(), op_rx }
         }
     }
 
     impl<'a> goldenscript::Runner for SQLRunner<'a> {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
+
+            // Obtain a session for the command prefix.
+            let prefix = command.prefix.clone().unwrap_or_default();
+            let session = self.sessions.entry(prefix).or_insert_with(|| self.engine.session());
 
             // Handle runner commands.
             match command.name.as_str() {
@@ -162,11 +168,11 @@ mod tests {
                     args.reject_rest()?;
 
                     let schemas = if tables.is_empty() {
-                        self.session.with_txn(true, |txn| txn.list_tables())?
+                        session.with_txn(true, |txn| txn.list_tables())?
                     } else {
                         tables
                             .into_iter()
-                            .map(|t| self.session.with_txn(true, |txn| txn.must_get_table(&t)))
+                            .map(|t| session.with_txn(true, |txn| txn.must_get_table(&t)))
                             .try_collect()?
                     };
                     return Ok(schemas.into_iter().map(|s| s.to_string()).join("\n"));
@@ -184,7 +190,7 @@ mod tests {
             let mut tags = command.tags.clone();
 
             // Execute the statement.
-            let result = self.session.execute(input)?;
+            let result = session.execute(input)?;
 
             // Output optimizations if requested.
             if tags.remove("opt") {
@@ -192,7 +198,7 @@ mod tests {
                     return Err("no point using both plan and opt".into());
                 }
                 let ast = Parser::new(input).parse()?;
-                let plan = self.session.with_txn(true, |txn| Planner::new(txn).build(ast))?;
+                let plan = session.with_txn(true, |txn| Planner::new(txn).build(ast))?;
                 let Plan::Select(mut root) = plan else {
                     return Err("can only use opt with SELECT plans".into());
                 };
@@ -211,23 +217,31 @@ mod tests {
             // Output the plan if requested.
             if tags.remove("plan") {
                 let query = format!("EXPLAIN {input}");
-                let StatementResult::Explain(plan) = self.session.execute(&query)? else {
+                let StatementResult::Explain(plan) = session.execute(&query)? else {
                     return Err("unexpected explain response".into());
                 };
                 writeln!(output, "{plan}")?;
             }
 
-            // Output the result if requested. SELECT results are always output,
-            // but the column only if result is given.
-            if let StatementResult::Select { columns, rows } = result {
-                if tags.remove("header") {
-                    writeln!(output, "{}", columns.into_iter().map(|c| c.to_string()).join(", "))?;
+            // Output the result if requested. SELECT results are always output.
+            let show_result = tags.remove("result");
+            match result {
+                StatementResult::Select { columns, rows } => {
+                    if tags.remove("header") {
+                        writeln!(output, "{}", columns.into_iter().join(", "))?;
+                    }
+                    for row in rows {
+                        writeln!(output, "{}", row.into_iter().join(", "))?;
+                    }
                 }
-                for row in rows {
-                    writeln!(output, "{}", row.into_iter().map(|v| v.to_string()).join(", "))?;
+                StatementResult::Begin { state } if show_result => {
+                    let version = state.version;
+                    let kind = if state.read_only { "read-only" } else { "read-write" };
+                    let active = state.active.iter().join(",");
+                    writeln!(output, "v{version} {kind} active={{{active}}}")?;
                 }
-            } else if tags.remove("result") {
-                writeln!(output, "{result:?}")?;
+                result if show_result => writeln!(output, "{result:?}")?,
+                _ => {}
             }
 
             // Output engine ops if requested.

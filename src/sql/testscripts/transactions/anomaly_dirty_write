@@ -1,0 +1,16 @@
+# A dirty write is when c2 overwrites an uncommitted value written by c1.
+# Snapshot isolation prevents this.
+
+> CREATE TABLE test (id INT PRIMARY KEY, value STRING)
+---
+ok
+
+c1:> BEGIN
+c1:> INSERT INTO test VALUES (1, 'a')
+---
+ok
+
+c2:> BEGIN
+c2:!> INSERT INTO test VALUES (1, 'a')
+---
+c2: Error: serialization failure, retry transaction

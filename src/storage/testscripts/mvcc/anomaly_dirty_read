@@ -1,4 +1,4 @@
-# A dirty read is when t2 can read an uncommitted value set by t1.Snapshot
+# A dirty read is when t2 can read an uncommitted value set by t1. Snapshot
 # isolation prevents this.
 
 t1: begin
