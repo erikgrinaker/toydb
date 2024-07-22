@@ -46,7 +46,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
                 };
                 let state = txn.state().clone();
                 self.txn = Some(txn);
-                StatementResult::Begin { state }
+                StatementResult::Begin(state)
             }
             ast::Statement::Commit => {
                 let Some(txn) = self.txn.take() else {
@@ -125,7 +125,7 @@ impl<'a, E: Engine<'a>> Drop for Session<'a, E> {
 /// A session statement result. Sent across the wire to SQL clients.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum StatementResult {
-    Begin { state: mvcc::TransactionState },
+    Begin(mvcc::TransactionState),
     Commit { version: mvcc::Version },
     Rollback { version: mvcc::Version },
     Explain(Plan),

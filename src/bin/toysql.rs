@@ -174,7 +174,7 @@ Transactions: {active_txns} active, {versions} total
     fn execute_sql(&mut self, statement: &str) -> Result<()> {
         use StatementResult::*;
         match self.client.execute(statement)? {
-            Begin { state } => match state.read_only {
+            Begin(state) => match state.read_only {
                 true => println!("Began read-only transaction at version {}", state.version),
                 false => println!("Began transaction {}", state.version),
             },

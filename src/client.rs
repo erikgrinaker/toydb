@@ -44,7 +44,7 @@ impl Client {
         };
         // Update the transaction state.
         match &result {
-            StatementResult::Begin { state } => self.txn = Some(state.clone()),
+            StatementResult::Begin(state) => self.txn = Some(state.clone()),
             StatementResult::Commit { .. } => self.txn = None,
             StatementResult::Rollback { .. } => self.txn = None,
             _ => {}

@@ -244,9 +244,11 @@ fn execute_txn() -> Result<()> {
     // Committing a change in a txn should work
     assert_eq!(
         c.execute("BEGIN")?,
-        StatementResult::Begin {
-            state: mvcc::TransactionState { version: 2, read_only: false, active: BTreeSet::new() }
-        }
+        StatementResult::Begin(mvcc::TransactionState {
+            version: 2,
+            read_only: false,
+            active: BTreeSet::new()
+        })
     );
     assert_eq!(
         c.txn(),
@@ -264,9 +266,11 @@ fn execute_txn() -> Result<()> {
     // Rolling back a change in a txn should also work
     assert_eq!(
         c.execute("BEGIN")?,
-        StatementResult::Begin {
-            state: mvcc::TransactionState { version: 3, read_only: false, active: BTreeSet::new() }
-        }
+        StatementResult::Begin(mvcc::TransactionState {
+            version: 3,
+            read_only: false,
+            active: BTreeSet::new()
+        })
     );
     assert_eq!(
         c.txn(),
@@ -284,9 +288,11 @@ fn execute_txn() -> Result<()> {
     // Starting a read-only txn should block writes
     assert_eq!(
         c.execute("BEGIN READ ONLY")?,
-        StatementResult::Begin {
-            state: mvcc::TransactionState { version: 4, read_only: true, active: BTreeSet::new() }
-        }
+        StatementResult::Begin(mvcc::TransactionState {
+            version: 4,
+            read_only: true,
+            active: BTreeSet::new()
+        })
     );
     assert_eq!(
         c.txn(),
@@ -307,9 +313,11 @@ fn execute_txn() -> Result<()> {
     // block writes
     assert_eq!(
         c.execute("BEGIN READ ONLY AS OF SYSTEM TIME 2")?,
-        StatementResult::Begin {
-            state: mvcc::TransactionState { version: 2, read_only: true, active: BTreeSet::new() }
-        },
+        StatementResult::Begin(mvcc::TransactionState {
+            version: 2,
+            read_only: true,
+            active: BTreeSet::new()
+        }),
     );
     assert_eq!(
         c.txn(),
@@ -329,9 +337,11 @@ fn execute_txn() -> Result<()> {
     // A txn should still be usable after an error occurs
     assert_eq!(
         c.execute("BEGIN")?,
-        StatementResult::Begin {
-            state: mvcc::TransactionState { version: 4, read_only: false, active: BTreeSet::new() }
-        },
+        StatementResult::Begin(mvcc::TransactionState {
+            version: 4,
+            read_only: false,
+            active: BTreeSet::new()
+        })
     );
     c.execute("INSERT INTO genres VALUES (5, 'Horror')")?;
     assert_eq!(
@@ -369,19 +379,19 @@ fn execute_txn_concurrent() -> Result<()> {
     // Concurrent updates should throw a serialization failure on conflict.
     assert_eq!(
         a.execute("BEGIN")?,
-        StatementResult::Begin {
-            state: mvcc::TransactionState { version: 2, read_only: false, active: BTreeSet::new() }
-        },
+        StatementResult::Begin(mvcc::TransactionState {
+            version: 2,
+            read_only: false,
+            active: BTreeSet::new()
+        })
     );
     assert_eq!(
         b.execute("BEGIN")?,
-        StatementResult::Begin {
-            state: mvcc::TransactionState {
-                version: 3,
-                read_only: false,
-                active: BTreeSet::from([2])
-            }
-        },
+        StatementResult::Begin(mvcc::TransactionState {
+            version: 3,
+            read_only: false,
+            active: BTreeSet::from([2])
+        })
     );
 
     assert_row(

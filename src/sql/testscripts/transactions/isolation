@@ -38,7 +38,7 @@ ok
 c4:[result]> BEGIN
 c4:> INSERT INTO test VALUES (4, 'd')
 ---
-c4: Begin { state: TransactionState { version: 4, read_only: false, active: {2, 3} } }
+c4: Begin(TransactionState { version: 4, read_only: false, active: {2, 3} })
 
 # Commit c2.
 c2:> COMMIT
