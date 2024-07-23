@@ -15,11 +15,12 @@ Distributed SQL database in Rust, written as an educational project. Built from 
 
 * [SQL interface][sql] including joins, aggregates, and transactions.
 
-toyDB is intended to illustrate the overall architecture and concepts of distributed SQL databases.
-It should be functional and correct, but focuses on simplicity and understandability. In particular,
-performance, scalability, and availability are explicit non-goals -- these are major sources of
-complexity in production-grade databases, which obscur the basic underlying concepts. Shortcuts have
-been taken wherever possible.
+Originally written to teach myself more about database iternals, toyDB is intended to illustrate 
+the basic architecture and concepts of distributed SQL databases. It should be functional and 
+correct, but focuses on simplicity and understandability. In particular, performance, scalability, 
+and availability are explicit non-goals -- these are major sources of complexity in 
+production-grade databases, which obscur the basic underlying concepts. Shortcuts have been taken 
+wherever possible.
 
 toyDB is not suitable for real-world use.
 
