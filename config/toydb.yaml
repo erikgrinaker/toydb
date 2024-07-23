@@ -21,6 +21,12 @@ data_dir: data
 storage_raft: bitcask
 storage_sql: bitcask
 
+# Whether to fsync writes to disk. Disabling this yields much better write
+# performance, but may lose data on host crashes and violate Raft guarantees. It
+# only affects Raft log writes (the SQL state machine is never fsynced since it
+# can be reconstructed from the Raft log).
+fsync: true
+
 # The minimum garbage fraction and bytes to trigger Bitcask log compaction on
 # node startup.
 compact_threshold: 0.2

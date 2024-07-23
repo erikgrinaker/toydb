@@ -46,6 +46,10 @@ struct Config {
     storage_raft: String,
     /// The SQL storage engine: bitcask or memory.
     storage_sql: String,
+    /// If false, don't fsync Raft log writes to disk. Disabling this
+    /// will yield much better write performance, but may lose data on
+    /// host crashes which compromises Raft safety guarantees.
+    fsync: bool,
     /// The garbage fraction threshold at which to trigger compaction.
     compact_threshold: f64,
     /// The minimum bytes of garbage before triggering compaction.
@@ -63,6 +67,7 @@ impl Config {
             .set_default("data_dir", "data")?
             .set_default("storage_raft", "bitcask")?
             .set_default("storage_sql", "bitcask")?
+            .set_default("fsync", true)?
             .set_default("compact_threshold", 0.2)?
             .set_default("compact_min_bytes", 1_000_000)?
             .add_source(config::File::with_name(file))
@@ -97,7 +102,7 @@ impl Command {
 
         // Initialize the Raft log storage engine.
         let datadir = std::path::Path::new(&cfg.data_dir);
-        let raft_log = match cfg.storage_raft.as_str() {
+        let mut raft_log = match cfg.storage_raft.as_str() {
             "bitcask" | "" => {
                 let engine = storage::BitCask::new_compact(
                     datadir.join("raft"),
@@ -109,6 +114,7 @@ impl Command {
             "memory" => raft::Log::new(Box::new(storage::Memory::new()))?,
             name => return errinput!("invalid Raft storage engine {name}"),
         };
+        raft_log.enable_fsync(cfg.fsync);
 
         // Initialize the SQL storage engine.
         let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {

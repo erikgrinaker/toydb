@@ -101,6 +101,13 @@ pub struct Log {
     commit_index: Index,
     /// The term of the last committed entry.
     commit_term: Term,
+    /// If true, fsync entries to disk when appended. This is mandated by Raft,
+    /// but comes with a hefty performance penalty (especially since we don't
+    /// optimize for it by batching entries before fsyncing). Disabling it will
+    /// yield much better write performance, but may lose data on host crashes,
+    /// which in some scenarios can cause log entries to become "uncommitted"
+    /// and state machines diverging.
+    fsync: bool,
 }
 
 impl Log {
@@ -125,7 +132,14 @@ impl Log {
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, 0));
-        Ok(Self { engine, term, vote, last_index, last_term, commit_index, commit_term })
+        let fsync = true; // fsync by default (NB: BitCask::flush() is a noop in tests)
+        Ok(Self { engine, term, vote, last_index, last_term, commit_index, commit_term, fsync })
+    }
+
+    /// Controls whether to fsync writes. Disabling this may violate Raft
+    /// guarantees, see comment on fsync attribute.
+    pub fn enable_fsync(&mut self, fsync: bool) {
+        self.fsync = fsync
     }
 
     /// Returns the commit index and term.
@@ -154,6 +168,9 @@ impl Log {
             return Ok(());
         }
         self.engine.set(&Key::TermVote.encode(), bincode::serialize(&(term, vote)))?;
+        // Always fsync, even with Log.fsync = false. Term changes are rare, so
+        // this doesn't materially affect performance, and double voting could
+        // lead to multiple leaders and split brain which is really bad.
         self.engine.flush()?;
         self.term = term;
         self.vote = vote;
@@ -169,7 +186,9 @@ impl Log {
         // in the key, but we keep it simple.
         let entry = Entry { index: self.last_index + 1, term: self.term, command };
         self.engine.set(&Key::Entry(entry.index).encode(), entry.encode())?;
-        self.engine.flush()?;
+        if self.fsync {
+            self.engine.flush()?;
+        }
         self.last_index = entry.index;
         self.last_term = entry.term;
         Ok(entry.index)
@@ -306,7 +325,9 @@ impl Log {
         for index in last.index + 1..=self.last_index {
             self.engine.delete(&Key::Entry(index).encode())?;
         }
-        self.engine.flush()?;
+        if self.fsync {
+            self.engine.flush()?;
+        }
 
         self.last_index = last.index;
         self.last_term = last.term;

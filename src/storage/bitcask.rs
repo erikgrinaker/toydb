@@ -117,7 +117,9 @@ impl Engine for BitCask {
     }
 
     fn flush(&mut self) -> Result<()> {
-        // Don't fsync in tests, to speed them up.
+        // Don't fsync in tests, to speed them up. We disable this here, instead
+        // of setting raft::Log::fsync = false in tests, because we want to
+        // assert that the Raft log flushes to disk even if the flush is a noop.
         #[cfg(not(test))]
         self.log.file.sync_all()?;
         Ok(())
