@@ -19,17 +19,15 @@ Originally written to teach myself more about database iternals, toyDB is intend
 the basic architecture and concepts of distributed SQL databases. It should be functional and 
 correct, but focuses on simplicity and understandability. In particular, performance, scalability, 
 and availability are explicit non-goals -- these are major sources of complexity in 
-production-grade databases, which obscur the basic underlying concepts. Shortcuts have been taken 
+production-grade databases, which obscure the basic underlying concepts. Shortcuts have been taken 
 wherever possible.
-
-toyDB is not suitable for real-world use.
 
 [raft]: https://github.com/erikgrinaker/toydb/blob/master/src/raft/mod.rs
 [txn]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/mvcc.rs
 [storage]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/engine.rs
 [bitcask]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/bitcask.rs
 [memory]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/memory.rs
-[query]: https://github.com/erikgrinaker/toydb/blob/master/src/sql/planner/plan.rs
+[query]: https://github.com/erikgrinaker/toydb/blob/master/src/sql/execution/execute.rs
 [optimizer]: https://github.com/erikgrinaker/toydb/blob/master/src/sql/planner/optimizer.rs
 [sql]: https://github.com/erikgrinaker/toydb/blob/master/src/sql/mod.rs
 
@@ -50,6 +48,17 @@ cluster can be started on `localhost` ports `9601` to `9605`, with data under `c
 
 ```
 $ ./cluster/run.sh
+Starting 5 nodes on ports 9601-9605 with data under cluster/*/data/.
+To connect to node 5, run: cargo run --release --bin toysql
+
+toydb4 21:03:55 [INFO] Listening on [::1]:9604 (SQL) and [::1]:9704 (Raft)
+toydb1 21:03:55 [INFO] Listening on [::1]:9601 (SQL) and [::1]:9701 (Raft)
+toydb2 21:03:55 [INFO] Listening on [::1]:9602 (SQL) and [::1]:9702 (Raft)
+toydb3 21:03:55 [INFO] Listening on [::1]:9603 (SQL) and [::1]:9703 (Raft)
+toydb5 21:03:55 [INFO] Listening on [::1]:9605 (SQL) and [::1]:9705 (Raft)
+toydb2 21:03:56 [INFO] Starting new election for term 1
+[...]
+toydb2 21:03:56 [INFO] Won election for term 1, becoming leader
 ```
 
 A command-line client can be built and used with node 5 on `localhost:9605`:
@@ -66,6 +75,29 @@ toydb> SELECT * FROM movies;
 ```
 
 toyDB supports most common SQL features, including joins, aggregates, and ACID transactions.
+Here is an `EXPLAIN` query plan of a more complex query, fetching movies from studios that
+have released movies with an IMDb rating of 8 or more:
+
+```
+toydb> EXPLAIN SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating
+  FROM movies m JOIN genres g ON m.genre_id = g.id,
+    studios s JOIN movies good ON good.studio_id = s.id AND good.rating >= 8
+  WHERE m.studio_id = s.id
+  GROUP BY m.id, m.title, g.name, s.name, m.rating, m.released
+  ORDER BY m.rating DESC, m.released ASC, m.id ASC;
+
+Remap: m.id, m.title, genre, studio, m.rating (dropped: m.released)
+└─ Order: m.rating desc, m.released asc, m.id asc
+   └─ Projection: m.id, m.title, g.name as genre, s.name as studio, m.rating, m.released
+      └─ Aggregate: m.id, m.title, g.name, s.name, m.rating, m.released
+         └─ HashJoin: inner on m.studio_id = s.id
+            ├─ HashJoin: inner on m.genre_id = g.id
+            │  ├─ Scan: movies as m
+            │  └─ Scan: genres as g
+            └─ HashJoin: inner on s.id = good.studio_id
+               ├─ Scan: studios as s
+               └─ Scan: movies as good (good.rating > 8 OR good.rating = 8)
+```
 
 ## Architecture
 
@@ -127,14 +159,15 @@ The available workloads are:
 
 For more information about workloads and parameters, run `cargo run --bin workload -- --help`.
 
-Example workload results:
+Example workload results are listed below. Write performance is pretty atrocious, due to fsyncs 
+and a lack of write batching at the Raft level. Disabling fsyncs, or using the in-memory engine, 
+significantly improves write performance.
 
-```
-Workload   Time       Txns      Rate       p50       p90       p99      pMax
-read       7.1s     100000   14163/s     1.2ms     1.4ms     1.7ms     8.4ms
-write      22.2s    100000    4502/s     3.9ms     4.5ms     4.9ms    15.7ms
-bank       155.0s   100000     645/s    16.9ms    41.7ms    95.0ms  1044.4ms
-```
+| Workload | BitCask     | BitCask w/o fsync | Memory      |
+|----------|-------------|-------------------|-------------|
+| `read`   | 14163 txn/s | 13941 txn/s       | 13949 txn/s |
+| `write`  | 35 txn/s    | 4719 txn/s        | 7781 txn/s  |
+| `bank`   | 21 txn/s    | 1120 txn/s        | 1346 txn/s  |
 
 ## Debugging
 

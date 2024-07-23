@@ -15,8 +15,8 @@ cd "$(dirname $0)"
 cargo build --release --bin toydb
 
 # Start nodes 1-5 in the background, prefixing their output with the node ID.
-echo "Starting 5 nodes on ports 9601-9605. To connect to node 5, run:"
-echo "cargo run --release --bin toysql"
+echo "Starting 5 nodes on ports 9601-9605 with data under cluster/*/data/."
+echo "To connect to node 5, run: cargo run --release --bin toysql"
 echo ""
 
 for ID in 1 2 3 4 5; do
