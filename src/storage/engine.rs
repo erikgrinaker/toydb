@@ -3,9 +3,12 @@ use crate::error::Result;
 
 use serde::{Deserialize, Serialize};
 
-/// A key/value storage engine, where both keys and values are arbitrary byte
-/// strings between 0 B and 2 GB, stored in lexicographical key order. Writes
-/// are only guaranteed durable after calling flush().
+/// A key/value storage engine storing arbitrary byte strings in lexicographical
+/// key order. Storing keys in order allows for efficient range scans, which is
+/// needed to e.g. scan a single table during SQL execution (where all rows have
+/// keys with a common key prefix for the table). Keys should use the KeyCode
+/// order-preserving encoding, see src/encoding/keycode. Writes are only
+/// guaranteed durable after calling flush().
 ///
 /// Only supports single-threaded use since all methods (including reads) take a
 /// mutable reference -- serialized access can't be avoided anyway, since both
