@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml/badge.svg)](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml)
 
-Distributed SQL database in Rust, written as an educational project. Built from scratch, including:
+Distributed SQL database in Rust, built from scratch as an educational project. Main features:
 
 * [Raft distributed consensus engine][raft] for linearizable state machine replication.
 
@@ -15,12 +15,12 @@ Distributed SQL database in Rust, written as an educational project. Built from 
 
 * [SQL interface][sql] including joins, aggregates, and transactions.
 
-Originally written to teach myself more about database iternals, toyDB is intended to illustrate 
-the basic architecture and concepts of distributed SQL databases. It should be functional and 
-correct, but focuses on simplicity and understandability. In particular, performance, scalability, 
-and availability are explicit non-goals -- these are major sources of complexity in 
-production-grade databases, which obscure the basic underlying concepts. Shortcuts have been taken 
-wherever possible.
+Originally written to learn more about database internals, toyDB is intended to illustrate the basic
+architecture and concepts of distributed SQL databases. It focuses on simplicity and 
+understandability, and should be functional and correct. Other aspects like performance,
+scalability, and availability are explicit non-goals -- these are major sources of complexity in 
+production-grade  databases, which obscure the basic underlying concepts. Shortcuts have been taken 
+where possible.
 
 [raft]: https://github.com/erikgrinaker/toydb/blob/master/src/raft/mod.rs
 [txn]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/mvcc.rs
@@ -39,12 +39,12 @@ wherever possible.
 
 * [SQL reference](docs/sql.md): toyDB SQL reference documentation.
 
-* [References](docs/references.md): books and other material used while building toyDB.
+* [References](docs/references.md): books and other materials used while building toyDB.
 
 ## Usage
 
 With a [Rust compiler](https://www.rust-lang.org/tools/install) installed, a local five-node 
-cluster can be started on `localhost` ports `9601` to `9605`, with data under `cluster/*/data`:
+cluster can be built and started as:
 
 ```
 $ ./cluster/run.sh
@@ -74,22 +74,23 @@ toydb> SELECT * FROM movies;
 3, 'Her'
 ```
 
-toyDB supports most common SQL features, including joins, aggregates, and ACID transactions.
-Here is an `EXPLAIN` query plan of a more complex query, fetching movies from studios that
-have released movies with an IMDb rating of 8 or more:
+toyDB supports most common SQL features, including joins, aggregates, and transactions.
+
+Below is an `EXPLAIN` query plan of a more complex query, fetching movies from studios that have
+released movies with an IMDb rating of 8 or more:
 
 ```
-toydb> EXPLAIN SELECT m.id, m.title, g.name AS genre, s.name AS studio, m.rating
+toydb> EXPLAIN SELECT m.title, g.name AS genre, s.name AS studio, m.rating
   FROM movies m JOIN genres g ON m.genre_id = g.id,
     studios s JOIN movies good ON good.studio_id = s.id AND good.rating >= 8
   WHERE m.studio_id = s.id
-  GROUP BY m.id, m.title, g.name, s.name, m.rating, m.released
-  ORDER BY m.rating DESC, m.released ASC, m.id ASC;
+  GROUP BY m.title, g.name, s.name, m.rating, m.released
+  ORDER BY m.rating DESC, m.released ASC, m.title ASC;
 
-Remap: m.id, m.title, genre, studio, m.rating (dropped: m.released)
-└─ Order: m.rating desc, m.released asc, m.id asc
-   └─ Projection: m.id, m.title, g.name as genre, s.name as studio, m.rating, m.released
-      └─ Aggregate: m.id, m.title, g.name, s.name, m.rating, m.released
+Remap: m.title, genre, studio, m.rating (dropped: m.released)
+└─ Order: m.rating desc, m.released asc, m.title asc
+   └─ Projection: m.title, g.name as genre, s.name as studio, m.rating, m.released
+      └─ Aggregate: m.title, g.name, s.name, m.rating, m.released
          └─ HashJoin: inner on m.studio_id = s.id
             ├─ HashJoin: inner on m.genre_id = g.id
             │  ├─ Scan: movies as m
@@ -101,17 +102,17 @@ Remap: m.id, m.title, genre, studio, m.rating (dropped: m.released)
 
 ## Architecture
 
-[![toyDB architecture](./docs/images/architecture.svg)](./docs/architecture.md)
-
 toyDB's architecture is fairly typical for a distributed SQL database: a transactional
 key/value store managed by a Raft cluster with a SQL query engine on top. See the
 [architecture guide](./docs/architecture.md) for more details.
 
+[![toyDB architecture](./docs/images/architecture.svg)](./docs/architecture.md)
+
 ## Tests
 
-toyDB mostly uses [Goldenscripts](https://github.com/erikgrinaker/goldenscript) for tests. These 
-are used to script various scenarios, capture events and output, and later assert that the
-behavior remains the same. See e.g.:
+toyDB mainly uses [Goldenscripts](https://github.com/erikgrinaker/goldenscript) for tests. These 
+script various scenarios, capture events and output, and later assert that the behavior remains the 
+same. See e.g.:
 
 * [Raft cluster tests](https://github.com/erikgrinaker/toydb/tree/master/src/raft/testscripts/node)
 * [MVCC transaction tests](https://github.com/erikgrinaker/toydb/tree/master/src/storage/testscripts/mvcc)
@@ -154,8 +155,8 @@ The available workloads are:
 
 * `read`: single-row primary key lookups.
 * `write`: single-row inserts to sequential primary keys.
-* `bank`: makes bank transfers between various customers and accounts. To make things interesting,
-  this includes joins, secondary indexes, sorting, and conflicts.
+* `bank`: bank transfers between various customers and accounts. To make things interesting, this
+  includes joins, secondary indexes, sorting, and conflicts.
 
 For more information about workloads and parameters, run `cargo run --bin workload -- --help`.
 
