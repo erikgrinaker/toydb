@@ -20,7 +20,7 @@ To start a five-node cluster on the local machine (requires a working
 [Rust compiler](https://www.rust-lang.org/tools/install)), run:
 
 ```
-$ (cd clusters/local && ./run.sh)
+$ (cd clusters && ./run.sh)
 toydb2 19:06:28 [ INFO] Listening on 0.0.0.0:9602 (SQL) and 0.0.0.0:9702 (Raft)
 toydb2 19:06:28 [ERROR] Failed connecting to Raft peer 127.0.0.1:9705: Connection refused
 toydb5 19:06:28 [ INFO] Listening on 0.0.0.0:9605 (SQL) and 0.0.0.0:9705 (Raft)
@@ -43,7 +43,7 @@ Node logs: 1:1 2:1 3:1 4:1 5:1
 SQL txns:  0 active, 0 total (bitcask storage)
 ```
 
-The cluster is shut down by pressing Ctrl-C. Data is saved under `clusters/local/toydb-?/data/`,
+The cluster is shut down by pressing Ctrl-C. Data is saved under `clusters/toydb-?/data/`,
 delete the contents to start over.
 
 ## Creating Tables and Data
