@@ -176,14 +176,14 @@ pub struct ScanIterator<'a> {
     log: &'a mut Log,
 }
 
-impl<'a> ScanIterator<'a> {
+impl ScanIterator<'_> {
     fn map(&mut self, item: (&Vec<u8>, &(u64, u32))) -> <Self as Iterator>::Item {
         let (key, (value_pos, value_len)) = item;
         Ok((key.clone(), self.log.read_value(*value_pos, *value_len)?))
     }
 }
 
-impl<'a> Iterator for ScanIterator<'a> {
+impl Iterator for ScanIterator<'_> {
     type Item = Result<(Vec<u8>, Vec<u8>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -191,7 +191,7 @@ impl<'a> Iterator for ScanIterator<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for ScanIterator<'a> {
+impl DoubleEndedIterator for ScanIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner.next_back().map(|item| self.map(item))
     }

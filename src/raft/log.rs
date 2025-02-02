@@ -351,7 +351,7 @@ impl<'a> Iterator<'a> {
     }
 }
 
-impl<'a> std::iter::Iterator for Iterator<'a> {
+impl std::iter::Iterator for Iterator<'_> {
     type Item = Result<Entry>;
 
     fn next(&mut self) -> Option<Self::Item> {

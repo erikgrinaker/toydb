@@ -126,7 +126,7 @@ impl<'a> Transaction<'a> {
     }
 }
 
-impl<'a> super::Transaction for Transaction<'a> {
+impl super::Transaction for Transaction<'_> {
     fn state(&self) -> &mvcc::TransactionState {
         &self.state
     }
@@ -188,7 +188,7 @@ impl<'a> super::Transaction for Transaction<'a> {
     }
 }
 
-impl<'a> Catalog for Transaction<'a> {
+impl Catalog for Transaction<'_> {
     fn create_table(&self, schema: Table) -> Result<()> {
         self.engine.write(Write::CreateTable { txn: (&self.state).into(), schema })
     }
@@ -371,7 +371,7 @@ pub enum Read<'a> {
     },
 }
 
-impl<'a> encoding::Value for Read<'a> {}
+impl encoding::Value for Read<'_> {}
 
 /// A Raft engine write. Values correspond to engine method parameters. Uses
 /// Cows to allow borrowed encoding (for borrowed params) and owned decoding.
@@ -389,7 +389,7 @@ pub enum Write<'a> {
     DropTable { txn: Cow<'a, mvcc::TransactionState>, table: Cow<'a, str>, if_exists: bool },
 }
 
-impl<'a> encoding::Value for Write<'a> {}
+impl encoding::Value for Write<'_> {}
 
 /// Raft SQL engine status.
 #[derive(Serialize, Deserialize)]

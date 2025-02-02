@@ -248,7 +248,10 @@ pub mod test {
     }
 
     impl<E: Engine> Engine for Emit<E> {
-        type ScanIterator<'a> = E::ScanIterator<'a> where E: 'a;
+        type ScanIterator<'a>
+            = E::ScanIterator<'a>
+        where
+            E: 'a;
 
         fn flush(&mut self) -> Result<()> {
             self.inner.flush()?;
@@ -303,7 +306,8 @@ pub mod test {
     }
 
     impl<A: Engine, B: Engine> Engine for Mirror<A, B> {
-        type ScanIterator<'a> = MirrorIterator<'a, A, B>
+        type ScanIterator<'a>
+            = MirrorIterator<'a, A, B>
         where
             Self: Sized,
             A: 'a,
@@ -364,7 +368,7 @@ pub mod test {
         b: B::ScanIterator<'a>,
     }
 
-    impl<'a, A: Engine, B: Engine> Iterator for MirrorIterator<'a, A, B> {
+    impl<A: Engine, B: Engine> Iterator for MirrorIterator<'_, A, B> {
         type Item = Result<(Vec<u8>, Vec<u8>)>;
 
         fn next(&mut self) -> Option<Self::Item> {
@@ -375,7 +379,7 @@ pub mod test {
         }
     }
 
-    impl<'a, A: Engine, B: Engine> DoubleEndedIterator for MirrorIterator<'a, A, B> {
+    impl<A: Engine, B: Engine> DoubleEndedIterator for MirrorIterator<'_, A, B> {
         fn next_back(&mut self) -> Option<Self::Item> {
             let a = self.a.next_back();
             let b = self.b.next_back();

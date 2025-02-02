@@ -42,7 +42,7 @@ impl<E: storage::Engine> Local<E> {
     }
 }
 
-impl<'a, E: storage::Engine> super::Engine<'a> for Local<E> {
+impl<E: storage::Engine> super::Engine<'_> for Local<E> {
     type Transaction = Transaction<E>;
 
     fn begin(&self) -> Result<Self::Transaction> {

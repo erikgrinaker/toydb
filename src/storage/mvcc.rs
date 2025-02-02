@@ -340,7 +340,7 @@ impl TransactionState {
     /// that version commits its writes. See the module documentation for
     /// details.
     fn is_visible(&self, version: Version) -> bool {
-        if self.active.get(&version).is_some() {
+        if self.active.contains(&version) {
             false
         } else if self.read_only {
             version < self.version
@@ -735,7 +735,7 @@ impl<'a, I: engine::ScanIterator> VersionIterator<'a, I> {
     }
 }
 
-impl<'a, I: engine::ScanIterator> Iterator for VersionIterator<'a, I> {
+impl<I: engine::ScanIterator> Iterator for VersionIterator<'_, I> {
     type Item = Result<(Vec<u8>, Version, Vec<u8>)>;
     fn next(&mut self) -> Option<Self::Item> {
         self.try_next().transpose()

@@ -104,7 +104,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
     }
 }
 
-impl<'a> Session<'a, Raft> {
+impl Session<'_, Raft> {
     /// Returns Raft SQL engine status.
     pub fn status(&self) -> Result<Status> {
         self.engine.status()

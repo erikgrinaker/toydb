@@ -138,7 +138,7 @@ mod tests {
         }
     }
 
-    impl<'a> goldenscript::Runner for SQLRunner<'a> {
+    impl goldenscript::Runner for SQLRunner<'_> {
         fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
 

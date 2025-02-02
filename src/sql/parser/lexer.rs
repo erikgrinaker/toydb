@@ -310,7 +310,7 @@ impl std::fmt::Display for Keyword {
 }
 
 /// The lexer is used as a token iterator.
-impl<'a> Iterator for Lexer<'a> {
+impl Iterator for Lexer<'_> {
     type Item = Result<Token>;
 
     fn next(&mut self) -> Option<Result<Token>> {
