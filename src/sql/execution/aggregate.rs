@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
+
+use itertools::Itertools as _;
+
 use crate::error::Result;
 use crate::sql::planner::Aggregate;
 use crate::sql::types::{Expression, Row, Rows, Value};
-
-use itertools::Itertools as _;
-use std::collections::BTreeMap;
 
 /// Aggregates row values from the source according to the aggregates, using the
 /// group_by expressions as buckets. Emits rows with group_by buckets then

@@ -1,6 +1,6 @@
-use crate::sql::types::DataType;
-
 use std::collections::BTreeMap;
+
+use crate::sql::types::DataType;
 
 /// The statement is the root node of the Abstract Syntax Tree, and describes
 /// the syntactic structure of a SQL query. It is built from a raw SQL string by

@@ -1,11 +1,15 @@
+use std::borrow::Cow;
+use std::cmp::{Eq, Ordering, PartialEq};
+use std::fmt::Display;
+use std::hash::{Hash, Hasher};
+
+use dyn_clone::DynClone;
+use serde::{Deserialize, Serialize};
+
 use crate::encoding;
 use crate::error::{Error, Result};
 use crate::sql::parser::ast;
 use crate::{errdata, errinput};
-
-use dyn_clone::DynClone;
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 
 /// A primitive SQL value.
 ///
@@ -40,7 +44,7 @@ impl encoding::Value for Value {}
 // In code, consider Null and NaN equal, so that we can detect and process these
 // values (e.g. in index lookups, aggregation groups, etc). SQL expressions
 // handle them specially to provide their undefined value semantics.
-impl std::cmp::PartialEq for Value {
+impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Boolean(l), Self::Boolean(r)) => l == r,
@@ -52,10 +56,10 @@ impl std::cmp::PartialEq for Value {
     }
 }
 
-impl std::cmp::Eq for Value {}
+impl Eq for Value {}
 
-impl std::hash::Hash for Value {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
         // Normalize to treat +/-0.0 and +/-NAN as equal when hashing.
         match self.normalize_ref().as_ref() {
@@ -71,8 +75,8 @@ impl std::hash::Hash for Value {
 // For ordering purposes, we consider NULL and NaN equal. We establish a total
 // order across all types, even though mixed types will rarely/never come up.
 impl Ord for Value {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::Ordering::*;
+    fn cmp(&self, other: &Self) -> Ordering {
+        use Ordering::*;
         use Value::*;
         match (self, other) {
             (Null, Null) => Equal,
@@ -97,7 +101,7 @@ impl Ord for Value {
 }
 
 impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -253,7 +257,7 @@ impl Value {
     }
 }
 
-impl std::fmt::Display for Value {
+impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Null => f.write_str("NULL"),
@@ -351,7 +355,7 @@ pub enum DataType {
     String,
 }
 
-impl std::fmt::Display for DataType {
+impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Boolean => write!(f, "BOOLEAN"),
@@ -387,7 +391,7 @@ pub enum Label {
     Qualified(String, String),
 }
 
-impl std::fmt::Display for Label {
+impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::None => write!(f, ""),

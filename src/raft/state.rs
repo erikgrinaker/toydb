@@ -53,13 +53,14 @@ pub trait State: Send {
 /// Test helper state machines.
 #[cfg(test)]
 pub mod test {
-    use super::*;
-    use crate::encoding::{self, Value as _};
+    use std::{collections::BTreeMap, fmt::Display};
 
     use crossbeam::channel::Sender;
     use itertools::Itertools as _;
     use serde::{Deserialize, Serialize};
-    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::encoding::{self, Value as _};
 
     /// Wraps a state machine and emits applied entries to the provided channel.
     pub struct Emit {
@@ -146,7 +147,7 @@ pub mod test {
 
     impl encoding::Value for KVCommand {}
 
-    impl std::fmt::Display for KVCommand {
+    impl Display for KVCommand {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 Self::Get { key } => write!(f, "get {key}"),
@@ -169,7 +170,7 @@ pub mod test {
 
     impl encoding::Value for KVResponse {}
 
-    impl std::fmt::Display for KVResponse {
+    impl Display for KVResponse {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
                 Self::Get(Some(value)) => write!(f, "{value}"),

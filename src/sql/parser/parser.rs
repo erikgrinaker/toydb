@@ -1,5 +1,7 @@
 #![allow(clippy::module_inception)]
 
+use std::iter::Peekable;
+
 use super::{ast, Keyword, Lexer, Token};
 use crate::errinput;
 use crate::error::Result;
@@ -12,7 +14,7 @@ use crate::sql::types::DataType;
 /// well-formed, and does not know whether e.g. a given table or column exists
 /// or which kind of join to use -- that is the job of the planner.
 pub struct Parser<'a> {
-    pub lexer: std::iter::Peekable<Lexer<'a>>,
+    pub lexer: Peekable<Lexer<'a>>,
 }
 
 impl Parser<'_> {

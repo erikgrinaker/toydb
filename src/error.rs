@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 /// toyDB errors.
@@ -22,7 +24,7 @@ pub enum Error {
 
 impl std::error::Error for Error {}
 
-impl std::fmt::Display for Error {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Error::Abort => write!(f, "operation aborted"),
@@ -84,13 +86,13 @@ impl<T> From<Error> for Result<T> {
 }
 
 impl serde::de::Error for Error {
-    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+    fn custom<T: Display>(msg: T) -> Self {
         Error::InvalidData(msg.to_string())
     }
 }
 
 impl serde::ser::Error for Error {
-    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+    fn custom<T: Display>(msg: T) -> Self {
         Error::InvalidData(msg.to_string())
     }
 }

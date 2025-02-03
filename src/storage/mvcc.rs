@@ -139,17 +139,18 @@
 //! forever, both out of laziness and also because it allows unlimited time
 //! travel queries (it's a feature, not a bug!).
 
-use super::engine::{self, Engine};
-use crate::encoding::{self, bincode, keycode, Key as _, Value as _};
-use crate::error::{Error, Result};
-use crate::{errdata, errinput};
-
-use itertools::Itertools as _;
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{BTreeSet, VecDeque};
 use std::ops::{Bound, RangeBounds};
 use std::sync::{Arc, Mutex, MutexGuard};
+
+use itertools::Itertools as _;
+use serde::{Deserialize, Serialize};
+
+use super::engine::{self, Engine};
+use crate::encoding::{self, bincode, keycode, Key as _, Value as _};
+use crate::error::{Error, Result};
+use crate::{errdata, errinput};
 
 /// An MVCC version represents a logical timestamp. The latest version
 /// is incremented when beginning each read-write transaction.
@@ -745,22 +746,26 @@ impl<I: engine::ScanIterator> Iterator for VersionIterator<'_, I> {
 /// Most storage tests are Goldenscripts under src/storage/testscripts.
 #[cfg(test)]
 pub mod tests {
+    use std::collections::HashMap;
+    use std::error::Error;
+    use std::fmt::Write as _;
+    use std::path::Path;
+    use std::result::Result;
+
+    use crossbeam::channel::Receiver;
+    use tempfile::TempDir;
+    use test_case::test_case;
+    use test_each_file::test_each_path;
+
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
     use crate::storage::engine::test::{decode_binary, parse_key_range, Emit, Mirror, Operation};
     use crate::storage::{BitCask, Memory};
 
-    use crossbeam::channel::Receiver;
-    use std::collections::HashMap;
-    use std::fmt::Write as _;
-    use std::{error::Error, result::Result};
-    use test_case::test_case;
-    use test_each_file::test_each_path;
-
     // Run goldenscript tests in src/storage/testscripts/mvcc.
     test_each_path! { in "src/storage/testscripts/mvcc" as scripts => test_goldenscript }
 
-    fn test_goldenscript(path: &std::path::Path) {
+    fn test_goldenscript(path: &Path) {
         goldenscript::run(&mut MVCCRunner::new(), path).expect("goldenscript failed")
     }
 
@@ -782,8 +787,7 @@ pub mod tests {
         mvcc: MVCC<TestEngine>,
         txns: HashMap<String, Transaction<TestEngine>>,
         op_rx: Receiver<Operation>,
-        #[allow(dead_code)]
-        tempdir: tempfile::TempDir,
+        _tempdir: TempDir,
     }
 
     type TestEngine = Emit<Mirror<BitCask, Memory>>;
@@ -793,12 +797,12 @@ pub mod tests {
             // Use both a BitCask and a Memory engine, and mirror operations
             // across them. Emit engine operations to op_rx.
             let (op_tx, op_rx) = crossbeam::channel::unbounded();
-            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
+            let tempdir = TempDir::with_prefix("toydb").expect("tempdir failed");
             let bitcask = BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
             let memory = Memory::new();
             let engine = Emit::new(Mirror::new(bitcask, memory), op_tx);
             let mvcc = MVCC::new(engine);
-            Self { mvcc, op_rx, txns: HashMap::new(), tempdir }
+            Self { mvcc, op_rx, txns: HashMap::new(), _tempdir: tempdir }
         }
 
         /// Fetches the named transaction from a command prefix.

@@ -1,3 +1,7 @@
+use std::fmt::Display;
+use std::iter::Peekable;
+use std::str::Chars;
+
 use crate::errinput;
 use crate::error::Result;
 
@@ -6,7 +10,7 @@ use crate::error::Result;
 /// the SQL parser. In doing so, it strips away basic syntactic noise such as
 /// whitespace, case, and quotes, and performs initial symbol validation.
 pub struct Lexer<'a> {
-    chars: std::iter::Peekable<std::str::Chars<'a>>,
+    chars: Peekable<Chars<'a>>,
 }
 
 /// A lexical token.
@@ -47,7 +51,7 @@ pub enum Token {
     CloseParen,         // )
 }
 
-impl std::fmt::Display for Token {
+impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(match self {
             Self::Number(n) => n,
@@ -235,7 +239,7 @@ impl TryFrom<&str> for Keyword {
     }
 }
 
-impl std::fmt::Display for Keyword {
+impl Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Display keywords as uppercase.
         f.write_str(match self {

@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
 use super::{Entry, Index, NodeID, Term};
 use crate::encoding;
 use crate::error::Result;
 use crate::storage;
-
-use serde::{Deserialize, Serialize};
 
 /// A message envelope specifying the sender and receiver.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -195,7 +197,7 @@ pub struct Status {
     pub term: Term,
     /// The match indexes of all nodes, indicating replication progress. Uses a
     /// BTreeMap for test determinism.
-    pub match_index: std::collections::BTreeMap<NodeID, Index>,
+    pub match_index: BTreeMap<NodeID, Index>,
     /// The current commit index.
     pub commit_index: Index,
     /// The current applied index.

@@ -1,9 +1,11 @@
+use std::cmp::Ordering;
+
+use itertools::{izip, Itertools as _};
+
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::planner::Direction;
 use crate::sql::types::{Expression, Rows, Value};
-
-use itertools::{izip, Itertools as _};
 
 /// Filters the input rows (i.e. WHERE).
 pub fn filter(source: Rows, predicate: Expression) -> Rows {
@@ -44,12 +46,12 @@ pub fn order(source: Rows, order: Vec<(Expression, Direction)>) -> Result<Rows> 
         let dirs = order.iter().map(|(_, dir)| dir);
         for (a, b, dir) in izip!(&sort_values[a], &sort_values[b], dirs) {
             match a.cmp(b) {
-                std::cmp::Ordering::Equal => {}
+                Ordering::Equal => {}
                 order if *dir == Direction::Descending => return order.reverse(),
                 order => return order,
             }
         }
-        std::cmp::Ordering::Equal
+        Ordering::Equal
     });
 
     Ok(Box::new(irows.into_iter().map(|(_, row)| Ok(row))))

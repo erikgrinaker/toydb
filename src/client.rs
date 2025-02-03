@@ -1,3 +1,9 @@
+use std::cmp::min;
+use std::io::Write as _;
+use std::time::Duration;
+
+use rand::Rng;
+
 use crate::encoding::Value as _;
 use crate::errdata;
 use crate::error::{Error, Result};
@@ -5,9 +11,6 @@ use crate::server::{Request, Response, Status};
 use crate::sql::engine::StatementResult;
 use crate::sql::types::Table;
 use crate::storage::mvcc;
-
-use rand::Rng;
-use std::io::Write as _;
 
 /// A toyDB client. Connects to a server via TCP and submits SQL statements and
 /// other requests.
@@ -100,9 +103,9 @@ impl Client {
                     // Use exponential backoff starting at MIN_WAIT doubling up
                     // to MAX_WAIT, but randomize the wait time in this interval
                     // to reduce the chance of collisions.
-                    let mut wait = std::cmp::min(MIN_WAIT * 2_u64.pow(retries), MAX_WAIT);
+                    let mut wait = min(MIN_WAIT * 2_u64.pow(retries), MAX_WAIT);
                     wait = rand::thread_rng().gen_range(MIN_WAIT..=wait);
-                    std::thread::sleep(std::time::Duration::from_millis(wait));
+                    std::thread::sleep(Duration::from_millis(wait));
                     retries += 1;
                 }
                 Err(error) => {

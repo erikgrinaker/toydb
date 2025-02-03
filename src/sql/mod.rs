@@ -75,6 +75,17 @@ pub mod types;
 /// SQL tests are implemented as goldenscripts under src/sql/testscripts.
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::error::Error;
+    use std::fmt::Write as _;
+    use std::path::Path;
+    use std::result::Result;
+
+    use crossbeam::channel::Receiver;
+    use itertools::Itertools as _;
+    use tempfile::TempDir;
+    use test_each_file::test_each_path;
+
     use super::engine::{Catalog as _, Session};
     use super::parser::Parser;
     use super::planner::{Plan, OPTIMIZERS};
@@ -83,14 +94,6 @@ mod tests {
     use crate::sql::planner::{Planner, Scope};
     use crate::storage::engine::test as testengine;
     use crate::storage::{self, Engine as _};
-
-    use crossbeam::channel::Receiver;
-    use itertools::Itertools as _;
-    use std::collections::HashMap;
-    use std::error::Error;
-    use std::fmt::Write as _;
-    use std::result::Result;
-    use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/sql/testscripts.
     test_each_path! { in "src/sql/testscripts/expressions" as expressions => test_goldenscript_expr }
@@ -101,12 +104,12 @@ mod tests {
     test_each_path! { in "src/sql/testscripts/writes" as writes => test_goldenscript }
 
     /// Runs SQL goldenscripts.
-    fn test_goldenscript(path: &std::path::Path) {
+    fn test_goldenscript(path: &Path) {
         // The runner's Session can't borrow from an Engine in the same struct,
         // so pass an engine reference. Use both BitCask and Memory engines and
         // mirror operations across them. Emit engine operations to op_rx.
         let (op_tx, op_rx) = crossbeam::channel::unbounded();
-        let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
+        let tempdir = TempDir::with_prefix("toydb").expect("tempdir failed");
         let bitcask =
             storage::BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
         let memory = storage::Memory::new();
@@ -118,7 +121,7 @@ mod tests {
     }
 
     /// Runs expression goldenscripts.
-    fn test_goldenscript_expr(path: &std::path::Path) {
+    fn test_goldenscript_expr(path: &Path) {
         goldenscript::run(&mut ExpressionRunner, path).expect("goldenscript failed")
     }
 

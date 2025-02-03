@@ -1,9 +1,14 @@
-use super::{Engine, Status};
-use crate::error::Result;
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Read as _, Seek as _, SeekFrom, Write as _};
+use std::ops::{Bound, RangeBounds};
+use std::path::PathBuf;
 
 use fs4::fs_std::FileExt;
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
+use log::{error, info};
+
+use super::{Engine, Status};
+use crate::error::Result;
 
 /// A very simple variant of BitCask, itself a very simple log-structured
 /// key-value engine used e.g. by the Riak database. It is not compatible with
@@ -49,15 +54,15 @@ pub struct BitCask {
 }
 
 /// Maps keys to a value position and length in the log file.
-type KeyDir = std::collections::BTreeMap<Vec<u8>, (u64, u32)>;
+type KeyDir = BTreeMap<Vec<u8>, (u64, u32)>;
 
 impl BitCask {
     /// Opens or creates a BitCask database in the given file.
     pub fn new(path: PathBuf) -> Result<Self> {
-        log::info!("Opening database {}", path.display());
+        info!("Opening database {}", path.display());
         let mut log = Log::new(path.clone())?;
         let keydir = log.build_keydir()?;
-        log::info!("Indexed {} live keys in {}", keydir.len(), path.display());
+        info!("Indexed {} live keys in {}", keydir.len(), path.display());
         Ok(Self { log, keydir })
     }
 
@@ -77,7 +82,7 @@ impl BitCask {
             garbage_min_fraction,
             garbage_min_bytes,
         ) {
-            log::info!(
+            info!(
                 "Compacting {} to remove {:.0}% garbage ({} MB out of {} MB)",
                 s.log.path.display(),
                 status.garbage_percent(),
@@ -85,7 +90,7 @@ impl BitCask {
                 status.total_disk_size / 1024 / 1024
             );
             s.compact()?;
-            log::info!(
+            info!(
                 "Compacted {} to size {} MB",
                 s.log.path.display(),
                 (status.total_disk_size - status.garbage_disk_size) / 1024 / 1024
@@ -133,13 +138,13 @@ impl Engine for BitCask {
         }
     }
 
-    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
+    fn scan(&mut self, range: impl RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
         ScanIterator { inner: self.keydir.range(range), log: &mut self.log }
     }
 
     fn scan_dyn(
         &mut self,
-        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+        range: (Bound<Vec<u8>>, Bound<Vec<u8>>),
     ) -> Box<dyn super::ScanIterator + '_> {
         Box::new(self.scan(range))
     }
@@ -232,7 +237,7 @@ impl BitCask {
 impl Drop for BitCask {
     fn drop(&mut self) {
         if let Err(error) = self.flush() {
-            log::error!("failed to flush file: {}", error)
+            error!("failed to flush file: {}", error)
         }
     }
 }
@@ -248,7 +253,7 @@ struct Log {
     /// Path to the log file.
     path: PathBuf,
     /// The opened file containing the log.
-    file: std::fs::File,
+    file: File,
 }
 
 impl Log {
@@ -321,7 +326,7 @@ impl Log {
                 // If an incomplete entry was found at the end of the file, assume an
                 // incomplete write and truncate the file.
                 Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    log::error!("Found incomplete entry at offset {}, truncating file", pos);
+                    error!("Found incomplete entry at offset {}, truncating file", pos);
                     self.file.set_len(pos)?;
                     break;
                 }
@@ -365,14 +370,17 @@ impl Log {
 /// Most storage tests are Goldenscripts under src/storage/testscripts.
 #[cfg(test)]
 mod tests {
+    use std::error::Error as StdError;
+    use std::fmt::Write as _;
+    use std::result::Result as StdResult;
+
+    use tempfile::TempDir;
+    use test_case::test_case;
+    use test_each_file::test_each_path;
+
     use super::super::engine::test::Runner;
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
-
-    use std::fmt::Write as _;
-    use std::{error::Error as StdError, result::Result as StdResult};
-    use test_case::test_case;
-    use test_each_file::test_each_path;
 
     // Run common goldenscript tests in src/storage/testscripts/engine.
     test_each_path! { in "src/storage/testscripts/engine" as engine => test_goldenscript }
@@ -388,7 +396,7 @@ mod tests {
     /// and released when the database is closed.
     #[test]
     fn lock() -> Result<()> {
-        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("bitcask");
+        let path = TempDir::with_prefix("toydb")?.path().join("bitcask");
         let engine = BitCask::new(path.clone()).expect("bitcask failed");
 
         // Opening another database with the same file should error.
@@ -406,7 +414,7 @@ mod tests {
     fn recovery() -> Result<()> {
         // Create an initial log file with a few entries. Keep track of where
         // each entry ends.
-        let dir = tempfile::TempDir::with_prefix("toydb")?;
+        let dir = TempDir::with_prefix("toydb")?;
         let path = dir.path().join("complete");
         let mut log = Log::new(path.clone())?;
 
@@ -454,7 +462,7 @@ mod tests {
     /// Tests key/value sizes up to 64 MB.
     #[test]
     fn point_ops_sizes() -> Result<()> {
-        let path = tempfile::TempDir::with_prefix("toydb")?.path().join("bitcask");
+        let path = TempDir::with_prefix("toydb")?.path().join("bitcask");
         let mut engine = BitCask::new(path.clone()).expect("bitcask failed");
 
         // Generate keys/values for increasing powers of two.
@@ -497,7 +505,7 @@ mod tests {
     /// standard Engine runner.
     struct BitCaskRunner {
         inner: Runner<BitCask>,
-        tempdir: tempfile::TempDir,
+        tempdir: TempDir,
     }
 
     impl goldenscript::Runner for BitCaskRunner {
@@ -547,7 +555,7 @@ mod tests {
 
     impl BitCaskRunner {
         fn new() -> Self {
-            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
+            let tempdir = TempDir::with_prefix("toydb").expect("tempdir failed");
             let engine = BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
             let inner = Runner::new(engine);
             Self { inner, tempdir }

@@ -1,8 +1,8 @@
+use std::collections::HashMap;
+
 use super::Node;
 use crate::error::Result;
 use crate::sql::types::{Expression, Label, Value};
-
-use std::collections::HashMap;
 
 /// A plan optimizer, which recursively transforms a plan node to make plan
 /// execution more efficient where possible.

@@ -1,10 +1,11 @@
+use std::collections::{BTreeMap, HashMap};
+
+use itertools::Itertools as _;
+
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Transaction;
 use crate::sql::types::{Expression, Rows, Table, Value};
-
-use itertools::Itertools as _;
-use std::collections::{BTreeMap, HashMap};
 
 /// Deletes rows, taking primary keys from the source (i.e. DELETE) using the
 /// primary_key column index. Returns the number of rows deleted.

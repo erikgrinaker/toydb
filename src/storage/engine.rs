@@ -1,7 +1,9 @@
-use crate::encoding::keycode;
-use crate::error::Result;
+use std::ops::{Bound, RangeBounds};
 
 use serde::{Deserialize, Serialize};
+
+use crate::encoding::keycode;
+use crate::error::Result;
 
 /// A key/value storage engine storing arbitrary byte strings in lexicographical
 /// key order. Storing keys in order allows for efficient range scans, which is
@@ -29,16 +31,13 @@ pub trait Engine: Send {
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 
     /// Iterates over an ordered range of key/value pairs.
-    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>
+    fn scan(&mut self, range: impl RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>
     where
         Self: Sized; // omit in trait objects, for object safety
 
     /// Like scan, but can be used from trait objects. The iterator will use
     /// dynamic dispatch, which has a minor performance penalty.
-    fn scan_dyn(
-        &mut self,
-        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
-    ) -> Box<dyn ScanIterator + '_>;
+    fn scan_dyn(&mut self, range: (Bound<Vec<u8>>, Bound<Vec<u8>>)) -> Box<dyn ScanIterator + '_>;
 
     /// Iterates over all key/value pairs starting with prefix.
     fn scan_prefix(&mut self, prefix: &[u8]) -> Self::ScanIterator<'_>
@@ -89,14 +88,17 @@ impl Status {
 /// Test helpers for engines.
 #[cfg(test)]
 pub mod test {
-    use super::*;
-    use crate::encoding::format::{self, Formatter as _};
+    use std::error::Error as StdError;
+    use std::fmt::Write as _;
+    use std::ops::{Bound, RangeBounds};
+    use std::result::Result as StdResult;
 
     use crossbeam::channel::Sender;
     use itertools::Itertools as _;
     use regex::Regex;
-    use std::fmt::Write as _;
-    use std::{error::Error as StdError, result::Result as StdResult};
+
+    use super::*;
+    use crate::encoding::format::{self, Formatter as _};
 
     /// Goldenscript runner for engines. All engines use a common set of
     /// goldenscripts in src/storage/testscripts/engine, as well as their own
@@ -205,10 +207,7 @@ pub mod test {
     }
 
     /// Parses an binary key range, using Rust range syntax.
-    pub fn parse_key_range(
-        s: &str,
-    ) -> StdResult<impl std::ops::RangeBounds<Vec<u8>>, Box<dyn StdError>> {
-        use std::ops::Bound;
+    pub fn parse_key_range(s: &str) -> StdResult<impl RangeBounds<Vec<u8>>, Box<dyn StdError>> {
         let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
         let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
         let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
@@ -269,13 +268,13 @@ pub mod test {
             self.inner.get(key)
         }
 
-        fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
+        fn scan(&mut self, range: impl RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
             self.inner.scan(range)
         }
 
         fn scan_dyn(
             &mut self,
-            range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+            range: (Bound<Vec<u8>>, Bound<Vec<u8>>),
         ) -> Box<dyn ScanIterator + '_> {
             Box::new(self.scan(range))
         }
@@ -330,7 +329,7 @@ pub mod test {
             Ok(a)
         }
 
-        fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>
+        fn scan(&mut self, range: impl RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_>
         where
             Self: Sized,
         {
@@ -341,7 +340,7 @@ pub mod test {
 
         fn scan_dyn(
             &mut self,
-            range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+            range: (Bound<Vec<u8>>, Bound<Vec<u8>>),
         ) -> Box<dyn ScanIterator + '_> {
             let a = self.a.scan(range.clone());
             let b = self.b.scan(range);

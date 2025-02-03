@@ -1,9 +1,10 @@
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+
 use super::{Label, Row, Value};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::planner::Node;
-
-use serde::{Deserialize, Serialize};
 
 /// An expression, made up of nested operations and values. Values are either
 /// constants or dynamic column references. Evaluates to a final value during
@@ -261,7 +262,7 @@ impl Expression {
                     // of recompiling it for every row, but this is fine.
                     let pattern =
                         format!("^{}$", regex::escape(&rhs).replace('%', ".*").replace('_', "."));
-                    Boolean(regex::Regex::new(&pattern)?.is_match(&lhs))
+                    Boolean(Regex::new(&pattern)?.is_match(&lhs))
                 }
                 (String(_), Null) | (Null, String(_)) | (Null, Null) => Null,
                 (lhs, rhs) => return errinput!("can't LIKE {lhs} and {rhs}"),

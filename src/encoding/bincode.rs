@@ -8,14 +8,18 @@
 //! Confusingly, upstream bincode::(de)serialize uses different options (fixed)
 //! than DefaultOptions (variable) -- this module always uses DefaultOptions.
 
-use crate::error::{Error, Result};
+use std::io::{Read, Write};
+use std::sync::OnceLock;
 
 use bincode::Options as _;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
+use crate::error::{Error, Result};
 
 /// Returns the default Bincode options, initialized on first use.
 fn bincode() -> &'static bincode::DefaultOptions {
-    static BINCODE: std::sync::OnceLock<bincode::DefaultOptions> = std::sync::OnceLock::new();
+    static BINCODE: OnceLock<bincode::DefaultOptions> = OnceLock::new();
     BINCODE.get_or_init(bincode::DefaultOptions::new)
 }
 
@@ -25,15 +29,13 @@ pub fn deserialize<'de, T: Deserialize<'de>>(bytes: &'de [u8]) -> Result<T> {
 }
 
 /// Deserializes a value from a reader using Bincode.
-pub fn deserialize_from<R: std::io::Read, T: DeserializeOwned>(reader: R) -> Result<T> {
+pub fn deserialize_from<R: Read, T: DeserializeOwned>(reader: R) -> Result<T> {
     Ok(bincode().deserialize_from(reader)?)
 }
 
 /// Deserializes a value from a reader using Bincode, or returns None if the
 /// reader is closed.
-pub fn maybe_deserialize_from<R: std::io::Read, T: DeserializeOwned>(
-    reader: R,
-) -> Result<Option<T>> {
+pub fn maybe_deserialize_from<R: Read, T: DeserializeOwned>(reader: R) -> Result<Option<T>> {
     match bincode().deserialize_from(reader) {
         Ok(v) => Ok(Some(v)),
         Err(e) => match *e {
@@ -55,6 +57,6 @@ pub fn serialize<T: Serialize>(value: &T) -> Vec<u8> {
 }
 
 /// Serializes a value to a writer using Bincode.
-pub fn serialize_into<W: std::io::Write, T: Serialize>(writer: W, value: &T) -> Result<()> {
+pub fn serialize_into<W: Write, T: Serialize>(writer: W, value: &T) -> Result<()> {
     Ok(bincode().serialize_into(writer, value)?)
 }

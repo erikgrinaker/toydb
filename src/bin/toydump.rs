@@ -4,11 +4,11 @@
 
 #![warn(clippy::all)]
 
+use clap::Parser as _;
+
 use toydb::encoding::format::{self, Formatter as _};
 use toydb::error::Result;
 use toydb::storage::{BitCask, Engine as _};
-
-use clap::Parser as _;
 
 fn main() {
     if let Err(error) = Command::parse().run() {

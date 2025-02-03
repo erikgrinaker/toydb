@@ -8,20 +8,22 @@
 
 #![warn(clippy::all)]
 
-use hdrhistogram::Histogram;
-use toydb::error::Result;
-use toydb::sql::types::{Row, Rows};
-use toydb::{Client, StatementResult};
+use std::cmp::min;
+use std::collections::HashSet;
+use std::io::Write as _;
+use std::time::{Duration, Instant};
 
 use clap::Parser;
+use hdrhistogram::Histogram;
 use itertools::Itertools as _;
 use petname::Generator as _;
 use rand::distributions::Distribution as _;
 use rand::rngs::StdRng;
 use rand::SeedableRng as _;
-use std::collections::HashSet;
-use std::io::Write as _;
-use std::time::Duration;
+
+use toydb::error::Result;
+use toydb::sql::types::{Row, Rows};
+use toydb::{Client, StatementResult};
 
 fn main() {
     let Command { runner, subcommand } = Command::parse();
@@ -91,7 +93,7 @@ impl Runner {
         // Prepare the dataset.
         print!("Preparing initial dataset... ");
         std::io::stdout().flush()?;
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         workload.prepare(&mut client, &mut rng)?;
         println!("done ({:.3}s)", start.elapsed().as_secs_f64());
 
@@ -99,7 +101,7 @@ impl Runner {
         std::thread::scope(|s| -> Result<()> {
             print!("Spawning {} workers... ", self.concurrency);
             std::io::stdout().flush()?;
-            let start = std::time::Instant::now();
+            let start = Instant::now();
 
             let (work_tx, work_rx) = crossbeam::channel::bounded(self.concurrency);
             let (done_tx, done_rx) = crossbeam::channel::bounded::<()>(0);
@@ -111,7 +113,7 @@ impl Runner {
                 let done_tx = done_tx.clone();
                 s.spawn(move || -> Result<()> {
                     while let Ok(item) = work_rx.recv() {
-                        let start = std::time::Instant::now();
+                        let start = Instant::now();
                         client.with_retry(|client| W::execute(client, &item))?;
                         recorder.record(start.elapsed().as_nanos() as u64)?;
                     }
@@ -136,7 +138,7 @@ impl Runner {
             }
 
             // Periodically print stats until all workers are done.
-            let start = std::time::Instant::now();
+            let start = Instant::now();
             let ticker = crossbeam::channel::tick(Duration::from_secs(1));
 
             println!();
@@ -170,7 +172,7 @@ impl Runner {
         println!();
         print!("Verifying dataset... ");
         std::io::stdout().flush()?;
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         workload.verify(&mut client, self.count)?;
         println!("done ({:.3}s)", start.elapsed().as_secs_f64());
 
@@ -479,7 +481,7 @@ impl Workload for Bank {
         let mut row = row.into_iter();
         let from_account: i64 = row.next().unwrap().try_into()?;
         let from_balance: i64 = row.next().unwrap().try_into()?;
-        amount = std::cmp::min(amount, from_balance as u64);
+        amount = min(amount, from_balance as u64);
 
         let to_account: i64 = client
             .execute(&format!(

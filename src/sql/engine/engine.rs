@@ -1,12 +1,12 @@
 #![allow(clippy::module_inception)]
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use super::Session;
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::mvcc;
-
-use std::collections::{BTreeMap, BTreeSet};
 
 /// A SQL engine. This provides low-level CRUD (create, read, update, delete)
 /// operations for table rows, a schema catalog for accessing and modifying

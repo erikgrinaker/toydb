@@ -1,3 +1,9 @@
+use std::collections::HashMap;
+use std::fmt::Display;
+
+use itertools::Itertools as _;
+use serde::{Deserialize, Serialize};
+
 use super::optimizer::OPTIMIZERS;
 use super::planner::Planner;
 use crate::error::Result;
@@ -5,10 +11,6 @@ use crate::sql::engine::{Catalog, Transaction};
 use crate::sql::execution::{self, ExecutionResult};
 use crate::sql::parser::ast;
 use crate::sql::types::{Expression, Label, Table, Value};
-
-use itertools::Itertools as _;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// A statement execution plan. The root nodes can perform data modifications or
 /// schema changes, in addition to SELECT queries. Beyond the root, the plan is
@@ -372,7 +374,7 @@ pub enum Direction {
     Descending,
 }
 
-impl std::fmt::Display for Direction {
+impl Display for Direction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Ascending => f.write_str("asc"),
@@ -391,7 +393,7 @@ impl From<ast::Direction> for Direction {
 }
 
 /// Formats the plan as an EXPLAIN tree.
-impl std::fmt::Display for Plan {
+impl Display for Plan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::CreateTable { schema } => write!(f, "CreateTable: {}", schema.name),
@@ -417,7 +419,7 @@ impl std::fmt::Display for Plan {
     }
 }
 
-impl std::fmt::Display for Node {
+impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.format(f, "", true, true)
     }

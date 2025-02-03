@@ -1,3 +1,13 @@
+use std::collections::HashMap;
+use std::io::{BufReader, BufWriter, Write as _};
+use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::time::Duration;
+
+use crossbeam::channel::{Receiver, Sender};
+use log::{debug, error, info};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
 use crate::encoding::{self, Value as _};
 use crate::error::Result;
 use crate::raft;
@@ -6,19 +16,12 @@ use crate::sql::engine::{Catalog as _, Engine as _, StatementResult};
 use crate::sql::types::{Row, Table};
 use crate::storage;
 
-use crossbeam::channel::{Receiver, Sender};
-use log::{debug, error, info};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::Write as _;
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
-
 /// The outbound Raft peer channel capacity. This buffers messages when a Raft
 /// peer is slow or unavailable. Beyond this, messages will be dropped.
 const RAFT_PEER_CHANNEL_CAPACITY: usize = 1000;
 
 /// The retry interval when connecting to a Raft peer.
-const RAFT_PEER_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+const RAFT_PEER_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 
 /// A toyDB server. Routes messages to/from an inner Raft node.
 ///
@@ -130,7 +133,7 @@ impl Server {
     /// Receives inbound messages from a peer via TCP, and queues them for
     /// stepping into the Raft node.
     fn raft_receive_peer(socket: TcpStream, raft_step_tx: Sender<raft::Envelope>) -> Result<()> {
-        let mut socket = std::io::BufReader::new(socket);
+        let mut socket = BufReader::new(socket);
         while let Some(message) = raft::Envelope::maybe_decode_from(&mut socket)? {
             raft_step_tx.send(message)?;
         }
@@ -142,7 +145,7 @@ impl Server {
     fn raft_send_peer(addr: String, raft_node_rx: Receiver<raft::Envelope>) {
         loop {
             let mut socket = match TcpStream::connect(&addr) {
-                Ok(socket) => std::io::BufWriter::new(socket),
+                Ok(socket) => BufWriter::new(socket),
                 Err(err) => {
                     error!("Failed connecting to Raft peer {addr}: {err}");
                     std::thread::sleep(RAFT_PEER_RETRY_INTERVAL);
@@ -228,7 +231,7 @@ impl Server {
                 // Track inbound client requests and step them into the node.
                 recv(request_rx) -> result => {
                     let (request, response_tx) = result.expect("request_rx disconnected");
-                    let id = uuid::Uuid::new_v4();
+                    let id = Uuid::new_v4();
                     let msg = raft::Envelope{
                         from: node.id(),
                         to: node.id(),
@@ -270,8 +273,8 @@ impl Server {
         socket: TcpStream,
         mut session: sql::engine::Session<sql::engine::Raft>,
     ) -> Result<()> {
-        let mut reader = std::io::BufReader::new(socket.try_clone()?);
-        let mut writer = std::io::BufWriter::new(socket);
+        let mut reader = BufReader::new(socket.try_clone()?);
+        let mut writer = BufWriter::new(socket);
 
         while let Some(request) = Request::maybe_decode_from(&mut reader)? {
             // Execute request.

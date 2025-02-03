@@ -1,14 +1,15 @@
 #![allow(clippy::module_inception)]
 
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+use itertools::{Either, Itertools as _};
+
 use super::plan::{remap_sources, Aggregate, Node, Plan};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Catalog;
 use crate::sql::parser::ast;
 use crate::sql::types::{Column, Expression, Label, Table, Value};
-
-use itertools::Itertools as _;
-use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// The planner builds an execution plan from a parsed Abstract Syntax Tree,
 /// using the catalog for schema information.
@@ -183,10 +184,10 @@ impl<'a, C: Catalog> Planner<'a, C> {
                 select = select
                     .into_iter()
                     .flat_map(|(expr, alias)| match expr {
-                        ast::Expression::All => itertools::Either::Left(
+                        ast::Expression::All => Either::Left(
                             (0..node.columns()).map(|i| (node.column_label(i).into(), None)),
                         ),
-                        expr => itertools::Either::Right(std::iter::once((expr, alias))),
+                        expr => Either::Right(std::iter::once((expr, alias))),
                     })
                     .collect();
             }

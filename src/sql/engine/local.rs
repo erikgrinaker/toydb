@@ -1,14 +1,15 @@
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
+
+use itertools::Itertools as _;
+use serde::{Deserialize, Serialize};
+
 use super::Catalog;
 use crate::encoding::{self, Key as _, Value as _};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::{self, mvcc};
-
-use itertools::Itertools as _;
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
 
 /// A SQL engine using local storage. This provides the main SQL storage logic,
 /// and the Raft SQL engine just dispatches to this for node-local SQL storage.

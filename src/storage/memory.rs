@@ -1,16 +1,19 @@
+use std::collections::BTreeMap;
+use std::ops::{Bound, RangeBounds};
+
 use super::{Engine, Status};
 use crate::error::Result;
 
 /// An in-memory key/value storage engine using the Rust standard library B-tree
 /// implementation. Data is not persisted.
 pub struct Memory {
-    data: std::collections::BTreeMap<Vec<u8>, Vec<u8>>,
+    data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 impl Memory {
     /// Creates a new Memory key-value storage engine.
     pub fn new() -> Self {
-        Self { data: std::collections::BTreeMap::new() }
+        Self { data: BTreeMap::new() }
     }
 }
 
@@ -30,13 +33,13 @@ impl Engine for Memory {
         Ok(self.data.get(key).cloned())
     }
 
-    fn scan(&mut self, range: impl std::ops::RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
+    fn scan(&mut self, range: impl RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
         ScanIterator { inner: self.data.range(range) }
     }
 
     fn scan_dyn(
         &mut self,
-        range: (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>),
+        range: (Bound<Vec<u8>>, Bound<Vec<u8>>),
     ) -> Box<dyn super::ScanIterator + '_> {
         Box::new(self.scan(range))
     }
@@ -86,10 +89,12 @@ impl DoubleEndedIterator for ScanIterator<'_> {
 /// Most storage tests are Goldenscripts under src/storage/testscripts.
 #[cfg(test)]
 mod tests {
-    use super::super::engine::test::Runner;
-    use super::*;
+    use std::path::Path;
 
     use test_each_file::test_each_path;
+
+    use super::super::engine::test::Runner;
+    use super::*;
 
     // Run common goldenscript tests in src/storage/testscripts/engine.
     test_each_path! { in "src/storage/testscripts/engine" as engine => test_goldenscript }
@@ -97,7 +102,7 @@ mod tests {
     // Also run Memory-specific tests in src/storage/testscripts/memory.
     test_each_path! { in "src/storage/testscripts/memory" as scripts => test_goldenscript }
 
-    fn test_goldenscript(path: &std::path::Path) {
+    fn test_goldenscript(path: &Path) {
         goldenscript::run(&mut Runner::new(Memory::new()), path).expect("goldenscript failed")
     }
 }

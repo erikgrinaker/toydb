@@ -1,13 +1,15 @@
 //! Decodes and formats raw keys and values, recursively as needed. Handles both
 //! both Raft, MVCC, SQL, and raw binary data.
 
+use std::collections::BTreeSet;
+use std::marker::PhantomData;
+
+use itertools::Itertools as _;
+
 use super::{bincode, Key as _, Value as _};
 use crate::raft;
 use crate::sql;
 use crate::storage::mvcc;
-
-use itertools::Itertools as _;
-use std::collections::BTreeSet;
 
 /// Formats raw key/value pairs.
 pub trait Formatter {
@@ -52,7 +54,7 @@ impl Formatter for Raw {
 }
 
 /// Formats Raft log entries. Dispatches to I for command formatting.
-pub struct Raft<I: Formatter>(std::marker::PhantomData<I>);
+pub struct Raft<I: Formatter>(PhantomData<I>);
 
 impl<I: Formatter> Raft<I> {
     pub fn entry(entry: &raft::Entry) -> String {
@@ -99,7 +101,7 @@ impl<I: Formatter> Formatter for Raft<I> {
 }
 
 /// Formats MVCC keys/values. Dispatches to I for inner key/value formatting.
-pub struct MVCC<I: Formatter>(std::marker::PhantomData<I>);
+pub struct MVCC<I: Formatter>(PhantomData<I>);
 
 impl<I: Formatter> Formatter for MVCC<I> {
     fn key(key: &[u8]) -> String {

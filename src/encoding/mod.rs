@@ -7,9 +7,15 @@ pub mod bincode;
 pub mod format;
 pub mod keycode;
 
-use crate::error::Result;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::cmp::Ord;
 use std::collections::{BTreeSet, HashSet};
+use std::hash::Hash;
+use std::io::{Read, Write};
+
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
+use crate::error::Result;
 
 /// Adds automatic Keycode encode/decode methods to key enums. These are
 /// primarily meant for keys stored in key/value storage engines.
@@ -40,13 +46,13 @@ pub trait Value: Serialize + DeserializeOwned {
     }
 
     /// Decodes a value from a reader using Bincode.
-    fn decode_from<R: std::io::Read>(reader: R) -> Result<Self> {
+    fn decode_from<R: Read>(reader: R) -> Result<Self> {
         bincode::deserialize_from(reader)
     }
 
     /// Decodes a value from a reader using Bincode, or returns None if the
     /// reader is closed.
-    fn maybe_decode_from<R: std::io::Read>(reader: R) -> Result<Option<Self>> {
+    fn maybe_decode_from<R: Read>(reader: R) -> Result<Option<Self>> {
         bincode::maybe_deserialize_from(reader)
     }
 
@@ -56,7 +62,7 @@ pub trait Value: Serialize + DeserializeOwned {
     }
 
     /// Encodes a value into a writer using Bincode.
-    fn encode_into<W: std::io::Write>(&self, writer: W) -> Result<()> {
+    fn encode_into<W: Write>(&self, writer: W) -> Result<()> {
         bincode::serialize_into(writer, self)
     }
 }
@@ -66,5 +72,5 @@ impl<V: Value> Value for Option<V> {}
 impl<V: Value> Value for Result<V> {}
 impl<V: Value> Value for Vec<V> {}
 impl<V1: Value, V2: Value> Value for (V1, V2) {}
-impl<V: Value + std::cmp::Eq + std::hash::Hash> Value for HashSet<V> {}
-impl<V: Value + std::cmp::Eq + std::cmp::Ord + std::hash::Hash> Value for BTreeSet<V> {}
+impl<V: Value + std::cmp::Eq + Hash> Value for HashSet<V> {}
+impl<V: Value + std::cmp::Eq + Ord + Hash> Value for BTreeSet<V> {}

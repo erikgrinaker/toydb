@@ -44,10 +44,16 @@
 //! serde_bytes::ByteBuf or use the #[serde(with="serde_bytes")] attribute. See
 //! https://github.com/serde-rs/bytes
 
+use std::ops::Bound;
+
+use serde::de::{
+    Deserialize, DeserializeSeed, EnumAccess, IntoDeserializer as _, SeqAccess, VariantAccess,
+    Visitor,
+};
+use serde::ser::{Impossible, Serialize, SerializeSeq, SerializeTuple, SerializeTupleVariant};
+
 use crate::errdata;
 use crate::error::{Error, Result};
-
-use serde::{de, de::IntoDeserializer as _, ser};
 
 /// Serializes a key to a binary KeyCode representation.
 ///
@@ -55,7 +61,7 @@ use serde::{de, de::IntoDeserializer as _, ser};
 /// and then thrown away. We could avoid a bunch of allocations by taking a
 /// reusable byte vector to encode into and return a reference to it, but we
 /// keep it simple.
-pub fn serialize<T: ser::Serialize>(key: &T) -> Vec<u8> {
+pub fn serialize<T: Serialize>(key: &T) -> Vec<u8> {
     let mut serializer = Serializer { output: Vec::new() };
     // Panic on serialization failures, as this is typically an issue with the
     // provided data structure.
@@ -64,7 +70,7 @@ pub fn serialize<T: ser::Serialize>(key: &T) -> Vec<u8> {
 }
 
 /// Deserializes a key from a binary KeyCode representation.
-pub fn deserialize<'a, T: de::Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
+pub fn deserialize<'a, T: Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
     let mut deserializer = Deserializer::from_bytes(input);
     let t = T::deserialize(&mut deserializer)?;
     if !deserializer.input.is_empty() {
@@ -83,13 +89,13 @@ pub fn deserialize<'a, T: de::Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
 /// find the latest non-0xff byte, increment that, and truncate the rest. If all
 /// bytes are 0xff, we scan to the end of the range, since there can't be other
 /// prefixes after it.
-pub fn prefix_range(prefix: &[u8]) -> (std::ops::Bound<Vec<u8>>, std::ops::Bound<Vec<u8>>) {
-    let start = std::ops::Bound::Included(prefix.to_vec());
+pub fn prefix_range(prefix: &[u8]) -> (Bound<Vec<u8>>, Bound<Vec<u8>>) {
+    let start = Bound::Included(prefix.to_vec());
     let end = match prefix.iter().rposition(|b| *b != 0xff) {
-        Some(i) => std::ops::Bound::Excluded(
+        Some(i) => Bound::Excluded(
             prefix.iter().take(i).copied().chain(std::iter::once(prefix[i] + 1)).collect(),
         ),
-        None => std::ops::Bound::Unbounded,
+        None => Bound::Unbounded,
     };
     (start, end)
 }
@@ -99,17 +105,17 @@ struct Serializer {
     output: Vec<u8>,
 }
 
-impl ser::Serializer for &mut Serializer {
+impl serde::ser::Serializer for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
     type SerializeSeq = Self;
     type SerializeTuple = Self;
     type SerializeTupleVariant = Self;
-    type SerializeTupleStruct = ser::Impossible<(), Error>;
-    type SerializeMap = ser::Impossible<(), Error>;
-    type SerializeStruct = ser::Impossible<(), Error>;
-    type SerializeStructVariant = ser::Impossible<(), Error>;
+    type SerializeTupleStruct = Impossible<(), Error>;
+    type SerializeMap = Impossible<(), Error>;
+    type SerializeStruct = Impossible<(), Error>;
+    type SerializeStructVariant = Impossible<(), Error>;
 
     /// bool simply uses 1 for true and 0 for false.
     fn serialize_bool(self, v: bool) -> Result<()> {
@@ -207,7 +213,7 @@ impl ser::Serializer for &mut Serializer {
         unimplemented!()
     }
 
-    fn serialize_some<T: ser::Serialize + ?Sized>(self, _: &T) -> Result<()> {
+    fn serialize_some<T: Serialize + ?Sized>(self, _: &T) -> Result<()> {
         unimplemented!()
     }
 
@@ -225,16 +231,12 @@ impl ser::Serializer for &mut Serializer {
         Ok(())
     }
 
-    fn serialize_newtype_struct<T: ser::Serialize + ?Sized>(
-        self,
-        _: &'static str,
-        _: &T,
-    ) -> Result<()> {
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(self, _: &'static str, _: &T) -> Result<()> {
         unimplemented!()
     }
 
     /// Newtype variants are serialized using the variant index and inner type.
-    fn serialize_newtype_variant<T: ser::Serialize + ?Sized>(
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
         self,
         name: &'static str,
         index: u32,
@@ -296,11 +298,11 @@ impl ser::Serializer for &mut Serializer {
 }
 
 /// Sequences simply concatenate the serialized elements, with no external structure.
-impl ser::SerializeSeq for &mut Serializer {
+impl SerializeSeq for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: ser::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
         value.serialize(&mut **self)
     }
 
@@ -310,11 +312,11 @@ impl ser::SerializeSeq for &mut Serializer {
 }
 
 /// Tuples, like sequences, simply concatenate the serialized elements.
-impl ser::SerializeTuple for &mut Serializer {
+impl SerializeTuple for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: ser::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
         value.serialize(&mut **self)
     }
 
@@ -324,11 +326,11 @@ impl ser::SerializeTuple for &mut Serializer {
 }
 
 /// Tuples, like sequences, simply concatenate the serialized elements.
-impl ser::SerializeTupleVariant for &mut Serializer {
+impl SerializeTupleVariant for &mut Serializer {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ser::Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
         value.serialize(&mut **self)
     }
 
@@ -385,14 +387,14 @@ impl<'de> Deserializer<'de> {
 }
 
 /// For details on serialization formats, see Serializer.
-impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
+impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
-    fn deserialize_any<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_any<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         panic!("must provide type, KeyCode is not self-describing")
     }
 
-    fn deserialize_bool<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         visitor.visit_bool(match self.take_bytes(1)?[0] {
             0x00 => false,
             0x01 => true,
@@ -400,45 +402,45 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         })
     }
 
-    fn deserialize_i8<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_i8<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_i16<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_i16<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_i32<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_i32<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_i64<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_i64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let mut bytes = self.take_bytes(8)?.to_vec();
         bytes[0] ^= 1 << 7; // flip sign bit
         visitor.visit_i64(i64::from_be_bytes(bytes.as_slice().try_into()?))
     }
 
-    fn deserialize_u8<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_u8<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_u16<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_u16<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_u32<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_u32<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_u64<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         visitor.visit_u64(u64::from_be_bytes(self.take_bytes(8)?.try_into()?))
     }
 
-    fn deserialize_f32<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_f32<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_f64<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let mut bytes = self.take_bytes(8)?.to_vec();
         if bytes[0] >> 7 & 1 == 1 {
             bytes[0] ^= 1 << 7; // positive, flip sign bit
@@ -448,39 +450,43 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         visitor.visit_f64(f64::from_be_bytes(bytes.as_slice().try_into()?))
     }
 
-    fn deserialize_char<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_char<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_str<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let bytes = self.decode_next_bytes()?;
         visitor.visit_str(&String::from_utf8(bytes)?)
     }
 
-    fn deserialize_string<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let bytes = self.decode_next_bytes()?;
         visitor.visit_string(String::from_utf8(bytes)?)
     }
 
-    fn deserialize_bytes<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let bytes = self.decode_next_bytes()?;
         visitor.visit_bytes(&bytes)
     }
 
-    fn deserialize_byte_buf<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let bytes = self.decode_next_bytes()?;
         visitor.visit_byte_buf(bytes)
     }
 
-    fn deserialize_option<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_option<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_unit<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_unit<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_unit_struct<V: de::Visitor<'de>>(
+    fn deserialize_unit_struct<V: Visitor<'de>>(self, _: &'static str, _: V) -> Result<V::Value> {
+        unimplemented!()
+    }
+
+    fn deserialize_newtype_struct<V: Visitor<'de>>(
         self,
         _: &'static str,
         _: V,
@@ -488,23 +494,15 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         unimplemented!()
     }
 
-    fn deserialize_newtype_struct<V: de::Visitor<'de>>(
-        self,
-        _: &'static str,
-        _: V,
-    ) -> Result<V::Value> {
-        unimplemented!()
-    }
-
-    fn deserialize_seq<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
+    fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         visitor.visit_seq(self)
     }
 
-    fn deserialize_tuple<V: de::Visitor<'de>>(self, _: usize, visitor: V) -> Result<V::Value> {
+    fn deserialize_tuple<V: Visitor<'de>>(self, _: usize, visitor: V) -> Result<V::Value> {
         visitor.visit_seq(self)
     }
 
-    fn deserialize_tuple_struct<V: de::Visitor<'de>>(
+    fn deserialize_tuple_struct<V: Visitor<'de>>(
         self,
         _: &'static str,
         _: usize,
@@ -513,11 +511,11 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         unimplemented!()
     }
 
-    fn deserialize_map<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_map<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_struct<V: de::Visitor<'de>>(
+    fn deserialize_struct<V: Visitor<'de>>(
         self,
         _: &'static str,
         _: &'static [&'static str],
@@ -526,7 +524,7 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         unimplemented!()
     }
 
-    fn deserialize_enum<V: de::Visitor<'de>>(
+    fn deserialize_enum<V: Visitor<'de>>(
         self,
         _: &'static str,
         _: &'static [&'static str],
@@ -535,23 +533,20 @@ impl<'de> de::Deserializer<'de> for &mut Deserializer<'de> {
         visitor.visit_enum(self)
     }
 
-    fn deserialize_identifier<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_identifier<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 
-    fn deserialize_ignored_any<V: de::Visitor<'de>>(self, _: V) -> Result<V::Value> {
+    fn deserialize_ignored_any<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
         unimplemented!()
     }
 }
 
 /// Sequences are simply deserialized until the byte slice is exhausted.
-impl<'de> de::SeqAccess<'de> for Deserializer<'de> {
+impl<'de> SeqAccess<'de> for Deserializer<'de> {
     type Error = Error;
 
-    fn next_element_seed<T: de::DeserializeSeed<'de>>(
-        &mut self,
-        seed: T,
-    ) -> Result<Option<T::Value>> {
+    fn next_element_seed<T: DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>> {
         if self.input.is_empty() {
             return Ok(None);
         }
@@ -560,14 +555,11 @@ impl<'de> de::SeqAccess<'de> for Deserializer<'de> {
 }
 
 /// Enum variants are deserialized by their index.
-impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
+impl<'de> EnumAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
     type Variant = Self;
 
-    fn variant_seed<V: de::DeserializeSeed<'de>>(
-        self,
-        seed: V,
-    ) -> Result<(V::Value, Self::Variant)> {
+    fn variant_seed<V: DeserializeSeed<'de>>(self, seed: V) -> Result<(V::Value, Self::Variant)> {
         let index = self.take_bytes(1)?[0] as u32;
         let value: Result<_> = seed.deserialize(index.into_deserializer());
         Ok((value?, self))
@@ -575,39 +567,37 @@ impl<'de> de::EnumAccess<'de> for &mut Deserializer<'de> {
 }
 
 /// Enum variant contents are deserialized as sequences.
-impl<'de> de::VariantAccess<'de> for &mut Deserializer<'de> {
+impl<'de> VariantAccess<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
         Ok(())
     }
 
-    fn newtype_variant_seed<T: de::DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value> {
+    fn newtype_variant_seed<T: DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value> {
         seed.deserialize(&mut *self)
     }
 
-    fn tuple_variant<V: de::Visitor<'de>>(self, _: usize, visitor: V) -> Result<V::Value> {
+    fn tuple_variant<V: Visitor<'de>>(self, _: usize, visitor: V) -> Result<V::Value> {
         visitor.visit_seq(self)
     }
 
-    fn struct_variant<V: de::Visitor<'de>>(
-        self,
-        _: &'static [&'static str],
-        _: V,
-    ) -> Result<V::Value> {
+    fn struct_variant<V: Visitor<'de>>(self, _: &'static [&'static str], _: V) -> Result<V::Value> {
         unimplemented!()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::sql::types::Value;
+    use std::borrow::Cow;
+    use std::f64::consts::PI;
+
     use paste::paste;
     use serde::{Deserialize, Serialize};
     use serde_bytes::ByteBuf;
-    use std::borrow::Cow;
-    use std::f64::consts::PI;
+
+    use super::*;
+    use crate::sql::types::Value;
 
     #[derive(Debug, Deserialize, Serialize, PartialEq)]
     enum Key<'a> {

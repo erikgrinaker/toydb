@@ -1,14 +1,17 @@
-use super::log::{Index, Log};
-use super::message::{Envelope, Message, ReadSequence, Request, RequestID, Response, Status};
-use super::state::State;
-use crate::errinput;
-use crate::error::{Error, Result};
+use std::cmp::{max, min};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::ops::Range;
 
 use crossbeam::channel::Sender;
 use itertools::Itertools as _;
 use log::{debug, info};
 use rand::Rng as _;
-use std::collections::{HashMap, HashSet, VecDeque};
+
+use super::log::{Index, Log};
+use super::message::{Envelope, Message, ReadSequence, Request, RequestID, Response, Status};
+use super::state::State;
+use crate::errinput;
+use crate::error::{Error, Result};
 
 /// A node ID. Unique within a cluster. Assigned manually when started.
 pub type NodeID = u8;
@@ -25,7 +28,7 @@ pub struct Options {
     /// The number of ticks between leader heartbeats.
     pub heartbeat_interval: Ticks,
     /// The range of randomized election timeouts for followers and candidates.
-    pub election_timeout_range: std::ops::Range<Ticks>,
+    pub election_timeout_range: Range<Ticks>,
     /// Maximum number of entries to send in a single Append message.
     pub max_append_entries: usize,
 }
@@ -412,7 +415,7 @@ impl RawNode<Follower> {
                     // Otherwise, reject the base index. If the local log is
                     // shorter than the base index, lower the reject index to
                     // skip all missing entries.
-                    reject_index = std::cmp::min(base_index, self.log.get_last_index().0 + 1);
+                    reject_index = min(base_index, self.log.get_last_index().0 + 1);
                 }
                 self.send(msg.from, Message::AppendResponse { reject_index, match_index })?;
             }
@@ -709,7 +712,7 @@ impl Progress {
             return false;
         }
         self.match_index = match_index;
-        self.next_index = std::cmp::max(self.next_index, match_index + 1);
+        self.next_index = max(self.next_index, match_index + 1);
         true
     }
 
@@ -728,7 +731,7 @@ impl Progress {
         if next_index >= self.next_index || self.next_index <= self.match_index + 1 {
             return false;
         }
-        self.next_index = std::cmp::max(next_index, self.match_index + 1);
+        self.next_index = max(next_index, self.match_index + 1);
         true
     }
 }
@@ -1155,20 +1158,23 @@ impl RawNode<Leader> {
 /// Most Raft tests are Goldenscripts under src/raft/testscripts.
 #[cfg(test)]
 mod tests {
+    use std::borrow::Borrow;
+    use std::error::Error;
+    use std::fmt::Write as _;
+    use std::result::Result;
+
+    use crossbeam::channel::Receiver;
+    use tempfile::TempDir;
+    use test_case::test_case;
+    use test_each_file::test_each_path;
+    use uuid::Uuid;
+
     use super::*;
     use crate::encoding::{bincode, Key as _, Value as _};
     use crate::raft::state::test::{self as teststate, KVCommand, KVResponse};
     use crate::raft::Entry;
     use crate::storage;
     use crate::storage::engine::test as testengine;
-
-    use crossbeam::channel::Receiver;
-    use std::borrow::Borrow;
-    use std::error::Error;
-    use std::fmt::Write as _;
-    use std::result::Result;
-    use test_case::test_case;
-    use test_each_file::test_each_path;
 
     // Run goldenscript tests in src/raft/testscripts/node.
     test_each_path! { in "src/raft/testscripts/node" as scripts => test_goldenscript }
@@ -1275,8 +1281,7 @@ mod tests {
         /// The request ID to use for the next client request.
         next_request_id: u64,
         /// Temporary directory (deleted when dropped).
-        #[allow(dead_code)]
-        tempdir: tempfile::TempDir,
+        tempdir: TempDir,
     }
 
     impl goldenscript::Runner for TestRunner {
@@ -1465,7 +1470,7 @@ mod tests {
                 disconnected: HashMap::new(),
                 requests: HashMap::new(),
                 next_request_id: 1,
-                tempdir: tempfile::TempDir::with_prefix("toydb").expect("tempdir failed"),
+                tempdir: TempDir::with_prefix("toydb").expect("tempdir failed"),
             }
         }
 
@@ -1708,7 +1713,7 @@ mod tests {
             request: Request,
             output: &mut String,
         ) -> Result<(), Box<dyn Error>> {
-            let request_id = uuid::Uuid::from_u64_pair(0, self.next_request_id);
+            let request_id = Uuid::from_u64_pair(0, self.next_request_id);
             self.next_request_id += 1;
             self.requests.insert(request_id, request.clone());
 

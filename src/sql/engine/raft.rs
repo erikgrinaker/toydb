@@ -1,3 +1,10 @@
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
+
+use crossbeam::channel::Sender;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
 use super::{Catalog, Engine as _, Transaction as _};
 use crate::encoding::{self, bincode, Value as _};
 use crate::errdata;
@@ -5,11 +12,6 @@ use crate::error::Result;
 use crate::raft;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::{self, mvcc};
-
-use crossbeam::channel::Sender;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
 
 /// A Raft-based SQL engine. This dispatches to the `Local` engine for local
 /// storage and processing on each node, but plumbs read/write commands through

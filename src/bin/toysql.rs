@@ -4,11 +4,7 @@
 
 #![warn(clippy::all)]
 
-use toydb::errinput;
-use toydb::error::Result;
-use toydb::sql::engine::StatementResult;
-use toydb::sql::parser::{Lexer, Token};
-use toydb::Client;
+use std::path::PathBuf;
 
 use clap::Parser as _;
 use itertools::Itertools as _;
@@ -17,6 +13,12 @@ use rustyline::history::DefaultHistory;
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
+
+use toydb::errinput;
+use toydb::error::Result;
+use toydb::sql::engine::StatementResult;
+use toydb::sql::parser::{Lexer, Token};
+use toydb::Client;
 
 fn main() {
     if let Err(error) = Command::parse().run() {
@@ -57,7 +59,7 @@ struct Shell {
     /// The Rustyline command editor.
     editor: Editor<InputValidator, DefaultHistory>,
     /// The path to the history file, if any.
-    history_path: Option<std::path::PathBuf>,
+    history_path: Option<PathBuf>,
     /// If true, SELECT column headers will be displayed.
     show_headers: bool,
 }
@@ -73,8 +75,8 @@ impl Shell {
             rustyline::KeyEvent(rustyline::KeyCode::BracketedPasteStart, Modifiers::NONE),
             rustyline::Cmd::Noop,
         );
-        let history_path = std::env::var_os("HOME")
-            .map(|home| std::path::PathBuf::from(home).join(".toysql.history"));
+        let history_path =
+            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".toysql.history"));
         Ok(Self { client, editor, history_path, show_headers: false })
     }
 

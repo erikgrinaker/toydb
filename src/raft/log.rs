@@ -1,9 +1,11 @@
+use std::ops::Bound;
+
+use serde::{Deserialize, Serialize};
+
 use super::{NodeID, Term};
 use crate::encoding::{self, bincode, Key as _, Value as _};
 use crate::error::Result;
 use crate::storage;
-
-use serde::{Deserialize, Serialize};
 
 /// A log index. Starts at 1, indicates no index if 0.
 pub type Index = u64;
@@ -113,14 +115,16 @@ pub struct Log {
 impl Log {
     /// Initializes a log using the given storage engine.
     pub fn new(mut engine: Box<dyn storage::Engine>) -> Result<Self> {
-        use std::ops::Bound::Included;
         let (term, vote) = engine
             .get(&Key::TermVote.encode())?
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, None));
         let (last_index, last_term) = engine
-            .scan_dyn((Included(Key::Entry(0).encode()), Included(Key::Entry(u64::MAX).encode())))
+            .scan_dyn((
+                Bound::Included(Key::Entry(0).encode()),
+                Bound::Included(Key::Entry(u64::MAX).encode()),
+            ))
             .last()
             .transpose()?
             .map(|(_, v)| Entry::decode(&v))
@@ -233,7 +237,6 @@ impl Log {
 
     /// Returns an iterator over log entries in the given index range.
     pub fn scan(&mut self, range: impl std::ops::RangeBounds<Index>) -> Iterator {
-        use std::ops::Bound;
         let from = match range.start_bound() {
             Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()),
             Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()),
@@ -362,16 +365,20 @@ impl std::iter::Iterator for Iterator<'_> {
 /// Most Raft tests are Goldenscripts under src/raft/testscripts.
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::encoding::format::{self, Formatter as _};
-    use crate::storage::engine::test as testengine;
+    use std::error::Error;
+    use std::fmt::Write as _;
+    use std::ops::RangeBounds;
+    use std::result::Result;
 
     use crossbeam::channel::Receiver;
     use itertools::Itertools as _;
     use regex::Regex;
-    use std::fmt::Write as _;
-    use std::{error::Error, result::Result};
+    use tempfile::TempDir;
     use test_each_file::test_each_path;
+
+    use super::*;
+    use crate::encoding::format::{self, Formatter as _};
+    use crate::storage::engine::test as testengine;
 
     // Run goldenscript tests in src/raft/testscripts/log.
     test_each_path! { in "src/raft/testscripts/log" as scripts => test_goldenscript }
@@ -385,7 +392,7 @@ mod tests {
         log: Log,
         op_rx: Receiver<testengine::Operation>,
         #[allow(dead_code)]
-        tempdir: tempfile::TempDir,
+        tempdir: TempDir,
     }
 
     impl TestRunner {
@@ -393,7 +400,7 @@ mod tests {
             // Use both a BitCask and a Memory engine, and mirror operations
             // across them. Emit write events to op_tx.
             let (op_tx, op_rx) = crossbeam::channel::unbounded();
-            let tempdir = tempfile::TempDir::with_prefix("toydb").expect("tempdir failed");
+            let tempdir = TempDir::with_prefix("toydb").expect("tempdir failed");
             let bitcask =
                 storage::BitCask::new(tempdir.path().join("bitcask")).expect("bitcask failed");
             let memory = storage::Memory::new();
@@ -412,7 +419,7 @@ mod tests {
         }
 
         /// Parses an index range, in Rust range syntax.
-        fn parse_index_range(s: &str) -> Result<impl std::ops::RangeBounds<Index>, Box<dyn Error>> {
+        fn parse_index_range(s: &str) -> Result<impl RangeBounds<Index>, Box<dyn Error>> {
             use std::ops::Bound;
             let mut bound = (Bound::<Index>::Unbounded, Bound::<Index>::Unbounded);
             let re = Regex::new(r"^(\d+)?\.\.(=)?(\d+)?").expect("invalid regex");

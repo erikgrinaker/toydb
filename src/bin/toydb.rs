@@ -8,16 +8,18 @@
 
 #![warn(clippy::all)]
 
+use std::collections::HashMap;
+use std::path::Path;
+
+use clap::Parser as _;
+use serde::Deserialize;
+
 use toydb::errinput;
 use toydb::error::Result;
 use toydb::raft;
 use toydb::sql;
 use toydb::storage;
 use toydb::Server;
-
-use clap::Parser as _;
-use serde::Deserialize;
-use std::collections::HashMap;
 
 fn main() {
     if let Err(error) = Command::parse().run() {
@@ -101,7 +103,7 @@ impl Command {
         simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
 
         // Initialize the Raft log storage engine.
-        let datadir = std::path::Path::new(&cfg.data_dir);
+        let datadir = Path::new(&cfg.data_dir);
         let mut raft_log = match cfg.storage_raft.as_str() {
             "bitcask" | "" => {
                 let engine = storage::BitCask::new_compact(

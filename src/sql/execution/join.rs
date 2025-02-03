@@ -1,10 +1,11 @@
-use crate::errinput;
-use crate::error::Result;
-use crate::sql::types::{Expression, Row, Rows, Value};
+use std::iter::Peekable;
 
 use itertools::Itertools as _;
 use std::collections::HashMap;
-use std::iter::Peekable;
+
+use crate::errinput;
+use crate::error::Result;
+use crate::sql::types::{Expression, Row, Rows, Value};
 
 /// A nested loop join. Iterates over the right source for every row in the left
 /// source, optionally filtering on the join predicate. If outer is true, and

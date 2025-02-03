@@ -1,11 +1,14 @@
+use std::borrow::Cow;
+use std::fmt::Display;
+
+use serde::{Deserialize, Serialize};
+
 use super::{DataType, Value};
 use crate::encoding;
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
-
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
+use crate::sql::parser::is_ident;
 
 /// A table schema, which specifies its data structure and constraints.
 ///
@@ -49,7 +52,7 @@ pub struct Column {
     pub references: Option<String>,
 }
 
-impl std::fmt::Display for Table {
+impl Display for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "CREATE TABLE {} (", format_ident(&self.name))?;
         for (i, column) in self.columns.iter().enumerate() {
@@ -224,7 +227,7 @@ impl Table {
 
 /// Formats an identifier as valid SQL, quoting it if necessary.
 fn format_ident(ident: &str) -> Cow<str> {
-    if crate::sql::parser::is_ident(ident) {
+    if is_ident(ident) {
         return ident.into();
     }
     format!("\"{}\"", ident.replace('\"', "\"\"")).into()

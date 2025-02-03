@@ -1,3 +1,7 @@
+use itertools::Itertools as _;
+use log::error;
+use serde::{Deserialize, Serialize};
+
 use super::raft::{Raft, Status};
 use super::{Engine, Transaction as _};
 use crate::error::{Error, Result};
@@ -7,10 +11,6 @@ use crate::sql::planner::Plan;
 use crate::sql::types::{Label, Row, Rows, Value};
 use crate::storage::mvcc;
 use crate::{errdata, errinput};
-
-use itertools::Itertools as _;
-use log::error;
-use serde::{Deserialize, Serialize};
 
 /// A SQL client session. Executes raw SQL statements against a SQL engine and
 /// handles transaction control.
