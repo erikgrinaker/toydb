@@ -1,7 +1,7 @@
 use super::{Engine, Status};
 use crate::error::Result;
 
-use fs4::FileExt;
+use fs4::fs_std::FileExt;
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 

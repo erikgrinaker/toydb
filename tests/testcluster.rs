@@ -114,9 +114,12 @@ impl TestServer {
         writeln!(cfg, "data_dir: {}", dir.to_string_lossy())?;
         writeln!(cfg, "listen_raft: localhost:{raft_port}")?;
         writeln!(cfg, "listen_sql: localhost:{sql_port}")?;
-        writeln!(cfg, "peers: {{")?;
+        write!(cfg, "peers: {{")?;
+        if ports.len() > 1 {
+            writeln!(cfg)?;
+        }
         for (peer_id, (peer_raft_port, _)) in ports.iter().filter(|(peer, _)| **peer != id) {
-            writeln!(cfg, "  '{peer_id}': localhost:{peer_raft_port},")?;
+            write!(cfg, "  '{peer_id}': localhost:{peer_raft_port},")?;
         }
         writeln!(cfg, "}}")?;
         Ok(cfg)
@@ -125,7 +128,7 @@ impl TestServer {
     /// Asserts that the server is still running.
     fn assert_alive(&mut self) {
         if let Some(status) = self.child.try_wait().expect("failed to check exit status") {
-            panic!("node {id} exited with status {status}", id = self.id)
+            panic!("node {id} exited with {status}", id = self.id)
         }
     }
 
