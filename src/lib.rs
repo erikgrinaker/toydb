@@ -1,5 +1,5 @@
 #![warn(clippy::all)]
-#![allow(clippy::new_without_default)]
+#![allow(clippy::module_inception)]
 
 pub mod client;
 pub mod encoding;

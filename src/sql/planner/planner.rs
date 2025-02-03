@@ -1,5 +1,3 @@
-#![allow(clippy::module_inception)]
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use itertools::{Either, Itertools as _};
@@ -577,6 +575,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 /// currently visible and what names they have. During expression planning, the
 /// scope is used to resolve column names to column indexes, which are placed in
 /// the plan and used during execution.
+#[derive(Default)]
 pub struct Scope {
     /// The currently visible columns. If empty, only constant expressions can
     /// be used (no column references).
@@ -603,14 +602,7 @@ pub struct Scope {
 impl Scope {
     /// Creates a new, empty scope.
     pub fn new() -> Self {
-        Self {
-            columns: Vec::new(),
-            tables: HashSet::new(),
-            qualified: HashMap::new(),
-            unqualified: HashMap::new(),
-            aggregates: HashMap::new(),
-            hidden: HashSet::new(),
-        }
+        Self::default()
     }
 
     /// Creates a scope from a table, using the table's original name.

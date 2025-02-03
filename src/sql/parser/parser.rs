@@ -1,5 +1,3 @@
-#![allow(clippy::module_inception)]
-
 use std::iter::Peekable;
 
 use super::{ast, Keyword, Lexer, Token};

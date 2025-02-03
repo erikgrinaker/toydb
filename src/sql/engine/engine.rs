@@ -1,5 +1,3 @@
-#![allow(clippy::module_inception)]
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::Session;

@@ -6,6 +6,7 @@ use crate::error::Result;
 
 /// An in-memory key/value storage engine using the Rust standard library B-tree
 /// implementation. Data is not persisted.
+#[derive(Default)]
 pub struct Memory {
     data: BTreeMap<Vec<u8>, Vec<u8>>,
 }
@@ -13,7 +14,7 @@ pub struct Memory {
 impl Memory {
     /// Creates a new Memory key-value storage engine.
     pub fn new() -> Self {
-        Self { data: BTreeMap::new() }
+        Self::default()
     }
 }
 
