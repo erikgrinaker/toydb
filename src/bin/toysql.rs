@@ -142,18 +142,18 @@ Transactions: {active_txns} active, {versions} total
                     nodes = status.raft.match_index.len(),
                     committed = status.raft.commit_index,
                     applied = status.raft.applied_index,
-                    raft_size = format_args!("{:.3}", status.raft.storage.size as f64 / 1000000.0),
-                    raft_garbage = format_args!("{:.0}", status.raft.storage.garbage_percent()),
+                    raft_size =
+                        format_args!("{:.3}", status.raft.storage.size as f64 / 1_000_000.0),
+                    raft_garbage =
+                        format_args!("{:.0}", status.raft.storage.garbage_disk_percent()),
                     raft_storage = status.raft.storage.name,
                     raft_match =
                         status.raft.match_index.iter().map(|(n, m)| format!("n{n}:{m}")).join(" "),
                     sql_keys = status.mvcc.storage.keys,
-                    sql_size = format_args!("{:.3}", status.mvcc.storage.size as f64 / 1000000.0),
-                    sql_disk_size = format_args!(
-                        "{:.3}",
-                        status.mvcc.storage.total_disk_size as f64 / 1000000.0
-                    ),
-                    sql_garbage = format_args!("{:.0}", status.mvcc.storage.garbage_percent()),
+                    sql_size = format_args!("{:.3}", status.mvcc.storage.size as f64 / 1_000_000.0),
+                    sql_disk_size =
+                        format_args!("{:.3}", status.mvcc.storage.disk_size as f64 / 1_000_000.0),
+                    sql_garbage = format_args!("{:.0}", status.mvcc.storage.garbage_disk_percent()),
                     sql_storage = status.mvcc.storage.name,
                     active_txns = status.mvcc.active_txns,
                     versions = status.mvcc.versions,

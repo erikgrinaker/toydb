@@ -77,23 +77,23 @@ impl BitCask {
 
         let status = s.status()?;
         if Self::should_compact(
-            status.garbage_disk_size,
-            status.total_disk_size,
+            status.garbage_disk_size(),
+            status.disk_size,
             garbage_min_fraction,
             garbage_min_bytes,
         ) {
             info!(
                 "Compacting {} to remove {:.0}% garbage ({} MB out of {} MB)",
                 s.log.path.display(),
-                status.garbage_percent(),
-                status.garbage_disk_size / 1024 / 1024,
-                status.total_disk_size / 1024 / 1024
+                status.garbage_disk_percent(),
+                status.garbage_disk_size() / 1024 / 1024,
+                status.disk_size / 1024 / 1024
             );
             s.compact()?;
             info!(
                 "Compacted {} to size {} MB",
                 s.log.path.display(),
-                (status.total_disk_size - status.garbage_disk_size) / 1024 / 1024
+                (status.disk_size - status.garbage_disk_size()) / 1024 / 1024
             );
         }
 
@@ -161,18 +161,11 @@ impl Engine for BitCask {
         let size = self
             .keydir
             .iter()
-            .fold(0, |size, (key, (_, value_len))| size + key.len() as u64 + *value_len as u64);
-        let total_disk_size = self.log.file.metadata()?.len();
+            .map(|(key, (_, value_len))| key.len() as u64 + *value_len as u64)
+            .sum();
+        let disk_size = self.log.file.metadata()?.len();
         let live_disk_size = size + 8 * keys; // account for length prefixes
-        let garbage_disk_size = total_disk_size - live_disk_size;
-        Ok(Status {
-            name: "bitcask".to_string(),
-            keys,
-            size,
-            total_disk_size,
-            live_disk_size,
-            garbage_disk_size,
-        })
+        Ok(Status { name: "bitcask".to_string(), keys, size, disk_size, live_disk_size })
     }
 }
 

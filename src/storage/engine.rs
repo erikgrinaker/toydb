@@ -69,19 +69,23 @@ pub struct Status {
     /// The logical size of live key/value pairs.
     pub size: u64,
     /// The on-disk size of all data, live and garbage.
-    pub total_disk_size: u64,
+    pub disk_size: u64,
     /// The on-disk size of live data.
     pub live_disk_size: u64,
-    /// The on-disk size of garbage data.
-    pub garbage_disk_size: u64,
 }
 
 impl Status {
-    pub fn garbage_percent(&self) -> f64 {
-        if self.total_disk_size == 0 {
+    /// The on-disk size of garbage data.
+    pub fn garbage_disk_size(&self) -> u64 {
+        self.disk_size - self.live_disk_size
+    }
+
+    /// The ratio of on-disk garbage to total size.
+    pub fn garbage_disk_percent(&self) -> f64 {
+        if self.disk_size == 0 {
             return 0.0;
         }
-        self.garbage_disk_size as f64 / self.total_disk_size as f64 * 100.0
+        self.garbage_disk_size() as f64 / self.disk_size as f64 * 100.0
     }
 }
 

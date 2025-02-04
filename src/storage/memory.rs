@@ -55,9 +55,8 @@ impl Engine for Memory {
             name: "memory".to_string(),
             keys: self.data.len() as u64,
             size: self.data.iter().fold(0, |size, (k, v)| size + k.len() as u64 + v.len() as u64),
-            total_disk_size: 0,
+            disk_size: 0,
             live_disk_size: 0,
-            garbage_disk_size: 0,
         })
     }
 }
