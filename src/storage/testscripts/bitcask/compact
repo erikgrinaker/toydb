@@ -30,9 +30,8 @@ Status {
     name: "bitcask",
     keys: 6,
     size: 14,
-    total_disk_size: 128,
+    disk_size: 128,
     live_disk_size: 62,
-    garbage_disk_size: 66,
 }
 
 # Dump the log.
@@ -99,9 +98,8 @@ Status {
     name: "bitcask",
     keys: 6,
     size: 14,
-    total_disk_size: 62,
+    disk_size: 62,
     live_disk_size: 62,
-    garbage_disk_size: 0,
 }
 
 # Dump the compacted log.

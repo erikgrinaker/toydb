@@ -5,9 +5,8 @@ term=0 last=0@0 commit=0@0 vote=None engine=Status {
     name: "bitcask",
     keys: 0,
     size: 0,
-    total_disk_size: 0,
+    disk_size: 0,
     live_disk_size: 0,
-    garbage_disk_size: 0,
 }
 
 # Write some data.
@@ -30,7 +29,6 @@ term=2 last=3@2 commit=2@1 vote=1 engine=Status {
     name: "bitcask",
     keys: 5,
     size: 51,
-    total_disk_size: 102,
+    disk_size: 102,
     live_disk_size: 91,
-    garbage_disk_size: 11,
 }

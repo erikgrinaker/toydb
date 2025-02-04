@@ -21,9 +21,8 @@ Status {
     name: "bitcask",
     keys: 2,
     size: 10,
-    total_disk_size: 84,
+    disk_size: 84,
     live_disk_size: 26,
-    garbage_disk_size: 58,
 }
 
 # Compact the log and show status again.
@@ -34,7 +33,6 @@ Status {
     name: "bitcask",
     keys: 2,
     size: 10,
-    total_disk_size: 26,
+    disk_size: 26,
     live_disk_size: 26,
-    garbage_disk_size: 0,
 }

@@ -175,9 +175,8 @@ Status {
             name: "bitcask",
             keys: 27,
             size: 1169,
-            total_disk_size: 1649,
+            disk_size: 1649,
             live_disk_size: 1385,
-            garbage_disk_size: 264,
         },
     },
     mvcc: Status {
@@ -187,9 +186,8 @@ Status {
             name: "bitcask",
             keys: 36,
             size: 2177,
-            total_disk_size: 8259,
+            disk_size: 8259,
             live_disk_size: 2465,
-            garbage_disk_size: 5794,
         },
     },
 }
