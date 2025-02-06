@@ -1,12 +1,590 @@
 # toyDB Architecture
 
-At the highest level, toyDB consists of a cluster of nodes that execute SQL transactions against
-a replicated state machine. Clients can connect to any node in the cluster and submit SQL
-statements. It aims to provide
-[linearizability](https://jepsen.io/consistency/models/linearizable) (i.e. strong consistency)
-and [serializability](https://jepsen.io/consistency/models/serializable), but falls slightly
-short as it currently only implements
-[snapshot isolation](https://jepsen.io/consistency/models/snapshot-isolation).
+toyDB is a simple distributed SQL database, intended to illustrate how such systems are built. The
+overall structure is similar to real-world distributed databases, but the design and implementation
+has been kept as simple as possible for understandability. Performance and scalability are explicit
+non-goals, as these are major sources of complexity in real-world systems.
+
+## Properties
+
+toyDB consists of a cluster of nodes that execute [SQL](https://en.wikipedia.org/wiki/SQL)
+transactions against a replicated state machine. Clients can connect to any node in the cluster
+and submit SQL statements. It is:
+
+* **Distributed:** runs across a cluster of nodes.
+* **Highly available:** tolerates loss of a minority of nodes.
+* **SQL compliant:** correctly supports most common SQL features.
+* **Strongly consistent:** committed writes are immediately visible to all readers ([linearizability](https://en.wikipedia.org/wiki/Linearizability)).
+* **Transactional:** provides ACID transactions:
+  * **Atomic:** groups of writes are applied as a single, atomic unit.
+  * **Consistent:** database constraints and referential integrity are always enforced.
+  * **Isolated:** concurrent transactions don't affect each other ([snapshot isolation](https://en.wikipedia.org/wiki/Snapshot_isolation)).
+  * **Durable:** committed writes are never lost.
+
+For simplicity, toyDB is:
+
+* **Not scalable:** every node stores the full dataset, and all reads/writes happen on one node.
+* **Not reliable:** only handles crash failures, not e.g. partial network partitions or node stalls.
+* **Not performant:** data processing is slow, and not optimized at all.
+* **Not efficient:** no compression or garbage collection, can load entire tables into memory.
+* **Not full-featured:** only basic SQL functionality is implemented.
+* **Not backwards compatible:** changes to data formats and protocols will break databases.
+* **Not flexible:** nodes can't be added or removed while running, and take a long time to join.
+* **Not secure:** there is no authentication, authorization, nor encryption.
+
+## Overview
+
+Internally, toyDB has a few main components:
+
+* **Storage engine:** stores data on disk and manages transactions.
+* **Raft consensus engine:** replicates data and coordinates cluster nodes.
+* **SQL engine:** organizes SQL data, manages SQL sessions, and executes SQL statements.
+* **Server:** manages network connections, both with SQL clients and Raft nodes.
+* **Client:** provides a SQL user interface and communicates with the server.
+
+This diagram illustrates the internal structure of a single toyDB node:
+
+![toyDB architecture](./images/architecture.svg)
+
+We will go through each of these components from the bottom up.
+
+## Storage Engine
+
+toyDB uses an embedded [key/value store](https://en.wikipedia.org/wiki/Key–value_database) for data
+storage, located in the [`storage`](https://github.com/erikgrinaker/toydb/tree/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage)
+module. This stores arbitrary keys and values as binary byte strings, and doesn't care what they
+contain. We'll see later how the SQL data model, with tables and rows, is mapped onto this key/value
+structure.
+
+The storage engine supports simple set/get/delete operations on individual keys. It does not itself
+support transactions -- this is built on top, and we'll get back to it shortly.
+
+Keys are stored in sorted order. This allows range scans, where we can iterate over all key/value
+pairs between two specific keys, or with a specific key prefix. As we'll see later, this is needed
+e.g. to scan all rows in a specific SQL table, to do limited SQL index scans, to scan the tail of
+the Raft log, etc.
+
+The storage engine is pluggable: there are multiple implementations, and the user can choose which
+one to use in the config file. These implement the [`storage::Engine`](https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/engine.rs#L22-L58) 
+trait:
+
+https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/engine.rs#L8-L58
+
+We'll discuss the two existing storage engine implementations next.
+
+### `Memory` Storage Engine
+
+The simplest storage engine is the [`Memory`](https://github.com/erikgrinaker/toydb/blob/cf83b50a01fcb6ada6916c276ebeae849c340369/src/storage/memory.rs)
+engine. This is a trivial implementation which stores all data in memory using the Rust standard
+library's [`BTreeMap`](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html), without
+persisting data to disk. It is primarily used for testing.
+
+This implementation is so simple that we can include it in its entirety here:
+
+https://github.com/erikgrinaker/toydb/blob/cf83b50a01fcb6ada6916c276ebeae849c340369/src/storage/memory.rs#L8-L77
+
+### `BitCask` Storage Engine
+
+The main storage engine is [`BitCask`](https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L50-L55).
+This is a very simple variant of [BitCask](https://riak.com/assets/bitcask-intro.pdf), used in the
+[Riak](https://riak.com/) database. It is kind of like the
+[LSM-tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree)'s baby cousin.
+
+https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L15-L55
+
+This BitCask implementation uses a single append-only log file for storage. To write a key/value
+pair, we simply append it to the file. To replace the key, we append a new key/value entry, and to
+delete it, we append a special tombstone value. The last value in the file for a given key is used.
+This also means that we don't need a separate [write-ahead log](https://en.wikipedia.org/wiki/Write-ahead_logging),
+since the data file _is_ the write-ahead log.
+
+The file format for a key/value pair is simply:
+
+1. The key length, as a big-endian `u32` (4 bytes).
+2. The value length, as a big-endian `i32` (4 bytes). -1 if tombstone.
+3. The binary key (n bytes).
+4. The binary value (n bytes).
+
+For example, the key/value pair `foo=bar` would be written as follows (in hexadecimal):
+
+```
+keylen   valuelen key    value
+00000003 00000003 666f6f 626172
+```
+
+https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L338-L363
+
+To find key/value pairs, we maintain a [`KeyDir`](https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L57-L58)
+index which maps a key to the latest value's position in the file. All keys must therefore fit in
+memory.
+
+https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L57-L65
+
+We generate this index by [scanning](https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L263-L328)
+through the entire file when it is opened, and then update it on every subsequent write.
+
+To read a value for a key, we simply look up the key's file location in the `KeyDir` index (if the
+key exists), and then read it from the file:
+
+https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L330-L336
+
+To remove old garbage (replaced or deleted key/value pairs), the log file is
+[compacted](https://github.com/erikgrinaker/toydb/blob/d774e7ca46c21a7c93ac6a162966db74ea5329cf/src/storage/bitcask.rs#L170-L194)
+on startup. This writes out the latest value of every live key/value pair to a new file, and
+replaces the old file. They are written in sorted order by key, which makes later scans faster.
+
+## Key and Value Encoding
+
+The key/value store uses binary `Vec<u8>` keys and values, so we need an encoding scheme to 
+translate between Rust in-memory data structures and the on-disk binary data. This is provided by
+the [`encoding`](https://github.com/erikgrinaker/toydb/tree/c0977a41b39e980a58698822e98b2c78a23e98c3/src/encoding)
+module, with separate schemes for key and value encoding.
+
+### `Bincode` Value Encoding
+
+Values are encoded using [Bincode](https://github.com/bincode-org/bincode), a third-party binary
+encoding scheme for Rust. Bincode is convenient because it can easily encode any arbitrary Rust
+data type. But we could also have chosen e.g. [JSON](https://en.wikipedia.org/wiki/JSON),
+[Protobuf](https://protobuf.dev), [MessagePack](https://msgpack.org/), or any other encoding.
+
+We won't dwell on the actual binary format here, see the [Bincode specification](https://github.com/bincode-org/bincode/blob/trunk/docs/spec.md)
+for details.
+
+Confusingly, `bincode::serialize()` uses fixed-width integer encoding (which takes up a lot of
+space), while `bincode::DefaultOptions` uses [variable-width integers](https://en.wikipedia.org/wiki/Variable-length_quantity).
+So we provide helper functions using `DefaultOptions` in the [`encoding::bincode`](https://github.com/erikgrinaker/toydb/blob/c0977a41b39e980a58698822e98b2c78a23e98c3/src/encoding/bincode.rs)
+module:
+
+https://github.com/erikgrinaker/toydb/blob/ae321c4f81a33b79283e695d069a7159c96f3015/src/encoding/bincode.rs#L20-L32
+
+Bincode uses the very common [Serde](https://serde.rs) framework for its API. toyDB also provides
+an `encoding::Value` helper trait for value types with automatic `encode()` and `decode()` methods:
+
+https://github.com/erikgrinaker/toydb/blob/ae321c4f81a33b79283e695d069a7159c96f3015/src/encoding/mod.rs#L39-L68
+
+Here's an example of how this is used to encode and decode an arbitrary `Dog` data type:
+
+```rust
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Dog {
+    name: String,
+    age: u8,
+    good_boy: bool,
+}
+
+impl encoding::Value for Dog {}
+
+let pluto = Dog { name: "Pluto".into(), age: 4, good_boy: true };
+let bytes = pluto.encode();
+println!("{bytes:02x?}");
+
+// Outputs [05, 50, 6c, 75, 74, 6f, 04, 01].
+//
+// * Length of string "Pluto": 05.
+// * String "Pluto": 50 6c 75 74 6f.
+// * Age 4: 04.
+// * Good boy: 01 (true).
+
+let pluto = Dog::decode(&bytes)?; // gives us back Pluto
+```
+
+### `Keycode` Key Encoding
+
+Unlike values, keys can't just use any binary encoding like Bincode. As mentioned before, the
+storage engine sorts data by key to enable range scans, which will be used e.g. for SQL table scans,
+limited SQL index scans, Raft log scans, etc. Because of this, the encoding needs to preserve the
+[lexicographical order](https://en.wikipedia.org/wiki/Lexicographic_order) of the encoded values:
+the binary byte slices must sort in the same order as the original values.
+
+As an example of why we can't just use Bincode, let's consider two strings: "house" should be
+sorted before "key", alphabetically. However, Bincode encodes strings prefixed by their length, so
+"key" would be sorted before "house" in binary form:
+
+```
+03 6b 65 79       ← 3 bytes: key
+05 68 6f 75 73 65 ← 5 bytes: house
+```
+
+For similar reasons, we can't just encode numbers in their native binary form, because the
+[little-endian](https://en.wikipedia.org/wiki/Endianness) representation will sometimes order very
+large numbers before small numbers, and the [sign bit](https://en.wikipedia.org/wiki/Sign_bit)
+will order positive numbers before negative numbers.
+
+We also have to be careful with value sequences, which should be ordered element-wise. For example,
+the pair ("a", "xyz") should be ordered before ("ab", "cd"), so we can't just encode the strings
+one after the other like "axyz" and "abcd" since that would sort "abcd" first.
+
+toyDB provides an encoding called "Keycode" which provides these properties, in the
+[`encoding::keycode`](https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs)
+module. It is implemented as a [Serde](https://serde.rs) (de)serializer, which
+requires a lot of boilerplate code, but we'll just focus on the actual encoding.
+
+Keycode only supports a handful of primary data types, and just needs to order values of the same
+type:
+
+* `bool`: `00` for `false` and `01` for `true`.
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L113-L117
+
+* `u64`: the [big-endian](https://en.wikipedia.org/wiki/Endianness) binary encoding.
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L157-L161
+
+* `i64`: the [big-endian](https://en.wikipedia.org/wiki/Endianness) binary encoding, but with the
+   sign bit flipped to order negative numbers before positive ones.
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L131-L143
+
+* `f64`: the [big-endian IEEE 754](https://en.wikipedia.org/wiki/Double-precision_floating-point_format)
+  binary encoding, but with the sign bit flipped, and all bits flipped for negative numbers, to
+  order negative numbers correctly.
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L167-L179
+
+* `Vec<u8>`: terminated by `00 00`, with `00` escaped as `00 ff` to disambiguate it.
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L190-L205
+
+* `String`: like `Vec<u8>`.
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L185-L188
+
+* `Vec<T>`, `[T]`, `(T,)`: just the concatenation of the inner values.
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L295-L307
+
+* `enum`: the enum variant's numerical index as a `u8`, then the inner values (if any).
+
+    https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/keycode.rs#L223-L227
+
+Decoding is just the inverse of the encoding.
+
+Like `encoding::Value`, there is also an `encoding::Key` helper trait:
+
+https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/encoding/mod.rs#L20-L37
+
+We typically use enums to represent different kinds of keys. For example, if we wanted to store
+cars and video games, we could use:
+
+```rust
+#[derive(serde::Serialize, serde::Deserialize)]
+enum Key {
+    Car(String, String, u64),    // make, model, year
+    Game(String, u64, Platform), // name, year, platform
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+enum Platform {
+    PC,
+    PS5,
+    Switch,
+    Xbox,
+}
+
+impl encoding::Key for Key {}
+
+let returnal = Key::Game("Returnal".into(), 2021, Platform::PS5);
+let bytes = returnal.encode();
+println!("{bytes:02x?}");
+
+// Outputs [01, 52, 65, 74, 75, 72, 6e, 61, 6c, 00, 00, 00, 00, 00, 00, 00, 00, 07, e5, 01].
+//
+// * Key::Game: 01
+// * Returnal: 52 65 74 75 72 6e 61 6c 00 00
+// * 2021: 00 00 00 00 00 00 07 e5
+// * Platform::PS5: 01
+
+let returnal = Key::decode(&bytes)?;
+```
+
+Because the keys are sorted in element-wise order, this would allow us to e.g. perform a prefix
+scan to fetch all platforms which Returnal (2021) was released on, or perform a range scan to fetch 
+all models of Nissan Altima released between 2010 and 2015.
+
+## MVCC Transactions
+
+Transactions provide _atomicity_: a user can submit multiple writes which will take effect as a
+single group, at the same instant, when they are _committed_. Other users should never see some of
+the writes without the others. And they provide _durability_: committed writes should never be lost
+(even if the system crashes), and should remain visible.
+
+Transactions also provide _isolation_: they should appear to have the entire database to themselves,
+unaffected by what other users may be doing at the same time. Two transactions may conflict, in
+which case one has to retry, but if a transaction succeeds then the user can rest easy that the
+operations were executed correctly without interference. This is a very powerful guarantee, since
+it basically eliminates the risk of [race conditions](https://en.wikipedia.org/wiki/Race_condition)
+(a class of bugs that are notoriously hard to fix). 
+
+To illustrate how transactions work, here's an example test script for the MVCC code (there's a
+bunch of [other test scripts](https://github.com/erikgrinaker/toydb/tree/aa14deb71f650249ce1cab8828ed7bcae2c9206e/src/storage/testscripts/mvcc)
+there too):
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/testscripts/mvcc/bank#L1-L69
+
+To provide such [ACID transactions](https://en.wikipedia.org/wiki/ACID), toyDB uses a common
+technique called [Multi-Version Concurrency Control](https://en.wikipedia.org/wiki/Multiversion_concurrency_control)
+(MVCC). It is implemented at the key/value storage level, in the
+[`storage::mvcc`](https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/storage/mvcc.rs)
+module. It sits on top of any `storage::Engine` implementation, which it uses for actual data
+storage.
+
+https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/storage/mvcc.rs#L220-L231
+
+MVCC provides a guarantee called [snapshot isolation](https://en.wikipedia.org/wiki/Snapshot_isolation):
+a transaction sees a snapshot of the database as it was when the transaction began. Any later
+changes will be invisible to it.
+
+It does this by storing several historical versions of key/value pairs. The version number is simply
+a number that's incremented for every new transaction:
+
+https://github.com/erikgrinaker/toydb/blob/aa14deb71f650249ce1cab8828ed7bcae2c9206e/src/storage/mvcc.rs#L155-L158
+
+Each transaction has its own unique version number. When it writes a key/value pair it appends its
+version number to the key as `Key::Version(&[u8], Version)`, via the Keycode encoding we saw above.
+If an old version of the key already exists, it will have a different version number and therefore
+be stored as a separate key/value in the storage engine, so it will be left intact. To delete a key,
+it writes a special tombstone value.
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L183-L189
+
+Here's a simple diagram of what a history of versions 1 to 5 of keys `a` to `d` might look like:
+
+https://github.com/erikgrinaker/toydb/blob/2027641004989355c2162bbd9eeefcc991d6b29b/src/storage/mvcc.rs#L11-L26
+
+Given this versioning scheme, we can summarize the MVCC protocol with a few simple rules:
+
+1. When a new transaction begins, it:
+    * Obtains the next available version number.
+    * Adds its version number to the set of active transactions (the "active set").
+    * Takes a snapshot of other uncommitted transaction versions from the active set.
+
+2. When the transaction reads a key, it:
+    * Ignores versions above its own version.
+    * Ignores versions in its active set (uncommitted transactions).
+    * Returns the latest version of the key at or below its own version.
+
+3. When the transaction writes a key, it:
+    * Looks for a key version above its own version; errors if found.
+    * Looks for a key version in its active set (uncommitted transactions); errors if found.
+    * Writes a key/value pair with its own version.
+
+4. When the transaction commits, it:
+    * Flushes all writes to disk.
+    * Removes itself from the active set.
+
+And that's basically it! The transaction's writes all become visible atomically at the instant it
+commits and removes itself from the active set, since new transactions no longer ignore its version.
+The transaction saw a stable snapshot of the database, since it ignored newer versions and versions
+that were uncommitted when it began. The transaction can read its own writes, even though noone else
+can. And if any of its writes conflict with another transaction it would get an error and have to
+retry.
+
+Not only that, this also allows us to do time-travel queries, where we can query the database as it
+was at any time in the past: we simply pick a version number to read at.
+
+There are a few more details that we've left out here. To roll back the transaction, it needs to
+keep track of its writes to undo them. To delete keys we write tombstone versions. For read-only
+queries we can avoid assigning new version numbers. And we don't garbage collect old versions.
+See the [module documentation](https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L1-L140)
+for more details.
+
+Let's walk through a simple example with code pointers to get a feel for how this works. Notice how
+we don't have to mess with any version numbers here -- this is an internal MVCC implementation
+detail.
+
+```rust
+// Open a BitCask database in the file "toy.db" with MVCC support.
+let path = PathBuf::from("toy.db");
+let db = MVCC::new(BitCask::new(path)?);
+
+// Begin a new transaction.
+let txn = db.begin()?;
+
+// Read the key "foo", and decode the binary value as a u64 with bincode.
+let bytes = txn.get(b"foo")?.expect("foo not found");
+let mut value: u64 = bincode::deserialize(&bytes)?;
+
+// Delete "foo".
+txn.delete(b"foo")?;
+
+// Add 1 to the value, and write it back to the key "bar".
+value += 1;
+let bytes = bincode::serialize(&value);
+txn.set(b"bar", bytes)?;
+
+// Commit the transaction.
+txn.commit()?;
+```
+
+First, we begin a new transaction with `MVCC::begin()`. This calls through to
+`Transaction::begin()`, which obtains a version number stored in `Key::NextVersion` and increments
+it, then takes a snapshot of the active set in `Key::ActiveSet`, adds itself to it, and writes it
+back:
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L368-L391
+
+This returns a `Transaction` object which provides the primary key/value API with get/set/delete
+methods. It contains the main state of the transaction: it's version number and active set.
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L294-L327
+
+We then call `Transaction::get(b"foo")` to read the value of the key `foo`. We want to find the
+latest version that's visible to us (ignoring future versions and the active set). Recall that
+we store multiple version of each key as `Key::Version(key, version)`. The Keycode encoding ensures
+that all versions are stored in sorted order, so we can do a reverse range scan from
+`Key::Version(b"foo", 0)` to `Key::Version(b"foo", self.version)` and return the latest version
+that's visible to us:
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L564-L581
+
+When we call `Transaction::delete(b"foo")` and `Transaction::set(b"bar", value)`, we're just calling
+through to the same `Transaction::write_version()` method, but use `None` as a deletion tombstone
+and `Some(value)` for a regular key/value pair:
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L514-L522
+
+To write a new version of a key, we first have to check for conflicts by seeing if there's a
+version of the key that's invisible to us -- if it is, we conflicted with a concurrent transaction.
+Like with `Transaction::get()`, we do this with a range scan.
+
+We then just go on to write the `Key::Version(b"foo", self.version)` and encode the value as an
+`Option<value>` to accomodate the `None` tombstone marker. We also write a
+`Key::TxnWrite(version, key)` to keep a version-indexed list of our writes in case we have to roll
+back.
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L524-L562
+
+Finally, `Transaction::commit()` will make our transaction take effect and become visible. It does
+this simply by removing itself from the active set in `Key::ActiveSet`, and also cleaning up its
+`Key::TxnWrite` write index. As the comment says, we don't actually have to flush to durable storage
+here, because the Raft log will provide durability for us -- we'll get back to this later.
+
+https://github.com/erikgrinaker/toydb/blob/a73e24b7e77671b9f466e0146323cd69c3e27bdf/src/storage/mvcc.rs#L466-L485
+
+## Raft Consensus Protocol
+
+[Raft](https://raft.github.io) is a distributed consensus protocol which replicates data across a
+cluster of nodes in a consistent and durable manner. It is described in the very readable
+[Raft paper](https://raft.github.io/raft.pdf), and the more comprehensive
+[Raft thesis](https://web.stanford.edu/~ouster/cgi-bin/papers/OngaroPhD.pdf). Raft is fundamentally
+the same protocol as [Paxos](https://lamport.azurewebsites.net/pubs/paxos-simple.pdf) and
+[Viewstamped Replication](https://pmg.csail.mit.edu/papers/vr-revisited.pdf), but an opinionated
+variant designed to be simple, understandable, and practical. It is widely used in the industry.
+
+Briefly, Raft elects a leader node which coordinates writes and replicates them to followers. Once a
+majority (>50%) of nodes have acknowledged a write, it is considered durably committed. It is common
+for the leader to also serve reads, since it always has the most recent data and is thus strongly
+consistent.
+
+A cluster must have a majority of nodes (known as a [quorum](https://en.wikipedia.org/wiki/Quorum_(distributed_computing)))
+live and connected to remain available, otherwise it will not commit writes in order to guarantee
+data consistency and durability. Since there can only be one majority in the cluster, this prevents
+a [split brain](https://en.wikipedia.org/wiki/Split-brain_(computing)) scenario where two active
+leaders can exist concurrently (e.g. during a [network partition](https://en.wikipedia.org/wiki/Network_partition))
+and store conflicting values.
+
+The Raft leader appends writes to an ordered command log, which is then replicated to followers.
+Once a majority has replicated the log up to a given entry, that log prefix is committed and then
+applied to a state machine. This ensures that all nodes will apply the same commands in the same
+order and eventually reach the same state (assuming the commands are deterministic). Raft itself
+doesn't care what the state machine and commands are, but in toyDB's case it is a key/value store
+with put/delete commands.
+
+This diagram from the Raft paper illustrates how a Raft node receives a command from a client (1),
+adds it to its log and reaches consensus with other nodes (2), then applies it to its state machine
+(3) before returning a result to the client (4):
+
+<img src="./images/raft.svg" alt="Raft node" width="400" style="display: block; margin: 30px auto;">
+
+You may notice that Raft is not very scalable, since all writes and reads go via the leader node,
+and every node must store the entire dataset. Raft solves replication and availability, but not
+scalability. Real-world systems typically provide horizontal scalability by splitting a large
+dataset across many separate Raft clusters, but this is out of scope for toyDB.
+
+For simplicitly, toyDB implements the bare minimum of Raft, and omits optimizations described in
+the paper such as state snapshots, log truncation, leader leases, and more. The implementation is
+in the [`raft`](https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/mod.rs)
+module, and we'll walk through the main components next.
+
+### Log Storage
+
+Raft replicates an ordered command log consisting of `raft::Entry`:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L13-L26
+
+`index` specifies the position in the log, and `command` contains the binary command to apply to the
+state machine. The `term` identifies the leadership term in which the command was proposed: a new
+term begins when a new leader election is held (we'll get back to this later).
+
+Entries are appended to the log by the leader and replicated to followers. Once acknowledged by a
+quorum, the log up to that index is committed, and will never change. Entries that are not yet
+committed may be replaced or removed if the leader changes.
+
+The Raft log enforces the following invariants:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L82-L91
+
+`raft::Log` implements a Raft log, and stores log entries in a `storage::Engine` key/value store:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L43-L116
+
+It also stores some additional metadata that we'll need later: the current term, vote, and commit
+index. These are stored as separate keys:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L30-L39
+
+Individual entries are appended to the log via `Log::append`, typically when the leader wants to
+replicate a new write:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L190-L203
+
+Entries can also be appended in bulk via `Log::splice`, typically when entries are replicated to
+followers. This also allows replacing existing uncommitted entries, e.g. after a leader change:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L269-L349
+
+Committed entries are marked by `Log::commit`, making them immutable and eligible for state machine
+application:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L205-L222
+
+It also has methods to read entries from the log, either individually as `Log::get` or by iterating
+over a range with `Log::scan`:
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/log.rs#L224-L267
+
+### State Machine Interface
+
+Raft doesn't know or care what the log commands are, nor what the state machine does with them. It
+simply takes `raft::Entry` from the log and gives them to the state machine.
+
+The Raft state machine is represented by the `raft::State` trait. Raft will ask about the last
+applied entry via `State::get_applied_index`, and feed it newly committed entries via
+`State::apply`. It also allows reads via `State::read`, but we'll get back to that later.
+
+The state machine must take care to be deterministic: the same commands applied in the same order
+must result in the same state across all nodes. This means that a command can't e.g. read the
+current time or generate a random number -- these values must be included in the command. It also
+means that non-deterministic errors, such as an IO error, must halt command application (in toyDB's
+case, we just panic and crash the node).
+
+In toyDB, the state machine is a key/value store that manages SQL data, as we'll see in the SQL
+section.
+
+https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/state.rs#L4-L51
+
+### Node Communication and Interface
+
+### Leader Election
+
+### Write Replication
+
+### Consistent Reads
+
+
+---
+
+# XXX Old 
 
 The [Raft algorithm](https://raft.github.io) is used for cluster consensus, which tolerates the
 failure of any node as long as a majority of nodes are still available. One node is elected
