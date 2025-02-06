@@ -106,7 +106,7 @@ impl Command {
         let datadir = Path::new(&cfg.data_dir);
         let mut raft_log = match cfg.storage_raft.as_str() {
             "bitcask" | "" => {
-                let engine = storage::BitCask::new_compact(
+                let engine = storage::BitCask::new_maybe_compact(
                     datadir.join("raft"),
                     cfg.compact_threshold,
                     cfg.compact_min_bytes,
@@ -121,7 +121,7 @@ impl Command {
         // Initialize the SQL storage engine.
         let raft_state: Box<dyn raft::State> = match cfg.storage_sql.as_str() {
             "bitcask" | "" => {
-                let engine = storage::BitCask::new_compact(
+                let engine = storage::BitCask::new_maybe_compact(
                     datadir.join("sql"),
                     cfg.compact_threshold,
                     cfg.compact_min_bytes,
