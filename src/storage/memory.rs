@@ -1,15 +1,14 @@
+use std::collections::btree_map::Range;
 use std::collections::BTreeMap;
 use std::ops::{Bound, RangeBounds};
 
 use super::{Engine, Status};
 use crate::error::Result;
 
-/// An in-memory key/value storage engine using the Rust standard library B-tree
-/// implementation. Data is not persisted.
+/// An in-memory key-value storage engine using the Rust standard library's
+/// B-tree implementation. Data is not persisted. Primarily for testing.
 #[derive(Default)]
-pub struct Memory {
-    data: BTreeMap<Vec<u8>, Vec<u8>>,
-}
+pub struct Memory(BTreeMap<Vec<u8>, Vec<u8>>);
 
 impl Memory {
     /// Creates a new Memory key-value storage engine.
@@ -21,21 +20,21 @@ impl Memory {
 impl Engine for Memory {
     type ScanIterator<'a> = ScanIterator<'a>;
 
+    fn delete(&mut self, key: &[u8]) -> Result<()> {
+        self.0.remove(key);
+        Ok(())
+    }
+
     fn flush(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn delete(&mut self, key: &[u8]) -> Result<()> {
-        self.data.remove(key);
-        Ok(())
-    }
-
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.data.get(key).cloned())
+        Ok(self.0.get(key).cloned())
     }
 
     fn scan(&mut self, range: impl RangeBounds<Vec<u8>>) -> Self::ScanIterator<'_> {
-        ScanIterator { inner: self.data.range(range) }
+        ScanIterator(self.0.range(range))
     }
 
     fn scan_dyn(
@@ -46,43 +45,34 @@ impl Engine for Memory {
     }
 
     fn set(&mut self, key: &[u8], value: Vec<u8>) -> Result<()> {
-        self.data.insert(key.to_vec(), value);
+        self.0.insert(key.to_vec(), value);
         Ok(())
     }
 
     fn status(&mut self) -> Result<Status> {
         Ok(Status {
             name: "memory".to_string(),
-            keys: self.data.len() as u64,
-            size: self.data.iter().fold(0, |size, (k, v)| size + k.len() as u64 + v.len() as u64),
+            keys: self.0.len() as u64,
+            size: self.0.iter().map(|(k, v)| (k.len() + v.len()) as u64).sum(),
             disk_size: 0,
             live_disk_size: 0,
         })
     }
 }
 
-pub struct ScanIterator<'a> {
-    inner: std::collections::btree_map::Range<'a, Vec<u8>, Vec<u8>>,
-}
-
-impl ScanIterator<'_> {
-    fn map(item: (&Vec<u8>, &Vec<u8>)) -> <Self as Iterator>::Item {
-        let (key, value) = item;
-        Ok((key.clone(), value.clone()))
-    }
-}
+pub struct ScanIterator<'a>(Range<'a, Vec<u8>, Vec<u8>>);
 
 impl Iterator for ScanIterator<'_> {
     type Item = Result<(Vec<u8>, Vec<u8>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(Self::map)
+        self.0.next().map(|(k, v)| Ok((k.clone(), v.clone())))
     }
 }
 
 impl DoubleEndedIterator for ScanIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner.next_back().map(Self::map)
+        self.0.next_back().map(|(k, v)| Ok((k.clone(), v.clone())))
     }
 }
 
