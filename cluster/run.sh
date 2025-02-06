@@ -2,7 +2,7 @@
 #
 # This script builds and runs a 5-node toyDB cluster listening on ports
 # 9601-9605. Config and data is stored under the toydb* directories.
-# To connect a toysql client to node 5 on port 9605, run:
+# To connect a toysql client to node 1 on port 9601, run:
 #
 # cargo run --release --bin toysql
 
@@ -16,7 +16,7 @@ cargo build --release --bin toydb
 
 # Start nodes 1-5 in the background, prefixing their output with the node ID.
 echo "Starting 5 nodes on ports 9601-9605 with data under cluster/*/data/."
-echo "To connect to node 5, run: cargo run --release --bin toysql"
+echo "To connect to node 1, run: cargo run --release --bin toysql"
 echo ""
 
 for ID in 1 2 3 4 5; do

@@ -1,7 +1,7 @@
 //! The toyDB server. Takes configuration from a config file (default
 //! config/toydb.yaml) or corresponding TOYDB_ environment variables. Listens
-//! for SQL clients (default port 9605) and Raft connections from other toyDB
-//! peers (default port 9705). The Raft log and SQL database are stored at
+//! for SQL clients (default port 9601) and Raft connections from other toyDB
+//! peers (default port 9701). The Raft log and SQL database are stored at
 //! data/raft and data/sql by default.
 //!
 //! Use the toysql command-line client to connect to the server.
@@ -63,8 +63,8 @@ impl Config {
     fn load(file: &str) -> Result<Self> {
         Ok(config::Config::builder()
             .set_default("id", "1")?
-            .set_default("listen_sql", "localhost:9605")?
-            .set_default("listen_raft", "localhost:9705")?
+            .set_default("listen_sql", "localhost:9601")?
+            .set_default("listen_raft", "localhost:9701")?
             .set_default("log_level", "info")?
             .set_default("data_dir", "data")?
             .set_default("storage_raft", "bitcask")?

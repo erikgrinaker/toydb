@@ -635,7 +635,7 @@ Finally, the root `ResultSet` is returned to the client.
 
 The toyDB [`Server`](https://github.com/erikgrinaker/toydb/blob/master/src/server.rs) manages 
 network traffic for the Raft and SQL engines, using the [Tokio](https://tokio.rs) async executor. 
-It opens TCP listeners on port `9605` for SQL clients and  `9705` for Raft peers, both using 
+It opens TCP listeners on port `9601` for SQL clients and  `9701` for Raft peers, both using 
 length-prefixed [Bincode](https://github.com/servo/bincode)-encoded message passing via
 [Serde](https://serde.rs)-encoded Tokio streams as a protocol.
 

@@ -1,5 +1,5 @@
 //! toySQL is a command-line client for toyDB. It connects to a toyDB node
-//! (default localhost:9605) and executes SQL statements against it via an
+//! (default localhost:9601) and executes SQL statements against it via an
 //! interactive shell interface. Command history is stored in .toysql.history.
 
 #![warn(clippy::all)]
@@ -37,7 +37,7 @@ struct Command {
     #[arg(short = 'H', long, default_value = "localhost")]
     host: String,
     /// Port number to connect to.
-    #[arg(short = 'p', long, default_value = "9605")]
+    #[arg(short = 'p', long, default_value = "9601")]
     port: u16,
 }
 

@@ -63,7 +63,7 @@ struct Runner {
         short = 'H',
         long,
         value_delimiter = ',',
-        default_value = "localhost:9605,localhost:9604,localhost:9603,localhost:9602,localhost:9601"
+        default_value = "localhost:9601,localhost:9602,localhost:9603,localhost:9604,localhost:9605"
     )]
     hosts: Vec<String>,
 

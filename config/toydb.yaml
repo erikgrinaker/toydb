@@ -4,8 +4,8 @@ id: 1
 peers: {}
 
 # Addresses to listen for SQL and Raft connections on.
-listen_sql: localhost:9605
-listen_raft: localhost:9705
+listen_sql: localhost:9601
+listen_raft: localhost:9701
 
 # The log level. Valid values are DEBUG, INFO, WARN, and ERROR.
 log_level: INFO

@@ -49,7 +49,7 @@ cluster can be built and started as:
 ```
 $ ./cluster/run.sh
 Starting 5 nodes on ports 9601-9605 with data under cluster/*/data/.
-To connect to node 5, run: cargo run --release --bin toysql
+To connect to node 1, run: cargo run --release --bin toysql
 
 toydb4 21:03:55 [INFO] Listening on [::1]:9604 (SQL) and [::1]:9704 (Raft)
 toydb1 21:03:55 [INFO] Listening on [::1]:9601 (SQL) and [::1]:9701 (Raft)
@@ -61,11 +61,11 @@ toydb2 21:03:56 [INFO] Starting new election for term 1
 toydb2 21:03:56 [INFO] Won election for term 1, becoming leader
 ```
 
-A command-line client can be built and used with node 5 on `localhost:9605`:
+A command-line client can be built and used with node 1 on `localhost:9601`:
 
 ```
 $ cargo run --release --bin toysql
-Connected to toyDB node n5. Enter !help for instructions.
+Connected to toyDB node n1. Enter !help for instructions.
 toydb> CREATE TABLE movies (id INTEGER PRIMARY KEY, title VARCHAR NOT NULL);
 toydb> INSERT INTO movies VALUES (1, 'Sicario'), (2, 'Stalker'), (3, 'Her');
 toydb> SELECT * FROM movies;
