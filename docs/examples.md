@@ -20,7 +20,7 @@ To start a five-node cluster on the local machine (requires a working
 [Rust compiler](https://www.rust-lang.org/tools/install)), run:
 
 ```
-$ (cd clusters && ./run.sh)
+$ ./cluster/run.rs
 toydb2 19:06:28 [ INFO] Listening on 0.0.0.0:9602 (SQL) and 0.0.0.0:9702 (Raft)
 toydb2 19:06:28 [ERROR] Failed connecting to Raft peer 127.0.0.1:9705: Connection refused
 toydb5 19:06:28 [ INFO] Listening on 0.0.0.0:9605 (SQL) and 0.0.0.0:9705 (Raft)
@@ -34,7 +34,7 @@ In a separate terminal, start a `toysql` client and check the server status:
 
 ```
 $ cargo run --release --bin toysql
-Connected to toyDB node "toydb-e". Enter !help for instructions.
+Connected to toyDB node "toydb-a". Enter !help for instructions.
 toydb> !status
 
 Server:    5 (leader 4 in term 1 with 5 nodes)

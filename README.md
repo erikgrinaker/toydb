@@ -1,7 +1,5 @@
 # <a><img src="./docs/images/toydb.svg" height="40" valign="top" /></a> toyDB
 
-[![CI](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml/badge.svg)](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml)
-
 Distributed SQL database in Rust, built from scratch as an educational project. Main features:
 
 * [Raft distributed consensus engine][raft] for linearizable state machine replication.
@@ -18,9 +16,9 @@ Distributed SQL database in Rust, built from scratch as an educational project. 
 I originally wrote toyDB in 2020 to learn more about database internals. Since then, I've spent
 several years building real distributed SQL databases at
 [CockroachDB](https://github.com/cockroachdb/cockroach) and
-[Neon](https://github.com/neondatabase/neon), and learnt a lot more. With this experience, I've
-rewritten toyDB as a simple illustration of the concepts and architecture behind distributed SQL
-databases.
+[Neon](https://github.com/neondatabase/neon), where I learnt a lot more. Based on this experience,
+I've rewritten toyDB as a simple illustration of the architecture and concepts behind distributed
+SQL databases.
 
 toyDB is intended to be simple and understandable, and also functional and correct. Other aspects
 like performance, scalability, and availability are non-goals -- these are major sources of
@@ -32,19 +30,19 @@ been taken where possible.
 [storage]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/engine.rs
 [bitcask]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/bitcask.rs
 [memory]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/memory.rs
-[query]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/execution/execute.rs
+[query]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/execution/executor.rs
 [optimizer]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/planner/optimizer.rs
 [sql]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/mod.rs
 
 ## Documentation
 
-* [Architecture guide](docs/architecture.md): overview of toyDB's architecture and implementation.
+* [Architecture guide](docs/architecture.md): a guided tour of toyDB's code and architecture.
 
 * [SQL examples](docs/examples.md): walkthrough of toyDB's SQL features.
 
-* [SQL reference](docs/sql.md): toyDB SQL reference documentation.
+* [SQL reference](docs/sql.md): toyDB's SQL reference documentation.
 
-* [References](docs/references.md): books and other materials used while building toyDB.
+* [References](docs/references.md): research material used while building toyDB.
 
 ## Usage
 
@@ -176,15 +174,11 @@ significantly improves write performance.
 
 ## Debugging
 
-[VSCode](https://code.visualstudio.com) provides an intuitive environment for debugging toyDB.
-The debug configuration is included under `.vscode/launch.json`, to use it:
+[VSCode](https://code.visualstudio.com) and the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb)
+extension can be used to debug toyDB, with the debug configuration under `.vscode/launch.json`.
 
-1. Install the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb)
-   extension.
-
-2. Go to the "Run and Debug" tab and select e.g. "Debug unit tests in library 'toydb'".
-
-3. To debug the binary, select "Debug executable 'toydb'" under "Run and Debug".
+Under the "Run and Debug" tag, select e.g. "Debug executable 'toydb'" or "Debug unit tests in
+library 'toydb'".
 
 ## Credits
 
