@@ -80,7 +80,7 @@ will be discussed separately in the [SQL section](#sql-engine).
 
 A key/value storage engine stores arbitrary key/value pairs as binary byte slices, and implements
 the
-[`storage::Engine`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/engine.rs) 
+[`storage::Engine`](https://github.com/erikgrinaker/toydb/blob/main/src/storage/engine.rs) 
 trait:
 
 ```rust
@@ -125,7 +125,7 @@ SQL table scans) and has a couple of important implications:
 * Keys should use an order-preserving byte encoding, to allow range scans.
 
 The engine itself does not care what keys contain, but the storage module offers
-an order-preserving key encoding called [KeyCode](https://github.com/erikgrinaker/toydb/blob/master/src/encoding/keycode.rs)
+an order-preserving key encoding called [KeyCode](https://github.com/erikgrinaker/toydb/blob/main/src/encoding/keycode.rs)
 for use by higher layers. These storage layers often use composite keys made up
 of several possibly variable-length values (e.g. an index key consists of table,
 column, and value), and the natural ordering of each segment must be preserved,
@@ -147,7 +147,7 @@ Additionally, several container types are supported:
 * Value: like enum.
 
 The default key/value engine is
-[`storage::BitCask`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/bitcask.rs),
+[`storage::BitCask`](https://github.com/erikgrinaker/toydb/blob/main/src/storage/bitcask.rs),
 a very simple variant of Bitcask, an append-only log-structured storage engine.
 All writes are appended to a log file, with an index mapping live keys to file
 positions maintained in memory.  When the amount of garbage (replaced or deleted
@@ -175,7 +175,7 @@ is a relatively simple concurrency control mechanism that provides
 having writes block reads. It also versions all data, allowing querying of historical data.
 
 toyDB implements MVCC at the storage layer as
-[`storage::mvcc::MVCC`](https://github.com/erikgrinaker/toydb/blob/master/src/storage/mvcc.rs),
+[`storage::mvcc::MVCC`](https://github.com/erikgrinaker/toydb/blob/main/src/storage/mvcc.rs),
 using any `storage::Engine` implementation for underlying storage. `begin` returns a new
 transaction, which provides the usual key/value operations such as `get`, `set`, and `scan`.
 Additionally, it has a `commit` method which persists the changes and makes them visible to
@@ -235,22 +235,22 @@ The Raft consensus protocol is explained well in the
 [original Raft paper](https://raft.github.io/raft.pdf), and will not be repeated here - refer to
 it for details. toyDB's implementation follows the paper fairly closely.
 
-The Raft node [`raft::Node`](https://github.com/erikgrinaker/toydb/tree/master/src/raft/node.rs) is
+The Raft node [`raft::Node`](https://github.com/erikgrinaker/toydb/tree/main/src/raft/node.rs) is
 the core of the implementation, a finite state machine with enum variants for the node roles:
 leader, follower, and candidate. This enum wraps the `RawNode` struct, which contains common
 node functionality and is generic over the specific roles `Leader`, `Follower`, and `Candidate`
 that implement the Raft protocol.
 
 Nodes are initialized with an ID and a list of peer IDs, and communicate by passing
-[`raft::Message`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/message.rs)
+[`raft::Message`](https://github.com/erikgrinaker/toydb/blob/main/src/raft/message.rs)
 messages. Inbound messages are received via `Node.step()` calls, and outbound messages are sent
 via an `mpsc` channel. Nodes also use a logical clock to keep track of e.g. election timeouts
 and heartbeats, and the clock is ticked at regular intervals via `Node.tick()` calls. These
 methods are synchronous and may cause state transitions, e.g. changing a candidate into a leader
 when it receives the winning vote.
 
-Nodes have a command log [`raft::Log`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/log.rs),
-using a `storage::Engine` for storage, and a [`raft::State`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/state.rs)
+Nodes have a command log [`raft::Log`](https://github.com/erikgrinaker/toydb/blob/main/src/raft/log.rs),
+using a `storage::Engine` for storage, and a [`raft::State`](https://github.com/erikgrinaker/toydb/blob/main/src/raft/state.rs)
 state machine (the SQL engine). When the leader receives a write request, it appends the command
 to its local log and replicates it to followers. Once a quorum have replicated it, the command is
 committed and applied to the state machine, and the result returned the the client. When the leader
@@ -294,10 +294,10 @@ storage engine, completing the chain.
 ### Types
 
 toyDB has a very simple type system, with the
-[`sql::DataType`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/types/mod.rs) enum 
+[`sql::DataType`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/types/mod.rs) enum 
 specifying the available data types: `Boolean`, `Integer`, `Float`, and `String`.
 
-The [`sql::Value`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/types/mod.rs) enum 
+The [`sql::Value`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/types/mod.rs) enum 
 represents a specific value using Rust's native type system, e.g. an integer value is 
 `Value::Integer(i64)`. This enum also specifies comparison, ordering, and formatting of values. The 
 special value `Value::Null` represents an unknown value of unknown type, following the rules of
@@ -306,7 +306,7 @@ special value `Value::Null` represents an unknown value of unknown type, followi
 Values can be grouped into a `Row`, which is an alias for `Vec<Value>`. The type `Rows` is an alias
 for a fallible row iterator, and `Column` is a result column containing a name.
 
-Expressions [`sql::Expression`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/types/expression.rs)
+Expressions [`sql::Expression`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/types/expression.rs)
 represent operations on values. For example, `(1 + 2) * 3` is represented as:
 
 ```rust
@@ -323,14 +323,14 @@ Calling `evaluate()` on the expression will recursively evaluate it, returning `
 
 ### Schemas
 
-The schema defines the tables [`sql::Table`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/schema.rs)
-and columns [`sql::Column`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/schema.rs)
+The schema defines the tables [`sql::Table`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/schema.rs)
+and columns [`sql::Column`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/schema.rs)
 in a toyDB database. Tables have a name and a list of columns, while a column has several
 attributes such as name, data type, and various constraints. They also have methods to
 validate rows and values, e.g. to make sure a value is of the correct type for a column
 or to enforce referential integrity.
 
-The schema is stored and managed with [`sql::Catalog`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/schema.rs),
+The schema is stored and managed with [`sql::Catalog`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/schema.rs),
 a trait implemented by the SQL storage engine:
 
 ```rust
@@ -360,7 +360,7 @@ avoids complicated data migration logic, and allows using table/column names as 
 
 ### Storage
 
-The SQL storage engine trait is [`sql::Engine`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/engine/mod.rs):
+The SQL storage engine trait is [`sql::Engine`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/engine/mod.rs):
 
 ```rust
 pub trait Engine: Clone {
@@ -410,11 +410,11 @@ pub trait Transaction: Catalog {
 ```
 
 The main SQL storage engine implementation is
-[`sql::engine::KV`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/engine/kv.rs), which 
+[`sql::engine::KV`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/engine/kv.rs), which 
 is built on top of an MVCC key/value store and its transaction functionality.
 
 The Raft SQL storage engine
-[`sql::engine::Raft`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/engine/raft.rs)
+[`sql::engine::Raft`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/engine/raft.rs)
 uses a Raft API client `raft::Client` to submit state machine commands specified by the enums 
 `Mutation` and `Query` to the local Raft node. It also provides a Raft state machine 
 `sql::engine::raft::State` which wraps a regular `sql::engine::KV` SQL storage engine and applies 
@@ -430,7 +430,7 @@ out of scope for the project.
 
 ### Parsing
 
-The SQL session [`sql::Session`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/engine/mod.rs)
+The SQL session [`sql::Session`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/engine/mod.rs)
 takes plain-text SQL queries via `execute()` and returns the result. The first step in this process 
 is to parse the query into an [abstract syntax tree](https://en.wikipedia.org/wiki/Abstract_syntax_tree)
 (AST) which represents the query semantics. This happens as follows:
@@ -438,7 +438,7 @@ is to parse the query into an [abstract syntax tree](https://en.wikipedia.org/wi
 > SQL → Lexer → Tokens → Parser → AST
 
 The lexer
-[`sql::Lexer`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/parser/lexer.rs) takes
+[`sql::Lexer`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/parser/lexer.rs) takes
 a SQL string, splits it into pieces, and classifies them as tokens `sql::Token`. It does not
 care about the meaning of the tokens, but removes whitespace and tries to figure out if
 something is a number, string, keyword, and so on. It also does some basic pre-processing, such as
@@ -449,7 +449,7 @@ invalid:
 
 > `3.14 +UPDATE 'abc'` → `Token::Number("3.14")` `Token::Plus` `Token::Keyword(Keyword::Update)` `Token::String("abc")`
 
-The parser [`sql::Parser`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/parser/mod.rs)
+The parser [`sql::Parser`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/parser/mod.rs)
 iterates over the tokens generated by the lexer, interprets them, and builds an AST representing
 the semantic query. For example, `SELECT name, 2020 - birthyear AS age FROM people` 
 results in the following AST:
@@ -492,9 +492,9 @@ arguments. The planner will translate this into actual expressions that can be e
 
 ### Planning
 
-The SQL planner [`sql::Planner`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/plan/planner.rs)
+The SQL planner [`sql::Planner`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/plan/planner.rs)
 takes the AST generated by the parser and builds a SQL execution plan
-[`sql::Plan`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/plan/mod.rs), which is an 
+[`sql::Plan`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/plan/mod.rs), which is an 
 abstract representation of the steps necessary to execute the query. For example, the following 
 shows a simple query and corresponding execution plan, formatted as `EXPLAIN` output:
 
@@ -545,7 +545,7 @@ The planner generates a very naïve execution plan, primarily concerned with pro
 is _correct_ but not necessarily _fast_. This means that it will always do full table scans,
 always use [nested loop joins](https://en.wikipedia.org/wiki/Nested_loop_join), and so on. The plan 
 is then optimized by a series of optimizers implementing
-[`sql::Optimizer`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/plan/optimizer.rs):
+[`sql::Optimizer`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/plan/optimizer.rs):
 
 * `ConstantFolder`: pre-evaluates constant expressions to avoid having to re-evaluate them for each 
   row.
@@ -600,7 +600,7 @@ planning.
 ### Execution
 
 Every SQL plan node has a corresponding executor, implementing the
-[`sql::Executor`](https://github.com/erikgrinaker/toydb/blob/master/src/sql/execution/mod.rs) trait:
+[`sql::Executor`](https://github.com/erikgrinaker/toydb/blob/main/src/sql/execution/mod.rs) trait:
 
 ```rust
 pub trait Executor<T: Transaction> {
@@ -633,13 +633,13 @@ Finally, the root `ResultSet` is returned to the client.
 
 ## Server
 
-The toyDB [`Server`](https://github.com/erikgrinaker/toydb/blob/master/src/server.rs) manages 
+The toyDB [`Server`](https://github.com/erikgrinaker/toydb/blob/main/src/server.rs) manages 
 network traffic for the Raft and SQL engines, using the [Tokio](https://tokio.rs) async executor. 
 It opens TCP listeners on port `9601` for SQL clients and  `9701` for Raft peers, both using 
 length-prefixed [Bincode](https://github.com/servo/bincode)-encoded message passing via
 [Serde](https://serde.rs)-encoded Tokio streams as a protocol.
 
-The Raft server is split out to [`raft::Server`](https://github.com/erikgrinaker/toydb/blob/master/src/raft/server.rs),
+The Raft server is split out to [`raft::Server`](https://github.com/erikgrinaker/toydb/blob/main/src/raft/server.rs),
 which runs a main [event loop](https://en.wikipedia.org/wiki/Event_loop) routing Raft messages 
 between the local Raft node, TCP peers, and local state machine clients (i.e. the Raft SQL engine 
 wrapper), as well as ticking the Raft logical clock at regular intervals. It spawns separate Tokio 
@@ -650,7 +650,7 @@ The SQL server spawns a new Tokio task for each SQL client that connects, runnin
 SQL session from the SQL storage engine on top of Raft. It communicates with the client by passing
 `server::Request` and `server::Response` messages that are translated to `sql::Session` calls.
 
-The main [`toydb`](https://github.com/erikgrinaker/toydb/blob/master/src/bin/toydb.rs) binary
+The main [`toydb`](https://github.com/erikgrinaker/toydb/blob/main/src/bin/toydb.rs) binary
 simply initializes a toyDB server based on command-line arguments and configuration files, and then 
 runs it via the Tokio runtime.
 
@@ -661,10 +661,10 @@ out of scope for the project.
 
 ## Client
 
-The toyDB [`Client`](https://github.com/erikgrinaker/toydb/blob/master/src/client.rs) provides a 
+The toyDB [`Client`](https://github.com/erikgrinaker/toydb/blob/main/src/client.rs) provides a 
 simple API for interacting with a server, mainly by executing SQL statements via `execute()` 
 returning `sql::ResultSet`.
 
-The [`toysql`](https://github.com/erikgrinaker/toydb/blob/master/src/bin/toysql.rs) command-line
+The [`toysql`](https://github.com/erikgrinaker/toydb/blob/main/src/bin/toysql.rs) command-line
 client is a simple REPL client that connects to a server using the toyDB `Client` and continually 
 prompts the user for a SQL query to execute, displaying the returned result.

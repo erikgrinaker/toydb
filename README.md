@@ -22,14 +22,14 @@ scalability, and availability are explicit non-goals -- these are major sources 
 production-grade  databases, which obscure the basic underlying concepts. Shortcuts have been taken 
 where possible.
 
-[raft]: https://github.com/erikgrinaker/toydb/blob/master/src/raft/mod.rs
-[txn]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/mvcc.rs
-[storage]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/engine.rs
-[bitcask]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/bitcask.rs
-[memory]: https://github.com/erikgrinaker/toydb/blob/master/src/storage/memory.rs
-[query]: https://github.com/erikgrinaker/toydb/blob/master/src/sql/execution/execute.rs
-[optimizer]: https://github.com/erikgrinaker/toydb/blob/master/src/sql/planner/optimizer.rs
-[sql]: https://github.com/erikgrinaker/toydb/blob/master/src/sql/mod.rs
+[raft]: https://github.com/erikgrinaker/toydb/blob/main/src/raft/mod.rs
+[txn]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/mvcc.rs
+[storage]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/engine.rs
+[bitcask]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/bitcask.rs
+[memory]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/memory.rs
+[query]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/execution/execute.rs
+[optimizer]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/planner/optimizer.rs
+[sql]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/mod.rs
 
 ## Documentation
 
@@ -114,10 +114,10 @@ toyDB mainly uses [Goldenscripts](https://github.com/erikgrinaker/goldenscript) 
 script various scenarios, capture events and output, and later assert that the behavior remains the 
 same. See e.g.:
 
-* [Raft cluster tests](https://github.com/erikgrinaker/toydb/tree/master/src/raft/testscripts/node)
-* [MVCC transaction tests](https://github.com/erikgrinaker/toydb/tree/master/src/storage/testscripts/mvcc)
-* [SQL execution tests](https://github.com/erikgrinaker/toydb/tree/master/src/sql/testscripts)
-* [End-to-end tests](https://github.com/erikgrinaker/toydb/tree/master/tests/scripts)
+* [Raft cluster tests](https://github.com/erikgrinaker/toydb/tree/main/src/raft/testscripts/node)
+* [MVCC transaction tests](https://github.com/erikgrinaker/toydb/tree/main/src/storage/testscripts/mvcc)
+* [SQL execution tests](https://github.com/erikgrinaker/toydb/tree/main/src/sql/testscripts)
+* [End-to-end tests](https://github.com/erikgrinaker/toydb/tree/main/tests/scripts)
 
 Run tests with `cargo test`, or have a look at the latest 
 [CI run](https://github.com/erikgrinaker/toydb/actions/workflows/ci.yml).
