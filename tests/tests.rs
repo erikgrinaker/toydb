@@ -9,29 +9,34 @@
 
 mod testcluster;
 
-use itertools::Itertools as _;
+use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::Write as _;
-use std::{collections::HashMap, error::Error};
+use std::path::Path;
+use std::sync::{LazyLock, Mutex};
+
+use itertools::Itertools as _;
 use test_each_file::test_each_path;
+
 use testcluster::TestCluster;
 use toydb::{Client, StatementResult};
 
 // Run goldenscript tests in tests/scripts.
 test_each_path! { in "tests/scripts" => test_goldenscript }
 
-fn test_goldenscript(path: &std::path::Path) {
+fn test_goldenscript(path: &Path) {
     // We can't run tests concurrently, because the test clusters end up using
-    // the same ports (and we don't want to run a ton of them). We can't use the
-    // #[serial] macro either, since it doesn't work with test_each_path. Just
-    // use a mutex to serialize them, and ignore any poisoning.
-    static MUTEX: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-    let mutex = MUTEX.get_or_init(|| std::sync::Mutex::new(()));
-    let _guard = mutex.lock().unwrap_or_else(|error| error.into_inner());
+    // the same ports. We also don't want to run a bunch of them concurrently.
+    // We can't use the #[serial_test] macro either, since it doesn't work with
+    // test_each_path. Just use a mutex to serialize them.
+    static MUTEX: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
+    let _guard = MUTEX.lock().ok(); // ignore poisoning
 
     goldenscript::run(&mut Runner::new(), path).expect("goldenscript failed")
 }
 
 /// Runs Raft goldenscript tests. See run() for available commands.
+#[derive(Default)]
 struct Runner {
     cluster: Option<TestCluster>,
     clients: HashMap<String, Client>,
@@ -39,7 +44,7 @@ struct Runner {
 
 impl Runner {
     fn new() -> Self {
-        Self { cluster: None, clients: HashMap::new() }
+        Self::default()
     }
 
     /// Fetches a client for the given prefix, or creates a new one.
