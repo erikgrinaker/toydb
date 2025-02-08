@@ -7,7 +7,7 @@ pub mod bincode;
 pub mod format;
 pub mod keycode;
 
-use std::cmp::Ord;
+use std::cmp::{Eq, Ord};
 use std::collections::{BTreeSet, HashSet};
 use std::hash::Hash;
 use std::io::{Read, Write};
@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 
-/// Adds automatic Keycode encode/decode methods to key enums. These are
-/// primarily meant for keys stored in key/value storage engines.
+/// Adds automatic Keycode encode/decode methods to key enums. These are used
+/// as keys in the key/value store.
 pub trait Key<'de>: Serialize + Deserialize<'de> {
     /// Decodes a key from a byte slice using Keycode.
     fn decode(bytes: &'de [u8]) -> Result<Self> {
@@ -72,5 +72,5 @@ impl<V: Value> Value for Option<V> {}
 impl<V: Value> Value for Result<V> {}
 impl<V: Value> Value for Vec<V> {}
 impl<V1: Value, V2: Value> Value for (V1, V2) {}
-impl<V: Value + std::cmp::Eq + Hash> Value for HashSet<V> {}
-impl<V: Value + std::cmp::Eq + Ord + Hash> Value for BTreeSet<V> {}
+impl<V: Value + Eq + Hash> Value for HashSet<V> {}
+impl<V: Value + Eq + Ord + Hash> Value for BTreeSet<V> {}

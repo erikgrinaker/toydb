@@ -22,7 +22,7 @@
 //! * Enum: the variant's index as [`u8`], then the content sequence.
 //! * [`crate::sql::types::Value`]: like any other enum.
 //!
-//! The canonical key reprentation is an enum. For example:
+//! The canonical key representation is an enum. For example:
 //!
 //! ```
 //! #[derive(Debug, Deserialize, Serialize)]
@@ -33,8 +33,8 @@
 //! }
 //! ```
 //!
-//! Unfortunately, byte vectors and slices such as `Vec<u8>` must be wrapped
-//! with [`serde_bytes::ByteBuf`] or use the `#[serde(with="serde_bytes")]`
+//! Unfortunately, byte strings such as `Vec<u8>` must be wrapped with
+//! [`serde_bytes::ByteBuf`] or use the `#[serde(with="serde_bytes")]`
 //! attribute. See <https://github.com/serde-rs/bytes>.
 
 use std::ops::Bound;
@@ -191,14 +191,11 @@ impl serde::ser::Serializer for &mut Serializer {
     // Byte slices are terminated by 0x0000, escaping 0x00 as 0x00ff.
     // Prefix-length encoding can't be used, since it violates ordering.
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        self.output.extend(
-            v.iter()
-                .flat_map(|b| match b {
-                    0x00 => vec![0x00, 0xff],
-                    b => vec![*b],
-                })
-                .chain([0x00, 0x00]),
-        );
+        let b = v
+            .iter()
+            .flat_map(|&b| if b == 0x00 { vec![0x00, 0xff] } else { vec![b] })
+            .chain([0x00, 0x00]);
+        self.output.extend(b);
         Ok(())
     }
 
@@ -220,7 +217,7 @@ impl serde::ser::Serializer for &mut Serializer {
 
     /// Enum variants are serialized using their index, as a single byte.
     fn serialize_unit_variant(self, _: &'static str, index: u32, _: &'static str) -> Result<()> {
-        self.output.push(u8::try_from(index)?);
+        self.output.push(index.try_into()?);
         Ok(())
     }
 

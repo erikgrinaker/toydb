@@ -663,7 +663,9 @@ impl<E: Engine> ScanIterator<E> {
         if self.buffer.len() >= Self::BUFFER_SIZE {
             return Ok(());
         }
-        let Some(range) = self.remainder.take() else { return Ok(()) };
+        let Some(range) = self.remainder.take() else {
+            return Ok(());
+        };
         let range_end = range.1.clone();
 
         let mut engine = self.engine.lock()?;

@@ -304,7 +304,9 @@ impl TryFrom<Value> for bool {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self> {
-        let Value::Boolean(b) = value else { return errdata!("not a boolean: {value}") };
+        let Value::Boolean(b) = value else {
+            return errdata!("not a boolean: {value}");
+        };
         Ok(b)
     }
 }
@@ -313,7 +315,9 @@ impl TryFrom<Value> for f64 {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self> {
-        let Value::Float(f) = value else { return errdata!("not a float: {value}") };
+        let Value::Float(f) = value else {
+            return errdata!("not a float: {value}");
+        };
         Ok(f)
     }
 }
@@ -322,7 +326,9 @@ impl TryFrom<Value> for i64 {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self> {
-        let Value::Integer(i) = value else { return errdata!("not an integer: {value}") };
+        let Value::Integer(i) = value else {
+            return errdata!("not an integer: {value}");
+        };
         Ok(i)
     }
 }
@@ -331,7 +337,9 @@ impl TryFrom<Value> for String {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self> {
-        let Value::String(s) = value else { return errdata!("not a string: {value}") };
+        let Value::String(s) = value else {
+            return errdata!("not a string: {value}");
+        };
         Ok(s)
     }
 }

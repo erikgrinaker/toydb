@@ -356,7 +356,9 @@ impl Expression {
         use Expression::*;
         let xform = |expr| {
             // We can't use a single match, since it needs deref patterns.
-            let Or(lhs, rhs) = expr else { return expr };
+            let Or(lhs, rhs) = expr else {
+                return expr;
+            };
             match (*lhs, *rhs) {
                 // (x AND y) OR z → (x OR z) AND (y OR z)
                 (And(l, r), rhs) => And(Or(l, rhs.clone().into()).into(), Or(r, rhs.into()).into()),
@@ -376,7 +378,9 @@ impl Expression {
     pub fn into_nnf(self) -> Self {
         use Expression::*;
         let xform = |expr| {
-            let Not(inner) = expr else { return expr };
+            let Not(inner) = expr else {
+                return expr;
+            };
             match *inner {
                 // NOT (x AND y) → (NOT x) OR (NOT y)
                 And(lhs, rhs) => Or(Not(lhs).into(), Not(rhs).into()),

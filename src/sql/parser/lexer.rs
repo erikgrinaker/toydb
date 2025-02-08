@@ -489,6 +489,8 @@ impl<'a> Lexer<'a> {
 /// Returns true if the entire given string is a single valid identifier.
 pub fn is_ident(ident: &str) -> bool {
     let mut lexer = Lexer::new(ident);
-    let Some(Ok(Token::Ident(_))) = lexer.next() else { return false };
+    let Some(Ok(Token::Ident(_))) = lexer.next() else {
+        return false;
+    };
     lexer.next().is_none() // if further tokens, it's not a lone identifier
 }

@@ -103,7 +103,9 @@ pub fn push_filters(node: Node) -> Result<Node> {
 
     /// Pushes down a filter node if possible.
     fn push_filter(node: Node) -> Node {
-        let Node::Filter { mut source, predicate } = node else { return node };
+        let Node::Filter { mut source, predicate } = node else {
+            return node;
+        };
         // Attempt to push the filter into the source.
         if let Some(predicate) = push_into(predicate, &mut source) {
             // Push failed, return the original filter node.
@@ -224,7 +226,9 @@ pub fn index_lookup(node: Node) -> Result<Node> {
     let transform = |mut node| {
         // Only handle scan filters. filter_pushdown() must have pushed filters
         // into scan nodes first.
-        let Node::Scan { table, alias, filter: Some(filter) } = node else { return node };
+        let Node::Scan { table, alias, filter: Some(filter) } = node else {
+            return node;
+        };
 
         // Convert the filter into conjunctive normal form (a list of ANDs).
         let mut cnf = filter.clone().into_cnf_vec();

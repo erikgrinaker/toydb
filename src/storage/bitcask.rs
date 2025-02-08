@@ -135,7 +135,9 @@ impl Engine for BitCask {
     }
 
     fn get(&mut self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        let Some(location) = self.keydir.get(key) else { return Ok(None) };
+        let Some(location) = self.keydir.get(key) else {
+            return Ok(None);
+        };
         self.log.read_value(*location).map(Some)
     }
 

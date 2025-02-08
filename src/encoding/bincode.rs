@@ -34,14 +34,14 @@ pub fn deserialize_from<R: Read, T: DeserializeOwned>(reader: R) -> Result<T> {
 /// reader is closed.
 pub fn maybe_deserialize_from<R: Read, T: DeserializeOwned>(reader: R) -> Result<Option<T>> {
     match BINCODE.deserialize_from(reader) {
-        Ok(v) => Ok(Some(v)),
-        Err(e) => match *e {
-            bincode::ErrorKind::Io(e) => match e.kind() {
+        Ok(t) => Ok(Some(t)),
+        Err(err) => match *err {
+            bincode::ErrorKind::Io(err) => match err.kind() {
                 std::io::ErrorKind::UnexpectedEof => Ok(None),
                 std::io::ErrorKind::ConnectionReset => Ok(None),
-                _ => Err(Error::from(e)),
+                _ => Err(Error::from(err)),
             },
-            _ => Err(Error::from(e)),
+            _ => Err(Error::from(err)),
         },
     }
 }
