@@ -614,7 +614,6 @@ impl<E: Engine> Transaction<E> {
 ///
 /// This does not implement DoubleEndedIterator (reverse scans), since the SQL
 /// layer doesn't currently need it.
-#[allow(clippy::type_complexity)]
 pub struct ScanIterator<E: Engine> {
     /// The engine.
     engine: Arc<Mutex<E>>,
@@ -721,7 +720,6 @@ impl<'a, I: engine::ScanIterator> VersionIterator<'a, I> {
     }
 
     // Fallible next(). Returns the next visible key/version/value tuple.
-    #[allow(clippy::type_complexity)]
     fn try_next(&mut self) -> Result<Option<(Vec<u8>, Version, Vec<u8>)>> {
         while let Some((key, value)) = self.inner.next().transpose()? {
             let Key::Version(key, version) = Key::decode(&key)? else {
