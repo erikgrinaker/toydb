@@ -628,9 +628,9 @@ pub struct ScanIterator<E: Engine> {
     remainder: Option<(Bound<Vec<u8>>, Bound<Vec<u8>>)>,
 }
 
-/// Implement Clone manually. derive(Clone) isn't smart enough to figure out
-/// that we don't need Engine: Clone when it's in an Arc. See:
-/// https://github.com/rust-lang/rust/issues/26925.
+/// Implement [`Clone`] manually. `derive(Clone)` isn't smart enough to figure
+/// out that we don't need `Engine: Clone` when it's in an [`Arc`]. See:
+/// <https://github.com/rust-lang/rust/issues/26925>.
 impl<E: Engine> Clone for ScanIterator<E> {
     fn clone(&self) -> Self {
         Self {

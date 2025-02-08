@@ -23,3 +23,6 @@ jobs:
     - run: cargo test
     - run: cargo clippy --tests --no-deps -- -D warnings
     - run: cargo fmt --check
+    - run: cargo doc --no-deps 
+      env:
+        RUSTDOCFLAGS: -D warnings

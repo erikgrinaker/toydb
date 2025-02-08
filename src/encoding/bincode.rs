@@ -1,12 +1,12 @@
 //! Bincode is used to encode values, both in key/value stores and the toyDB
 //! network protocol. It is a Rust-specific encoding that depends on the
 //! internal data structures being stable, but it's sufficient for toyDB. See:
-//! https://github.com/bincode-org/bincode
+//! <https://github.com/bincode-org/bincode>
 //!
-//! This module wraps the standard bincode crate to change the default options,
-//! in particular to use variable-length rather than fixed-length integers.
-//! Confusingly, upstream bincode::(de)serialize uses different options (fixed)
-//! than DefaultOptions (variable) -- this module always uses DefaultOptions.
+//! This module wraps the standard [`bincode`] crate to change the default
+//! options. In particular, this uses variable-length rather than fixed-length
+//! integer encoding. Confusingly, upstream [`bincode::serialize`] uses
+//! different options than [`bincode::DefaultOptions`].
 
 use std::io::{Read, Write};
 use std::sync::LazyLock;
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-/// Default Bincode options. Unlike e.g. `bincode::serialize()`, this uses varint encoding.
+/// Use default Bincode options, unlike [`bincode::serialize`] (weirdly).
 static BINCODE: LazyLock<bincode::DefaultOptions> = LazyLock::new(bincode::DefaultOptions::new);
 
 /// Deserializes a value using Bincode.

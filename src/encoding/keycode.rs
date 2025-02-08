@@ -4,7 +4,7 @@
 //!
 //! Ordering is important because it allows limited scans across specific parts
 //! of the keyspace, e.g. scanning an individual table or using an index range
-//! predicate like WHERE id < 100. It also avoids sorting in some cases where
+//! predicate like `WHERE id < 100`. It also avoids sorting in some cases where
 //! the keys are already in the desired order, e.g. in the Raft log.
 //!
 //! The encoding is not self-describing: the caller must provide a concrete type
@@ -12,24 +12,17 @@
 //!
 //! KeyCode supports a subset of primitive data types, encoded as follows:
 //!
-//! bool:    0x00 for false, 0x01 for true.
-//! u64:     Big-endian binary representation.
-//! i64:     Big-endian binary representation, with sign bit flipped.
-//! f64:     Big-endian binary representation, with sign bit flipped, and rest if negative.
-//! Vec<u8>: 0x00 is escaped as 0x00ff, terminated with 0x0000.
-//! String:  Like Vec<u8>.
+//! * [`bool`]: `0x00` for `false`, `0x01` for `true`.
+//! * [`u64`]: big-endian binary representation.
+//! * [`i64`]: big-endian binary, sign bit flipped.
+//! * [`f64`]: big-endian binary, sign bit flipped, all flipped if negative.
+//! * [`Vec<u8>`]: `0x00` escaped as `0x00ff`, terminated with `0x0000`.
+//! * [`String`]: like [`Vec<u8>`].
+//! * Sequences: concatenation of contained elements, with no other structure.
+//! * Enum: the variant's index as [`u8`], then the content sequence.
+//! * [`crate::sql::types::Value`]: like any other enum.
 //!
-//! Additionally, several container types are supported:
-//!
-//! Tuple:  Concatenation of elements, with no surrounding structure.
-//! Array:  Like tuple.
-//! Vec:    Like tuple.
-//! Enum:   The variant's enum index as a single u8 byte.
-//!
-//! SQL Value enums are encoded according to the above scheme, i.e. a single
-//! byte identifying the enum variant by index, then the primitive value.
-//!
-//! The canonical key reprentation is an enum -- for example:
+//! The canonical key reprentation is an enum. For example:
 //!
 //! ```
 //! #[derive(Debug, Deserialize, Serialize)]
@@ -40,9 +33,9 @@
 //! }
 //! ```
 //!
-//! Unfortunately, byte vectors and slices such as Vec<u8> must be wrapped with
-//! serde_bytes::ByteBuf or use the #[serde(with="serde_bytes")] attribute. See
-//! https://github.com/serde-rs/bytes
+//! Unfortunately, byte vectors and slices such as `Vec<u8>` must be wrapped
+//! with [`serde_bytes::ByteBuf`] or use the `#[serde(with="serde_bytes")]`
+//! attribute. See <https://github.com/serde-rs/bytes>.
 
 use std::ops::Bound;
 
