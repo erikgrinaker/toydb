@@ -39,6 +39,7 @@
 
 use std::ops::Bound;
 
+use itertools::Either;
 use serde::de::{
     Deserialize, DeserializeSeed, EnumAccess, IntoDeserializer as _, SeqAccess, VariantAccess,
     Visitor,
@@ -127,7 +128,7 @@ impl serde::ser::Serializer for &mut Serializer {
         unimplemented!()
     }
 
-    /// i64 uses the big-endian two's completement encoding, but flips the
+    /// i64 uses the big-endian two's complement encoding, but flips the
     /// left-most sign bit such that negative numbers are ordered before
     /// positive numbers.
     ///
@@ -163,16 +164,15 @@ impl serde::ser::Serializer for &mut Serializer {
         unimplemented!()
     }
 
-    /// f64 is encoded in big-endian form, but it flips the sign bit to order
-    /// positive numbers after negative numbers, and also flips all other bits
-    /// for negative numbers to order them from smallest to greatest. NaN is
+    /// f64 is encoded in big-endian IEEE 754 form, but it flips the sign bit to
+    /// order positive numbers after negative numbers, and also flips all other
+    /// bits for negative numbers to order them from smallest to largest. NaN is
     /// ordered at the end.
     fn serialize_f64(self, v: f64) -> Result<()> {
         let mut bytes = v.to_be_bytes();
-        if bytes[0] & 1 << 7 == 0 {
-            bytes[0] ^= 1 << 7; // positive, flip sign bit
-        } else {
-            bytes.iter_mut().for_each(|b| *b = !*b); // negative, flip all bits
+        match v.is_sign_negative() {
+            false => bytes[0] ^= 1 << 7, // positive, flip sign bit
+            true => bytes.iter_mut().for_each(|b| *b = !*b), // negative, flip all bits
         }
         self.output.extend(bytes);
         Ok(())
@@ -187,14 +187,20 @@ impl serde::ser::Serializer for &mut Serializer {
         self.serialize_bytes(v.as_bytes())
     }
 
-    // Byte slices are terminated by 0x0000, escaping 0x00 as 0x00ff.
-    // Prefix-length encoding can't be used, since it violates ordering.
+    // Byte slices are terminated by 0x0000, escaping 0x00 as 0x00ff. This
+    // ensures that we can detect the end, and that for two overlapping slices,
+    // the shorter one orders before the longer one.
+    //
+    // We can't use e.g. length prefix encoding, since it doesn't sort correctly.
     fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        let b = v
+        let bytes = v
             .iter()
-            .flat_map(|&b| if b == 0x00 { vec![0x00, 0xff] } else { vec![b] })
+            .flat_map(|&byte| match byte {
+                0x00 => Either::Left([0x00, 0xff].into_iter()),
+                byte => Either::Right([byte].into_iter()),
+            })
             .chain([0x00, 0x00]);
-        self.output.extend(b);
+        self.output.extend(bytes);
         Ok(())
     }
 
@@ -354,9 +360,6 @@ impl<'de> Deserializer<'de> {
 
     /// Decodes and chops off the next encoded byte slice.
     fn decode_next_bytes(&mut self) -> Result<Vec<u8>> {
-        // We can't easily share state between Iterator.scan() and
-        // Iterator.filter() when processing escape sequences, so use a
-        // straightforward loop.
         let mut decoded = Vec::new();
         let mut iter = self.input.iter().enumerate();
         let taken = loop {
@@ -387,7 +390,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         visitor.visit_bool(match self.take_bytes(1)?[0] {
             0x00 => false,
             0x01 => true,
-            b => return errdata!("Invalid boolean value {b:?}"),
+            b => return errdata!("invalid boolean value {b}"),
         })
     }
 
@@ -431,10 +434,10 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 
     fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         let mut bytes = self.take_bytes(8)?.to_vec();
-        if bytes[0] >> 7 & 1 == 1 {
-            bytes[0] ^= 1 << 7; // positive, flip sign bit
-        } else {
-            bytes.iter_mut().for_each(|b| *b = !*b); // negative, flip all bits
+        match bytes[0] >> 7 {
+            0 => bytes.iter_mut().for_each(|b| *b = !*b), // negative, flip all bits
+            1 => bytes[0] ^= 1 << 7,                      // positive, flip sign bit
+            _ => panic!("bits can only be 0 or 1"),
         }
         visitor.visit_f64(f64::from_be_bytes(bytes.as_slice().try_into()?))
     }
