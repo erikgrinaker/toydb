@@ -37,8 +37,8 @@ pub trait Key<'de>: Serialize + Deserialize<'de> {
 }
 
 /// Adds automatic Bincode encode/decode methods to value types. These are used
-/// not only for values in key/value storage engines, but also for e.g. network
-/// protocol messages and other values.
+/// for values in key/value storage engines, and also for e.g. network protocol
+/// messages and other values.
 pub trait Value: Serialize + DeserializeOwned {
     /// Decodes a value from a byte slice using Bincode.
     fn decode(bytes: &[u8]) -> Result<Self> {

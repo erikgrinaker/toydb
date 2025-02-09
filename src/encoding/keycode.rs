@@ -1,6 +1,6 @@
 //! Keycode is a lexicographical order-preserving binary encoding for use with
-//! keys. It is designed for simplicity, not efficiency (i.e. it does not use
-//! varints or other compression methods).
+//! keys in key/value stores. It is designed for simplicity, not efficiency
+//! (i.e. it does not use varints or other compression methods).
 //!
 //! Ordering is important because it allows limited scans across specific parts
 //! of the keyspace, e.g. scanning an individual table or using an index range
@@ -56,9 +56,8 @@ use crate::error::{Error, Result};
 /// keep it simple.
 pub fn serialize<T: Serialize>(key: &T) -> Vec<u8> {
     let mut serializer = Serializer { output: Vec::new() };
-    // Panic on serialization failures, as this is typically an issue with the
-    // provided data structure.
-    key.serialize(&mut serializer).expect("keycode serialization failed");
+    // Panic on failure, as this is a problem with the data structure.
+    key.serialize(&mut serializer).expect("key must be serializable");
     serializer.output
 }
 
@@ -84,7 +83,7 @@ pub fn deserialize<'a, T: Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
 /// prefixes after it.
 pub fn prefix_range(prefix: &[u8]) -> (Bound<Vec<u8>>, Bound<Vec<u8>>) {
     let start = Bound::Included(prefix.to_vec());
-    let end = match prefix.iter().rposition(|b| *b != 0xff) {
+    let end = match prefix.iter().rposition(|&b| b != 0xff) {
         Some(i) => Bound::Excluded(
             prefix.iter().take(i).copied().chain(std::iter::once(prefix[i] + 1)).collect(),
         ),

@@ -23,7 +23,7 @@ static BINCODE: LazyLock<bincode::DefaultOptions> = LazyLock::new(bincode::Defau
 /// Serializes a value using Bincode.
 pub fn serialize<T: Serialize>(value: &T) -> Vec<u8> {
     // Panic on failure, as this is a problem with the data structure.
-    BINCODE.serialize(value).expect("bincode serialization failed")
+    BINCODE.serialize(value).expect("value must be serializable")
 }
 
 /// Deserializes a value using Bincode.
