@@ -20,9 +20,20 @@ use crate::error::{Error, Result};
 /// Use default Bincode options, unlike [`bincode::serialize`] (weirdly).
 static BINCODE: LazyLock<bincode::DefaultOptions> = LazyLock::new(bincode::DefaultOptions::new);
 
+/// Serializes a value using Bincode.
+pub fn serialize<T: Serialize>(value: &T) -> Vec<u8> {
+    // Panic on failure, as this is a problem with the data structure.
+    BINCODE.serialize(value).expect("bincode serialization failed")
+}
+
 /// Deserializes a value using Bincode.
 pub fn deserialize<'de, T: Deserialize<'de>>(bytes: &'de [u8]) -> Result<T> {
     Ok(BINCODE.deserialize(bytes)?)
+}
+
+/// Serializes a value to a writer using Bincode.
+pub fn serialize_into<W: Write, T: Serialize>(writer: W, value: &T) -> Result<()> {
+    Ok(BINCODE.serialize_into(writer, value)?)
 }
 
 /// Deserializes a value from a reader using Bincode.
@@ -44,16 +55,4 @@ pub fn maybe_deserialize_from<R: Read, T: DeserializeOwned>(reader: R) -> Result
             _ => Err(Error::from(err)),
         },
     }
-}
-
-/// Serializes a value using Bincode.
-pub fn serialize<T: Serialize>(value: &T) -> Vec<u8> {
-    // Panic on serialization failures, as this is typically an issue with the
-    // provided data structure.
-    BINCODE.serialize(value).expect("bincode serialization failed")
-}
-
-/// Serializes a value to a writer using Bincode.
-pub fn serialize_into<W: Write, T: Serialize>(writer: W, value: &T) -> Result<()> {
-    Ok(BINCODE.serialize_into(writer, value)?)
 }
