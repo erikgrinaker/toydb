@@ -45,19 +45,22 @@ alice: commit
 ---
 ok
 
-# But what about Bob? If he now sets B=0 and C=200, we'll have A=200 C=200, and
-# 100 would have appeared out of thin air! Thankfully, MVCC saves us:
+# But what about Bob? If he now sets C=200 and B=0, we'll have A=200 B=0 C=200,
+# and 100 would have appeared out of thin air! Thankfully, MVCC saves us:
 bob: set C=200
+---
+ok
+
 bob: !set B=0
 ---
 bob: Error: serialization failure, retry transaction
 
-# MVCC caught the conflict, and Bob has to roll back and retry. He then finds
-# there are no money left in B anymore, and can't make the transfer.
+# MVCC caught the conflict, and Bob has to roll back and retry.
 bob: rollback
 ---
 ok
 
+# He then finds there's no money left in B anymore, and can't make the transfer.
 bob: begin
 bob: scan
 ---
