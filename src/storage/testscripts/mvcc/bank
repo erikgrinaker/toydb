@@ -1,0 +1,66 @@
+# A simple illustration of MVCC transactions with bank transfers.
+#
+# We start with three bank accounts A, B, and C, each with a balance of 100.
+import A=100 B=100 C=100
+---
+ok
+
+# Alice wants to transfer 100 from B to A. She begins a transaction and
+# checks the balance of all accounts.
+alice: begin
+alice: scan
+---
+alice: "A" → "100"
+alice: "B" → "100"
+alice: "C" → "100"
+
+# She then subtracts 100 from B, and is about to add 100 to A.
+alice: set B=0
+---
+ok
+
+# Bob comes along and wants to transfer 100 from B to C. He begins a transaction
+# and checks the balances.
+#
+# Bob might freak out if there was no money in B and only 200 total in all
+# accounts, but Alice hasn't yet committed her change to B so it's not visible.
+# If the system were to crash or Alice disconnects, B would still have 100.
+bob: begin
+bob: scan
+---
+bob: "A" → "100"
+bob: "B" → "100"
+bob: "C" → "100"
+
+# Alice now completes the transfer by adding 100 to A and committing to finalize
+# the transaction.
+alice: set A=200
+alice: scan
+---
+alice: "A" → "200"
+alice: "B" → "0"
+alice: "C" → "100"
+
+alice: commit
+---
+ok
+
+# But what about Bob? If he now sets B=0 and C=200, we'll have A=200 C=200, and
+# 100 would have appeared out of thin air! Thankfully, MVCC saves us:
+bob: set C=200
+bob: !set B=0
+---
+bob: Error: serialization failure, retry transaction
+
+# MVCC caught the conflict, and Bob has to roll back and retry. He then finds
+# there are no money left in B anymore, and can't make the transfer.
+bob: rollback
+---
+ok
+
+bob: begin
+bob: scan
+---
+bob: "A" → "200"
+bob: "B" → "0"
+bob: "C" → "100"
