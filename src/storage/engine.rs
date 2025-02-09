@@ -11,7 +11,7 @@ use crate::error::Result;
 /// have a common key prefix), or to scan the tail of the Raft log (after a
 /// given log entry index).
 ///
-/// Keys should use the KeyCode order-preserving encoding, see
+/// Keys should use the Keycode order-preserving encoding, see
 /// [`crate::encoding::keycode`].
 ///
 /// Writes are only guaranteed durable after calling [`Engine::flush()`].

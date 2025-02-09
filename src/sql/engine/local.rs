@@ -382,7 +382,7 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
     }
 }
 
-/// SQL engine keys, using the KeyCode order-preserving encoding. For
+/// SQL engine keys, using the Keycode order-preserving encoding. For
 /// simplicity, table and column names are used directly as identifiers in
 /// keys, instead of e.g. numberic IDs. It is not possible to change
 /// table/column names, so this is fine.

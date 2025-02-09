@@ -159,7 +159,7 @@ pub type Version = u64;
 
 impl encoding::Value for Version {}
 
-/// MVCC keys, using the KeyCode encoding which preserves the ordering and
+/// MVCC keys, using the Keycode encoding which preserves the ordering and
 /// grouping of keys.
 ///
 /// Cow byte slices allow encoding borrowed values and decoding owned values.
@@ -600,7 +600,7 @@ impl<E: Engine> Transaction<E> {
     pub fn scan_prefix(&self, prefix: &[u8]) -> ScanIterator<E> {
         // Normally, KeyPrefix::Version will only match all versions of the
         // exact given key. We want all keys maching the prefix, so we chop off
-        // the KeyCode byte slice terminator 0x0000 at the end.
+        // the Keycode byte slice terminator 0x0000 at the end.
         let mut prefix = KeyPrefix::Version(prefix.into()).encode();
         prefix.truncate(prefix.len() - 2);
         let range = keycode::prefix_range(&prefix);

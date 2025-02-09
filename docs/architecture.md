@@ -125,7 +125,7 @@ SQL table scans) and has a couple of important implications:
 * Keys should use an order-preserving byte encoding, to allow range scans.
 
 The engine itself does not care what keys contain, but the storage module offers
-an order-preserving key encoding called [KeyCode](https://github.com/erikgrinaker/toydb/blob/main/src/encoding/keycode.rs)
+an order-preserving key encoding called [Keycode](https://github.com/erikgrinaker/toydb/blob/main/src/encoding/keycode.rs)
 for use by higher layers. These storage layers often use composite keys made up
 of several possibly variable-length values (e.g. an index key consists of table,
 column, and value), and the natural ordering of each segment must be preserved,

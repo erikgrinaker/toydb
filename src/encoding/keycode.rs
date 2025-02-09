@@ -1,4 +1,4 @@
-//! KeyCode is a lexicographical order-preserving binary encoding for use with
+//! Keycode is a lexicographical order-preserving binary encoding for use with
 //! keys. It is designed for simplicity, not efficiency (i.e. it does not use
 //! varints or other compression methods).
 //!
@@ -10,7 +10,7 @@
 //! The encoding is not self-describing: the caller must provide a concrete type
 //! to decode into, and the binary key must conform to its structure.
 //!
-//! KeyCode supports a subset of primitive data types, encoded as follows:
+//! Keycode supports a subset of primitive data types, encoded as follows:
 //!
 //! * [`bool`]: `0x00` for `false`, `0x01` for `true`.
 //! * [`u64`]: big-endian binary representation.
@@ -48,7 +48,7 @@ use serde::ser::{Impossible, Serialize, SerializeSeq, SerializeTuple, SerializeT
 use crate::errdata;
 use crate::error::{Error, Result};
 
-/// Serializes a key to a binary KeyCode representation.
+/// Serializes a key to a binary Keycode representation.
 ///
 /// In the common case, the encoded key is borrowed for a storage engine call
 /// and then thrown away. We could avoid a bunch of allocations by taking a
@@ -62,7 +62,7 @@ pub fn serialize<T: Serialize>(key: &T) -> Vec<u8> {
     serializer.output
 }
 
-/// Deserializes a key from a binary KeyCode representation.
+/// Deserializes a key from a binary Keycode representation.
 pub fn deserialize<'a, T: Deserialize<'a>>(input: &'a [u8]) -> Result<T> {
     let mut deserializer = Deserializer::from_bytes(input);
     let t = T::deserialize(&mut deserializer)?;
@@ -381,7 +381,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
     fn deserialize_any<V: Visitor<'de>>(self, _: V) -> Result<V::Value> {
-        panic!("must provide type, KeyCode is not self-describing")
+        panic!("must provide type, Keycode is not self-describing")
     }
 
     fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
