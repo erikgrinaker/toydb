@@ -111,22 +111,24 @@ impl Server {
     /// Accepts new inbound Raft connections from peers and spawns threads
     /// routing inbound messages to the local Raft node.
     fn raft_accept(listener: TcpListener, raft_step_tx: Sender<raft::Envelope>) {
-        std::thread::scope(|s| loop {
-            let (socket, peer) = match listener.accept() {
-                Ok((socket, peer)) => (socket, peer),
-                Err(err) => {
-                    error!("Raft peer accept failed: {err}");
-                    continue;
-                }
-            };
-            let raft_step_tx = raft_step_tx.clone();
-            s.spawn(move || {
-                debug!("Raft peer {peer} connected");
-                match Self::raft_receive_peer(socket, raft_step_tx) {
-                    Ok(()) => debug!("Raft peer {peer} disconnected"),
-                    Err(err) => error!("Raft peer {peer} error: {err}"),
-                }
-            });
+        std::thread::scope(|s| {
+            loop {
+                let (socket, peer) = match listener.accept() {
+                    Ok((socket, peer)) => (socket, peer),
+                    Err(err) => {
+                        error!("Raft peer accept failed: {err}");
+                        continue;
+                    }
+                };
+                let raft_step_tx = raft_step_tx.clone();
+                s.spawn(move || {
+                    debug!("Raft peer {peer} connected");
+                    match Self::raft_receive_peer(socket, raft_step_tx) {
+                        Ok(()) => debug!("Raft peer {peer} disconnected"),
+                        Err(err) => error!("Raft peer {peer} error: {err}"),
+                    }
+                });
+            }
         });
     }
 
@@ -247,22 +249,24 @@ impl Server {
 
     /// Accepts new SQL client connections and spawns session threads for them.
     fn sql_accept(id: raft::NodeID, listener: TcpListener, sql_engine: sql::engine::Raft) {
-        std::thread::scope(|s| loop {
-            let (socket, peer) = match listener.accept() {
-                Ok((socket, peer)) => (socket, peer),
-                Err(err) => {
-                    error!("Client accept failed: {err}");
-                    continue;
-                }
-            };
-            let session = sql_engine.session();
-            s.spawn(move || {
-                debug!("Client {peer} connected");
-                match Self::sql_session(id, socket, session) {
-                    Ok(()) => debug!("Client {peer} disconnected"),
-                    Err(err) => error!("Client {peer} error: {err}"),
-                }
-            });
+        std::thread::scope(|s| {
+            loop {
+                let (socket, peer) = match listener.accept() {
+                    Ok((socket, peer)) => (socket, peer),
+                    Err(err) => {
+                        error!("Client accept failed: {err}");
+                        continue;
+                    }
+                };
+                let session = sql_engine.session();
+                s.spawn(move || {
+                    debug!("Client {peer} connected");
+                    match Self::sql_session(id, socket, session) {
+                        Ok(()) => debug!("Client {peer} disconnected"),
+                        Err(err) => error!("Client {peer} error: {err}"),
+                    }
+                });
+            }
         })
     }
 

@@ -6,7 +6,7 @@ use super::raft::{Raft, Status};
 use super::{Engine, Transaction as _};
 use crate::error::{Error, Result};
 use crate::sql::execution::ExecutionResult;
-use crate::sql::parser::{ast, Parser};
+use crate::sql::parser::{Parser, ast};
 use crate::sql::planner::Plan;
 use crate::sql::types::{Label, Row, Rows, Value};
 use crate::storage::mvcc;
@@ -41,7 +41,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
                     (true, None) => self.engine.begin_read_only()?,
                     (true, Some(as_of)) => self.engine.begin_as_of(as_of)?,
                     (false, Some(_)) => {
-                        return errinput!("can't start read-write transaction in a given version")
+                        return errinput!("can't start read-write transaction in a given version");
                     }
                 };
                 let state = txn.state().clone();

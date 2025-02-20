@@ -122,10 +122,10 @@ impl Table {
             // Validate default value.
             match column.default.as_ref().map(|v| v.datatype()) {
                 None if column.nullable => {
-                    return errinput!("nullable column {cname} must have a default value")
+                    return errinput!("nullable column {cname} must have a default value");
                 }
                 Some(None) if !column.nullable => {
-                    return errinput!("invalid NULL default for non-nullable column {cname}")
+                    return errinput!("invalid NULL default for non-nullable column {cname}");
                 }
                 Some(Some(vtype)) if vtype != column.datatype => {
                     return errinput!("invalid default type {vtype} for {ctype} column {cname}");
@@ -151,7 +151,9 @@ impl Table {
                     return errinput!("unknown table {reference} referenced by column {cname}");
                 };
                 if column.datatype != reftype {
-                    return errinput!("can't reference {reftype} primary key of {reference} from {ctype} column {cname}");
+                    return errinput!(
+                        "can't reference {reftype} primary key of {reference} from {ctype} column {cname}"
+                    );
                 }
             }
         }

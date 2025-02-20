@@ -3,7 +3,7 @@ name = "toydb"
 description = "A distributed SQL database"
 version = "0.1.0"
 authors = ["Erik Grinaker <erik@grinaker.org>"]
-edition = "2021"
+edition = "2024"
 default-run = "toydb"
 
 [lib]

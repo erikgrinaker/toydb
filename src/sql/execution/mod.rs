@@ -7,4 +7,4 @@ mod source;
 mod transform;
 mod write;
 
-pub use execute::{execute_plan, ExecutionResult};
+pub use execute::{ExecutionResult, execute_plan};

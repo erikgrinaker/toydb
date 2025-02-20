@@ -17,9 +17,9 @@ use clap::Parser;
 use hdrhistogram::Histogram;
 use itertools::Itertools as _;
 use petname::Generator as _;
+use rand::SeedableRng as _;
 use rand::distributions::Distribution as _;
 use rand::rngs::StdRng;
-use rand::SeedableRng as _;
 
 use toydb::error::Result;
 use toydb::sql::types::{Row, Rows};
@@ -464,7 +464,7 @@ impl Workload for Bank {
     }
 
     fn execute(client: &mut Client, item: &Self::Item) -> Result<()> {
-        let (from, to, mut amount) = item;
+        let &(from, to, mut amount) = item;
 
         client.execute("BEGIN")?;
 

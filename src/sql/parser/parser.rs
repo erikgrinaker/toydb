@@ -1,6 +1,6 @@
 use std::iter::Peekable;
 
-use super::{ast, Keyword, Lexer, Token};
+use super::{Keyword, Lexer, Token, ast};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::types::DataType;

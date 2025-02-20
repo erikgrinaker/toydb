@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use itertools::Itertools as _;
 use regex::Regex;
 
-use super::{bincode, Key as _, Value as _};
+use super::{Key as _, Value as _, bincode};
 use crate::raft;
 use crate::sql;
 use crate::storage::mvcc;

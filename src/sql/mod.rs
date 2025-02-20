@@ -88,7 +88,7 @@ mod tests {
 
     use super::engine::{Catalog as _, Session};
     use super::parser::Parser;
-    use super::planner::{Plan, OPTIMIZERS};
+    use super::planner::{OPTIMIZERS, Plan};
     use crate::encoding::format::{self, Formatter as _};
     use crate::sql::engine::{Engine, Local, StatementResult};
     use crate::sql::planner::{Planner, Scope};

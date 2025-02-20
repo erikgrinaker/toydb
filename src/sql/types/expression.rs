@@ -457,11 +457,7 @@ impl Expression {
                     assert_eq!(column, index, "unexpected column");
                     // NULL and NAN index lookups are for IS NULL and IS NAN.
                     // Equality shouldn't match anything, return empty vec.
-                    if value.is_undefined() {
-                        Vec::new()
-                    } else {
-                        vec![value]
-                    }
+                    if value.is_undefined() { Vec::new() } else { vec![value] }
                 }
                 (lhs, rhs) => panic!("unexpected expression {:?}", Equal(lhs.into(), rhs.into())),
             },

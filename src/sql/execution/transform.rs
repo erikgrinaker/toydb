@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use itertools::{izip, Itertools as _};
+use itertools::{Itertools as _, izip};
 
 use crate::errinput;
 use crate::error::Result;

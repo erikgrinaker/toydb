@@ -4,8 +4,8 @@ use std::error::Error;
 use std::fmt::Write as _;
 use std::path::Path;
 use std::time::Duration;
-use toydb::raft::NodeID;
 use toydb::Client;
+use toydb::raft::NodeID;
 
 /// Timeout for node readiness.
 const TIMEOUT: Duration = Duration::from_secs(5);

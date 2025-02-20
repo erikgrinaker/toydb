@@ -117,11 +117,7 @@ impl<E: storage::Engine> Transaction<E> {
         debug_assert!(value.is_normalized(), "value not normalized");
         debug_assert!(ids.iter().all(|v| v.is_normalized()), "value not normalized");
         let key = Key::Index(table.into(), column.into(), value.into()).encode();
-        if ids.is_empty() {
-            self.txn.delete(&key)
-        } else {
-            self.txn.set(&key, ids.encode())
-        }
+        if ids.is_empty() { self.txn.delete(&key) } else { self.txn.set(&key, ids.encode()) }
     }
 
     /// Returns all tables referencing a table, as (table, column index) pairs.

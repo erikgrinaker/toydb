@@ -4,5 +4,5 @@ pub mod ast;
 mod lexer;
 mod parser;
 
-pub use lexer::{is_ident, Keyword, Lexer, Token};
+pub use lexer::{Keyword, Lexer, Token, is_ident};
 pub use parser::Parser;

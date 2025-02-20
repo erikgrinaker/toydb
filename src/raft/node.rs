@@ -83,9 +83,9 @@ macro_rules! with_rawnode {
             f(node)
         }
         match $node {
-            Node::Candidate(ref node) => with(node, $closure),
-            Node::Follower(ref node) => with(node, $closure),
-            Node::Leader(ref node) => with(node, $closure),
+            &Node::Candidate(ref node) => with(node, $closure),
+            &Node::Follower(ref node) => with(node, $closure),
+            &Node::Leader(ref node) => with(node, $closure),
         }
     }};
     // Node is mutably borrowed (ref mut).
@@ -94,9 +94,9 @@ macro_rules! with_rawnode {
             f(node)
         }
         match $node {
-            Node::Candidate(ref mut node) => with(node, $closure),
-            Node::Follower(ref mut node) => with(node, $closure),
-            Node::Leader(ref mut node) => with(node, $closure),
+            &mut Node::Candidate(ref mut node) => with(node, $closure),
+            &mut Node::Follower(ref mut node) => with(node, $closure),
+            &mut Node::Leader(ref mut node) => with(node, $closure),
         }
     }};
 }
@@ -1170,9 +1170,9 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::encoding::{bincode, Key as _, Value as _};
-    use crate::raft::state::test::{self as teststate, KVCommand, KVResponse};
+    use crate::encoding::{Key as _, Value as _, bincode};
     use crate::raft::Entry;
+    use crate::raft::state::test::{self as teststate, KVCommand, KVResponse};
     use crate::storage;
     use crate::storage::engine::test as testengine;
 
@@ -2046,7 +2046,9 @@ mod tests {
                     format!("CampaignResponse vote={vote}")
                 }
                 Message::Heartbeat { last_index, commit_index, read_seq } => {
-                    format!("Heartbeat last_index={last_index} commit_index={commit_index} read_seq={read_seq}")
+                    format!(
+                        "Heartbeat last_index={last_index} commit_index={commit_index} read_seq={read_seq}"
+                    )
                 }
                 Message::HeartbeatResponse { match_index, read_seq } => {
                     format!("HeartbeatResponse match_index={match_index} read_seq={read_seq}")

@@ -148,7 +148,7 @@ use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 
 use super::engine::{self, Engine};
-use crate::encoding::{self, bincode, keycode, Key as _, Value as _};
+use crate::encoding::{self, Key as _, Value as _, bincode, keycode};
 use crate::error::{Error, Result};
 use crate::{errdata, errinput};
 
@@ -765,7 +765,7 @@ pub mod tests {
 
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
-    use crate::storage::engine::test::{decode_binary, parse_key_range, Emit, Mirror, Operation};
+    use crate::storage::engine::test::{Emit, Mirror, Operation, decode_binary, parse_key_range};
     use crate::storage::{BitCask, Memory};
 
     // Run goldenscript tests in src/storage/testscripts/mvcc.

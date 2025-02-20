@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use itertools::{Either, Itertools as _};
 
-use super::plan::{remap_sources, Aggregate, Node, Plan};
+use super::plan::{Aggregate, Node, Plan, remap_sources};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Catalog;

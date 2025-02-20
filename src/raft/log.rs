@@ -3,7 +3,7 @@ use std::ops::Bound;
 use serde::{Deserialize, Serialize};
 
 use super::{NodeID, Term};
-use crate::encoding::{self, bincode, Key as _, Value as _};
+use crate::encoding::{self, Key as _, Value as _, bincode};
 use crate::error::Result;
 use crate::storage;
 

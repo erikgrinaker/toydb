@@ -14,11 +14,11 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{Editor, Modifiers};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 
+use toydb::Client;
 use toydb::errinput;
 use toydb::error::Result;
 use toydb::sql::engine::StatementResult;
 use toydb::sql::parser::{Lexer, Token};
-use toydb::Client;
 
 fn main() {
     if let Err(error) = Command::parse().run() {

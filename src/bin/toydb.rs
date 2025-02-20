@@ -14,12 +14,12 @@ use std::path::Path;
 use clap::Parser as _;
 use serde::Deserialize;
 
+use toydb::Server;
 use toydb::errinput;
 use toydb::error::Result;
 use toydb::raft;
 use toydb::sql;
 use toydb::storage;
-use toydb::Server;
 
 fn main() {
     if let Err(error) = Command::parse().run() {

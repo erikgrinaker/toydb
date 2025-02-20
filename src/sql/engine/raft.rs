@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use super::{Catalog, Engine as _, Transaction as _};
-use crate::encoding::{self, bincode, Value as _};
+use crate::encoding::{self, Value as _, bincode};
 use crate::errdata;
 use crate::error::Result;
 use crate::raft;
