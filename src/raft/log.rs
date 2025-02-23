@@ -7,13 +7,16 @@ use crate::encoding::{self, Key as _, Value as _, bincode};
 use crate::error::Result;
 use crate::storage;
 
-/// A log index. Starts at 1, indicates no index if 0.
+/// A log index (entry position). Starts at 1. 0 indicates no index.
 pub type Index = u64;
 
-/// A log entry.
+/// A log entry containing a state machine command.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
     /// The entry index.
+    ///
+    /// We could omit the index in the encoded value, since it's also stored in
+    /// the key, but we keep it simple.
     pub index: Index,
     /// The term in which the entry was added.
     pub term: Term,
@@ -106,15 +109,16 @@ pub struct Log {
     /// If true, fsync entries to disk when appended. This is mandated by Raft,
     /// but comes with a hefty performance penalty (especially since we don't
     /// optimize for it by batching entries before fsyncing). Disabling it will
-    /// yield much better write performance, but may lose data on host crashes,
-    /// which in some scenarios can cause log entries to become "uncommitted"
-    /// and state machines diverging.
+    /// yield much better write performance, but may lose data on crashes, which
+    /// in some scenarios can cause log entries to become "uncommitted" and
+    /// state machines diverging.
     fsync: bool,
 }
 
 impl Log {
     /// Initializes a log using the given storage engine.
     pub fn new(mut engine: Box<dyn storage::Engine>) -> Result<Self> {
+        // Load some initial in-memory state from disk.
         let (term, vote) = engine
             .get(&Key::TermVote.encode())?
             .map(|v| bincode::deserialize(&v))
@@ -136,7 +140,8 @@ impl Log {
             .map(|v| bincode::deserialize(&v))
             .transpose()?
             .unwrap_or((0, 0));
-        let fsync = true; // fsync by default (NB: BitCask::flush() is a noop in tests)
+
+        let fsync = true; // fsync by default
         Ok(Self { engine, term, vote, last_index, last_term, commit_index, commit_term, fsync })
     }
 
@@ -168,11 +173,12 @@ impl Log {
         assert!(term > 0, "can't set term 0");
         assert!(term >= self.term, "term regression {} → {}", self.term, term);
         assert!(term > self.term || self.vote.is_none() || vote == self.vote, "can't change vote");
+
         if term == self.term && vote == self.vote {
             return Ok(());
         }
         self.engine.set(&Key::TermVote.encode(), bincode::serialize(&(term, vote)))?;
-        // Always fsync, even with Log.fsync = false. Term changes are rare, so
+        // Always fsync, even with Log::fsync = false. Term changes are rare, so
         // this doesn't materially affect performance, and double voting could
         // lead to multiple leaders and split brain which is really bad.
         self.engine.flush()?;
@@ -186,8 +192,6 @@ impl Log {
     /// Raft leader changes.
     pub fn append(&mut self, command: Option<Vec<u8>>) -> Result<Index> {
         assert!(self.term > 0, "can't append entry in term 0");
-        // We could omit the index in the encoded value, since it's also stored
-        // in the key, but we keep it simple.
         let entry = Entry { index: self.last_index + 1, term: self.term, command };
         self.engine.set(&Key::Entry(entry.index).encode(), entry.encode())?;
         if self.fsync {
@@ -202,16 +206,16 @@ impl Log {
     /// exist and be at or after the current commit index.
     pub fn commit(&mut self, index: Index) -> Result<Index> {
         let term = match self.get(index)? {
-            Some(e) if e.index < self.commit_index => {
-                panic!("commit index regression {} → {}", self.commit_index, e.index);
+            Some(entry) if entry.index < self.commit_index => {
+                panic!("commit index regression {} → {}", self.commit_index, entry.index);
             }
-            Some(e) if e.index == self.commit_index => return Ok(index),
-            Some(e) => e.term,
+            Some(entry) if entry.index == self.commit_index => return Ok(index),
+            Some(entry) => entry.term,
             None => panic!("commit index {index} does not exist"),
         };
         self.engine.set(&Key::CommitIndex.encode(), bincode::serialize(&(index, term)))?;
         // NB: the commit index doesn't need to be fsynced, since the entries
-        // are fsynced and the commit index can be recovered from a log quorum.
+        // are fsynced and the commit index can be recovered from the quorum.
         self.commit_index = index;
         self.commit_term = term;
         Ok(index)
@@ -255,21 +259,22 @@ impl Log {
     pub fn scan_apply(&mut self, applied_index: Index) -> Iterator {
         // NB: we don't assert that commit_index >= applied_index, because the
         // local commit index is not flushed to durable storage -- if lost on
-        // restart, it can be recovered from a quorum of logs.
+        // restart, it can be recovered from the logs of a quorum.
         if applied_index >= self.commit_index {
             return Iterator::new(Box::new(std::iter::empty()));
         }
         self.scan(applied_index + 1..=self.commit_index)
     }
 
-    /// Splices a set of entries into the log and flushes it to disk. The
-    /// entries must have contiguous indexes and equal/increasing terms, and the
-    /// first entry must be in the range [1,last_index+1] with a term at or
+    /// Splices a set of entries into the log and flushes it to disk.  New
+    /// indexes will be appended. Overlapping indexes with the same term must be
+    /// equal and will be ignored. Overlapping indexes with different terms will
+    /// truncate the existing log at the first conflict and then splice the new
+    /// entries.
+    ///
+    /// The entries must have contiguous indexes and equal/increasing terms, and
+    /// the first entry must be in the range [1,last_index+1] with a term at or
     /// above the previous (base) entry's term and at or below the current term.
-    /// New indexes will be appended. Overlapping indexes with the same term
-    /// must be equal and will be ignored. Overlapping indexes with different
-    /// terms will truncate the existing log at the first conflict and then
-    /// splice the new entries.
     pub fn splice(&mut self, entries: Vec<Entry>) -> Result<Index> {
         let (Some(first), Some(last)) = (entries.first(), entries.last()) else {
             return Ok(self.last_index); // empty input is noop

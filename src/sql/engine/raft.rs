@@ -282,8 +282,8 @@ impl<E: storage::Engine> raft::State for State<E> {
 
         let result = match &entry.command {
             Some(command) => match self.write(Write::decode(command)?) {
-                // Panic on non-deterministic apply failures, to prevent replica
-                // divergence. See [`raft::State`] docs for details.
+                // Panic on non-deterministic apply failures, to prevent node
+                // state divergence. See [`raft::State`] docs for details.
                 Err(e) if !e.is_deterministic() => panic!("non-deterministic apply failure: {e}"),
                 result => result,
             },

@@ -25,10 +25,10 @@ impl encoding::Value for Envelope {}
 /// A message sent between Raft nodes. Messages are sent asynchronously (i.e.
 /// they are not request/response) and may be dropped or reordered.
 ///
-/// In practice, they are sent across a TCP connection and crossbeam channels
-/// ensuring messages are not dropped or reordered as long as the connection
-/// remains intact. A message and its response are sent across separate TCP
-/// connections (outbound from their respective senders).
+/// In practice, they are sent across a TCP connection and crossbeam channel
+/// which ensures messages are not dropped or reordered as long as the
+/// connection remains intact. A message and its response are sent across
+/// separate TCP connections (outbound from the respective sender).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Message {
     /// Candidates campaign for leadership by soliciting votes from peers.
@@ -151,10 +151,11 @@ pub enum Message {
     },
 }
 
-/// A client request ID. Must be globally unique for the duration of the
-/// request. For simplicity, a random UUIDv4 is used -- the node ID and process
-/// ID could be incorporated for further collision avoidance, but it does not
-/// matter at this scale.
+/// A client request ID. Must be globally unique while in flight.
+///
+/// For simplicity, a random UUIDv4 is used. We could incorporate the
+/// node/process/MAC ID and timestamp for better collision avoidance (e.g. via
+/// UUIDv6) but it doesn't matter at this scale.
 pub type RequestID = uuid::Uuid;
 
 /// A read sequence number, used to confirm leadership for linearizable reads.

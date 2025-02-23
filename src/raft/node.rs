@@ -522,7 +522,7 @@ impl RawNode<Follower> {
             debug!("Applying {entry:?}");
             // Throw away the result, since only the leader responds to clients.
             // This includes errors -- any non-deterministic errors (e.g. IO
-            // errors) must panic instead to avoid replica divergence.
+            // errors) must panic instead to avoid node divergence.
             _ = self.state.apply(entry);
         }
         Ok(())

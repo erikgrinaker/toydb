@@ -42,7 +42,7 @@ impl Error {
     /// machine application needs to know whether a command failure is
     /// deterministic on the input command -- if it is, the command can be
     /// considered applied and the error returned to the client, but otherwise
-    /// the state machine must panic to prevent replica divergence.
+    /// the state machine must panic to prevent node divergence.
     pub fn is_deterministic(&self) -> bool {
         match self {
             // Aborts don't happen during application, only leader changes. But

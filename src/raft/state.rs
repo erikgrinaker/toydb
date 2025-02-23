@@ -6,18 +6,18 @@ use crate::error::Result;
 /// arbitrary binary commands sequentially from the Raft log, returning an
 /// arbitrary binary result to the client.
 ///
-/// Since commands are applied identically across all replicas, they must be
-/// deterministic and yield the same state and result across all replicas too.
-/// Otherwise, the replicas will diverge, and different replicas will produce
+/// Since commands are applied identically across all nodes, they must be
+/// deterministic and yield the same state and result across all nodes too.
+/// Otherwise, the nodes will diverge, such that different nodes will produce
 /// different results.
 ///
-/// Write commands (`Request::Write`) are replicated and applied on all replicas
+/// Write commands (`Request::Write`) are replicated and applied on all nodes
 /// via `State::apply`. The state machine must keep track of the last applied
 /// index and return it via `State::get_applied_index`. Read commands
-/// (`Request::Read`) are only executed on a single replica via `State::read`
-/// and must not make any state changes.
+/// (`Request::Read`) are only executed on a single node via `State::read` and
+/// must not make any state changes.
 pub trait State: Send {
-    /// Returns the last applied index from the state machine.
+    /// Returns the last applied log index from the state machine.
     ///
     /// This must correspond to the current state of the state machine, since it
     /// determines which command to apply next. In particular, a node crash may
@@ -28,13 +28,13 @@ pub trait State: Send {
     /// Applies a log entry to the state machine, returning a client result.
     /// Errors are considered applied and propagated back to the client.
     ///
-    /// This is executed on all replicas, so the result must be deterministic:
-    /// it must yield the same state and result on all replicas, even if the
-    /// command is reapplied following a node crash.
+    /// This is executed on all nodes, so the result must be deterministic: it
+    /// must yield the same state and result on all nodes, even if the command
+    /// is reapplied following a node crash.
     ///
     /// Any non-deterministic apply error (e.g. an IO error) must panic and
     /// crash the node -- if it instead returns an error to the client, the
-    /// command is considered applied and replica states will diverge. The state
+    /// command is considered applied and node states will diverge. The state
     /// machine is responsible for panicing when appropriate.
     ///
     /// The entry may contain a noop command, which is committed by Raft during
@@ -45,8 +45,8 @@ pub trait State: Send {
     /// Executes a read command in the state machine, returning a client result.
     /// Errors are also propagated back to the client.
     ///
-    /// This is only executed on a single replica/node, so it must not result in
-    /// any state changes (i.e. it must not write).
+    /// This is only executed on a single node, so it must not result in any
+    /// state changes (i.e. it must not write).
     fn read(&self, command: Vec<u8>) -> Result<Vec<u8>>;
 }
 

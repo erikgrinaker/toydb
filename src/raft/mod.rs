@@ -188,7 +188,7 @@
 //! machine, the leader looks up the write request by its log index and sends
 //! the result to the client. Deterministic errors (e.g. foreign key violations)
 //! are also returned to the client, but non-deterministic errors (e.g. IO
-//! errors) must panic the node to avoid replica state divergence.
+//! errors) must panic the node to avoid state divergence.
 //!
 //! Read requests, `Request::Read`, are only executed on the leader and don't
 //! need to be replicated via the Raft log. However, to ensure linearizability,
@@ -252,15 +252,15 @@ pub use message::{Envelope, Message, ReadSequence, Request, RequestID, Response,
 pub use node::{Node, NodeID, Options, Term, Ticks};
 pub use state::State;
 
-/// The interval between Raft ticks, the unit of time.
+/// The interval between Raft ticks, the Raft unit of time.
 pub const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
 /// The interval between leader heartbeats in ticks.
 const HEARTBEAT_INTERVAL: Ticks = 4;
 
-/// The default election timeout range in ticks. This is randomized in this
-/// interval, to avoid election ties.
+/// The default election timeout range in ticks. To avoid election ties, a node
+/// chooses a random value in this interval.
 const ELECTION_TIMEOUT_RANGE: Range<Ticks> = 10..20;
 
-/// The maximum number of entries to send in a single append message.
+/// The maximum number of log entries to send in a single append message.
 const MAX_APPEND_ENTRIES: usize = 100;
