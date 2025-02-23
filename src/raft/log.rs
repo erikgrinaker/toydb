@@ -1,4 +1,4 @@
-use std::ops::Bound;
+use std::ops::{Bound, RangeBounds};
 
 use serde::{Deserialize, Serialize};
 
@@ -162,14 +162,14 @@ impl Log {
     }
 
     /// Returns the current term (0 if none) and vote.
-    pub fn get_term(&self) -> (Term, Option<NodeID>) {
+    pub fn get_term_vote(&self) -> (Term, Option<NodeID>) {
         (self.term, self.vote)
     }
 
     /// Stores the current term and cast vote (if any). Enforces that the term
     /// does not regress, and that we only vote for one node in a term. append()
     /// will use this term, and splice() can't write entries beyond it.
-    pub fn set_term(&mut self, term: Term, vote: Option<NodeID>) -> Result<()> {
+    pub fn set_term_vote(&mut self, term: Term, vote: Option<NodeID>) -> Result<()> {
         assert!(term > 0, "can't set term 0");
         assert!(term >= self.term, "term regression {} → {}", self.term, term);
         assert!(term > self.term || self.vote.is_none() || vote == self.vote, "can't change vote");
@@ -240,7 +240,7 @@ impl Log {
     }
 
     /// Returns an iterator over log entries in the given index range.
-    pub fn scan(&mut self, range: impl std::ops::RangeBounds<Index>) -> Iterator {
+    pub fn scan(&mut self, range: impl RangeBounds<Index>) -> Iterator {
         let from = match range.start_bound() {
             Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()),
             Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()),
@@ -266,7 +266,7 @@ impl Log {
         self.scan(applied_index + 1..=self.commit_index)
     }
 
-    /// Splices a set of entries into the log and flushes it to disk.  New
+    /// Splices a set of entries into the log and flushes it to disk. New
     /// indexes will be appended. Overlapping indexes with the same term must be
     /// equal and will be ignored. Overlapping indexes with different terms will
     /// truncate the existing log at the first conflict and then splice the new
@@ -281,15 +281,15 @@ impl Log {
         };
 
         // Check that the entries are well-formed.
-        if first.index == 0 || first.term == 0 {
-            panic!("spliced entry has index or term 0");
-        }
-        if !entries.windows(2).all(|w| w[0].index + 1 == w[1].index) {
-            panic!("spliced entries are not contiguous");
-        }
-        if !entries.windows(2).all(|w| w[0].term <= w[1].term) {
-            panic!("spliced entries have term regression");
-        }
+        assert!(first.index > 0 && first.term > 0, "spliced entry has index or term 0",);
+        assert!(
+            entries.windows(2).all(|w| w[0].index + 1 == w[1].index),
+            "spliced entries are not contiguous"
+        );
+        assert!(
+            entries.windows(2).all(|w| w[0].term <= w[1].term),
+            "spliced entries have term regression",
+        );
 
         // Check that the entries connect to the existing log (if any), and that the
         // term doesn't regress.
@@ -372,7 +372,6 @@ impl std::iter::Iterator for Iterator<'_> {
 mod tests {
     use std::error::Error;
     use std::fmt::Write as _;
-    use std::ops::RangeBounds;
     use std::result::Result;
 
     use crossbeam::channel::Receiver;
@@ -503,7 +502,7 @@ mod tests {
                 // get_term
                 "get_term" => {
                     command.consume_args().reject_rest()?;
-                    let (term, vote) = self.log.get_term();
+                    let (term, vote) = self.log.get_term_vote();
                     let vote = vote.map(|v| v.to_string()).unwrap_or("None".to_string());
                     writeln!(output, "term={term} vote={vote}")?;
                 }
@@ -566,7 +565,7 @@ mod tests {
                     let term = args.next_pos().ok_or("term not given")?.parse()?;
                     let vote = args.next_pos().map(|a| a.parse()).transpose()?;
                     args.reject_rest()?;
-                    self.log.set_term(term, vote)?;
+                    self.log.set_term_vote(term, vote)?;
                 }
 
                 // splice [INDEX@TERM=COMMAND...]
@@ -593,7 +592,7 @@ mod tests {
                     let mut args = command.consume_args();
                     let engine = args.lookup_parse("engine")?.unwrap_or(false);
                     args.reject_rest()?;
-                    let (term, vote) = self.log.get_term();
+                    let (term, vote) = self.log.get_term_vote();
                     let (last_index, last_term) = self.log.get_last_index();
                     let (commit_index, commit_term) = self.log.get_commit_index();
                     let vote = vote.map(|id| id.to_string()).unwrap_or("None".to_string());
