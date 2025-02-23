@@ -10,13 +10,14 @@ use rand::Rng as _;
 use super::log::{Index, Log};
 use super::message::{Envelope, Message, ReadSequence, Request, RequestID, Response, Status};
 use super::state::State;
+use super::{ELECTION_TIMEOUT_RANGE, HEARTBEAT_INTERVAL, MAX_APPEND_ENTRIES};
 use crate::errinput;
 use crate::error::{Error, Result};
 
-/// A node ID. Unique within a cluster. Assigned manually when started.
+/// A node ID, unique within a cluster. Assigned manually when started.
 pub type NodeID = u8;
 
-/// A leader term number. Increases monotonically.
+/// A leader term number. Increases monotonically on elections.
 pub type Term = u64;
 
 /// A logical clock interval as number of ticks.
@@ -36,9 +37,9 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
-            heartbeat_interval: super::HEARTBEAT_INTERVAL,
-            election_timeout_range: super::ELECTION_TIMEOUT_RANGE,
-            max_append_entries: super::MAX_APPEND_ENTRIES,
+            heartbeat_interval: HEARTBEAT_INTERVAL,
+            election_timeout_range: ELECTION_TIMEOUT_RANGE,
+            max_append_entries: MAX_APPEND_ENTRIES,
         }
     }
 }
@@ -64,43 +65,6 @@ pub enum Node {
     Leader(RawNode<Leader>),
 }
 
-/// Helper macro which calls a closure on the inner RawNode<Role>.
-macro_rules! with_rawnode {
-    // Node is moved.
-    ($node:expr, $closure:expr) => {{
-        fn with<R: Role, T>(node: RawNode<R>, f: impl FnOnce(RawNode<R>) -> T) -> T {
-            f(node)
-        }
-        match $node {
-            Node::Candidate(node) => with(node, $closure),
-            Node::Follower(node) => with(node, $closure),
-            Node::Leader(node) => with(node, $closure),
-        }
-    }};
-    // Node is borrowed (ref).
-    (ref $node:expr, $closure:expr) => {{
-        fn with<R: Role, T>(node: &RawNode<R>, f: impl FnOnce(&RawNode<R>) -> T) -> T {
-            f(node)
-        }
-        match $node {
-            &Node::Candidate(ref node) => with(node, $closure),
-            &Node::Follower(ref node) => with(node, $closure),
-            &Node::Leader(ref node) => with(node, $closure),
-        }
-    }};
-    // Node is mutably borrowed (ref mut).
-    (ref mut $node:expr, $closure:expr) => {{
-        fn with<R: Role, T>(node: &mut RawNode<R>, f: impl FnOnce(&mut RawNode<R>) -> T) -> T {
-            f(node)
-        }
-        match $node {
-            &mut Node::Candidate(ref mut node) => with(node, $closure),
-            &mut Node::Follower(ref mut node) => with(node, $closure),
-            &mut Node::Leader(ref mut node) => with(node, $closure),
-        }
-    }};
-}
-
 impl Node {
     /// Creates a new Raft node. It starts as a leaderless follower, waiting to
     /// hear from a leader or otherwise transitioning to candidate and
@@ -122,47 +86,67 @@ impl Node {
         Ok(node.into())
     }
 
-    /// Returns the node ID.
+    /// Returns the node's ID.
     pub fn id(&self) -> NodeID {
-        with_rawnode!(ref self, |n| n.id)
+        match self {
+            Self::Candidate(node) => node.id,
+            Self::Follower(node) => node.id,
+            Self::Leader(node) => node.id,
+        }
     }
 
-    /// Returns the node term.
+    /// Returns the node's term.
     pub fn term(&self) -> Term {
-        with_rawnode!(ref self, |n| n.term())
+        match self {
+            Self::Candidate(node) => node.term(),
+            Self::Follower(node) => node.term(),
+            Self::Leader(node) => node.term(),
+        }
     }
 
     /// Processes an inbound message.
     pub fn step(self, msg: Envelope) -> Result<Self> {
-        with_rawnode!(self, |n| {
-            assert_eq!(msg.to, n.id, "message to other node: {msg:?}");
-            assert!(n.peers.contains(&msg.from) || msg.from == n.id, "unknown sender: {msg:?}");
-            debug!("Stepping {msg:?}");
-            n.step(msg)
-        })
+        let peers = match &self {
+            Self::Candidate(node) => &node.peers,
+            Self::Follower(node) => &node.peers,
+            Self::Leader(node) => &node.peers,
+        };
+        assert_eq!(msg.to, self.id(), "message to other node: {msg:?}");
+        assert!(peers.contains(&msg.from) || msg.from == self.id(), "unknown sender: {msg:?}");
+        debug!("Stepping {msg:?}");
+
+        match self {
+            Self::Candidate(node) => node.step(msg),
+            Self::Follower(node) => node.step(msg),
+            Self::Leader(node) => node.step(msg),
+        }
     }
 
     /// Advances time by a tick.
     pub fn tick(self) -> Result<Self> {
-        with_rawnode!(self, |n| n.tick())
+        match self {
+            Self::Candidate(node) => node.tick(),
+            Self::Follower(node) => node.tick(),
+            Self::Leader(node) => node.tick(),
+        }
     }
 }
 
 impl From<RawNode<Candidate>> for Node {
-    fn from(n: RawNode<Candidate>) -> Self {
-        Node::Candidate(n)
+    fn from(node: RawNode<Candidate>) -> Self {
+        Node::Candidate(node)
     }
 }
 
 impl From<RawNode<Follower>> for Node {
-    fn from(n: RawNode<Follower>) -> Self {
-        Node::Follower(n)
+    fn from(node: RawNode<Follower>) -> Self {
+        Node::Follower(node)
     }
 }
 
 impl From<RawNode<Leader>> for Node {
-    fn from(n: RawNode<Leader>) -> Self {
-        Node::Leader(n)
+    fn from(node: RawNode<Leader>) -> Self {
+        Node::Leader(node)
     }
 }
 
@@ -172,17 +156,17 @@ pub trait Role {}
 /// A Raft node with role R.
 ///
 /// This implements the typestate pattern, where individual node states (roles)
-/// are encoded as RawNode<Role>. See: http://cliffle.com/blog/rust-typestate/
+/// are encoded as RawNode<Role>. See http://cliffle.com/blog/rust-typestate/.
 pub struct RawNode<R: Role> {
-    /// The node ID. Must be unique in this cluster.
+    /// The node ID. Must be unique in the cluster.
     id: NodeID,
     /// The IDs of the other nodes in the cluster. Does not change while
-    /// running. Can change on restart, but all nodes must have the same node
-    /// set to avoid multiple leaders (i.e. split brain).
+    /// running. Can change on restart, but all nodes must have the same set of
+    /// nodes, otherwise it can result in multiple leaders (split brain).
     peers: HashSet<NodeID>,
-    /// The Raft log, containing client commands to be executed.
+    /// The Raft log, which stores client commands to be executed.
     log: Log,
-    /// The Raft state machine, on which client commands are executed.
+    /// The Raft state machine, which executes client commands from the log.
     state: Box<dyn State>,
     /// Channel for sending outbound messages to other nodes.
     tx: Sender<Envelope>,
@@ -206,9 +190,9 @@ impl<R: Role> RawNode<R> {
         }
     }
 
-    /// Returns the node's current term. Convenience wrapper for Log.get_term().
+    /// Returns the node's current term.
     fn term(&self) -> Term {
-        self.log.get_term().0
+        self.log.get_term_vote().0
     }
 
     /// Returns the cluster size as number of nodes.
@@ -221,8 +205,8 @@ impl<R: Role> RawNode<R> {
         self.cluster_size() / 2 + 1
     }
 
-    /// Returns the quorum value of the given unsorted vector, in descending
-    /// order. The slice must have the same size as the cluster.
+    /// Returns the quorum value (i.e. median) of the given unsorted vector. It
+    /// must have the same length as the cluster size.
     fn quorum_value<T: Ord + Copy>(&self, mut values: Vec<T>) -> T {
         assert_eq!(values.len(), self.cluster_size(), "vector size must match cluster size");
         *values.select_nth_unstable_by(self.quorum_size() - 1, |a, b| a.cmp(b).reverse()).1
@@ -235,11 +219,12 @@ impl<R: Role> RawNode<R> {
 
     /// Sends a message to the given recipient.
     fn send(&self, to: NodeID, message: Message) -> Result<()> {
-        Self::send_with(&self.tx, Envelope { from: self.id, to, term: self.term(), message })
+        Self::send_via(&self.tx, Envelope { from: self.id, to, term: self.term(), message })
     }
 
-    /// Sends a message without borrowing self, to allow partial borrows.
-    fn send_with(tx: &Sender<Envelope>, msg: Envelope) -> Result<()> {
+    /// Sends a message via the given channel. This avoid borrowing self, to
+    /// allow sending while holding partial borrows of self.
+    fn send_via(tx: &Sender<Envelope>, msg: Envelope) -> Result<()> {
         debug!("Sending {msg:?}");
         Ok(tx.send(msg)?)
     }
@@ -254,9 +239,9 @@ impl<R: Role> RawNode<R> {
     }
 }
 
-// A follower replicates log entries from a leader and forwards client requests.
-// Nodes start as leaderless followers, until they either discover a leader or
-// hold an election.
+/// A follower replicates log entries from a leader and forwards client requests
+/// to it. Nodes start as leaderless followers, until they either discover a
+/// leader or hold an election.
 pub struct Follower {
     /// The leader, or None if we're a leaderless follower.
     leader: Option<NodeID>,
@@ -295,9 +280,11 @@ impl RawNode<Follower> {
         let mut node = Self { id, peers, log, state, tx, opts, role };
         node.role.election_timeout = node.random_election_timeout();
 
-        // Apply any pending entries following restart. Unlike the Raft log,
-        // state machine writes are not flushed to durable storage, so a tail of
-        // writes may be lost if the OS crashes or restarts.
+        // Apply any pending entries following restart. State machine writes are
+        // not flushed to durable storage, so a tail of writes may be lost if
+        // the host crashes or restarts. The Raft log is durable, so we can
+        // always recover the state from it. We reapply any missing entries here
+        // if that should happen.
         node.maybe_apply()?;
         Ok(node)
     }
@@ -316,7 +303,7 @@ impl RawNode<Follower> {
         let mut node = self.into_role(Candidate::new(election_timeout));
         node.campaign()?;
 
-        let (term, vote) = node.log.get_term();
+        let (term, vote) = node.log.get_term_vote();
         assert!(node.role.votes.contains(&node.id), "candidate did not vote for self");
         assert_ne!(term, 0, "candidate can't have term 0");
         assert_eq!(vote, Some(node.id), "log vote does not match self");
@@ -344,7 +331,7 @@ impl RawNode<Follower> {
             // We'll find out if we step a message from it.
             assert_ne!(term, self.term(), "can't become leaderless follower in current term");
             info!("Discovered new term {term}");
-            self.log.set_term(term, None)?;
+            self.log.set_term_vote(term, None)?;
             self.role = Follower::new(None, self.random_election_timeout());
         }
         Ok(self)
@@ -352,12 +339,13 @@ impl RawNode<Follower> {
 
     /// Processes an inbound message.
     fn step(mut self, msg: Envelope) -> Result<Node> {
-        // Past term: drop the message.
+        // Past term: outdated peer, drop the message.
         if msg.term < self.term() {
             debug!("Dropping message from past term: {msg:?}");
             return Ok(self.into());
         }
-        // Future term: become leaderless follower and step the message.
+        // Future term: newer leader or candidate, become leaderless follower
+        // and step the message.
         if msg.term > self.term() {
             return self.into_follower(msg.term, None)?.step(msg);
         }
@@ -379,8 +367,9 @@ impl RawNode<Follower> {
                     None => self = self.into_follower(msg.term, Some(msg.from))?,
                 }
 
-                // Attempt to match the leader's log and respond to the
-                // heartbeat. last_index always has the leader's term.
+                // Check if our log matches the leader's log up to last_index,
+                // and respond to the heartbeat. last_index always has the
+                // leader's term, since it only appends entries in its term.
                 let match_index = if self.log.has(last_index, msg.term)? { last_index } else { 0 };
                 self.send(msg.from, Message::HeartbeatResponse { match_index, read_seq })?;
 
@@ -407,17 +396,17 @@ impl RawNode<Follower> {
                 }
 
                 // If the base entry matches our log, append the entries.
-                let (mut reject_index, mut match_index) = (0, 0);
                 if base_index == 0 || self.log.has(base_index, base_term)? {
-                    match_index = entries.last().map(|e| e.index).unwrap_or(base_index);
+                    let match_index = entries.last().map(|e| e.index).unwrap_or(base_index);
                     self.log.splice(entries)?;
+                    self.send(msg.from, Message::AppendResponse { match_index, reject_index: 0 })?;
                 } else {
                     // Otherwise, reject the base index. If the local log is
                     // shorter than the base index, lower the reject index to
                     // skip all missing entries.
-                    reject_index = min(base_index, self.log.get_last_index().0 + 1);
+                    let reject_index = min(base_index, self.log.get_last_index().0 + 1);
+                    self.send(msg.from, Message::AppendResponse { reject_index, match_index: 0 })?;
                 }
-                self.send(msg.from, Message::AppendResponse { reject_index, match_index })?;
             }
 
             // Confirm the leader's read sequence number.
@@ -432,20 +421,21 @@ impl RawNode<Follower> {
                 self.send(msg.from, Message::ReadResponse { seq })?;
             }
 
-            // A candidate is requesting our vote. We'll only grant one.
+            // A candidate is requesting our vote. We only grant one per term.
             Message::Campaign { last_index, last_term } => {
                 // Don't vote if we already voted for someone else in this term.
-                // We can repeat our vote though.
-                if let (_, Some(vote)) = self.log.get_term() {
+                // We can repeat our vote for the same node though.
+                if let (_, Some(vote)) = self.log.get_term_vote() {
                     if msg.from != vote {
                         self.send(msg.from, Message::CampaignResponse { vote: false })?;
                         return Ok(self.into());
                     }
                 }
 
-                // Don't vote if our log is newer than the candidate's log.
-                // This ensures that an elected leader has all committed
-                // entries, see section 5.4.1 in the Raft paper.
+                // Only vote if the candidate's log is at least as long as ours.
+                // At least one node in any quorum must have all committed
+                // entries, and this ensures we'll only elect a leader that has
+                // all committed entries. See section 5.4.1 in the Raft paper.
                 let (log_index, log_term) = self.log.get_last_index();
                 if log_term > last_term || log_term == last_term && log_index > last_index {
                     self.send(msg.from, Message::CampaignResponse { vote: false })?;
@@ -454,13 +444,13 @@ impl RawNode<Follower> {
 
                 // Grant the vote.
                 info!("Voting for {} in term {} election", msg.from, msg.term);
-                self.log.set_term(msg.term, Some(msg.from))?;
+                self.log.set_term_vote(msg.term, Some(msg.from))?;
                 self.send(msg.from, Message::CampaignResponse { vote: true })?;
             }
 
             // Forward client requests to the leader, or abort them if there is
-            // none. These will not be retried, the client should use timeouts.
-            // Local client requests use our node ID as the sender.
+            // none. These will not be retried, the client should use timeouts
+            // instead.  Local client requests use our node ID as the sender.
             Message::ClientRequest { id, request: _ } => {
                 assert_eq!(msg.from, self.id, "client request from other node");
 
@@ -490,7 +480,7 @@ impl RawNode<Follower> {
             Message::HeartbeatResponse { .. }
             | Message::AppendResponse { .. }
             | Message::ReadResponse { .. } => {
-                panic!("unexpected message {msg:?}")
+                panic!("follower received unexpected message {msg:?}")
             }
         };
         Ok(self.into())
@@ -498,6 +488,7 @@ impl RawNode<Follower> {
 
     /// Processes a logical clock tick.
     fn tick(mut self) -> Result<Node> {
+        // Campaign if we haven't heard from the leader in a while.
         self.role.leader_seen += 1;
         if self.role.leader_seen >= self.role.election_timeout {
             return Ok(self.into_candidate()?.into());
@@ -564,14 +555,14 @@ impl RawNode<Candidate> {
             // is yet. We'll find out when we step a message from it.
             assert_ne!(term, self.term(), "can't become leaderless follower in current term");
             info!("Discovered new term {term}");
-            self.log.set_term(term, None)?;
+            self.log.set_term_vote(term, None)?;
             Ok(self.into_role(Follower::new(None, election_timeout)))
         }
     }
 
     /// Transitions the candidate to a leader. We won the election.
     fn into_leader(self) -> Result<RawNode<Leader>> {
-        let (term, vote) = self.log.get_term();
+        let (term, vote) = self.log.get_term_vote();
         assert_ne!(term, 0, "leaders can't have term 0");
         assert_eq!(vote, Some(self.id), "leader did not vote for self");
 
@@ -593,12 +584,13 @@ impl RawNode<Candidate> {
 
     /// Processes an inbound message.
     fn step(mut self, msg: Envelope) -> Result<Node> {
-        // Past term: drop the message.
+        // Past term: outdated peer, drop the message.
         if msg.term < self.term() {
             debug!("Dropping message from past term: {msg:?}");
             return Ok(self.into());
         }
-        // Future term: become leaderless follower and step the message.
+        // Future term: newer leader or candidate, become leaderless follower
+        // and step the message.
         if msg.term > self.term() {
             return self.into_follower(msg.term, None)?.step(msg);
         }
@@ -644,6 +636,7 @@ impl RawNode<Candidate> {
 
     /// Processes a logical clock tick.
     fn tick(mut self) -> Result<Node> {
+        // If noone won this election, start a new one after a while.
         self.role.election_duration += 1;
         if self.role.election_duration >= self.role.election_timeout {
             self.campaign()?;
@@ -658,15 +651,15 @@ impl RawNode<Candidate> {
         info!("Starting new election for term {term}");
         self.role = Candidate::new(self.random_election_timeout());
         self.role.votes.insert(self.id); // vote for ourself
-        self.log.set_term(term, Some(self.id))?;
+        self.log.set_term_vote(term, Some(self.id))?;
 
         let (last_index, last_term) = self.log.get_last_index();
         self.broadcast(Message::Campaign { last_index, last_term })
     }
 }
 
-// A leader serves client requests and replicates the log to followers.
-// If the leader loses leadership, all client requests are aborted.
+/// A leader serves client requests and replicates the log to followers.
+/// If the leader loses leadership, all client requests are aborted.
 pub struct Leader {
     /// Follower replication progress.
     progress: HashMap<NodeID, Progress>,
@@ -676,8 +669,8 @@ pub struct Leader {
     writes: HashMap<Index, Write>,
     /// Tracks pending read requests. For linearizability, read requests are
     /// assigned a sequence number and only executed once a quorum of nodes have
-    /// confirmed it. Otherwise, an old leader may serve stale reads if a new
-    /// leader has been elected elsewhere.
+    /// confirmed that we're still the leader. Otherwise, an old leader could
+    /// serve stale reads if a new leader has been elected elsewhere.
     reads: VecDeque<Read>,
     /// The read sequence number used for the last read. Initialized to 0 in
     /// this term, and incremented for every read command.
@@ -686,7 +679,7 @@ pub struct Leader {
     since_heartbeat: Ticks,
 }
 
-/// Follower replication progress (in this term).
+/// Per-follower replication progress (in this term).
 struct Progress {
     /// The highest index where the follower's log is known to match the leader.
     /// Initialized to 0, increases monotonically.
@@ -695,10 +688,10 @@ struct Progress {
     /// last_index+1, decreased when probing log mismatches. Always in
     /// the range [match_index+1, last_index+1].
     ///
-    /// Entries pending transmission are in the range [next_index, last_index].
-    /// Unacknowledged entries are in the range [match_index+1, next_index).
+    /// Entries not yet sent are in the range [next_index, last_index].
+    /// Entries not acknowledged are in the range [match_index+1, next_index).
     next_index: Index,
-    /// The last read sequence number confirmed by the peer. To avoid stale
+    /// The last read sequence number confirmed by this follower. To avoid stale
     /// reads on leader changes, a read is only served once its sequence number
     /// is confirmed by a quorum.
     read_seq: ReadSequence,
@@ -779,7 +772,7 @@ impl Role for Leader {}
 impl RawNode<Leader> {
     /// Transitions the leader into a follower. This can only happen if we
     /// discover a new term, so we become a leaderless follower. Stepping the
-    /// received message may then follow the new leader, if there is one.
+    /// received message may then follow a new leader, if there is one.
     fn into_follower(mut self, term: Term) -> Result<RawNode<Follower>> {
         assert!(term > self.term(), "leader can only become follower in later term");
         info!("Discovered new term {term}");
@@ -795,14 +788,14 @@ impl RawNode<Leader> {
             self.send(read.from, Message::ClientResponse { id: read.id, response })?;
         }
 
-        self.log.set_term(term, None)?;
+        self.log.set_term_vote(term, None)?;
         let election_timeout = self.random_election_timeout();
         Ok(self.into_role(Follower::new(None, election_timeout)))
     }
 
     /// Processes an inbound message.
     fn step(mut self, msg: Envelope) -> Result<Node> {
-        // Past term: drop the message.
+        // Past term: outdated peer, drop the message.
         if msg.term < self.term() {
             debug!("Dropping message from past term: {msg:?}");
             return Ok(self.into());
@@ -951,6 +944,7 @@ impl RawNode<Leader> {
 
     /// Processes a logical clock tick.
     fn tick(mut self) -> Result<Node> {
+        // Send periodic heartbeats.
         self.role.since_heartbeat += 1;
         if self.role.since_heartbeat >= self.opts.heartbeat_interval {
             self.heartbeat()?;
@@ -990,7 +984,7 @@ impl RawNode<Leader> {
     fn maybe_commit_and_apply(&mut self) -> Result<Index> {
         // Determine the new commit index by quorum.
         let (last_index, _) = self.log.get_last_index();
-        let quorum_index = self.quorum_value(
+        let commit_index = self.quorum_value(
             self.role.progress.values().map(|p| p.match_index).chain([last_index]).collect(),
         );
 
@@ -998,20 +992,20 @@ impl RawNode<Leader> {
         // this, since the quorum value may regress e.g. following a restart or
         // leader change where followers are initialized with match index 0.
         let (old_index, old_term) = self.log.get_commit_index();
-        if quorum_index <= old_index {
+        if commit_index <= old_index {
             return Ok(old_index);
         }
 
         // We can only safely commit an entry from our own term (see section
         // 5.4.2 in Raft paper).
-        match self.log.get(quorum_index)? {
+        match self.log.get(commit_index)? {
             Some(entry) if entry.term == self.term() => {}
             Some(_) => return Ok(old_index),
-            None => panic!("commit index {quorum_index} missing"),
+            None => panic!("commit index {commit_index} missing"),
         }
 
         // Commit entries.
-        self.log.commit(quorum_index)?;
+        self.log.commit(commit_index)?;
 
         // Apply entries and respond to clients.
         let term = self.term();
@@ -1023,7 +1017,7 @@ impl RawNode<Leader> {
 
             if let Some(Write { id, from: to }) = write {
                 let message = Message::ClientResponse { id, response: result.map(Response::Write) };
-                Self::send_with(&self.tx, Envelope { from: self.id, term, to, message })?;
+                Self::send_via(&self.tx, Envelope { from: self.id, term, to, message })?;
             }
         }
         drop(iter);
@@ -1034,10 +1028,11 @@ impl RawNode<Leader> {
             self.maybe_read()?;
         }
 
-        Ok(quorum_index)
+        Ok(commit_index)
     }
 
-    /// Executes any ready read requests (with confirmed sequence numbers).
+    /// Executes any ready read requests, where a quorum have confirmed that
+    /// we're still the leader for the read sequences.
     fn maybe_read(&mut self) -> Result<()> {
         if self.role.reads.is_empty() {
             return Ok(());
@@ -1070,18 +1065,19 @@ impl RawNode<Leader> {
         Ok(())
     }
 
-    // Sends a batch of pending log entries to a follower in the
-    // [next_index,last_index] range, limited by max_append_entries.
-    //
-    // If probe is true, an empty append probe with base_index of next_index-1
-    // is sent to check if the base entry is present in the follower's log. If
-    // it is, the actual entries are sent next -- otherwise, next_index is
-    // decremented and another probe is sent until a match is found. See section
-    // 5.3 in the Raft paper.
-    //
-    // The probe is skipped if the follower is up-to-date (according to
-    // match_index and last_index). If the probe's base_index has already been
-    // confirmed via match_index, an actual append is sent instead.
+    /// Sends a batch of pending log entries to a follower, in the
+    /// [next_index,last_index] range. Limited by max_append_entries.
+    ///
+    /// If probe is true, we're trying to find a log index on the follower where
+    /// it matches our log. To do this, we send an empty append probe with
+    /// base_index of next_index-1. If the follower confirms the base_index
+    /// matches its log, the actual entries are sent next -- otherwise,
+    /// next_index is decremented and another probe is sent until a match is
+    /// found. See section 5.3 in the Raft paper.
+    ///
+    /// The probe is skipped if the follower is up-to-date (according to
+    /// match_index and last_index). If the probe's base_index has already been
+    /// confirmed via match_index, an actual append is sent instead.
     fn maybe_send_append(&mut self, peer: NodeID, mut probe: bool) -> Result<()> {
         let (last_index, _) = self.log.get_last_index();
         let progress = self.role.progress.get_mut(&peer).expect("unknown node");
@@ -1109,7 +1105,7 @@ impl RawNode<Leader> {
         // Fetch the base and entries.
         let (base_index, base_term) = match progress.next_index {
             0 => panic!("next_index=0 for node {peer}"),
-            1 => (0, 0),
+            1 => (0, 0), // first entry, there is no base
             next => self.log.get(next - 1)?.map(|e| (e.index, e.term)).expect("missing base entry"),
         };
         let entries = match probe {
@@ -1161,6 +1157,7 @@ mod tests {
     use std::borrow::Borrow;
     use std::error::Error;
     use std::fmt::Write as _;
+    use std::path::Path;
     use std::result::Result;
 
     use crossbeam::channel::Receiver;
@@ -1179,7 +1176,7 @@ mod tests {
     // Run goldenscript tests in src/raft/testscripts/node.
     test_each_path! { in "src/raft/testscripts/node" as scripts => test_goldenscript }
 
-    fn test_goldenscript(path: &std::path::Path) {
+    fn test_goldenscript(path: &Path) {
         goldenscript::run(&mut TestRunner::new(), path).expect("goldenscript failed")
     }
 
@@ -1222,6 +1219,43 @@ mod tests {
         }
     }
 
+    /// Helper macro which calls a closure on the inner RawNode<Role>.
+    macro_rules! with_rawnode {
+        // Node is moved.
+        ($node:expr, $closure:expr) => {{
+            fn with<R: Role, T>(node: RawNode<R>, f: impl FnOnce(RawNode<R>) -> T) -> T {
+                f(node)
+            }
+            match $node {
+                Node::Candidate(node) => with(node, $closure),
+                Node::Follower(node) => with(node, $closure),
+                Node::Leader(node) => with(node, $closure),
+            }
+        }};
+        // Node is borrowed (ref).
+        (ref $node:expr, $closure:expr) => {{
+            fn with<R: Role, T>(node: &RawNode<R>, f: impl FnOnce(&RawNode<R>) -> T) -> T {
+                f(node)
+            }
+            match $node {
+                &Node::Candidate(ref node) => with(node, $closure),
+                &Node::Follower(ref node) => with(node, $closure),
+                &Node::Leader(ref node) => with(node, $closure),
+            }
+        }};
+        // Node is mutably borrowed (ref mut).
+        (ref mut $node:expr, $closure:expr) => {{
+            fn with<R: Role, T>(node: &mut RawNode<R>, f: impl FnOnce(&mut RawNode<R>) -> T) -> T {
+                f(node)
+            }
+            match $node {
+                &mut Node::Candidate(ref mut node) => with(node, $closure),
+                &mut Node::Follower(ref mut node) => with(node, $closure),
+                &mut Node::Leader(ref mut node) => with(node, $closure),
+            }
+        }};
+    }
+
     /// Test helpers for Node.
     impl Node {
         fn dismantle(self) -> (Log, Box<dyn State>) {
@@ -1241,7 +1275,7 @@ mod tests {
         }
 
         fn get_term_vote(&self) -> (Term, Option<NodeID>) {
-            with_rawnode!(ref self, |n| n.log.get_term())
+            with_rawnode!(ref self, |n| n.log.get_term_vote())
         }
 
         fn options(&self) -> Options {

@@ -53,7 +53,8 @@ pub trait State: Send {
 /// Test helper state machines.
 #[cfg(test)]
 pub mod test {
-    use std::{collections::BTreeMap, fmt::Display};
+    use std::collections::BTreeMap;
+    use std::fmt::Display;
 
     use crossbeam::channel::Sender;
     use itertools::Itertools as _;
