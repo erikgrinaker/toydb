@@ -10,7 +10,7 @@ default-run = "toydb"
 doctest = false
 
 [dependencies]
-bincode = "1.3"
+bincode = { version = "2.0", features = ["serde"] }
 clap = { version = "4.5", features = ["cargo", "derive"] }
 config = "0.15"
 crossbeam = { version = "0.8", features = ["crossbeam-channel"] }
