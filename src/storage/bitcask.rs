@@ -10,7 +10,7 @@ use fs4::fs_std::FileExt;
 use log::{error, info};
 
 use super::{Engine, Status};
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// A very simple variant of BitCask, itself a simple log-structured key-value
 /// engine used e.g. by the Riak database. This is not compatible with BitCask
@@ -258,7 +258,9 @@ impl Log {
             .create(true)
             .truncate(false)
             .open(&path)?;
-        file.try_lock_exclusive()?;
+        if !file.try_lock_exclusive()? {
+            return Err(Error::IO(format!("file {path:?} is already is use")));
+        }
         Ok(Self { file, path })
     }
 

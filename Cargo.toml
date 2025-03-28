@@ -15,7 +15,7 @@ clap = { version = "4.5", features = ["cargo", "derive"] }
 config = "0.15"
 crossbeam = { version = "0.8", features = ["crossbeam-channel"] }
 dyn-clone = "1.0"
-fs4 = "0.12"
+fs4 = "0.13"
 hdrhistogram = "7.5"
 itertools = "0.14"
 log = "0.4"
