@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cmp::{Eq, Ordering, PartialEq};
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
+use std::result::Result as StdResult;
 
 use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize, Serializer};
@@ -11,23 +12,39 @@ use crate::error::{Error, Result};
 use crate::sql::parser::ast;
 use crate::{errdata, errinput};
 
-/// A primitive SQL value.
-///
-/// For simplicity, only a handful of representative scalar types are supported,
-/// no compound types or more compact variants.
-///
-/// In SQL, neither Null nor floating point NaN are considered equal to
-/// themselves (they are unknown values). However, in code, we consider them
-/// equal and comparable. This is necessary to allow sorting and processing of
-/// these values (e.g. in index lookups, aggregation buckets, etc.). SQL
-/// expression evaluation have special handling of these values to produce the
-/// desired NULL != NULL and NAN != NAN semantics in SQL queries.
-///
-/// Float -0.0 is considered equal to 0.0. It is normalized to 0.0 when stored.
-/// Similarly, -NaN is normalized to NaN.
+/// A primitive SQL data type. For simplicity, only a handful of scalar types
+/// are supported (no compound types).
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Serialize, Deserialize)]
+pub enum DataType {
+    /// A boolean: true or false.
+    Boolean,
+    /// A 64-bit signed integer.
+    Integer,
+    /// A 64-bit floating point number.
+    Float,
+    /// A UTF-8 encoded string.
+    String,
+}
+
+impl Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Boolean => write!(f, "BOOLEAN"),
+            Self::Integer => write!(f, "INTEGER"),
+            Self::Float => write!(f, "FLOAT"),
+            Self::String => write!(f, "STRING"),
+        }
+    }
+}
+
+/// A primitive SQL value, represented as a native Rust type.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Value {
-    /// An unknown value of unknown type.
+    /// An unknown value of unknown type (i.e. SQL NULL).
+    ///
+    /// In code, Null is considered equal to Null, so that we can detect, index,
+    /// and order these values. The SQL NULL semantics are implemented during
+    /// Expression evaluation.
     Null,
     /// A boolean.
     Boolean(bool),
@@ -35,8 +52,12 @@ pub enum Value {
     Integer(i64),
     /// A 64-bit floating point number.
     ///
-    /// ±0.0 and ±NaN are considered equal, and are normalized to the positive
-    /// variant when serialized.
+    /// In code, NaN is considered equal to NaN, so that we can detect, index,
+    /// and order these values. The SQL NAN semantics are implemented during
+    /// Expression evaluation.
+    ///
+    /// -0.0 and -NaN are considered equal to their positive counterpart, and
+    /// normalized as positive when serialized (for key lookups).
     Float(#[serde(serialize_with = "serialize_f64")] f64),
     /// A UTF-8 encoded string.
     String(String),
@@ -44,77 +65,91 @@ pub enum Value {
 
 impl encoding::Value for Value {}
 
-/// Serialize f64 -0.0 and -NaN as their positive counterpart, such that they
-/// are considered equal in the key/value store (e.g. for index lookups and
-/// scans). This is equivalent to the Hash/PartialEq/Ord impls below.
-fn serialize_f64<S: Serializer>(value: &f64, s: S) -> std::result::Result<S::Ok, S::Error> {
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Null => f.write_str("NULL"),
+            Self::Boolean(true) => f.write_str("TRUE"),
+            Self::Boolean(false) => f.write_str("FALSE"),
+            Self::Integer(integer) => integer.fmt(f),
+            Self::Float(float) => write!(f, "{float:?}"),
+            Self::String(string) => write!(f, "'{}'", string.escape_debug()),
+        }
+    }
+}
+
+/// Serialize f64 -0.0 and -NaN as positive, such that they're considered equal
+/// in the key/value store (e.g. for index lookups).
+fn serialize_f64<S: Serializer>(value: &f64, serializer: S) -> StdResult<S::Ok, S::Error> {
     let mut value = *value;
     if (value.is_nan() || value == 0.0) && value.is_sign_negative() {
         value = -value;
     }
-    s.serialize_f64(value)
+    serializer.serialize_f64(value)
 }
 
-// In code, consider Null and NaN equal, so that we can detect and process these
-// values (e.g. in index lookups, aggregation groups, etc). SQL expressions
-// handle them specially to provide their undefined value semantics.
+// Consider Nulls and ±NaNs equal. Rust already considers -0.0 == 0.0.
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Boolean(l), Self::Boolean(r)) => l == r,
-            (Self::Integer(l), Self::Integer(r)) => l == r,
-            (Self::Float(l), Self::Float(r)) => l == r || l.is_nan() && r.is_nan(),
-            (Self::String(l), Self::String(r)) => l == r,
-            (l, r) => core::mem::discriminant(l) == core::mem::discriminant(r),
+            (Self::Boolean(a), Self::Boolean(b)) => a == b,
+            (Self::Integer(a), Self::Integer(b)) => a == b,
+            (Self::Integer(a), Self::Float(b)) => *a as f64 == *b,
+            (Self::Float(a), Self::Integer(b)) => *a == *b as f64,
+            (Self::Float(a), Self::Float(b)) => a == b || a.is_nan() && b.is_nan(),
+            (Self::String(a), Self::String(b)) => a == b,
+            (Self::Null, Self::Null) => true,
+            (_, _) => false,
         }
     }
 }
 
 impl Eq for Value {}
 
+// Allow hashing Nulls and floats, and hash -0.0 and -NaN as positive.
 impl Hash for Value {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        core::mem::discriminant(self).hash(state);
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        core::mem::discriminant(self).hash(hasher); // hash the type
         match self {
             Self::Null => {}
-            Self::Boolean(v) => v.hash(state),
-            Self::Integer(v) => v.hash(state),
+            Self::Boolean(v) => v.hash(hasher),
+            Self::Integer(v) => v.hash(hasher),
             Self::Float(v) => {
-                // Hash -NaN and -0.0 as their positive counterpart.
+                // Hash -NaN and -0.0 as positive.
                 let mut v = *v;
                 if (v.is_nan() || v == 0.0) && v.is_sign_negative() {
                     v = -v;
                 }
-                v.to_bits().hash(state)
+                v.to_bits().hash(hasher)
             }
-            Self::String(v) => v.hash(state),
+            Self::String(v) => v.hash(hasher),
         }
     }
 }
 
-// For ordering purposes, we consider NULL and NaN equal. We establish a total
-// order across all types, even though mixed types will rarely/never come up.
+// Consider Nulls and NaNs equal when ordering.
+//
+// We establish a total order across all types, even though mixed types will
+// rarely/never come up: String > Integer/Float > Boolean > Null.
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
-        use Ordering::*;
-        use Value::*;
         match (self, other) {
-            (Null, Null) => Equal,
-            (Boolean(a), Boolean(b)) => a.cmp(b),
-            (Integer(a), Integer(b)) => a.cmp(b),
-            (Integer(a), Float(b)) => (*a as f64).total_cmp(b),
-            (Float(a), Integer(b)) => a.total_cmp(&(*b as f64)),
-            (Float(a), Float(b)) => a.total_cmp(b),
-            (String(a), String(b)) => a.cmp(b),
+            (Self::Null, Self::Null) => Ordering::Equal,
+            (Self::Boolean(a), Self::Boolean(b)) => a.cmp(b),
+            (Self::Integer(a), Self::Integer(b)) => a.cmp(b),
+            (Self::Integer(a), Self::Float(b)) => (*a as f64).total_cmp(b),
+            (Self::Float(a), Self::Integer(b)) => a.total_cmp(&(*b as f64)),
+            (Self::Float(a), Self::Float(b)) => a.total_cmp(b),
+            (Self::String(a), Self::String(b)) => a.cmp(b),
 
-            (Null, _) => Less,
-            (_, Null) => Greater,
-            (Boolean(_), _) => Less,
-            (_, Boolean(_)) => Greater,
-            (Float(_), _) => Less,
-            (_, Float(_)) => Greater,
-            (Integer(_), _) => Less,
-            (_, Integer(_)) => Greater,
+            (Self::Null, _) => Ordering::Less,
+            (_, Self::Null) => Ordering::Greater,
+            (Self::Boolean(_), _) => Ordering::Less,
+            (_, Self::Boolean(_)) => Ordering::Greater,
+            (Self::Float(_), _) => Ordering::Less,
+            (_, Self::Float(_)) => Ordering::Greater,
+            (Self::Integer(_), _) => Ordering::Less,
+            (_, Self::Integer(_)) => Ordering::Greater,
             // String is ordered last.
         }
     }
@@ -127,9 +162,30 @@ impl PartialOrd for Value {
 }
 
 impl Value {
-    /// Adds two values. Errors when invalid.
+    /// Returns the value's datatype, or None for null values.
+    pub fn datatype(&self) -> Option<DataType> {
+        match self {
+            Self::Null => None,
+            Self::Boolean(_) => Some(DataType::Boolean),
+            Self::Integer(_) => Some(DataType::Integer),
+            Self::Float(_) => Some(DataType::Float),
+            Self::String(_) => Some(DataType::String),
+        }
+    }
+
+    /// Returns true if the value is undefined (NULL or NaN).
+    pub fn is_undefined(&self) -> bool {
+        match self {
+            Self::Null => true,
+            Self::Float(f) if f.is_nan() => true,
+            _ => false,
+        }
+    }
+
+    /// Adds two values. Errors if invalid.
     pub fn checked_add(&self, other: &Self) -> Result<Self> {
         use Value::*;
+
         Ok(match (self, other) {
             (Integer(lhs), Integer(rhs)) => match lhs.checked_add(*rhs) {
                 Some(i) => Integer(i),
@@ -144,9 +200,10 @@ impl Value {
         })
     }
 
-    /// Divides two values. Errors when invalid.
+    /// Divides two values. Errors if invalid.
     pub fn checked_div(&self, other: &Self) -> Result<Self> {
         use Value::*;
+
         Ok(match (self, other) {
             (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
             (Integer(lhs), Integer(rhs)) => Integer(lhs / rhs),
@@ -159,9 +216,10 @@ impl Value {
         })
     }
 
-    /// Multiplies two values. Errors when invalid.
+    /// Multiplies two values. Errors if invalid.
     pub fn checked_mul(&self, other: &Self) -> Result<Self> {
         use Value::*;
+
         Ok(match (self, other) {
             (Integer(lhs), Integer(rhs)) => match lhs.checked_mul(*rhs) {
                 Some(i) => Integer(i),
@@ -176,9 +234,10 @@ impl Value {
         })
     }
 
-    /// Exponentiates two values. Errors when invalid.
+    /// Exponentiates two values. Errors if invalid.
     pub fn checked_pow(&self, other: &Self) -> Result<Self> {
         use Value::*;
+
         Ok(match (self, other) {
             (Integer(lhs), Integer(rhs)) if *rhs >= 0 => {
                 let rhs = (*rhs).try_into().or_else(|_| errinput!("integer overflow"))?;
@@ -197,13 +256,14 @@ impl Value {
         })
     }
 
-    /// Finds the remainder of two values. Errors when invalid.
+    /// Finds the remainder of two values. Errors if invalid.
     ///
-    /// NB: uses the remainder, not modulo, like Postgres. For negative values,
-    /// the result has the sign of the dividend, rather than always returning a
-    /// positive value (modulo).
+    /// NB: uses the remainder, not modulo, like Postgres. This means that for
+    /// negative values, the result has the sign of the dividend, rather than
+    /// always returning a positive value.
     pub fn checked_rem(&self, other: &Self) -> Result<Self> {
         use Value::*;
+
         Ok(match (self, other) {
             (Integer(_), Integer(0)) => return errinput!("can't divide by zero"),
             (Integer(lhs), Integer(rhs)) => Integer(lhs % rhs),
@@ -216,9 +276,10 @@ impl Value {
         })
     }
 
-    /// Subtracts two values. Errors when invalid.
+    /// Subtracts two values. Errors if invalid.
     pub fn checked_sub(&self, other: &Self) -> Result<Self> {
         use Value::*;
+
         Ok(match (self, other) {
             (Integer(lhs), Integer(rhs)) => match lhs.checked_sub(*rhs) {
                 Some(i) => Integer(i),
@@ -231,35 +292,6 @@ impl Value {
             (Integer(_) | Float(_), Null) => Null,
             (lhs, rhs) => return errinput!("can't subtract {lhs} and {rhs}"),
         })
-    }
-
-    /// Returns the value's datatype, or None for null values.
-    pub fn datatype(&self) -> Option<DataType> {
-        match self {
-            Self::Null => None,
-            Self::Boolean(_) => Some(DataType::Boolean),
-            Self::Integer(_) => Some(DataType::Integer),
-            Self::Float(_) => Some(DataType::Float),
-            Self::String(_) => Some(DataType::String),
-        }
-    }
-
-    /// Returns true if the value is undefined (NULL or NaN).
-    pub fn is_undefined(&self) -> bool {
-        *self == Self::Null || matches!(self, Self::Float(f) if f.is_nan())
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::Null => f.write_str("NULL"),
-            Self::Boolean(true) => f.write_str("TRUE"),
-            Self::Boolean(false) => f.write_str("FALSE"),
-            Self::Integer(integer) => integer.fmt(f),
-            Self::Float(float) => write!(f, "{float:?}"),
-            Self::String(string) => write!(f, "'{}'", string.escape_debug()),
-        }
     }
 }
 
@@ -343,30 +375,6 @@ impl<'a> From<&'a Value> for Cow<'a, Value> {
     }
 }
 
-/// A primitive data type.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Serialize, Deserialize)]
-pub enum DataType {
-    /// A boolean: true or false.
-    Boolean,
-    /// A 64-bit signed integer.
-    Integer,
-    /// A 64-bit floating point number.
-    Float,
-    /// A UTF-8 encoded string.
-    String,
-}
-
-impl Display for DataType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::Boolean => write!(f, "BOOLEAN"),
-            Self::Integer => write!(f, "INTEGER"),
-            Self::Float => write!(f, "FLOAT"),
-            Self::String => write!(f, "STRING"),
-        }
-    }
-}
-
 /// A row of values.
 pub type Row = Vec<Value>;
 
@@ -374,12 +382,14 @@ pub type Row = Vec<Value>;
 pub type Rows = Box<dyn RowIterator>;
 
 /// A row iterator trait, which requires the iterator to be both clonable and
-/// object-safe. Cloning is needed to be able to reset an iterator back to an
-/// initial state, e.g. during nested loop joins. It has a blanket
-/// implementation for all matching iterators.
+/// object-safe. Cloning allows resetting an iterator back to an initial state,
+/// e.g. for nested loop joins. It uses a blanket implementation, and relies on
+/// dyn_clone to allow cloning trait objects.
 pub trait RowIterator: Iterator<Item = Result<Row>> + DynClone {}
-impl<I: Iterator<Item = Result<Row>> + DynClone> RowIterator for I {}
+
 dyn_clone::clone_trait_object!(RowIterator);
+
+impl<I: Iterator<Item = Result<Row>> + DynClone> RowIterator for I {}
 
 /// A column label, used in query results and plans.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -418,7 +428,7 @@ impl From<Label> for ast::Expression {
         match label {
             Label::Qualified(table, column) => ast::Expression::Column(Some(table), column),
             Label::Unqualified(column) => ast::Expression::Column(None, column),
-            Label::None => panic!("can't convert None label to AST expression"), // shouldn't happen
+            Label::None => panic!("can't convert None label to AST expression"),
         }
     }
 }

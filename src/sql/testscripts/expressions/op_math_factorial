@@ -16,6 +16,13 @@ Error: invalid input: can't take factorial of 3.0
 Error: invalid input: can't take factorial of TRUE
 Error: invalid input: can't take factorial of 'a'
 
+# 0 factorial is 1, but negative factorial errors.
+> -0!
+!> -1!
+---
+1
+Error: invalid input: can't take factorial of -1
+
 # NULL yields null, infinity and NaN error.
 > NULL!
 !> INFINITY!

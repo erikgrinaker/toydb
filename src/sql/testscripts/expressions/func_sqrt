@@ -11,7 +11,7 @@
 !> sqrt(-1)
 > sqrt(0)
 ---
-Error: invalid input: can't take negative square root
+Error: invalid input: can't take square root of -1
 0.0
 
 # Floats work.

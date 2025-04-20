@@ -1,9 +1,8 @@
-use std::borrow::Cow;
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
-use super::{DataType, Value};
+use super::{DataType, Row, Value};
 use crate::encoding;
 use crate::errinput;
 use crate::error::Result;
@@ -13,7 +12,7 @@ use crate::sql::parser::is_ident;
 /// A table schema, which specifies its data structure and constraints.
 ///
 /// Tables can't change after they are created. There is no ALTER TABLE nor
-/// CREATE/DROP INDEX -- only CREATE TABLE and DROP TABLE.
+/// CREATE/DROP INDEX, only CREATE TABLE and DROP TABLE.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Table {
     /// The table name. Can't be empty.
@@ -38,22 +37,32 @@ pub struct Column {
     pub nullable: bool,
     /// The column's default value. If None, the user must specify an explicit
     /// value. Must match the column datatype. Nullable columns require a
-    /// default (often Null), and Null is only a valid default when nullable.
+    /// default (often Null). Null is only a valid default when nullable.
     pub default: Option<Value>,
     /// Whether the column should only allow unique values (ignoring NULLs).
-    /// Must be true for a primary key column.
+    /// Must be true for a primary key column. Requires index.
     pub unique: bool,
     /// Whether the column should have a secondary index. Must be false for
-    /// primary keys, which are the implicit primary index. Must be true for
-    /// unique or reference columns.
+    /// primary keys, which are the primary index. Must be true for unique or
+    /// reference columns.
     pub index: bool,
     /// If set, this column is a foreign key reference to the given table's
     /// primary key. Must be of the same type as the target primary key.
+    /// Requires index.
     pub references: Option<String>,
 }
 
+// Formats the table as a SQL CREATE TABLE statement.
 impl Display for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        /// Formats an identifier as valid SQL, quoting it if necessary.
+        fn format_ident(ident: &str) -> String {
+            match is_ident(ident) {
+                true => ident.to_string(),
+                false => format!("\"{}\"", ident.replace('\"', "\"\"")),
+            }
+        }
+
         writeln!(f, "CREATE TABLE {} (", format_ident(&self.name))?;
         for (i, column) in self.columns.iter().enumerate() {
             write!(f, "  {} {}", format_ident(&column.name), column.datatype)?;
@@ -169,7 +178,7 @@ impl Table {
     ///
     /// Validating uniqueness and references individually for each row is not
     /// performant, but it's fine for our purposes.
-    pub fn validate_row(&self, row: &[Value], update: bool, txn: &impl Transaction) -> Result<()> {
+    pub fn validate_row(&self, row: &Row, update: bool, txn: &impl Transaction) -> Result<()> {
         if row.len() != self.columns.len() {
             return errinput!("invalid row size for table {}", self.name);
         }
@@ -225,12 +234,4 @@ impl Table {
         }
         Ok(())
     }
-}
-
-/// Formats an identifier as valid SQL, quoting it if necessary.
-fn format_ident(ident: &str) -> Cow<str> {
-    if is_ident(ident) {
-        return ident.into();
-    }
-    format!("\"{}\"", ident.replace('\"', "\"\"")).into()
 }

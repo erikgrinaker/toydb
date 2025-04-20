@@ -305,7 +305,7 @@ mod tests {
             if tags.remove("cnf") {
                 let cnf = expr.clone().into_cnf();
                 assert_eq!(value, cnf.evaluate(None)?, "CNF result differs");
-                write!(output, " ← {}", cnf.format_constant())?;
+                write!(output, " ← {cnf}")?;
             }
 
             // If requested, debug-dump the parsed expression.
