@@ -15,12 +15,17 @@ Distributed SQL database in Rust, built from scratch as an educational project. 
 
 * [SQL interface][sql] including joins, aggregates, and transactions.
 
-Originally written to learn more about database internals, toyDB is intended to illustrate the basic
-architecture and concepts of distributed SQL databases. It focuses on simplicity and 
-understandability, and should be functional and correct. Other aspects like performance,
-scalability, and availability are explicit non-goals -- these are major sources of complexity in 
-production-grade  databases, which obscure the basic underlying concepts. Shortcuts have been taken 
-where possible.
+I originally wrote toyDB back in 2020 to learn more about database internals. Since then, I spent
+several years building real distributed SQL databases at
+[CockroachDB](https://github.com/cockroachdb/cockroach) and
+[Neon](https://github.com/neondatabase/neon), where I learnt a whole lot more. Based on this
+experience, I've now rewritten toyDB as a simple illustration of the basic architecture and concepts
+of distributed SQL databases.
+
+toyDB focuses on simplicity and understandability, but it should be functional and correct. Other
+aspects like performance, scalability, and availability are explicit non-goals -- these are major
+sources of complexity in production-grade databases, which obscure the basic underlying concepts.
+Shortcuts have been taken where possible.
 
 [raft]: https://github.com/erikgrinaker/toydb/blob/main/src/raft/mod.rs
 [txn]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/mvcc.rs
@@ -74,10 +79,9 @@ toydb> SELECT * FROM movies;
 3, 'Her'
 ```
 
-toyDB supports most common SQL features, including joins, aggregates, and transactions.
-
-Below is an `EXPLAIN` query plan of a more complex query, fetching movies from studios that have
-released movies with an IMDb rating of 8 or more:
+toyDB supports most common SQL features, including joins, aggregates, and transactions. Below is an
+`EXPLAIN` query plan of a more complex query (fetches all movies from studios that have released any
+movie with an IMDb rating of 8 or more):
 
 ```
 toydb> EXPLAIN SELECT m.title, g.name AS genre, s.name AS studio, m.rating
