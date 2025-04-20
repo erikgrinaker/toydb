@@ -19,7 +19,7 @@ I originally wrote toyDB back in 2020 to learn more about database internals. Si
 several years building real distributed SQL databases at
 [CockroachDB](https://github.com/cockroachdb/cockroach) and
 [Neon](https://github.com/neondatabase/neon), where I learnt a whole lot more. Based on this
-experience, I've now rewritten toyDB as a simple illustration of the basic architecture and concepts
+experience, I've rewritten toyDB to be a simple illustration of the basic architecture and concepts
 of distributed SQL databases.
 
 toyDB focuses on simplicity and understandability, but it should be functional and correct. Other
