@@ -95,7 +95,7 @@ inf
 Error: invalid input: primary key 3.14 already exists
 Error: invalid input: primary key -3.14 already exists
 Error: invalid input: primary key 0.0 already exists
-Error: invalid input: primary key 0.0 already exists
+Error: invalid input: primary key -0.0 already exists
 Error: invalid input: primary key 1.23456789012345e308 already exists
 Error: invalid input: primary key -1.23456789012345e308 already exists
 Error: invalid input: primary key inf already exists

@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 
 use dyn_clone::DynClone;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 use crate::encoding;
 use crate::error::{Error, Result};
@@ -34,12 +34,26 @@ pub enum Value {
     /// A 64-bit signed integer.
     Integer(i64),
     /// A 64-bit floating point number.
-    Float(f64),
+    ///
+    /// ±0.0 and ±NaN are considered equal, and are normalized to the positive
+    /// variant when serialized.
+    Float(#[serde(serialize_with = "serialize_f64")] f64),
     /// A UTF-8 encoded string.
     String(String),
 }
 
 impl encoding::Value for Value {}
+
+/// Serialize f64 -0.0 and -NaN as their positive counterpart, such that they
+/// are considered equal in the key/value store (e.g. for index lookups and
+/// scans). This is equivalent to the Hash/PartialEq/Ord impls below.
+fn serialize_f64<S: Serializer>(value: &f64, s: S) -> std::result::Result<S::Ok, S::Error> {
+    let mut value = *value;
+    if (value.is_nan() || value == 0.0) && value.is_sign_negative() {
+        value = -value;
+    }
+    s.serialize_f64(value)
+}
 
 // In code, consider Null and NaN equal, so that we can detect and process these
 // values (e.g. in index lookups, aggregation groups, etc). SQL expressions
@@ -61,12 +75,18 @@ impl Eq for Value {}
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
-        // Normalize to treat +/-0.0 and +/-NAN as equal when hashing.
-        match self.normalize_ref().as_ref() {
+        match self {
             Self::Null => {}
             Self::Boolean(v) => v.hash(state),
             Self::Integer(v) => v.hash(state),
-            Self::Float(v) => v.to_bits().hash(state),
+            Self::Float(v) => {
+                // Hash -NaN and -0.0 as their positive counterpart.
+                let mut v = *v;
+                if (v.is_nan() || v == 0.0) && v.is_sign_negative() {
+                    v = -v;
+                }
+                v.to_bits().hash(state)
+            }
             Self::String(v) => v.hash(state),
         }
     }
@@ -227,33 +247,6 @@ impl Value {
     /// Returns true if the value is undefined (NULL or NaN).
     pub fn is_undefined(&self) -> bool {
         *self == Self::Null || matches!(self, Self::Float(f) if f.is_nan())
-    }
-
-    /// Normalizes a value in place. Currently normalizes -0.0 and -NAN to 0.0
-    /// and NAN respectively, which is the canonical value used e.g. in primary
-    /// key and index lookups.
-    pub fn normalize(&mut self) {
-        if let Cow::Owned(normalized) = self.normalize_ref() {
-            *self = normalized;
-        }
-    }
-
-    /// Normalizes a borrowed value. Currently normalizes -0.0 and -NAN to 0.0
-    /// and NAN respectively, which is the canonical value used e.g. in primary
-    /// key and index lookups. Returns a Cow::Owned when changed, to avoid
-    /// allocating in the common case where the value doesn't change.
-    pub fn normalize_ref(&self) -> Cow<'_, Self> {
-        if let Self::Float(f) = self {
-            if (f.is_nan() || *f == -0.0) && f.is_sign_negative() {
-                return Cow::Owned(Self::Float(-f));
-            }
-        }
-        Cow::Borrowed(self)
-    }
-
-    // Returns true if the value is already normalized.
-    pub fn is_normalized(&self) -> bool {
-        matches!(self.normalize_ref(), Cow::Borrowed(_))
     }
 }
 
