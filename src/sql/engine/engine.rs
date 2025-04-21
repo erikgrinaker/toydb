@@ -11,9 +11,8 @@ use crate::storage::mvcc;
 /// table schemas, and interactive SQL sessions that execute client SQL
 /// statements. All engine access is transactional with snapshot isolation.
 pub trait Engine<'a>: Sized {
-    /// The engine's transaction type. This provides both row-level CRUD
-    /// operations as well as transactional access to the schema catalog. It
-    /// can't outlive the engine.
+    /// The engine's transaction type. This provides both row-level CRUD operations and
+    /// transactional access to the schema catalog.
     type Transaction: Transaction + Catalog + 'a;
 
     /// Begins a read-write transaction.
@@ -23,7 +22,7 @@ pub trait Engine<'a>: Sized {
     /// Begins a read-only transaction as of a historical version.
     fn begin_as_of(&'a self, version: mvcc::Version) -> Result<Self::Transaction>;
 
-    /// Creates a session for executing SQL statements. Can't outlive engine.
+    /// Creates a client session for executing SQL statements.
     fn session(&'a self) -> Session<'a, Self> {
         Session::new(self)
     }
@@ -38,14 +37,6 @@ pub trait Engine<'a>: Sized {
 pub trait Transaction {
     /// The transaction's internal MVCC state.
     fn state(&self) -> &mvcc::TransactionState;
-    /// The transaction's MVCC version. Unique for read/write transactions.
-    fn version(&self) -> mvcc::Version {
-        self.state().version
-    }
-    /// Whether the transaction is read-only.
-    fn read_only(&self) -> bool {
-        self.state().read_only
-    }
 
     /// Commits the transaction.
     fn commit(self) -> Result<()>;
@@ -62,19 +53,18 @@ pub trait Transaction {
     fn lookup_index(&self, table: &str, column: &str, values: &[Value]) -> Result<BTreeSet<Value>>;
     /// Scans a table's rows, optionally applying the given filter.
     fn scan(&self, table: &str, filter: Option<Expression>) -> Result<Rows>;
-    /// Updates table rows by primary key. Uses BTreeMap for testing.
+    /// Updates table rows by primary key. BTreeMap for testing.
     fn update(&self, table: &str, rows: BTreeMap<Value, Row>) -> Result<()>;
 }
 
 /// The catalog stores table schema information. It must be implemented for
-/// Engine::Transaction, and is thus fully transactional. For simplicity, it
-/// only supports creating and dropping tables. There are no ALTER TABLE schema
-/// changes, nor CREATE INDEX -- everything has to be specified when the table
-/// is initially created.
+/// Engine::Transaction, and is fully transactional. For simplicity, it only
+/// supports creating and dropping tables -- there are no ALTER TABLE schema
+/// changes, nor CREATE INDEX.
 ///
 /// This type is separate from Transaction, even though Engine::Transaction
 /// requires transactions to implement it. This allows better control of when
-/// catalog access should be used (i.e. during planning, not execution).
+/// catalog access can be used (i.e. during planning, not execution).
 pub trait Catalog {
     /// Creates a new table. Errors if it already exists.
     fn create_table(&self, table: Table) -> Result<()>;

@@ -15,7 +15,7 @@ use crate::sql::parser::is_ident;
 /// CREATE/DROP INDEX, only CREATE TABLE and DROP TABLE.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Table {
-    /// The table name. Can't be empty.
+    /// The table name. Unique identifier for the table. Can't be empty.
     pub name: String,
     /// The primary key column index. A table must have a primary key, and it
     /// can only be a single column.

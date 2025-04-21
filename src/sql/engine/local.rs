@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::slice;
 
 use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
@@ -11,8 +12,42 @@ use crate::error::Result;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::{self, mvcc};
 
-/// A SQL engine using local storage. This provides the main SQL storage logic,
-/// and the Raft SQL engine just dispatches to this for node-local SQL storage.
+/// SQL engine keys, using the Keycode order-preserving encoding. For
+/// simplicity, table and column names are used directly as identifiers, instead
+/// of e.g. numeric IDs. It is not possible to change table/column names, so
+/// this is fine, if somewhat inefficient.
+///
+/// Uses Cow to allow encoding borrowed values but decoding owned values.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum Key<'a> {
+    /// A table schema, keyed by table name.
+    Table(Cow<'a, str>),
+    /// A column index entry, keyed by table name, column name, and index value.
+    Index(Cow<'a, str>, Cow<'a, str>, Cow<'a, Value>),
+    /// A table row, keyed by table name and primary key value.
+    Row(Cow<'a, str>, Cow<'a, Value>),
+}
+
+impl<'a> encoding::Key<'a> for Key<'a> {}
+
+/// Key prefixes, allowing prefix scans of specific parts of the keyspace. These
+/// must match the keys -- in particular, the enum variant indexes must match,
+/// since it's part of the encoded key.
+#[derive(Deserialize, Serialize)]
+enum KeyPrefix<'a> {
+    /// All table schemas.
+    Table,
+    /// All column index entries, keyed by table and column name.
+    Index(Cow<'a, str>, Cow<'a, str>),
+    /// All table rows, keyed by table name.
+    Row(Cow<'a, str>),
+}
+
+impl<'a> encoding::Key<'a> for KeyPrefix<'a> {}
+
+/// A SQL engine using local storage. This provides the main SQL storage logic.
+/// The Raft SQL engine dispatches to this for node-local SQL storage, executing
+/// the same writes across each nodes' instance of `Local`.
 pub struct Local<E: storage::Engine + 'static> {
     /// The local MVCC storage engine.
     pub mvcc: mvcc::MVCC<E>,
@@ -24,10 +59,10 @@ impl<E: storage::Engine> Local<E> {
         Self { mvcc: mvcc::MVCC::new(engine) }
     }
 
-    /// Resumes a transaction from the given state. This is usually encapsulated
-    /// in `mvcc::Transaction`, but the Raft-based engine can't retain the MVCC
-    /// transaction between each request since it may be executed across
-    /// different leader nodes, so it instead keeps the state in the session.
+    /// Resumes a transaction from the given state. This is usually kept within
+    /// `mvcc::Transaction`, but the Raft-based engine can't retain the MVCC
+    /// transaction across requests since it may be executed on different leader
+    /// nodes, so it instead keeps the state client-side in the session.
     pub fn resume(&self, state: mvcc::TransactionState) -> Result<Transaction<E>> {
         Ok(Transaction::new(self.mvcc.resume(state)?))
     }
@@ -95,14 +130,14 @@ impl<E: storage::Engine> Transaction<E> {
             .transpose()
     }
 
-    /// Returns true if the given secondary index exists.
+    /// Returns true if a secondary index exists for the given column.
     fn has_index(&self, table: &str, column: &str) -> Result<bool> {
         let table = self.must_get_table(table)?;
         Ok(table.columns.iter().find(|c| c.name == column).map(|c| c.index).unwrap_or(false))
     }
 
     /// Stores a secondary index entry for the given column value, replacing the
-    /// existing entry.
+    /// existing entry if any.
     fn set_index(
         &self,
         table: &str,
@@ -112,23 +147,28 @@ impl<E: storage::Engine> Transaction<E> {
     ) -> Result<()> {
         debug_assert!(self.has_index(table, column)?, "no index on {table}.{column}");
         let key = Key::Index(table.into(), column.into(), value.into()).encode();
-        if ids.is_empty() { self.txn.delete(&key) } else { self.txn.set(&key, ids.encode()) }
+        if ids.is_empty() {
+            self.txn.delete(&key)?;
+        } else {
+            self.txn.set(&key, ids.encode())?;
+        }
+        Ok(())
     }
 
     /// Returns all tables referencing a table, as (table, column index) pairs.
-    /// This includes references from the table itself.
+    /// This includes any references from the table itself.
     fn table_references(&self, table: &str) -> Result<Vec<(Table, Vec<usize>)>> {
         Ok(self
             .list_tables()?
             .into_iter()
             .map(|t| {
-                let references: Vec<usize> = t
+                let references = t
                     .columns
                     .iter()
                     .enumerate()
                     .filter(|(_, c)| c.references.as_deref() == Some(table))
                     .map(|(i, _)| i)
-                    .collect();
+                    .collect_vec();
                 (t, references)
             })
             .filter(|(_, references)| !references.is_empty())
@@ -170,7 +210,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                     self.lookup_index(&source.name, &column.name, ids)?
                 };
                 // We can ignore any references between the deleted rows,
-                // including a row referring to itself.
+                // including a row referencing itself.
                 if self_reference {
                     for id in ids {
                         source_ids.remove(id);
@@ -185,19 +225,19 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             }
         }
 
-        // Delete the rows.
         for id in ids {
-            // Update any index entries.
+            // Update any secondary index entries.
             if !indexes.is_empty() {
                 if let Some(row) = self.get_row(&table.name, id)? {
                     for (i, column) in indexes.iter().copied() {
-                        let mut index = self.get_index(&table.name, &column.name, &row[i])?;
-                        index.remove(id);
-                        self.set_index(&table.name, &column.name, &row[i], index)?;
+                        let mut ids = self.get_index(&table.name, &column.name, &row[i])?;
+                        ids.remove(id);
+                        self.set_index(&table.name, &column.name, &row[i], ids)?;
                     }
                 }
             }
 
+            // Delete the row.
             self.txn.delete(&Key::Row((&table.name).into(), id.into()).encode())?;
         }
         Ok(())
@@ -215,11 +255,11 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             let id = &row[table.primary_key];
             self.txn.set(&Key::Row((&table.name).into(), id.into()).encode(), row.encode())?;
 
-            // Update any secondary indexes.
+            // Update any secondary index entries.
             for (i, column) in table.columns.iter().enumerate().filter(|(_, c)| c.index) {
-                let mut index = self.get_index(&table.name, &column.name, &row[i])?;
-                index.insert(id.clone());
-                self.set_index(&table.name, &column.name, &row[i], index)?;
+                let mut ids = self.get_index(&table.name, &column.name, &row[i])?;
+                ids.insert(id.clone());
+                self.set_index(&table.name, &column.name, &row[i], ids)?;
             }
         }
         Ok(())
@@ -269,7 +309,7 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
             // Update indexes, knowing that the primary key has not changed.
             let indexes = table.columns.iter().enumerate().filter(|(_, c)| c.index).collect_vec();
             if !indexes.is_empty() {
-                let old = self.get(&table.name, &[id.clone()])?.remove(0);
+                let old = self.get(&table.name, slice::from_ref(&id))?.remove(0);
                 for (i, column) in indexes {
                     // If the value didn't change, we don't have to do anything.
                     if old[i] == row[i] {
@@ -277,14 +317,14 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
                     }
 
                     // Remove the old value from the index entry.
-                    let mut index = self.get_index(&table.name, &column.name, &old[i])?;
-                    index.remove(&id);
-                    self.set_index(&table.name, &column.name, &old[i], index)?;
+                    let mut ids = self.get_index(&table.name, &column.name, &old[i])?;
+                    ids.remove(&id);
+                    self.set_index(&table.name, &column.name, &old[i], ids)?;
 
                     // Insert the new value into the index entry.
-                    let mut index = self.get_index(&table.name, &column.name, &row[i])?;
-                    index.insert(id.clone());
-                    self.set_index(&table.name, &column.name, &row[i], index)?;
+                    let mut ids = self.get_index(&table.name, &column.name, &row[i])?;
+                    ids.insert(id.clone());
+                    self.set_index(&table.name, &column.name, &row[i], ids)?;
                 }
             }
 
@@ -305,10 +345,11 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
     }
 
     fn drop_table(&self, table: &str, if_exists: bool) -> Result<bool> {
-        let table = match self.get_table(table)? {
-            Some(table) => table,
-            None if if_exists => return Ok(false),
-            None => return errinput!("table {table} does not exist"),
+        let Some(table) = self.get_table(table)? else {
+            if if_exists {
+                return Ok(false);
+            }
+            return errinput!("table {table} does not exist");
         };
 
         // Check for foreign key references.
@@ -326,22 +367,18 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
         // Delete the table schema entry.
         self.txn.delete(&Key::Table((&table.name).into()).encode())?;
 
-        // Delete the table rows. storage::Engine doesn't support writing while
-        // scanning, so we buffer all keys in a vector. We could also do this in
-        // batches, although we'd want to do the batching above Raft to avoid
-        // blocking Raft processing for the duration of the drop.
+        // Delete the table rows.
         let prefix = &KeyPrefix::Row((&table.name).into()).encode();
-        let keys: Vec<Vec<u8>> =
-            self.txn.scan_prefix(prefix).map_ok(|(key, _)| key).try_collect()?;
-        for key in keys {
+        let mut keys = self.txn.scan_prefix(prefix).map_ok(|(key, _)| key);
+        while let Some(key) = keys.next().transpose()? {
             self.txn.delete(&key)?;
         }
 
-        // Delete any secondary indexes.
+        // Delete any secondary index entries.
         for column in table.columns.iter().filter(|c| c.index) {
             let prefix = &KeyPrefix::Index((&table.name).into(), (&column.name).into()).encode();
-            let keys: Vec<_> = self.txn.scan_prefix(prefix).map_ok(|(key, _)| key).try_collect()?;
-            for key in keys {
+            let mut keys = self.txn.scan_prefix(prefix).map_ok(|(key, _)| key);
+            while let Some(key) = keys.next().transpose()? {
                 self.txn.delete(&key)?;
             }
         }
@@ -359,35 +396,3 @@ impl<E: storage::Engine> Catalog for Transaction<E> {
             .collect()
     }
 }
-
-/// SQL engine keys, using the Keycode order-preserving encoding. For
-/// simplicity, table and column names are used directly as identifiers in
-/// keys, instead of e.g. numberic IDs. It is not possible to change
-/// table/column names, so this is fine.
-///
-/// Uses Cow to allow encoding borrowed values but decoding owned values.
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Key<'a> {
-    /// A table schema by table name.
-    Table(Cow<'a, str>),
-    /// An index entry, by table name, index name, and index value.
-    Index(Cow<'a, str>, Cow<'a, str>, Cow<'a, Value>),
-    /// A table row, by table name and primary key value.
-    Row(Cow<'a, str>, Cow<'a, Value>),
-}
-
-impl<'a> encoding::Key<'a> for Key<'a> {}
-
-/// Key prefixes, allowing prefix scans of specific parts of the keyspace. These
-/// must match the keys -- in particular, the enum variant indexes must match.
-#[derive(Deserialize, Serialize)]
-enum KeyPrefix<'a> {
-    /// All table schemas.
-    Table,
-    /// An entire table index, by table and index name.
-    Index(Cow<'a, str>, Cow<'a, str>),
-    /// An entire table's rows, by table name.
-    Row(Cow<'a, str>),
-}
-
-impl<'a> encoding::Key<'a> for KeyPrefix<'a> {}

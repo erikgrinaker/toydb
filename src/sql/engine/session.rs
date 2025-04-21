@@ -29,9 +29,10 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
 
     /// Executes a client statement.
     pub fn execute(&mut self, statement: &str) -> Result<StatementResult> {
-        // Parse and execute the statement. Transaction control is done here,
-        // other statements are executed by the SQL engine.
+        // Parse and execute the statement. Transaction control is handled here,
+        // other statements are handled by the SQL executor.
         Ok(match Parser::new(statement).parse()? {
+            // BEGIN: starts a new transaction and returns its state.
             ast::Statement::Begin { read_only, as_of } => {
                 if self.txn.is_some() {
                     return errinput!("already in a transaction");
@@ -48,25 +49,33 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
                 self.txn = Some(txn);
                 StatementResult::Begin(state)
             }
+
+            // COMMIT: commits the currently open transaction, if any.
             ast::Statement::Commit => {
                 let Some(txn) = self.txn.take() else {
                     return errinput!("not in a transaction");
                 };
-                let version = txn.version();
+                let version = txn.state().version;
                 txn.commit()?;
                 StatementResult::Commit { version }
             }
+
+            // ROLLBACK: rolls back the currently open transaction, if any.
             ast::Statement::Rollback => {
                 let Some(txn) = self.txn.take() else {
                     return errinput!("not in a transaction");
                 };
-                let version = txn.version();
+                let version = txn.state().version;
                 txn.rollback()?;
                 StatementResult::Rollback { version }
             }
+
+            // EXPLAIN: returns the given SQL query's plan.
             ast::Statement::Explain(statement) => self.with_txn(true, |txn| {
                 Ok(StatementResult::Explain(Plan::build(*statement, txn)?.optimize()?))
             })?,
+
+            // Other statements (SELECT etc.) are handled by the SQL executor.
             statement => {
                 let read_only = matches!(statement, ast::Statement::Select { .. });
                 self.with_txn(read_only, |txn| {
@@ -76,9 +85,9 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
         })
     }
 
-    /// Runs a closure in the session's explicit transaction, if there is one,
-    /// otherwise a temporary implicit transaction. If read_only is true, uses a
-    /// read-only implicit transaction. Does not retry errors.
+    /// Runs a closure in the session's transaction, if there is one, otherwise
+    /// a temporary implicit transaction. If read_only is true, uses a read-only
+    /// implicit transaction. Does not automatically retry errors.
     pub fn with_txn<F, T>(&mut self, read_only: bool, f: F) -> Result<T>
     where
         F: FnOnce(&mut E::Transaction) -> Result<T>,
@@ -89,8 +98,8 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
         }
         // Otherwise, use an implicit transaction. Doing this session-side
         // results in additional Raft roundtrips to begin and complete the
-        // transaction -- we could avoid this if the below-Raft engine supported
-        // implicit transactions, but we keep it simple.
+        // transaction -- we could avoid this if the Raft SQL state machine
+        // supported implicit transactions, but we keep it simple.
         let mut txn = match read_only {
             true => self.engine.begin_read_only()?,
             false => self.engine.begin()?,
@@ -105,7 +114,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
 }
 
 impl Session<'_, Raft> {
-    /// Returns Raft SQL engine status.
+    /// Returns the Raft SQL engine status.
     pub fn status(&self) -> Result<Status> {
         self.engine.status()
     }
@@ -114,15 +123,14 @@ impl Session<'_, Raft> {
 /// If the session has an open transaction when dropped, roll it back.
 impl<'a, E: Engine<'a>> Drop for Session<'a, E> {
     fn drop(&mut self) {
-        if let Some(txn) = self.txn.take() {
-            if let Err(error) = txn.rollback() {
-                error!("implicit transaction rollback failed: {error}")
-            }
+        let Some(txn) = self.txn.take() else { return };
+        if let Err(error) = txn.rollback() {
+            error!("implicit transaction rollback failed: {error}")
         }
     }
 }
 
-/// A session statement result. Sent across the wire to SQL clients.
+/// A session statement result, returned over the network to SQL clients.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum StatementResult {
     Begin(mvcc::TransactionState),
@@ -159,7 +167,7 @@ impl TryFrom<ExecutionResult> for StatementResult {
     }
 }
 
-/// Converts a query result into a row iterator.
+/// Attempts to convert a SELECT result into a row iterator.
 impl TryFrom<StatementResult> for Rows {
     type Error = Error;
 
@@ -171,7 +179,7 @@ impl TryFrom<StatementResult> for Rows {
     }
 }
 
-/// Extracts the first row from a query result.
+/// Extracts the first row from a SELECT result.
 impl TryFrom<StatementResult> for Row {
     type Error = Error;
 
