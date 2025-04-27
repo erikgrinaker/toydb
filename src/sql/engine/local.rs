@@ -20,11 +20,13 @@ use crate::storage::{self, mvcc};
 /// Uses Cow to allow encoding borrowed values but decoding owned values.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum Key<'a> {
-    /// A table schema, keyed by table name.
+    /// A table schema, keyed by table name. The value is a `sql::types::Table`.
     Table(Cow<'a, str>),
     /// A column index entry, keyed by table name, column name, and index value.
+    /// The value is a `BTreeSet` of `sql::types::Value` primary key values.
     Index(Cow<'a, str>, Cow<'a, str>, Cow<'a, Value>),
-    /// A table row, keyed by table name and primary key value.
+    /// A table row, keyed by table name and primary key value. The value is a
+    /// `sql::types::Row`.
     Row(Cow<'a, str>, Cow<'a, Value>),
 }
 

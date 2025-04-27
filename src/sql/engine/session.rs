@@ -31,7 +31,7 @@ impl<'a, E: Engine<'a>> Session<'a, E> {
     pub fn execute(&mut self, statement: &str) -> Result<StatementResult> {
         // Parse and execute the statement. Transaction control is handled here,
         // other statements are handled by the SQL executor.
-        Ok(match Parser::new(statement).parse()? {
+        Ok(match Parser::parse(statement)? {
             // BEGIN: starts a new transaction and returns its state.
             ast::Statement::Begin { read_only, as_of } => {
                 if self.txn.is_some() {

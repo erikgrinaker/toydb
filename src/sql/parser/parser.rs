@@ -1,4 +1,5 @@
 use std::iter::Peekable;
+use std::ops::Add;
 
 use super::{Keyword, Lexer, Token, ast};
 use crate::errinput;
@@ -6,30 +7,45 @@ use crate::error::Result;
 use crate::sql::types::DataType;
 
 /// The SQL parser takes tokens from the lexer and parses the SQL syntax into an
-/// Abstract Syntax Tree (AST). This nested structure represents the syntactic
-/// structure of a SQL query (e.g. the SELECT and FROM clauses, values,
-/// arithmetic expressions, etc.). However, it only ensures the syntax is
-/// well-formed, and does not know whether e.g. a given table or column exists
-/// or which kind of join to use -- that is the job of the planner.
+/// Abstract Syntax Tree (AST).
+///
+/// The AST represents the syntactic structure of a SQL query (e.g. the SELECT
+/// and FROM clauses, values, arithmetic expressions, etc.). However, it only
+/// ensures the syntax is well-formed, and does not know whether e.g. a given
+/// table or column exists or which kind of join to use -- that is the job of
+/// the planner.
 pub struct Parser<'a> {
     pub lexer: Peekable<Lexer<'a>>,
 }
 
 impl Parser<'_> {
-    /// Creates a new parser for the given raw SQL string.
-    pub fn new(statement: &str) -> Parser {
-        Parser { lexer: Lexer::new(statement).peekable() }
-    }
-
-    /// Parses the input string into an AST statement. The whole string must be
-    /// parsed as a single statement, ending with an optional semicolon.
-    pub fn parse(&mut self) -> Result<ast::Statement> {
-        let statement = self.parse_statement()?;
-        self.next_is(Token::Semicolon);
-        if let Some(token) = self.lexer.next().transpose()? {
+    /// Parses the input string into a SQL statement AST. The entire string must
+    /// be parsed as a single statement, ending with an optional semicolon.
+    pub fn parse(statement: &str) -> Result<ast::Statement> {
+        let mut parser = Self::new(statement);
+        let statement = parser.parse_statement()?;
+        parser.skip(Token::Semicolon);
+        if let Some(token) = parser.lexer.next().transpose()? {
             return errinput!("unexpected token {token}");
         }
         Ok(statement)
+    }
+
+    /// Parse the input string into a SQL expression AST. The entire string must
+    /// be parsed as a single expression. Only used in tests.
+    #[cfg(test)]
+    pub fn parse_expr(expr: &str) -> Result<ast::Expression> {
+        let mut parser = Self::new(expr);
+        let expression = parser.parse_expression()?;
+        if let Some(token) = parser.lexer.next().transpose()? {
+            return errinput!("unexpected token {token}");
+        }
+        Ok(expression)
+    }
+
+    /// Creates a new parser for the given raw SQL string.
+    fn new(input: &str) -> Parser {
+        Parser { lexer: Lexer::new(input).peekable() }
     }
 
     /// Fetches the next lexer token, or errors if none is found.
@@ -47,21 +63,17 @@ impl Parser<'_> {
 
     /// Returns the next lexer token if it satisfies the predicate.
     fn next_if(&mut self, predicate: impl Fn(&Token) -> bool) -> Option<Token> {
-        self.peek().unwrap_or(None).filter(|t| predicate(t))?;
+        self.peek().ok()?.filter(|t| predicate(t))?;
         self.next().ok()
     }
 
     /// Passes the next lexer token through the closure, consuming it if the
-    /// closure returns Some.
+    /// closure returns Some. Returns the result of the closure.
     fn next_if_map<T>(&mut self, f: impl Fn(&Token) -> Option<T>) -> Option<T> {
-        let out = self.peek().unwrap_or(None).map(f)?;
-        if out.is_some() {
-            self.next().ok();
-        }
-        out
+        self.peek().ok()?.map(f)?.inspect(|_| drop(self.next()))
     }
 
-    /// Grabs the next keyword if there is one.
+    /// Returns the next keyword if there is one.
     fn next_if_keyword(&mut self) -> Option<Keyword> {
         self.next_if_map(|token| match token {
             Token::Keyword(keyword) => Some(*keyword),
@@ -83,8 +95,8 @@ impl Parser<'_> {
         Ok(())
     }
 
-    /// Consumes the next lexer token if it is the given token. Mostly
-    /// equivalent to next_is(), but expresses intent better.
+    /// Consumes the next lexer token if it is the given token. Equivalent to
+    /// next_is(), but expresses intent better.
     fn skip(&mut self, token: Token) {
         self.next_is(token);
     }
@@ -324,14 +336,8 @@ impl Parser<'_> {
             group_by: self.parse_group_by_clause()?,
             having: self.parse_having_clause()?,
             order_by: self.parse_order_by_clause()?,
-            limit: self
-                .next_is(Keyword::Limit.into())
-                .then(|| self.parse_expression())
-                .transpose()?,
-            offset: self
-                .next_is(Keyword::Offset.into())
-                .then(|| self.parse_expression())
-                .transpose()?,
+            limit: self.parse_limit_clause()?,
+            offset: self.parse_offset_clause()?,
         })
     }
 
@@ -343,14 +349,14 @@ impl Parser<'_> {
         let mut select = Vec::new();
         loop {
             let expr = self.parse_expression()?;
-            let mut label = None;
+            let mut alias = None;
             if self.next_is(Keyword::As.into()) || matches!(self.peek()?, Some(Token::Ident(_))) {
                 if expr == ast::Expression::All {
                     return errinput!("can't alias *");
                 }
-                label = Some(self.next_ident()?);
+                alias = Some(self.next_ident()?);
             }
-            select.push((expr, label));
+            select.push((expr, alias));
             if !self.next_is(Token::Comma) {
                 break;
             }
@@ -365,18 +371,18 @@ impl Parser<'_> {
         }
         let mut from = Vec::new();
         loop {
-            let mut item = self.parse_from_table()?;
+            let mut from_item = self.parse_from_table()?;
             while let Some(r#type) = self.parse_from_join()? {
-                let left = Box::new(item);
+                let left = Box::new(from_item);
                 let right = Box::new(self.parse_from_table()?);
                 let mut predicate = None;
                 if r#type != ast::JoinType::Cross {
                     self.expect(Keyword::On.into())?;
                     predicate = Some(self.parse_expression()?)
                 }
-                item = ast::From::Join { left, right, r#type, predicate };
+                from_item = ast::From::Join { left, right, r#type, predicate };
             }
-            from.push(item);
+            from.push(from_item);
             if !self.next_is(Token::Comma) {
                 break;
             }
@@ -467,7 +473,7 @@ impl Parser<'_> {
                     Token::Keyword(Keyword::Desc) => Some(ast::Direction::Descending),
                     _ => None,
                 })
-                .unwrap_or(ast::Direction::Ascending);
+                .unwrap_or_default();
             order_by.push((expr, order));
             if !self.next_is(Token::Comma) {
                 break;
@@ -476,39 +482,164 @@ impl Parser<'_> {
         Ok(order_by)
     }
 
-    /// Parses an expression consisting of at least one atom operated on by any
-    /// number of operators, using the precedence climbing algorithm.
+    /// Parses a LIMIT clause, if present.
+    fn parse_limit_clause(&mut self) -> Result<Option<ast::Expression>> {
+        if !self.next_is(Keyword::Limit.into()) {
+            return Ok(None);
+        }
+        Ok(Some(self.parse_expression()?))
+    }
+
+    /// Parses an OFFSET clause, if present.
+    fn parse_offset_clause(&mut self) -> Result<Option<ast::Expression>> {
+        if !self.next_is(Keyword::Offset.into()) {
+            return Ok(None);
+        }
+        Ok(Some(self.parse_expression()?))
+    }
+
+    /// Parses an expression using the precedence climbing algorithm. See:
     ///
-    /// TODO: write a description of the algorithm.
-    pub fn parse_expression(&mut self) -> Result<ast::Expression> {
+    /// <https://en.wikipedia.org/wiki/Operator-precedence_parser#Precedence_climbing_method>
+    /// <https://eli.thegreenplace.net/2012/08/02/parsing-expressions-by-precedence-climbing>
+    ///
+    /// Expressions are made up of two main entities:
+    ///
+    /// * Atoms: values, variables, functions, and parenthesized expressions.
+    /// * Operators: performs operations on atoms and sub-expressions.
+    ///   * Prefix operators: e.g. `-a` or `NOT a`.
+    ///   * Infix operators: e.g. `a + b`  or `a AND b`.
+    ///   * Postfix operators: e.g. `a!` or `a IS NULL`.
+    ///
+    /// During parsing, we have to respect the mathematical precedence and
+    /// associativity of operators. Consider e.g.:
+    ///
+    /// 2 ^ 3 ^ 2 - 4 * 3
+    ///
+    /// By the rules of precedence and associativity, this expression should
+    /// be interpreted as:
+    ///
+    /// (2 ^ (3 ^ 2)) - (4 * 3)
+    ///
+    /// Specifically, the exponentiation operator ^ is right-associative, so it
+    /// should be 2 ^ (3 ^ 2) = 512, not (2 ^ 3) ^ 2 = 64. Similarly,
+    /// exponentiation and multiplication have higher precedence than
+    /// subtraction, so it should be (2 ^ 3 ^ 2) - (4 * 3) = 500, not
+    /// 2 ^ 3 ^ (2 - 4) * 3 = -3.24.
+    ///
+    /// To use precedence climbing, we first need to specify the relative
+    /// precedence of operators as a number, where 1 is the lowest precedence:
+    ///
+    /// * 1: OR
+    /// * 2: AND
+    /// * 3: NOT
+    /// * 4: =, !=, LIKE, IS
+    /// * 5: <, <=, >, >=
+    /// * 6: +, -
+    /// * 7: *, /, %
+    /// * 8: ^
+    /// * 9: !
+    /// * 10: +, - (prefix)
+    ///
+    /// We also have to specify the associativity of operators:
+    ///
+    /// * Right-associative: ^ and all prefix operators.
+    /// * Left-associative: all other operators.
+    ///
+    /// Left-associative operators get a +1 to their precedence, so that they
+    /// bind tighter to their left operand than right-associative operators.
+    ///
+    /// The precedence climbing algorithm works by recursively parsing the
+    /// left-hand side of an expression (including any prefix operators), any
+    /// infix operators and recursive right-hand side expressions, and finally
+    /// any postfix operators.
+    ///
+    /// The grouping is determined by where the right-hand side recursion
+    /// terminates. The algorithm will greedily consume as many operators as
+    /// possible, but only as long as their precedence is greater than or equal
+    /// to the precedence of the previous operator (hence the name "climbing").
+    /// When we find an operator with lower precedence, we return the current
+    /// expression up the recursion stack and resume parsing the operator at a
+    /// lower precedence.
+    ///
+    /// The precedence levels for the previous example are as follows:
+    ///
+    ///     -----          Precedence 9: ^ right-associativity
+    /// ---------          Precedence 9: ^
+    ///             -----  Precedence 7: *
+    /// -----------------  Precedence 6: -
+    /// 2 ^ 3 ^ 2 - 4 * 3
+    ///
+    /// Let's walk through the recursive parsing of this expression:
+    ///
+    /// parse_expression_at(prec=0)
+    ///   lhs = parse_expression_atom() = 2
+    ///   op = parse_infix_operator(prec=0) = ^ (prec=9)
+    ///   rhs = parse_expression_at(prec=9)
+    ///     lhs = parse_expression_atom() = 3
+    ///     op = parse_infix_operator(prec=9) = ^ (prec=9)
+    ///     rhs = parse_expression_at(prec=9)
+    ///       lhs = parse_expression_atom() = 2
+    ///       op = parse_infix_operator(prec=9) = None (reject - at prec=6)
+    ///       return lhs = 2
+    ///     lhs = (lhs op rhs) = (3 ^ 2)
+    ///     op = parse_infix_operator(prec=9) = None (reject - at prec=6)
+    ///     return lhs = (3 ^ 2)
+    ///   lhs = (lhs op rhs) = (2 ^ (3 ^ 2))
+    ///   op = parse_infix_operator(prec=0) = - (prec=6)
+    ///   rhs = parse_expression_at(prec=6)
+    ///     lhs = parse_expression_atom() = 4
+    ///     op = parse_infix_operator(prec=6) = * (prec=7)
+    ///     rhs = parse_expression_at(prec=7)
+    ///       lhs = parse_expression_atom() = 3
+    ///       op = parse_infix_operator(prec=7) = None (end of expression)
+    ///       return lhs = 3
+    ///     lhs = (lhs op rhs) = (4 * 3)
+    ///     op = parse_infix_operator(prec=6) = None (end of expression)
+    ///     return lhs = (4 * 3)
+    ///   lhs = (lhs op rhs) = ((2 ^ (3 ^ 2)) - (4 * 3))
+    ///   op = parse_infix_operator(prec=0) = None (end of expression)
+    ///   return lhs = ((2 ^ (3 ^ 2)) - (4 * 3))
+    fn parse_expression(&mut self) -> Result<ast::Expression> {
         self.parse_expression_at(0)
     }
 
     /// Parses an expression at the given minimum precedence.
     fn parse_expression_at(&mut self, min_precedence: Precedence) -> Result<ast::Expression> {
-        // If there is a prefix operator, parse it and its right-hand operand.
-        // Otherwise, parse the left-hand atom.
-        let mut lhs = if let Some(prefix) = self.parse_prefix_operator(min_precedence) {
-            let at_precedence = prefix.precedence() + prefix.associativity();
-            prefix.build(self.parse_expression_at(at_precedence)?)
+        // If the left-hand side is a prefix operator, recursively parse it and
+        // its operand. Otherwise, parse the left-hand side as an atom.
+        let mut lhs = if let Some(prefix) = self.parse_prefix_operator_at(min_precedence) {
+            let next_precedence = prefix.precedence() + prefix.associativity();
+            let rhs = self.parse_expression_at(next_precedence)?;
+            prefix.into_expression(rhs)
         } else {
             self.parse_expression_atom()?
         };
-        // Apply any postfix operators for the left-hand atom.
-        while let Some(postfix) = self.parse_postfix_operator(min_precedence)? {
-            lhs = postfix.build(lhs)
+
+        // Apply any postfix operators to the left-hand side.
+        while let Some(postfix) = self.parse_postfix_operator_at(min_precedence)? {
+            lhs = postfix.into_expression(lhs)
         }
-        // Apply any binary infix operators, parsing the right-hand operand.
-        while let Some(infix) = self.parse_infix_operator(min_precedence) {
-            let at_precedence = infix.precedence() + infix.associativity();
-            let rhs = self.parse_expression_at(at_precedence)?;
-            lhs = infix.build(lhs, rhs);
+
+        // Repeatedly apply any infix operators to the left-hand side as long as
+        // their precedence is greater than or equal to the current minimum
+        // precedence (i.e. that of the upstack operator).
+        //
+        // The right-hand side expression parsing will recursively apply any
+        // infix operators at or above this operator's precedence to the
+        // right-hand side.
+        while let Some(infix) = self.parse_infix_operator_at(min_precedence) {
+            let next_precedence = infix.precedence() + infix.associativity();
+            let rhs = self.parse_expression_at(next_precedence)?;
+            lhs = infix.into_expression(lhs, rhs);
         }
+
         // Apply any postfix operators after the binary operator. Consider e.g.
         // 1 + NULL IS NULL.
-        while let Some(postfix) = self.parse_postfix_operator(min_precedence)? {
-            lhs = postfix.build(lhs)
+        while let Some(postfix) = self.parse_postfix_operator_at(min_precedence)? {
+            lhs = postfix.into_expression(lhs)
         }
+
         Ok(lhs)
     }
 
@@ -566,7 +697,7 @@ impl Parser<'_> {
 
     /// Parses a prefix operator, if there is one and its precedence is at least
     /// min_precedence.
-    fn parse_prefix_operator(&mut self, min_precedence: Precedence) -> Option<PrefixOperator> {
+    fn parse_prefix_operator_at(&mut self, min_precedence: Precedence) -> Option<PrefixOperator> {
         self.next_if_map(|token| {
             let operator = match token {
                 Token::Keyword(Keyword::Not) => PrefixOperator::Not,
@@ -580,7 +711,7 @@ impl Parser<'_> {
 
     /// Parses an infix operator, if there is one and its precedence is at least
     /// min_precedence.
-    fn parse_infix_operator(&mut self, min_precedence: Precedence) -> Option<InfixOperator> {
+    fn parse_infix_operator_at(&mut self, min_precedence: Precedence) -> Option<InfixOperator> {
         self.next_if_map(|token| {
             let operator = match token {
                 Token::Asterisk => InfixOperator::Multiply,
@@ -607,12 +738,12 @@ impl Parser<'_> {
 
     /// Parses a postfix operator, if there is one and its precedence is at
     /// least min_precedence.
-    fn parse_postfix_operator(
+    fn parse_postfix_operator_at(
         &mut self,
         min_precedence: Precedence,
     ) -> Result<Option<PostfixOperator>> {
         // Handle IS (NOT) NULL/NAN separately, since it's multiple tokens.
-        if let Some(Token::Keyword(Keyword::Is)) = self.peek()? {
+        if self.peek()? == Some(&Token::Keyword(Keyword::Is)) {
             // We can't consume tokens unless the precedence is satisfied, so we
             // assume IS NULL (they all have the same precedence).
             if PostfixOperator::Is(ast::Literal::Null).precedence() < min_precedence {
@@ -645,8 +776,24 @@ impl Parser<'_> {
 /// Operator precedence.
 type Precedence = u8;
 
-const LEFT_ASSOCIATIVE: Precedence = 1;
-const RIGHT_ASSOCIATIVE: Precedence = 0;
+/// Operator associativity.
+enum Associativity {
+    Left,
+    Right,
+}
+
+impl Add<Associativity> for Precedence {
+    type Output = Self;
+
+    fn add(self, rhs: Associativity) -> Self {
+        // Left-associative operators have increased precedence, so they bind
+        // tighter to their left-hand side.
+        self + match rhs {
+            Associativity::Left => 1,
+            Associativity::Right => 0,
+        }
+    }
+}
 
 /// Prefix operators.
 enum PrefixOperator {
@@ -666,12 +813,12 @@ impl PrefixOperator {
 
     // The operator associativity. Prefix operators are right-associative by
     // definition.
-    fn associativity(&self) -> Precedence {
-        RIGHT_ASSOCIATIVE
+    fn associativity(&self) -> Associativity {
+        Associativity::Right
     }
 
     /// Builds an AST expression for the operator.
-    fn build(self, rhs: ast::Expression) -> ast::Expression {
+    fn into_expression(self, rhs: ast::Expression) -> ast::Expression {
         let rhs = Box::new(rhs);
         match self {
             Self::Plus => ast::Operator::Identity(rhs).into(),
@@ -710,7 +857,7 @@ impl InfixOperator {
             Self::Or => 1,
             Self::And => 2,
             // Self::Not => 3
-            Self::Equal | Self::NotEqual | Self::Like => 4, // and Self::Is
+            Self::Equal | Self::NotEqual | Self::Like => 4, // also Self::Is
             Self::GreaterThan
             | Self::GreaterThanOrEqual
             | Self::LessThan
@@ -722,15 +869,15 @@ impl InfixOperator {
     }
 
     /// The operator associativity.
-    fn associativity(&self) -> Precedence {
+    fn associativity(&self) -> Associativity {
         match self {
-            Self::Exponentiate => RIGHT_ASSOCIATIVE,
-            _ => LEFT_ASSOCIATIVE,
+            Self::Exponentiate => Associativity::Right,
+            _ => Associativity::Left,
         }
     }
 
     /// Builds an AST expression for the infix operator.
-    fn build(self, lhs: ast::Expression, rhs: ast::Expression) -> ast::Expression {
+    fn into_expression(self, lhs: ast::Expression, rhs: ast::Expression) -> ast::Expression {
         let (lhs, rhs) = (Box::new(lhs), Box::new(rhs));
         match self {
             Self::Add => ast::Operator::Add(lhs, rhs).into(),
@@ -769,7 +916,7 @@ impl PostfixOperator {
     }
 
     /// Builds an AST expression for the operator.
-    fn build(self, lhs: ast::Expression) -> ast::Expression {
+    fn into_expression(self, lhs: ast::Expression) -> ast::Expression {
         let lhs = Box::new(lhs);
         match self {
             Self::Factorial => ast::Operator::Factorial(lhs).into(),

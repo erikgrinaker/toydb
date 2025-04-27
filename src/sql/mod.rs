@@ -194,7 +194,7 @@ mod tests {
 
             // Output the plan if requested.
             if tags.remove("plan") {
-                let ast = Parser::new(input).parse()?;
+                let ast = Parser::parse(input)?;
                 let plan =
                     session.with_txn(true, |txn| Planner::new(txn).build(ast)?.optimize())?;
                 writeln!(output, "{plan}")?;
@@ -205,7 +205,7 @@ mod tests {
                 if tags.contains("plan") {
                     return Err("using both plan and opt is redundant".into());
                 }
-                let ast = Parser::new(input).parse()?;
+                let ast = Parser::parse(input)?;
                 let plan = session.with_txn(true, |txn| Planner::new(txn).build(ast))?;
                 let Plan::Select(mut root) = plan else {
                     return Err("can only use opt with SELECT plans".into());
@@ -289,11 +289,7 @@ mod tests {
             let mut tags = command.tags.clone();
 
             // Parse and build the expression.
-            let mut parser = Parser::new(input);
-            let ast = parser.parse_expression()?;
-            if let Some(next) = parser.lexer.next().transpose()? {
-                return Err(format!("unconsumed token {next}").into());
-            }
+            let ast = Parser::parse_expr(input)?;
             let expr = Planner::<Catalog>::build_expression(ast, &Scope::new())?;
 
             // Evaluate the expression.

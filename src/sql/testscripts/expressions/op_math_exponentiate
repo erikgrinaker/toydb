@@ -70,3 +70,10 @@ NaN
 ---
 Error: invalid input: can't exponentiate TRUE and FALSE
 Error: invalid input: can't exponentiate 'a' and 'b'
+
+# Right-associativity.
+[expr]> 2 ^ 3 ^ 2
+[expr]> 2 ^ 1 ^ 2 ^ 3
+---
+512 ← Exponentiate(Constant(Integer(2)), Exponentiate(Constant(Integer(3)), Constant(Integer(2))))
+2 ← Exponentiate(Constant(Integer(2)), Exponentiate(Constant(Integer(1)), Exponentiate(Constant(Integer(2)), Constant(Integer(3)))))

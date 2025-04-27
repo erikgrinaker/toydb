@@ -68,3 +68,8 @@ Error: invalid input: integer overflow
 ---
 Error: invalid input: can't subtract TRUE and FALSE
 Error: invalid input: can't subtract 'a' and 'b'
+
+# Left-associativity.
+> 5 - 3 - 1
+---
+1

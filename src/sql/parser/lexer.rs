@@ -5,19 +5,14 @@ use std::str::Chars;
 use crate::errinput;
 use crate::error::Result;
 
-/// The lexer (lexical analyzer) preprocesses raw SQL strings into a sequence of
-/// lexical tokens (e.g. keyword, number, string, etc), which are passed on to
-/// the SQL parser. In doing so, it strips away basic syntactic noise such as
-/// whitespace, case, and quotes, and performs initial symbol validation.
-pub struct Lexer<'a> {
-    chars: Peekable<Chars<'a>>,
-}
-
 /// A lexical token.
 ///
-/// For simplicity, these carry owned String copies rather than &str references
-/// into the original input string. This causes frequent allocations, but that's
-/// fine for our purposes here.
+/// These carry owned String clones rather than &str references into the
+/// original input string, because the lexer may need to modify the string (e.g.
+/// to parse escaped quotes in strings, lowercase identifiers, etc). We could
+/// use `Cow<str>` to avoid this in the common case, but we'll end up using
+/// owned strings in the final parsed AST anyway to avoid propagating these
+/// lifetimes throughout the entire SQL execution engine, so we keep it simple.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     /// A numeric string, with digits, decimal points, and/or exponents. Leading
@@ -25,7 +20,7 @@ pub enum Token {
     Number(String),
     /// A Unicode string, with quotes stripped and escape sequences resolved.
     String(String),
-    /// An identifier, with any quotes stripped.
+    /// An identifier, with any quotes stripped. Lowercased if not quoted.
     Ident(String),
     /// A SQL keyword.
     Keyword(Keyword),
@@ -160,7 +155,7 @@ pub enum Keyword {
 }
 
 impl TryFrom<&str> for Keyword {
-    // Use a cheap static string, since this just indicates it's not a keyword.
+    // Use a cheap static error string. This just indicates it's not a keyword.
     type Error = &'static str;
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
@@ -313,6 +308,14 @@ impl Display for Keyword {
     }
 }
 
+/// The lexer (lexical analyzer) preprocesses raw SQL strings into a sequence of
+/// lexical tokens (e.g. keyword, number, string, etc), which are passed on to
+/// the SQL parser. In doing so, it strips away basic syntactic noise such as
+/// whitespace, case, and quotes, and performs initial symbol validation.
+pub struct Lexer<'a> {
+    chars: Peekable<Chars<'a>>,
+}
+
 /// The lexer is used as a token iterator.
 impl Iterator for Lexer<'_> {
     type Item = Result<Token>;
@@ -321,7 +324,6 @@ impl Iterator for Lexer<'_> {
         match self.scan() {
             Ok(Some(token)) => Some(Ok(token)),
             // If there's any remaining chars, the lexer didn't recognize them.
-            // Otherwise, we're done lexing.
             Ok(None) => self.chars.peek().map(|c| errinput!("unexpected character {c}")),
             Err(err) => Some(Err(err)),
         }
@@ -340,10 +342,10 @@ impl<'a> Lexer<'a> {
         self.chars.next()
     }
 
-    /// Applies a function to the next character, returning its result and
+    /// Applies a closure to the next character, returning its result and
     /// consuming the next character if it's Some.
     fn next_if_map<T>(&mut self, map: impl Fn(char) -> Option<T>) -> Option<T> {
-        let value = self.chars.peek().and_then(|&c| map(c))?;
+        let value = self.chars.peek().copied().and_then(map)?;
         self.chars.next();
         Some(value)
     }
@@ -357,14 +359,16 @@ impl<'a> Lexer<'a> {
     fn scan(&mut self) -> Result<Option<Token>> {
         // Ignore whitespace.
         self.skip_whitespace();
-        // The first character tells us the token type.
-        match self.chars.peek() {
-            Some('\'') => self.scan_string(),
-            Some('"') => self.scan_ident_quoted(),
-            Some(c) if c.is_ascii_digit() => Ok(self.scan_number()),
-            Some(c) if c.is_alphabetic() => Ok(self.scan_ident_or_keyword()),
-            Some(_) => Ok(self.scan_symbol()),
-            None => Ok(None),
+        let Some(c) = self.chars.peek() else {
+            return Ok(None);
+        };
+        // The first character tells us the token kind. Scan it accordingly.
+        match c {
+            '\'' => self.scan_string(),
+            '"' => self.scan_ident_quoted(),
+            '0'..='9' => Ok(self.scan_number()),
+            c if c.is_alphabetic() => Ok(self.scan_ident_or_keyword()),
+            _ => Ok(self.scan_symbol()),
         }
     }
 
@@ -377,10 +381,10 @@ impl<'a> Lexer<'a> {
             name.extend(c.to_lowercase())
         }
         // Check if the identifier matches a keyword.
-        match Keyword::try_from(name.as_str()).ok() {
-            Some(keyword) => Some(Token::Keyword(keyword)),
-            None => Some(Token::Ident(name)),
+        if let Ok(keyword) = Keyword::try_from(name.as_str()) {
+            return Some(Token::Keyword(keyword));
         }
+        Some(Token::Ident(name))
     }
 
     /// Scans the next quoted identifier, if any. Case is preserved.
@@ -403,7 +407,7 @@ impl<'a> Lexer<'a> {
 
     /// Scans the next number, if any.
     fn scan_number(&mut self) -> Option<Token> {
-        // Scan the integer part. There must be one digit.
+        // Scan the integer part. There must be at least one digit.
         let mut number = self.next_if(|c| c.is_ascii_digit())?.to_string();
         while let Some(c) = self.next_if(|c| c.is_ascii_digit()) {
             number.push(c)
