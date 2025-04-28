@@ -8,11 +8,13 @@ use super::optimizer::OPTIMIZERS;
 use super::planner::Planner;
 use crate::error::Result;
 use crate::sql::engine::{Catalog, Transaction};
-use crate::sql::execution::{self, ExecutionResult};
+use crate::sql::execution::{ExecutionResult, Executor};
 use crate::sql::parser::ast;
 use crate::sql::types::{Expression, Label, Table, Value};
 
-/// A statement execution plan. The root nodes can perform data modifications or
+/// A statement execution plan.
+///
+/// The root nodes can perform data modifications or
 /// schema changes, in addition to SELECT queries. Beyond the root, the plan is
 /// made up of a tree of inner plan nodes that stream and process rows via
 /// iterators. Below is an example of an (unoptimized) plan for the given query:
@@ -40,7 +42,7 @@ pub enum Plan {
     CreateTable { schema: Table },
     /// A DROP TABLE plan. Drops the given table. Errors if the table does not
     /// exist, unless if_exists is true.
-    DropTable { table: String, if_exists: bool },
+    DropTable { name: String, if_exists: bool },
     /// A DELETE plan. Deletes rows in table that match the rows from source.
     /// primary_key specifies the primary key column index in the source rows.
     Delete { table: String, primary_key: usize, source: Node },
@@ -68,7 +70,7 @@ impl Plan {
 
     /// Executes the plan, consuming it.
     pub fn execute(self, txn: &impl Transaction) -> Result<ExecutionResult> {
-        execution::execute_plan(self, txn)
+        Executor::new(txn).execute(self)
     }
 
     /// Optimizes the plan, consuming it. See OPTIMIZERS for the list of
@@ -365,10 +367,21 @@ impl Aggregate {
             Self::Sum(expr) => format!("sum({})", expr.format(node)),
         }
     }
+
+    /// Returns the inner expression.
+    pub fn expr(&self) -> &Expression {
+        match self {
+            Self::Average(expr)
+            | Self::Count(expr)
+            | Self::Max(expr)
+            | Self::Min(expr)
+            | Self::Sum(expr) => expr,
+        }
+    }
 }
 
 /// A sort order direction.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Direction {
     Ascending,
     Descending,
@@ -397,7 +410,7 @@ impl Display for Plan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::CreateTable { schema } => write!(f, "CreateTable: {}", schema.name),
-            Self::DropTable { table, .. } => write!(f, "DropTable: {table}"),
+            Self::DropTable { name: table, .. } => write!(f, "DropTable: {table}"),
             Self::Delete { table, source, .. } => {
                 write!(f, "Delete: {table}")?;
                 source.format(f, "", false, true)

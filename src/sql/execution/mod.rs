@@ -1,10 +1,7 @@
-//! Executes a `Plan` against a `sql::engine::Engine`.
+//! Executes a `Plan`.
 
-mod aggregate;
-mod execute;
+mod aggregator;
+mod executor;
 mod join;
-mod source;
-mod transform;
-mod write;
 
-pub use execute::{ExecutionResult, execute_plan};
+pub use executor::{ExecutionResult, Executor};

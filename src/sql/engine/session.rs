@@ -14,6 +14,8 @@ use crate::{errdata, errinput};
 
 /// A SQL client session. Executes raw SQL statements against a SQL engine and
 /// handles transaction control.
+///
+/// TODO: move into executor module.
 pub struct Session<'a, E: Engine<'a>> {
     /// The SQL engine.
     engine: &'a E,

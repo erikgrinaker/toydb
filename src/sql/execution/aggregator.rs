@@ -6,81 +6,76 @@ use crate::error::Result;
 use crate::sql::planner::Aggregate;
 use crate::sql::types::{Expression, Row, Rows, Value};
 
-/// Aggregates row values from the source according to the aggregates, using the
-/// group_by expressions as buckets. Emits rows with group_by buckets then
-/// aggregates in the given order.
-pub fn aggregate(
-    mut source: Rows,
+/// Computes bucketed aggregates for input rows. For example, this query would
+/// compute COUNT and SUM aggregates bucketed by category and brand:
+///
+/// SELECT COUNT(*), SUM(price) FROM products GROUP BY category, brand
+pub struct Aggregator {
+    /// GROUP BY expressions.
     group_by: Vec<Expression>,
+    /// Aggregates to compute.
     aggregates: Vec<Aggregate>,
-) -> Result<Rows> {
-    let mut aggregator = Aggregator::new(group_by, aggregates);
-    while let Some(row) = source.next().transpose()? {
-        aggregator.add(row)?;
-    }
-    aggregator.into_rows()
-}
-
-/// Computes bucketed aggregates for rows.
-struct Aggregator {
-    /// Bucketed accumulators (by group_by values).
+    /// Accumulators indexed by group_by bucket.
     buckets: BTreeMap<Vec<Value>, Vec<Accumulator>>,
-    /// The set of empty accumulators. Used to create new buckets.
-    empty: Vec<Accumulator>,
-    /// Group by expressions. Indexes map to bucket values.
-    group_by: Vec<Expression>,
-    /// Expressions to accumulate. Indexes map to accumulators.
-    expressions: Vec<Expression>,
 }
 
 impl Aggregator {
     /// Creates a new aggregator for the given GROUP BY buckets and aggregates.
-    fn new(group_by: Vec<Expression>, aggregates: Vec<Aggregate>) -> Self {
-        use Aggregate::*;
-        let accumulators = aggregates.iter().map(Accumulator::new).collect();
-        let expressions = aggregates
-            .into_iter()
-            .map(|aggregate| match aggregate {
-                Average(expr) | Count(expr) | Max(expr) | Min(expr) | Sum(expr) => expr,
-            })
-            .collect();
-        Self { buckets: BTreeMap::new(), empty: accumulators, group_by, expressions }
+    pub fn new(group_by: Vec<Expression>, aggregates: Vec<Aggregate>) -> Self {
+        Self { group_by, aggregates, buckets: BTreeMap::new() }
     }
 
     /// Adds a row to the aggregator.
-    fn add(&mut self, row: Row) -> Result<()> {
-        // Compute the bucket value.
-        let bucket: Vec<Value> =
-            self.group_by.iter().map(|expr| expr.evaluate(Some(&row))).try_collect()?;
+    pub fn add(&mut self, row: &Row) -> Result<()> {
+        // Compute the bucket values.
+        let bucket = self.group_by.iter().map(|expr| expr.evaluate(Some(row))).try_collect()?;
 
-        // Compute and accumulate the input values.
-        let accumulators = self.buckets.entry(bucket).or_insert_with(|| self.empty.clone());
-        for (accumulator, expr) in accumulators.iter_mut().zip(&self.expressions) {
-            accumulator.add(expr.evaluate(Some(&row))?)?;
+        // Look up the bucket accumulators, or create a new bucket.
+        let accumulators = self
+            .buckets
+            .entry(bucket)
+            .or_insert_with(|| self.aggregates.iter().map(Accumulator::new).collect())
+            .iter_mut();
+
+        // Collect expressions to evaluate.
+        let exprs = self.aggregates.iter().map(|a| a.expr());
+
+        // Accumulate the evaluated values.
+        for (accumulator, expr) in accumulators.zip_eq(exprs) {
+            accumulator.add(expr.evaluate(Some(row))?)?;
+        }
+        Ok(())
+    }
+
+    /// Adds rows to the aggregator.
+    pub fn add_rows(&mut self, rows: Rows) -> Result<()> {
+        for row in rows {
+            self.add(&row?)?;
         }
         Ok(())
     }
 
     /// Returns a row iterator over the aggregate result.
-    fn into_rows(self) -> Result<Rows> {
+    pub fn into_rows(self) -> Rows {
         // If there were no rows and no group_by expressions, return a row of
-        // empty accumulators, e.g. SELECT COUNT(*) FROM t WHERE FALSE
+        // empty accumulators (e.g. SELECT COUNT(*) FROM t WHERE FALSE).
         if self.buckets.is_empty() && self.group_by.is_empty() {
-            let result = self.empty.into_iter().map(|acc| acc.value()).collect();
-            return Ok(Box::new(std::iter::once(result)));
+            let result =
+                self.aggregates.iter().map(Accumulator::new).map(|acc| acc.value()).try_collect();
+            return Box::new(std::iter::once(result));
         }
 
         // Emit the group_by and aggregate values for each bucket. We use an
         // intermediate vec since btree_map::IntoIter doesn't implement Clone
         // (required by Rows).
         let buckets = self.buckets.into_iter().collect_vec();
-        Ok(Box::new(buckets.into_iter().map(|(bucket, accumulators)| {
+        Box::new(buckets.into_iter().map(|(bucket, accumulators)| {
             bucket
                 .into_iter()
                 .map(Ok)
                 .chain(accumulators.into_iter().map(|acc| acc.value()))
                 .collect()
-        })))
+        }))
     }
 }
 

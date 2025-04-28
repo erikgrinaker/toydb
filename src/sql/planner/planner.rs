@@ -26,7 +26,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
         use ast::Statement::*;
         match statement {
             CreateTable { name, columns } => self.build_create_table(name, columns),
-            DropTable { name, if_exists } => Ok(Plan::DropTable { table: name, if_exists }),
+            DropTable { name, if_exists } => Ok(Plan::DropTable { name, if_exists }),
             Delete { table, r#where } => self.build_delete(table, r#where),
             Insert { table, columns, values } => self.build_insert(table, columns, values),
             Update { table, set, r#where } => self.build_update(table, set, r#where),
