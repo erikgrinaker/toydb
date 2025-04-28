@@ -1,27 +1,20 @@
 use super::{aggregate, join, source, transform, write};
 use crate::error::Result;
-use crate::sql::engine::{Catalog, Transaction};
+use crate::sql::engine::Transaction;
 use crate::sql::planner::{Node, Plan};
 use crate::sql::types::{Label, Rows};
 
 /// Executes a plan, returning an execution result.
-///
-/// Takes the transaction and catalog separately, even though Transaction must
-/// implement Catalog, to ensure the catalog is primarily used during planning.
-pub fn execute_plan(
-    plan: Plan,
-    txn: &impl Transaction,
-    catalog: &impl Catalog,
-) -> Result<ExecutionResult> {
+pub fn execute_plan(plan: Plan, txn: &impl Transaction) -> Result<ExecutionResult> {
     Ok(match plan {
         Plan::CreateTable { schema } => {
             let name = schema.name.clone();
-            catalog.create_table(schema)?;
+            txn.create_table(schema)?;
             ExecutionResult::CreateTable { name }
         }
 
         Plan::DropTable { table, if_exists } => {
-            let existed = catalog.drop_table(&table, if_exists)?;
+            let existed = txn.drop_table(&table, if_exists)?;
             ExecutionResult::DropTable { name: table, existed }
         }
 

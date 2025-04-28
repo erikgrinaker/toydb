@@ -13,7 +13,7 @@ use crate::storage::mvcc;
 pub trait Engine<'a>: Sized {
     /// The engine's transaction type. This provides both row-level CRUD operations and
     /// transactional access to the schema catalog.
-    type Transaction: Transaction + Catalog + 'a;
+    type Transaction: Transaction + 'a;
 
     /// Begins a read-write transaction.
     fn begin(&'a self) -> Result<Self::Transaction>;
@@ -34,7 +34,7 @@ pub trait Engine<'a>: Sized {
 /// All methods operate on row batches rather than single rows to amortize the
 /// cost. With the Raft engine, each call results in a Raft roundtrip, and we'd
 /// rather not have to do that for every single row that's modified.
-pub trait Transaction {
+pub trait Transaction: Catalog {
     /// The transaction's internal MVCC state.
     fn state(&self) -> &mvcc::TransactionState;
 
@@ -58,13 +58,9 @@ pub trait Transaction {
 }
 
 /// The catalog stores table schema information. It must be implemented for
-/// Engine::Transaction, and is fully transactional. For simplicity, it only
+/// Transaction, and is thus fully transactional. For simplicity, it only
 /// supports creating and dropping tables -- there are no ALTER TABLE schema
 /// changes, nor CREATE INDEX.
-///
-/// This type is separate from Transaction, even though Engine::Transaction
-/// requires transactions to implement it. This allows better control of when
-/// catalog access can be used (i.e. during planning, not execution).
 pub trait Catalog {
     /// Creates a new table. Errors if it already exists.
     fn create_table(&self, table: Table) -> Result<()>;

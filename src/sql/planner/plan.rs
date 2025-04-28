@@ -67,8 +67,8 @@ impl Plan {
     }
 
     /// Executes the plan, consuming it.
-    pub fn execute(self, txn: &(impl Transaction + Catalog)) -> Result<ExecutionResult> {
-        execution::execute_plan(self, txn, txn)
+    pub fn execute(self, txn: &impl Transaction) -> Result<ExecutionResult> {
+        execution::execute_plan(self, txn)
     }
 
     /// Optimizes the plan, consuming it. See OPTIMIZERS for the list of
