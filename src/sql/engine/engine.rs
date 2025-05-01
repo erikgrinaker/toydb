@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::Session;
 use crate::errinput;
 use crate::error::Result;
+use crate::sql::execution::Session;
 use crate::sql::types::{Expression, Row, Rows, Table, Value};
 use crate::storage::mvcc;
 

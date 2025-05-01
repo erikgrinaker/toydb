@@ -2,9 +2,8 @@ use itertools::Itertools as _;
 use log::error;
 use serde::{Deserialize, Serialize};
 
-use super::raft::{Raft, Status};
-use super::{Engine, Transaction as _};
 use crate::error::{Error, Result};
+use crate::sql::engine::{Engine, Raft, Status, Transaction as _};
 use crate::sql::execution::ExecutionResult;
 use crate::sql::parser::{Parser, ast};
 use crate::sql::planner::Plan;
@@ -12,10 +11,8 @@ use crate::sql::types::{Label, Row, Rows, Value};
 use crate::storage::mvcc;
 use crate::{errdata, errinput};
 
-/// A SQL client session. Executes raw SQL statements against a SQL engine and
-/// handles transaction control.
-///
-/// TODO: move into executor module.
+/// A SQL client session. Parses and executes raw SQL statements and handles
+/// transaction control.
 pub struct Session<'a, E: Engine<'a>> {
     /// The SQL engine.
     engine: &'a E,

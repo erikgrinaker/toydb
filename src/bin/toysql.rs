@@ -17,7 +17,7 @@ use rustyline_derive::{Completer, Helper, Highlighter, Hinter};
 use toydb::Client;
 use toydb::errinput;
 use toydb::error::Result;
-use toydb::sql::engine::StatementResult;
+use toydb::sql::execution::StatementResult;
 use toydb::sql::parser::{Lexer, Token};
 
 fn main() {

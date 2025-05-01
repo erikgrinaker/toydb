@@ -2,7 +2,7 @@
 //! as follows:
 //!
 //! 1. The `toySQL` client connects to the server, which creates a new
-//!    `sql::engine::Session` in `Server::sql_session`.
+//!    `sql::execution::Session` in `Server::sql_session`.
 //!
 //! 2. `toySQL` submits a SQL `SELECT` string, which the server executes via
 //!     `Session::execute`.
@@ -86,11 +86,12 @@ mod tests {
     use tempfile::TempDir;
     use test_each_file::test_each_path;
 
-    use super::engine::{Catalog as _, Session};
+    use super::engine::Catalog as _;
+    use super::execution::{Session, StatementResult};
     use super::parser::Parser;
     use super::planner::{OPTIMIZERS, Plan};
     use crate::encoding::format::{self, Formatter as _};
-    use crate::sql::engine::{Engine, Local, StatementResult};
+    use crate::sql::engine::{Engine, Local};
     use crate::sql::planner::{Planner, Scope};
     use crate::storage::engine::test as testengine;
     use crate::storage::{self, Engine as _};

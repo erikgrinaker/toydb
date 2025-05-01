@@ -12,7 +12,8 @@ use crate::encoding::{self, Value as _};
 use crate::error::Result;
 use crate::raft;
 use crate::sql;
-use crate::sql::engine::{Catalog as _, Engine as _, StatementResult};
+use crate::sql::engine::{Catalog as _, Engine as _};
+use crate::sql::execution::StatementResult;
 use crate::sql::types::{Row, Table};
 use crate::storage;
 
@@ -275,7 +276,7 @@ impl Server {
     fn sql_session(
         id: raft::NodeID,
         socket: TcpStream,
-        mut session: sql::engine::Session<sql::engine::Raft>,
+        mut session: sql::execution::Session<sql::engine::Raft>,
     ) -> Result<()> {
         let mut reader = BufReader::new(socket.try_clone()?);
         let mut writer = BufWriter::new(socket);
