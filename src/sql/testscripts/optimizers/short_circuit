@@ -13,9 +13,9 @@ ok
 Initial:
    Filter: TRUE
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (TRUE)
-Short circuit:
+ShortCircuit:
    Scan: test
 1, 'a'
 2, 'b'
@@ -27,7 +27,7 @@ Initial:
    Projection: 1, 2, 3
    └─ Filter: TRUE
       └─ Values: blank row
-Short circuit:
+ShortCircuit:
    Projection: 1, 2, 3
    └─ Values: blank row
 1, 2, 3
@@ -38,11 +38,11 @@ Initial:
    NestedLoopJoin: inner on TRUE
    ├─ Scan: test
    └─ Scan: ref
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner
    ├─ Scan: test (TRUE)
    └─ Scan: ref (TRUE)
-Short circuit:
+ShortCircuit:
    NestedLoopJoin: inner
    ├─ Scan: test
    └─ Scan: ref
@@ -62,9 +62,9 @@ Short circuit:
 Initial:
    Filter: FALSE
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (FALSE)
-Short circuit:
+ShortCircuit:
    Nothing
 test.id, test.value
 
@@ -74,7 +74,7 @@ Initial:
    Projection: 1, 2, 3
    └─ Filter: FALSE
       └─ Values: blank row
-Short circuit:
+ShortCircuit:
    Nothing
 , , 
 
@@ -84,15 +84,15 @@ Initial:
    NestedLoopJoin: inner on ref.test_id = test.id AND FALSE
    ├─ Scan: test
    └─ Scan: ref
-Constant folding:
+ConstantFolding:
    NestedLoopJoin: inner on FALSE
    ├─ Scan: test
    └─ Scan: ref
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner
    ├─ Scan: test (FALSE)
    └─ Scan: ref (FALSE)
-Short circuit:
+ShortCircuit:
    Nothing
 test.id, test.value, ref.id, ref.test_id
 
@@ -102,9 +102,9 @@ test.id, test.value, ref.id, ref.test_id
 Initial:
    Filter: NULL
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (NULL)
-Short circuit:
+ShortCircuit:
    Nothing
 test.id, test.value
 
@@ -114,7 +114,7 @@ Initial:
    Projection: 1, 2, 3
    └─ Filter: NULL
       └─ Values: blank row
-Short circuit:
+ShortCircuit:
    Nothing
 , , 
 
@@ -124,15 +124,15 @@ Initial:
    NestedLoopJoin: inner on ref.test_id = test.id AND NULL
    ├─ Scan: test
    └─ Scan: ref
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on ref.test_id = test.id
    ├─ Scan: test (NULL)
    └─ Scan: ref (NULL)
-Hash join:
+HashJoin:
    HashJoin: inner on test.id = ref.test_id
    ├─ Scan: test (NULL)
    └─ Scan: ref (NULL)
-Short circuit:
+ShortCircuit:
    Nothing
 test.id, test.value, ref.id, ref.test_id
 
@@ -142,11 +142,11 @@ test.id, test.value, ref.id, ref.test_id
 Initial:
    Filter: test.id = NULL
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (test.id = NULL)
-Index lookup:
+IndexLookup:
    KeyLookup: test (0 keys)
-Short circuit:
+ShortCircuit:
    Nothing
 test.id, test.value
 
@@ -155,11 +155,11 @@ test.id, test.value
 Initial:
    Filter: ref.test_id = NULL
    └─ Scan: ref
-Filter pushdown:
+FilterPushdown:
    Scan: ref (ref.test_id = NULL)
-Index lookup:
+IndexLookup:
    IndexLookup: ref.test_id (0 values)
-Short circuit:
+ShortCircuit:
    Nothing
 ref.id, ref.test_id
 
@@ -169,7 +169,7 @@ ref.id, ref.test_id
 Initial:
    Limit: 0
    └─ Scan: test
-Short circuit:
+ShortCircuit:
    Nothing
 test.id, test.value
 
@@ -180,7 +180,7 @@ test.id, test.value
 Initial:
    Projection: test.id, test.value
    └─ Scan: test
-Short circuit:
+ShortCircuit:
    Scan: test
 1, 'a'
 2, 'b'
@@ -202,7 +202,7 @@ Initial:
    Projection: test.id, #1, #2
    └─ Aggregate: test.id, min(test.id), max(test.id)
       └─ Scan: test
-Short circuit:
+ShortCircuit:
    Aggregate: test.id, min(test.id), max(test.id)
    └─ Scan: test
 1, 1, 1
@@ -215,10 +215,10 @@ Short circuit:
 Initial:
    Filter: NOT 1 = 1 OR 0 > 3 AND NOT NULL
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Filter: FALSE
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (FALSE)
-Short circuit:
+ShortCircuit:
    Nothing

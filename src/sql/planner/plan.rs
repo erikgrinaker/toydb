@@ -85,7 +85,7 @@ impl Plan {
     /// Optimizes the plan, consuming it. See OPTIMIZERS for the list of
     /// optimizers.
     pub fn optimize(self) -> Result<Self> {
-        let optimize = |node| OPTIMIZERS.iter().try_fold(node, |node, (_, opt)| opt(node));
+        let optimize = |node| OPTIMIZERS.iter().try_fold(node, |node, opt| opt.optimize(node));
         Ok(match self {
             Self::CreateTable { .. } | Self::DropTable { .. } => self,
             Self::Delete { table, primary_key, source } => {

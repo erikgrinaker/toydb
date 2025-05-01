@@ -11,7 +11,7 @@ ok
 Initial:
    Projection: 1 + 1
    └─ Values: blank row
-Constant folding:
+ConstantFolding:
    Projection: 2
    └─ Values: blank row
 2
@@ -21,7 +21,7 @@ Constant folding:
 Initial:
    Projection: 1 + 1
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Projection: 2
    └─ Scan: test
 2
@@ -34,15 +34,15 @@ Initial:
    NestedLoopJoin: inner on 1 + 1 > 1
    ├─ Scan: test as a
    └─ Scan: test as b
-Constant folding:
+ConstantFolding:
    NestedLoopJoin: inner on TRUE
    ├─ Scan: test as a
    └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner
    ├─ Scan: test as a (TRUE)
    └─ Scan: test as b (TRUE)
-Short circuit:
+ShortCircuit:
    NestedLoopJoin: inner
    ├─ Scan: test as a
    └─ Scan: test as b
@@ -61,12 +61,12 @@ Short circuit:
 Initial:
    Filter: 1 + 1 > 1
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Filter: TRUE
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (TRUE)
-Short circuit:
+ShortCircuit:
    Scan: test
 1, 'a'
 2, 'b'
@@ -77,7 +77,7 @@ Short circuit:
 Initial:
    Order: 1 + 1 asc
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Order: 2 asc
    └─ Scan: test
 1, 'a'
@@ -106,7 +106,7 @@ Initial:
 Initial:
    Projection: 2 * 2 + test.id - 3 * 2
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Projection: 4 + test.id - 6
    └─ Scan: test
 -1
@@ -119,12 +119,12 @@ Constant folding:
 Initial:
    Filter: 1 + 1 > 1 OR test.id > 1
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Filter: TRUE
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (TRUE)
-Short circuit:
+ShortCircuit:
    Scan: test
 1, 'a'
 2, 'b'
@@ -135,10 +135,10 @@ Short circuit:
 Initial:
    Filter: 1 + 1 < 1 OR test.id > 1
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Filter: test.id > 1
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (test.id > 1)
 2, 'b'
 3, 'c'
@@ -148,10 +148,10 @@ Filter pushdown:
 Initial:
    Filter: 1 + 1 > 1 AND test.id > 1
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Filter: test.id > 1
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (test.id > 1)
 2, 'b'
 3, 'c'
@@ -161,10 +161,10 @@ Filter pushdown:
 Initial:
    Filter: 1 + 1 < 1 AND test.id > 1
    └─ Scan: test
-Constant folding:
+ConstantFolding:
    Filter: FALSE
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (FALSE)
-Short circuit:
+ShortCircuit:
    Nothing

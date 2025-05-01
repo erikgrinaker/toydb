@@ -1,26 +1,46 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
+use std::sync::LazyLock;
 
 use super::Node;
 use crate::error::Result;
 use crate::sql::types::{Expression, Label, Value};
 
-/// A plan optimizer, which recursively transforms a plan node to make plan
-/// execution more efficient where possible.
-pub type Optimizer = fn(Node) -> Result<Node>;
-
 /// The set of optimizers, and the order in which they are applied.
-pub static OPTIMIZERS: &[(&str, Optimizer)] = &[
-    ("Constant folding", fold_constants),
-    ("Filter pushdown", push_filters),
-    ("Index lookup", index_lookup),
-    ("Hash join", hash_join),
-    ("Short circuit", short_circuit),
-];
+pub static OPTIMIZERS: LazyLock<Vec<Box<dyn Optimizer>>> = LazyLock::new(|| {
+    vec![
+        Box::new(ConstantFolding),
+        Box::new(FilterPushdown),
+        Box::new(IndexLookup),
+        Box::new(HashJoin),
+        Box::new(ShortCircuit),
+    ]
+});
 
-/// Folds constant (sub)expressions by pre-evaluating them once, instead of
+/// A node optimizer, which recursively transforms a plan node to make plan
+/// execution more efficient where possible.
+pub trait Optimizer: Debug + Send + Sync {
+    /// Optimizes a node, returning the optimized node.
+    fn optimize(&self, node: Node) -> Result<Node>;
+}
+
+/// Folds constant expressions by pre-evaluating them once now, instead of
 /// re-evaluating them for every row during execution.
-pub fn fold_constants(node: Node) -> Result<Node> {
-    fn xform(mut expr: Expression) -> Result<Expression> {
+#[derive(Debug)]
+pub struct ConstantFolding;
+
+impl Optimizer for ConstantFolding {
+    fn optimize(&self, node: Node) -> Result<Node> {
+        // Recursively transform expressions in the node tree. Post-order to
+        // partially fold child expressions as far as possible, and avoid
+        // quadratic costs.
+        node.transform(&|node| node.transform_expressions(&Ok, &Self::fold), &Ok)
+    }
+}
+
+impl ConstantFolding {
+    /// Folds constant expressions in a node.
+    pub fn fold(mut expr: Expression) -> Result<Expression> {
         use Expression::*;
         use Value::*;
 
@@ -49,6 +69,7 @@ pub fn fold_constants(node: Node) -> Result<Node> {
                 (Constant(Boolean(true)), expr) | (expr, Constant(Boolean(true))) => expr,
                 (lhs, rhs) => And(lhs.into(), rhs.into()),
             },
+
             Or(lhs, rhs) => match (*lhs, *rhs) {
                 // If either side of an OR is true, the OR is true.
                 (Constant(Boolean(true)), _) | (_, Constant(Boolean(true))) => {
@@ -58,28 +79,45 @@ pub fn fold_constants(node: Node) -> Result<Node> {
                 (Constant(Boolean(false)), expr) | (expr, Constant(Boolean(false))) => expr,
                 (lhs, rhs) => Or(lhs.into(), rhs.into()),
             },
+
             expr => expr,
         };
+
         Ok(expr)
     }
-
-    // Transform after descending, to perform logical short-circuiting on child
-    // expressions that have already been folded, and to reduce the quadratic
-    // cost when an expression contains a column.
-    node.transform(&|node| node.transform_expressions(&Ok, &xform), &Ok)
 }
 
 /// Pushes filter predicates down into child nodes where possible. In
-/// particular, this can allow filtering during storage scans (below Raft),
-/// instead of reading and transmitting all rows then filtering, by pushing
-/// a predicate from a Filter node down into a Scan node.
-pub fn push_filters(node: Node) -> Result<Node> {
+/// particular, this can perform filtering during storage scans (below Raft),
+/// instead of reading and transmitting all rows across the network before
+/// filtering, by pushing a predicate from a Filter node down into a Scan node.
+#[derive(Debug)]
+pub struct FilterPushdown;
+
+impl Optimizer for FilterPushdown {
+    fn optimize(&self, node: Node) -> Result<Node> {
+        // Recursively transform expressions in the node tree. Uses post-order
+        // traversal to partially fold child expressions as far as possible, and
+        // avoid quadratic costs.
+        // Push down before descending, so we can keep recursively pushing down.
+        node.transform(&|node| Ok(Self::push_filters(node)), &Ok)
+    }
+}
+
+impl FilterPushdown {
+    /// Pushes filter predicates down into child nodes where possible.
+    fn push_filters(mut node: Node) -> Node {
+        node = Self::maybe_push_filter(node);
+        node = Self::maybe_push_join(node);
+        node
+    }
+
     /// Pushes an expression into a node if possible. Otherwise, returns the the
     /// unpushed expression.
     fn push_into(expr: Expression, target: &mut Node) -> Option<Expression> {
         match target {
             Node::Filter { predicate, .. } => {
-                // Temporarily swap the predicate to take ownership.
+                // Temporarily replace the predicate to take ownership.
                 let rhs = std::mem::replace(predicate, Expression::Constant(Value::Null));
                 *predicate = Expression::And(expr.into(), rhs.into());
             }
@@ -107,14 +145,14 @@ pub fn push_filters(node: Node) -> Result<Node> {
             return node;
         };
         // Attempt to push the filter into the source, or return the original.
-        if let Some(predicate) = push_into(predicate, &mut source) {
+        if let Some(predicate) = Self::push_into(predicate, &mut source) {
             return Node::Filter { source, predicate };
         }
         // Push succeded, return the source that was pushed into. When we
         // replace this filter node with the source node, Node.transform() will
         // skip the source node since it now takes the place of the original
         // filter node. Transform the source manually.
-        xform(*source)
+        Self::push_filters(*source)
     }
 
     // Pushes down parts of a join predicate into the left or right sources
@@ -190,7 +228,7 @@ pub fn push_filters(node: Node) -> Result<Node> {
 
         // Push predicates down into the sources if possible.
         if let Some(expr) = Expression::and_vec(push_left) {
-            if let Some(expr) = push_into(expr, &mut left) {
+            if let Some(expr) = Self::push_into(expr, &mut left) {
                 // Pushdown failed, put it back into the join predicate.
                 predicate.push(expr)
             }
@@ -199,7 +237,7 @@ pub fn push_filters(node: Node) -> Result<Node> {
         if let Some(mut expr) = Expression::and_vec(push_right) {
             // Right columns have indexes in the joined row; shift them left.
             expr = expr.shift_column(-(left.columns() as isize));
-            if let Some(mut expr) = push_into(expr, &mut right) {
+            if let Some(mut expr) = Self::push_into(expr, &mut right) {
                 // Pushdown failed, undo the column index shift.
                 expr = expr.shift_column(left.columns() as isize);
                 predicate.push(expr)
@@ -210,22 +248,25 @@ pub fn push_filters(node: Node) -> Result<Node> {
         let predicate = Expression::and_vec(predicate);
         Node::NestedLoopJoin { left, right, predicate, outer }
     }
-
-    /// Applies pushdown transformations to a node.
-    fn xform(mut node: Node) -> Node {
-        node = maybe_push_filter(node);
-        node = maybe_push_join(node);
-        node
-    }
-
-    // Push down before descending, so we can keep recursively pushing down.
-    node.transform(&|node| Ok(xform(node)), &Ok)
 }
 
-/// Uses an index or primary key lookup for a filter when possible.
-pub fn index_lookup(node: Node) -> Result<Node> {
-    fn xform(mut node: Node) -> Node {
-        // Only handle scan filters. filter_pushdown() must have pushed filters
+/// Uses a primary key or secondary index lookup where possible.
+#[derive(Debug)]
+pub struct IndexLookup;
+
+impl Optimizer for IndexLookup {
+    fn optimize(&self, node: Node) -> Result<Node> {
+        // Recursively transform expressions in the node tree. Post-order to
+        // partially fold child expressions as far as possible, and avoid
+        // quadratic costs.
+        node.transform(&|node| Ok(Self::index_lookup(node)), &Ok)
+    }
+}
+
+impl IndexLookup {
+    /// Rewrites a filtered scan node into a key or index lookup if possible.
+    fn index_lookup(mut node: Node) -> Node {
+        // Only handle scan filters. Assume FilterPushdown has pushed filters
         // into scan nodes first.
         let Node::Scan { table, alias, filter: Some(filter) } = node else {
             return node;
@@ -241,6 +282,7 @@ pub fn index_lookup(node: Node) -> Result<Node> {
                 .filter(|&c| c == table.primary_key || table.columns[c].index)
                 .map(|column| (i, column))
         }) else {
+            // No index lookups found, return the original node.
             return Node::Scan { table, alias, filter: Some(filter) };
         };
 
@@ -261,13 +303,21 @@ pub fn index_lookup(node: Node) -> Result<Node> {
 
         node
     }
-
-    node.transform(&Ok, &|n| Ok(xform(n)))
 }
 
 /// Uses a hash join instead of a nested loop join for single-column equijoins.
-pub fn hash_join(node: Node) -> Result<Node> {
-    fn xform(node: Node) -> Node {
+#[derive(Debug)]
+pub struct HashJoin;
+
+impl Optimizer for HashJoin {
+    fn optimize(&self, node: Node) -> Result<Node> {
+        node.transform(&|node| Ok(Self::hash_join(node)), &Ok)
+    }
+}
+
+impl HashJoin {
+    /// Rewrites a nested loop join into a hash join if possible.
+    pub fn hash_join(node: Node) -> Node {
         let Node::NestedLoopJoin {
             left,
             right,
@@ -298,81 +348,97 @@ pub fn hash_join(node: Node) -> Result<Node> {
             }
         }
     }
-
-    node.transform(&|node| Ok(xform(node)), &Ok)
 }
 
 /// Short-circuits useless nodes and expressions (for example a Filter node that
 /// always evaluates to false), by removing them and/or replacing them with
 /// Nothing nodes that yield no rows.
-pub fn short_circuit(node: Node) -> Result<Node> {
-    use Expression::*;
-    use Value::*;
+#[derive(Debug)]
+pub struct ShortCircuit;
 
+impl Optimizer for ShortCircuit {
+    fn optimize(&self, node: Node) -> Result<Node> {
+        // Post-order transform, to pull Nothing nodes upwards in the tree.
+        node.transform(&Ok, &|node| Ok(Self::short_circuit(node)))
+    }
+}
+
+impl ShortCircuit {
     /// Creates a Nothing node with the columns of the original node.
     fn nothing(node: &Node) -> Node {
         let columns = (0..node.columns()).map(|i| node.column_label(i)).collect();
         Node::Nothing { columns }
     }
 
-    let xform = |node| match node {
-        // Filter nodes that always yield true are unnecessary: remove them.
-        Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
+    /// Short-circuits useless nodes.
+    fn short_circuit(node: Node) -> Node {
+        use Expression::*;
+        use Value::*;
 
-        // Predicates that always yield true are unnecessary: remove them.
-        Node::Scan { table, filter: Some(Constant(Boolean(true))), alias } => {
-            Node::Scan { table, filter: None, alias }
+        match node {
+            // Filter nodes that always yield true are unnecessary: remove them.
+            Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
+
+            // Predicates that always yield true are unnecessary: remove them.
+            Node::Scan { table, filter: Some(Constant(Boolean(true))), alias } => {
+                Node::Scan { table, filter: None, alias }
+            }
+            Node::NestedLoopJoin {
+                left,
+                right,
+                predicate: Some(Constant(Boolean(true))),
+                outer,
+            } => Node::NestedLoopJoin { left, right, predicate: None, outer },
+
+            // Short-circuit nodes that can't produce anything by replacing them
+            // with a Nothing node, retaining the columns.
+            ref node @ Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => {
+                Self::nothing(node)
+            }
+            ref node @ Node::IndexLookup { ref values, .. } if values.is_empty() => {
+                Self::nothing(node)
+            }
+            ref node @ Node::KeyLookup { ref keys, .. } if keys.is_empty() => Self::nothing(node),
+            ref node @ Node::Limit { limit: 0, .. } => Self::nothing(node),
+            ref node @ Node::NestedLoopJoin {
+                predicate: Some(Constant(Boolean(false) | Null)),
+                ..
+            } => Self::nothing(node),
+            ref node @ Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => {
+                Self::nothing(node)
+            }
+            ref node @ Node::Values { ref rows } if rows.is_empty() => Self::nothing(node),
+
+            // Short-circuit nodes that pull from a Nothing node.
+            //
+            // NB: does not short-circuit aggregation, since an aggregation over 0
+            // rows should produce a result.
+            ref node @ (Node::Filter { ref source, .. }
+            | Node::HashJoin { left: ref source, .. }
+            | Node::HashJoin { right: ref source, .. }
+            | Node::NestedLoopJoin { left: ref source, .. }
+            | Node::NestedLoopJoin { right: ref source, .. }
+            | Node::Offset { ref source, .. }
+            | Node::Order { ref source, .. }
+            | Node::Projection { ref source, .. })
+                if matches!(**source, Node::Nothing { .. }) =>
+            {
+                Self::nothing(node)
+            }
+
+            // Remove noop projections that simply pass through the source columns.
+            Node::Projection { source, expressions, aliases }
+                if source.columns() == expressions.len()
+                    && aliases.iter().all(|alias| *alias == Label::None)
+                    && expressions
+                        .iter()
+                        .enumerate()
+                        .all(|(i, expr)| *expr == Expression::Column(i)) =>
+            {
+                *source
+            }
+
+            node => node,
         }
-        Node::NestedLoopJoin { left, right, predicate: Some(Constant(Boolean(true))), outer } => {
-            Node::NestedLoopJoin { left, right, predicate: None, outer }
-        }
-
-        // Short-circuit nodes that can't produce anything by replacing them
-        // with a Nothing node, retaining the columns.
-        ref node @ Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => nothing(node),
-        ref node @ Node::IndexLookup { ref values, .. } if values.is_empty() => nothing(node),
-        ref node @ Node::KeyLookup { ref keys, .. } if keys.is_empty() => nothing(node),
-        ref node @ Node::Limit { limit: 0, .. } => nothing(node),
-        ref node @ Node::NestedLoopJoin {
-            predicate: Some(Constant(Boolean(false) | Null)), ..
-        } => nothing(node),
-        ref node @ Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => {
-            nothing(node)
-        }
-        ref node @ Node::Values { ref rows } if rows.is_empty() => nothing(node),
-
-        // Short-circuit nodes that pull from a Nothing node.
-        //
-        // NB: does not short-circuit aggregation, since an aggregation over 0
-        // rows should produce a result.
-        ref node @ (Node::Filter { ref source, .. }
-        | Node::HashJoin { left: ref source, .. }
-        | Node::HashJoin { right: ref source, .. }
-        | Node::NestedLoopJoin { left: ref source, .. }
-        | Node::NestedLoopJoin { right: ref source, .. }
-        | Node::Offset { ref source, .. }
-        | Node::Order { ref source, .. }
-        | Node::Projection { ref source, .. })
-            if matches!(**source, Node::Nothing { .. }) =>
-        {
-            nothing(node)
-        }
-
-        // Remove noop projections that simply pass through the source columns.
-        Node::Projection { source, expressions, aliases }
-            if source.columns() == expressions.len()
-                && aliases.iter().all(|alias| *alias == Label::None)
-                && expressions
-                    .iter()
-                    .enumerate()
-                    .all(|(i, expr)| matches!(expr, Expression::Column(c) if i == *c)) =>
-        {
-            *source
-        }
-
-        node => node,
-    };
-
-    // Transform after descending, to pull Nothing nodes upwards.
-    node.transform(&Ok, &|node| Ok(xform(node)))
+    }
 }

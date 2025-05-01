@@ -11,7 +11,7 @@ ok
 Initial:
    Filter: test.value = 'b'
    └─ Scan: test
-Filter pushdown:
+FilterPushdown:
    Scan: test (test.value = 'b')
 2, 'b'
 
@@ -24,7 +24,7 @@ Initial:
    └─ Projection: test.id, test.value
       └─ Aggregate: test.id, test.value
          └─ Scan: test
-Short circuit:
+ShortCircuit:
    Filter: test.value = 'b'
    └─ Aggregate: test.id, test.value
       └─ Scan: test
@@ -37,7 +37,7 @@ Initial:
    NestedLoopJoin: inner on a.value = 'a' AND b.value = 'b'
    ├─ Scan: test as a
    └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
@@ -51,11 +51,11 @@ Initial:
    NestedLoopJoin: inner on a.id = b.id AND a.value = 'a' AND b.value = 'b'
    ├─ Scan: test as a
    └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
-Hash join:
+HashJoin:
    HashJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
@@ -81,11 +81,11 @@ Initial:
    └─ NestedLoopJoin: inner on a.id = b.id
       ├─ Scan: test as a
       └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
-Hash join:
+HashJoin:
    HashJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
@@ -98,7 +98,7 @@ Initial:
    └─ NestedLoopJoin: inner on a.id = b.id
       ├─ Scan: test as a
       └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on (a.id > 0 OR b.id > 0) AND a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
@@ -112,15 +112,15 @@ Initial:
    └─ NestedLoopJoin: inner on a.id = b.id
       ├─ Scan: test as a
       └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.id = 1 OR a.id = 2)
    └─ Scan: test as b (b.id = 1 OR b.id = 2)
-Index lookup:
+IndexLookup:
    NestedLoopJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
-Hash join:
+HashJoin:
    HashJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
@@ -134,15 +134,15 @@ Initial:
    └─ NestedLoopJoin: inner on a.id = b.id
       ├─ Scan: test as a
       └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.id = 1 OR a.id = 2)
    └─ Scan: test as b (b.id = 1 OR b.id = 2)
-Index lookup:
+IndexLookup:
    NestedLoopJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
-Hash join:
+HashJoin:
    HashJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
@@ -163,7 +163,7 @@ Initial:
       │  │  └─ Scan: test as b
       │  └─ Scan: test as c
       └─ Scan: test as d
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on c.id = d.id
    ├─ NestedLoopJoin: inner on b.id = c.id
    │  ├─ NestedLoopJoin: inner on a.id = b.id
@@ -171,7 +171,7 @@ Filter pushdown:
    │  │  └─ Scan: test as b (b.id = 2 AND (b.id = 2 OR b.id = 3))
    │  └─ Scan: test as c (c.id < 3 AND (c.id = 2 OR c.id = 3) AND c.id = 2)
    └─ Scan: test as d (d.id = 2 OR d.id = 3)
-Index lookup:
+IndexLookup:
    NestedLoopJoin: inner on c.id = d.id
    ├─ NestedLoopJoin: inner on b.id = c.id
    │  ├─ NestedLoopJoin: inner on a.id = b.id
@@ -182,7 +182,7 @@ Index lookup:
    │  └─ Filter: c.id < 3 AND c.id = 2
    │     └─ KeyLookup: test as c (2, 3)
    └─ KeyLookup: test as d (2, 3)
-Hash join:
+HashJoin:
    HashJoin: inner on c.id = d.id
    ├─ HashJoin: inner on b.id = c.id
    │  ├─ HashJoin: inner on a.id = b.id

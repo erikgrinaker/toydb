@@ -12,7 +12,7 @@ Initial:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a
    └─ Scan: test as b
-Hash join:
+HashJoin:
    HashJoin: inner on a.id = b.id
    ├─ Scan: test as a
    └─ Scan: test as b
@@ -27,7 +27,7 @@ Initial:
    NestedLoopJoin: inner on a.value = b.value
    ├─ Scan: test as a
    └─ Scan: test as b
-Hash join:
+HashJoin:
    HashJoin: inner on a.value = b.value
    ├─ Scan: test as a
    └─ Scan: test as b
@@ -66,11 +66,11 @@ Initial:
    NestedLoopJoin: inner on a.id = b.id AND a.value = 'b' AND b.value = 'c'
    ├─ Scan: test as a
    └─ Scan: test as b
-Filter pushdown:
+FilterPushdown:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'b')
    └─ Scan: test as b (b.value = 'c')
-Hash join:
+HashJoin:
    HashJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'b')
    └─ Scan: test as b (b.value = 'c')

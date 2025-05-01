@@ -212,11 +212,15 @@ mod tests {
                     return Err("can only use opt with SELECT plans".into());
                 };
                 writeln!(output, "{}", format!("Initial:\n{root}").replace('\n', "\n   "))?;
-                for (name, optimizer) in OPTIMIZERS {
+                for optimizer in OPTIMIZERS.iter() {
                     let prev = root.clone();
-                    root = optimizer(root)?;
+                    root = optimizer.optimize(root)?;
                     if root != prev {
-                        writeln!(output, "{}", format!("{name}:\n{root}").replace('\n', "\n   "))?;
+                        writeln!(
+                            output,
+                            "{}",
+                            format!("{optimizer:?}:\n{root}").replace('\n', "\n   ")
+                        )?;
                     }
                 }
             }
