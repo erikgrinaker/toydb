@@ -224,7 +224,7 @@ Index lookup:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ KeyLookup: test (1, 3)
    └─ IndexLookup: other.test_id (1, 3)
-Join type:
+Hash join:
    HashJoin: inner on test.id = other.test_id
    ├─ KeyLookup: test (1, 3)
    └─ IndexLookup: other.test_id (1, 3)
@@ -246,7 +246,7 @@ Index lookup:
    NestedLoopJoin: inner on other.test_id = test.id
    ├─ KeyLookup: test (1, 3)
    └─ IndexLookup: other.test_id (1, 3)
-Join type:
+Hash join:
    HashJoin: inner on test.id = other.test_id
    ├─ KeyLookup: test (1, 3)
    └─ IndexLookup: other.test_id (1, 3)
@@ -276,7 +276,7 @@ Index lookup:
    │  ├─ KeyLookup: test (2)
    │  └─ IndexLookup: other.test_id as a.test_id (2)
    └─ IndexLookup: other.test_id as b.test_id (1, 3)
-Join type:
+Hash join:
    NestedLoopJoin: inner on b.test_id = test.id OR b.test_id = 3
    ├─ HashJoin: inner on test.id = a.test_id
    │  ├─ KeyLookup: test (2)

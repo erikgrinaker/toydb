@@ -128,7 +128,7 @@ Filter pushdown:
    NestedLoopJoin: inner on ref.test_id = test.id
    ├─ Scan: test (NULL)
    └─ Scan: ref (NULL)
-Join type:
+Hash join:
    HashJoin: inner on test.id = ref.test_id
    ├─ Scan: test (NULL)
    └─ Scan: ref (NULL)

@@ -13,20 +13,17 @@ pub static OPTIMIZERS: &[(&str, Optimizer)] = &[
     ("Constant folding", fold_constants),
     ("Filter pushdown", push_filters),
     ("Index lookup", index_lookup),
-    ("Join type", join_type),
+    ("Hash join", hash_join),
     ("Short circuit", short_circuit),
 ];
 
-/// Folds constant (sub)expressions by pre-evaluating them, instead of
-/// re-evaluating then for every row during execution.
+/// Folds constant (sub)expressions by pre-evaluating them once, instead of
+/// re-evaluating them for every row during execution.
 pub fn fold_constants(node: Node) -> Result<Node> {
-    use Expression::*;
-    use Value::*;
+    fn xform(mut expr: Expression) -> Result<Expression> {
+        use Expression::*;
+        use Value::*;
 
-    // Transform expressions. Called after descending, to perform logical
-    // short-circuiting on child expressions that have already been folded, and
-    // to reduce the quadratic cost when an expression contains a column.
-    let xform = |mut expr: Expression| {
         // If the expression is constant, evaluate it.
         //
         // This is a very simple approach, which doesn't handle more complex
@@ -39,7 +36,9 @@ pub fn fold_constants(node: Node) -> Result<Node> {
         }
 
         // If the expression is a logical operator, and one of the sides is
-        // known, we may be able to short-circuit it.
+        // constant, we may be able to evaluate it even if it has a column
+        // reference. For example, a AND FALSE is always FALSE, regardless of
+        // what a is.
         expr = match expr {
             And(lhs, rhs) => match (*lhs, *rhs) {
                 // If either side of an AND is false, the AND is false.
@@ -62,14 +61,18 @@ pub fn fold_constants(node: Node) -> Result<Node> {
             expr => expr,
         };
         Ok(expr)
-    };
+    }
 
+    // Transform after descending, to perform logical short-circuiting on child
+    // expressions that have already been folded, and to reduce the quadratic
+    // cost when an expression contains a column.
     node.transform(&|node| node.transform_expressions(&Ok, &xform), &Ok)
 }
 
 /// Pushes filter predicates down into child nodes where possible. In
 /// particular, this can allow filtering during storage scans (below Raft),
-/// instead of reading and transmitting all rows then filtering.
+/// instead of reading and transmitting all rows then filtering, by pushing
+/// a predicate from a Filter node down into a Scan node.
 pub fn push_filters(node: Node) -> Result<Node> {
     /// Pushes an expression into a node if possible. Otherwise, returns the the
     /// unpushed expression.
@@ -92,23 +95,19 @@ pub fn push_filters(node: Node) -> Result<Node> {
                     None => Some(expr),
                 };
             }
-            // We don't handle HashJoin here, since we assume the join_type()
-            // optimizer runs after this.
-            Node::HashJoin { .. } => panic!("filter pushdown must run before join optimizer"),
             // Unable to push down, just return the original expression.
             _ => return Some(expr),
         }
         None
     }
 
-    /// Pushes down a filter node if possible.
-    fn push_filter(node: Node) -> Node {
+    /// Pushes a filter node predicate down into its source, if possible.
+    fn maybe_push_filter(node: Node) -> Node {
         let Node::Filter { mut source, predicate } = node else {
             return node;
         };
-        // Attempt to push the filter into the source.
+        // Attempt to push the filter into the source, or return the original.
         if let Some(predicate) = push_into(predicate, &mut source) {
-            // Push failed, return the original filter node.
             return Node::Filter { source, predicate };
         }
         // Push succeded, return the source that was pushed into. When we
@@ -120,7 +119,7 @@ pub fn push_filters(node: Node) -> Result<Node> {
 
     // Pushes down parts of a join predicate into the left or right sources
     // where possible.
-    fn push_join(node: Node) -> Node {
+    fn maybe_push_join(node: Node) -> Node {
         let Node::NestedLoopJoin { mut left, mut right, predicate: Some(predicate), outer } = node
         else {
             return node;
@@ -213,8 +212,10 @@ pub fn push_filters(node: Node) -> Result<Node> {
     }
 
     /// Applies pushdown transformations to a node.
-    fn xform(node: Node) -> Node {
-        push_join(push_filter(node))
+    fn xform(mut node: Node) -> Node {
+        node = maybe_push_filter(node);
+        node = maybe_push_join(node);
+        node
     }
 
     // Push down before descending, so we can keep recursively pushing down.
@@ -223,7 +224,7 @@ pub fn push_filters(node: Node) -> Result<Node> {
 
 /// Uses an index or primary key lookup for a filter when possible.
 pub fn index_lookup(node: Node) -> Result<Node> {
-    let transform = |mut node| {
+    fn xform(mut node: Node) -> Node {
         // Only handle scan filters. filter_pushdown() must have pushed filters
         // into scan nodes first.
         let Node::Scan { table, alias, filter: Some(filter) } = node else {
@@ -237,7 +238,7 @@ pub fn index_lookup(node: Node) -> Result<Node> {
         // index lookup. We could be more clever here, but this is fine.
         let Some((i, column)) = cnf.iter().enumerate().find_map(|(i, expr)| {
             expr.is_column_lookup()
-                .filter(|c| *c == table.primary_key || table.columns[*c].index)
+                .filter(|&c| c == table.primary_key || table.columns[c].index)
                 .map(|column| (i, column))
         }) else {
             return Node::Scan { table, alias, filter: Some(filter) };
@@ -259,19 +260,26 @@ pub fn index_lookup(node: Node) -> Result<Node> {
         }
 
         node
-    };
-    node.transform(&Ok, &|n| Ok(transform(n)))
+    }
+
+    node.transform(&Ok, &|n| Ok(xform(n)))
 }
 
 /// Uses a hash join instead of a nested loop join for single-column equijoins.
-pub fn join_type(node: Node) -> Result<Node> {
-    let xform = |node| match node {
-        Node::NestedLoopJoin {
+pub fn hash_join(node: Node) -> Result<Node> {
+    fn xform(node: Node) -> Node {
+        let Node::NestedLoopJoin {
             left,
             right,
             predicate: Some(Expression::Equal(lhs, rhs)),
             outer,
-        } => match (*lhs, *rhs) {
+        } = node
+        else {
+            return node;
+        };
+
+        match (*lhs, *rhs) {
+            // If this is a single-column equijoin, use a hash join.
             (Expression::Column(mut left_column), Expression::Column(mut right_column)) => {
                 // The LHS column may be a column in the right table; swap them.
                 if right_column < left_column {
@@ -283,18 +291,20 @@ pub fn join_type(node: Node) -> Result<Node> {
                 right_column -= left.columns();
                 Node::HashJoin { left, left_column, right, right_column, outer }
             }
+            // Otherwise, retain the nested loop join.
             (lhs, rhs) => {
                 let predicate = Some(Expression::Equal(lhs.into(), rhs.into()));
                 Node::NestedLoopJoin { left, right, predicate, outer }
             }
-        },
-        node => node,
-    };
+        }
+    }
+
     node.transform(&|node| Ok(xform(node)), &Ok)
 }
 
-/// Short-circuits useless nodes and expressions, by removing them and/or
-/// replacing them with Nothing nodes that yield no rows.
+/// Short-circuits useless nodes and expressions (for example a Filter node that
+/// always evaluates to false), by removing them and/or replacing them with
+/// Nothing nodes that yield no rows.
 pub fn short_circuit(node: Node) -> Result<Node> {
     use Expression::*;
     use Value::*;

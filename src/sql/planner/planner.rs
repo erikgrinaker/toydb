@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use itertools::{Either, Itertools as _};
 
-use super::plan::{Aggregate, Node, Plan, remap_sources};
+use super::plan::{Aggregate, Node, Plan, invert_remap};
 use crate::errinput;
 use crate::error::Result;
 use crate::sql::engine::Catalog;
@@ -11,6 +11,10 @@ use crate::sql::types::{Column, Expression, Label, Table, Value};
 
 /// The planner builds an execution plan from a parsed Abstract Syntax Tree,
 /// using the catalog for schema information.
+///
+/// To build the plan, it recursively traverses the AST and transforms AST nodes
+/// into plan nodes. The planner also resolves column names to column indexes,
+/// using a Scope to track currently visible columns and tables at each node.
 pub struct Planner<'a, C: Catalog> {
     catalog: &'a C,
 }
@@ -26,7 +30,8 @@ impl<'a, C: Catalog> Planner<'a, C> {
         use ast::Statement::*;
         match statement {
             CreateTable { name, columns } => self.build_create_table(name, columns),
-            DropTable { name, if_exists } => Ok(Plan::DropTable { name, if_exists }),
+            DropTable { name, if_exists } => self.build_drop_table(name, if_exists),
+
             Delete { table, r#where } => self.build_delete(table, r#where),
             Insert { table, columns, values } => self.build_insert(table, columns, values),
             Update { table, set, r#where } => self.build_update(table, set, r#where),
@@ -44,8 +49,6 @@ impl<'a, C: Catalog> Planner<'a, C> {
     /// Builds a CREATE TABLE plan.
     fn build_create_table(&self, name: String, columns: Vec<ast::Column>) -> Result<Plan> {
         // Most schema validation happens during execution via Table.validate().
-        // However, the AST specifies the primary key as a column field, while
-        // the schema stores it as a column index, so we have to map that here.
         let Some(primary_key) = columns.iter().position(|c| c.primary_key) else {
             return errinput!("no primary key for table {name}");
         };
@@ -61,7 +64,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
                     datatype: c.datatype,
                     nullable,
                     default: match c.default {
-                        Some(expr) => Some(Self::evaluate_constant(expr)?),
+                        Some(expr) => Some(Self::build_constant_value(expr)?),
                         None if nullable => Some(Value::Null),
                         None => None,
                     },
@@ -72,6 +75,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
             })
             .collect::<Result<_>>()?;
         Ok(Plan::CreateTable { schema: Table { name, primary_key, columns } })
+    }
+
+    /// Builds a DROP TABLE plan.
+    fn build_drop_table(&self, name: String, if_exists: bool) -> Result<Plan> {
+        Ok(Plan::DropTable { name, if_exists })
     }
 
     /// Builds a DELETE plan.
@@ -97,11 +105,11 @@ impl<'a, C: Catalog> Planner<'a, C> {
         let mut column_map = None;
         if let Some(columns) = columns {
             let column_map = column_map.insert(HashMap::new());
-            for (vidx, name) in columns.into_iter().enumerate() {
-                let Some(cidx) = table.columns.iter().position(|c| c.name == name) else {
+            for (vindex, name) in columns.into_iter().enumerate() {
+                let Some(cindex) = table.columns.iter().position(|c| c.name == name) else {
                     return errinput!("unknown column {name} in table {}", table.name);
                 };
-                if column_map.insert(cidx, vidx).is_some() {
+                if column_map.insert(cindex, vindex).is_some() {
                     return errinput!("column {name} given multiple times");
                 }
             }
@@ -245,7 +253,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build OFFSET clause.
         if let Some(offset) = offset {
-            let offset = match Self::evaluate_constant(offset)? {
+            let offset = match Self::build_constant_value(offset)? {
                 Value::Integer(offset) if offset >= 0 => offset as usize,
                 offset => return errinput!("invalid offset {offset}"),
             };
@@ -254,7 +262,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
         // Build LIMIT clause.
         if let Some(limit) = limit {
-            let limit = match Self::evaluate_constant(limit)? {
+            let limit = match Self::build_constant_value(limit)? {
                 Value::Integer(limit) if limit >= 0 => limit as usize,
                 limit => return errinput!("invalid limit {limit}"),
             };
@@ -559,22 +567,24 @@ impl<'a, C: Catalog> Planner<'a, C> {
         })
     }
 
-    /// Builds and evaluates a constant AST expression. Errors on column refs.
-    fn evaluate_constant(expr: ast::Expression) -> Result<Value> {
+    /// Builds a constant value from an AST expression by evaluating it. The
+    /// expression can't contain column references or aggregate functions.
+    fn build_constant_value(expr: ast::Expression) -> Result<Value> {
         Self::build_expression(expr, &Scope::new())?.evaluate(None)
     }
 }
 
 /// A scope maps column/table names to input column indexes, for lookups during
 /// expression construction. It also tracks aggregate and GROUP BY expressions,
-/// as well as hidden columns.
+/// as well as hidden columns (e.g. ORDER BY columns that aren't projected in
+/// the SELECT clause).
 ///
+/// When building expressions, the scope is used to resolve column names to
+/// column indexes, which are placed in the plan and used during execution.
 /// Expression evaluation generally happens in the context of an input row. This
 /// row may come directly from a single table, or it may be the result of a long
 /// chain of joins and projections. The scope keeps track of which columns are
-/// currently visible and what names they have. During expression planning, the
-/// scope is used to resolve column names to column indexes, which are placed in
-/// the plan and used during execution.
+/// currently visible and what names they have.
 #[derive(Default)]
 pub struct Scope {
     /// The currently visible columns. If empty, only constant expressions can
@@ -770,7 +780,7 @@ impl Scope {
     /// Remaps the scope using the given targets.
     fn remap(&self, targets: &[Option<usize>]) -> Self {
         let mut child = self.spawn();
-        for index in remap_sources(targets).into_iter().flatten() {
+        for index in invert_remap(targets).into_iter().flatten() {
             child.add_passthrough(self, index, false);
         }
         child

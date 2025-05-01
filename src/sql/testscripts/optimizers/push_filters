@@ -55,7 +55,7 @@ Filter pushdown:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
-Join type:
+Hash join:
    HashJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
@@ -85,7 +85,7 @@ Filter pushdown:
    NestedLoopJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
-Join type:
+Hash join:
    HashJoin: inner on a.id = b.id
    ├─ Scan: test as a (a.value = 'a')
    └─ Scan: test as b (b.value = 'b')
@@ -120,7 +120,7 @@ Index lookup:
    NestedLoopJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
-Join type:
+Hash join:
    HashJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
@@ -142,7 +142,7 @@ Index lookup:
    NestedLoopJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
-Join type:
+Hash join:
    HashJoin: inner on a.id = b.id
    ├─ KeyLookup: test as a (1, 2)
    └─ KeyLookup: test as b (1, 2)
@@ -182,7 +182,7 @@ Index lookup:
    │  └─ Filter: c.id < 3 AND c.id = 2
    │     └─ KeyLookup: test as c (2, 3)
    └─ KeyLookup: test as d (2, 3)
-Join type:
+Hash join:
    HashJoin: inner on c.id = d.id
    ├─ HashJoin: inner on b.id = c.id
    │  ├─ HashJoin: inner on a.id = b.id

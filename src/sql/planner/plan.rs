@@ -14,49 +14,58 @@ use crate::sql::types::{Expression, Label, Table, Value};
 
 /// A statement execution plan.
 ///
-/// The root nodes can perform data modifications or
-/// schema changes, in addition to SELECT queries. Beyond the root, the plan is
-/// made up of a tree of inner plan nodes that stream and process rows via
-/// iterators. Below is an example of an (unoptimized) plan for the given query:
+/// The plan root specifies the action to take (e.g. SELECT, INSERT, UPDATE,
+/// etc). It has a nested tree of child nodes that stream an process rows.
+///
+/// Below is an example of an (unoptimized) query plan:
 ///
 /// SELECT title, released, genres.name AS genre
 /// FROM movies INNER JOIN genres ON movies.genre_id = genres.id
 /// WHERE released >= 2000 ORDER BY released
 ///
-/// Order: movies.released desc
-/// └─ Projection: movies.title, movies.released, genres.name as genre
-///    └─ Filter: movies.released >= 2000
-///       └─ NestedLoopJoin: inner on movies.genre_id = genres.id
-///          ├─ Scan: movies
-///          └─ Scan: genres
+/// Select
+/// └─ Order: movies.released desc
+///    └─ Projection: movies.title, movies.released, genres.name as genre
+///       └─ Filter: movies.released >= 2000
+///          └─ NestedLoopJoin: inner on movies.genre_id = genres.id
+///             ├─ Scan: movies
+///             └─ Scan: genres
 ///
-/// Rows flow from the tree leaves to the root. The Scan nodes read and emit
-/// table rows from storage. They are passed to the NestedLoopJoin node which
-/// joins the rows from the two tables, then the Filter node discards old
-/// movies, the Projection node picks out the requested columns, and the Order
-/// node sorts them before emitting the rows to the client.
+/// Rows flow from the tree leaves to the root:
+///
+/// 1. Scan nodes read rows from movies and genres.
+/// 2. NestedLoopJoin joins the rows from movies and genres.
+/// 3. Filter discards rows with release dates older than 2000.
+/// 4. Projection picks out the requested column values from the rows.
+/// 5. Order sorts the rows by release date.
+/// 6. Select returns the final rows to the client.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Plan {
     /// A CREATE TABLE plan. Creates a new table with the given schema. Errors
     /// if the table already exists or the schema is invalid.
     CreateTable { schema: Table },
+
     /// A DROP TABLE plan. Drops the given table. Errors if the table does not
     /// exist, unless if_exists is true.
     DropTable { name: String, if_exists: bool },
+
     /// A DELETE plan. Deletes rows in table that match the rows from source.
     /// primary_key specifies the primary key column index in the source rows.
     Delete { table: String, primary_key: usize, source: Node },
+
     /// An INSERT plan. Inserts rows from source (typically a Values node) into
     /// table. If column_map is given, it maps table → source column indexes and
     /// must have one entry for every column in source. Table columns not
     /// present in source will get the column's default value if set, or error.
     Insert { table: Table, column_map: Option<HashMap<usize, usize>>, source: Node },
+
     /// An UPDATE plan. Updates rows in table that match the rows from source,
     /// where primary_key specifies the primary key column index in the source
     /// rows. The given column/expression pairs specify the row updates to make,
     /// evaluated using the existing source row, which must be a complete row
     /// from the update table.
     Update { table: Table, primary_key: usize, source: Node, expressions: Vec<(usize, Expression)> },
+
     /// A SELECT plan. Recursively executes the query plan tree and returns the
     /// resulting rows.
     Select(Node),
@@ -96,13 +105,15 @@ impl Plan {
 /// A query plan node. Returns a row iterator, and can be nested.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Node {
-    /// Computes the given aggregate values for the given group_by buckets
-    /// across all rows in the source node. The group_by columns are emitted
-    /// first, followed by the aggregate columns, in the given order.
+    /// Aggregates values for the given group_by buckets, across all rows in the
+    /// source node. The group_by columns are emitted first, followed by the
+    /// aggregate columns, in the given order.
     Aggregate { source: Box<Node>, group_by: Vec<Expression>, aggregates: Vec<Aggregate> },
+
     /// Filters source rows, by discarding rows for which the predicate
     /// evaluates to false.
     Filter { source: Box<Node>, predicate: Expression },
+
     /// Joins the left and right sources on the given columns by building an
     /// in-memory hashmap of the right source and looking up matches for each
     /// row in the left source. When outer is true (e.g. LEFT JOIN), a left row
@@ -114,39 +125,50 @@ pub enum Node {
         right_column: usize,
         outer: bool,
     },
+
     /// Looks up the given values in a secondary index and emits matching rows.
     /// NULL and NaN values are considered equal, to allow IS NULL and IS NAN
     /// index lookups, as is -0.0 and 0.0.
     IndexLookup { table: Table, column: usize, values: Vec<Value>, alias: Option<String> },
+
     /// Looks up the given primary keys and emits their rows.
     KeyLookup { table: Table, keys: Vec<Value>, alias: Option<String> },
+
     /// Only emits the first limit rows from the source, discards the rest.
     Limit { source: Box<Node>, limit: usize },
+
     /// Joins the left and right sources on the given predicate by buffering the
     /// right source and iterating over it for every row in the left source.
     /// When outer is true (e.g. LEFT JOIN), a left row without a right match is
     /// emitted anyway, with NULLs for the right row.
     NestedLoopJoin { left: Box<Node>, right: Box<Node>, predicate: Option<Expression>, outer: bool },
+
     /// Nothing does not emit anything, and is used to short-circuit nodes that
     /// can't emit anything during optimization. It retains the column names of
     /// any replaced nodes for results headers and plan formatting.
     Nothing { columns: Vec<Label> },
+
     /// Discards the first offset rows from source, emits the rest.
     Offset { source: Box<Node>, offset: usize },
+
     /// Sorts the source rows by the given sort key. Buffers the entire row set
     /// in memory.
     Order { source: Box<Node>, key: Vec<(Expression, Direction)> },
+
     /// Projects the input rows by evaluating the given expressions. Aliases are
     /// only used when displaying the plan.
     Projection { source: Box<Node>, expressions: Vec<Expression>, aliases: Vec<Label> },
+
     /// Remaps source columns to the given target column index, or None to drop
     /// the column. Unspecified target columns yield Value::Null. The source →
     /// target mapping ensures a source column can only be mapped to a single
     /// target column, allowing the value to be moved rather than cloned.
     Remap { source: Box<Node>, targets: Vec<Option<usize>> },
+
     /// A full table scan, with an optional pushed-down filter. The schema is
     /// used during plan optimization. The alias is only used for formatting.
     Scan { table: Table, filter: Option<Expression>, alias: Option<String> },
+
     /// A constant set of values.
     Values { rows: Vec<Vec<Expression>> },
 }
@@ -160,11 +182,11 @@ impl Node {
             | Self::KeyLookup { table, .. }
             | Self::Scan { table, .. } => table.columns.len(),
 
-            // Some nodes modify the column set.
+            // These nodes modify the set of columns.
             Self::Aggregate { aggregates, group_by, .. } => aggregates.len() + group_by.len(),
             Self::Projection { expressions, .. } => expressions.len(),
             Self::Remap { targets, .. } => {
-                targets.iter().filter_map(|v| *v).map(|i| i + 1).max().unwrap_or(0)
+                targets.iter().copied().flatten().map(|i| i + 1).max().unwrap_or(0)
             }
 
             // Join nodes emit the combined columns.
@@ -172,15 +194,15 @@ impl Node {
                 left.columns() + right.columns()
             }
 
+            // Constant nodes have a predefined number of columns.
+            Self::Nothing { columns } => columns.len(),
+            Self::Values { rows } => rows.first().map(|row| row.len()).unwrap_or(0),
+
             // Simple nodes just pass through the source columns.
             Self::Filter { source, .. }
             | Self::Limit { source, .. }
             | Self::Offset { source, .. }
             | Self::Order { source, .. } => source.columns(),
-
-            // And some are trivial.
-            Self::Nothing { columns } => columns.len(),
-            Self::Values { rows } => rows.first().map(|row| row.len()).unwrap_or(0),
         }
     }
 
@@ -197,8 +219,8 @@ impl Node {
                 table.columns[index].name.clone(),
             ),
 
-            // Some nodes rearrange columns. Route them to the correct
-            // upstream column where appropriate.
+            // These nodes rearrange columns. Route them to the correct upstream
+            // column where appropriate.
             Self::Aggregate { source, group_by, .. } => match group_by.get(index) {
                 Some(Expression::Column(index)) => source.column_label(*index),
                 Some(_) | None => Label::None,
@@ -215,7 +237,8 @@ impl Node {
             },
             Self::Remap { source, targets } => targets
                 .iter()
-                .position(|t| t == &Some(index))
+                .copied()
+                .position(|t| t == Some(index))
                 .map(|i| source.column_label(i))
                 .unwrap_or(Label::None),
 
@@ -310,8 +333,8 @@ impl Node {
             Self::Order { source, mut key } => {
                 key = key
                     .into_iter()
-                    .map(|(expr, dir)| Ok((expr.transform(before, after)?, dir)))
-                    .collect::<Result<_>>()?;
+                    .map(|(expr, dir)| expr.transform(before, after).map(|expr| (expr, dir)))
+                    .try_collect()?;
                 Self::Order { source, key }
             }
             Self::Projection { source, mut expressions, aliases } => {
@@ -479,10 +502,12 @@ impl Node {
                 write!(f, "Aggregate: {aggregates}")?;
                 source.format(f, &prefix, false, true)?;
             }
+
             Self::Filter { source, predicate } => {
                 write!(f, "Filter: {}", predicate.format(source))?;
                 source.format(f, &prefix, false, true)?;
             }
+
             Self::HashJoin { left, left_column, right, right_column, outer } => {
                 let kind = if *outer { "outer" } else { "inner" };
                 let left_column = match left.column_label(*left_column) {
@@ -497,6 +522,7 @@ impl Node {
                 left.format(f, &prefix, false, false)?;
                 right.format(f, &prefix, false, true)?;
             }
+
             Self::IndexLookup { table, column, alias, values } => {
                 let column = &table.columns[*column].name;
                 write!(f, "IndexLookup: {}.{column}", table.name)?;
@@ -509,6 +535,7 @@ impl Node {
                     write!(f, " ({} values)", values.len())?;
                 }
             }
+
             Self::KeyLookup { table, alias, keys } => {
                 write!(f, "KeyLookup: {}", table.name)?;
                 if let Some(alias) = alias {
@@ -520,10 +547,12 @@ impl Node {
                     write!(f, " ({} keys)", keys.len())?;
                 }
             }
+
             Self::Limit { source, limit } => {
                 write!(f, "Limit: {limit}")?;
                 source.format(f, &prefix, false, true)?;
             }
+
             Self::NestedLoopJoin { left, right, predicate, outer, .. } => {
                 let kind = if *outer { "outer" } else { "inner" };
                 write!(f, "NestedLoopJoin: {kind}")?;
@@ -533,11 +562,14 @@ impl Node {
                 left.format(f, &prefix, false, false)?;
                 right.format(f, &prefix, false, true)?;
             }
+
             Self::Nothing { .. } => write!(f, "Nothing")?,
+
             Self::Offset { source, offset } => {
                 write!(f, "Offset: {offset}")?;
                 source.format(f, &prefix, false, true)?;
             }
+
             Self::Order { source, key: orders } => {
                 let orders = orders
                     .iter()
@@ -546,6 +578,7 @@ impl Node {
                 write!(f, "Order: {orders}")?;
                 source.format(f, &prefix, false, true)?;
             }
+
             Self::Projection { source, expressions, aliases } => {
                 let expressions = expressions
                     .iter()
@@ -558,8 +591,9 @@ impl Node {
                 write!(f, "Projection: {expressions}")?;
                 source.format(f, &prefix, false, true)?;
             }
+
             Self::Remap { source, targets } => {
-                let remap = remap_sources(targets)
+                let remap = invert_remap(targets)
                     .into_iter()
                     .map(|from| match from {
                         Some(from) => match source.column_label(from) {
@@ -585,6 +619,7 @@ impl Node {
                 }
                 source.format(f, &prefix, false, true)?;
             }
+
             Self::Scan { table, alias, filter } => {
                 write!(f, "Scan: {}", table.name)?;
                 if let Some(alias) = alias {
@@ -594,6 +629,7 @@ impl Node {
                     write!(f, " ({})", filter.format(self))?;
                 }
             }
+
             Self::Values { rows, .. } => {
                 write!(f, "Values: ")?;
                 match rows.len() {
@@ -609,12 +645,12 @@ impl Node {
 
 /// Inverts a Remap targets vector to a vector of source indexes, with None
 /// for columns that weren't targeted.
-pub fn remap_sources(targets: &[Option<usize>]) -> Vec<Option<usize>> {
-    let size = targets.iter().filter_map(|v| *v).map(|i| i + 1).max().unwrap_or(0);
+pub fn invert_remap(targets: &[Option<usize>]) -> Vec<Option<usize>> {
+    let size = targets.iter().copied().flatten().map(|i| i + 1).max().unwrap_or(0);
     let mut sources = vec![None; size];
-    for (from, to) in targets.iter().enumerate() {
+    for (from, to) in targets.iter().copied().enumerate() {
         if let Some(to) = to {
-            sources[*to] = Some(from);
+            sources[to] = Some(from);
         }
     }
     sources
