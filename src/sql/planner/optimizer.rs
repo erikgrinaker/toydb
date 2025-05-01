@@ -364,18 +364,13 @@ impl Optimizer for ShortCircuit {
 }
 
 impl ShortCircuit {
-    /// Creates a Nothing node with the columns of the original node.
-    fn nothing(node: &Node) -> Node {
-        let columns = (0..node.columns()).map(|i| node.column_label(i)).collect();
-        Node::Nothing { columns }
-    }
-
-    /// Short-circuits useless nodes.
-    fn short_circuit(node: Node) -> Node {
+    /// Short-circuits useless nodes. Assumes the node has already been
+    /// optimized by ConstantFolding.
+    fn short_circuit(mut node: Node) -> Node {
         use Expression::*;
         use Value::*;
 
-        match node {
+        node = match node {
             // Filter nodes that always yield true are unnecessary: remove them.
             Node::Filter { source, predicate: Constant(Boolean(true)) } => *source,
 
@@ -390,42 +385,6 @@ impl ShortCircuit {
                 outer,
             } => Node::NestedLoopJoin { left, right, predicate: None, outer },
 
-            // Short-circuit nodes that can't produce anything by replacing them
-            // with a Nothing node, retaining the columns.
-            ref node @ Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => {
-                Self::nothing(node)
-            }
-            ref node @ Node::IndexLookup { ref values, .. } if values.is_empty() => {
-                Self::nothing(node)
-            }
-            ref node @ Node::KeyLookup { ref keys, .. } if keys.is_empty() => Self::nothing(node),
-            ref node @ Node::Limit { limit: 0, .. } => Self::nothing(node),
-            ref node @ Node::NestedLoopJoin {
-                predicate: Some(Constant(Boolean(false) | Null)),
-                ..
-            } => Self::nothing(node),
-            ref node @ Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => {
-                Self::nothing(node)
-            }
-            ref node @ Node::Values { ref rows } if rows.is_empty() => Self::nothing(node),
-
-            // Short-circuit nodes that pull from a Nothing node.
-            //
-            // NB: does not short-circuit aggregation, since an aggregation over 0
-            // rows should produce a result.
-            ref node @ (Node::Filter { ref source, .. }
-            | Node::HashJoin { left: ref source, .. }
-            | Node::HashJoin { right: ref source, .. }
-            | Node::NestedLoopJoin { left: ref source, .. }
-            | Node::NestedLoopJoin { right: ref source, .. }
-            | Node::Offset { ref source, .. }
-            | Node::Order { ref source, .. }
-            | Node::Projection { ref source, .. })
-                if matches!(**source, Node::Nothing { .. }) =>
-            {
-                Self::nothing(node)
-            }
-
             // Remove noop projections that simply pass through the source columns.
             Node::Projection { source, expressions, aliases }
                 if source.columns() == expressions.len()
@@ -439,6 +398,44 @@ impl ShortCircuit {
             }
 
             node => node,
+        };
+
+        // Short-circuit nodes that don't produce anything by replacing them
+        // with a Nothing node.
+        let is_empty = match &node {
+            Node::Filter { predicate: Constant(Boolean(false) | Null), .. } => true,
+            Node::IndexLookup { values, .. } if values.is_empty() => true,
+            Node::KeyLookup { keys, .. } if keys.is_empty() => true,
+            Node::Limit { limit: 0, .. } => true,
+            Node::NestedLoopJoin { predicate: Some(Constant(Boolean(false) | Null)), .. } => true,
+            Node::Scan { filter: Some(Constant(Boolean(false) | Null)), .. } => true,
+            Node::Values { rows } if rows.is_empty() => true,
+
+            // Nodes that pull from a Nothing node can't produce anything.
+            //
+            // NB: does not short-circuit aggregation, since an aggregation over 0
+            // rows should produce a result.
+            Node::Filter { source, .. }
+            | Node::HashJoin { left: source, .. }
+            | Node::HashJoin { right: source, .. }
+            | Node::NestedLoopJoin { left: source, .. }
+            | Node::NestedLoopJoin { right: source, .. }
+            | Node::Offset { source, .. }
+            | Node::Order { source, .. }
+            | Node::Projection { source, .. }
+                if matches!(**source, Node::Nothing { .. }) =>
+            {
+                true
+            }
+
+            _ => false,
+        };
+
+        if is_empty {
+            let columns = (0..node.columns()).map(|i| node.column_label(i)).collect();
+            return Node::Nothing { columns };
         }
+
+        node
     }
 }
