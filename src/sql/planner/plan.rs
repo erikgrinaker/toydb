@@ -383,11 +383,11 @@ pub enum Aggregate {
 impl Aggregate {
     fn format(&self, node: &Node) -> String {
         match self {
-            Self::Average(expr) => format!("avg({})", expr.format(node)),
-            Self::Count(expr) => format!("count({})", expr.format(node)),
-            Self::Max(expr) => format!("max({})", expr.format(node)),
-            Self::Min(expr) => format!("min({})", expr.format(node)),
-            Self::Sum(expr) => format!("sum({})", expr.format(node)),
+            Self::Average(expr) => format!("avg({})", expr.display(node)),
+            Self::Count(expr) => format!("count({})", expr.display(node)),
+            Self::Max(expr) => format!("max({})", expr.display(node)),
+            Self::Min(expr) => format!("min({})", expr.display(node)),
+            Self::Sum(expr) => format!("sum({})", expr.display(node)),
         }
     }
 
@@ -445,7 +445,7 @@ impl Display for Plan {
             Self::Update { table, source, expressions, .. } => {
                 let expressions = expressions
                     .iter()
-                    .map(|(i, expr)| format!("{}={}", table.columns[*i].name, expr.format(source)))
+                    .map(|(i, expr)| format!("{}={}", table.columns[*i].name, expr.display(source)))
                     .join(", ");
                 write!(f, "Update: {} ({expressions})", table.name)?;
                 source.format(f, "", false, true)
@@ -496,7 +496,7 @@ impl Node {
             Self::Aggregate { source, aggregates, group_by } => {
                 let aggregates = group_by
                     .iter()
-                    .map(|group_by| group_by.format(source))
+                    .map(|group_by| group_by.display(source).to_string())
                     .chain(aggregates.iter().map(|agg| agg.format(source)))
                     .join(", ");
                 write!(f, "Aggregate: {aggregates}")?;
@@ -504,7 +504,7 @@ impl Node {
             }
 
             Self::Filter { source, predicate } => {
-                write!(f, "Filter: {}", predicate.format(source))?;
+                write!(f, "Filter: {}", predicate.display(source))?;
                 source.format(f, &prefix, false, true)?;
             }
 
@@ -557,7 +557,7 @@ impl Node {
                 let kind = if *outer { "outer" } else { "inner" };
                 write!(f, "NestedLoopJoin: {kind}")?;
                 if let Some(predicate) = predicate {
-                    write!(f, " on {}", predicate.format(self))?;
+                    write!(f, " on {}", predicate.display(self))?;
                 }
                 left.format(f, &prefix, false, false)?;
                 right.format(f, &prefix, false, true)?;
@@ -573,7 +573,7 @@ impl Node {
             Self::Order { source, key: orders } => {
                 let orders = orders
                     .iter()
-                    .map(|(expr, dir)| format!("{} {dir}", expr.format(source)))
+                    .map(|(expr, dir)| format!("{} {dir}", expr.display(source)))
                     .join(", ");
                 write!(f, "Order: {orders}")?;
                 source.format(f, &prefix, false, true)?;
@@ -584,8 +584,8 @@ impl Node {
                     .iter()
                     .enumerate()
                     .map(|(i, expr)| match aliases.get(i) {
-                        Some(Label::None) | None => expr.format(source),
-                        Some(alias) => format!("{} as {alias}", expr.format(source)),
+                        Some(Label::None) | None => expr.display(source).to_string(),
+                        Some(alias) => format!("{} as {alias}", expr.display(source)),
                     })
                     .join(", ");
                 write!(f, "Projection: {expressions}")?;
@@ -626,7 +626,7 @@ impl Node {
                     write!(f, " as {alias}")?;
                 }
                 if let Some(filter) = filter {
-                    write!(f, " ({})", filter.format(self))?;
+                    write!(f, " ({})", filter.display(self))?;
                 }
             }
 
@@ -634,7 +634,7 @@ impl Node {
                 write!(f, "Values: ")?;
                 match rows.len() {
                     1 if rows[0].is_empty() => write!(f, "blank row")?,
-                    1 => write!(f, "{}", rows[0].iter().map(|e| e.format(self)).join(", "))?,
+                    1 => write!(f, "{}", rows[0].iter().map(|e| e.display(self)).join(", "))?,
                     n => write!(f, "{n} rows")?,
                 }
             }

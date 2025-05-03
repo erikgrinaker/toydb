@@ -9,8 +9,8 @@ use crate::error::Result;
 use crate::sql::planner::Node;
 
 /// An expression, made up of nested operations and values. Values are either
-/// constants, or column references which are looked up in rows. Evaluated to a
-/// final value during query execution.
+/// constants, or numeric column references which are looked up in rows.
+/// Evaluated to a final value during query execution.
 ///
 /// Since this is a recursive data structure, we have to box each child
 /// expression, which incurs a heap allocation per expression node. There are
@@ -63,77 +63,11 @@ pub enum Expression {
     Like(Box<Expression>, Box<Expression>),
 }
 
-// NB: display can't look up column labels, and will print numeric column
-// indexes instead. Use Expression::format() to print with labels.
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.format(&Node::Nothing { columns: Vec::new() }))
-    }
-}
-
 impl Expression {
-    /// Formats the expression, using the given plan node to look up labels for
+    /// Displays the expression, using the given plan node to look up labels for
     /// column references.
-    pub fn format(&self, node: &Node) -> String {
-        use Expression::*;
-
-        // Precedence levels, for () grouping. Matches the parser precedence.
-        fn precedence(expr: &Expression) -> u8 {
-            match expr {
-                Column(_) | Constant(_) | SquareRoot(_) => 11,
-                Identity(_) | Negate(_) => 10,
-                Factorial(_) => 9,
-                Exponentiate(_, _) => 8,
-                Multiply(_, _) | Divide(_, _) | Remainder(_, _) => 7,
-                Add(_, _) | Subtract(_, _) => 6,
-                GreaterThan(_, _) | LessThan(_, _) => 5,
-                Equal(_, _) | Like(_, _) | Is(_, _) => 4,
-                Not(_) => 3,
-                And(_, _) => 2,
-                Or(_, _) => 1,
-            }
-        }
-
-        // Helper to format a boxed expression, grouping it with () if needed.
-        let fmt = |expr: &Expression| {
-            let mut string = expr.format(node);
-            if precedence(expr) < precedence(self) {
-                string = format!("({string})");
-            }
-            string
-        };
-
-        match self {
-            Constant(value) => format!("{value}"),
-            Column(index) => match node.column_label(*index) {
-                Label::None => format!("#{index}"),
-                label => format!("{label}"),
-            },
-
-            And(lhs, rhs) => format!("{} AND {}", fmt(lhs), fmt(rhs)),
-            Or(lhs, rhs) => format!("{} OR {}", fmt(lhs), fmt(rhs)),
-            Not(expr) => format!("NOT {}", fmt(expr)),
-
-            Equal(lhs, rhs) => format!("{} = {}", fmt(lhs), fmt(rhs)),
-            GreaterThan(lhs, rhs) => format!("{} > {}", fmt(lhs), fmt(rhs)),
-            LessThan(lhs, rhs) => format!("{} < {}", fmt(lhs), fmt(rhs)),
-            Is(expr, Value::Null) => format!("{} IS NULL", fmt(expr)),
-            Is(expr, Value::Float(f)) if f.is_nan() => format!("{} IS NAN", fmt(expr)),
-            Is(_, v) => panic!("unexpected IS value {v}"),
-
-            Add(lhs, rhs) => format!("{} + {}", fmt(lhs), fmt(rhs)),
-            Divide(lhs, rhs) => format!("{} / {}", fmt(lhs), fmt(rhs)),
-            Exponentiate(lhs, rhs) => format!("{} ^ {}", fmt(lhs), fmt(rhs)),
-            Factorial(expr) => format!("{}!", fmt(expr)),
-            Identity(expr) => fmt(expr),
-            Multiply(lhs, rhs) => format!("{} * {}", fmt(lhs), fmt(rhs)),
-            Negate(expr) => format!("-{}", fmt(expr)),
-            Remainder(lhs, rhs) => format!("{} % {}", fmt(lhs), fmt(rhs)),
-            SquareRoot(expr) => format!("sqrt({})", fmt(expr)),
-            Subtract(lhs, rhs) => format!("{} - {}", fmt(lhs), fmt(rhs)),
-
-            Like(lhs, rhs) => format!("{} LIKE {}", fmt(lhs), fmt(rhs)),
-        }
+    pub fn display<'a>(&'a self, node: &'a Node) -> ExpressionDisplay<'a> {
+        ExpressionDisplay::new(self, node, 0)
     }
 
     /// Evaluates an expression, returning a constant value. Column references
@@ -502,6 +436,101 @@ impl Expression {
             expr => expr,
         };
         self.transform(&|e| Ok(xform(e)), &Ok).unwrap() // infallible
+    }
+}
+
+// NB: Display can't look up column labels, and will print numeric column
+// indexes instead. Use Expression::display() instead to print with labels
+// resolved from a given plan node.
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.display(&Node::Nothing { columns: Vec::new() }).fmt(f)
+    }
+}
+
+// Helper to display expressions. Groups with () as needed by precedence rules,
+// and looks up column labels in the given plan node.
+pub struct ExpressionDisplay<'a> {
+    expr: &'a Expression,
+    node: &'a Node,
+    parent_precedence: u8,
+}
+
+impl<'a> Display for ExpressionDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Expression::*;
+
+        // Group the expression if its precedence is lower than the parent.
+        let precedence = Self::precedence(self.expr);
+        if precedence < self.parent_precedence {
+            write!(f, "(")?;
+        }
+
+        // Helper to display a boxed, grouped expression.
+        let group = |expr: &'a Expression| ExpressionDisplay::new(expr, self.node, precedence);
+
+        match self.expr {
+            Constant(value) => write!(f, "{value}")?,
+            Column(index) => match self.node.column_label(*index) {
+                Label::None => write!(f, "#{index}")?,
+                label => write!(f, "{label}")?,
+            },
+
+            And(lhs, rhs) => write!(f, "{} AND {}", group(lhs), group(rhs))?,
+            Or(lhs, rhs) => write!(f, "{} OR {}", group(lhs), group(rhs))?,
+            Not(expr) => write!(f, "NOT {}", group(expr))?,
+
+            Equal(lhs, rhs) => write!(f, "{} = {}", group(lhs), group(rhs))?,
+            GreaterThan(lhs, rhs) => write!(f, "{} > {}", group(lhs), group(rhs))?,
+            LessThan(lhs, rhs) => write!(f, "{} < {}", group(lhs), group(rhs))?,
+            Is(expr, Value::Null) => write!(f, "{} IS NULL", group(expr))?,
+            Is(expr, Value::Float(n)) if n.is_nan() => write!(f, "{} IS NAN", group(expr))?,
+            Is(_, v) => panic!("unexpected IS value {v}"),
+
+            Add(lhs, rhs) => write!(f, "{} + {}", group(lhs), group(rhs))?,
+            Divide(lhs, rhs) => write!(f, "{} / {}", group(lhs), group(rhs))?,
+            Exponentiate(lhs, rhs) => write!(f, "{} ^ {}", group(lhs), group(rhs))?,
+            Factorial(expr) => write!(f, "{}!", group(expr))?,
+            Identity(expr) => write!(f, "{}", group(expr))?,
+            Multiply(lhs, rhs) => write!(f, "{} * {}", group(lhs), group(rhs))?,
+            Negate(expr) => write!(f, "-{}", group(expr))?,
+            Remainder(lhs, rhs) => write!(f, "{} % {}", group(lhs), group(rhs))?,
+            SquareRoot(expr) => write!(f, "sqrt({})", group(expr))?,
+            Subtract(lhs, rhs) => write!(f, "{} - {}", group(lhs), group(rhs))?,
+
+            Like(lhs, rhs) => write!(f, "{} LIKE {}", group(lhs), group(rhs))?,
+        }
+
+        if precedence < self.parent_precedence {
+            write!(f, ")")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'a> ExpressionDisplay<'a> {
+    // Creates a new expression display.
+    pub fn new(expr: &'a Expression, node: &'a Node, parent_precedence: u8) -> Self {
+        Self { expr, node, parent_precedence }
+    }
+
+    // Precedence levels for () grouping. Matches the parser.
+    fn precedence(expr: &Expression) -> u8 {
+        use Expression::*;
+        match expr {
+            Column(_) | Constant(_) | SquareRoot(_) => 11,
+            Identity(_) | Negate(_) => 10,
+            Factorial(_) => 9,
+            Exponentiate(_, _) => 8,
+            Multiply(_, _) | Divide(_, _) | Remainder(_, _) => 7,
+            Add(_, _) | Subtract(_, _) => 6,
+            GreaterThan(_, _) | LessThan(_, _) => 5,
+            Equal(_, _) | Like(_, _) | Is(_, _) => 4,
+            Not(_) => 3,
+            And(_, _) => 2,
+            Or(_, _) => 1,
+        }
     }
 }
 
