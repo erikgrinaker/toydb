@@ -96,9 +96,6 @@ pub struct FilterPushdown;
 
 impl Optimizer for FilterPushdown {
     fn optimize(&self, node: Node) -> Result<Node> {
-        // Recursively transform expressions in the node tree. Uses post-order
-        // traversal to partially fold child expressions as far as possible, and
-        // avoid quadratic costs.
         // Push down before descending, so we can keep recursively pushing down.
         node.transform(&|node| Ok(Self::push_filters(node)), &Ok)
     }

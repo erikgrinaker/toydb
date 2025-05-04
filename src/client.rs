@@ -1,8 +1,8 @@
-use std::cmp::min;
-use std::io::Write as _;
+use std::io::{BufReader, BufWriter, Write as _};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
-use rand::Rng;
+use rand::Rng as _;
 
 use crate::encoding::Value as _;
 use crate::errdata;
@@ -16,19 +16,19 @@ use crate::storage::mvcc;
 /// other requests.
 pub struct Client {
     /// Inbound response stream.
-    reader: std::io::BufReader<std::net::TcpStream>,
+    reader: BufReader<TcpStream>,
     /// Outbound request stream.
-    writer: std::io::BufWriter<std::net::TcpStream>,
+    writer: BufWriter<TcpStream>,
     /// The current transaction, if any.
     txn: Option<mvcc::TransactionState>,
 }
 
 impl Client {
     /// Connects to a toyDB server, creating a new client.
-    pub fn connect(addr: impl std::net::ToSocketAddrs) -> Result<Self> {
-        let socket = std::net::TcpStream::connect(addr)?;
-        let reader = std::io::BufReader::new(socket.try_clone()?);
-        let writer = std::io::BufWriter::new(socket);
+    pub fn connect(addr: impl ToSocketAddrs) -> Result<Self> {
+        let socket = TcpStream::connect(addr)?;
+        let reader = BufReader::new(socket.try_clone()?);
+        let writer = BufWriter::new(socket);
         Ok(Self { reader, writer, txn: None })
     }
 
@@ -103,7 +103,7 @@ impl Client {
                     // Use exponential backoff starting at MIN_WAIT doubling up
                     // to MAX_WAIT, but randomize the wait time in this interval
                     // to reduce the chance of collisions.
-                    let mut wait = min(MIN_WAIT * 2_u64.pow(retries), MAX_WAIT);
+                    let mut wait = MAX_WAIT.min(MIN_WAIT * 2_u64.pow(retries));
                     wait = rand::thread_rng().gen_range(MIN_WAIT..=wait);
                     std::thread::sleep(Duration::from_millis(wait));
                     retries += 1;

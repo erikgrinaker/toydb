@@ -24,7 +24,8 @@ use crate::sql::types::{Expression, Label, Row, Rows, Table, Value};
 ///
 /// SELECT title, released, genres.name AS genre
 /// FROM movies INNER JOIN genres ON movies.genre_id = genres.id
-/// WHERE released >= 2000 ORDER BY released
+/// WHERE released >= 2000
+/// ORDER BY released
 ///
 /// Select
 /// └─ Order: movies.released desc
