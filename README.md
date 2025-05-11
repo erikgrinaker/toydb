@@ -31,7 +31,7 @@ been taken where possible.
 [memory]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/memory.rs
 [query]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/execution/executor.rs
 [optimizer]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/planner/optimizer.rs
-[sql]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/parser.rs
+[sql]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/parser/parser.rs
 
 ## Documentation
 
