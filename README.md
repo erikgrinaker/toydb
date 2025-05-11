@@ -177,7 +177,7 @@ expense of durability).
 [VSCode](https://code.visualstudio.com) and the [CodeLLDB](https://marketplace.visualstudio.com/items?itemName=vadimcn.vscode-lldb)
 extension can be used to debug toyDB, with the debug configuration under `.vscode/launch.json`.
 
-Under the "Run and Debug" tag, select e.g. "Debug executable 'toydb'" or "Debug unit tests in
+Under the "Run and Debug" tab, select e.g. "Debug executable 'toydb'" or "Debug unit tests in
 library 'toydb'".
 
 ## Credits
