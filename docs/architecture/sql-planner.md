@@ -1,8 +1,8 @@
 # SQL Planning
 
-The SQL planner in [`sql/planner`](https://github.com/erikgrinaker/toydb/tree/c64012e29c5712d6fe028d3d5375a98b8faea266/src/sql/planner)
-takes a SQL statement AST from the parser and generates an execution plan for it. We won't actually
-execute it just yet though, only figure out how to execute it.
+The SQL planner in the [`sql::planner`](https://github.com/erikgrinaker/toydb/tree/c64012e29c5712d6fe028d3d5375a98b8faea266/src/sql/planner)
+module takes a SQL statement AST from the parser and generates an execution plan for it. We won't
+actually execute it just yet though, only figure out how to execute it.
 
 ## Execution Plan
 
@@ -16,7 +16,7 @@ emits a stream of SQL rows as output, and may take streams of input rows from ch
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/planner/plan.rs#L106-L175
 
-Here is an example (taken from the `Plan` code comment above):
+Here is an example, taken from the `Plan` code comment above:
 
 ```sql
 SELECT title, released, genres.name AS genre
@@ -63,12 +63,13 @@ the `Order` node still needs access to the column data to sort by it).
 
 The planner uses a `sql::planner::Scope` to keep track of which column names are currently visible,
 and which column indexes they refer to. For each node the planner builds, starting from the leaves,
-it creates a new `Scope` that tracks how columns are modified and rearranged by the node.
+it creates a new `Scope` that contains the currently visible columns, tracking how they are modified
+and rearranged by each node.
 
 https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147dd5/src/sql/planner/planner.rs#L577-L610
 
-When an expression refers to a column name, the planner can use `Scope::lookup_column` to find out
-which column number the expression should take its input value from.
+When an AST expression refers to a column name, the planner can use `Scope::lookup_column()` to find
+out which column number the expression should take its input value from.
 
 https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147dd5/src/sql/planner/planner.rs#L660-L686
 
@@ -154,7 +155,7 @@ https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147
 
 https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147dd5/src/sql/planner/planner.rs#L283-L289
 
-`Planner::build_from` first encounters the `ast::From::Join` item, which joins `movies` and
+`Planner::build_from()` first encounters the `ast::From::Join` item, which joins `movies` and
 `genres`. This will build a `Node::NestedLoopJoin` plan node for the join, which is the simplest and
 most straightforward join algorithm -- it simply iterates over all rows in the `genres` table for
 every row in the `movies` table and emits the joined rows (we'll see how to optimize it with a
@@ -162,16 +163,16 @@ better join algorithm later).
 
 https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147dd5/src/sql/planner/planner.rs#L319-L344
 
-It first recurses into `Planner::build_from` to build each of the `ast::From::Table` nodes for each
-table.  This will look up the table schemas in the catalog, add them to the current scope, and build
-a `Node::Scan` node which will emit all rows from each table. The `Node::Scan` nodes are placed into
-the `Node::NestedLoopJoin` above.
+It first recurses into `Planner::build_from()` to build each of the `ast::From::Table` nodes for
+each table.  This will look up the table schemas in the catalog, add them to the current scope, and
+build a `Node::Scan` node which will emit all rows from each table. The `Node::Scan` nodes are
+placed into the `Node::NestedLoopJoin` above.
 
 https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147dd5/src/sql/planner/planner.rs#L312-L317
 
 While building the `Node::NestedLoopJoin`, it also needs to convert the join expression
 `movies.genre_id = genres.id` into a proper `sql::types::Expression`. This is done by
-`Planner::build_expression`:
+`Planner::build_expression()`:
 
 https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147dd5/src/sql/planner/planner.rs#L493-L568
 
@@ -228,9 +229,6 @@ sorts them by the order expression.
 https://github.com/erikgrinaker/toydb/blob/6f6cec4db10bc015a37ee47ff6c7dae383147dd5/src/sql/planner/planner.rs#L245-L252
 
 And that's it. The `Node::Order` is placed into the root `Plan::Select`, and we have our final plan.
-We'll see how to execute it soon, but first we should optimize it to see if we can make it run
-faster -- in particular, to see if we can avoid reading all movies from storage, and if we can do
-better than the very slow nested loop join.
 
 ```
 Select
@@ -241,6 +239,10 @@ Select
             ├─ Scan: movies
             └─ Scan: genres
 ```
+
+We'll see how to execute it soon, but first we should optimize it to see if we can make it run
+faster -- in particular, to see if we can avoid reading all movies from storage, and if we can do
+better than the very slow nested loop join.
 
 ---
 

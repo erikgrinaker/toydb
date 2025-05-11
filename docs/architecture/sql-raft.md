@@ -1,8 +1,8 @@
 # SQL Raft Replication
 
-toyDB uses Raft to replicate SQL storage across a cluster of nodes (see the Raft section above for
-details). All nodes will store a copy of the SQL database, and the Raft leader will replicate writes
-across nodes and execute reads.
+toyDB uses Raft to replicate SQL storage across a cluster of nodes (see the Raft section for
+details). All nodes will store a full copy of the SQL database, and the Raft leader will replicate
+writes across nodes and execute reads.
 
 Recall the Raft state machine interface `raft::State`:
 
@@ -44,19 +44,38 @@ send requests to the local Raft node (we'll see how this plumbing works in the s
 
 https://github.com/erikgrinaker/toydb/blob/c2b0f7f1d6cbf6e2cdc09fc0aec7b050e840ec21/src/sql/engine/raft.rs#L80-L95
 
-The channel takes a `raft::Request` containing binary Raft client requests, and also a return
-channel where the Raft node can send back a `raft::Response`. The Raft engine has a few convenience
-methods to send requests and receive responses, for both read and write requests:
+The channel takes a `raft::Request` containing binary Raft client requests and a return channel
+where the Raft node can send back a `raft::Response`. The Raft engine has a few convenience methods
+to send requests and receive responses, for both read and write requests:
 
 https://github.com/erikgrinaker/toydb/blob/c2b0f7f1d6cbf6e2cdc09fc0aec7b050e840ec21/src/sql/engine/raft.rs#L114-L135
 
-And the implementation of the `Engine` and `Transaction` traits simply send requests via Raft:
+And the implementation of the `sql::engine::Engine` and `sql::engine::Transaction` traits simply
+send these requests via Raft:
 
 https://github.com/erikgrinaker/toydb/blob/c2b0f7f1d6cbf6e2cdc09fc0aec7b050e840ec21/src/sql/engine/raft.rs#L194-L276
 
 One thing to note here is that we don't support streaming data via Raft, so e.g. the
 `Transaction::scan` method will buffer the entire result in a `Vec`. With a full table scan, this
 will load the entire table into memory -- that's unfortunate, but we keep it simple.
+
+To summarize, this is what happens when `Transaction::insert()` is called to insert a row via Raft:
+
+1. `sql::engine::raft::Transaction::insert()`: called to insert a row.
+2. `sql::engine::raft::Write::Insert`: enum representation of the insert command.
+3. `raft::Request::Write`: raft request containing the Bincode-encoded `Write::Insert` command.
+4. `sql::engine::raft::Engine::tx`: sends the `Request::Write` and response channel to Raft.
+5. `raft::Node::step()`: the `Request::Write` is given to Raft in a `Message::ClientRequest`.
+6. Raft does its replication thing, and commits the command's log entry.
+7. `raft::State::apply()`: the Bincode-encoded `Write::Insert` is passed to the state machine.
+8. `sql::engine::raft::State::apply()`: decodes the command to a `Write::Insert`.
+9. `sql::engine::raft::State::local`: contains the `Local` engine on each node.
+10. `sql::engine::local::Engine::resume()`: called to obtain the SQL/MVCC transaction.
+11. `sql::engine::local::Transaction::insert()`: the row is inserted to the local engine.
+12. `raft::RawNode::tx`: the `Ok(())` result is sent as a Bincode-encoded `Message::ClientResponse`.
+13. `sql::engine::raft::Transaction::insert()`: receives the result and returns it to the caller.
+
+The plumbing here will be covered in more details in the server section.
 
 ---
 

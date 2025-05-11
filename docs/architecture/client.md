@@ -6,11 +6,11 @@ module. It uses the same Bincode-based protocol that we saw in the server sectio
 
 ## Client Library
 
-The main client library `toydb::Client` is used to connect to a toyDB server:
+The main client library `toydb::Client` is used to communicate with a toyDB server:
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/client.rs#L15-L24
 
-When initialized, it connects to a toyDB server over TCP:
+When initialized, it connects to a toyDB server over TCP, which establishes a SQL session for it:
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/client.rs#L27-L33
 
@@ -36,7 +36,7 @@ toyDB server address to connect to and starts an interactive shell:
 
 https://github.com/erikgrinaker/toydb/blob/0839215770e31f1e693d5cccf20a68210deaaa3f/src/bin/toysql.rs#L29-L53
 
-This first attempts to connect to the toyDB server using the `toydb::Client` client, and then starts
+It first attempts to connect to the toyDB server using the `toydb::Client` client, and then starts
 an interactive shell using the [Rustyline](https://docs.rs/rustyline/latest/rustyline/) library.
 
 https://github.com/erikgrinaker/toydb/blob/0839215770e31f1e693d5cccf20a68210deaaa3f/src/bin/toysql.rs#L55-L81

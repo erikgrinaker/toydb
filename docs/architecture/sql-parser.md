@@ -1,7 +1,7 @@
 # SQL Parsing
 
-And so we finally arrive at SQL. The SQL parser is the first stage in processing SQL
-queries and statements, located in the [`src/sql/parser`](https://github.com/erikgrinaker/toydb/tree/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/parser)
+We finally arrive at SQL. The SQL parser is the first stage in processing SQL queries and
+statements, located in the [`sql::parser`](https://github.com/erikgrinaker/toydb/tree/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/parser)
 module.
 
 The SQL parser's job is to take a raw SQL string and turn it into a structured form that's more
@@ -99,7 +99,7 @@ string are well-formed. For example, the following input string:
 Will result in these tokens:
 
 ```
-String("foo"), CloseParen, Number("3.14"), Keyword(Select), Plus, Ident("x")
+String("foo") CloseParen Number("3.14") Keyword(Select) Plus Ident("x")
 ```
 
 Tokens and keywords are represented by the `sql::parser::Token` and `sql::parser::Keyword` enums
@@ -137,12 +137,14 @@ kinds of SQL statements that we support, along with their contents:
 
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/parser/ast.rs#L6-L145
 
-The nested tree structure is particularly apparent with _expressions_ -- these represent values and
-operations which will eventually _evaluate_ to a single value. For example, the expression
-`2 * 3 - 4 / 2`, which evaluates to the value `4`.
+The nested tree structure is particularly apparent with expressions, which represent values and
+operations on them. For example, the expression `2 * 3 - 4 / 2`, which evaluates to the value `4`.
 
-These expressions are represented as `sql::parser::ast::Expression`, and can be nested indefinitely
-into a tree structure.
+We've seen in the data model section how such expressions are represented as
+`sql::types::Expression`, but before we get there we have to parse them. The parser has its own
+representation `sql::parser::ast::Expression` -- this is necessary e.g. because in the AST, we
+represent columns as names rather than numeric indexes (we don't know yet which columns exist or
+what their names are, we'll get to that during planning).
 
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/parser/ast.rs#L147-L170
 
@@ -215,7 +217,7 @@ than that of the operators preceding them (hence "precedence climbing"). For exa
 2 * 3 - 4 / 2
 ```
 
-The algorithm is documented in more detail on `Parser::parse_expression`:
+The algorithm is documented in more detail on `Parser::parse_expression()`:
 
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/parser/parser.rs#L501-L696
 

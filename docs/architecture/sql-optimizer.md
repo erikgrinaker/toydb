@@ -93,15 +93,14 @@ Additionally, `ConstantFolding` also short-circuits logical expressions. For exa
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/planner/optimizer.rs#L58-L84
 
-As the code comment mentions though, this doesn't fold as far as possible. It doesn't attempt to
-rearrange expressions, which would require knowledge of precedence rules. For example,
-`(1 + foo) - 2` could be folded into `foo - 1` by first rearranging it as `foo + (1 - 2)`, but we
-don't do this currently.
+As the code comment mentions though, this doesn't fold optimally: it doesn't attempt to rearrange
+expressions, which would require knowledge of precedence rules. For example, `(1 + foo) - 2` could
+be folded into `foo - 1` by first rearranging it as `foo + (1 - 2)`, but we don't do this currently.
 
 ## Filter Pushdown
 
 The `FilterPushdown` optimizer attempts to push filter predicates as far down into the plan as
-possible, to reduce the amount of work we do.
+possible, to reduce the number of rows each node has to process.
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/planner/optimizer.rs#L90-L95
 
@@ -117,10 +116,10 @@ Select
             └─ Scan: genres
 ```
 
-Even though we're filtering on `release >= 2000`, the `Scan` node still has to read all of them
-from disk and send them via Raft, and the `NestedLoopJoin` node still has to join all of them.
-It would be nice if we could push this filtering into into the `NestedLoopJoin` and `Scan` nodes
-and avoid this work, which is exactly what `FilterPushdown` does.
+Even though we're filtering on `release >= 2000`, the `Scan` node still has to read all of them from
+disk and send them via Raft, and the `NestedLoopJoin` node still has to join all of them. It would
+be nice if we could push this filtering into the `NestedLoopJoin` and `Scan` nodes and avoid this
+extra work, and this is exactly what `FilterPushdown` does.
 
 The only plan nodes that have predicates that can be pushed down are `Filter` nodes and
 `NestedLoopJoin` nodes, so we recurse through the plan tree and look for these nodes, attempting
@@ -159,10 +158,9 @@ discussed previously. This allows us to examine and push down each AND part in i
 has the same effect regardless of whether it is evaluated in the `NestedLoopJoin` node or one of
 the source nodes. Our expression is already in conjunctive normal form, though.
 
-We then look at each AND part, and check which side of the join they have column references for.
-If they only reference one of the sides, then the expression can be pushed down into it. We also
-make some effort here to move primary/foreign key constants across to both sides, but we'll gloss
-over that.
+We then look at each AND part, and check which side of the join it has column references for.  If it
+only references one of the sides, then the expression can be pushed down into it. We also make some
+effort here to move primary/foreign key constants across to both sides, but we'll gloss over that.
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/planner/optimizer.rs#L155-L247
 
@@ -213,7 +211,7 @@ The code is as outlined above:
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/planner/optimizer.rs#L254-L303
 
-Helped by `Expression::is_column_lookup` and `Expression::into_column_values`:
+Helped by `Expression::is_column_lookup()` and `Expression::into_column_values()`:
 
 https://github.com/erikgrinaker/toydb/blob/9419bcf6aededf0e20b4e7485e2a5fa3e975d79f/src/sql/types/expression.rs#L363-L421
 
@@ -227,14 +225,13 @@ A [nested loop join](https://en.wikipedia.org/wiki/Nested_loop_join) is a very i
 algorithm, which iterates over all rows in the right source for each row in the left source to see
 if they match. However, it is completely general, and can join on arbitraily complex predicates.
 
-In the common case where the join predicate is an equality check (i.e. an
-[equijoin](https://en.wikipedia.org/wiki/Relational_algebra#θ-join_and_equijoin)), such as
-`movies.genre_id = genres.id`, then we can instead use a
-[hash join](https://en.wikipedia.org/wiki/Hash_join). This scans the right table once, builds an
-in-memory hash table from it, and for each left row it looks up any right rows in the hash table.
-This is a much more efficient O(n) algorithm.
+In the common case where the join predicate is an equality comparison such as
+`movies.genre_id = genres.id` (i.e. an [equijoin](https://en.wikipedia.org/wiki/Relational_algebra#θ-join_and_equijoin)),
+then we can instead use a [hash join](https://en.wikipedia.org/wiki/Hash_join). This scans the right
+table once, builds an in-memory hash table from it, and for each left row it looks up any right rows
+in the hash table. This is a much more efficient O(n) algorithm.
 
-In our previous movie example, we are in fact doing an equijoin, and so our `NestedLoopJoin`:
+In our previous movie example, we are in fact doing an equijoin:
 
 ```
 Select
@@ -245,7 +242,7 @@ Select
          └─ Scan: genres
 ```
 
-Will be replaced by a `HashJoin`:
+And so our `NestedLoopJoin` can be replaced by a `HashJoin`:
 
 ```
 Select
@@ -263,15 +260,15 @@ hash table), but we keep it simple.
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/planner/optimizer.rs#L309-L348
 
 Of course there are many other join algorithms out there, and one of the harder problems in SQL
-optimization is how to efficiently perform deep multijoins. We don't attempt to tackle these
+optimization is how to efficiently perform large N-way multijoins. We don't attempt to tackle these
 problems here -- the `HashJoin` optimizer is just a very simple example of such join optimization.
 
 ## Short Circuiting
 
 The `ShortCircuit` optimizer tries to find nodes that can't possibly do any useful work, and either
 removes them from the plan, or replaces them with trivial nodes that don't do anything. It is kind
-of similar to the `ConstantFolding` optimizer in spirit, but works at the plan node level rather
-than the expression node level.
+of similar to the `ConstantFolding` optimizer in spirit, but works on plan nodes rather than
+expression nodes.
 
 https://github.com/erikgrinaker/toydb/blob/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/planner/optimizer.rs#L350-L354
 

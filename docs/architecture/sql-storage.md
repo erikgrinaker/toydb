@@ -3,36 +3,37 @@
 The SQL storage engine, in the [`sql::engine`](https://github.com/erikgrinaker/toydb/tree/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/sql/engine)
 module, stores tables and rows. toyDB has two SQL storage implementations:
 
-* `sql::engine::Local`: a local key/value store using `storage::Engine`.
-* `sql::engine::Raft` Raft-replicated storage, using `Local` on each node below Raft.
+* `sql::engine::Local`: local storage using a `storage::Engine` key/value store.
+* `sql::engine::Raft`: Raft-replicated storage, using `Local` on each node below Raft.
 
 These implement the `sql::engine::Engine` trait, which specifies the SQL storage API. SQL execution
-can use either simple local storage or Raft-replicated storage, as they're functionally equivalent.
-toyDB itself always uses the Raft-replicated engine, but many tests use the local engine.
+can use either simple local storage or Raft-replicated storage -- toyDB itself always uses the
+Raft-replicated engine, but many tests use a local in-memory engine.
 
-The `sql::engine::Engine` trait is fully transactional, based on the MVCC transaction engine
-`storage::MVCC` that we've discussed previously. As such, the trait just has a few methods that
-begin transactions -- the storage logic itself is implemented in the transaction. The trait also
-has a `session()` method to run SQL sessions for query execution, which we'll revisit later.
+The `sql::engine::Engine` trait is fully transactional, based on the `storage::MVCC` transaction
+engine discussed previously. As such, the trait just has a few methods that begin transactions --
+the storage logic itself is implemented in the transaction, which we'll cover in next. The trait
+also has a `session()` method to start SQL sessions for query execution, which we'll revisit in the
+execution section.
 
 https://github.com/erikgrinaker/toydb/blob/0839215770e31f1e693d5cccf20a68210deaaa3f/src/sql/engine/engine.rs#L9-L29
 
-In this section we'll only look at the `Local` engine, and we'll discuss Raft replication
-afterwards. `Local` itself is just a thin wrapper around a `storage::MVCC<storage::Engine>`:
+Here, we'll only look at the `Local` engine, and we'll discuss Raft replication afterwards. `Local`
+itself is just a thin wrapper around a `storage::MVCC<storage::Engine>` to create transactions:
 
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L50-L97
 
 ## Key/Value Representation
 
-A `storage::Engine` key/value store will be used to store SQL table schemas, table rows, and
+`Local` uses a `storage::Engine` key/value store to store SQL table schemas, table rows, and
 secondary index entries. But how do we represent these as keys and values?
 
 The keys are represented by the `sql::engine::Key` enum, and encoded using the Keycode encoding
-that we've discussed previously:
+that we've discussed in the encoding section:
 
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L15-L31
 
-The values are encoded using the Bincode encoding, where the value type depends on the key:
+The values are encoded using the Bincode encoding, where the value type is given by the key:
 
 * `Key::Table` → `sql::types::Table` (table schemas)
 * `Key::Index` → `BTreeSet<sql::types::Value>` (indexed primary keys)
@@ -83,6 +84,7 @@ This would result in the following illustrated keys and values, in the given ord
 Thus, if we want to do a full table scan of the `movies` table, we just do a prefix scan of
 `/Row/movies/`. If we want to do a secondary index lookup of all movies with `genre_id = 2`, we
 fetch `/Index/movies/genre_id/Integer(2)` and find that movies with `id = {1,3}` have this genre.
+
 To help with prefix scans, the valid key prefixes are represented as `sql::engine::KeyPrefix`:
 
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L35-L48
@@ -97,32 +99,33 @@ The `sql::engine::Catalog` trait is used to store table schemas, i.e. `sql::type
 handful of methods for creating, dropping and fetching tables (recall that toyDB does not support
 schema changes). The `Table::name` field is used as a unique table identifier throughout.
 
-https://github.com/erikgrinaker/toydb/blob/0839215770e31f1e693d5cccf20a68210deaaa3f/src/sql/engine/engine.rs#L60-L83
+https://github.com/erikgrinaker/toydb/blob/0839215770e31f1e693d5cccf20a68210deaaa3f/src/sql/engine/engine.rs#L60-L79
 
 The `Catalog` trait is also fully transactional, as it must be implemented on a transaction via the
 `type Transaction: Transaction + Catalog` trait bound on `sql::engine::Engine`.
 
 Creating a table is straightforward: insert a key/value pair with a Keycode-encoded `Key::Table`
-for the key, and a Bincode-encoded `sql::types::Table` for the value. We first check that the
-table doesn't already exist, and validate the table schema using `Table::validate`.
+for the key and a Bincode-encoded `sql::types::Table` for the value. We first check that the
+table doesn't already exist, and validate the table schema using `Table::validate()`.
 
-https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L339-L345
+https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L340-L347
 
 Similarly, fetching and listing tables is straightforward: just key/value gets or scans using the
 appropriate keys.
 
-https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L388-L397
+https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L390-L399
 
-Dropping tables is a bit more involved, since we have to perform some validation and also delete
-the actual table rows and any secondary index entries, but not terribly so:
+Dropping tables is a bit more involved, since we have to perform some validation and also delete the
+actual table rows and any secondary index entries, but it's not terribly complicated:
 
-https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L347-L386
+https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L349-L388
 
 ## Row Storage and Transactions
 
-The workhorse of the SQL storage engine is the `Transaction` trait, which provides CRUD operations
-(create, read, update, delete) on table rows and secondary index entries. For performance
-(especially with Raft), it operates on row batches rather than individual rows.
+The workhorse of the SQL storage engine is the `Transaction` trait, which provides
+[CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) operations (create, read,
+update, delete) on table rows and secondary index entries. For performance (especially with Raft),
+it operates on row batches rather than individual rows.
 
 https://github.com/erikgrinaker/toydb/blob/0839215770e31f1e693d5cccf20a68210deaaa3f/src/sql/engine/engine.rs#L31-L58
 
@@ -134,11 +137,10 @@ https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa0
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L182-L192
 
 To insert new rows into a table, we first have to perform some validation: check that the table
-exist, validate the rows against the table schema (including checking for e.g. primary key conflicts
-and foreign key references). We then store the rows as a key/value pairs, using a `Key::Row` with
-the table name and primary key value. And finally, we update secondary index entries (if any). We
-don't have to worry about partial writes if something should go wrong -- the caller can roll back
-the MVCC transaction to clean up our writes.
+exists and validate the rows against the table schema (including checking for e.g. primary key
+conflicts and foreign key references). We then store the rows as a key/value pairs, using a
+`Key::Row` with the table name and primary key value. And finally, we update secondary index entries
+(if any).
 
 https://github.com/erikgrinaker/toydb/blob/39c6b60afc4c235f19113dc98087176748fa091d/src/sql/engine/local.rs#L252-L268
 
