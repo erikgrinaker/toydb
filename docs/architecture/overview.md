@@ -1,16 +1,18 @@
 # Overview
 
 toyDB consists of a cluster of nodes that execute [SQL](https://en.wikipedia.org/wiki/SQL)
-transactions against a replicated state machine. Clients can connect to any node in the cluster
-and submit SQL statements.
+transactions against a replicated state machine. Clients can connect to any node in the cluster and
+submit SQL statements. The cluster remains available if a minority of nodes crash or disconnect,
+but halts if a majority of nodes fail.
 
 ## Properties
 
 * **Distributed:** runs across a cluster of nodes.
-* **Highly available:** tolerates loss of a minority of nodes.
-* **SQL compliant:** correctly supports most common SQL features.
+* **Highly available:** tolerates failure of a minority of nodes.
+* **SQL compliant:** correctly supports most common [SQL](https://en.wikipedia.org/wiki/SQL)
+  features.
 * **Strongly consistent:** committed writes are immediately visible to all readers ([linearizability](https://en.wikipedia.org/wiki/Linearizability)).
-* **Transactional:** provides ACID transactions:
+* **Transactional:** provides [ACID](https://en.wikipedia.org/wiki/ACID) transactions
   * **Atomic:** groups of writes are applied as a single, atomic unit.
   * **Consistent:** database constraints and referential integrity are always enforced.
   * **Isolated:** concurrent transactions don't affect each other ([snapshot isolation](https://en.wikipedia.org/wiki/Snapshot_isolation)).
@@ -18,10 +20,10 @@ and submit SQL statements.
 
 For simplicity, toyDB is:
 
-* **Not scalable:** every node stores the full dataset, and all reads/writes happen on one node.
+* **Not scalable:** every node stores the full dataset, and reads/writes execute on one node.
 * **Not reliable:** only handles crash failures, not e.g. partial network partitions or node stalls.
 * **Not performant:** data processing is slow, and not optimized at all.
-* **Not efficient:** no compression or garbage collection, can load entire tables into memory.
+* **Not efficient:** loads entire tables into memory, no compression or garbage collection, etc.
 * **Not full-featured:** only basic SQL functionality is implemented.
 * **Not backwards compatible:** changes to data formats and protocols will break databases.
 * **Not flexible:** nodes can't be added or removed while running, and take a long time to join.
@@ -34,7 +36,7 @@ Internally, toyDB is made up of a few main components:
 * **Storage engine:** stores data on disk and manages transactions.
 * **Raft consensus engine:** replicates data and coordinates cluster nodes.
 * **SQL engine:** organizes SQL data, manages SQL sessions, and executes SQL statements.
-* **Server:** manages network connections, both with SQL clients and Raft nodes.
+* **Server:** manages network communication, both with SQL clients and Raft nodes.
 * **Client:** provides a SQL user interface and communicates with the server.
 
 This diagram illustrates the internal structure of a single toyDB node:

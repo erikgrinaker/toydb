@@ -2,9 +2,9 @@
 
 Distributed SQL database in Rust, built from scratch as an educational project. Main features:
 
-* [Raft distributed consensus engine][raft] for linearizable state machine replication.
+* [Raft distributed consensus][raft] for linearizable state machine replication.
 
-* [ACID transaction engine][txn] with MVCC-based snapshot isolation.
+* [ACID transactions][txn] with MVCC-based snapshot isolation.
 
 * [Pluggable storage engine][storage] with [BitCask][bitcask] and [in-memory][memory] backends.
 
@@ -31,7 +31,7 @@ been taken where possible.
 [memory]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/memory.rs
 [query]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/execution/executor.rs
 [optimizer]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/planner/optimizer.rs
-[sql]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/mod.rs
+[sql]: https://github.com/erikgrinaker/toydb/blob/main/src/sql/parser.rs
 
 ## Documentation
 
@@ -39,9 +39,9 @@ been taken where possible.
 
 * [SQL examples](docs/examples.md): walkthrough of toyDB's SQL features.
 
-* [SQL reference](docs/sql.md): toyDB's SQL reference documentation.
+* [SQL reference](docs/sql.md): reference documentation for toyDB's SQL dialect.
 
-* [References](docs/references.md): research material used while building toyDB.
+* [References](docs/references.md): research materials used while building toyDB.
 
 ## Usage
 
@@ -161,9 +161,10 @@ The available workloads are:
 
 For more information about workloads and parameters, run `cargo run --bin workload -- --help`.
 
-Example workload results are listed below. Write performance is pretty atrocious, due to fsyncs 
-and a lack of write batching at the Raft level. Disabling fsyncs, or using the in-memory engine, 
-significantly improves write performance.
+Example workload results are listed below. Write performance is atrocious, due to
+[fsync](https://en.wikipedia.org/wiki/Sync_(Unix)) and a lack of write batching in the Raft layer.
+Disabling fsync, or using the in-memory engine, significantly improves write performance (at the
+expense of durability).
 
 | Workload | BitCask     | BitCask w/o fsync | Memory      |
 |----------|-------------|-------------------|-------------|
@@ -181,4 +182,4 @@ library 'toydb'".
 
 ## Credits
 
-toyDB logo is courtesy of [@jonasmerlin](https://github.com/jonasmerlin).
+The toyDB logo is courtesy of [@jonasmerlin](https://github.com/jonasmerlin).

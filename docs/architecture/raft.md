@@ -2,7 +2,7 @@
 
 [Raft](https://raft.github.io) is a distributed consensus protocol which replicates data across a
 cluster of nodes in a consistent and durable manner. It is described in the very readable
-[Raft paper](https://raft.github.io/raft.pdf), and the more comprehensive
+[Raft paper](https://raft.github.io/raft.pdf), and in the more comprehensive
 [Raft thesis](https://web.stanford.edu/~ouster/cgi-bin/papers/OngaroPhD.pdf).
 
 The toyDB Raft implementation is in the [`raft`](https://github.com/erikgrinaker/toydb/tree/213e5c02b09f1a3cac6a8bbd0a81773462f367f5/src/raft)
@@ -13,7 +13,8 @@ https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a4
 Raft is fundamentally the same protocol as [Paxos](https://lamport.azurewebsites.net/pubs/paxos-simple.pdf)
 and [Viewstamped Replication](https://pmg.csail.mit.edu/papers/vr-revisited.pdf), but an
 opinionated variant designed to be simple, understandable, and practical. It is widely used in the
-industry.
+industry: [CockroachDB](https://www.cockroachlabs.com), [TiDB](https://www.pingcap.com),
+[etcd](https://etcd.io), [Consul](https://developer.hashicorp.com/consul), and many others.
 
 Briefly, Raft elects a leader node which coordinates writes and replicates them to followers. Once a
 majority (>50%) of nodes have acknowledged a write, it is considered durably committed. It is common
@@ -31,8 +32,8 @@ The Raft leader appends writes to an ordered command log, which is then replicat
 Once a majority has replicated the log up to a given entry, that log prefix is committed and then
 applied to a state machine. This ensures that all nodes will apply the same commands in the same
 order and eventually reach the same state (assuming the commands are deterministic). Raft itself
-doesn't care what the state machine and commands are, but in toyDB's case it is a key/value store
-with put/delete commands.
+doesn't care what the state machine and commands are, but in toyDB's case it's SQL tables and rows
+stored in an MVCC key/value store.
 
 This diagram from the Raft paper illustrates how a Raft node receives a command from a client (1),
 adds it to its log and reaches consensus with other nodes (2), then applies it to its state machine
@@ -40,7 +41,7 @@ adds it to its log and reaches consensus with other nodes (2), then applies it t
 
 <img src="./images/raft.svg" alt="Raft node" width="400" style="display: block; margin: 30px auto;">
 
-You may notice that Raft is not very scalable, since all writes and reads go via the leader node,
+You may notice that Raft is not very scalable, since all reads and writes go via the leader node,
 and every node must store the entire dataset. Raft solves replication and availability, but not
 scalability. Real-world systems typically provide horizontal scalability by splitting a large
 dataset across many separate Raft clusters (i.e. sharding), but this is out of scope for toyDB.
@@ -57,14 +58,14 @@ which illustrate the protocol in a wide variety of scenarios.
 
 Raft replicates an ordered command log consisting of `raft::Entry`:
 
-https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/log.rs#L13-L26
+https://github.com/erikgrinaker/toydb/blob/90a6cae47ac20481ac4eb2f20eea50f02e6c2b33/src/raft/log.rs#L10-L28
 
 `index` specifies the position in the log, and `command` contains the binary command to apply to the
 state machine. The `term` identifies the leadership term in which the command was proposed: a new
 term begins when a new leader election is held (we'll get back to this later).
 
 Entries are appended to the log by the leader and replicated to followers. Once acknowledged by a
-quorum, the log up to that index is committed, and will never change. Entries that are not yet
+quorum, the log up to that index is committed and will never change. Entries that are not yet
 committed may be replaced or removed if the leader changes.
 
 The Raft log enforces the following invariants:
@@ -95,8 +96,8 @@ application:
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/log.rs#L205-L222
 
-It also has methods to read entries from the log, either individually as `Log::get` or by iterating
-over a range with `Log::scan`:
+The log also has methods to read entries from the log, either individually as `Log::get` or by
+iterating over a range with `Log::scan`:
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/log.rs#L224-L267
 
@@ -109,6 +110,8 @@ The Raft state machine is represented by the `raft::State` trait. Raft will ask 
 applied entry via `State::get_applied_index`, and feed it newly committed entries via
 `State::apply`. It also allows reads via `State::read`, but we'll get back to that later.
 
+https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/state.rs#L4-L51
+
 The state machine does not have to flush its state to durable storage after each transition; on node
 crashes, the state machine is allowed to regress, and will be caught up by replaying the unapplied
 log entries. It is also possible to implement a purely in-memory state machine (and in fact, toyDB
@@ -120,10 +123,8 @@ current time or generate a random number -- these values must be included in the
 means that non-deterministic errors, such as an IO error, must halt command application (in toyDB's
 case, we just panic and crash the node).
 
-In toyDB, the state machine is a key/value store that manages SQL data, as we'll see in the SQL
-section.
-
-https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/state.rs#L4-L51
+In toyDB's, the state machine is an MVCC key/value store that stores SQL tables and rows, as we'll
+see in the SQL Raft replication section.
 
 ## Node Roles
 
@@ -144,8 +145,8 @@ https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8de
 
 This wraps the `raft::RawNode<Role>` type which contains the inner node state. It is generic over
 the role, and uses the [typestate pattern](http://cliffle.com/blog/rust-typestate/) to provide
-methods and transitions depending on the node's current role, enforcing state transitions and
-invariants at compile time via Rust's type system. For example, only `RawNode<Candidate>` has an
+methods and transitions depending on the node's current role. This enforces state transitions and
+invariants at compile time via Rust's type system -- for example, only `RawNode<Candidate>` has an
 `into_leader()` method, since only candidates can transition to leaders (when they win an election).
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L156-L177
@@ -159,10 +160,12 @@ https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8de
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L523-L531
 
+We'll see what the various fields are used for in the following sections.
+
 ## Node Interface and Communication
 
-The `raft::Node` enum has two main methods that drive the node. These consume the current node and
-return a new node, possibly with a different role.
+The `raft::Node` enum has two main methods that drive the node: `tick()` and `step()`. These consume
+the current node and return a new node, possibly with a different role.
 
 `tick()` advances time by a logical tick. This is used to measure the passage of time, e.g. to
 trigger election timeouts or periodic leader heartbeats. toyDB uses a tick interval of 100
@@ -178,6 +181,10 @@ Outbound messages to other nodes are sent via the `RawNode::tx` channel:
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L171-L172
 
+Nodes are identified by a unique node ID, which is given at node startup:
+
+https://github.com/erikgrinaker/toydb/blob/90a6cae47ac20481ac4eb2f20eea50f02e6c2b33/src/raft/node.rs#L17-L18
+
 Messages are wrapped in a `raft::Envelope` specifying the sender and recipient:
 
 https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/message.rs#L10-L21
@@ -191,8 +198,8 @@ https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a4
 
 This is an entirely synchronous and deterministic model -- the same sequence of calls on a given
 node in a given initial state will always produce the same result. This is very convenient for
-testing and understandability. We will see later how toyDB drives the node on a separate thread,
-provides a network transport for messages, and ticks it at regular intervals.
+testing and understandability. We will see in the server section how toyDB drives the node on a
+separate thread, provides a network transport for messages, and ticks it at regular intervals.
 
 ## Leader Election and Terms
 
@@ -263,18 +270,18 @@ this for now (see section 5.4.2 in the Raft paper for why).
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L563-L583
 
-When the other nodes receive the heartbeat, they will follow the leader:
+When the other nodes receive the heartbeat, they become followers of the new leader in its term:
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L359-L384
 
-From now on, the leader will send periodic `Message::Heartbeat` every 4 ticks, i.e. 400 ms (see
+From now on, the leader will send periodic `Message::Heartbeat` every 4 ticks (see
 `HEARTBEAT_INTERVAL`) to assert its leadership:
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L945-L953
 
-The followers record when they last received any message from the leader, and will hold a new
-election if they haven't heard from the leader in an election timeout (e.g. due to a leader crash
-or network partition):
+The followers record when they last received any message from the leader (including heartbeats), and
+will hold a new election if they haven't heard from the leader in an election timeout (e.g. due to a
+leader crash or network partition):
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L353-L356
 
@@ -289,9 +296,9 @@ https://github.com/erikgrinaker/toydb/blob/cb234a0b776484608118fd9382869ee5bc30d
 
 ## Client Requests and Forwarding
 
-Once a leader has been elected, we need to submit write and read requests to it. This is done by
-stepping a request message into the node using the local node ID, marked with a unique request ID
-(toyDB uses random UUIDv4), and waiting for an outbound response message with the same ID:
+Once a leader has been elected, we can submit read and write requests to it. This is done by
+stepping a `Message::ClientRequest` into the node using the local node ID, with a unique request ID
+(toyDB uses UUIDv4), and waiting for an outbound response message with the same ID:
 
 https://github.com/erikgrinaker/toydb/blob/d96c6dd5ae7c0af55ee609760dcd958c289a44f2/src/raft/message.rs#L134-L151
 
@@ -303,34 +310,35 @@ machine. For our purposes here, let's pretend the requests are:
 * `Request::Write("key=value")` → `Response::Write("ok")`
 * `Request::Read("key")` → `Response::Read("value")`
 
-The fundamental difference between write and read requests are that write requests are replicated
+The fundamental difference between read and write requests are that write requests are replicated
 through Raft and executed on all nodes, while read requests are only executed on the leader without
 being appended to the log. It would be possible to execute reads on followers too, for load
 balancing, but these reads would be eventually consistent and thus violate linearizability, so toyDB
 only executes reads on the leader.
 
 If a request is submitted to a follower, it will be forwarded to the leader and the response
-forwarded back to the client (distinguished by the sender/recipient node ID -- a client always
+forwarded back to the client (distinguished by the sender/recipient node ID -- a local client always
 uses the local node ID):
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L451-L474
 
 For simplicity, we cancel the request with `Error::Abort` if a request is submitted to a candidate,
 and similarly if a follower changes its role to candidate or discovers a new leader. We could have
-held on to these and redirected them to a new leader, but the client may as well retry.
+held on to these and redirected them to a new leader, but we keep it simple and ask the client to
+retry.
 
-We'll look at the actual write/read request processing next.
+We'll look at the actual read and write request processing next.
 
 ## Write Replication and Application
 
 When the leader receives a write request, it proposes the command for replication to followers. It
-keeps track of the in-flight write and its assigned log index in `writes`, such that it can
-respond to the client with the command result once it has been committed and applied.
+keeps track of the in-flight write and its log entry index in `writes`, such that it can respond to
+the client with the command result once the entry has been committed and applied.
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L895-L904
 
-To propose the command, the leader appends it to its log and eagerly sends a `Message::Append` to
-each follower to replicate it to their logs:
+To propose the command, the leader appends it to its log and sends a `Message::Append` to each
+follower to replicate it to their logs:
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L966-L980
 
@@ -369,8 +377,9 @@ https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8de
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L701-L710
 
 Once a quorum of nodes (in our case 2 out of 3 including the leader) have the entry in their log,
-the leader can commit the entry and apply it to the state machine. It looks up the in-flight write
-request from `writes` and sends the command result back to the client as `Message::ClientResponse`:
+the leader can commit the entry and apply it to the state machine. It also looks up the in-flight
+write request from `writes` and sends the command result back to the client as
+`Message::ClientResponse`:
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L982-L1032
 
@@ -421,6 +430,8 @@ executes the read once a quorum have confirmed the sequence number:
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L860-L866
 
 https://github.com/erikgrinaker/toydb/blob/8782c2b05f11333c1586ef248f1a13dc1c8dec4a/src/raft/node.rs#L1034-L1066
+
+We now have a Raft-managed state machine with replicated writes and linearizable reads.
 
 ---
 
