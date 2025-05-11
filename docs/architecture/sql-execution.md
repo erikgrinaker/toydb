@@ -115,5 +115,5 @@ And with that, we have a fully functional SQL engine!
 ---
 
 <p align="center">
-← <a href="sql-optimizer.md">SQL Optimization</a> &nbsp; | &nbsp; <a href="server.md">Server and Client</a> →
+← <a href="sql-optimizer.md">SQL Optimization</a> &nbsp; | &nbsp; <a href="server.md">Server</a> →
 </p>

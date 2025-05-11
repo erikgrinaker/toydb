@@ -56,13 +56,13 @@ to the actual source code.
   * [Execution](sql-execution.md)
     * [Plan Executor](sql-execution.md#plan-executor)
     * [Session Management](sql-execution.md#session-management)
-* [Server and Client](server.md)
-  * [Server](server.md#server)
+* [Server](server.md)
   * [Raft Routing](server.md#raft-routing)
   * [SQL Service](server.md#sql-service)
   * [`toydb` Binary](server.md#toydb-binary)
-  * [Client Library](server.md#client-library)
-  * [`toysql` Binary](server.md#toysql-binary)
+* [Client](client.md)
+  * [Client Library](client.md#client-library)
+  * [`toysql` Binary](client.md#toysql-binary)
 
 ---
 
