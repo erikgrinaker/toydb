@@ -88,7 +88,7 @@ into account) is represented as:
 //   / \
 //  1   *
 //     /  \
-///   2    3
+//    2    3
 Expression::Add(
     Expression::Constant(Value::Integer(1)),
     Expression::Multiply(
