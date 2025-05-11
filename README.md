@@ -1,4 +1,4 @@
-# <a><img src="./docs/images/toydb.svg" height="40" valign="top" /></a> toyDB
+# <a><img src="./docs/architecture/images/toydb.svg" height="40" valign="top" /></a> toyDB
 
 Distributed SQL database in Rust, built from scratch as an educational project. Main features:
 
@@ -16,9 +16,8 @@ Distributed SQL database in Rust, built from scratch as an educational project. 
 I originally wrote toyDB in 2020 to learn more about database internals. Since then, I've spent
 several years building real distributed SQL databases at
 [CockroachDB](https://github.com/cockroachdb/cockroach) and
-[Neon](https://github.com/neondatabase/neon), where I learnt a lot more. Based on this experience,
-I've rewritten toyDB as a simple illustration of the architecture and concepts behind distributed
-SQL databases.
+[Neon](https://github.com/neondatabase/neon). Based on this experience, I've rewritten toyDB as a
+simple illustration of the architecture and concepts behind distributed SQL databases.
 
 toyDB is intended to be simple and understandable, and also functional and correct. Other aspects
 like performance, scalability, and availability are non-goals -- these are major sources of
@@ -36,7 +35,7 @@ been taken where possible.
 
 ## Documentation
 
-* [Architecture guide](docs/architecture.md): a guided tour of toyDB's code and architecture.
+* [Architecture guide](docs/architecture/index.md): a guided tour of toyDB's code and architecture.
 
 * [SQL examples](docs/examples.md): walkthrough of toyDB's SQL features.
 
@@ -106,9 +105,9 @@ Remap: m.title, genre, studio, m.rating (dropped: m.released)
 
 toyDB's architecture is fairly typical for a distributed SQL database: a transactional
 key/value store managed by a Raft cluster with a SQL query engine on top. See the
-[architecture guide](./docs/architecture.md) for more details.
+[architecture guide](./docs/architecture/index.md) for more details.
 
-[![toyDB architecture](./docs/images/architecture.svg)](./docs/architecture.md)
+[![toyDB architecture](./docs/architecture/images/architecture.svg)](./docs/architecture/index.md)
 
 ## Tests
 
