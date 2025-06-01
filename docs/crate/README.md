@@ -7,7 +7,7 @@ features:
 
 * ACID transactions with MVCC-based snapshot isolation.
 
-* Pluggable storage engine with [BitCask][bitcask] and [in-memory][memory] backends.
+* Pluggable storage engine with BitCask and in-memory backends.
 
 * Iterator-based query engine with heuristic optimization and time-travel  support.
 
