@@ -1,5 +1,6 @@
 /cluster/toydb*/data
 /data
+/docs/crate/target
 /target
 .DS_Store
 .vscode/
