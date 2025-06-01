@@ -1,6 +1,6 @@
 [package]
 name = "toydb"
-version = "1.0.0"
+version = "1.0.1"
 description = "A simple distributed SQL database, built for education"
 authors = ["Erik Grinaker <erik@grinaker.org>"]
 license = "Apache-2.0"
