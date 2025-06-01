@@ -1,8 +1,11 @@
 [package]
 name = "toydb"
-description = "A distributed SQL database"
 version = "1.0.0"
+description = "A distributed SQL database"
 authors = ["Erik Grinaker <erik@grinaker.org>"]
+license = "Apache-2.0"
+homepage = "https://github.com/erikgrinaker/toydb"
+repository = "https://github.com/erikgrinaker/toydb"
 edition = "2024"
 default-run = "toydb"
 
