@@ -537,7 +537,7 @@ impl<E: Engine> Transaction<E> {
         // the same invariant.
         let from = Key::Version(
             key.into(),
-            self.state.active.iter().min().copied().unwrap_or(self.state.version + 1),
+            self.state.active.first().copied().unwrap_or(self.state.version + 1),
         )
         .encode();
         let to = Key::Version(key.into(), u64::MAX).encode();
