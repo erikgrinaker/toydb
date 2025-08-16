@@ -13,16 +13,16 @@ Distributed SQL database in Rust, built from scratch as an educational project. 
 
 * [SQL interface][sql] including joins, aggregates, and transactions.
 
+toyDB is intended to be simple and understandable, and also functional and correct. Other aspects
+like performance, scalability, and availability are non-goals -- these are major sources of
+complexity in production-grade databases, and obscure the basic underlying concepts. Shortcuts have
+been taken where possible.
+
 I originally wrote toyDB in 2020 to learn more about database internals. Since then, I've spent
 several years building real distributed SQL databases at
 [CockroachDB](https://github.com/cockroachdb/cockroach) and
 [Neon](https://github.com/neondatabase/neon). Based on this experience, I've rewritten toyDB as a
 simple illustration of the architecture and concepts behind distributed SQL databases.
-
-toyDB is intended to be simple and understandable, and also functional and correct. Other aspects
-like performance, scalability, and availability are non-goals -- these are major sources of
-complexity in production-grade databases, and obscure the basic underlying concepts. Shortcuts have
-been taken where possible.
 
 [raft]: https://github.com/erikgrinaker/toydb/blob/main/src/raft/mod.rs
 [txn]: https://github.com/erikgrinaker/toydb/blob/main/src/storage/mvcc.rs
