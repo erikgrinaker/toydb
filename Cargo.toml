@@ -26,9 +26,9 @@ log = "0.4"
 petname = "2.0"
 rand = "0.8"
 regex = "1.10"
-rustyline = "15.0"
+rustyline = "17.0"
 rustyline-derive = "0.11"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 simplelog = "0.12"
 uuid = { version = "1.8", features = ["serde", "v4"] }
