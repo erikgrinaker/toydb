@@ -198,10 +198,10 @@ impl Table {
             let valueslice = &row[i..=i];
 
             // Validate datatype.
-            if let Some(ref vtype) = value.datatype() {
-                if vtype != ctype {
-                    return errinput!("invalid datatype {vtype} for {ctype} column {cname}");
-                }
+            if let Some(ref vtype) = value.datatype()
+                && vtype != ctype
+            {
+                return errinput!("invalid datatype {vtype} for {ctype} column {cname}");
             }
             if value == &Value::Null && !column.nullable {
                 return errinput!("NULL value not allowed for column {cname}");

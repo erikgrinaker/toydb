@@ -224,11 +224,11 @@ impl FilterPushdown {
         }
 
         // Push predicates down into the sources if possible.
-        if let Some(expr) = Expression::and_vec(push_left) {
-            if let Some(expr) = Self::push_into(expr, &mut left) {
-                // Pushdown failed, put it back into the join predicate.
-                predicate.push(expr)
-            }
+        if let Some(expr) = Expression::and_vec(push_left)
+            && let Some(expr) = Self::push_into(expr, &mut left)
+        {
+            // Pushdown failed, put it back into the join predicate.
+            predicate.push(expr)
         }
 
         if let Some(mut expr) = Expression::and_vec(push_right) {

@@ -229,13 +229,13 @@ impl<E: storage::Engine> super::Transaction for Transaction<E> {
 
         for id in ids {
             // Update any secondary index entries.
-            if !indexes.is_empty() {
-                if let Some(row) = self.get_row(&table.name, id)? {
-                    for (i, column) in indexes.iter().copied() {
-                        let mut ids = self.get_index(&table.name, &column.name, &row[i])?;
-                        ids.remove(id);
-                        self.set_index(&table.name, &column.name, &row[i], ids)?;
-                    }
+            if !indexes.is_empty()
+                && let Some(row) = self.get_row(&table.name, id)?
+            {
+                for (i, column) in indexes.iter().copied() {
+                    let mut ids = self.get_index(&table.name, &column.name, &row[i])?;
+                    ids.remove(id);
+                    self.set_index(&table.name, &column.name, &row[i], ids)?;
                 }
             }
 

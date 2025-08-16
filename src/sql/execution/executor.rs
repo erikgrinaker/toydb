@@ -243,10 +243,10 @@ impl<'a, T: Transaction> Executor<'a, T> {
             if values.len() > table.columns.len() {
                 return errinput!("too many values for table {}", table.name);
             }
-            if let Some(column_map) = &column_map {
-                if column_map.len() != values.len() {
-                    return errinput!("column and value counts do not match");
-                }
+            if let Some(column_map) = &column_map
+                && column_map.len() != values.len()
+            {
+                return errinput!("column and value counts do not match");
             }
 
             // Map source columns to table columns, and fill in default values.

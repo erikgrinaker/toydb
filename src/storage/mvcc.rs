@@ -702,10 +702,10 @@ impl<E: Engine> Iterator for ScanIterator<E> {
     type Item = Result<(Vec<u8>, Vec<u8>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.buffer.is_empty() {
-            if let Err(error) = self.fill_buffer() {
-                return Some(Err(error));
-            }
+        if self.buffer.is_empty()
+            && let Err(error) = self.fill_buffer()
+        {
+            return Some(Err(error));
         }
         self.buffer.pop_front().map(Ok)
     }

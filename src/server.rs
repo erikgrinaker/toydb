@@ -211,13 +211,13 @@ impl Server {
                 // forward it to the waiting client via the response channel.
                 recv(node_rx) -> result => {
                     let msg = result.expect("node_rx disconnected");
-                    if msg.to == node.id() {
-                        if let raft::Message::ClientResponse{ id, response } = msg.message {
-                            if let Some(response_tx) = response_txs.remove(&id) {
-                                response_tx.send(response).expect("response_tx disconnected");
-                            }
-                            continue
+                    if msg.to == node.id()
+                        && let raft::Message::ClientResponse{ id, response } = msg.message
+                    {
+                        if let Some(response_tx) = response_txs.remove(&id) {
+                            response_tx.send(response).expect("response_tx disconnected");
                         }
+                        continue
                     }
                     let peer_tx = peers_tx.get_mut(&msg.to).expect("unknown peer");
                     match peer_tx.try_send(msg) {

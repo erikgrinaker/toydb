@@ -192,10 +192,10 @@ impl Formatter for SQL {
 
     fn value(key: &[u8], value: &[u8]) -> String {
         // Special-case the applied_index key.
-        if key == sql::engine::Raft::APPLIED_INDEX_KEY {
-            if let Ok(applied_index) = bincode::deserialize::<raft::Index>(value) {
-                return applied_index.to_string();
-            }
+        if key == sql::engine::Raft::APPLIED_INDEX_KEY
+            && let Ok(applied_index) = bincode::deserialize::<raft::Index>(value)
+        {
+            return applied_index.to_string();
         }
 
         let Ok(key) = sql::engine::Key::decode(key) else {

@@ -240,7 +240,7 @@ impl Log {
     }
 
     /// Returns an iterator over log entries in the given index range.
-    pub fn scan(&mut self, range: impl RangeBounds<Index>) -> Iterator {
+    pub fn scan(&mut self, range: impl RangeBounds<Index>) -> Iterator<'_> {
         let from = match range.start_bound() {
             Bound::Excluded(&index) => Bound::Excluded(Key::Entry(index).encode()),
             Bound::Included(&index) => Bound::Included(Key::Entry(index).encode()),
@@ -256,7 +256,7 @@ impl Log {
 
     /// Returns an iterator over entries that are ready to apply, starting after
     /// the current applied index up to the commit index.
-    pub fn scan_apply(&mut self, applied_index: Index) -> Iterator {
+    pub fn scan_apply(&mut self, applied_index: Index) -> Iterator<'_> {
         // NB: we don't assert that commit_index >= applied_index, because the
         // local commit index is not flushed to durable storage -- if lost on
         // restart, it can be recovered from the logs of a quorum.

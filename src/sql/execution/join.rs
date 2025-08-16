@@ -75,7 +75,7 @@ impl NestedLoopJoiner {
                 return Ok(Some(
                     left.iter()
                         .cloned()
-                        .chain(std::iter::repeat(Value::Null).take(self.right_columns))
+                        .chain(std::iter::repeat_n(Value::Null, self.right_columns))
                         .collect(),
                 ));
             }
@@ -172,7 +172,7 @@ impl HashJoiner {
                 // join, emit a row with right NULLs.
                 return Ok(Some(
                     left.into_iter()
-                        .chain(std::iter::repeat(Value::Null).take(self.right_columns))
+                        .chain(std::iter::repeat_n(Value::Null, self.right_columns))
                         .collect(),
                 ));
             }

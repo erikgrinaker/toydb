@@ -5,11 +5,11 @@
 //!    `sql::execution::Session` in `Server::sql_session`.
 //!
 //! 2. `toySQL` submits a SQL `SELECT` string, which the server executes via
-//!     `Session::execute`.
+//!    `Session::execute`.
 //!
 //! 3. `Session::execute` calls `Parser::parse` to parse the SQL `SELECT` string
-//!     into an `ast::Statement::Select` AST (Abstract Syntax Tree). The parser
-//!     uses the `Lexer` for initial tokenization.
+//!    into an `ast::Statement::Select` AST (Abstract Syntax Tree). The parser
+//!    uses the `Lexer` for initial tokenization.
 //!     
 //! 4. `Session::execute` obtains a new read-only `sql::engine::Transaction` via
 //!    `Session::with_txn`. We'll gloss over the details here.

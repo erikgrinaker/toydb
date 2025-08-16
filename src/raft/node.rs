@@ -425,11 +425,11 @@ impl RawNode<Follower> {
             Message::Campaign { last_index, last_term } => {
                 // Don't vote if we already voted for someone else in this term.
                 // We can repeat our vote for the same node though.
-                if let (_, Some(vote)) = self.log.get_term_vote() {
-                    if msg.from != vote {
-                        self.send(msg.from, Message::CampaignResponse { vote: false })?;
-                        return Ok(self.into());
-                    }
+                if let (_, Some(vote)) = self.log.get_term_vote()
+                    && msg.from != vote
+                {
+                    self.send(msg.from, Message::CampaignResponse { vote: false })?;
+                    return Ok(self.into());
                 }
 
                 // Only vote if the candidate's log is at least as long as ours.
@@ -2020,12 +2020,12 @@ mod tests {
                     let peer_len = symmetric.get(peer).map(|p| p.len()).unwrap_or(0);
                     // If this peer set is the smallest (or we're the higher ID),
                     // remove the entry. We may no longer be in the map.
-                    if len < peer_len || len == peer_len && id > peer {
-                        if let Some(peers) = symmetric.get_mut(id) {
-                            peers.remove(peer);
-                            if peers.is_empty() {
-                                symmetric.remove(id);
-                            }
+                    if (len < peer_len || len == peer_len && id > peer)
+                        && let Some(peers) = symmetric.get_mut(id)
+                    {
+                        peers.remove(peer);
+                        if peers.is_empty() {
+                            symmetric.remove(id);
                         }
                     }
                 }

@@ -226,7 +226,7 @@ impl<'a, C: Catalog> Planner<'a, C> {
 
             // Add hidden columns for HAVING and ORDER BY columns not in SELECT.
             let hidden = self.build_select_hidden(&having, &order_by, &scope, &mut child_scope);
-            aliases.extend(std::iter::repeat(Label::None).take(hidden.len()));
+            aliases.extend(std::iter::repeat_n(Label::None, hidden.len()));
             expressions.extend(hidden);
 
             scope = child_scope;
@@ -461,12 +461,12 @@ impl<'a, C: Catalog> Planner<'a, C> {
             expr.walk(&mut |expr| {
                 // If this is an aggregate or GROUP BY expression that isn't
                 // already available in the child scope, add a hidden column.
-                if let Some(index) = scope.lookup_aggregate(expr) {
-                    if child_scope.lookup_aggregate(expr).is_none() {
-                        child_scope.add_passthrough(scope, index, true);
-                        hidden.push(Expression::Column(index));
-                        return true;
-                    }
+                if let Some(index) = scope.lookup_aggregate(expr)
+                    && child_scope.lookup_aggregate(expr).is_none()
+                {
+                    child_scope.add_passthrough(scope, index, true);
+                    hidden.push(Expression::Column(index));
+                    return true;
                 }
 
                 // Look for column references that don't exist post-projection,

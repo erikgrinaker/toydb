@@ -44,7 +44,7 @@ impl Parser<'_> {
     }
 
     /// Creates a new parser for the given raw SQL string.
-    fn new(input: &str) -> Parser {
+    fn new(input: &str) -> Parser<'_> {
         Parser { lexer: Lexer::new(input).peekable() }
     }
 
