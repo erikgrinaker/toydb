@@ -25,5 +25,5 @@ done
 
 # Wait for the background processes to exit. Kill all toyDB processes when the
 # script exits (e.g. via Ctrl-C).
-trap 'kill $(jobs -p)' EXIT
-wait < <(jobs -p)
+trap 'kill -TERM -- -$$ 2>/dev/null' INT TERM EXIT
+wait
