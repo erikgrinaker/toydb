@@ -104,7 +104,7 @@ impl Client {
                     // to MAX_WAIT, but randomize the wait time in this interval
                     // to reduce the chance of collisions.
                     let mut wait = MAX_WAIT.min(MIN_WAIT * 2_u64.pow(retries));
-                    wait = rand::thread_rng().gen_range(MIN_WAIT..=wait);
+                    wait = rand::rng().random_range(MIN_WAIT..=wait);
                     std::thread::sleep(Duration::from_millis(wait));
                     retries += 1;
                 }

@@ -18,7 +18,7 @@ use hdrhistogram::Histogram;
 use itertools::Itertools as _;
 use petname::Generator as _;
 use rand::SeedableRng as _;
-use rand::distributions::Distribution as _;
+use rand::distr::Distribution as _;
 use rand::rngs::StdRng;
 
 use toydb::error::Result;
@@ -128,7 +128,7 @@ impl Runner {
             // Spawn work generator.
             {
                 println!("Running workload {}...", workload);
-                let generator = workload.generate(rng).take(self.count);
+                let generator = workload.generate(rng)?.take(self.count);
                 s.spawn(move || -> Result<()> {
                     for item in generator {
                         work_tx.send(item)?;
@@ -189,7 +189,7 @@ trait Workload: std::fmt::Display {
     fn prepare(&self, client: &mut Client, rng: &mut StdRng) -> Result<()>;
 
     /// Generates work items as an iterator.
-    fn generate(&self, rng: StdRng) -> impl Iterator<Item = Self::Item> + Send + 'static;
+    fn generate(&self, rng: StdRng) -> Result<impl Iterator<Item = Self::Item> + Send + 'static>;
 
     /// Executes a single work item. This will automatically be retried on
     /// certain errors, and must use a transaction where appropriate.
@@ -234,7 +234,7 @@ impl Workload for Read {
         client.execute(r#"DROP TABLE IF EXISTS "read""#)?;
         client.execute(r#"CREATE TABLE "read" (id INT PRIMARY KEY, value STRING NOT NULL)"#)?;
 
-        let chars = &mut rand::distributions::Alphanumeric.sample_iter(rng).map(|b| b as char);
+        let chars = &mut rand::distr::Alphanumeric.sample_iter(rng).map(|b| b as char);
         let rows = (1..=self.rows).map(|id| (id, chars.take(self.size).collect::<String>()));
         let chunks = rows.chunks(100);
         let queries = chunks.into_iter().map(|chunk| {
@@ -250,12 +250,12 @@ impl Workload for Read {
         Ok(())
     }
 
-    fn generate(&self, rng: StdRng) -> impl Iterator<Item = Self::Item> + 'static {
-        ReadGenerator {
+    fn generate(&self, rng: StdRng) -> Result<impl Iterator<Item = Self::Item> + 'static> {
+        Ok(ReadGenerator {
             batch: self.batch,
-            dist: rand::distributions::Uniform::new(1, self.rows + 1),
+            dist: rand::distr::Uniform::new(1, self.rows + 1)?,
             rng,
-        }
+        })
     }
 
     fn execute(client: &mut Client, item: &Self::Item) -> Result<()> {
@@ -280,7 +280,7 @@ impl Workload for Read {
 struct ReadGenerator {
     batch: usize,
     rng: StdRng,
-    dist: rand::distributions::Uniform<u64>,
+    dist: rand::distr::Uniform<u64>,
 }
 
 impl Iterator for ReadGenerator {
@@ -331,8 +331,8 @@ impl Workload for Write {
         Ok(())
     }
 
-    fn generate(&self, rng: StdRng) -> impl Iterator<Item = Self::Item> + 'static {
-        WriteGenerator { next_id: 1, size: self.size, batch: self.batch, rng }
+    fn generate(&self, rng: StdRng) -> Result<impl Iterator<Item = Self::Item> + 'static> {
+        Ok(WriteGenerator { next_id: 1, size: self.size, batch: self.batch, rng })
     }
 
     fn execute(client: &mut Client, item: &Self::Item) -> Result<()> {
@@ -369,8 +369,7 @@ impl Iterator for WriteGenerator {
     type Item = <Write as Workload>::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let chars =
-            &mut rand::distributions::Alphanumeric.sample_iter(&mut self.rng).map(|b| b as char);
+        let chars = &mut rand::distr::Alphanumeric.sample_iter(&mut self.rng).map(|b| b as char);
         let mut rows = Vec::with_capacity(self.batch);
         while rows.len() < self.batch {
             rows.push((self.next_id, chars.take(self.size).collect()));
@@ -451,16 +450,16 @@ impl Workload for Bank {
         Ok(())
     }
 
-    fn generate(&self, rng: StdRng) -> impl Iterator<Item = Self::Item> + 'static {
+    fn generate(&self, rng: StdRng) -> Result<impl Iterator<Item = Self::Item> + 'static> {
         let customers = self.customers;
         let max_transfer = self.max_transfer;
         // Generate random u64s, then pick random from,to,amount as the
         // remainder of the max customer and amount.
-        rand::distributions::Uniform::new_inclusive(0, u64::MAX)
+        Ok(rand::distr::Uniform::new_inclusive(0, u64::MAX)?
             .sample_iter(rng)
             .tuples()
             .map(move |(a, b, c)| (a % customers + 1, b % customers + 1, c % max_transfer + 1))
-            .filter(|(from, to, _)| from != to)
+            .filter(|(from, to, _)| from != to))
     }
 
     fn execute(client: &mut Client, item: &Self::Item) -> Result<()> {

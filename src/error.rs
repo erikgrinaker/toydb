@@ -163,6 +163,12 @@ impl From<log::SetLoggerError> for Error {
     }
 }
 
+impl From<rand::distr::uniform::Error> for Error {
+    fn from(err: rand::distr::uniform::Error) -> Self {
+        Error::InvalidInput(err.to_string())
+    }
+}
+
 impl From<regex::Error> for Error {
     fn from(err: regex::Error) -> Self {
         panic!("{err}") // faulty code

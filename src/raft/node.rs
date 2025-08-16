@@ -214,7 +214,7 @@ impl<R: Role> RawNode<R> {
 
     /// Generates a random election timeout.
     fn random_election_timeout(&self) -> Ticks {
-        rand::thread_rng().gen_range(self.opts.election_timeout_range.clone())
+        rand::rng().random_range(self.opts.election_timeout_range.clone())
     }
 
     /// Sends a message to the given recipient.

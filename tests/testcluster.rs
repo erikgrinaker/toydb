@@ -69,7 +69,7 @@ impl TestCluster {
     /// toysql is too annoying, since we have to deal with rustyline, PTYs,
     /// echoing, multiline editing, etc.
     pub fn connect(&self) -> Result<Client, Box<dyn Error>> {
-        let id = rand::thread_rng().gen_range(1..=self.servers.len()) as NodeID;
+        let id = rand::rng().random_range(1..=self.servers.len()) as NodeID;
         self.servers.get(&id).unwrap().connect()
     }
 }
