@@ -73,10 +73,9 @@ impl ValueLocation {
 impl BitCask {
     /// Opens or creates a BitCask database in the given file.
     pub fn new(path: PathBuf) -> Result<Self> {
-        info!("Opening database {}", path.display());
         let mut log = Log::new(path.clone())?;
         let keydir = log.build_keydir()?;
-        info!("Indexed {} live keys in {}", keydir.len(), path.display());
+        info!("Opened {} with {} live keys", path.display(), keydir.len());
         Ok(Self { log, keydir })
     }
 
