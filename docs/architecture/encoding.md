@@ -12,7 +12,7 @@ encoding scheme for Rust. Bincode is convenient because it can easily encode any
 data type. But we could also have chosen e.g. [JSON](https://en.wikipedia.org/wiki/JSON),
 [Protobuf](https://protobuf.dev), [MessagePack](https://msgpack.org/), or any other encoding.
 
-We won't dwell on the actual binary format here, see the [Bincode specification](https://github.com/bincode-org/bincode/blob/trunk/docs/spec.md)
+We won't dwell on the actual binary format here, see the [Bincode specification](https://git.sr.ht/~stygianentity/bincode/tree/trunk/item/docs/spec.md)
 for details.
 
 To use a consistent configuration for all encoding and decoding, we provide helper functions in
