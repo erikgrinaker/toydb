@@ -1,12 +1,11 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Range;
-use std::fs::File;
+use std::fs::{File, TryLockError};
 use std::io::{BufReader, BufWriter, Read as _, Seek as _, SeekFrom, Write as _};
 use std::ops::{Bound, RangeBounds};
 use std::path::PathBuf;
 use std::result::Result as StdResult;
 
-use fs4::fs_std::FileExt;
 use log::{error, info};
 
 use super::{Engine, Status};
@@ -257,8 +256,12 @@ impl Log {
             .create(true)
             .truncate(false)
             .open(&path)?;
-        if !file.try_lock_exclusive()? {
-            return Err(Error::IO(format!("file {path:?} is already is use")));
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(TryLockError::WouldBlock) => {
+                return Err(Error::IO(format!("file {path:?} is already is use")));
+            }
+            Err(TryLockError::Error(err)) => return Err(err.into()),
         }
         Ok(Self { file, path })
     }
