@@ -2,7 +2,7 @@
 name = "toydb"
 version = "1.0.0"
 description = "A simple distributed SQL database, built for education"
-authors = ["Erik Grinaker <erik@grinaker.org>"]
+authors = ["Erik Grinaker <erik@grinaker.me>"]
 license = "Apache-2.0"
 homepage = "https://github.com/erikgrinaker/toydb"
 repository = "https://github.com/erikgrinaker/toydb"
