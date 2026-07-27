@@ -10,12 +10,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - uses: dtolnay/rust-toolchain@1.96.0
       id: toolchain
       with:
         components: clippy, rustfmt
-    - uses: actions/cache@v3
+    - uses: actions/cache@v6
       with:
         path: target
         key: ${{runner.os}}-target-${{steps.toolchain.outputs.cachekey}}-${{hashFiles('Cargo.lock')}}
