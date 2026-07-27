@@ -765,7 +765,7 @@ pub mod tests {
 
     use super::*;
     use crate::encoding::format::{self, Formatter as _};
-    use crate::storage::engine::test::{Emit, Mirror, Operation, decode_binary, parse_key_range};
+    use crate::storage::engine::test::{BinaryString, Emit, KeyRange, Mirror, Operation};
     use crate::storage::{BitCask, Memory};
 
     // Run goldenscript tests in src/storage/testscripts/mvcc.
@@ -798,6 +798,65 @@ pub mod tests {
 
     type TestEngine = Emit<Mirror<BitCask, Memory>>;
 
+    /// Commands accepted by the MVCC Goldenscript runner.
+    #[derive(goldenscript::Command)]
+    pub enum Command {
+        /// Begins a transaction selected by the command prefix.
+        Begin {
+            /// The optional `readonly` transaction mode.
+            readonly: Option<String>,
+            /// The historical version for a read-only transaction.
+            #[arg(key)]
+            as_of: Option<Version>,
+        },
+        /// Commits the transaction selected by the command prefix.
+        Commit,
+        /// Deletes keys in the selected transaction.
+        Delete(
+            /// The keys to delete.
+            Vec<BinaryString>,
+        ),
+        /// Dumps all raw MVCC storage entries.
+        Dump,
+        /// Fetches keys from the selected transaction.
+        Get(
+            /// The keys to fetch.
+            Vec<BinaryString>,
+        ),
+        /// Fetches unversioned keys.
+        GetUnversioned(
+            /// The unversioned keys to fetch.
+            Vec<BinaryString>,
+        ),
+        /// Imports key/value pairs at an optional version.
+        Import {
+            /// The version to import at.
+            version: Option<Version>,
+            /// The key/value pairs to import.
+            entries: Vec<(BinaryString, BinaryString)>,
+        },
+        /// Resumes a transaction from serialized state.
+        Resume(String),
+        /// Rolls back the transaction selected by the command prefix.
+        Rollback,
+        /// Scans a key range in the selected transaction.
+        Scan(
+            /// The key range, or the full range if omitted.
+            #[arg(optional)]
+            KeyRange,
+        ),
+        /// Scans keys with a prefix in the selected transaction.
+        ScanPrefix(BinaryString),
+        /// Sets key/value pairs in the selected transaction.
+        Set(Vec<(BinaryString, BinaryString)>),
+        /// Sets unversioned key/value pairs.
+        SetUnversioned(Vec<(BinaryString, BinaryString)>),
+        /// Displays the selected transaction state.
+        State,
+        /// Displays MVCC status.
+        Status,
+    }
+
     impl MVCCRunner {
         fn new() -> Self {
             // Use both a BitCask and a Memory engine, and mirror operations
@@ -826,34 +885,36 @@ pub mod tests {
         }
 
         /// Errors if a txn prefix is given.
-        fn no_txn(command: &goldenscript::Command) -> Result<(), Box<dyn Error>> {
-            if let Some(name) = &command.prefix {
-                return Err(format!("can't run {} with txn {name}", command.name).into());
+        fn no_txn(name: &str, context: &goldenscript::Context) -> Result<(), Box<dyn Error>> {
+            if let Some(prefix) = &context.prefix {
+                return Err(format!("can't run {name} with txn {prefix}").into());
             }
             Ok(())
         }
     }
 
     impl goldenscript::Runner for MVCCRunner {
-        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
-            let mut output = String::new();
-            let mut tags = command.tags.clone();
+        type Command = Command;
 
-            match command.name.as_str() {
-                // txn: begin [readonly] [as_of=VERSION]
-                "begin" => {
-                    let name = Self::txn_name(&command.prefix)?;
+        fn run(
+            &mut self,
+            command: &Command,
+            context: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
+            let mut output = String::new();
+            let mut tags = context.tags.clone();
+
+            match command {
+                &Command::Begin { ref readonly, as_of } => {
+                    let name = Self::txn_name(&context.prefix)?;
                     if self.txns.contains_key(name) {
                         return Err(format!("txn {name} already exists").into());
                     }
-                    let mut args = command.consume_args();
-                    let readonly = match args.next_pos().map(|a| a.value.as_str()) {
+                    let readonly = match readonly.as_deref() {
                         Some("readonly") => true,
                         None => false,
                         Some(v) => return Err(format!("invalid argument {v}").into()),
                     };
-                    let as_of = args.lookup_parse("as_of")?;
-                    args.reject_rest()?;
                     let txn = match (readonly, as_of) {
                         (false, None) => self.mvcc.begin()?,
                         (true, None) => self.mvcc.begin_read_only()?,
@@ -863,28 +924,20 @@ pub mod tests {
                     self.txns.insert(name.to_string(), txn);
                 }
 
-                // txn: commit
-                "commit" => {
-                    let name = Self::txn_name(&command.prefix)?;
+                Command::Commit => {
+                    let name = Self::txn_name(&context.prefix)?;
                     let txn = self.txns.remove(name).ok_or(format!("unknown txn {name}"))?;
-                    command.consume_args().reject_rest()?;
                     txn.commit()?;
                 }
 
-                // txn: delete KEY...
-                "delete" => {
-                    let txn = self.get_txn(&command.prefix)?;
-                    let mut args = command.consume_args();
-                    for arg in args.rest_pos() {
-                        let key = decode_binary(&arg.value);
-                        txn.delete(&key)?;
+                Command::Delete(keys) => {
+                    let txn = self.get_txn(&context.prefix)?;
+                    for key in keys {
+                        txn.delete(key)?;
                     }
-                    args.reject_rest()?;
                 }
 
-                // dump
-                "dump" => {
-                    command.consume_args().reject_rest()?;
+                Command::Dump => {
                     let mut engine = self.mvcc.engine.lock().unwrap();
                     let mut scan = engine.scan(..);
                     while let Some((key, value)) = scan.next().transpose()? {
@@ -894,37 +947,26 @@ pub mod tests {
                     }
                 }
 
-                // txn: get KEY...
-                "get" => {
-                    let txn = self.get_txn(&command.prefix)?;
-                    let mut args = command.consume_args();
-                    for arg in args.rest_pos() {
-                        let key = decode_binary(&arg.value);
-                        let value = txn.get(&key)?;
-                        let fmtkv = format::Raw::key_maybe_value(&key, value.as_deref());
+                Command::Get(keys) => {
+                    let txn = self.get_txn(&context.prefix)?;
+                    for key in keys {
+                        let value = txn.get(key)?;
+                        let fmtkv = format::Raw::key_maybe_value(key, value.as_deref());
                         writeln!(output, "{fmtkv}")?;
                     }
-                    args.reject_rest()?;
                 }
 
-                // get_unversioned KEY...
-                "get_unversioned" => {
-                    Self::no_txn(command)?;
-                    let mut args = command.consume_args();
-                    for arg in args.rest_pos() {
-                        let key = decode_binary(&arg.value);
-                        let value = self.mvcc.get_unversioned(&key)?;
-                        let fmtkv = format::Raw::key_maybe_value(&key, value.as_deref());
+                Command::GetUnversioned(keys) => {
+                    Self::no_txn("get_unversioned", context)?;
+                    for key in keys {
+                        let value = self.mvcc.get_unversioned(key)?;
+                        let fmtkv = format::Raw::key_maybe_value(key, value.as_deref());
                         writeln!(output, "{fmtkv}")?;
                     }
-                    args.reject_rest()?;
                 }
 
-                // import [VERSION] KEY=VALUE...
-                "import" => {
-                    Self::no_txn(command)?;
-                    let mut args = command.consume_args();
-                    let version = args.next_pos().map(|a| a.parse()).transpose()?;
+                &Command::Import { version, ref entries } => {
+                    Self::no_txn("import", context)?;
                     let mut txn = self.mvcc.begin()?;
                     if let Some(version) = version {
                         if txn.version() > version {
@@ -934,45 +976,31 @@ pub mod tests {
                             txn = self.mvcc.begin()?;
                         }
                     }
-                    for kv in args.rest_key() {
-                        let key = decode_binary(kv.key.as_ref().unwrap());
-                        let value = decode_binary(&kv.value);
+                    for (key, value) in entries {
                         if value.is_empty() {
-                            txn.delete(&key)?;
+                            txn.delete(key)?;
                         } else {
-                            txn.set(&key, value)?;
+                            txn.set(key, value.to_vec())?;
                         }
                     }
-                    args.reject_rest()?;
                     txn.commit()?;
                 }
 
-                // txn: resume JSON
-                "resume" => {
-                    let name = Self::txn_name(&command.prefix)?;
-                    let mut args = command.consume_args();
-                    let raw = &args.next_pos().ok_or("state not given")?.value;
-                    args.reject_rest()?;
+                Command::Resume(raw) => {
+                    let name = Self::txn_name(&context.prefix)?;
                     let state: TransactionState = serde_json::from_str(raw)?;
                     let txn = self.mvcc.resume(state)?;
                     self.txns.insert(name.to_string(), txn);
                 }
 
-                // txn: rollback
-                "rollback" => {
-                    let name = Self::txn_name(&command.prefix)?;
+                Command::Rollback => {
+                    let name = Self::txn_name(&context.prefix)?;
                     let txn = self.txns.remove(name).ok_or(format!("unknown txn {name}"))?;
-                    command.consume_args().reject_rest()?;
                     txn.rollback()?;
                 }
 
-                // txn: scan [RANGE]
-                "scan" => {
-                    let txn = self.get_txn(&command.prefix)?;
-                    let mut args = command.consume_args();
-                    let range =
-                        parse_key_range(args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."))?;
-                    args.reject_rest()?;
+                Command::Scan(range) => {
+                    let txn = self.get_txn(&context.prefix)?;
 
                     let kvs: Vec<_> = txn.scan(range).try_collect()?;
                     for (key, value) in kvs {
@@ -980,47 +1008,31 @@ pub mod tests {
                     }
                 }
 
-                // txn: scan_prefix PREFIX
-                "scan_prefix" => {
-                    let txn = self.get_txn(&command.prefix)?;
-                    let mut args = command.consume_args();
-                    let prefix = decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
-                    args.reject_rest()?;
+                Command::ScanPrefix(prefix) => {
+                    let txn = self.get_txn(&context.prefix)?;
 
-                    let kvs: Vec<_> = txn.scan_prefix(&prefix).try_collect()?;
+                    let kvs: Vec<_> = txn.scan_prefix(prefix).try_collect()?;
                     for (key, value) in kvs {
                         writeln!(output, "{}", format::Raw::key_value(&key, &value))?;
                     }
                 }
 
-                // txn: set KEY=VALUE...
-                "set" => {
-                    let txn = self.get_txn(&command.prefix)?;
-                    let mut args = command.consume_args();
-                    for kv in args.rest_key() {
-                        let key = decode_binary(kv.key.as_ref().unwrap());
-                        let value = decode_binary(&kv.value);
-                        txn.set(&key, value)?;
+                Command::Set(entries) => {
+                    let txn = self.get_txn(&context.prefix)?;
+                    for (key, value) in entries {
+                        txn.set(key, value.to_vec())?;
                     }
-                    args.reject_rest()?;
                 }
 
-                // set_unversioned KEY=VALUE...
-                "set_unversioned" => {
-                    Self::no_txn(command)?;
-                    let mut args = command.consume_args();
-                    for kv in args.rest_key() {
-                        let key = decode_binary(kv.key.as_ref().unwrap());
-                        let value = decode_binary(&kv.value);
-                        self.mvcc.set_unversioned(&key, value)?;
+                Command::SetUnversioned(entries) => {
+                    Self::no_txn("set_unversioned", context)?;
+                    for (key, value) in entries {
+                        self.mvcc.set_unversioned(key, value.to_vec())?;
                     }
-                    args.reject_rest()?;
                 }
 
-                // txn: state
-                "state" => {
-                    command.consume_args().reject_rest()?;
-                    let txn = self.get_txn(&command.prefix)?;
+                Command::State => {
+                    let txn = self.get_txn(&context.prefix)?;
                     let state = txn.state();
                     write!(
                         output,
@@ -1031,10 +1043,7 @@ pub mod tests {
                     )?;
                 }
 
-                // status
-                "status" => writeln!(output, "{:#?}", self.mvcc.status()?)?,
-
-                name => return Err(format!("invalid command {name}").into()),
+                Command::Status => writeln!(output, "{:#?}", self.mvcc.status()?)?,
             }
 
             // If requested, output engine operations.
@@ -1064,7 +1073,11 @@ pub mod tests {
         }
 
         // Drain unhandled engine operations.
-        fn end_command(&mut self, _: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+        fn end_command(
+            &mut self,
+            _: &Command,
+            _: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
             while self.op_rx.try_recv().is_ok() {}
             Ok(String::new())
         }

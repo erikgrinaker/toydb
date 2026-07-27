@@ -373,9 +373,9 @@ mod tests {
     use std::error::Error;
     use std::fmt::Write as _;
     use std::result::Result;
+    use std::str::FromStr;
 
     use crossbeam::channel::Receiver;
-    use itertools::Itertools as _;
     use regex::Regex;
     use tempfile::TempDir;
     use test_each_file::test_each_path;
@@ -391,12 +391,130 @@ mod tests {
         goldenscript::run(&mut TestRunner::new(), path).expect("goldenscript failed")
     }
 
-    /// Runs Raft log goldenscript tests. For available commands, see run().
+    /// Runs Raft log goldenscript tests.
     struct TestRunner {
         log: Log,
         op_rx: Receiver<testengine::Operation>,
         #[allow(dead_code)]
         tempdir: TempDir,
+    }
+
+    /// Commands accepted by the TestRunner.
+    #[derive(goldenscript::Command)]
+    enum Command {
+        /// Appends an entry to the Raft log.
+        Append(
+            /// The entry command. Appending a None entry is valid, and happens
+            /// on leader changes.
+            Option<String>,
+        ),
+        /// Commits a Raft log entry.
+        Commit(
+            /// The index to commit.
+            Index,
+        ),
+        /// Dumps all raw Raft storage entries.
+        Dump,
+        /// Fetches Raft log entries.
+        Get(
+            /// The indexes to fetch.
+            Vec<Index>,
+        ),
+        /// Displays the current term and vote.
+        GetTerm,
+        /// Checks whether index/term pairs exist.
+        Has(
+            /// The index/term pairs to check.
+            Vec<IndexTerm>,
+        ),
+        /// Reloads the Raft log from storage.
+        Reload,
+        /// Scans a Raft log index range.
+        Scan(
+            /// The index range, or the full range if omitted.
+            #[arg(optional)]
+            IndexRange,
+        ),
+        /// Scans entries to apply after an index.
+        ScanApply(
+            /// The last applied index.
+            Index,
+        ),
+        /// Sets the current term and optional vote.
+        SetTerm(
+            /// The term to set.
+            Term,
+            /// The node we voted for in this term, if any.
+            Option<NodeID>,
+        ),
+        /// Splices entries into the Raft log.
+        Splice(
+            /// The index/term and command entries to splice.
+            #[arg(optional)]
+            Vec<(IndexTerm, String)>,
+        ),
+        /// Displays Raft log status.
+        Status {
+            /// Whether to include storage engine status.
+            #[arg(key, optional)]
+            engine: bool,
+        },
+    }
+
+    /// An index and term pair parsed from INDEX@TERM.
+    struct IndexTerm(Index, Term);
+
+    impl FromStr for IndexTerm {
+        type Err = Box<dyn Error>;
+
+        fn from_str(value: &str) -> Result<Self, Self::Err> {
+            let re = Regex::new(r"^(\d+)@(\d+)$").expect("invalid regex");
+            let groups = re.captures(value).ok_or_else(|| format!("invalid index/term {value}"))?;
+            let index = groups.get(1).unwrap().as_str().parse()?;
+            let term = groups.get(2).unwrap().as_str().parse()?;
+            Ok(Self(index, term))
+        }
+    }
+
+    /// An index range parsed from Rust range syntax.
+    #[derive(Clone, Copy)]
+    struct IndexRange(Bound<Index>, Bound<Index>);
+
+    impl Default for IndexRange {
+        fn default() -> Self {
+            Self(Bound::Unbounded, Bound::Unbounded)
+        }
+    }
+
+    impl FromStr for IndexRange {
+        type Err = Box<dyn Error>;
+
+        fn from_str(value: &str) -> Result<Self, Self::Err> {
+            let mut range = Self::default();
+            let re = Regex::new(r"^(\d+)?\.\.(=)?(\d+)?").expect("invalid regex");
+            let groups = re.captures(value).ok_or_else(|| format!("invalid range {value}"))?;
+            if let Some(start) = groups.get(1) {
+                range.0 = Bound::Included(start.as_str().parse()?);
+            }
+            if let Some(end) = groups.get(3) {
+                let end = end.as_str().parse()?;
+                range.1 = match groups.get(2) {
+                    Some(_) => Bound::Included(end),
+                    None => Bound::Excluded(end),
+                };
+            }
+            Ok(range)
+        }
+    }
+
+    impl RangeBounds<Index> for IndexRange {
+        fn start_bound(&self) -> Bound<&Index> {
+            self.0.as_ref()
+        }
+
+        fn end_bound(&self) -> Bound<&Index> {
+            self.1.as_ref()
+        }
     }
 
     impl TestRunner {
@@ -412,68 +530,35 @@ mod tests {
             let log = Log::new(Box::new(engine)).expect("log failed");
             Self { log, op_rx, tempdir }
         }
-
-        /// Parses an index@term pair.
-        fn parse_index_term(s: &str) -> Result<(Index, Term), Box<dyn Error>> {
-            let re = Regex::new(r"^(\d+)@(\d+)$").expect("invalid regex");
-            let groups = re.captures(s).ok_or_else(|| format!("invalid index/term {s}"))?;
-            let index = groups.get(1).unwrap().as_str().parse()?;
-            let term = groups.get(2).unwrap().as_str().parse()?;
-            Ok((index, term))
-        }
-
-        /// Parses an index range, in Rust range syntax.
-        fn parse_index_range(s: &str) -> Result<impl RangeBounds<Index>, Box<dyn Error>> {
-            use std::ops::Bound;
-            let mut bound = (Bound::<Index>::Unbounded, Bound::<Index>::Unbounded);
-            let re = Regex::new(r"^(\d+)?\.\.(=)?(\d+)?").expect("invalid regex");
-            let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
-            if let Some(start) = groups.get(1) {
-                bound.0 = Bound::Included(start.as_str().parse()?);
-            }
-            if let Some(end) = groups.get(3) {
-                let end = end.as_str().parse()?;
-                if groups.get(2).is_some() {
-                    bound.1 = Bound::Included(end)
-                } else {
-                    bound.1 = Bound::Excluded(end)
-                }
-            }
-            Ok(bound)
-        }
     }
 
     impl goldenscript::Runner for TestRunner {
-        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
-            let mut output = String::new();
-            let mut tags = command.tags.clone();
+        type Command = Command;
 
-            match command.name.as_str() {
-                // append [COMMAND]
-                "append" => {
-                    let mut args = command.consume_args();
-                    let command = args.next_pos().map(|a| a.value.as_bytes().to_vec());
-                    args.reject_rest()?;
+        fn run(
+            &mut self,
+            command: &Command,
+            context: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
+            let mut output = String::new();
+
+            match command {
+                Command::Append(command) => {
+                    let command = command.as_ref().map(|command| command.as_bytes().to_vec());
                     let index = self.log.append(command)?;
                     let entry = self.log.get(index)?.expect("entry not found");
                     let fmtentry = format::Raft::<format::Raw>::entry(&entry);
                     writeln!(output, "append → {fmtentry}")?;
                 }
 
-                // commit INDEX
-                "commit" => {
-                    let mut args = command.consume_args();
-                    let index = args.next_pos().ok_or("index not given")?.parse()?;
-                    args.reject_rest()?;
+                &Command::Commit(index) => {
                     let index = self.log.commit(index)?;
                     let entry = self.log.get(index)?.expect("entry not found");
                     let fmtentry = format::Raft::<format::Raw>::entry(&entry);
                     writeln!(output, "commit → {fmtentry}")?;
                 }
 
-                // dump
-                "dump" => {
-                    command.consume_args().reject_rest()?;
+                Command::Dump => {
                     let range = (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded);
                     let mut scan = self.log.engine.scan_dyn(range);
                     while let Some((key, value)) = scan.next().transpose()? {
@@ -483,13 +568,8 @@ mod tests {
                     }
                 }
 
-                // get INDEX...
-                "get" => {
-                    let mut args = command.consume_args();
-                    let indexes: Vec<Index> =
-                        args.rest_pos().iter().map(|a| a.parse()).try_collect()?;
-                    args.reject_rest()?;
-                    for index in indexes {
+                Command::Get(indexes) => {
+                    for &index in indexes {
                         let entry = self.log.get(index)?;
                         let fmtentry = entry
                             .as_ref()
@@ -499,32 +579,20 @@ mod tests {
                     }
                 }
 
-                // get_term
-                "get_term" => {
-                    command.consume_args().reject_rest()?;
+                Command::GetTerm => {
                     let (term, vote) = self.log.get_term_vote();
                     let vote = vote.map(|v| v.to_string()).unwrap_or("None".to_string());
                     writeln!(output, "term={term} vote={vote}")?;
                 }
 
-                // has INDEX@TERM...
-                "has" => {
-                    let mut args = command.consume_args();
-                    let indexes: Vec<(Index, Term)> = args
-                        .rest_pos()
-                        .iter()
-                        .map(|a| Self::parse_index_term(&a.value))
-                        .try_collect()?;
-                    args.reject_rest()?;
-                    for (index, term) in indexes {
+                Command::Has(indexes) => {
+                    for &IndexTerm(index, term) in indexes {
                         let has = self.log.has(index, term)?;
                         writeln!(output, "{has}")?;
                     }
                 }
 
-                // reload
-                "reload" => {
-                    command.consume_args().reject_rest()?;
+                Command::Reload => {
                     // To get owned access to the inner engine, temporarily
                     // replace it with an empty memory engine.
                     let engine =
@@ -532,13 +600,7 @@ mod tests {
                     self.log = Log::new(engine)?;
                 }
 
-                // scan [RANGE]
-                "scan" => {
-                    let mut args = command.consume_args();
-                    let range = Self::parse_index_range(
-                        args.next_pos().map_or("..", |a| a.value.as_str()),
-                    )?;
-                    args.reject_rest()?;
+                &Command::Scan(range) => {
                     let mut scan = self.log.scan(range);
                     while let Some(entry) = scan.next().transpose()? {
                         let fmtentry = format::Raft::<format::Raw>::entry(&entry);
@@ -546,12 +608,7 @@ mod tests {
                     }
                 }
 
-                // scan_apply APPLIED_INDEX
-                "scan_apply" => {
-                    let mut args = command.consume_args();
-                    let applied_index =
-                        args.next_pos().ok_or("applied index not given")?.parse()?;
-                    args.reject_rest()?;
+                &Command::ScanApply(applied_index) => {
                     let mut scan = self.log.scan_apply(applied_index);
                     while let Some(entry) = scan.next().transpose()? {
                         let fmtentry = format::Raft::<format::Raw>::entry(&entry);
@@ -559,39 +616,26 @@ mod tests {
                     }
                 }
 
-                // set_term TERM [VOTE]
-                "set_term" => {
-                    let mut args = command.consume_args();
-                    let term = args.next_pos().ok_or("term not given")?.parse()?;
-                    let vote = args.next_pos().map(|a| a.parse()).transpose()?;
-                    args.reject_rest()?;
+                &Command::SetTerm(term, vote) => {
                     self.log.set_term_vote(term, vote)?;
                 }
 
-                // splice [INDEX@TERM=COMMAND...]
-                "splice" => {
-                    let mut args = command.consume_args();
+                Command::Splice(values) => {
                     let mut entries = Vec::new();
-                    for arg in args.rest_key() {
-                        let (index, term) = Self::parse_index_term(arg.key.as_deref().unwrap())?;
-                        let command = match arg.value.as_str() {
+                    for &(IndexTerm(index, term), ref value) in values {
+                        let command = match value.as_str() {
                             "" => None,
                             value => Some(value.as_bytes().to_vec()),
                         };
                         entries.push(Entry { index, term, command });
                     }
-                    args.reject_rest()?;
                     let index = self.log.splice(entries)?;
                     let entry = self.log.get(index)?.expect("entry not found");
                     let fmtentry = format::Raft::<format::Raw>::entry(&entry);
                     writeln!(output, "splice → {fmtentry}")?;
                 }
 
-                // status [engine=BOOL]
-                "status" => {
-                    let mut args = command.consume_args();
-                    let engine = args.lookup_parse("engine")?.unwrap_or(false);
-                    args.reject_rest()?;
+                &Command::Status { engine } => {
                     let (term, vote) = self.log.get_term_vote();
                     let (last_index, last_term) = self.log.get_last_index();
                     let (commit_index, commit_term) = self.log.get_commit_index();
@@ -605,11 +649,10 @@ mod tests {
                     }
                     writeln!(output)?;
                 }
-
-                name => return Err(format!("unknown command {name}").into()),
             }
 
             // If requested, output engine operations.
+            let mut tags = context.tags.clone();
             if tags.remove("ops") {
                 while let Ok(op) = self.op_rx.try_recv() {
                     match op {
@@ -635,8 +678,11 @@ mod tests {
             Ok(output)
         }
 
-        /// If requested via [ops] tag, output engine operations for the command.
-        fn end_command(&mut self, _: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+        fn end_command(
+            &mut self,
+            _: &Command,
+            _: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
             // Drain any remaining engine operations.
             while self.op_rx.try_recv().is_ok() {}
             Ok(String::new())

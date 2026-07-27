@@ -1154,7 +1154,6 @@ impl RawNode<Leader> {
 /// Most Raft tests are Goldenscripts under src/raft/testscripts.
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
     use std::error::Error;
     use std::fmt::Write as _;
     use std::path::Path;
@@ -1318,145 +1317,225 @@ mod tests {
         tempdir: TempDir,
     }
 
+    /// Commands accepted by the TestRunner.
+    #[derive(goldenscript::Command)]
+    enum Command {
+        /// Campaigns nodes.
+        Campaign(
+            /// The node IDs, or empty to select all nodes.
+            #[arg(optional)]
+            Vec<NodeID>,
+        ),
+        /// Creates a Raft cluster.
+        Cluster {
+            /// The number of nodes to create.
+            #[arg(key)]
+            nodes: u8,
+            /// The node to promote as leader.
+            #[arg(key)]
+            leader: Option<NodeID>,
+            /// The heartbeat interval in ticks.
+            #[arg(key)]
+            heartbeat_interval: Option<Ticks>,
+            /// The fixed election timeout in ticks.
+            #[arg(key)]
+            election_timeout: Option<Ticks>,
+            /// The maximum entries per append message.
+            #[arg(key)]
+            max_append_entries: Option<usize>,
+        },
+        /// Delivers pending messages to nodes.
+        Deliver {
+            /// The sender to deliver messages from, or None to deliver
+            /// from all senders.
+            #[arg(key)]
+            from: Option<NodeID>,
+            /// The recipient node IDs, or empty to deliver to all nodes.
+            #[arg(optional)]
+            ids: Vec<NodeID>,
+        },
+        /// Sends a read request to a node.
+        Get(
+            /// The node ID.
+            NodeID,
+            /// The key to fetch.
+            String,
+        ),
+        /// Heals partitions for nodes.
+        Heal(
+            /// The node IDs, or empty to heal all nodes.
+            #[arg(optional)]
+            Vec<NodeID>,
+        ),
+        /// Sends heartbeats from nodes.
+        Heartbeat(
+            /// The node IDs, or empty to select all nodes.
+            #[arg(optional)]
+            Vec<NodeID>,
+        ),
+        /// Displays node logs.
+        Log(
+            /// The node IDs, or empty to select all nodes.
+            #[arg(optional)]
+            Vec<NodeID>,
+        ),
+        /// Partitions nodes from the cluster.
+        Partition(
+            /// The node IDs to partition.
+            Vec<NodeID>,
+        ),
+        /// Sends a write request to a node.
+        Put(
+            /// The node ID.
+            NodeID,
+            /// The key/value pair to write. Only 1 is allowed.
+            Vec<(String, String)>,
+        ),
+        /// Restarts nodes.
+        Restart {
+            /// The state machine index to restore.
+            #[arg(key)]
+            applied_index: Option<Index>,
+            /// The log commit index to restore.
+            #[arg(key)]
+            commit_index: Option<Index>,
+            /// The node IDs, or empty to restart all nodes.
+            #[arg(optional)]
+            ids: Vec<NodeID>,
+        },
+        /// Stabilizes nodes by repeatedly delivering messages
+        /// until no more messages are pending.
+        Stabilize {
+            /// Whether to send a final leader heartbeat.
+            #[arg(key, optional)]
+            heartbeat: bool,
+            /// The node IDs, or empty to stabilize all nodes.
+            #[arg(optional)]
+            ids: Vec<NodeID>,
+        },
+        /// Displays node state machines.
+        State(
+            /// The node IDs, or empty for all nodes.
+            #[arg(optional)]
+            Vec<NodeID>,
+        ),
+        /// Displays node status.
+        Status {
+            /// Whether to fetch status through a client request.
+            #[arg(key, optional)]
+            request: bool,
+            /// The node IDs, or empty for all nodes.
+            #[arg(optional)]
+            ids: Vec<NodeID>,
+        },
+        /// Steps a message on a node.
+        Step(
+            /// The node ID.
+            NodeID,
+            /// The serialized message.
+            String,
+        ),
+        /// Ticks nodes.
+        Tick(
+            /// The node IDs, or empty for all nodes.
+            #[arg(optional)]
+            Vec<NodeID>,
+        ),
+    }
+
     impl goldenscript::Runner for TestRunner {
+        type Command = Command;
+
         /// Runs a goldenscript command.
-        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+        fn run(
+            &mut self,
+            command: &Command,
+            _: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
-            match command.name.as_str() {
-                // campaign [ID...]
-                // Transition the given nodes to candidates and campaign.
-                "campaign" => {
-                    let ids = self.parse_ids_or_all(&command.args)?;
+            match command {
+                Command::Campaign(ids) => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     self.campaign(&ids, &mut output)?;
                 }
 
-                // cluster nodes=N [leader=ID] [heartbeat_interval=N] [election_timeout=N] [max_append_entries=N]
-                // Creates a new Raft cluster.
-                "cluster" => {
+                &Command::Cluster {
+                    nodes,
+                    leader,
+                    heartbeat_interval,
+                    election_timeout,
+                    max_append_entries,
+                } => {
                     let mut opts = Options::default();
-                    let mut args = command.consume_args();
-                    let nodes = args.lookup_parse("nodes")?.unwrap_or(0);
-                    let leader = args.lookup_parse("leader")?;
-                    if let Some(heartbeat_interval) = args.lookup_parse("heartbeat_interval")? {
+                    if let Some(heartbeat_interval) = heartbeat_interval {
                         opts.heartbeat_interval = heartbeat_interval;
                     };
-                    if let Some(election_timeout) = args.lookup_parse("election_timeout")? {
+                    if let Some(election_timeout) = election_timeout {
                         opts.election_timeout_range = election_timeout..election_timeout + 1;
                     }
-                    if let Some(max_append_entries) = args.lookup_parse("max_append_entries")? {
+                    if let Some(max_append_entries) = max_append_entries {
                         opts.max_append_entries = max_append_entries;
                     }
-                    args.reject_rest()?;
                     self.cluster(nodes, leader, opts, &mut output)?;
                 }
 
-                // deliver [from=ID] [ID...]
-                // Delivers (steps) pending messages to the given nodes. If from
-                // is given, only messages from the given node is delivered, the
-                // others are left pending.
-                "deliver" => {
-                    let mut args = command.consume_args();
-                    let from = args.lookup_parse("from")?;
-                    let ids = self.parse_ids_or_all(&args.rest())?;
-                    self.deliver(&ids, from, &mut output)?;
+                Command::Deliver { from, ids } => {
+                    let ids = self.validate_ids_or_all(ids)?;
+                    self.deliver(&ids, *from, &mut output)?;
                 }
 
-                // get ID KEY
-                // Sends a client request to the given node to read the given
-                // key from the state machine (key/value store).
-                "get" => {
-                    let mut args = command.consume_args();
-                    let id = args.next_pos().ok_or("must specify node ID")?.parse()?;
-                    let key = args.next_pos().ok_or("must specify key")?.value.clone();
-                    args.reject_rest()?;
-                    let request = Request::Read(KVCommand::Get { key }.encode());
+                &Command::Get(id, ref key) => {
+                    let request = Request::Read(KVCommand::Get { key: key.clone() }.encode());
                     self.request(id, request, &mut output)?;
                 }
 
-                // heal [ID...]
-                // Heals all network partitions for the given nodes.
-                "heal" => {
-                    let ids = self.parse_ids_or_all(&command.args)?;
+                Command::Heal(ids) => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     self.heal(&ids, &mut output)?;
                 }
 
-                // heartbeat ID...
-                // Sends a heartbeat from the given leader nodes.
-                "heartbeat" => {
-                    let ids = self.parse_ids_or_all(&command.args)?;
+                Command::Heartbeat(ids) => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     self.heartbeat(&ids, &mut output)?;
                 }
 
-                // log [ID...]
-                // Outputs the current Raft log for the given nodes.
-                "log" => {
-                    let ids = self.parse_ids_or_all(&command.args)?;
+                Command::Log(ids) => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     self.log(&ids, &mut output)?;
                 }
 
-                // partition ID...
-                // Partitions the given nodes away from the rest of the cluster.
-                // They can still communicate with each other, unless they were
-                // previously partitioned.
-                "partition" => {
-                    let ids = self.parse_ids_or_error(&command.args)?;
-                    self.partition(&ids, &mut output)?;
+                Command::Partition(ids) => {
+                    self.validate_ids(ids)?;
+                    self.partition(ids, &mut output)?;
                 }
 
-                // put ID KEY=VALUE
-                // Sends a client request to the given node to write a key/value
-                // pair to the state machine (key/value store).
-                "put" => {
-                    let mut args = command.consume_args();
-                    let id = args.next_pos().ok_or("must specify node ID")?.parse()?;
-                    let kv = args.next_key().ok_or("must specify key/value pair")?.clone();
-                    let (key, value) = (kv.key.unwrap(), kv.value);
-                    args.reject_rest()?;
-                    let request = Request::Write(KVCommand::Put { key, value }.encode());
+                &Command::Put(id, ref values) => {
+                    let [(key, value)] = values.as_slice() else {
+                        return Err("must specify one key/value pair".into());
+                    };
+                    let request = Request::Write(
+                        KVCommand::Put { key: key.clone(), value: value.clone() }.encode(),
+                    );
                     self.request(id, request, &mut output)?;
                 }
 
-                // restart [commit_index=INDEX] [applied_index=INDEX] [ID...]
-                // Restarts the given nodes (or all nodes). They retain their
-                // log and state, unless applied_index is given (which reverts
-                // the state machine to the given index, or 0 if empty).
-                // commit_index may be given to regress the commit index (it
-                // is not flushed to durable storage).
-                "restart" => {
-                    let mut args = command.consume_args();
-                    let applied_index = args.lookup_parse("applied_index")?;
-                    let commit_index = args.lookup_parse("commit_index")?;
-                    let ids = self.parse_ids_or_all(&args.rest())?;
+                &Command::Restart { applied_index, commit_index, ref ids } => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     self.restart(&ids, commit_index, applied_index, &mut output)?;
                 }
 
-                // stabilize [heartbeat=BOOL] [ID...]
-                // Stabilizes the given nodes by repeatedly delivering messages
-                // until no more messages are pending. If heartbeat is true, also
-                // emits a heartbeat from the leader and restabilizes, e.g. to
-                // propagate the commit index.
-                "stabilize" => {
-                    let mut args = command.consume_args();
-                    let heartbeat = args.lookup_parse("heartbeat")?.unwrap_or(false);
-                    let ids = self.parse_ids_or_all(&args.rest())?;
+                &Command::Stabilize { heartbeat, ref ids } => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     self.stabilize(&ids, heartbeat, &mut output)?;
                 }
 
-                // state [ID...]
-                // Prints the current state machine contents on the given nodes.
-                "state" => {
-                    let ids = self.parse_ids_or_all(&command.args)?;
+                Command::State(ids) => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     self.state(&ids, &mut output)?;
                 }
 
-                // status [request=BOOL] [ID...]
-                // Prints the current node status of the given nodes. If request
-                // is true, sends a status client request to a single node,
-                // otherwise fetches status directly from each node.
-                "status" => {
-                    let mut args = command.consume_args();
-                    let request = args.lookup_parse("request")?.unwrap_or(false);
-                    let ids = self.parse_ids_or_all(&args.rest())?;
+                &Command::Status { request, ref ids } => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     if request {
                         let [id] = *ids.as_slice() else {
                             return Err("request=true requires 1 node ID".into());
@@ -1467,27 +1546,17 @@ mod tests {
                     }
                 }
 
-                // step ID JSON
-                // Steps a manually generated JSON message on the given node.
-                "step" => {
-                    let mut args = command.consume_args();
-                    let id = args.next_pos().ok_or("node ID not given")?.parse()?;
-                    let raw = &args.next_pos().ok_or("message not given")?.value;
+                &Command::Step(id, ref raw) => {
                     let msg = serde_json::from_str(raw)?;
-                    args.reject_rest()?;
                     self.transition(id, |n| n.step(msg), &mut output)?;
                 }
 
-                // tick [ID...]
-                // Ticks the given nodes.
-                "tick" => {
-                    let ids = self.parse_ids_or_all(&command.args)?;
+                Command::Tick(ids) => {
+                    let ids = self.validate_ids_or_all(ids)?;
                     for id in ids {
                         self.transition(id, |n| n.tick(), &mut output)?;
                     }
                 }
-
-                name => return Err(format!("unknown command {name}").into()),
             }
             Ok(output)
         }
@@ -1940,49 +2009,23 @@ mod tests {
             Ok(())
         }
 
-        /// Parses node IDs from the given argument values. Errors on key/value
-        /// arguments. Can take both [Argument] and [&Argument].
-        fn parse_ids<A>(&self, args: &[A]) -> Result<Vec<NodeID>, Box<dyn Error>>
-        where
-            A: Borrow<goldenscript::Argument>,
-        {
-            let mut ids = Vec::new();
-            for arg in args.iter().map(|a| a.borrow()) {
-                if let Some(key) = &arg.key {
-                    return Err(format!("unknown argument '{key}'").into());
-                }
-                let id = arg.parse()?;
-                if !self.nodes.contains_key(&id) {
+        /// Validates node IDs, by checking that they exist in the cluster.
+        fn validate_ids(&self, ids: &[NodeID]) -> Result<(), Box<dyn Error>> {
+            for id in ids {
+                if !self.nodes.contains_key(id) {
                     return Err(format!("unknown node {id}").into());
                 }
-                ids.push(id)
             }
-            Ok(ids)
+            Ok(())
         }
 
-        // Parses node IDs from the given argument values, or returns all node
-        // IDs if none were given.
-        fn parse_ids_or_all<A>(&self, args: &[A]) -> Result<Vec<NodeID>, Box<dyn Error>>
-        where
-            A: Borrow<goldenscript::Argument>,
-        {
-            let ids = self.parse_ids(args)?;
+        /// Validates node IDs, or returns all node IDs if none were given.
+        fn validate_ids_or_all(&self, ids: &[NodeID]) -> Result<Vec<NodeID>, Box<dyn Error>> {
+            self.validate_ids(ids)?;
             if ids.is_empty() {
                 return Ok(self.ids.clone());
             }
-            Ok(ids)
-        }
-
-        // Parses node IDs from the given argument values, or errors if none.
-        fn parse_ids_or_error<A>(&self, args: &[A]) -> Result<Vec<NodeID>, Box<dyn Error>>
-        where
-            A: Borrow<goldenscript::Argument>,
-        {
-            let ids = self.parse_ids(args)?;
-            if ids.is_empty() {
-                return Err("node ID not given".into());
-            }
-            Ok(ids)
+            Ok(ids.to_vec())
         }
 
         /// Formats network partitions.

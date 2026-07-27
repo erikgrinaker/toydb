@@ -136,6 +136,22 @@ mod tests {
     type TestEngine =
         Local<testengine::Emit<testengine::Mirror<storage::BitCask, storage::Memory>>>;
 
+    /// Commands accepted by the SQL Goldenscript runner.
+    #[derive(goldenscript::Command)]
+    enum SQLCommand {
+        /// Dumps the raw SQL storage engine contents.
+        Dump,
+        /// Displays table schemas.
+        Schema(
+            /// The table names, or empty to display all tables.
+            #[arg(optional)]
+            Vec<String>,
+        ),
+        /// Any other command is executed as a raw SQL statement.
+        #[command(other)]
+        Statement(goldenscript::Command),
+    }
+
     impl<'a> SQLRunner<'a> {
         fn new(engine: &'a TestEngine, op_rx: Receiver<testengine::Operation>) -> Self {
             Self { engine, sessions: HashMap::new(), op_rx }
@@ -143,18 +159,22 @@ mod tests {
     }
 
     impl goldenscript::Runner for SQLRunner<'_> {
-        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+        type Command = SQLCommand;
+
+        fn run(
+            &mut self,
+            command: &SQLCommand,
+            context: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
 
             // Obtain a session based on the command prefix ("" if none).
-            let prefix = command.prefix.clone().unwrap_or_default();
+            let prefix = context.prefix.clone().unwrap_or_default();
             let session = self.sessions.entry(prefix).or_insert_with(|| self.engine.session());
 
             // Handle runner commands.
-            match command.name.as_str() {
-                // dump
-                "dump" => {
-                    command.consume_args().reject_rest()?;
+            let command = match command {
+                SQLCommand::Dump => {
                     let mut engine = self.engine.mvcc.engine.lock().expect("mutex failed");
                     let mut iter = engine.scan(..);
                     while let Some((key, value)) = iter.next().transpose()? {
@@ -165,33 +185,27 @@ mod tests {
                     return Ok(output);
                 }
 
-                // schema [TABLE...]
-                "schema" => {
-                    let mut args = command.consume_args();
-                    let tables = args.rest_pos().iter().map(|arg| arg.value.clone()).collect_vec();
-                    args.reject_rest()?;
-
+                SQLCommand::Schema(tables) => {
                     let schemas = if tables.is_empty() {
                         session.with_txn(true, |txn| txn.list_tables())?
                     } else {
                         tables
-                            .into_iter()
-                            .map(|t| session.with_txn(true, |txn| txn.must_get_table(&t)))
+                            .iter()
+                            .map(|t| session.with_txn(true, |txn| txn.must_get_table(t)))
                             .try_collect()?
                     };
                     return Ok(schemas.into_iter().join("\n"));
                 }
 
-                // Otherwise, fall through to SQL execution.
-                _ => {}
-            }
+                SQLCommand::Statement(command) => command,
+            };
 
             // The entire command is the SQL statement. There are no args.
             if !command.args.is_empty() {
                 return Err("SQL statements should be given as a command with no args".into());
             }
             let input = &command.name;
-            let mut tags = command.tags.clone();
+            let mut tags = context.tags.clone();
 
             // Output the plan if requested.
             if tags.remove("plan") {
@@ -270,7 +284,11 @@ mod tests {
         }
 
         /// Drain unprocessed operations after each command.
-        fn end_command(&mut self, _: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+        fn end_command(
+            &mut self,
+            _: &SQLCommand,
+            _: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
             while self.op_rx.try_recv().is_ok() {}
             Ok(String::new())
         }
@@ -283,15 +301,21 @@ mod tests {
     type Catalog<'a> = <Local<storage::Memory> as Engine<'a>>::Transaction;
 
     impl goldenscript::Runner for ExpressionRunner {
-        fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+        type Command = goldenscript::Command;
+
+        fn run(
+            &mut self,
+            command: &goldenscript::Command,
+            context: &goldenscript::Context,
+        ) -> Result<String, Box<dyn Error>> {
             let mut output = String::new();
 
             // The entire command is the expression to evaluate. There are no args.
-            if !command.args.is_empty() {
+            if command.consume_args().next().is_some() {
                 return Err("expressions should be given as a command with no args".into());
             }
             let input = &command.name;
-            let mut tags = command.tags.clone();
+            let mut tags = context.tags.clone();
 
             // Parse and build the expression.
             let ast = Parser::parse_expr(input)?;

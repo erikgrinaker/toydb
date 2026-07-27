@@ -485,46 +485,62 @@ mod tests {
         tempdir: TempDir,
     }
 
+    /// BitCask-specific Goldenscript commands.
+    #[derive(goldenscript::Command)]
+    enum BitCaskCommand {
+        /// Compacts the BitCask entry log.
+        Compact,
+        /// Dumps the BitCask entry log.
+        Dump,
+        /// Closes and reopens the BitCask database.
+        Reopen {
+            /// The garbage fraction that triggers compaction on open.
+            #[arg(key)]
+            compact_fraction: Option<f64>,
+        },
+        /// Delegates all other commands to the engine runner.
+        #[command(other)]
+        Engine(goldenscript::Command),
+    }
+
     impl goldenscript::Runner for BitCaskRunner {
-        fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
+        type Command = BitCaskCommand;
+
+        fn run(
+            &mut self,
+            command: &BitCaskCommand,
+            context: &goldenscript::Context,
+        ) -> StdResult<String, Box<dyn StdError>> {
             let mut output = String::new();
-            match command.name.as_str() {
-                // compact
-                // Compacts the BitCask entry log.
-                "compact" => {
-                    command.consume_args().reject_rest()?;
+            match command {
+                BitCaskCommand::Compact => {
                     self.inner.engine.compact()?;
                 }
 
-                // dump
-                // Dumps the full BitCask entry log.
-                "dump" => {
-                    command.consume_args().reject_rest()?;
+                BitCaskCommand::Dump => {
                     self.dump(&mut output)?;
                 }
 
-                // reopen [compact_fraction=FLOAT]
-                // Closes and reopens the BitCask database. If compact_ratio is
-                // given, it specifies a garbage ratio beyond which the log
-                // should be auto-compacted on open.
-                "reopen" => {
-                    let mut args = command.consume_args();
-                    let compact_fraction = args.lookup_parse("compact_fraction")?;
-                    args.reject_rest()?;
+                BitCaskCommand::Reopen { compact_fraction } => {
                     // We need to close the file before we can reopen it, which
                     // happens when the database is dropped. Replace the engine
                     // with a temporary empty engine then reopen the file.
                     let path = self.inner.engine.log.path.clone();
                     self.inner.engine = BitCask::new(self.tempdir.path().join("empty"))?;
-                    if let Some(garbage_fraction) = compact_fraction {
+                    if let Some(garbage_fraction) = *compact_fraction {
                         self.inner.engine = BitCask::new_maybe_compact(path, garbage_fraction, 0)?;
                     } else {
                         self.inner.engine = BitCask::new(path)?;
                     }
                 }
 
-                // Pass other commands to the standard engine runner.
-                _ => return self.inner.run(command),
+                BitCaskCommand::Engine(command) => {
+                    return goldenscript::Runner::run(
+                        &mut self.inner,
+                        &command.try_into()?,
+                        context,
+                    );
+                }
             }
             Ok(output)
         }

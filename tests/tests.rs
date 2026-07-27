@@ -42,6 +42,34 @@ struct Runner {
     clients: HashMap<String, Client>,
 }
 
+/// Commands accepted by the end-to-end Goldenscript runner.
+#[derive(goldenscript::Command)]
+enum Command {
+    /// Closes the client selected by the command prefix.
+    Close,
+    /// Starts a test cluster.
+    Cluster {
+        /// The number of nodes to start.
+        #[arg(key)]
+        nodes: u8,
+    },
+    /// Fetches status from the client selected by the command prefix.
+    Status,
+    /// Displays a table schema.
+    Table {
+        /// The table name.
+        name: String,
+        /// Whether to use the raw debug representation.
+        #[arg(key, optional)]
+        raw: bool,
+    },
+    /// Lists all table schemas.
+    Tables,
+    /// Executes any other command as a SQL statement.
+    #[command(other)]
+    Statement(goldenscript::Command),
+}
+
 impl Runner {
     fn new() -> Self {
         Self::default()
@@ -67,28 +95,27 @@ impl Runner {
 }
 
 impl goldenscript::Runner for Runner {
+    type Command = Command;
+
     /// Runs a goldenscript command.
-    fn run(&mut self, command: &goldenscript::Command) -> Result<String, Box<dyn Error>> {
+    fn run(
+        &mut self,
+        command: &Command,
+        context: &goldenscript::Context,
+    ) -> Result<String, Box<dyn Error>> {
         let mut output = String::new();
-        let mut tags = command.tags.clone();
 
         // Handle simple, non-SQL commands.
-        match command.name.as_str() {
-            // close
-            "close" => {
-                command.consume_args().reject_rest()?;
-                let name = Self::client_name(&command.prefix);
+        let command = match command {
+            Command::Close => {
+                let name = Self::client_name(&context.prefix);
                 if self.clients.remove(name).is_none() {
                     return Err("no client to close".into());
                 }
                 return Ok(output);
             }
 
-            // cluster nodes=N
-            "cluster" => {
-                let mut args = command.consume_args();
-                let nodes = args.lookup_parse("nodes")?.unwrap_or(0);
-                args.reject_rest()?;
+            &Command::Cluster { nodes } => {
                 if self.cluster.is_some() {
                     return Err("cluster already exists".into());
                 }
@@ -96,21 +123,14 @@ impl goldenscript::Runner for Runner {
                 return Ok(output);
             }
 
-            // status
-            "status" => {
-                command.consume_args().reject_rest()?;
-                let status = self.get_client(&command.prefix)?.status()?;
+            Command::Status => {
+                let status = self.get_client(&context.prefix)?.status()?;
                 write!(output, "{status:#?}")?;
                 return Ok(output);
             }
 
-            // table [TABLE]
-            "table" => {
-                let mut args = command.consume_args();
-                let name = &args.next_pos().ok_or("table not given")?.value;
-                let raw = args.lookup_parse("raw")?.unwrap_or(false);
-                args.reject_rest()?;
-                let table = self.get_client(&command.prefix)?.get_table(name)?;
+            &Command::Table { ref name, raw } => {
+                let table = self.get_client(&context.prefix)?.get_table(name)?;
                 if raw {
                     write!(output, "{table:#?}")?;
                 } else {
@@ -119,25 +139,24 @@ impl goldenscript::Runner for Runner {
                 return Ok(output);
             }
 
-            // tables
-            "tables" => {
-                command.consume_args().reject_rest()?;
-                let tables = self.get_client(&command.prefix)?.list_tables()?;
+            Command::Tables => {
+                let tables = self.get_client(&context.prefix)?.list_tables()?;
                 for table in tables {
                     writeln!(output, "{table}")?;
                 }
                 return Ok(output);
             }
 
-            _ => {}
-        }
+            Command::Statement(command) => command,
+        };
 
         // Otherwise, interpret the entire command as a SQL statement.
         if !command.args.is_empty() {
             return Err("statements should be given as a command with no args".into());
         }
-        let client = self.get_client(&command.prefix)?;
+        let client = self.get_client(&context.prefix)?;
         let input = &command.name;
+        let mut tags = context.tags.clone();
 
         // Execute the command and display the result if requested.
         // SELECT and EXPLAIN results are always output.

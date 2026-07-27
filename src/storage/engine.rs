@@ -96,10 +96,12 @@ impl Status {
 /// Test helpers for engines.
 #[cfg(test)]
 pub mod test {
+    use std::convert::Infallible;
     use std::error::Error as StdError;
     use std::fmt::Write as _;
-    use std::ops::{Bound, RangeBounds};
+    use std::ops::{Bound, Deref, RangeBounds};
     use std::result::Result as StdResult;
+    use std::str::FromStr;
 
     use crossbeam::channel::Sender;
     use itertools::Itertools as _;
@@ -115,6 +117,121 @@ pub mod test {
         pub engine: E,
     }
 
+    /// Commands accepted by the engine Goldenscript runner.
+    #[derive(goldenscript::Command)]
+    pub enum Command {
+        /// Deletes a key.
+        Delete(BinaryString),
+        /// Fetches a key.
+        Get(BinaryString),
+        /// Scans a key range.
+        Scan {
+            /// The key range in Rust range syntax, or the full range if omitted.
+            #[arg(optional)]
+            range: KeyRange,
+            /// Whether to scan in reverse.
+            #[arg(key, optional)]
+            reverse: bool,
+        },
+        /// Scans all keys with the given prefix.
+        ScanPrefix(BinaryString),
+        /// Sets a key/value pair.
+        Set(
+            /// The single key/value pair to set.
+            Vec<(BinaryString, BinaryString)>,
+        ),
+        /// Displays engine status.
+        Status,
+    }
+
+    /// A string parsed into its binary byte representation.
+    ///
+    /// Code points U+0080 through U+00FF are converted directly to bytes 0x80
+    /// through 0xff. This allows using e.g. `\xff` in an input string literal
+    /// to represent the byte 0xff rather than its UTF-8 encoding 0xc3bf.
+    pub struct BinaryString(Vec<u8>);
+
+    impl FromStr for BinaryString {
+        type Err = Infallible;
+
+        fn from_str(value: &str) -> StdResult<Self, Self::Err> {
+            let mut buf = [0; 4];
+            let mut bytes = Vec::new();
+            for c in value.chars() {
+                // u32 is the Unicode code point, not the UTF-8 encoding.
+                match c as u32 {
+                    b @ 0x80..=0xff => bytes.push(b as u8),
+                    _ => bytes.extend(c.encode_utf8(&mut buf).as_bytes()),
+                }
+            }
+            Ok(Self(bytes))
+        }
+    }
+
+    impl Deref for BinaryString {
+        type Target = [u8];
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl From<BinaryString> for Vec<u8> {
+        fn from(value: BinaryString) -> Self {
+            value.0
+        }
+    }
+
+    /// A binary key range parsed from Rust range syntax and BinaryString.
+    pub struct KeyRange(Bound<Vec<u8>>, Bound<Vec<u8>>);
+
+    impl Default for KeyRange {
+        fn default() -> Self {
+            Self(Bound::Unbounded, Bound::Unbounded)
+        }
+    }
+
+    impl FromStr for KeyRange {
+        type Err = Box<dyn StdError>;
+
+        fn from_str(value: &str) -> StdResult<Self, Self::Err> {
+            let mut range = Self::default();
+            let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
+            let groups = re.captures(value).ok_or_else(|| format!("invalid range {value}"))?;
+            if let Some(start) = groups.get(1) {
+                range.0 = Bound::Included(start.as_str().parse::<BinaryString>()?.into());
+            }
+            if let Some(end) = groups.get(3) {
+                let end = end.as_str().parse::<BinaryString>()?.into();
+                range.1 = match groups.get(2) {
+                    Some(_) => Bound::Included(end),
+                    None => Bound::Excluded(end),
+                };
+            }
+            Ok(range)
+        }
+    }
+
+    impl RangeBounds<Vec<u8>> for KeyRange {
+        fn start_bound(&self) -> Bound<&Vec<u8>> {
+            self.0.as_ref()
+        }
+
+        fn end_bound(&self) -> Bound<&Vec<u8>> {
+            self.1.as_ref()
+        }
+    }
+
+    impl RangeBounds<Vec<u8>> for &KeyRange {
+        fn start_bound(&self) -> Bound<&Vec<u8>> {
+            self.0.as_ref()
+        }
+
+        fn end_bound(&self) -> Bound<&Vec<u8>> {
+            self.1.as_ref()
+        }
+    }
+
     impl<E: Engine> Runner<E> {
         pub fn new(engine: E) -> Self {
             Self { engine }
@@ -122,33 +239,25 @@ pub mod test {
     }
 
     impl<E: Engine> goldenscript::Runner for Runner<E> {
-        fn run(&mut self, command: &goldenscript::Command) -> StdResult<String, Box<dyn StdError>> {
+        type Command = Command;
+
+        fn run(
+            &mut self,
+            command: &Command,
+            _: &goldenscript::Context,
+        ) -> StdResult<String, Box<dyn StdError>> {
             let mut output = String::new();
-            match command.name.as_str() {
-                // delete KEY
-                "delete" => {
-                    let mut args = command.consume_args();
-                    let key = decode_binary(&args.next_pos().ok_or("key not given")?.value);
-                    args.reject_rest()?;
-                    self.engine.delete(&key)?;
+            match command {
+                Command::Delete(key) => {
+                    self.engine.delete(key)?;
                 }
 
-                // get KEY
-                "get" => {
-                    let mut args = command.consume_args();
-                    let key = decode_binary(&args.next_pos().ok_or("key not given")?.value);
-                    args.reject_rest()?;
-                    let value = self.engine.get(&key)?;
-                    writeln!(output, "{}", format::Raw::key_maybe_value(&key, value.as_deref()))?;
+                Command::Get(key) => {
+                    let value = self.engine.get(key)?;
+                    writeln!(output, "{}", format::Raw::key_maybe_value(key, value.as_deref()))?;
                 }
 
-                // scan [reverse=BOOL] RANGE
-                "scan" => {
-                    let mut args = command.consume_args();
-                    let reverse = args.lookup_parse("reverse")?.unwrap_or(false);
-                    let range =
-                        parse_key_range(args.next_pos().map(|a| a.value.as_str()).unwrap_or(".."))?;
-                    args.reject_rest()?;
+                &Command::Scan { ref range, reverse } => {
                     let items: Vec<_> = if reverse {
                         self.engine.scan(range).rev().try_collect()?
                     } else {
@@ -160,77 +269,27 @@ pub mod test {
                     }
                 }
 
-                // scan_prefix PREFIX
-                "scan_prefix" => {
-                    let mut args = command.consume_args();
-                    let prefix = decode_binary(&args.next_pos().ok_or("prefix not given")?.value);
-                    args.reject_rest()?;
-                    let mut scan = self.engine.scan_prefix(&prefix);
+                Command::ScanPrefix(prefix) => {
+                    let mut scan = self.engine.scan_prefix(prefix);
                     while let Some((key, value)) = scan.next().transpose()? {
                         let fmtkv = format::Raw::key_value(&key, &value);
                         writeln!(output, "{fmtkv}")?;
                     }
                 }
 
-                // set KEY=VALUE
-                "set" => {
-                    let mut args = command.consume_args();
-                    let kv = args.next_key().ok_or("key=value not given")?.clone();
-                    let key = decode_binary(&kv.key.unwrap());
-                    let value = decode_binary(&kv.value);
-                    args.reject_rest()?;
-                    self.engine.set(&key, value)?;
+                Command::Set(entries) => {
+                    let [(key, value)] = entries.as_slice() else {
+                        return Err("must specify one key=value pair".into());
+                    };
+                    self.engine.set(key, value.to_vec())?;
                 }
 
-                // status
-                "status" => {
-                    command.consume_args().reject_rest()?;
+                Command::Status => {
                     writeln!(output, "{:#?}", self.engine.status()?)?;
                 }
-
-                name => return Err(format!("invalid command {name}").into()),
             }
             Ok(output)
         }
-    }
-
-    /// Decodes a raw byte vector from a Unicode string. Code points in the
-    /// range U+0080 to U+00FF are converted back to bytes 0x80 to 0xff.
-    /// This allows using e.g. \xff in the input string literal, and getting
-    /// back a 0xff byte in the byte vector. Otherwise, char(0xff) yields
-    /// the UTF-8 bytes 0xc3bf, which is the U+00FF code point as UTF-8.
-    /// These characters are effectively represented as ISO-8859-1 rather
-    /// than UTF-8, but it allows precise use of the entire u8 value range.
-    pub fn decode_binary(s: &str) -> Vec<u8> {
-        let mut buf = [0; 4];
-        let mut bytes = Vec::new();
-        for c in s.chars() {
-            // u32 is the Unicode code point, not the UTF-8 encoding.
-            match c as u32 {
-                b @ 0x80..=0xff => bytes.push(b as u8),
-                _ => bytes.extend(c.encode_utf8(&mut buf).as_bytes()),
-            }
-        }
-        bytes
-    }
-
-    /// Parses an binary key range, using Rust range syntax.
-    pub fn parse_key_range(s: &str) -> StdResult<impl RangeBounds<Vec<u8>>, Box<dyn StdError>> {
-        let mut bound = (Bound::<Vec<u8>>::Unbounded, Bound::<Vec<u8>>::Unbounded);
-        let re = Regex::new(r"^(\S+)?\.\.(=)?(\S+)?").expect("invalid regex");
-        let groups = re.captures(s).ok_or_else(|| format!("invalid range {s}"))?;
-        if let Some(start) = groups.get(1) {
-            bound.0 = Bound::Included(decode_binary(start.as_str()));
-        }
-        if let Some(end) = groups.get(3) {
-            let end = decode_binary(end.as_str());
-            if groups.get(2).is_some() {
-                bound.1 = Bound::Included(end)
-            } else {
-                bound.1 = Bound::Excluded(end)
-            }
-        }
-        Ok(bound)
     }
 
     /// Wraps another engine and emits write events to the given channel.
