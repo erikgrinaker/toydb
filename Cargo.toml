@@ -20,7 +20,7 @@ config = "0.15"
 crossbeam = { version = "0.8", features = ["crossbeam-channel"] }
 dyn-clone = "1.0"
 hdrhistogram = "7.5"
-itertools = "0.14"
+itertools = "0.15"
 log = "0.4"
 petname = "3.0.0"
 rand = "0.10"
