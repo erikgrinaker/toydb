@@ -163,7 +163,7 @@ version of the key that's invisible to us -- if it is, we conflicted with a conc
 We use a range scan for this, like we did in `Transaction::get()`.
 
 If there are no conflicts, we go on to write `Key::Version(b"foo", self.version)` and encode the
-value as an `Option<value>` to accomodate the `None` tombstone marker. We also write a
+value as an `Option<value>` to accommodate the `None` tombstone marker. We also write a
 `Key::TxnWrite(version, key)` to keep track of the keys we've written in case we have to roll back.
 
 https://github.com/erikgrinaker/toydb/blob/8f8eae0dcf70b1a0df2e853b1f6600e0c7075340/src/storage/mvcc.rs#L524-L562
